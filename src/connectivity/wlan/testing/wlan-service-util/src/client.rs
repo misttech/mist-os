@@ -133,7 +133,7 @@ pub async fn get_sme_proxy(
     wlan_svc: &WlanService,
     iface_id: u16,
 ) -> Result<fidl_sme::ClientSmeProxy, Error> {
-    let (sme_proxy, sme_remote) = endpoints::create_proxy()?;
+    let (sme_proxy, sme_remote) = endpoints::create_proxy();
     let result = wlan_svc
         .get_client_sme(iface_id, sme_remote)
         .await
@@ -161,7 +161,7 @@ pub async fn connect(
     target_pwd: Vec<u8>,
     target_bss_desc: fidl_common::BssDescription,
 ) -> Result<bool, Error> {
-    let (connection_proxy, connection_remote) = endpoints::create_proxy()?;
+    let (connection_proxy, connection_remote) = endpoints::create_proxy();
 
     // Create a `ConnectRequest` using the given network information.
     // Negotiate a security protocol based on the given credential and BSS metadata. Note that the
@@ -382,9 +382,9 @@ mod tests {
             .expect("fake sme proxy response: send failed");
 
         // and return the stream
-        // let sme_stream = fake_sme_server.into_stream().expect("sme server stream failed");
+        // let sme_stream = fake_sme_server.into_stream();
         // sme_stream
-        fake_sme_server.into_stream().expect("sme server stream failed")
+        fake_sme_server.into_stream()
     }
 
     fn respond_to_get_client_sme_request(
@@ -1038,16 +1038,14 @@ mod tests {
     }
 
     fn create_client_sme_proxy() -> (fidl_sme::ClientSmeProxy, ClientSmeRequestStream) {
-        let (proxy, server) = endpoints::create_proxy::<ClientSmeMarker>()
-            .expect("failed to create sme client channel");
-        let server = server.into_stream().expect("failed to create a client sme response stream");
+        let (proxy, server) = endpoints::create_proxy::<ClientSmeMarker>();
+        let server = server.into_stream();
         (proxy, server)
     }
 
     fn create_wlan_monitor_util() -> (DeviceMonitorProxy, DeviceMonitorRequestStream) {
-        let (proxy, server) = endpoints::create_proxy::<DeviceMonitorMarker>()
-            .expect("failed to create a wlan_service channel for tests");
-        let server = server.into_stream().expect("failed to create a wlan_service response stream");
+        let (proxy, server) = endpoints::create_proxy::<DeviceMonitorMarker>();
+        let server = server.into_stream();
         (proxy, server)
     }
 

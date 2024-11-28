@@ -14,7 +14,9 @@
     },
     use: [
         {
-            storage: "data",
+            directory: "data",
+            from: "#test-fxfs",
+            rights: [ "rw*" ],
             path: "/data",
         },
     ],

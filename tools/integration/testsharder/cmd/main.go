@@ -44,6 +44,7 @@ type testsharderFlags struct {
 	affectedOnly             bool
 	skipUnaffected           bool
 	testsharderParamsFile    string
+	depsFile                 string
 }
 
 func parseFlags() testsharderFlags {
@@ -56,6 +57,7 @@ func parseFlags() testsharderFlags {
 	flag.BoolVar(&flags.affectedOnly, "affected-only", false, "whether to create test shards for only the affected tests found in either the modifiers file or the affected-tests file.")
 	flag.BoolVar(&flags.skipUnaffected, "skip-unaffected", false, "whether the shards should ignore hermetic, unaffected tests")
 	flag.StringVar(&flags.testsharderParamsFile, "params-file", "", "path to the testsharder params file")
+	flag.StringVar(&flags.depsFile, "deps-file", "", "path to a file to write all the builder deps to in the format expected from `cas archive -paths-json`.")
 
 	flag.Usage = usage
 
@@ -119,12 +121,15 @@ func mainImpl(ctx context.Context) error {
 type buildModules interface {
 	Args() build.Args
 	Images() []build.Image
+	ModulePaths() ([]string, error)
 	Platforms() []build.DimensionSet
 	TestSpecs() []build.TestSpec
 	TestListLocation() []string
 	TestDurations() []build.TestDuration
 	Tools() build.Tools
+	TriageSources() []string
 	PackageRepositories() []build.PackageRepo
+	PrebuiltVersions() ([]build.PrebuiltVersion, error)
 	ProductBundles() []build.ProductBundle
 }
 
@@ -134,6 +139,10 @@ var getHostPlatform = func() (string, error) {
 }
 
 func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, m buildModules) error {
+	if flags.depsFile != "" && flags.outputFile == "" {
+		return fmt.Errorf("output-file needs to be set if deps-file is set")
+	}
+
 	targetDuration := params.TargetDuration.AsDuration()
 	if params.TargetTestCount > 0 && targetDuration > 0 {
 		return fmt.Errorf("max-shard-size and target-duration-secs cannot both be set")
@@ -322,6 +331,10 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		return err
 	}
 	ffxPath := filepath.Join(flags.buildDir, ffxTool.Path)
+	prebuiltVersions, err := m.PrebuiltVersions()
+	if err != nil {
+		return err
+	}
 	for _, s := range shards {
 		// Pave = false means netboot = true. We set this after creating the shards
 		// so that `netboot` doesn't get added to the shard names since this would
@@ -331,6 +344,9 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		}
 		if s.Env.Dimensions.DeviceType() == "" {
 			continue
+		}
+		if err := testsharder.AddEmuVersion(s, prebuiltVersions); err != nil {
+			return err
 		}
 		if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Tools(), params.Pave); err != nil {
 			return err
@@ -375,6 +391,12 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		}
 	}
 
+	if flags.depsFile != "" {
+		if err := testsharder.AddShardDeps(ctx, shards, m.Args(), m.Tools()); err != nil {
+			return err
+		}
+	}
+
 	if err := testsharder.ExtractDeps(shards, flags.buildDir); err != nil {
 		return err
 	}
@@ -410,6 +432,32 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 	encoder.SetIndent("", "    ")
 	if err := encoder.Encode(&shards); err != nil {
 		return fmt.Errorf("failed to encode shards: %v", err)
+	}
+
+	if flags.depsFile != "" {
+		var extraDeps []string
+		buildAPIFiles, err := m.ModulePaths()
+		if err != nil {
+			return err
+		}
+		for _, file := range append(m.TriageSources(), buildAPIFiles...) {
+			absPath := file
+			if !filepath.IsAbs(absPath) {
+				absPath = filepath.Join(flags.buildDir, file)
+			}
+			extraDeps = append(extraDeps, absPath)
+		}
+		absOutputFile, err := filepath.Abs(flags.outputFile)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for %s: %w", flags.outputFile, err)
+		}
+		allDeps, err := testsharder.GetBuilderDeps(shards, flags.buildDir, m.Tools(), platform, append(extraDeps, absOutputFile))
+		if err != nil {
+			return err
+		}
+		if err := testsharder.WriteCASPathsJSONFile(allDeps, flags.buildDir, flags.depsFile); err != nil {
+			return err
+		}
 	}
 
 	// All shard names must be unique. Validate this *after* emitting the shards

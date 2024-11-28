@@ -90,10 +90,8 @@ impl<R> RemoveResourceResult<R, Never> {
     /// A helper function to unwrap a [`RemoveResourceResult`] that can never be
     /// [`RemoveResourceResult::Deferred`].
     pub fn into_removed(self) -> R {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match self {
             Self::Removed(r) => r,
-            Self::Deferred(never) => match never {},
         }
     }
 }

@@ -861,7 +861,7 @@ mod tests {
             fio::OpenFlags::TRUNCATE,
             fio::OpenFlags::APPEND,
         ] {
-            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
 
             root_dir.clone().open(
                 ExecutionScope::new(),
@@ -881,7 +881,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_self() {
         let (_env, root_dir) = TestEnv::new().await;
-        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
 
         root_dir.open(
             ExecutionScope::new(),
@@ -905,7 +905,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["resource", "resource/"] {
-            let (proxy, server_end) = create_proxy().unwrap();
+            let (proxy, server_end) = create_proxy();
 
             root_dir.clone().open(
                 ExecutionScope::new(),
@@ -930,7 +930,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["meta", "meta/"] {
-            let (proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::FileMarker>();
 
             root_dir.clone().open(
                 ExecutionScope::new(),
@@ -945,10 +945,8 @@ mod tests {
             );
 
             // Cloning meta_as_file yields meta_as_file
-            let (cloned_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
-            let () = proxy
-                .clone(fio::OpenFlags::RIGHT_READABLE, server_end.into_channel().into())
-                .unwrap();
+            let (cloned_proxy, server_end) = create_proxy::<fio::FileMarker>();
+            let () = proxy.clone2(server_end.into_channel().into()).unwrap();
             assert_eq!(
                 fuchsia_fs::file::read(&cloned_proxy).await.unwrap(),
                 root_dir.hash.to_string().as_bytes()
@@ -961,7 +959,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["meta", "meta/"] {
-            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
 
             root_dir.clone().open(
                 ExecutionScope::new(),
@@ -982,9 +980,8 @@ mod tests {
             );
 
             // Cloning meta_as_dir yields meta_as_dir
-            let (cloned_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-            let () =
-                proxy.clone(fio::OpenFlags::empty(), server_end.into_channel().into()).unwrap();
+            let (cloned_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
+            let () = proxy.clone2(server_end.into_channel().into()).unwrap();
             assert_eq!(
                 fuchsia_fs::directory::readdir(&cloned_proxy).await.unwrap(),
                 vec![
@@ -1003,7 +1000,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["meta", "meta/"] {
-            let (proxy, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::NodeMarker>();
 
             root_dir.clone().open(
                 ExecutionScope::new(),
@@ -1025,7 +1022,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["meta/file", "meta/file/"] {
-            let (proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::FileMarker>();
 
             root_dir.clone().open(
                 ExecutionScope::new(),
@@ -1043,7 +1040,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["meta/dir", "meta/dir/"] {
-            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
 
             root_dir.clone().open(
                 ExecutionScope::new(),
@@ -1064,7 +1061,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["dir", "dir/"] {
-            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
 
             root_dir.clone().open(
                 ExecutionScope::new(),
@@ -1083,7 +1080,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open3_self() {
         let (_env, root_dir) = TestEnv::new().await;
-        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let flags = fio::Flags::PERM_READ;
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
@@ -1104,7 +1101,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["resource", "resource/"] {
-            let (proxy, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::NodeMarker>();
             let scope = ExecutionScope::new();
             let path = VfsPath::validate_and_split(path).unwrap();
             let flags = fio::Flags::PERM_READ;
@@ -1127,7 +1124,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["meta", "meta/"] {
-            let (proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::FileMarker>();
             let scope = ExecutionScope::new();
             let path = VfsPath::validate_and_split(path).unwrap();
             let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ;
@@ -1139,10 +1136,8 @@ mod tests {
             );
 
             // Cloning meta_as_file yields meta_as_file
-            let (cloned_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
-            let () = proxy
-                .clone(fio::OpenFlags::RIGHT_READABLE, server_end.into_channel().into())
-                .unwrap();
+            let (cloned_proxy, server_end) = create_proxy::<fio::FileMarker>();
+            let () = proxy.clone2(server_end.into_channel().into()).unwrap();
             assert_eq!(
                 fuchsia_fs::file::read(&cloned_proxy).await.unwrap(),
                 root_dir.hash.to_string().as_bytes()
@@ -1155,7 +1150,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["meta", "meta/"] {
-            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let path = VfsPath::validate_and_split(path).unwrap();
             let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ;
@@ -1173,9 +1168,8 @@ mod tests {
             );
 
             // Cloning meta_as_dir yields meta_as_dir
-            let (cloned_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-            let () =
-                proxy.clone(fio::OpenFlags::empty(), server_end.into_channel().into()).unwrap();
+            let (cloned_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
+            let () = proxy.clone2(server_end.into_channel().into()).unwrap();
             assert_eq!(
                 fuchsia_fs::directory::readdir(&cloned_proxy).await.unwrap(),
                 vec![
@@ -1194,7 +1188,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["meta", "meta/"] {
-            let (proxy, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::NodeMarker>();
             let scope = ExecutionScope::new();
             let path = VfsPath::validate_and_split(path).unwrap();
             let flags = fio::Flags::PROTOCOL_NODE
@@ -1237,7 +1231,7 @@ mod tests {
 
         // Opening as symlink should return an error
         for path in ["meta", "meta/"] {
-            let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
             let scope = ExecutionScope::new();
             let path = VfsPath::validate_and_split(path).unwrap();
             let flags = fio::Flags::PROTOCOL_SYMLINK;
@@ -1256,7 +1250,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["meta/file", "meta/file/"] {
-            let (proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::FileMarker>();
             let scope = ExecutionScope::new();
             let path = VfsPath::validate_and_split(path).unwrap();
             let flags = fio::Flags::PERM_READ;
@@ -1272,7 +1266,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["meta/dir", "meta/dir/"] {
-            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let path = VfsPath::validate_and_split(path).unwrap();
             let flags = fio::Flags::PERM_READ;
@@ -1291,7 +1285,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         for path in ["dir", "dir/"] {
-            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let path = VfsPath::validate_and_split(path).unwrap();
             let flags = fio::Flags::PERM_READ;
@@ -1312,8 +1306,7 @@ mod tests {
         for invalid_flags in
             [fio::Flags::FLAG_MUST_CREATE, fio::Flags::FLAG_MAYBE_CREATE, fio::Flags::PERM_WRITE]
         {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let flags = fio::Flags::FLAG_SEND_REPRESENTATION | invalid_flags;
             ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
@@ -1332,8 +1325,7 @@ mod tests {
 
         // Requesting to open with `PROTOCOL_FILE` should return a `NOT_FILE` error.
         {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let flags = fio::Flags::PROTOCOL_FILE;
             ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
@@ -1347,8 +1339,7 @@ mod tests {
 
         // Opening with file flags is also invalid.
         for file_flags in [fio::Flags::FILE_APPEND, fio::Flags::FILE_TRUNCATE] {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             ObjectRequest::new3(file_flags, &fio::Options::default(), server_end.into())
                 .handle(|req| root_dir.clone().open3(scope, VfsPath::dot(), file_flags, req));

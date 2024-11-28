@@ -87,6 +87,18 @@ enum class LogCategory {
   // Associated with the build ID index.
   kBuildIDIndex,
 
+  // Associated with process symbols.
+  kProcessSymbols,
+
+  // Associated with module symbols.
+  kModuleSymbols,
+
+  // Associated with system symbols.
+  kSystemSymbols,
+
+  // Associated with the download manager.
+  kDownloadManager,
+
   // All the previous categories are enabled.
   // Log statements in this category will always be outputting if debug logging is enabled.
   kAll,

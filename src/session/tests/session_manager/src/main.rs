@@ -40,7 +40,7 @@ async fn launch_root_session() {
 
     // `launch_session()` requires an initial exposed-directory request, so create, pass and
     // immediately close a `Directory` channel.
-    let (_exposed_dir, exposed_dir_server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (_exposed_dir, exposed_dir_server_end) = create_proxy::<fio::DirectoryMarker>();
 
     session_manager_lib::startup::launch_session(
         &session_url,

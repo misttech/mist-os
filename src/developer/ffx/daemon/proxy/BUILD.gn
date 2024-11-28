@@ -12,7 +12,10 @@ if (is_host) {
     with_unit_tests = true
 
     deps = [
+      "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_fdomain",
       "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_fdomain",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
       "//src/connectivity/overnet/lib/core",
       "//src/developer/ffx/command/error:lib",
       "//src/developer/ffx/config:lib",
@@ -21,9 +24,12 @@ if (is_host) {
       "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/errors:lib",
       "//src/developer/ffx/lib/metrics:lib",
+      "//src/developer/ffx/lib/rcs:lib",
       "//src/developer/ffx/lib/target:lib",
       "//src/developer/ffx/lib/timeout:lib",
       "//src/developer/ffx/lib/version:lib",
+      "//src/lib/fdomain/client",
+      "//src/lib/fdomain/local",
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-async",
       "//src/lib/versioning/version-history/rust",
@@ -35,9 +41,10 @@ if (is_host) {
 
     test_deps = [
       "//src/connectivity/overnet/lib/ascendd",
+      "//src/developer/ffx/lib/netext:lib",
       "//src/lib/fuchsia",
       "//third_party/rust_crates:async-lock",
-      "//third_party/rust_crates:async-net",
+      "//third_party/rust_crates:tokio",
     ]
 
     sources = [ "src/lib.rs" ]

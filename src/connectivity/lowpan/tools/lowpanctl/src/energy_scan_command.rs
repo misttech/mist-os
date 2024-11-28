@@ -60,7 +60,7 @@ impl EnergyScanCommand {
             .await
             .context("Unable to get energy scan instance")?;
         let (client_end, server_end) = create_endpoints::<EnergyScanResultStreamMarker>();
-        let result_stream = client_end.into_proxy()?;
+        let result_stream = client_end.into_proxy();
         println!("{:?}", energy_scan_marker);
         energy_scan
             .start_energy_scan(&energy_scan_marker, server_end)

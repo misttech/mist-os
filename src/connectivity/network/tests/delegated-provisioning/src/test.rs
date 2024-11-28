@@ -23,10 +23,9 @@ async fn delegated_provisioning_test() {
     let state_proxy =
         fuchsia_component::client::connect_to_protocol::<fnet_interfaces::StateMarker>()
             .expect("Failed to connect to State proxy");
-    let event_stream = fnet_interfaces_ext::event_stream_from_state(
-        &state_proxy,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
+    let event_stream = fnet_interfaces_ext::event_stream_from_state::<
+        fnet_interfaces_ext::DefaultInterest,
+    >(&state_proxy, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
     .expect("failed to get interface event stream");
 
     info!(
@@ -35,7 +34,7 @@ async fn delegated_provisioning_test() {
         constants::DHCP_DYNAMIC_IP
     );
 
-    let mut interfaces = HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new();
+    let mut interfaces = HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<(), _>>::new();
     fnet_interfaces_ext::wait_interface(event_stream, &mut interfaces, |interfaces| {
         info!("Observed change on interfaces watcher. Current State: {:?}", interfaces);
         interfaces

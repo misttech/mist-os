@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fpromise/single_threaded_executor.h>
+
 #include "unit-lib.h"
-#include "zxtest/zxtest.h"
 
 namespace ufs {
 using namespace ufs_mock_device;
@@ -41,7 +42,7 @@ TEST_F(PowerTest, PowerSuspendResume) {
   block_device->BlockImplQuery(&info, &op_size);
 
   // 1. Initial power level is kPowerLevelOff.
-  runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
+  EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { sleep_complete.Wait(); }));
 
   // TODO(https://fxbug.dev/42075643): Check if suspend is enabled with inspect
   ASSERT_FALSE(dut_->IsResumed());
@@ -55,20 +56,20 @@ TEST_F(PowerTest, PowerSuspendResume) {
   const zx::vmo inspect_vmo = dut_->inspect().DuplicateVmo();
   ASSERT_TRUE(inspect_vmo.is_valid());
 
-  inspect::InspectTestHelper inspector;
-  inspector.ReadInspect(inspect_vmo);
-
-  const inspect::Hierarchy* root = inspector.hierarchy().GetByPath({"ufs"});
-  ASSERT_NOT_NULL(root);
+  fpromise::result<inspect::Hierarchy> hierarchy =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(dut_->inspect()));
+  ASSERT_TRUE(hierarchy.is_ok());
+  const auto* ufs = hierarchy.value().GetByPath({"ufs"});
+  ASSERT_NE(ufs, nullptr);
 
   const auto* power_suspended =
-      root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
-  ASSERT_NOT_NULL(power_suspended);
+      ufs->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NE(power_suspended, nullptr);
   EXPECT_TRUE(power_suspended->value());
   const auto* wake_on_request_count =
-      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
-  ASSERT_NOT_NULL(wake_on_request_count);
-  EXPECT_EQ(wake_on_request_count->value(), 0);
+      ufs->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
+  ASSERT_NE(wake_on_request_count, nullptr);
+  EXPECT_EQ(wake_on_request_count->value(), 0U);
 
   // 2. Issue request while power is suspended.
   awake_complete.Reset();
@@ -104,14 +105,15 @@ TEST_F(PowerTest, PowerSuspendResume) {
           },
   };
   block_device->BlockImplQueue(op, callback, &done);
-  runtime_.PerformBlockingWork([&] { awake_complete.Wait(); });
+  EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { awake_complete.Wait(); }));
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 
   // Return the driver to the suspended state.
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOff;
+  driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
+    env.power_broker().hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOff;
   });
-  runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
+
+  EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { sleep_complete.Wait(); }));
 
   ASSERT_FALSE(dut_->IsResumed());
   power_mode = UfsPowerMode::kSleep;
@@ -121,25 +123,26 @@ TEST_F(PowerTest, PowerSuspendResume) {
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
 
-  inspector.ReadInspect(inspect_vmo);
+  hierarchy = fpromise::run_single_threaded(inspect::ReadFromInspector(dut_->inspect()));
+  ASSERT_TRUE(hierarchy.is_ok());
+  ufs = hierarchy.value().GetByPath({"ufs"});
+  ASSERT_NE(ufs, nullptr);
 
-  root = inspector.hierarchy().GetByPath({"ufs"});
-  ASSERT_NOT_NULL(root);
-
-  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
-  ASSERT_NOT_NULL(power_suspended);
+  power_suspended = ufs->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NE(power_suspended, nullptr);
   EXPECT_TRUE(power_suspended->value());
   wake_on_request_count =
-      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
-  ASSERT_NOT_NULL(wake_on_request_count);
-  EXPECT_EQ(wake_on_request_count->value(), 1);
+      ufs->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
+  ASSERT_NE(wake_on_request_count, nullptr);
+  EXPECT_EQ(wake_on_request_count->value(), 1U);
 
   // 3. Trigger power level change to kPowerLevelOn.
   awake_complete.Reset();
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOn;
+  driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
+    env.power_broker().hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOn;
   });
-  runtime_.PerformBlockingWork([&] { awake_complete.Wait(); });
+
+  EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { awake_complete.Wait(); }));
 
   ASSERT_TRUE(dut_->IsResumed());
   power_mode = UfsPowerMode::kActive;
@@ -149,25 +152,26 @@ TEST_F(PowerTest, PowerSuspendResume) {
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
 
-  inspector.ReadInspect(inspect_vmo);
+  hierarchy = fpromise::run_single_threaded(inspect::ReadFromInspector(dut_->inspect()));
+  ASSERT_TRUE(hierarchy.is_ok());
+  ufs = hierarchy.value().GetByPath({"ufs"});
+  ASSERT_NE(ufs, nullptr);
 
-  root = inspector.hierarchy().GetByPath({"ufs"});
-  ASSERT_NOT_NULL(root);
-
-  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
-  ASSERT_NOT_NULL(power_suspended);
+  power_suspended = ufs->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NE(power_suspended, nullptr);
   EXPECT_FALSE(power_suspended->value());
   wake_on_request_count =
-      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
-  ASSERT_NOT_NULL(wake_on_request_count);
-  EXPECT_EQ(wake_on_request_count->value(), 1);
+      ufs->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
+  ASSERT_NE(wake_on_request_count, nullptr);
+  EXPECT_EQ(wake_on_request_count->value(), 1U);
 
   // 4. Trigger power level change to kPowerLevelOff.
   sleep_complete.Reset();
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOff;
+  driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
+    env.power_broker().hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOff;
   });
-  runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
+
+  EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { sleep_complete.Wait(); }));
 
   ASSERT_FALSE(dut_->IsResumed());
   power_mode = UfsPowerMode::kSleep;
@@ -177,18 +181,171 @@ TEST_F(PowerTest, PowerSuspendResume) {
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
 
-  inspector.ReadInspect(inspect_vmo);
+  hierarchy = fpromise::run_single_threaded(inspect::ReadFromInspector(dut_->inspect()));
+  ASSERT_TRUE(hierarchy.is_ok());
+  ufs = hierarchy.value().GetByPath({"ufs"});
+  ASSERT_NE(ufs, nullptr);
 
-  root = inspector.hierarchy().GetByPath({"ufs"});
-  ASSERT_NOT_NULL(root);
-
-  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
-  ASSERT_NOT_NULL(power_suspended);
+  power_suspended = ufs->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NE(power_suspended, nullptr);
   EXPECT_TRUE(power_suspended->value());
   wake_on_request_count =
-      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
-  ASSERT_NOT_NULL(wake_on_request_count);
-  EXPECT_EQ(wake_on_request_count->value(), 1);
+      ufs->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
+  ASSERT_NE(wake_on_request_count, nullptr);
+  EXPECT_EQ(wake_on_request_count->value(), 1U);
+}
+
+TEST_F(PowerTest, BackgroundOperations) {
+  libsync::Completion sleep_complete;
+  libsync::Completion awake_complete;
+  mock_device_.GetUicCmdProcessor().SetHook(
+      UicCommandOpcode::kDmeHibernateEnter,
+      [&](UfsMockDevice& mock_device, uint32_t ucmdarg1, uint32_t ucmdarg2, uint32_t ucmdarg3) {
+        mock_device_.GetUicCmdProcessor().DefaultDmeHibernateEnterHandler(mock_device, ucmdarg1,
+                                                                          ucmdarg2, ucmdarg3);
+        sleep_complete.Signal();
+      });
+  mock_device_.GetUicCmdProcessor().SetHook(
+      UicCommandOpcode::kDmeHibernateExit,
+      [&](UfsMockDevice& mock_device, uint32_t ucmdarg1, uint32_t ucmdarg2, uint32_t ucmdarg3) {
+        mock_device_.GetUicCmdProcessor().DefaultDmeHibernateExitHandler(mock_device, ucmdarg1,
+                                                                         ucmdarg2, ucmdarg3);
+        awake_complete.Signal();
+      });
+
+  ASSERT_NO_FATAL_FAILURE(StartDriver(/*supply_power_framework=*/true));
+
+  // 1. Background Operation is disabled at power off
+  EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { sleep_complete.Wait(); }));
+
+  ASSERT_FALSE(dut_->IsResumed());
+  UfsPowerMode power_mode = UfsPowerMode::kSleep;
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
+            dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
+            dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
+
+  const zx::vmo inspect_vmo = dut_->inspect().DuplicateVmo();
+  ASSERT_TRUE(inspect_vmo.is_valid());
+
+  fpromise::result<inspect::Hierarchy> hierarchy =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(dut_->inspect()));
+  ASSERT_TRUE(hierarchy.is_ok());
+  const auto* ufs = hierarchy.value().GetByPath({"ufs"});
+  ASSERT_NE(ufs, nullptr);
+
+  const auto* power_suspended =
+      ufs->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NE(power_suspended, nullptr);
+  EXPECT_TRUE(power_suspended->value());
+
+  const auto* bkop_node = ufs->GetByPath({"controller"})->GetByPath({"background_operations"});
+  const auto* is_background_op_enabled =
+      bkop_node->node().get_property<inspect::BoolPropertyValue>("is_background_op_enabled");
+  ASSERT_NE(is_background_op_enabled, nullptr);
+  EXPECT_FALSE(is_background_op_enabled->value());
+
+  // 2. Background Operation is enabled at power on
+  awake_complete.Reset();
+  driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
+    env.power_broker().hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOn;
+  });
+  EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { awake_complete.Wait(); }));
+
+  ASSERT_TRUE(dut_->IsResumed());
+  power_mode = UfsPowerMode::kActive;
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
+            dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
+            dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
+
+  hierarchy = fpromise::run_single_threaded(inspect::ReadFromInspector(dut_->inspect()));
+  ASSERT_TRUE(hierarchy.is_ok());
+  ufs = hierarchy.value().GetByPath({"ufs"});
+  ASSERT_NE(ufs, nullptr);
+
+  power_suspended = ufs->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  EXPECT_FALSE(power_suspended->value());
+
+  bkop_node = ufs->GetByPath({"controller"})->GetByPath({"background_operations"});
+  is_background_op_enabled =
+      bkop_node->node().get_property<inspect::BoolPropertyValue>("is_background_op_enabled");
+  EXPECT_TRUE(is_background_op_enabled->value());
+
+  // 3. Background operations change from disabled to enabled when an Urgent Background Operation
+  // Exception Event occurs.
+  ASSERT_OK(DisableBackgroundOp());
+
+  hierarchy = fpromise::run_single_threaded(inspect::ReadFromInspector(dut_->inspect()));
+  ASSERT_TRUE(hierarchy.is_ok());
+  ufs = hierarchy.value().GetByPath({"ufs"});
+  ASSERT_NE(ufs, nullptr);
+
+  bkop_node = ufs->GetByPath({"controller"})->GetByPath({"background_operations"});
+  is_background_op_enabled =
+      bkop_node->node().get_property<inspect::BoolPropertyValue>("is_background_op_enabled");
+  EXPECT_FALSE(is_background_op_enabled->value());
+
+  // Using Exception Event to trigger Urgent Background Operations.
+  mock_device_.SetExceptionEventAlert(true);
+  ExceptionEventStatus ee_status = {0};
+  ee_status.set_urgent_bkops(true);
+  mock_device_.SetAttribute(Attributes::wExceptionEventStatus,
+                            static_cast<uint32_t>(ee_status.value));
+  mock_device_.SetAttribute(Attributes::bBackgroundOpStatus,
+                            static_cast<uint32_t>(BackgroundOpStatus::kCritical));
+
+  // To check for an Exception Event, send a command.
+  auto attribute = ReadAttribute(Attributes::bBackgroundOpStatus);
+  EXPECT_OK(attribute);
+
+  // Wait for exception event completion
+  auto wait_for = [&]() -> bool {
+    // Check that Background Operations is enabled
+    hierarchy = fpromise::run_single_threaded(inspect::ReadFromInspector(dut_->inspect()));
+    ufs = hierarchy.value().GetByPath({"ufs"});
+
+    bkop_node = ufs->GetByPath({"controller"})->GetByPath({"background_operations"});
+    is_background_op_enabled =
+        bkop_node->node().get_property<inspect::BoolPropertyValue>("is_background_op_enabled");
+    return is_background_op_enabled->value();
+  };
+  fbl::String timeout_message = "Timeout waiting for enabling Background Op";
+  constexpr uint32_t kTimeoutUs = 1000000;
+  ASSERT_OK(dut_->WaitWithTimeout(wait_for, kTimeoutUs, timeout_message));
+
+  // Clean up
+  mock_device_.SetExceptionEventAlert(false);
+
+  // 4. Background Operation is disabled at power off
+  sleep_complete.Reset();
+  driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
+    env.power_broker().hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOff;
+  });
+  EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([&]() { sleep_complete.Wait(); }));
+
+  ASSERT_FALSE(dut_->IsResumed());
+  power_mode = UfsPowerMode::kSleep;
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
+            dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
+            dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
+
+  hierarchy = fpromise::run_single_threaded(inspect::ReadFromInspector(dut_->inspect()));
+  ASSERT_TRUE(hierarchy.is_ok());
+  ufs = hierarchy.value().GetByPath({"ufs"});
+  ASSERT_NE(ufs, nullptr);
+
+  power_suspended = ufs->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  EXPECT_TRUE(power_suspended->value());
+
+  bkop_node = ufs->GetByPath({"controller"})->GetByPath({"background_operations"});
+  is_background_op_enabled =
+      bkop_node->node().get_property<inspect::BoolPropertyValue>("is_background_op_enabled");
+  EXPECT_FALSE(is_background_op_enabled->value());
 }
 
 }  // namespace ufs

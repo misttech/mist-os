@@ -172,9 +172,8 @@ mod tests {
             F: Future<Output = ()> + Unpin,
         {
             // Register #1 listener.
-            let (proxy, events) = create_proxy::<fidl_policy::ClientStateUpdatesMarker>()
-                .expect("failed to create ClientStateUpdates proxy");
-            let stream = events.into_stream().expect("failed to create stream");
+            let (proxy, events) = create_proxy::<fidl_policy::ClientStateUpdatesMarker>();
+            let stream = events.into_stream();
             sender.unbounded_send(Message::NewListener(proxy)).expect("error sending update");
             assert_variant!(exec.run_until_stalled(serve_listeners), Poll::Pending);
             stream

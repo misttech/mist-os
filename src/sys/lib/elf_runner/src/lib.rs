@@ -303,7 +303,7 @@ impl ElfRunner {
 
         let (lifecycle_client, lifecycle_server) = if program_config.notify_lifecycle_stop {
             // Creating a channel is not expected to fail.
-            let (client, server) = fidl::endpoints::create_proxy::<LifecycleMarker>().unwrap();
+            let (client, server) = fidl::endpoints::create_proxy::<LifecycleMarker>();
             (Some(client), Some(server.into_channel()))
         } else {
             (None, None)
@@ -352,10 +352,10 @@ impl ElfRunner {
             };
             let (outgoing_dir_client, outgoing_dir_server) = fidl::endpoints::create_endpoints();
             start_info.outgoing_dir = Some(outgoing_dir_server);
-            fdio::open_at_deprecated(
+            fdio::open_at(
                 outgoing_dir_client.channel(),
                 ".",
-                fio::OpenFlags::DIRECTORY,
+                fio::Flags::PROTOCOL_DIRECTORY,
                 outgoing_dir.into_channel(),
             )
             .unwrap();
@@ -603,7 +603,7 @@ async fn start(
         })
         .ok();
 
-    let (server_stream, control) = server_end.into_stream_and_control_handle().unwrap();
+    let (server_stream, control) = server_end.into_stream_and_control_handle();
 
     // Spawn a future that watches for the process to exit
     fasync::Task::spawn({
@@ -897,7 +897,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_runtime_dir_entries() -> Result<(), Error> {
-        let (runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>()?;
+        let (runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>();
         let start_info = lifecycle_startinfo(runtime_dir_server);
 
         let runner = new_elf_runner_for_test();
@@ -905,8 +905,7 @@ mod tests {
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
         ));
-        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
-            .expect("could not create component controller endpoints");
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
 
         runner.start(start_info, server_controller).await;
 
@@ -962,7 +961,7 @@ mod tests {
         // Presence of the Lifecycle channel isn't used by ElfComponent to sense
         // component exit, but it does modify the stop behavior and this is
         // what we want to test.
-        let (lifecycle_client, _lifecycle_server) = create_proxy::<LifecycleMarker>()?;
+        let (lifecycle_client, _lifecycle_server) = create_proxy::<LifecycleMarker>();
         let (job, mut component) = make_default_elf_component(Some(lifecycle_client), true);
         let process = component.copy_process().unwrap();
         let job_info = job.info()?;
@@ -1005,7 +1004,7 @@ mod tests {
         // Presence of the Lifecycle channel isn't used by ElfComponent to sense
         // component exit, but it does modify the stop behavior and this is
         // what we want to test.
-        let (lifecycle_client, lifecycle_server) = create_proxy::<LifecycleMarker>()?;
+        let (lifecycle_client, lifecycle_server) = create_proxy::<LifecycleMarker>();
         let (job, mut component) = make_default_elf_component(Some(lifecycle_client), false);
 
         let job_info = job.info()?;
@@ -1069,7 +1068,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_stop_critical_component_with_closed_lifecycle() -> Result<(), Error> {
-        let (lifecycle_client, lifecycle_server) = create_proxy::<LifecycleMarker>()?;
+        let (lifecycle_client, lifecycle_server) = create_proxy::<LifecycleMarker>();
         let (job, mut component) = make_default_elf_component(Some(lifecycle_client), true);
         let process = component.copy_process().unwrap();
         let job_info = job.info()?;
@@ -1094,7 +1093,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_stop_noncritical_component_with_closed_lifecycle() -> Result<(), Error> {
-        let (lifecycle_client, lifecycle_server) = create_proxy::<LifecycleMarker>()?;
+        let (lifecycle_client, lifecycle_server) = create_proxy::<LifecycleMarker>();
         let (job, mut component) = make_default_elf_component(Some(lifecycle_client), false);
 
         let job_info = job.info()?;
@@ -1177,8 +1176,7 @@ mod tests {
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
         ));
-        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
-            .expect("could not create component controller endpoints");
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
 
         // Attempting to start the component should fail, which we detect by looking for an
         // ACCESS_DENIED epitaph on the ComponentController's event stream.
@@ -1193,7 +1191,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn vmex_security_policy_allowed() -> Result<(), Error> {
-        let (runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>()?;
+        let (runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>();
         let start_info = with_mark_vmo_exec(lifecycle_startinfo(runtime_dir_server));
 
         let policy = SecurityPolicy {
@@ -1208,8 +1206,7 @@ mod tests {
             Arc::new(policy),
             Moniker::try_from(vec!["foo"]).unwrap(),
         ));
-        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
-            .expect("could not create component controller endpoints");
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
         runner.start(start_info, server_controller).await;
 
         // Runtime dir won't exist if the component failed to start.
@@ -1243,8 +1240,7 @@ mod tests {
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
         ));
-        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
-            .expect("could not create component controller endpoints");
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
 
         // Attempting to start the component should fail, which we detect by looking for an
         // ACCESS_DENIED epitaph on the ComponentController's event stream.
@@ -1278,8 +1274,7 @@ mod tests {
         let runner = new_elf_runner_for_test();
         let runner =
             runner.get_scoped_runner(ScopedPolicyChecker::new(Arc::new(policy), Moniker::root()));
-        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
-            .expect("could not create component controller endpoints");
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
 
         runner.start(start_info, server_controller).await;
 
@@ -1345,8 +1340,7 @@ mod tests {
                 Moniker::root(),
             ));
             let (client_controller, server_controller) =
-                create_proxy::<fcrunner::ComponentControllerMarker>()
-                    .expect("could not create component controller endpoints");
+                create_proxy::<fcrunner::ComponentControllerMarker>();
 
             runner.start(start_info, server_controller).await;
             let mut event_stream = client_controller.take_event_stream();
@@ -1394,7 +1388,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn on_publish_diagnostics_contains_job_handle() -> Result<(), Error> {
-        let (runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>()?;
+        let (runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>();
         let start_info = lifecycle_startinfo(runtime_dir_server);
 
         let runner = new_elf_runner_for_test();
@@ -1402,8 +1396,7 @@ mod tests {
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
         ));
-        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
-            .expect("could not create component controller endpoints");
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
 
         runner.start(start_info, server_controller).await;
 
@@ -1498,7 +1491,7 @@ mod tests {
             let sender = self.sender.clone();
             let payload = Arc::new(Mutex::new(LaunchPayload::default()));
 
-            spawn_stream_handler(move |launcher_request| {
+            Ok(spawn_stream_handler(move |launcher_request| {
                 let sender = sender.clone();
                 let payload = payload.clone();
                 async move {
@@ -1533,8 +1526,7 @@ mod tests {
                         }
                     }
                 }
-            })
-            .map_err(anyhow::Error::new)
+            }))
         }
     }
 
@@ -1559,7 +1551,7 @@ mod tests {
             zx::SyntheticClock::create(zx::ClockOpts::AUTO_START | zx::ClockOpts::MONOTONIC, None)?;
         let clock_koid = clock.get_koid().unwrap();
 
-        let (_runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>()?;
+        let (_runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>();
         let mut start_info = hello_world_startinfo(runtime_dir_server);
         start_info.numbered_handles = Some(vec![fproc::HandleInfo {
             handle: clock.into_handle(),
@@ -1586,7 +1578,7 @@ mod tests {
     async fn test_enumerate_components() {
         use std::sync::atomic::{AtomicUsize, Ordering};
 
-        let (_runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (_runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>();
         let start_info = lifecycle_startinfo(runtime_dir_server);
 
         let runner = new_elf_runner_for_test();
@@ -1604,8 +1596,7 @@ mod tests {
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
         ));
-        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
-            .expect("could not create component controller endpoints");
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
         runner.start(start_info, server_controller).await;
 
         // There should now be one component in the set.
@@ -1706,8 +1697,7 @@ mod tests {
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
         ));
-        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
-            .expect("could not create component controller endpoints");
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
 
         runner.start(start_info, server_controller).await;
 
@@ -1734,7 +1724,7 @@ mod tests {
     }
 
     fn exit_with_code_startinfo(exit_code: i64) -> fcrunner::ComponentStartInfo {
-        let (_runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (_runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>();
         let ns = vec![pkg_dir_namespace_entry()];
 
         fcrunner::ComponentStartInfo {
@@ -1776,8 +1766,7 @@ mod tests {
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
         ));
-        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
-            .expect("could not create component controller endpoints");
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
         runner.start(start_info, server_controller).await;
 
         let mut event_stream = controller.take_event_stream();
@@ -1795,8 +1784,7 @@ mod tests {
             Arc::new(SecurityPolicy::default()),
             Moniker::root(),
         ));
-        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
-            .expect("could not create component controller endpoints");
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>();
         runner.start(start_info, server_controller).await;
 
         let mut event_stream = controller.take_event_stream();

@@ -50,7 +50,7 @@ component_config("mock_runner_cm_config") {
 
 fuchsia_component("component_manager_debug_with_mock_runner") {
   testonly = true
-  deps = [ "//src/sys/component_manager:bin" ]
+  deps = [ "//src/sys/component_manager:bin_eng" ]
   manifest = "meta/component_manager_debug_with_mock_runner.cml"
 }
 

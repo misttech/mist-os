@@ -168,7 +168,7 @@ impl FfxMain for ServerStartTool {
             _ => {
                 let basename = format!(
                     "repo_{}",
-                    self.cmd.repository.clone().unwrap_or(DEFAULT_REPO_NAME.into())
+                    self.cmd.repository.clone().unwrap_or_else(|| DEFAULT_REPO_NAME.into())
                 );
                 Some(basename)
             }

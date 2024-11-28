@@ -46,8 +46,7 @@ impl MediaSessions {
         // Set up the MediaSession Discovery service. Connect to the session watcher.
         let discovery = connect_to_protocol::<DiscoveryMarker>()
             .expect("Couldn't connect to discovery service.");
-        let (watcher_client, watcher_requests) =
-            create_request_stream().expect("Error creating watcher request stream");
+        let (watcher_client, watcher_requests) = create_request_stream();
 
         // Subscribe to all players. The active player is the player that has sent this
         // component the most recent SessionUpdate with an active status.
@@ -70,7 +69,7 @@ impl MediaSessions {
 
     pub fn get_active_session(&self) -> Result<MediaState, Error> {
         let r_inner = self.inner.read().get_active_session();
-        r_inner.ok_or(format_err!("No active player"))
+        r_inner.ok_or_else(|| format_err!("No active player"))
     }
 
     pub fn get_supported_notification_events(&self) -> &'static [fidl_avrcp::NotificationEvent] {
@@ -400,7 +399,7 @@ impl MediaSessionsInner {
         let _evicted = self
             .notifications
             .entry(event_id)
-            .or_insert(BoundedQueue::new(MAX_NOTIFICATION_EVENT_QUEUE_SIZE))
+            .or_insert_with(|| BoundedQueue::new(MAX_NOTIFICATION_EVENT_QUEUE_SIZE))
             .insert(data);
 
         // Notify the evicted responder that the TG has removed it from the active list of responders.
@@ -453,7 +452,7 @@ fn create_session_control_proxy(
     discovery: DiscoveryProxy,
     id: MediaSessionId,
 ) -> Result<SessionControlProxy, Error> {
-    let (session_proxy, session_request_stream) = create_proxy()?;
+    let (session_proxy, session_request_stream) = create_proxy();
     discovery.connect_to_session(id.0, session_request_stream)?;
     Ok(session_proxy)
 }
@@ -505,10 +504,8 @@ pub(crate) mod tests {
     /// Since there are no state updates, it should stay there until the variable goes
     /// out of program scope.
     async fn test_register_notification_supported() {
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>()
-            .expect("Couldn't create discovery service endpoints.");
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
         let disc_clone = discovery.clone();
 
         let (result_fut, responder) = generate_empty_watch_notification(&mut proxy, &mut stream)
@@ -549,10 +546,8 @@ pub(crate) mod tests {
     /// Test the insertion of a TrackPosChangedNotification.
     /// It should be successfully inserted, and a timeout duration should be returned.
     async fn test_register_notification_track_pos_changed() {
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>()
-            .expect("Couldn't create discovery service endpoints.");
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
         let disc_clone = discovery.clone();
 
         let (result_fut, responder) = generate_empty_watch_notification(&mut proxy, &mut stream)
@@ -598,10 +593,8 @@ pub(crate) mod tests {
     /// Test the insertion of a AddressedPlayerChanged notification.
     /// It should not resolve.
     async fn test_register_notification_addressed_player_changed() {
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>()
-            .expect("Couldn't create discovery service endpoints.");
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
         let disc_clone = discovery.clone();
 
         let (result_fut, responder) = generate_empty_watch_notification(&mut proxy, &mut stream)
@@ -631,8 +624,7 @@ pub(crate) mod tests {
     /// Upon insertion, the supported notification should be rejected and sent over
     /// the responder.
     async fn test_register_notification_no_active_session() {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         let (result_fut, responder) = generate_empty_watch_notification(&mut proxy, &mut stream)
             .await
@@ -659,8 +651,7 @@ pub(crate) mod tests {
     /// Upon insertion, the unsupported notification should be rejected, and the responder
     /// should immediately be called with a `RejectedInvalidParameter`.
     async fn test_register_notification_unsupported() {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         let (result_fut, responder) = generate_empty_watch_notification(&mut proxy, &mut stream)
             .await
@@ -685,7 +676,7 @@ pub(crate) mod tests {
     /// proxy, and inserts into the state map. No outstanding notifications so no updates.
     /// 2. Test updating of an existing MediaSession in the map. The SessionInfo should change.
     async fn test_create_and_update_media_session() {
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>().unwrap();
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
 
         let id = MediaSessionId(1234);
         let mut sessions = create_session(discovery.clone(), id, true);
@@ -725,12 +716,10 @@ pub(crate) mod tests {
     /// 1. Test updating active_session_id with the same id does nothing.
     /// 2. Test updating active_session_id with a new id updates active id.
     async fn update_target_session_id() {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         // Create a new active session with default state.
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>()
-            .expect("Discovery service should be able to be created");
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
         let id = MediaSessionId(1234);
         let mut sessions = create_session(discovery.clone(), id, true);
 
@@ -781,12 +770,10 @@ pub(crate) mod tests {
     /// 5. Ensures the resolved responders return the correct updated current notification
     /// values.
     async fn test_update_notification_responders() {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create TargetHandler proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         // Create a new active session with default state.
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>()
-            .expect("Discovery service should be able to be created");
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
         let id = MediaSessionId(1234);
         let mut sessions = create_session(discovery, id, true);
 
@@ -963,10 +950,10 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     async fn test_notification_update_with_unchanged_value_is_no_op() {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>().unwrap();
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         // Create a new active session with default state.
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>().unwrap();
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
         let id = MediaSessionId(14);
         let mut sessions = create_session(discovery, id, true);
 
@@ -1010,12 +997,10 @@ pub(crate) mod tests {
     /// Tests `clear_notification_responders` correctly sends AddressedPlayerChanged
     /// error to all outstanding notifications.
     async fn test_clear_notification_responders() {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         // Create a new active session with default state.
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>()
-            .expect("Discovery service should be able to be created");
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
         let id = MediaSessionId(1234);
         let mut sessions = create_session(discovery, id, true);
 
@@ -1105,7 +1090,7 @@ pub(crate) mod tests {
     /// 3. Test clearing an existing and active session updates `active_session_id` and
     /// removes from map.
     async fn test_clear_session() {
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>().unwrap();
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
 
         // Create a new active session with default state.
         let id = MediaSessionId(1234);
@@ -1144,7 +1129,7 @@ pub(crate) mod tests {
     /// We only support one player id: `MEDIA_SESSION_ADDRESSED_PLAYER_ID`, so any
     /// calls to `set_addressed_player` with a different ID should result in an error.
     async fn test_set_addressed_player() {
-        let (discovery, _stream) = create_proxy::<DiscoveryMarker>().unwrap();
+        let (discovery, _stream) = create_proxy::<DiscoveryMarker>();
 
         // Create a new active session with default state.
         let id = MediaSessionId(1234);
@@ -1170,7 +1155,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     /// Getting the media items should return the same static response.
     async fn test_get_media_player_items() {
-        let (discovery, _stream) = create_proxy::<DiscoveryMarker>().unwrap();
+        let (discovery, _stream) = create_proxy::<DiscoveryMarker>();
 
         // Create a new active session with default state.
         let id = MediaSessionId(1234);

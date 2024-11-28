@@ -48,6 +48,9 @@ struct CoordinatorInner {
 
     // Simple counter to generate client-assigned integer identifiers.
     id_counter: u64,
+
+    // Generate stamps for `apply_config()`.
+    stamp_counter: u64,
 }
 
 /// A vsync event payload.
@@ -90,9 +93,9 @@ impl Coordinator {
             .map_err(Error::DeviceConnectionError)?;
 
         let (coordinator_proxy, coordinator_server_end) =
-            fidl::endpoints::create_proxy::<display::CoordinatorMarker>()?;
+            fidl::endpoints::create_proxy::<display::CoordinatorMarker>();
         let (coordinator_listener_client_end, coordinator_listener_requests) =
-            fidl::endpoints::create_request_stream::<display::CoordinatorListenerMarker>()?;
+            fidl::endpoints::create_request_stream::<display::CoordinatorListenerMarker>();
 
         // TODO(https://fxbug.dev/42075865): Consider supporting virtcon client
         // connections.
@@ -139,6 +142,7 @@ impl Coordinator {
                 displays,
                 vsync_listeners: Vec::new(),
                 id_counter: 0,
+                stamp_counter: 0,
             })),
         })
     }
@@ -230,7 +234,7 @@ impl Coordinator {
     pub async fn apply_config(
         &self,
         configs: &[DisplayConfig],
-    ) -> std::result::Result<(), ConfigError> {
+    ) -> std::result::Result<u64, ConfigError> {
         let proxy = self.proxy();
         for config in configs {
             proxy.set_display_layers(
@@ -243,18 +247,12 @@ impl Coordinator {
                         let fidl_color = fidl_fuchsia_hardware_display_types::Color::from(color);
                         proxy.set_layer_color_config(&layer.id.into(), &fidl_color)?;
                     }
-                    LayerConfig::Primary {
-                        image_id,
-                        image_metadata,
-                        unblock_event,
-                        retirement_event,
-                    } => {
+                    LayerConfig::Primary { image_id, image_metadata, unblock_event } => {
                         proxy.set_layer_primary_config(&layer.id.into(), &image_metadata)?;
-                        proxy.set_layer_image(
+                        proxy.set_layer_image2(
                             &layer.id.into(),
                             &(*image_id).into(),
                             &unblock_event.unwrap_or(INVALID_EVENT_ID).into(),
-                            &retirement_event.unwrap_or(INVALID_EVENT_ID).into(),
                         )?;
                     }
                 }
@@ -266,7 +264,15 @@ impl Coordinator {
             return Err(ConfigError::invalid(result, ops));
         }
 
-        proxy.apply_config().map_err(ConfigError::from)
+        let config_stamp = self.inner.write().next_config_stamp().unwrap();
+        let payload = fidl_fuchsia_hardware_display::CoordinatorApplyConfig3Request {
+            stamp: Some(fidl_fuchsia_hardware_display_types::ConfigStamp { value: config_stamp }),
+            ..Default::default()
+        };
+        match proxy.apply_config3(payload) {
+            Ok(()) => Ok(config_stamp),
+            Err(err) => Err(ConfigError::from(err)),
+        }
     }
 
     /// Get the config stamp value of the most recent applied config in
@@ -343,6 +349,11 @@ impl CoordinatorInner {
     fn next_free_event_id(&mut self) -> Result<EventId> {
         self.id_counter = self.id_counter.checked_add(1).ok_or(Error::IdsExhausted)?;
         Ok(EventId(self.id_counter))
+    }
+
+    fn next_config_stamp(&mut self) -> Result<u64> {
+        self.stamp_counter = self.stamp_counter.checked_add(1).ok_or(Error::IdsExhausted)?;
+        Ok(self.stamp_counter)
     }
 
     fn handle_displays_changed(&self, _added: Vec<display::Info>, _removed: Vec<DisplayId>) {

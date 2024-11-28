@@ -50,7 +50,7 @@ fuchsia_component("abi_compat_component_manager") {
   testonly = true
   deps = [
     ":component_manager_config",
-    "//src/sys/component_manager:bin",
+    "//src/sys/component_manager:bin_eng",
   ]
   manifest = "meta/abi_compat_component_manager.cml"
 }

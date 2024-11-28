@@ -9,5 +9,14 @@
                 "*",
             ],
         },
+        {
+            type: "expect_pass_with_err_logs",
+            matchers: [
+                "route_table_provider_netstack2_closes_channel_v[46]",
+                "rules::rule_table_netstack2_closes_channel_v[46]",
+                "validates_route_v6_ns2::rejects_next_hop_set_to_unspecified_address",
+                "validates_route_v6_ns2::rejects_multicast_next_hop",
+            ],
+        },
     ],
 }

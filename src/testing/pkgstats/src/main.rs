@@ -287,7 +287,7 @@ fn package_link_helper(
     out: &mut dyn Output,
 ) -> HelperResult {
     let input_name = if let Some(name) = h.param(0) {
-        name.value().as_str().ok_or(RenderError::new("Value is not a non-empty string"))?
+        name.value().as_str().ok_or_else(|| RenderError::new("Value is not a non-empty string"))?
     } else {
         return Err(RenderError::new("Helper requires one param"));
     };
@@ -311,7 +311,7 @@ fn content_link_helper(
     out: &mut dyn Output,
 ) -> HelperResult {
     let input_name = if let Some(name) = h.param(0) {
-        name.value().as_str().ok_or(RenderError::new("Value is not a non-empty string"))?
+        name.value().as_str().ok_or_else(|| RenderError::new("Value is not a non-empty string"))?
     } else {
         return Err(RenderError::new("Helper requires one param"));
     };

@@ -19,6 +19,8 @@ inline void RestartAndWait(std::string driver_url) {
 
   fidl::WireSyncClient manager_client(*std::move(manager));
   auto test_device = magma::TestDeviceBase(MAGMA_VENDOR_ID_MALI);
+  ASSERT_NO_FATAL_FAILURE() << "Failed to create test device";
+
   auto restart_result = manager_client->RestartDriverHosts(
       fidl::StringView::FromExternal(driver_url),
       fuchsia_driver_development::wire::RestartRematchFlags::kRequested |
@@ -34,10 +36,9 @@ inline void RestartAndWait(std::string driver_url) {
               channel.handle()->wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(), nullptr));
   }
 
-  bool found_device = false;
   // Loop until a new device with the correct specs is found.
-  auto deadline_time = zx::clock::get_monotonic() + zx::sec(5);
-  while (!found_device && zx::clock::get_monotonic() < deadline_time) {
+  auto deadline_time = zx::clock::get_monotonic() + zx::sec(10);
+  while (zx::clock::get_monotonic() < deadline_time) {
     for (auto& p : std::filesystem::directory_iterator("/dev/class/gpu")) {
       auto magma_client =
           component::Connect<fuchsia_gpu_magma::TestDevice>(static_cast<std::string>(p.path()));
@@ -52,12 +53,12 @@ inline void RestartAndWait(std::string driver_url) {
 
       magma_device_release(device);
       if (magma_status == MAGMA_STATUS_OK && vendor_id == MAGMA_VENDOR_ID_MALI) {
-        found_device = true;
-        break;
+        return;
       }
     }
     zx::nanosleep(zx::deadline_after(zx::msec(10)));
   }
+  GTEST_FATAL_FAILURE_("We failed to find the GPU before the deadline");
 }
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_TESTS_INTEGRATION_DRIVER_REGISTRY_H_

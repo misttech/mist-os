@@ -33,7 +33,7 @@ pub async fn remove(cmd: RemoveCommand, repos_proxy: RepositoryRegistryProxy) ->
         let repos = list_repositories(repos_proxy.clone()).await?;
         repos.iter().map(|r| r.name.to_string()).collect()
     } else if let Some(name) = cmd.name {
-        vec![name.clone()]
+        vec![name]
     } else {
         return_user_error!(
             "No repository name specified. Use `--all` or specify the repository name to remove."
@@ -60,8 +60,7 @@ pub async fn remove(cmd: RemoveCommand, repos_proxy: RepositoryRegistryProxy) ->
 async fn list_repositories(repos_proxy: RepositoryRegistryProxy) -> Result<Vec<RepositoryConfig>> {
     let (client, server) = fidl::endpoints::create_endpoints::<RepositoryIteratorMarker>();
     repos_proxy.list_repositories(server).map_err(|e| bug!("error listing repositories: {e}"))?;
-    let client =
-        client.into_proxy().map_err(|e| bug!("error creating repository iterator proxy: {e}"))?;
+    let client = client.into_proxy();
 
     let mut repos = vec![];
     loop {
@@ -126,7 +125,7 @@ mod test {
     fn fake_repo_list_handler(iterator: fidl::endpoints::ServerEnd<RepositoryIteratorMarker>) {
         fuchsia_async::Task::spawn(async move {
             let mut sent = false;
-            let mut iterator = iterator.into_stream().unwrap();
+            let mut iterator = iterator.into_stream();
             while let Some(Ok(req)) = iterator.next().await {
                 match req {
                     RepositoryIteratorRequest::Next { responder } => {

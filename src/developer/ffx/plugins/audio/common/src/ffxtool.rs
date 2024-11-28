@@ -25,7 +25,7 @@ impl TryFromEnvWith for WithExposedDir {
     type Output = fio::DirectoryProxy;
 
     async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         // It would be better to use connect_to_rcs that retries, but it's private.
         let rcs = RemoteControlProxy::try_from_env(env).await?;
         rcs::open_with_timeout_at(

@@ -4,7 +4,7 @@
 
 use serde::Deserialize;
 
-use super::{Attributes, CompIdent, Constant, IntType};
+use super::{Attributes, CompIdent, Constant, Ident, IntType};
 use crate::de::Index;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -32,6 +32,6 @@ pub struct EnumMember {
     #[expect(dead_code)]
     #[serde(flatten)]
     pub attributes: Attributes,
-    pub name: String,
+    pub name: Ident,
     pub value: Constant,
 }

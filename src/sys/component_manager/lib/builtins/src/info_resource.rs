@@ -53,7 +53,7 @@ mod tests {
         let info_resource = get_info_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::InfoResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::InfoResourceMarker>();
         fasync::Task::local(
             InfoResource::new(info_resource)
                 .unwrap_or_else(|e| panic!("Error while creating info resource service: {}", e))

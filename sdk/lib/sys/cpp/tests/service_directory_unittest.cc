@@ -55,7 +55,7 @@ TEST(ServiceDirectoryTest, Clone) {
   auto message = buffer.CreateEmptyIncomingMessage();
   message.Read(svc_server.get(), 0);
 
-  EXPECT_EQ(fidl::internal::WireOrdinal<fio::Directory::Clone>::value, message.ordinal());
+  EXPECT_EQ(fidl::internal::WireOrdinal<fio::Directory::Clone2>::value, message.ordinal());
 }
 
 TEST(ServiceDirectoryTest, Invalid) {

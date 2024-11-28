@@ -385,7 +385,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.io/Directory",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -1005,7 +1005,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.io/File",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -1791,7 +1791,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.io/Node",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -2350,6 +2350,24 @@
     {
         "kind": "table",
         "name": "fuchsia.io/Options"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.io/PERM_EXECUTABLE",
+        "type": "fuchsia.io/Flags",
+        "value": "201"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.io/PERM_READABLE",
+        "type": "fuchsia.io/Flags",
+        "value": "211"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.io/PERM_WRITABLE",
+        "type": "fuchsia.io/Flags",
+        "value": "485"
     },
     {
         "kind": "const",

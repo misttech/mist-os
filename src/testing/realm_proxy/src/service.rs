@@ -234,7 +234,7 @@ where
             fsandbox::ReceiverRequest::Receive { channel, control_handle: _ } => {
                 task_group.spawn(async move {
                     let server_end = endpoints::ServerEnd::<T>::new(channel.into());
-                    let stream: T::RequestStream = server_end.into_stream().unwrap();
+                    let stream: T::RequestStream = server_end.into_stream();
                     request_stream_handler(stream).await;
                 });
             }

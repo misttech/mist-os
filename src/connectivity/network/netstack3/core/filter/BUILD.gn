@@ -104,5 +104,6 @@ group("tests") {
   public_deps = [
     ":netstack3-filter-instrumented_test($host_toolchain)",
     ":netstack3-filter-test",
+    "tests",
   ]
 }

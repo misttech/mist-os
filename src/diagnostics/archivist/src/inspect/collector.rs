@@ -41,7 +41,7 @@ fn maybe_load_service<P: DiscoverableProtocolMarker>(
     entry: &fuchsia_fs::directory::DirEntry,
 ) -> Result<Option<P::Proxy>, anyhow::Error> {
     if entry.name.ends_with(P::PROTOCOL_NAME) {
-        let (proxy, server) = fidl::endpoints::create_proxy::<P>()?;
+        let (proxy, server) = fidl::endpoints::create_proxy::<P>();
         fdio::service_connect_at(
             dir_proxy.as_channel().as_ref(),
             &entry.name,
@@ -201,13 +201,13 @@ mod tests {
         insp2.root().record_int("two", 2);
         insp3.root().record_int("three", 3);
 
-        let (tree1, request_stream) = create_request_stream::<TreeMarker>().unwrap();
+        let (tree1, request_stream) = create_request_stream::<TreeMarker>();
         spawn_tree_server_with_stream(insp1, TreeServerSendPreference::default(), request_stream)
             .detach();
-        let (tree2, request_stream) = create_request_stream::<TreeMarker>().unwrap();
+        let (tree2, request_stream) = create_request_stream::<TreeMarker>();
         spawn_tree_server_with_stream(insp2, TreeServerSendPreference::default(), request_stream)
             .detach();
-        let (tree3, request_stream) = create_request_stream::<TreeMarker>().unwrap();
+        let (tree3, request_stream) = create_request_stream::<TreeMarker>();
         spawn_tree_server_with_stream(insp3, TreeServerSendPreference::default(), request_stream)
             .detach();
 
@@ -216,15 +216,9 @@ mod tests {
         let name3 = None;
 
         let handles = [
-            Arc::new(InspectHandle::Tree {
-                proxy: tree1.into_proxy().unwrap(),
-                name: Some("tree1".into()),
-            }),
-            Arc::new(InspectHandle::Tree {
-                proxy: tree2.into_proxy().unwrap(),
-                name: Some("tree2".into()),
-            }),
-            Arc::new(InspectHandle::Tree { proxy: tree3.into_proxy().unwrap(), name: None }),
+            Arc::new(InspectHandle::Tree { proxy: tree1.into_proxy(), name: Some("tree1".into()) }),
+            Arc::new(InspectHandle::Tree { proxy: tree2.into_proxy(), name: Some("tree2".into()) }),
+            Arc::new(InspectHandle::Tree { proxy: tree3.into_proxy(), name: None }),
         ];
         let data = populate_data_map(&handles.iter().map(Arc::downgrade).collect::<Vec<_>>()).await;
         assert_eq!(data.len(), 3);

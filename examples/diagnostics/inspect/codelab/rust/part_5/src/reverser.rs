@@ -167,7 +167,7 @@ mod tests {
     where
         F: FnOnce() -> () + 'static,
     {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ReverserMarker>()?;
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ReverserMarker>();
         factory.spawn_new_internal(stream, callback);
         Ok(proxy)
     }

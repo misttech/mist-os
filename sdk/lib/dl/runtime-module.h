@@ -10,6 +10,7 @@
 #include <lib/elfldltl/symbol.h>
 #include <lib/ld/abi.h>
 #include <lib/ld/load.h>  // For ld::AbiModule
+#include <lib/ld/tls.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_double_list.h>
@@ -19,6 +20,7 @@
 
 namespace dl {
 
+using AbiModule = ld::AbiModule<>;
 using Elf = elfldltl::Elf<>;
 using Soname = elfldltl::Soname<>;
 
@@ -73,7 +75,6 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
  public:
   using Addr = Elf::Addr;
   using SymbolInfo = elfldltl::SymbolInfo<Elf>;
-  using AbiModule = ld::AbiModule<>;
   using TlsModule = ld::abi::Abi<>::TlsModule;
   using size_type = Elf::size_type;
 
@@ -104,20 +105,45 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
     return module;
   }
 
+  // This is called if the RuntimeModule is created from a startup module (i.e.
+  // a module that was linked and loaded with the running program). This sets
+  // the abi and TLS information onto the RuntimeModule.
+  void SetStartupModule(const AbiModule& abi_module, const ld::abi::Abi<>& abi) {
+    abi_module_ = abi_module;
+    can_unload_ = false;
+
+    size_t tls_modid = abi_module_.tls_modid;
+    if (tls_modid > 0) {
+      const size_t idx = tls_modid - 1;
+      tls_module_ = abi.static_tls_modules[idx];
+      static_tls_bias_ = abi.static_tls_offsets[idx];
+    }
+  }
+
   constexpr AbiModule& module() { return abi_module_; }
   constexpr const AbiModule& module() const { return abi_module_; }
 
-  constexpr Addr load_bias() const { return abi_module_.link_map.addr; }
-
-  const SymbolInfo& symbol_info() const { return abi_module_.symbols; }
+  constexpr const TlsModule& tls_module() const { return tls_module_; }
 
   size_t vaddr_size() const { return abi_module_.vaddr_end - abi_module_.vaddr_start; }
 
-  size_type tls_module_id() const { return abi_module_.tls_modid; }
+  // The following methods satisfy the Module template API for use with
+  // elfldltl::ResolverDefinition (see <lib/elfldltl/resolve.h>).
+
+  const SymbolInfo& symbol_info() const { return abi_module_.symbols; }
+
+  constexpr Addr load_bias() const { return abi_module_.link_map.addr; }
+
+  constexpr size_type tls_module_id() const { return abi_module_.tls_modid; }
 
   constexpr bool uses_static_tls() const { return ld::ModuleUsesStaticTls(abi_module_); }
 
   constexpr size_t static_tls_bias() const { return static_tls_bias_; }
+
+  constexpr fit::result<bool, const typename Elf::Sym*> Lookup(  //
+      Diagnostics& diag, elfldltl::SymbolName& name) const {
+    return fit::ok(name.Lookup(symbol_info()));
+  }
 
   // Return a view of `list` with all of its elements dereferenced and made
   // constant (i.e. Vector<const RuntimeModule*> -> View<const RuntimeModule&>).
@@ -163,7 +189,9 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
 
   Soname name_;
   AbiModule abi_module_;
+  TlsModule tls_module_;
   size_type static_tls_bias_ = 0;
+  bool can_unload_ = true;
   ModuleRefList direct_deps_;
   ModuleRefList module_tree_;
 };

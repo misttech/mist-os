@@ -44,9 +44,6 @@ class DlTestsBase : public ::testing::Test {
   // Whether the test fixture supports TLS.
   static constexpr bool kSupportsTls = true;
 
-  // Whether the test fixture can test startup modules.
-  static constexpr bool kSupportsStartupModules = true;
-
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);
 

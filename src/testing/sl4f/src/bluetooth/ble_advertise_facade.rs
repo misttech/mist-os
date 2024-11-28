@@ -148,13 +148,10 @@ impl BleAdvertiseFacade {
         let inner_clone = inner.clone();
         let stream_fut = async move {
             while let Some(event) = stream.next().await {
-                #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336801)
                 match event {
-                    Ok(_) => {
-                        debug!(tag = &with_line!(tag), "ignoring event for Connection");
-                    }
+                    Ok(_) => debug!(tag = &with_line!(tag), "ignoring event for Connection"),
                     Err(err) => {
-                        info!(tag = &with_line!(tag), "Connection ({}) error: {:?}", peer_id, err);
+                        info!(tag = &with_line!(tag), "Connection ({}) error: {:?}", peer_id, err)
                     }
                 }
             }
@@ -183,16 +180,7 @@ impl BleAdvertiseFacade {
                         );
                     }
 
-                    let proxy = match connection.into_proxy() {
-                        Ok(proxy) => proxy,
-                        Err(_) => {
-                            warn!(
-                                tag = &with_line!(tag),
-                                "error creating Connection proxy, dropping Connection"
-                            );
-                            continue;
-                        }
-                    };
+                    let proxy = connection.into_proxy();
                     let peer_id: PeerId = peer.id.unwrap().into();
                     BleAdvertiseFacade::process_new_connection(inner.clone(), proxy, peer_id);
                 }
@@ -212,10 +200,7 @@ impl BleAdvertiseFacade {
     ) {
         let tag = "BleAdvertiseFacade::advertise";
         let (client_end, server_request_stream) =
-            match create_request_stream::<AdvertisedPeripheralMarker>() {
-                Ok(value) => value,
-                Err(_) => return,
-            };
+            create_request_stream::<AdvertisedPeripheralMarker>();
 
         // advertise() only returns after advertising has been terminated, so we can't await here.
         let advertise_fut = peripheral.advertise(&parameters, client_end);

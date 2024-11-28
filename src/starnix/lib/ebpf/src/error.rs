@@ -11,7 +11,10 @@ pub enum EbpfError {
     VmRegisterError(String),
 
     #[error("Verification error loading program: {0}")]
-    ProgramLoadError(String),
+    ProgramVerifyError(String),
+
+    #[error("Failed to link program: {0}")]
+    ProgramLinkError(String),
 
     #[error("VM error loading program: {0}")]
     VmLoadError(String),
@@ -24,4 +27,7 @@ pub enum EbpfError {
 
     #[error("Invalid cBPF jump offset: 0x{0:x}")]
     InvalidCbpfJumpOffset(u32),
+
+    #[error("Unsupported program type: 0x{0:x}")]
+    UnsupportedProgramType(u32),
 }

@@ -29,11 +29,11 @@
 #include <pretty/hexdump.h>
 
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
-namespace display {
+namespace display_coordinator {
 
 namespace {
 
@@ -135,7 +135,7 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
 
   out->pending_layer_change = false;
   out->layer_count = 0;
-  out->id = ToDisplayId(banjo_display_info.display_id);
+  out->id = display::ToDisplayId(banjo_display_info.display_id);
 
   zx::result get_display_info_pixel_formats_result =
       CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(cpp20::span(
@@ -150,7 +150,7 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
   if (banjo_display_info.preferred_modes_count != 0) {
     ZX_DEBUG_ASSERT(banjo_display_info.preferred_modes_count == 1);
 
-    out->mode = ToDisplayTiming(banjo_display_info.preferred_modes_list[0]);
+    out->mode = display::ToDisplayTiming(banjo_display_info.preferred_modes_list[0]);
 
     // TODO(https://fxbug.dev/348695412): This should not be an early return.
     // `preferred_modes` should be merged and de-duplicated with the modes
@@ -239,4 +239,4 @@ std::string DisplayInfo::GetMonitorSerial() const {
   return edid->base.GetDisplayProductSerialNumber();
 }
 
-}  // namespace display
+}  // namespace display_coordinator

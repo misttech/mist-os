@@ -15,13 +15,14 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/discovery:lib",
     "//src/developer/ffx/lib/fastboot/interface:lib",
     "//src/developer/ffx/lib/fastboot/transport/interface:lib",
+    "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/usb_fastboot_discovery:lib",
     "//src/lib/fuchsia-async",
     "//src/lib/usb_bulk/rust:lib",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-net",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tokio",
     "//third_party/rust_crates:tracing",
   ]
 

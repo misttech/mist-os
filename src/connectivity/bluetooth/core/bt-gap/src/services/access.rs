@@ -63,15 +63,8 @@ async fn handler(
     match request {
         AccessRequest::SetPairingDelegate { input, output, delegate, .. } => {
             warn!("fuchsia.bluetooth.sys.Access.SetPairingDelegate({:?}, {:?})", input, output);
-            match delegate.into_proxy() {
-                Ok(proxy) => {
-                    if let Err(e) = hd.set_pairing_delegate(proxy, input, output) {
-                        warn!("Couldn't set PairingDelegate: {e:?}");
-                    }
-                }
-                Err(e) => {
-                    warn!("Invalid Pairing Delegate passed to SetPairingDelegate: {e:?}");
-                }
+            if let Err(e) = hd.set_pairing_delegate(delegate.into_proxy(), input, output) {
+                warn!("Couldn't set PairingDelegate: {e:?}");
             }
             Ok(())
         }
@@ -91,7 +84,7 @@ async fn handler(
         }
         AccessRequest::MakeDiscoverable { token, responder } => {
             info!("fuchsia.bluetooth.sys.Access.MakeDiscoverable()");
-            let stream = token.into_stream().unwrap(); // into_stream never fails
+            let stream = token.into_stream(); // into_stream never fails
             let result = hd
                 .set_discoverable()
                 .await
@@ -104,7 +97,7 @@ async fn handler(
         }
         AccessRequest::StartDiscovery { token, responder } => {
             info!("fuchsia.bluetooth.sys.Access.StartDiscovery()");
-            let stream = token.into_stream().unwrap(); // into_stream never fails
+            let stream = token.into_stream(); // into_stream never fails
             let result = hd.start_discovery().await.map(|discovery_session| {
                 debug!("StartDiscovery: discovery started");
                 let mut wait_for_discovery_end = discovery_session.on_discovery_end();

@@ -30,7 +30,7 @@ async fn main() {
     // Open the storage by ID.
     let (node_client_end, node_server) = create_endpoints::<fio::NodeMarker>();
     let directory = ClientEnd::<fio::DirectoryMarker>::new(node_client_end.into_channel());
-    let dir_proxy = directory.into_proxy().unwrap();
+    let dir_proxy = directory.into_proxy();
     storage_admin
         .open_component_storage_by_id(&component_storage_id, node_server)
         .await

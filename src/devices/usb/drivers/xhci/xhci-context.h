@@ -34,7 +34,7 @@ struct TRBContext : fbl::DoublyLinkedListable<std::unique_ptr<TRBContext>>,
   // Root hub port number
   uint8_t port_number = 0;
   std::optional<HubInfo> hub_info;
-  std::optional<usb_endpoint::RequestVariant> request;
+  std::optional<usb::RequestVariant> request;
   std::optional<fpromise::completer<TRB*, zx_status_t>> completer;
   uint64_t token;
 

@@ -67,9 +67,9 @@ struct RequestHandler {
 
 impl RequestHandler {
     pub fn new(repository_dir_ref: &fio::DirectoryProxy) -> Self {
-        let (repository_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (repository_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
         let server_end = server_end.into_channel().into();
-        repository_dir_ref.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end).unwrap();
+        repository_dir_ref.clone2(server_end).unwrap();
         Self { repository_dir }
     }
 

@@ -228,7 +228,7 @@ impl SizeBreakdown {
         let mut blobs = BTreeMap::new();
         for package in contents.packages.base.0.iter().chain(contents.packages.cache.0.iter()) {
             for blob in &package.blobs {
-                let entry = blobs.entry(blob.merkle.clone()).or_insert(BlobBreakdown {
+                let entry = blobs.entry(blob.merkle.clone()).or_insert_with(|| BlobBreakdown {
                     size: blob.used_space_in_blobfs,
                     psize: 0,
                     hash: blob.merkle.clone(),
@@ -246,9 +246,8 @@ impl SizeBreakdown {
         let mut packages = BTreeMap::new();
         for (_, blob) in &blobs {
             for reference in &blob.references {
-                let entry = packages.entry(reference.name.clone()).or_insert(PackageBreakdown {
-                    name: reference.name.clone(),
-                    blobs: BTreeMap::new(),
+                let entry = packages.entry(reference.name.clone()).or_insert_with(|| {
+                    PackageBreakdown { name: reference.name.clone(), blobs: BTreeMap::new() }
                 });
                 entry.blobs.insert(reference.path.clone(), blob.clone());
             }

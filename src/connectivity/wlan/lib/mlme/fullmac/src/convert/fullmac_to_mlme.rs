@@ -146,21 +146,25 @@ pub fn convert_iface_histogram_stats(
     }
 }
 
-pub fn convert_device_info(info: fidl_fullmac::WlanFullmacQueryInfo) -> fidl_mlme::DeviceInfo {
-    let bands: Vec<fidl_mlme::BandCapability> = info.band_cap_list[0..info.band_cap_count as usize]
+pub fn convert_device_info(
+    info: fidl_fullmac::WlanFullmacImplQueryResponse,
+) -> Result<fidl_mlme::DeviceInfo> {
+    let bands: Vec<fidl_mlme::BandCapability> = info
+        .band_caps
+        .context("missing band_caps")?
         .into_iter()
-        .map(|band_cap| convert_band_cap(band_cap.clone()))
+        .map(|band_cap| convert_band_cap(band_cap))
         .collect();
-    fidl_mlme::DeviceInfo {
-        sta_addr: info.sta_addr,
-        role: info.role,
+    Ok(fidl_mlme::DeviceInfo {
+        sta_addr: info.sta_addr.context("missing sta_addr")?,
+        role: info.role.context("missing role")?,
         bands,
         // TODO(https://fxbug.dev/42169534): This field will be replaced in the new driver features
         // framework.
         softmac_hardware_capability: 0,
         // TODO(https://fxbug.dev/42120297): This field is stubbed out for future use.
         qos_capable: false,
-    }
+    })
 }
 
 pub fn convert_set_keys_resp(
@@ -303,25 +307,27 @@ pub fn convert_roam_result_indication(
 }
 
 pub fn convert_authenticate_indication(
-    ind: fidl_fullmac::WlanFullmacAuthInd,
-) -> fidl_mlme::AuthenticateIndication {
+    ind: fidl_fullmac::WlanFullmacImplIfcAuthIndRequest,
+) -> Result<fidl_mlme::AuthenticateIndication> {
     use fidl_fullmac::WlanAuthType;
-    fidl_mlme::AuthenticateIndication {
-        peer_sta_address: ind.peer_sta_address,
+    Ok(fidl_mlme::AuthenticateIndication {
+        peer_sta_address: ind.peer_sta_address.context("missing peer_sta_address")?,
         auth_type: match ind.auth_type {
-            WlanAuthType::OpenSystem => fidl_mlme::AuthenticationTypes::OpenSystem,
-            WlanAuthType::SharedKey => fidl_mlme::AuthenticationTypes::SharedKey,
-            WlanAuthType::FastBssTransition => fidl_mlme::AuthenticationTypes::FastBssTransition,
-            WlanAuthType::Sae => fidl_mlme::AuthenticationTypes::Sae,
+            Some(WlanAuthType::OpenSystem) => fidl_mlme::AuthenticationTypes::OpenSystem,
+            Some(WlanAuthType::SharedKey) => fidl_mlme::AuthenticationTypes::SharedKey,
+            Some(WlanAuthType::FastBssTransition) => {
+                fidl_mlme::AuthenticationTypes::FastBssTransition
+            }
+            Some(WlanAuthType::Sae) => fidl_mlme::AuthenticationTypes::Sae,
             _ => {
                 warn!(
                     "Invalid auth type {}, defaulting to AuthenticationTypes::OpenSystem",
-                    ind.auth_type.into_primitive()
+                    ind.auth_type.expect("missing auth type").into_primitive()
                 );
                 fidl_mlme::AuthenticationTypes::OpenSystem
             }
         },
-    }
+    })
 }
 
 pub fn convert_deauthenticate_confirm(
@@ -340,46 +346,60 @@ pub fn convert_deauthenticate_confirm(
 }
 
 pub fn convert_deauthenticate_indication(
-    ind: fidl_fullmac::WlanFullmacDeauthIndication,
-) -> fidl_mlme::DeauthenticateIndication {
-    fidl_mlme::DeauthenticateIndication {
-        peer_sta_address: ind.peer_sta_address,
-        reason_code: ind.reason_code,
-        locally_initiated: ind.locally_initiated,
-    }
+    ind: fidl_fullmac::WlanFullmacImplIfcDeauthIndRequest,
+) -> Result<fidl_mlme::DeauthenticateIndication> {
+    Ok(fidl_mlme::DeauthenticateIndication {
+        peer_sta_address: ind.peer_sta_address.context("missing peer sta address")?,
+        reason_code: ind.reason_code.context("missing reason code")?,
+        locally_initiated: ind.locally_initiated.context("missing locally initiated")?,
+    })
 }
 pub fn convert_associate_indication(
-    ind: fidl_fullmac::WlanFullmacAssocInd,
-) -> fidl_mlme::AssociateIndication {
-    fidl_mlme::AssociateIndication {
-        peer_sta_address: ind.peer_sta_address,
+    ind: fidl_fullmac::WlanFullmacImplIfcAssocIndRequest,
+) -> Result<fidl_mlme::AssociateIndication> {
+    Ok(fidl_mlme::AssociateIndication {
+        peer_sta_address: ind.peer_sta_address.context("missing peer sta address")?,
         // TODO(https://fxbug.dev/42068281): Fix the discrepancy between WlanFullmacAssocInd and
         // fidl_mlme::AssociateIndication
         capability_info: 0,
-        listen_interval: ind.listen_interval,
-        ssid: if ind.ssid.len > 0 {
-            Some(ind.ssid.data[..ind.ssid.len as usize].to_vec())
+        listen_interval: ind.listen_interval.context("missing listen interval")?,
+        ssid: if ind.ssid.clone().expect("missing ssid").len() > 0 {
+            Some(ind.ssid.expect("missing ssid"))
         } else {
             None
         },
         rates: vec![],
-        rsne: if ind.rsne.len() > 0 { Some(ind.rsne) } else { None },
-    }
+        rsne: if ind.rsne.clone().expect("missing rsne").len() > 0 {
+            Some(ind.rsne.expect("missing rsne"))
+        } else {
+            None
+        },
+    })
 }
+
 pub fn convert_disassociate_confirm(
-    conf: fidl_fullmac::WlanFullmacDisassocConfirm,
+    conf: fidl_fullmac::WlanFullmacImplIfcDisassocConfRequest,
 ) -> fidl_mlme::DisassociateConfirm {
-    fidl_mlme::DisassociateConfirm { status: conf.status }
+    let status = conf
+        .status
+        .or_else(|| {
+            warn!("Got None for status when converting DisassocConf. Using error INTERNAL.");
+            Some(zx::Status::INTERNAL.into_raw())
+        })
+        .unwrap();
+    fidl_mlme::DisassociateConfirm { status }
 }
+
 pub fn convert_disassociate_indication(
-    ind: fidl_fullmac::WlanFullmacDisassocIndication,
-) -> fidl_mlme::DisassociateIndication {
-    fidl_mlme::DisassociateIndication {
-        peer_sta_address: ind.peer_sta_address,
-        reason_code: ind.reason_code,
-        locally_initiated: ind.locally_initiated,
-    }
+    ind: fidl_fullmac::WlanFullmacImplIfcDisassocIndRequest,
+) -> Result<fidl_mlme::DisassociateIndication> {
+    Ok(fidl_mlme::DisassociateIndication {
+        peer_sta_address: ind.peer_sta_address.context("missing peer_sta_address")?,
+        reason_code: ind.reason_code.context("missing reason_code")?,
+        locally_initiated: ind.locally_initiated.context("missing locally_initiated")?,
+    })
 }
+
 pub fn convert_start_confirm(
     conf: fidl_fullmac::WlanFullmacStartConfirm,
 ) -> fidl_mlme::StartConfirm {
@@ -759,12 +779,13 @@ mod tests {
 
     #[test]
     fn test_convert_authenticate_indication_with_unknown_auth_type_defaults_to_open_system() {
-        let fullmac = fidl_fullmac::WlanFullmacAuthInd {
-            peer_sta_address: [8; 6],
-            auth_type: fidl_fullmac::WlanAuthType::from_primitive_allow_unknown(100),
+        let fullmac = fidl_fullmac::WlanFullmacImplIfcAuthIndRequest {
+            peer_sta_address: Some([8; 6]),
+            auth_type: Some(fidl_fullmac::WlanAuthType::from_primitive_allow_unknown(100)),
+            ..Default::default()
         };
         assert_eq!(
-            convert_authenticate_indication(fullmac),
+            convert_authenticate_indication(fullmac).unwrap(),
             fidl_mlme::AuthenticateIndication {
                 peer_sta_address: [8; 6],
                 auth_type: fidl_mlme::AuthenticationTypes::OpenSystem,
@@ -786,15 +807,16 @@ mod tests {
 
     #[test]
     fn test_convert_associate_indication_empty_vec_and_ssid_are_none() {
-        let fullmac = fidl_fullmac::WlanFullmacAssocInd {
-            peer_sta_address: [3; 6],
-            listen_interval: 123,
-            ssid: fidl_ieee80211::CSsid { len: 0, data: [4; 32] },
-            rsne: vec![],
-            vendor_ie: vec![],
+        let fullmac = fidl_fullmac::WlanFullmacImplIfcAssocIndRequest {
+            peer_sta_address: Some([3; 6]),
+            listen_interval: Some(123),
+            ssid: vec![].into(),
+            rsne: vec![].into(),
+            vendor_ie: vec![].into(),
+            ..Default::default()
         };
 
-        let mlme = convert_associate_indication(fullmac);
+        let mlme = convert_associate_indication(fullmac).unwrap();
         assert!(mlme.ssid.is_none());
         assert!(mlme.rsne.is_none());
     }
@@ -842,7 +864,7 @@ mod tests {
     #[test]
     fn test_convert_band_cap() {
         let fullmac = fidl_fullmac::WlanFullmacBandCapability {
-            band: fidl_common::WlanBand::FiveGhz,
+            band: fidl_ieee80211::WlanBand::FiveGhz,
             basic_rates: vec![123; 3],
             ht_supported: true,
             ht_caps: fidl_ieee80211::HtCapabilities { bytes: [8; 26] },
@@ -855,7 +877,7 @@ mod tests {
         assert_eq!(
             convert_band_cap(fullmac),
             fidl_mlme::BandCapability {
-                band: fidl_common::WlanBand::FiveGhz,
+                band: fidl_ieee80211::WlanBand::FiveGhz,
                 basic_rates: vec![123; 3],
                 ht_cap: Some(Box::new(fidl_ieee80211::HtCapabilities { bytes: [8; 26] })),
                 vht_cap: Some(Box::new(fidl_ieee80211::VhtCapabilities { bytes: [9; 12] })),
@@ -867,7 +889,7 @@ mod tests {
     #[test]
     fn test_convert_band_cap_no_ht_vht_become_none() {
         let fullmac = fidl_fullmac::WlanFullmacBandCapability {
-            band: fidl_common::WlanBand::FiveGhz,
+            band: fidl_ieee80211::WlanBand::FiveGhz,
             basic_rates: vec![123; 3],
             ht_supported: false,
             ht_caps: fidl_ieee80211::HtCapabilities { bytes: [8; 26] },

@@ -1,0 +1,61 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// Add test realm to core
+{
+    children: [
+        {
+            name: "testing",
+            url: "fuchsia-boot:///test_manager#meta/bootstrap_test_realm.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "#testing",
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: "#testing",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "#role_manager",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.process.Launcher",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor",
+            from: "#archivist",
+            to: "#testing",
+        },
+        {
+            protocol: "fuchsia.driver.development.Manager",
+            from: "#driver_manager",
+            to: "#testing",
+        },
+        {
+            event_stream: [
+                "capability_requested",
+                "destroyed",
+                "started",
+                "stopped",
+            ],
+            from: "parent",
+            to: "#testing",
+            scope: "#testing",
+        },
+    ],
+}

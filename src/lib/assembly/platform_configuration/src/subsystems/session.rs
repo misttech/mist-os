@@ -15,16 +15,15 @@ impl
     DefineSubsystemConfiguration<(
         &PlatformSessionConfig,
         &Option<ProductSessionConfig>,
-        &String,
         &SwdConfig,
     )> for SessionConfig
 {
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        config: &(&PlatformSessionConfig, &Option<ProductSessionConfig>, &String, &SwdConfig),
+        config: &(&PlatformSessionConfig, &Option<ProductSessionConfig>, &SwdConfig),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        let (platform_config, product_config, session_url, swd_config) = *config;
+        let (platform_config, product_config, swd_config) = *config;
 
         if platform_config.enabled {
             ensure!(
@@ -47,9 +46,8 @@ impl
         let (url, collection, element_url, view_id_annotation) = match (
             context.feature_set_level,
             product_config,
-            session_url.is_empty(),
         ) {
-            (FeatureSupportLevel::Standard, Some(config), true) => {
+            (FeatureSupportLevel::Standard, Some(config)) => {
                 let config_url = AbsoluteComponentUrl::parse(&config.url)
                     .with_context(|| format!("valid session URLs given by session.url must start with `fuchsia-pkg://`, got `{}`", &config.url))?
                     .to_string();
@@ -78,19 +76,11 @@ impl
                     (config_url, Config::new_void(), Config::new_void(), Config::new_void())
                 }
             }
-            (FeatureSupportLevel::Standard, None, false) => (
-                AbsoluteComponentUrl::parse(&session_url)
-                    .with_context(|| format!("valid session URLs given by session_url must start with `fuchsia-pkg://`, got `{}`", &session_url))?
-                    .to_string(),
-                Config::new_void(),
-                Config::new_void(),
-                Config::new_void(),
-            ),
             _ => {
                 ensure!(
-                        product_config.is_none() && session_url.is_empty(),
-                        "sessions are only supported with the 'Standard' feature set level, and only one of 'session' and 'session_url' should be used at a time."
-                    );
+                    product_config.is_none(),
+                    "sessions are only supported with the 'Standard' feature set level."
+                );
                 (String::new(), Config::new_void(), Config::new_void(), Config::new_void())
             }
         };

@@ -19,13 +19,13 @@ impl Migration for V1653667210LightMigrationTeardown {
     }
 
     async fn migrate(&self, _: FileGenerator) -> Result<(), MigrationError> {
-        let (stash_proxy, server_end) = create_proxy().expect("failed to create proxy for stash");
+        let (stash_proxy, server_end) = create_proxy();
         self.0.create_accessor(false, server_end).expect("failed to create accessor for stash");
         stash_proxy.delete_value(LIGHT_KEY).context("failed to call delete_value")?;
         stash_proxy.commit().context("failed to commit deletion of old light key")?;
         drop(stash_proxy);
 
-        let (stash_proxy, server_end) = create_proxy().expect("failed to create proxy for stash");
+        let (stash_proxy, server_end) = create_proxy();
         self.0.create_accessor(true, server_end).expect("failed to create accessor for stash");
         let value = stash_proxy.get_value(LIGHT_KEY).await.context("failed to call get_value")?;
         if value.is_some() {
@@ -50,9 +50,8 @@ mod tests {
     // Ensure the teardown deletes and commits the deletion of data from stash.
     #[fuchsia::test]
     async fn v1653667208_light_migration_teardown_test() {
-        let (store_proxy, server_end) =
-            create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
-        let mut request_stream = server_end.into_stream().expect("Should be able to get stream");
+        let (store_proxy, server_end) = create_proxy::<StoreMarker>();
+        let mut request_stream = server_end.into_stream();
         let commit_called = Rc::new(AtomicBool::new(false));
         let task = fasync::Task::local({
             let commit_called = Rc::clone(&commit_called);
@@ -60,8 +59,7 @@ mod tests {
                 let mut tasks = vec![];
                 while let Some(Ok(request)) = request_stream.next().await {
                     if let StoreRequest::CreateAccessor { accessor_request, .. } = request {
-                        let mut request_stream =
-                            accessor_request.into_stream().expect("should be able to get stream");
+                        let mut request_stream = accessor_request.into_stream();
                         tasks.push(fasync::Task::local({
                             let commit_called = Rc::clone(&commit_called);
                             async move {
@@ -107,15 +105,13 @@ mod tests {
     // Ensure we report an unrecoverable error if we're unable to delete the data from stash.
     #[fuchsia::test]
     async fn v1653667208_light_migration_teardown_commit_fails() {
-        let (store_proxy, server_end) =
-            create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
-        let mut request_stream = server_end.into_stream().expect("Should be able to get stream");
+        let (store_proxy, server_end) = create_proxy::<StoreMarker>();
+        let mut request_stream = server_end.into_stream();
         let task = fasync::Task::local(async move {
             let mut tasks = vec![];
             while let Some(Ok(request)) = request_stream.next().await {
                 if let StoreRequest::CreateAccessor { accessor_request, .. } = request {
-                    let mut request_stream =
-                        accessor_request.into_stream().expect("should be able to get stream");
+                    let mut request_stream = accessor_request.into_stream();
                     tasks.push(fasync::Task::local(async move {
                         while let Some(Ok(request)) = request_stream.next().await {
                             match request {

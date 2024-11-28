@@ -55,8 +55,8 @@ where
                 requires_level_by_preference: vec![REQUIRED_LEVEL],
             }];
 
-            let (current, current_level_channel) = create_proxy::<fpb::CurrentLevelMarker>()?;
-            let (required, required_level_channel) = create_proxy::<fpb::RequiredLevelMarker>()?;
+            let (current, current_level_channel) = create_proxy::<fpb::CurrentLevelMarker>();
+            let (required, required_level_channel) = create_proxy::<fpb::RequiredLevelMarker>();
             let result = topology_proxy
                 .add_element(fpb::ElementSchema {
                     element_name: Some(ELEMENT_NAME.into()),
@@ -172,11 +172,9 @@ mod tests {
     #[fuchsia::test]
     async fn propagate_level() {
         let (current, mut current_stream) =
-            endpoints::create_proxy_and_stream::<fpb::CurrentLevelMarker>()
-                .expect("always succeeds");
+            endpoints::create_proxy_and_stream::<fpb::CurrentLevelMarker>();
         let (required, mut required_stream) =
-            endpoints::create_proxy_and_stream::<fpb::RequiredLevelMarker>()
-                .expect("always succeeds");
+            endpoints::create_proxy_and_stream::<fpb::RequiredLevelMarker>();
 
         // Send the power level in from test into the handler.
         let (mut in_send, mut in_recv) = mpsc::channel(1);
@@ -245,10 +243,8 @@ mod tests {
     #[fuchsia::test]
     async fn test_manage_internal() {
         let (g_proxy, mut g_stream) =
-            endpoints::create_proxy_and_stream::<fps::ActivityGovernorMarker>()
-                .expect("infallible");
-        let (t_proxy, mut _t_stream) =
-            endpoints::create_proxy_and_stream::<fpb::TopologyMarker>().expect("infallible");
+            endpoints::create_proxy_and_stream::<fps::ActivityGovernorMarker>();
+        let (t_proxy, mut _t_stream) = endpoints::create_proxy_and_stream::<fpb::TopologyMarker>();
         let (_activity_s, mut activity_r) = mpsc::channel::<Command>(1);
 
         // Run the server side activity governor.

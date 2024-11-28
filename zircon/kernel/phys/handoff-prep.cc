@@ -173,7 +173,6 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kDataZbi:
       case memalloc::Type::kKernel:
       case memalloc::Type::kPhysDebugdata:
-      case memalloc::Type::kNvram:
       case memalloc::Type::kPeripheral:
       case memalloc::Type::kPhysLog:
       case memalloc::Type::kReservedLow:
@@ -183,7 +182,13 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kVdso:
         return type;
 
-      // Truncated RAM should now be forgotten.
+      // An NVRAM range should no longer be treated like normal RAM. The kernel
+      // will access it through PhysHandoff::nvram via its own mapping for it.
+      //
+      // TODO(https://fxbug.dev/42164859): Create a dedicated mapping for the
+      // NVRAM range and hand that off.
+      case memalloc::Type::kNvram:
+      // Truncations should now go into effect.
       case memalloc::Type::kTruncatedRam:
         return ktl::nullopt;
 

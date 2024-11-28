@@ -14,9 +14,9 @@ async fn get_connection_info_file_using_open_deprecated() {
     let harness = TestHarness::new().await;
 
     for file_flags in harness.file_rights.combinations_deprecated() {
-        let root = root_directory(vec![file(TEST_FILE, vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
-        let file = open_file_with_flags(&test_dir, file_flags, TEST_FILE).await;
+        let entries = vec![file(TEST_FILE, vec![])];
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
+        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
 
         // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
         let mut expected_operations = fio::Operations::GET_ATTRIBUTES;
@@ -44,9 +44,9 @@ async fn get_connection_info_file() {
     let harness = TestHarness::new().await;
 
     for file_flags in harness.file_rights.combinations() {
-        let root = root_directory(vec![file(TEST_FILE, vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
-        let file = test_dir
+        let entries = vec![file(TEST_FILE, vec![])];
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
+        let file = dir
             .open3_node::<fio::FileMarker>(TEST_FILE, fio::Flags::PROTOCOL_FILE | file_flags, None)
             .await
             .expect("open3 failed");
@@ -85,9 +85,9 @@ async fn get_connection_info_file_with_directory_rights() {
         {
             continue;
         }
-        let root = root_directory(vec![file(TEST_FILE, vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
-        let file = test_dir
+        let entries = vec![file(TEST_FILE, vec![])];
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
+        let file = dir
             .open3_node::<fio::FileMarker>(
                 TEST_FILE,
                 fio::Flags::PROTOCOL_FILE | directory_flags,
@@ -112,9 +112,9 @@ async fn get_connection_info_file_with_directory_rights() {
 async fn get_connection_info_file_node_reference_deprecated() {
     let harness = TestHarness::new().await;
 
-    let root = root_directory(vec![file(TEST_FILE, vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
-    let file = open_file_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
+    let entries = vec![file(TEST_FILE, vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
+    let file = open_file_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
     // Node references should only have the ability to get attributes.
     // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
     assert_eq!(
@@ -128,13 +128,13 @@ async fn get_connection_info_file_node_reference_deprecated() {
 async fn get_connection_info_file_node_reference() {
     let harness = TestHarness::new().await;
 
-    let root = root_directory(vec![file(TEST_FILE, vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let entries = vec![file(TEST_FILE, vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
     let node_allowed_rights = Rights::new(fio::Rights::GET_ATTRIBUTES);
     // This will return combinations of rights, including empty rights
     for rights in node_allowed_rights.rights_combinations() {
-        let file = test_dir
+        let file = dir
             .open3_node::<fio::FileMarker>(
                 TEST_FILE,
                 fio::Flags::PROTOCOL_FILE
@@ -163,9 +163,9 @@ async fn get_connection_info_directory_using_open_deprecated() {
     let harness = TestHarness::new().await;
 
     for dir_flags in harness.dir_rights.combinations_deprecated() {
-        let root = root_directory(vec![directory("dir", vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
-        let dir = open_dir_with_flags(&test_dir, dir_flags, "dir").await;
+        let entries = vec![directory("dir", vec![])];
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
+        let dir = open_dir_with_flags(&dir, dir_flags, "dir").await;
 
         // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES, it is always requested when
         // opening nodes via Open1.
@@ -193,9 +193,9 @@ async fn get_connection_info_directory() {
     let harness = TestHarness::new().await;
 
     for dir_flags in harness.dir_rights.combinations() {
-        let root = root_directory(vec![directory("dir", vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
-        let dir = test_dir
+        let entries = vec![directory("dir", vec![])];
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
+        let dir = dir
             .open3_node::<fio::DirectoryMarker>(
                 "dir",
                 fio::Flags::PROTOCOL_DIRECTORY | dir_flags,
@@ -221,9 +221,9 @@ async fn get_connection_info_directory() {
 async fn get_connection_info_directory_node_reference_using_open_deprecated() {
     let harness = TestHarness::new().await;
 
-    let root = root_directory(vec![directory("dir", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
-    let dir = open_dir_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
+    let entries = vec![directory("dir", vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
+    let dir = open_dir_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
     assert_eq!(
         dir.get_connection_info().await.unwrap(),
         fio::ConnectionInfo { rights: Some(fio::Operations::GET_ATTRIBUTES), ..Default::default() }
@@ -235,13 +235,13 @@ async fn get_connection_info_directory_node_reference_using_open_deprecated() {
 async fn get_connection_info_directory_node_reference() {
     let harness = TestHarness::new().await;
 
-    let root = root_directory(vec![directory("dir", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let entries = vec![directory("dir", vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
     let node_allowed_rights = Rights::new(fio::Rights::GET_ATTRIBUTES);
     // This will return combinations of rights, including empty rights
     for rights in node_allowed_rights.rights_combinations() {
-        let dir = test_dir
+        let dir = dir
             .open3_node::<fio::DirectoryMarker>(
                 "dir",
                 fio::Flags::PROTOCOL_DIRECTORY

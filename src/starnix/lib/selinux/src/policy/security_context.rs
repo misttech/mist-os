@@ -32,19 +32,16 @@ pub struct SecurityContext {
 
 impl SecurityContext {
     /// Returns a new instance with the specified field values.
-    // TODO(b/319232900): Validate that the specified fields are consistent
-    // in the context of the supplied policy.
-    pub(super) fn new<PS: ParseStrategy>(
-        policy: &PolicyIndex<PS>,
+    /// Fields are not validated against the policy until explicitly via `validate()`,
+    /// or implicitly via insertion into a [`SidTable`].
+    pub(super) fn new(
         user: UserId,
         role: RoleId,
         type_: TypeId,
         low_level: SecurityLevel,
         high_level: Option<SecurityLevel>,
-    ) -> Result<Self, SecurityContextError> {
-        let context = Self { user, role, type_, low_level, high_level };
-        context.validate(policy)?;
-        Ok(context)
+    ) -> Self {
+        Self { user, role, type_, low_level, high_level }
     }
 
     /// Returns the user component of the security context.
@@ -146,14 +143,13 @@ impl SecurityContext {
             .ok_or_else(|| SecurityContextError::UnknownType { name: type_.into() })?
             .id();
 
-        Self::new(
-            policy_index,
+        Ok(Self::new(
             user,
             role,
             type_,
             SecurityLevel::parse(policy_index, low_level)?,
             high_level.map(|x| SecurityLevel::parse(policy_index, x)).transpose()?,
-        )
+        ))
     }
 
     /// Returns this Security Context serialized to a byte string.
@@ -172,7 +168,9 @@ impl SecurityContext {
         parts.join(b":".as_ref())
     }
 
-    fn validate<PS: ParseStrategy>(
+    /// Validates that this `SecurityContext`'s fields are consistent with policy constraints
+    /// (e.g. that the role is valid for the user).
+    pub(super) fn validate<PS: ParseStrategy>(
         &self,
         policy_index: &PolicyIndex<PS>,
     ) -> Result<(), SecurityContextError> {
@@ -244,11 +242,11 @@ impl SecurityContext {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SecurityLevel {
     sensitivity: SensitivityId,
-    categories: Vec<Category>,
+    categories: Vec<CategorySpan>,
 }
 
 impl SecurityLevel {
-    pub(super) fn new(sensitivity: SensitivityId, categories: Vec<Category>) -> Self {
+    pub(super) fn new(sensitivity: SensitivityId, categories: Vec<CategorySpan>) -> Self {
         Self { sensitivity, categories }
     }
 
@@ -279,18 +277,47 @@ impl SecurityLevel {
         if let Some(categories_str) = categories_item {
             for entry in categories_str.split(",") {
                 let category = if let Some((low, high)) = entry.split_once(".") {
-                    Category::Range {
-                        low: Self::category_id_by_name(policy_index, low)?,
-                        high: Self::category_id_by_name(policy_index, high)?,
+                    let low = Self::category_id_by_name(policy_index, low)?;
+                    let high = Self::category_id_by_name(policy_index, high)?;
+                    if high <= low {
+                        return Err(SecurityContextError::InvalidSyntax);
                     }
+                    CategorySpan::new(low, high)
                 } else {
-                    Category::Single(Self::category_id_by_name(policy_index, entry)?)
+                    let id = Self::category_id_by_name(policy_index, entry)?;
+                    CategorySpan::new(id, id)
                 };
                 categories.push(category);
             }
         }
+        if categories.is_empty() {
+            return Ok(Self { sensitivity, categories });
+        }
+        // Represent the set of category IDs in the following normalized form:
+        // - Consecutive IDs are coalesced into spans.
+        // - The list of spans is sorted by ID.
+        //
+        // 1. Sort by lower bound, then upper bound.
+        categories.sort_by(|x, y| (x.low, x.high).cmp(&(y.low, y.high)));
+        // 2. Merge overlapping and adjacent ranges.
+        let categories = categories.into_iter();
+        let normalized =
+            categories.fold(vec![], |mut normalized: Vec<CategorySpan>, current: CategorySpan| {
+                if let Some(last) = normalized.last_mut() {
+                    if current.low <= last.high
+                        || (u32::from(current.low.0) - u32::from(last.high.0) == 1)
+                    {
+                        *last = CategorySpan::new(last.low, current.high)
+                    } else {
+                        normalized.push(current);
+                    }
+                    return normalized;
+                }
+                normalized.push(current);
+                normalized
+            });
 
-        Ok(Self { sensitivity, categories })
+        Ok(Self { sensitivity, categories: normalized })
     }
 
     /// Returns a byte string describing the security level sensitivity and
@@ -330,24 +357,27 @@ impl PartialOrd for SecurityLevel {
     }
 }
 
-/// Describes an entry in a category specification, which may be an
-/// individual category, or a range.
+/// Describes an entry in a category specification, which may be a single category
+/// (in which case `low` = `high`) or a span of consecutive categories. The bounds
+/// are included in the span.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Category {
-    Single(CategoryId),
-    Range { low: CategoryId, high: CategoryId },
+pub(super) struct CategorySpan {
+    low: CategoryId,
+    high: CategoryId,
 }
 
-impl Category {
+impl CategorySpan {
+    pub(super) fn new(low: CategoryId, high: CategoryId) -> Self {
+        Self { low, high }
+    }
+
     /// Returns a byte string describing the category, or category range.
     fn serialize<PS: ParseStrategy>(&self, policy_index: &PolicyIndex<PS>) -> Vec<u8> {
-        match self {
-            Self::Single(category) => {
-                policy_index.parsed_policy().category(*category).name_bytes().into()
-            }
-            Self::Range { low, high } => [
-                policy_index.parsed_policy().category(*low).name_bytes(),
-                policy_index.parsed_policy().category(*high).name_bytes(),
+        match self.low == self.high {
+            true => policy_index.parsed_policy().category(self.low).name_bytes().into(),
+            false => [
+                policy_index.parsed_policy().category(self.low).name_bytes(),
+                policy_index.parsed_policy().category(self.high).name_bytes(),
             ]
             .join(b".".as_ref()),
         }
@@ -389,10 +419,11 @@ mod tests {
         parse_policy_by_reference(TEST_POLICY).unwrap().validate().unwrap()
     }
 
+    // Represents a `CategorySpan`.
     #[derive(Debug, Eq, PartialEq)]
-    enum CategoryItem<'a> {
-        Single(&'a str),
-        Range { low: &'a str, high: &'a str },
+    struct CategoryItem<'a> {
+        low: &'a str,
+        high: &'a str,
     }
 
     fn user_name(policy: &TestPolicy, id: UserId) -> &str {
@@ -415,21 +446,18 @@ mod tests {
         std::str::from_utf8(policy.0.parsed_policy().category(id).name_bytes()).unwrap()
     }
 
-    fn category_item<'a>(policy: &'a TestPolicy, category: &Category) -> CategoryItem<'a> {
-        match category {
-            Category::Single(id) => CategoryItem::Single(category_name(policy, *id)),
-            Category::Range { low, high } => CategoryItem::Range {
-                low: category_name(policy, *low),
-                high: category_name(policy, *high),
-            },
+    fn category_span<'a>(policy: &'a TestPolicy, category: &CategorySpan) -> CategoryItem<'a> {
+        CategoryItem {
+            low: category_name(policy, category.low),
+            high: category_name(policy, category.high),
         }
     }
 
-    fn category_items<'a>(
+    fn category_spans<'a>(
         policy: &'a TestPolicy,
-        categories: &Vec<Category>,
+        categories: &Vec<CategorySpan>,
     ) -> Vec<CategoryItem<'a>> {
-        categories.iter().map(|x| category_item(policy, x)).collect()
+        categories.iter().map(|x| category_span(policy, x)).collect()
     }
 
     #[test]
@@ -473,10 +501,44 @@ mod tests {
         assert_eq!(type_name(&policy, security_context.type_), "type0");
         assert_eq!(sensitivity_name(&policy, security_context.low_level.sensitivity), "s1");
         assert_eq!(
-            category_items(&policy, &security_context.low_level.categories),
-            [CategoryItem::Range { low: "c0", high: "c4" }]
+            category_spans(&policy, &security_context.low_level.categories),
+            [CategoryItem { low: "c0", high: "c4" }]
         );
         assert_eq!(security_context.high_level, None);
+    }
+
+    #[test]
+    fn parse_security_context_and_normalize_categories() {
+        let policy = &test_policy();
+        let normalize = {
+            |security_context: &str| -> String {
+                String::from_utf8(
+                    policy.serialize_security_context(
+                        &policy
+                            .parse_security_context(security_context.into())
+                            .expect("creating security context should succeed"),
+                    ),
+                )
+                .unwrap()
+            }
+        };
+        // Overlapping category ranges are merged.
+        assert_eq!(normalize("user0:object_r:type0:s1:c0.c1,c1"), "user0:object_r:type0:s1:c0.c1");
+        assert_eq!(
+            normalize("user0:object_r:type0:s1:c0.c2,c1.c2"),
+            "user0:object_r:type0:s1:c0.c2"
+        );
+        assert_eq!(
+            normalize("user0:object_r:type0:s1:c0.c2,c1.c3"),
+            "user0:object_r:type0:s1:c0.c3"
+        );
+        // Adjacent category ranges are merged.
+        assert_eq!(normalize("user0:object_r:type0:s1:c0.c1,c2"), "user0:object_r:type0:s1:c0.c2");
+        // Category ranges are ordered by first element.
+        assert_eq!(
+            normalize("user0:object_r:type0:s1:c2.c3,c0"),
+            "user0:object_r:type0:s1:c0,c2.c3"
+        );
     }
 
     #[test]
@@ -493,8 +555,8 @@ mod tests {
         let high_level = security_context.high_level.as_ref().unwrap();
         assert_eq!(sensitivity_name(&policy, high_level.sensitivity), "s1");
         assert_eq!(
-            category_items(&policy, &high_level.categories),
-            [CategoryItem::Range { low: "c0", high: "c4" }]
+            category_spans(&policy, &high_level.categories),
+            [CategoryItem { low: "c0", high: "c4" }]
         );
     }
 
@@ -509,14 +571,15 @@ mod tests {
         assert_eq!(type_name(&policy, security_context.type_), "type0");
         assert_eq!(sensitivity_name(&policy, security_context.low_level.sensitivity), "s0");
         assert_eq!(
-            category_items(&policy, &security_context.low_level.categories),
-            [CategoryItem::Single("c0")]
+            category_spans(&policy, &security_context.low_level.categories),
+            [CategoryItem { low: "c0", high: "c0" }]
         );
+
         let high_level = security_context.high_level.as_ref().unwrap();
         assert_eq!(sensitivity_name(&policy, high_level.sensitivity), "s1");
         assert_eq!(
-            category_items(&policy, &high_level.categories),
-            [CategoryItem::Range { low: "c0", high: "c4" }]
+            category_spans(&policy, &high_level.categories),
+            [CategoryItem { low: "c0", high: "c4" }]
         );
     }
 
@@ -531,8 +594,8 @@ mod tests {
         assert_eq!(type_name(&policy, security_context.type_), "type0");
         assert_eq!(sensitivity_name(&policy, security_context.low_level.sensitivity), "s1");
         assert_eq!(
-            category_items(&policy, &security_context.low_level.categories),
-            [CategoryItem::Single("c0"), CategoryItem::Single("c4")]
+            category_spans(&policy, &security_context.low_level.categories),
+            [CategoryItem { low: "c0", high: "c0" }, CategoryItem { low: "c4", high: "c4" }]
         );
         assert_eq!(security_context.high_level, None);
     }
@@ -548,8 +611,8 @@ mod tests {
         assert_eq!(type_name(&policy, security_context.type_), "type0");
         assert_eq!(sensitivity_name(&policy, security_context.low_level.sensitivity), "s1");
         assert_eq!(
-            category_items(&policy, &security_context.low_level.categories),
-            [CategoryItem::Single("c0"), CategoryItem::Range { low: "c3", high: "c4" }]
+            category_spans(&policy, &security_context.low_level.categories),
+            [CategoryItem { low: "c0", high: "c0" }, CategoryItem { low: "c3", high: "c4" }]
         );
         assert_eq!(security_context.high_level, None);
     }
@@ -563,6 +626,8 @@ mod tests {
             "user0:object_r:type0",
             "user0:object_r:type0:s0-",
             "user0:object_r:type0:s0:s0:s0",
+            "user0:object_r:type0:s0:c0.c0", // Category upper bound is equal to lower bound.
+            "user0:object_r:type0:s0:c1.c0", // Category upper bound is less than lower bound.
         ] {
             assert_eq!(
                 policy.parse_security_context(invalid_label.as_bytes().into()),
@@ -608,19 +673,29 @@ mod tests {
 
         // TODO(b/319232900): Should fail validation because the low security level has
         // categories that the high level does not.
-        assert!(policy
+        let context = policy
             .parse_security_context(b"user0:object_r:type0:s1:c0,c3.c4-s1".into())
-            .is_ok());
+            .expect("successfully parsed");
+        assert!(policy.validate_security_context(&context).is_ok());
 
         // Fails validation because the sensitivity is not valid for the user.
-        assert!(policy.parse_security_context(b"user1:object_r:type0:s0".into()).is_err());
+        let context = policy
+            .parse_security_context(b"user1:object_r:type0:s0".into())
+            .expect("successfully parsed");
+        assert!(policy.validate_security_context(&context).is_err());
 
         // Fails validation because the role is not valid for the user.
-        assert!(policy.parse_security_context(b"user0:subject_r:type0:s0".into()).is_err());
+        let context = policy
+            .parse_security_context(b"user0:subject_r:type0:s0".into())
+            .expect("successfully parsed");
+        assert!(policy.validate_security_context(&context).is_err());
 
         // Passes validation even though the role is not explicitly allowed for the user,
         // because it is the special "object_r" role, used when labelling resources.
-        assert!(policy.parse_security_context(b"user1:object_r:type0:s1".into()).is_ok());
+        let context = policy
+            .parse_security_context(b"user1:object_r:type0:s1".into())
+            .expect("successfully parsed");
+        assert!(policy.validate_security_context(&context).is_ok());
     }
 
     #[test]

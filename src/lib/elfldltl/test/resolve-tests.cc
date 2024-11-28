@@ -45,6 +45,11 @@ class ElfldltlResolveTests : public testing::Test {
 
     constexpr auto& file() { return file_; }
 
+    constexpr fit::result<bool, const typename Elf::Sym*> Lookup(  //
+        auto& diag, elfldltl::SymbolName& name) const {
+      return fit::ok(name.Lookup(symbol_info_));
+    }
+
    private:
     // This is in it's own function that returns void so that ASSERT_* macros
     // can be used. Evidently they don't work in constructors. This method

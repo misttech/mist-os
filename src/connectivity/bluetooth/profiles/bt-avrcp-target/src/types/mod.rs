@@ -169,8 +169,7 @@ mod tests {
     #[fuchsia::test]
     /// Tests the comparison of `Notification` values works as intended.
     async fn test_notification_value_changed() -> Result<(), Error> {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         let (result_fut, responder) =
             generate_empty_watch_notification(&mut proxy, &mut stream).await?;
@@ -256,8 +255,7 @@ mod tests {
     #[fuchsia::test]
     /// Tests sending response with a changed value successfully sends over the responder.
     async fn test_update_responder_changed_value_success() -> Result<(), Error> {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         let (result_fut, responder) =
             generate_empty_watch_notification(&mut proxy, &mut stream).await?;
@@ -300,8 +298,7 @@ mod tests {
     /// Tests sending response with an unchanged value does not send/consume the responder.
     /// Instead, it should return itself, with the unchanged responder.
     async fn test_update_responder_same_value_success() -> Result<(), Error> {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         let (result_fut, responder) =
             generate_empty_watch_notification(&mut proxy, &mut stream).await?;
@@ -341,8 +338,7 @@ mod tests {
     #[fuchsia::test]
     /// Tests sending an error response sends & consumes the responder.
     async fn test_update_responder_with_error() -> Result<(), Error> {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         let (result_fut, responder) =
             generate_empty_watch_notification(&mut proxy, &mut stream).await?;

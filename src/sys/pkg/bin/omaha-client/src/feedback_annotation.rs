@@ -72,7 +72,7 @@ mod tests {
             AppMetadata { appid_source: AppIdSource::VbMetadata },
         )));
 
-        let (proxy, mut stream) = create_proxy_and_stream::<ComponentDataRegisterMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<ComponentDataRegisterMarker>();
         let stream_fut = async move {
             match stream.next().await {
                 Some(Ok(ComponentDataRegisterRequest::Upsert { data, responder })) => {

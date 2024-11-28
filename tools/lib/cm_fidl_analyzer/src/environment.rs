@@ -136,11 +136,13 @@ impl EnvironmentForAnalyzer {
                     .environments
                     .iter()
                     .find(|&env| &env.name == child_env_name)
-                    .ok_or(BuildAnalyzerModelError::EnvironmentNotFound(
-                        child_env_name.to_string(),
-                        child.child_moniker.name().to_string(),
-                        parent.moniker().to_string(),
-                    ))?;
+                    .ok_or_else(|| {
+                        BuildAnalyzerModelError::EnvironmentNotFound(
+                            child_env_name.to_string(),
+                            child.child_moniker.name().to_string(),
+                            parent.moniker().to_string(),
+                        )
+                    })?;
                 Self::new_from_decl(parent, env_decl)
             }
             None => Ok(Self::new_inheriting(parent)),

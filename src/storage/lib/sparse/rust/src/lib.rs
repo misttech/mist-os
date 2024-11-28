@@ -481,14 +481,12 @@ fn resparse(
 ///
 /// # Arguments
 ///
-/// * `writer` - Used for writing log information.
 /// * `name` - Name of the partition the image. Used for logs only.
 /// * `file_to_upload` - Path to the file to translate to sparse image format.
 /// * `dir` - Path to write the Sparse file(s).
 /// * `max_download_size` - Maximum size that can be downloaded by the device.
-#[tracing::instrument(skip(writer))]
-pub fn build_sparse_files<W: Write>(
-    writer: &mut W,
+#[tracing::instrument()]
+pub fn build_sparse_files(
     name: &str,
     file_to_upload: &str,
     dir: &Path,
@@ -501,7 +499,7 @@ pub fn build_sparse_files<W: Write>(
             BLK_SIZE
         );
     }
-    writeln!(writer, "Building sparse files for: {}. File: {}", name, file_to_upload)?;
+    tracing::debug!("Building sparse files for: {}. File: {}", name, file_to_upload);
     let mut in_file = File::open(file_to_upload)?;
 
     let mut total_read: usize = 0;
@@ -562,7 +560,7 @@ pub fn build_sparse_files<W: Write>(
         ret.push(temp_path);
     }
 
-    writeln!(writer, "Finished building sparse files")?;
+    tracing::debug!("Finished building sparse files");
 
     Ok(ret)
 }

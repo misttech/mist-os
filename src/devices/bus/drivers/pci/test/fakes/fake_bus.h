@@ -19,7 +19,8 @@ namespace pci {
 
 class FakeBus : public BusDeviceInterface {
  public:
-  explicit FakeBus(uint8_t bus_start = 0, uint8_t bus_end = 0) : pciroot_(bus_start, bus_end) {}
+  explicit FakeBus(uint8_t bus_start, uint8_t bus_end, bool is_extended)
+      : pciroot_(bus_start, bus_end, is_extended) {}
 
   zx_status_t LinkDevice(fbl::RefPtr<pci::Device> device) final {
     fbl::AutoLock devices_lock(&devices_lock_);

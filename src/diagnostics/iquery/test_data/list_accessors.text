@@ -1,1 +1,1 @@
-archivist:expose:fuchsia.diagnostics.ArchiveAccessor
+archivist:fuchsia.diagnostics.ArchiveAccessor

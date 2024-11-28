@@ -60,7 +60,7 @@ impl PeerTask {
                 debug!("Received FIDL PeerHandler protocol request {:?} from peer {}",
                    peer_handler_request_result_option, self.peer_id);
                let peer_handler_request_result = peer_handler_request_result_option
-                   .ok_or(format_err!("FIDL Peer protocol request stream closed for peer {}", self.peer_id))?;
+                   .ok_or_else(|| format_err!("FIDL Peer protocol request stream closed for peer {}", self.peer_id))?;
                let peer_handler_request = peer_handler_request_result?;
                self.handle_peer_handler_request(peer_handler_request)?;
 
@@ -71,7 +71,7 @@ impl PeerTask {
                     at_response_result_option, self.peer_id);
                 let at_response_result =
                     at_response_result_option
-                        .ok_or(format_err!("AT connection stream closed for peer {}", self.peer_id))?;
+                        .ok_or_else(|| format_err!("AT connection stream closed for peer {}", self.peer_id))?;
                 let at_response = at_response_result?;
 
                 self.handle_at_response(at_response);
@@ -82,7 +82,7 @@ impl PeerTask {
 
                 let procedure_outputs_result =
                     procedure_outputs_result_option
-                        .ok_or(format_err!("Procedure manager stream closed for peer {}", self.peer_id))?;
+                        .ok_or_else(|| format_err!("Procedure manager stream closed for peer {}", self.peer_id))?;
                 let procedure_outputs = procedure_outputs_result?;
 
                 for procedure_output in procedure_outputs {

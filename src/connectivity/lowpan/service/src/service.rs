@@ -64,7 +64,7 @@ impl<S: Spawn> LowpanService<S> {
         name: &str,
         driver: fidl::endpoints::ClientEnd<DriverMarker>,
     ) -> Result<(), ZxStatus> {
-        let driver = driver.into_proxy().map_err(|_| ZxStatus::INVALID_ARGS)?;
+        let driver = driver.into_proxy();
 
         if !DEVICE_NAME_REGEX.is_match(name) {
             error!("Attempted to register LoWPAN device with invalid name {:?}", name);
@@ -203,9 +203,11 @@ impl<S: Sync> ServeTo<DeviceWatcherRequestStream> for LowpanService<S> {
                 match command {
                     DeviceWatcherRequest::WatchDevices { responder } => {
                         let mut locked_device_list =
-                            last_device_list.try_lock().ok_or(format_err!(
-                                "No more than 1 outstanding call to watch_devices is allowed"
-                            ))?;
+                            last_device_list.try_lock().ok_or_else(|| {
+                                format_err!(
+                                    "No more than 1 outstanding call to watch_devices is allowed"
+                                )
+                            })?;
 
                         if locked_device_list.is_none() {
                             // This is the first call to WatchDevices,
@@ -326,7 +328,7 @@ mod factory {
             name: &str,
             driver: fidl::endpoints::ClientEnd<FactoryDriverMarker>,
         ) -> Result<(), ZxStatus> {
-            let driver = driver.into_proxy().map_err(|_| ZxStatus::INVALID_ARGS)?;
+            let driver = driver.into_proxy();
 
             if !DEVICE_NAME_REGEX.is_match(name) {
                 error!("Attempted to register LoWPAN device with invalid name {:?}", name);
@@ -349,7 +351,7 @@ mod factory {
             }
 
             // Insert the new device into the list.
-            devices.insert(name.clone(), driver.clone());
+            devices.insert(name, driver);
 
             Ok(())
         }

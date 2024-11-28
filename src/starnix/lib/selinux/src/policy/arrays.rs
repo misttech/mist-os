@@ -27,7 +27,15 @@ pub(super) const MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY: u32 = 31;
 pub(super) const ACCESS_VECTOR_TYPE_ALLOW_MASK: u16 = 1;
 
 /// Mask for [`AccessVectorMetadata`] `access_vector_type` that indicates whether the access vector
-/// comes from an `allow [source] [target]:[class] { [permissions] };` policy statement.
+/// comes from an `auditallow [source] [target]:[class] { [permissions] };` policy statement.
+pub(super) const ACCESS_VECTOR_TYPE_AUDITALLOW_MASK: u16 = 2;
+
+/// Mask for [`AccessVectorMetadata`] `access_vector_type` that indicates whether the access vector
+/// comes from a `dontaudit [source] [target]:[class] { [permissions] };` policy statement.
+pub(super) const ACCESS_VECTOR_TYPE_DONTAUDIT_MASK: u16 = 4;
+
+/// Mask for [`AccessVectorMetadata`] `access_vector_type` that indicates whether the access vector
+/// comes from an `type_transition [source] [target]:[class] [new_type];` policy statement.
 pub(super) const ACCESS_VECTOR_TYPE_TYPE_TRANSITION_MASK: u16 = 16;
 
 #[allow(type_alias_bounds)]
@@ -170,7 +178,7 @@ impl<PS: ParseStrategy> Validate for AccessVectors<PS> {
 
 #[derive(Debug, PartialEq)]
 pub(super) struct AccessVector<PS: ParseStrategy> {
-    metadata: PS::Output<AccessVectorMetadata>,
+    pub metadata: PS::Output<AccessVectorMetadata>,
     extended_permissions: ExtendedPermissions<PS>,
 }
 
@@ -179,6 +187,18 @@ impl<PS: ParseStrategy> AccessVector<PS> {
     /// `allow [source] [target]:[class] { [permissions] };` policy statement.
     pub fn is_allow(&self) -> bool {
         PS::deref(&self.metadata).is_allow()
+    }
+
+    /// Returns whether this access vector comes from an
+    /// `auditallow [source] [target]:[class] { [permissions] };` policy statement.
+    pub fn is_auditallow(&self) -> bool {
+        PS::deref(&self.metadata).is_auditallow()
+    }
+
+    /// Returns whether this access vector comes from an
+    /// `dontaudit [source] [target]:[class] { [permissions] };` policy statement.
+    pub fn is_dontaudit(&self) -> bool {
+        PS::deref(&self.metadata).is_dontaudit()
     }
 
     /// Returns whether this access vector compes from a
@@ -306,6 +326,18 @@ impl AccessVectorMetadata {
     /// `allow [source] [target]:[class] { [permissions] };` policy statement.
     pub fn is_allow(&self) -> bool {
         (self.access_vector_type() & ACCESS_VECTOR_TYPE_ALLOW_MASK) != 0
+    }
+
+    /// Returns whether this access vector comes from an
+    /// `auditallow [source] [target]:[class] { [permissions] };` policy statement.
+    pub fn is_auditallow(&self) -> bool {
+        (self.access_vector_type() & ACCESS_VECTOR_TYPE_AUDITALLOW_MASK) != 0
+    }
+
+    /// Returns whether this access vector comes from an
+    /// `dontaudit [source] [target]:[class] { [permissions] };` policy statement.
+    pub fn is_dontaudit(&self) -> bool {
+        (self.access_vector_type() & ACCESS_VECTOR_TYPE_DONTAUDIT_MASK) != 0
     }
 
     /// Returns whether this access vector compes from a

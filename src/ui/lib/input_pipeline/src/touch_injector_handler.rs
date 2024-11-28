@@ -89,7 +89,7 @@ impl UnhandledInputHandler for TouchInjectorHandler {
                 fuchsia_trace::flow_end!(
                     c"input",
                     c"report-to-event",
-                    trace_id.unwrap_or(0.into())
+                    trace_id.unwrap_or_else(|| 0.into())
                 );
                 // Create a new injector if this is the first time seeing device_id.
                 if let Err(e) = self.ensure_injector_registered(&touch_device_descriptor).await {
@@ -256,8 +256,7 @@ impl TouchInjectorHandler {
         }
 
         // Create a new injector.
-        let (device_proxy, device_server) = create_proxy::<pointerinjector::DeviceMarker>()
-            .context("Failed to create DeviceProxy.")?;
+        let (device_proxy, device_server) = create_proxy::<pointerinjector::DeviceMarker>();
         let context = fuchsia_scenic::duplicate_view_ref(&self.context_view_ref)
             .context("Failed to duplicate context view ref.")?;
         let target = fuchsia_scenic::duplicate_view_ref(&self.target_view_ref)
@@ -630,14 +629,11 @@ mod tests {
 
         // Create touch handler.
         let (aggregator_proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, _injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let touch_handler_fut = TouchInjectorHandler::new_handler(
@@ -658,8 +654,7 @@ mod tests {
 
         // Add an injector.
         let (injector_device_proxy, mut injector_device_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::DeviceMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::DeviceMarker>();
         touch_handler.mutable_state.borrow_mut().injectors.insert(1, injector_device_proxy);
 
         // This nested block is used to bound the lifetime of `watch_viewport_fut`.
@@ -743,14 +738,11 @@ mod tests {
 
         // Set up fidl streams.
         let (aggregator_proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, mut injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
 
@@ -805,14 +797,11 @@ mod tests {
 
         // Create touch handler.
         let (aggregator_proxy, aggregator_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, _injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let touch_handler_fut = TouchInjectorHandler::new_handler(
@@ -833,8 +822,7 @@ mod tests {
 
         // Add an injector.
         let (injector_device_proxy, mut injector_device_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::DeviceMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::DeviceMarker>();
         touch_handler.mutable_state.borrow_mut().injectors.insert(1, injector_device_proxy);
 
         // Request a viewport update.
@@ -917,14 +905,11 @@ mod tests {
 
         // Create touch handler.
         let (aggregator_proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, mut injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let touch_handler_fut = TouchInjectorHandler::new_handler(
@@ -945,8 +930,7 @@ mod tests {
 
         // Add an injector.
         let (injector_device_proxy, mut injector_device_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::DeviceMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::DeviceMarker>();
         touch_handler.mutable_state.borrow_mut().injectors.insert(1, injector_device_proxy);
 
         // Request a viewport update.
@@ -1010,8 +994,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn touch_injector_handler_initialized_with_inspect_node() {
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
         let touch_handler_fut = TouchInjectorHandler::new_with_config_proxy(
@@ -1045,14 +1028,11 @@ mod tests {
     async fn touch_injector_handler_inspect_counts_events() {
         // Set up fidl streams.
         let (aggregator_proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
 
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");

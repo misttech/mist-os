@@ -265,7 +265,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_empty() {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send the end of stream marker.
@@ -281,7 +281,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_one_batch() {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send a batch containing two allocations - whose threads, stack traces and contents can be
@@ -391,7 +391,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_two_batches() {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send a first batch.
@@ -518,7 +518,7 @@ mod tests {
         set_one_field_to_none: fn(&mut fheapdump_client::Allocation),
     ) -> Result<Snapshot, Error> {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Start with an Allocation with all the required fields set.
@@ -572,7 +572,7 @@ mod tests {
         set_one_field_to_none: fn(&mut fheapdump_client::ThreadInfo),
     ) -> Result<Snapshot, Error> {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Start with a ThreadInfo with all the required fields set.
@@ -610,7 +610,7 @@ mod tests {
         set_one_field_to_none: fn(&mut fheapdump_client::StackTrace),
     ) -> Result<Snapshot, Error> {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Start with a StackTrace with all the required fields set.
@@ -651,7 +651,7 @@ mod tests {
         set_one_field_to_none: fn(&mut fheapdump_client::ExecutableRegion),
     ) -> Result<Snapshot, Error> {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Start with an ExecutableRegion with all the required fields set.
@@ -690,7 +690,7 @@ mod tests {
         set_one_field_to_none: fn(&mut fheapdump_client::BlockContents),
     ) -> Result<Snapshot, Error> {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Start with a BlockContents with all the required fields set.
@@ -739,7 +739,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_conflicting_allocations() {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send two allocations with the same address along with the stack trace they reference.
@@ -788,7 +788,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_conflicting_executable_regions() {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send two executable regions with the same address.
@@ -832,7 +832,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_block_contents_wrong_size() {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send an allocation whose BlockContents has the wrong size.
@@ -879,7 +879,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_empty_stack_trace() {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send an allocation that references an empty stack trace.
@@ -919,7 +919,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_chunked_stack_trace() {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send an allocation and the first chunk of its stack trace.
@@ -969,7 +969,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_empty_block_contents() {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send a zero-sized allocation and its empty contents.
@@ -1014,7 +1014,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_chunked_block_contents() {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Split the contents in two halves.
@@ -1073,7 +1073,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_missing_end_of_stream() {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Send an allocation and its stack trace.

@@ -289,34 +289,45 @@ zx_status_t WlanInterface::GetCountry(brcmf_pub* drvr, uint8_t* cc_code) {
 
 zx_status_t WlanInterface::ClearCountry(brcmf_pub* drvr) { return brcmf_clear_country(drvr); }
 
-void WlanInterface::Start(StartRequestView request, StartCompleter::Sync& completer) {
+void WlanInterface::Init(InitRequestView request, InitCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
   if (wdev_ == nullptr) {
-    BRCMF_ERR("Failed to start interface: wdev_ not found.");
+    BRCMF_ERR("Failed to initialize interface: wdev_ not found.");
     completer.ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
+
+  if (!request->has_ifc()) {
+    BRCMF_ERR("Failed to initialize interface: request missing ifc");
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
   {
     std::lock_guard<std::shared_mutex> guard(wdev_->netdev->if_proto_lock);
     wdev_->netdev->if_proto =
-        fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc>(std::move(request->ifc));
+        fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc>(std::move(request->ifc()));
   }
 
-  zx::channel out_mlme_channel;
-  zx_status_t status = brcmf_if_start(wdev_->netdev, (zx_handle_t*)&out_mlme_channel);
+  zx::channel out_sme_channel;
+  zx_status_t status = brcmf_if_start(wdev_->netdev, (zx_handle_t*)&out_sme_channel);
   if (status != ZX_OK) {
     BRCMF_ERR("Failed to start interface: %s", zx_status_get_string(status));
     completer.ReplyError(status);
     return;
   }
-  completer.ReplySuccess(std::move(out_mlme_channel));
+
+  fidl::Arena arena;
+  auto response = fuchsia_wlan_fullmac::wire::WlanFullmacImplInitResponse::Builder(arena)
+                      .sme_channel(std::move(out_sme_channel))
+                      .Build();
+  completer.ReplySuccess(response);
 }
 
 void WlanInterface::Query(QueryCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
   fdf::Arena arena('WLAN');
-  fuchsia_wlan_fullmac::wire::WlanFullmacQueryInfo info;
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplQueryResponse info;
   if (wdev_ != nullptr) {
     brcmf_if_query(wdev_->netdev, &info, arena);
   }
@@ -415,14 +426,6 @@ void WlanInterface::Disassoc(DisassocRequestView request, DisassocCompleter::Syn
   completer.Reply();
 }
 
-void WlanInterface::Reset(ResetRequestView request, ResetCompleter::Sync& completer) {
-  std::shared_lock<std::shared_mutex> guard(lock_);
-  if (wdev_ != nullptr) {
-    brcmf_if_reset_req(wdev_->netdev, request);
-  }
-  completer.Reply();
-}
-
 void WlanInterface::StartBss(StartBssRequestView request, StartBssCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
   if (wdev_ != nullptr) {
@@ -451,14 +454,6 @@ void WlanInterface::SetKeys(SetKeysRequestView request, SetKeysCompleter::Sync& 
   fuchsia_wlan_fullmac_wire::WlanFullmacSetKeysResp resp;
   resp.statuslist = fidl::VectorView(arena, statuslist);
   completer.Reply(resp);
-}
-
-void WlanInterface::DelKeys(DelKeysRequestView request, DelKeysCompleter::Sync& completer) {
-  std::shared_lock<std::shared_mutex> guard(lock_);
-  if (wdev_ != nullptr) {
-    brcmf_if_del_keys_req(wdev_->netdev, request);
-  }
-  completer.Reply();
 }
 
 void WlanInterface::EapolTx(EapolTxRequestView request, EapolTxCompleter::Sync& completer) {
@@ -505,26 +500,9 @@ void WlanInterface::GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync
   }
 }
 
-void WlanInterface::SetMulticastPromisc(SetMulticastPromiscRequestView request,
-                                        SetMulticastPromiscCompleter::Sync& completer) {
-  std::shared_lock<std::shared_mutex> guard(lock_);
-  if (wdev_ == nullptr) {
-    completer.ReplyError(ZX_ERR_BAD_STATE);
-    return;
-  }
-  bool enable = request->enable;
-  zx_status_t status = brcmf_if_set_multicast_promisc(wdev_->netdev, enable);
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
-  } else {
-    completer.ReplySuccess();
-  }
-}
-
 void WlanInterface::SaeHandshakeResp(SaeHandshakeRespRequestView request,
                                      SaeHandshakeRespCompleter::Sync& completer) {
-  const fuchsia_wlan_fullmac::wire::WlanFullmacSaeHandshakeResp resp = request->resp;
-  brcmf_if_sae_handshake_resp(wdev_->netdev, &resp);
+  brcmf_if_sae_handshake_resp(wdev_->netdev, request);
   completer.Reply();
 }
 
@@ -547,7 +525,13 @@ void WlanInterface::OnLinkStateChanged(OnLinkStateChangedRequestView request,
                                        OnLinkStateChangedCompleter::Sync& completer) {
   {
     std::shared_lock<std::shared_mutex> guard(lock_);
-    bool online = request->online;
+    if (!request->has_online()) {
+      BRCMF_ERR("Reset req does not contain required field, online: %d", request->has_online());
+      completer.Reply();
+      return;
+    }
+
+    bool online = request->online();
     SetPortOnline(online);
   }
   completer.Reply();

@@ -7,6 +7,7 @@
 
 #include <ios>
 
+#include "constants.h"
 #include "diagnostics.h"
 #include "internal/const-string.h"
 
@@ -39,6 +40,15 @@ template <typename S, typename T>
 constexpr decltype(auto) operator<<(S&& ostream, FileAddress<T> address) {
   auto flags = ostream.flags();
   ostream << std::showbase << std::hex << " at relative address " << *address;
+  ostream.flags(flags);
+  return std::forward<S>(ostream);
+}
+
+template <typename S>
+constexpr decltype(auto) operator<<(S&& ostream, ElfMachine machine) {
+  auto flags = ostream.flags();
+  ostream << ElfMachineName(machine) << " (" << std::showbase << std::hex
+          << static_cast<uint16_t>(machine) << ")";
   ostream.flags(flags);
   return std::forward<S>(ostream);
 }

@@ -1303,9 +1303,19 @@ mod tests {
         ]);
     }
 
+    fn nudge_executor(executor: &fasync::TestExecutor, delta: fasync::MonotonicDuration) {
+        let now = executor.now();
+        executor.set_fake_time(now + delta);
+    }
+
     #[fuchsia::test]
     fn correction_by_slew() {
-        let mut executor = fasync::TestExecutor::new();
+        // Get time from the kernel, then start the fake executor from actual time, but run in fake
+        // time. This works around validation checks in TimeSourceManager, which use actual time as
+        // reference. These checks are valid at real runtime, but not at fake time.
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+        let actual_time = zx::MonotonicInstant::get();
+        executor.set_fake_time(actual_time.into());
 
         // Calculate a small change in offset that will be corrected by slewing and is large enough
         // to require an error bound reduction. Note the tests doesn't have to actually wait this
@@ -1315,7 +1325,7 @@ mod tests {
 
         let clock = create_clock();
         let diagnostics = Arc::new(FakeDiagnostics::new());
-        let reference = zx::BootInstant::get();
+        let reference: zx::BootInstant = executor.boot_now().into();
         let config = make_test_config();
         let clock_manager = create_clock_manager(
             Arc::clone(&clock),
@@ -1342,14 +1352,15 @@ mod tests {
 
         // Maintain the clock until no more work remains, which should correspond to having started
         // a clock skew but blocking on the timer to end it.
-        let reference_before = zx::BootInstant::get();
+        let reference_before = executor.boot_now();
         let (_, r) = mpsc::channel(1);
         let b = Rc::new(Cell::new(true));
         let mut fut = pin!(clock_manager.maintain_clock(r, b));
+        nudge_executor(&executor, fasync::MonotonicDuration::from_seconds(1));
         let _ = executor.run_until_stalled(&mut fut);
         let updated_utc = clock.read().unwrap();
         let details = clock.get_details().unwrap();
-        let reference_after = zx::BootInstant::get();
+        let reference_after = executor.boot_now();
 
         // The clock time should still be very close to the original value but the details should
         // show that a rate change is in progress.
@@ -1365,12 +1376,14 @@ mod tests {
         // After waiting for the first deferred update the clock should still be still at the
         // modified rate with a smaller error bound.
         assert!(executor.wake_next_timer().is_some());
+        nudge_executor(&executor, fasync::MonotonicDuration::from_seconds(1));
         let _ = executor.run_until_stalled(&mut fut);
         // This stepwise execution of the control algorithm is sensitive to the changes
         // in task scheduling, and may need an arbitrary number of "stalled runs"
         // to complete with success. This additional stalled run is a consequence
         // of adding a new async `mpsc::Sender` for async commands.
         assert!(executor.wake_next_boot_timer().is_some());
+        nudge_executor(&executor, fasync::MonotonicDuration::from_seconds(1));
         let _ = executor.run_until_stalled(&mut fut);
 
         let details2 = clock.get_details().unwrap();
@@ -1381,6 +1394,7 @@ mod tests {
         // After waiting for the next deferred update the clock should be back to the original rate
         // with an even smaller error bound.
         assert!(executor.wake_next_boot_timer().is_some());
+        nudge_executor(&executor, fasync::MonotonicDuration::from_seconds(1));
         let _ = executor.run_until_stalled(&mut fut);
         let details3 = clock.get_details().unwrap();
         assert_eq!(details3.reference_to_synthetic.rate.synthetic_ticks, 1000000);
@@ -1389,11 +1403,13 @@ mod tests {
 
         // If we keep on waiting the error bound should keep increasing in the absence of updates.
         assert!(executor.wake_next_boot_timer().is_some());
+        nudge_executor(&executor, fasync::MonotonicDuration::from_seconds(1));
         let _ = executor.run_until_stalled(&mut fut);
         let details4 = clock.get_details().unwrap();
         assert_eq!(details4.reference_to_synthetic, details3.reference_to_synthetic);
         assert_gt!(details4.error_bounds, details3.error_bounds);
         assert!(executor.wake_next_boot_timer().is_some());
+        nudge_executor(&executor, fasync::MonotonicDuration::from_seconds(1));
         let _ = executor.run_until_stalled(&mut fut);
         let details5 = clock.get_details().unwrap();
         assert_eq!(details5.reference_to_synthetic, details3.reference_to_synthetic);

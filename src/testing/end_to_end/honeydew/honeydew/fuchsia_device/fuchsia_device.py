@@ -23,15 +23,10 @@ import fuchsia_controller_py as fcp
 
 from honeydew import errors
 from honeydew.affordances.connectivity.wlan.utils import types as wlan_types
-from honeydew.affordances.connectivity.wlan.wlan import (
-    wlan,
-    wlan_using_fc,
-    wlan_using_sl4f,
-)
+from honeydew.affordances.connectivity.wlan.wlan import wlan, wlan_using_fc
 from honeydew.affordances.connectivity.wlan.wlan_policy import (
     wlan_policy,
     wlan_policy_using_fc,
-    wlan_policy_using_sl4f,
 )
 from honeydew.affordances.connectivity.wlan.wlan_policy_ap import (
     wlan_policy_ap,
@@ -533,22 +528,13 @@ class FuchsiaDevice(
         Returns:
             wlan_policy.WlanPolicy object
         """
-        if (
-            self._get_wlan_affordances_implementation()
-            == wlan_types.Implementation.SL4F
-        ):
-            return wlan_policy_using_sl4f.WlanPolicy(
-                device_name=self.device_name,
-                sl4f=self.sl4f,
-            )
-        else:
-            return wlan_policy_using_fc.WlanPolicy(
-                device_name=self.device_name,
-                ffx=self.ffx,
-                fuchsia_controller=self.fuchsia_controller,
-                reboot_affordance=self,
-                fuchsia_device_close=self,
-            )
+        return wlan_policy_using_fc.WlanPolicy(
+            device_name=self.device_name,
+            ffx=self.ffx,
+            fuchsia_controller=self.fuchsia_controller,
+            reboot_affordance=self,
+            fuchsia_device_close=self,
+        )
 
     @properties.Affordance
     def wlan_policy_ap(self) -> wlan_policy_ap.WlanPolicyAp:
@@ -572,21 +558,13 @@ class FuchsiaDevice(
         Returns:
             wlan.Wlan object
         """
-        if (
-            self._get_wlan_affordances_implementation()
-            == wlan_types.Implementation.SL4F
-        ):
-            return wlan_using_sl4f.Wlan(
-                device_name=self.device_name, sl4f=self.sl4f
-            )
-        else:
-            return wlan_using_fc.Wlan(
-                device_name=self.device_name,
-                ffx=self.ffx,
-                fuchsia_controller=self.fuchsia_controller,
-                reboot_affordance=self,
-                fuchsia_device_close=self,
-            )
+        return wlan_using_fc.Wlan(
+            device_name=self.device_name,
+            ffx=self.ffx,
+            fuchsia_controller=self.fuchsia_controller,
+            reboot_affordance=self,
+            fuchsia_device_close=self,
+        )
 
     @properties.Affordance
     def inspect(self) -> inspect_interface.Inspect:

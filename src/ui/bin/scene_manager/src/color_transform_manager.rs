@@ -404,7 +404,7 @@ mod tests {
     }
 
     fn init() -> (Arc<Mutex<ColorTransformManager>>, MockConverter, Arc<Mutex<MockSceneManager>>) {
-        let (client, server) = create_proxy_and_stream::<fidl_color::ConverterMarker>().unwrap();
+        let (client, server) = create_proxy_and_stream::<fidl_color::ConverterMarker>();
 
         let converter = MockConverter::default();
         // Run the converter in the background.
@@ -425,7 +425,7 @@ mod tests {
     fn create_display_backlight_stream(
         manager: Arc<Mutex<ColorTransformManager>>,
     ) -> DisplayBacklightProxy {
-        let (client, server) = create_proxy_and_stream::<DisplayBacklightMarker>().unwrap();
+        let (client, server) = create_proxy_and_stream::<DisplayBacklightMarker>();
         super::ColorTransformManager::handle_display_backlight_request_stream(manager, server);
         client
     }
@@ -433,7 +433,7 @@ mod tests {
     fn create_color_adjustment_handler_stream(
         manager: Arc<Mutex<ColorTransformManager>>,
     ) -> ColorAdjustmentHandlerProxy {
-        let (client, server) = create_proxy_and_stream::<ColorAdjustmentHandlerMarker>().unwrap();
+        let (client, server) = create_proxy_and_stream::<ColorAdjustmentHandlerMarker>();
         super::ColorTransformManager::handle_color_adjustment_handler_request_stream(
             manager, server,
         );
@@ -443,7 +443,7 @@ mod tests {
     fn create_color_adjustment_stream(
         manager: Arc<Mutex<ColorTransformManager>>,
     ) -> ColorAdjustmentProxy {
-        let (client, server) = create_proxy_and_stream::<ColorAdjustmentMarker>().unwrap();
+        let (client, server) = create_proxy_and_stream::<ColorAdjustmentMarker>();
         super::ColorTransformManager::handle_color_adjustment_request_stream(manager, server);
         client
     }
@@ -451,7 +451,7 @@ mod tests {
     fn create_color_transform_stream(
         manager: Arc<Mutex<ColorTransformManager>>,
     ) -> ColorTransformHandlerProxy {
-        let (client, server) = create_proxy_and_stream::<ColorTransformHandlerMarker>().unwrap();
+        let (client, server) = create_proxy_and_stream::<ColorTransformHandlerMarker>();
         super::ColorTransformManager::handle_color_transform_request_stream(manager, server);
         client
     }

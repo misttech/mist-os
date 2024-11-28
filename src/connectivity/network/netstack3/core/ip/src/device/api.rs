@@ -24,8 +24,8 @@ use crate::internal::device::config::{
     IpDeviceConfigurationHandler, PendingIpDeviceConfigurationUpdate, UpdateIpConfigurationError,
 };
 use crate::internal::device::state::{
-    IpDeviceConfiguration, Ipv4AddrConfig, Ipv4AddressState, Ipv6AddrConfig, Ipv6AddrManualConfig,
-    Ipv6AddressState, Lifetime,
+    CommonAddressProperties, IpDeviceConfiguration, Ipv4AddrConfig, Ipv4AddressState,
+    Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddressState,
 };
 use crate::internal::device::{
     self, AddressRemovedReason, DelIpAddr, IpAddressId as _, IpDeviceAddressContext as _,
@@ -208,24 +208,22 @@ where
         &mut self,
         device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
         address: SpecifiedAddr<I::Addr>,
-        next_valid_until: Lifetime<<C::BindingsContext as InstantBindingsTypes>::Instant>,
+        next_properties: CommonAddressProperties<
+            <C::BindingsContext as InstantBindingsTypes>::Instant,
+        >,
     ) -> Result<(), SetIpAddressPropertiesError> {
-        trace!(
-            "set_ip_addr_properties: setting valid_until={:?} for addr={:?}",
-            next_valid_until,
-            address
-        );
+        trace!("set_ip_addr_properties: setting {:?} for addr={:?}", next_properties, address);
         let (core_ctx, bindings_ctx) = self.contexts();
         let address_id = core_ctx.get_address_id(device, address)?;
         core_ctx.with_ip_address_state_mut(device, &address_id, |address_state| {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
             struct Wrap<'a, I: IpDeviceIpExt, II: Instant>(&'a mut I::AddressState<II>);
-            let valid_until = I::map_ip_in(
+            let CommonAddressProperties { valid_until, preferred_lifetime } = I::map_ip_in(
                 Wrap(address_state),
                 |Wrap(Ipv4AddressState { config })| {
                     match config {
-                        Some(Ipv4AddrConfig { valid_until }) => Ok(valid_until),
+                        Some(Ipv4AddrConfig { common }) => Ok(common),
                         // Address is being removed, configuration has been
                         // taken out.
                         None => Err(NotFoundError.into()),
@@ -239,18 +237,28 @@ where
                         Some(Ipv6AddrConfig::Slaac(_)) => {
                             Err(SetIpAddressPropertiesError::NotManual)
                         }
-                        Some(Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until })) => {
-                            Ok(valid_until)
-                        }
+                        Some(Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
+                            common,
+                            temporary: _,
+                        })) => Ok(common),
                     }
                 },
-            );
-            let valid_until = valid_until?;
-            if core::mem::replace(valid_until, next_valid_until) != next_valid_until {
+            )?;
+
+            let CommonAddressProperties {
+                valid_until: next_valid_until,
+                preferred_lifetime: next_preferred_lifetime,
+            } = next_properties;
+            let mut changed = core::mem::replace(valid_until, next_valid_until) != next_valid_until;
+            changed |= core::mem::replace(preferred_lifetime, next_preferred_lifetime)
+                != next_preferred_lifetime;
+
+            if changed {
                 bindings_ctx.on_event(IpDeviceEvent::AddressPropertiesChanged {
                     device: device.clone(),
                     addr: address,
                     valid_until: next_valid_until,
+                    preferred_lifetime: next_preferred_lifetime,
                 });
             }
             Ok(())

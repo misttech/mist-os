@@ -51,7 +51,7 @@ pub async fn list_all_mas_instances(client: AccessorClient) -> Result<(), Error>
 
 // Takes the NotificationRegistration FIDL server end and prints incoming notifications.
 async fn print_notifications(relayer_server: ServerEnd<NotificationRegistrationMarker>) {
-    let mut notification_stream = relayer_server.into_stream().unwrap().fuse();
+    let mut notification_stream = relayer_server.into_stream().fuse();
     while let Some(res) = notification_stream.next().await {
         if let Err(e) = res {
             warn!(?e, "Error with FIDL stream");

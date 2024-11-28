@@ -27,11 +27,12 @@ pub async fn wait_for_device_with<T>(
     let stream = stream.try_filter_map(|filename| {
         let predicate = &predicate;
         async move {
-            let filename = filename.to_str().ok_or(format_err!("to_str for filename failed"))?;
+            let filename =
+                filename.to_str().ok_or_else(|| format_err!("to_str for filename failed"))?;
             let controller_filename = filename.to_owned() + "/device_controller";
 
             let (controller_proxy, server_end) =
-                fidl::endpoints::create_proxy::<ControllerMarker>()?;
+                fidl::endpoints::create_proxy::<ControllerMarker>();
             if dev_dir
                 .open3(
                     &controller_filename,
@@ -67,7 +68,7 @@ pub async fn wait_for_device_with<T>(
     });
     futures::pin_mut!(stream);
     let item = stream.try_next().await?;
-    item.ok_or(format_err!("stream ended prematurely"))
+    item.ok_or_else(|| format_err!("stream ended prematurely"))
 }
 
 /// Returns a stream that contains the paths of any existing files and
@@ -121,7 +122,8 @@ where
     let path = std::path::Path::new(name);
     let mut components = path.components().peekable();
     loop {
-        let component = components.next().ok_or(format_err!("cannot wait for empty path"))?;
+        let component =
+            components.next().ok_or_else(|| format_err!("cannot wait for empty path"))?;
         let file = match component {
             std::path::Component::Normal(file) => file,
             // Per fuchsia.io/Directory.Open[0]:
@@ -230,7 +232,7 @@ mod tests {
           },
         };
 
-        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let flags: fio::Flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
         let object_request =
@@ -254,7 +256,7 @@ mod tests {
           "b" => read_only(b"/b"),
         };
 
-        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let flags: fio::Flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
         let object_request =
@@ -290,7 +292,7 @@ mod tests {
           "3" => read_only("file 3"),
         };
 
-        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let flags: fio::Flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
         let object_request =
@@ -309,7 +311,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn open_two_directories() {
-        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let root = vfs::pseudo_directory! {
             "test" => vfs::pseudo_directory! {
@@ -335,7 +337,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn open_directory_with_leading_slash() {
-        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let root = vfs::pseudo_directory! {
             "test" => vfs::pseudo_directory! {},

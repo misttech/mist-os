@@ -102,7 +102,7 @@ async fn handle_provider_request(
 ) -> Result<(), fidl::Error> {
     match req {
         fidl_policy::ClientProviderRequest::GetController { requests, updates, .. } => {
-            register_listener(update_sender, updates.into_proxy()?);
+            register_listener(update_sender, updates.into_proxy());
             handle_client_requests(
                 iface_manager,
                 scan_requester,
@@ -144,7 +144,7 @@ async fn handle_client_requests(
     requests: ClientRequests,
     telemetry_sender: TelemetrySender,
 ) -> Result<(), fidl::Error> {
-    let mut request_stream = requests.into_stream()?;
+    let mut request_stream = requests.into_stream();
     while let Some(request) = request_stream.try_next().await? {
         log_client_request(&request);
         match request {
@@ -409,7 +409,7 @@ async fn handle_client_request_get_networks(
             .map(fidl_policy::NetworkConfig::from)
             .collect::<Vec<fidl_policy::NetworkConfig>>()
     });
-    let mut stream = iterator.into_stream()?;
+    let mut stream = iterator.into_stream();
     for chunk in fidl_chunks {
         send_next_chunk(&mut stream, chunk).await?;
     }
@@ -440,7 +440,7 @@ async fn handle_listener_request(
 ) -> Result<(), fidl::Error> {
     match req {
         fidl_policy::ClientListenerRequest::GetListener { updates, .. } => {
-            register_listener(update_sender, updates.into_proxy()?);
+            register_listener(update_sender, updates.into_proxy());
             Ok(())
         }
     }
@@ -656,11 +656,9 @@ mod tests {
     fn request_controller(
         provider: &fidl_policy::ClientProviderProxy,
     ) -> (fidl_policy::ClientControllerProxy, fidl_policy::ClientStateUpdatesRequestStream) {
-        let (controller, requests) = create_proxy::<fidl_policy::ClientControllerMarker>()
-            .expect("failed to create ClientController proxy");
+        let (controller, requests) = create_proxy::<fidl_policy::ClientControllerMarker>();
         let (update_sink, update_stream) =
-            create_request_stream::<fidl_policy::ClientStateUpdatesMarker>()
-                .expect("failed to create ClientStateUpdates proxy");
+            create_request_stream::<fidl_policy::ClientStateUpdatesMarker>();
         provider.get_controller(requests, update_sink).expect("error getting controller");
         (controller, update_stream)
     }
@@ -719,12 +717,10 @@ mod tests {
         let saved_networks =
             Arc::new(FakeSavedNetworksManager::new_with_saved_networks(presaved_default_configs));
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
+        let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>();
+        let requests = requests.into_stream();
 
-        let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
-            .expect("failed to create ClientSmeProxy");
+        let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>();
         let (req_sender, iface_mgr_req_recvr) = mpsc::channel(1);
         let iface_manager = FakeIfaceManager::new(proxy.clone(), req_sender);
         let iface_manager = Arc::new(Mutex::new(iface_manager));
@@ -912,8 +908,7 @@ mod tests {
         let mut test_values = test_setup();
 
         // Create a Fake IfaceManager without WPA3 support for this test.
-        let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
-            .expect("failed to create ClientSmeProxy");
+        let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>();
         let (req_sender, _req_recvr) = mpsc::channel(1);
         let iface_manager = FakeIfaceManager::new_without_wpa3(proxy.clone(), req_sender);
         let iface_manager: Arc<Mutex<dyn IfaceManagerApi>> = Arc::new(Mutex::new(iface_manager));
@@ -1097,7 +1092,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue a scan request.
-        let (_iter, server) = fidl::endpoints::create_proxy().expect("failed to create iterator");
+        let (_iter, server) = fidl::endpoints::create_proxy();
         controller.scan_for_networks(server).expect("Failed to call scan for networks");
 
         // Currently the FakeScanRequester will panic if a scan is requested and no results
@@ -1493,8 +1488,7 @@ mod tests {
 
         // Issue request to get the list of saved networks.
         let (iter, server) =
-            fidl::endpoints::create_proxy::<fidl_policy::NetworkConfigIteratorMarker>()
-                .expect("failed to create iterator");
+            fidl::endpoints::create_proxy::<fidl_policy::NetworkConfigIteratorMarker>();
         controller.get_saved_networks(server).expect("Failed to call get saved networks");
 
         // Get responses from iterator. Expect to see the specified number of responses with
@@ -1559,9 +1553,8 @@ mod tests {
     #[fuchsia::test]
     fn get_listener() {
         let mut exec = fasync::TestExecutor::new();
-        let (listener, requests) = create_proxy::<fidl_policy::ClientListenerMarker>()
-            .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
+        let (listener, requests) = create_proxy::<fidl_policy::ClientListenerMarker>();
+        let requests = requests.into_stream();
 
         let (update_sender, mut listener_updates) = mpsc::unbounded();
         let serve_fut = serve_listener_requests(update_sender, requests);
@@ -1572,8 +1565,7 @@ mod tests {
 
         // Register listener.
         let (update_sink, _update_stream) =
-            create_request_stream::<fidl_policy::ClientStateUpdatesMarker>()
-                .expect("failed to create ClientStateUpdates proxy");
+            create_request_stream::<fidl_policy::ClientStateUpdatesMarker>();
         listener.get_listener(update_sink).expect("error getting listener");
 
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1887,9 +1879,8 @@ mod tests {
 
         // Create another client provider request stream and start serving it.  This is equivalent
         // to the behavior that occurs when a second client connects to the ClientProvider service.
-        let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
+        let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>();
+        let requests = requests.into_stream();
 
         let second_serve_fut = serve_provider_requests(
             test_values.iface_manager.clone(),
@@ -1945,8 +1936,7 @@ mod tests {
     #[fuchsia::test(add_test_attr = false)]
     fn test_start_client_connections(start_client_connections_succeeds: bool) {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
-            .expect("failed to create ClientSmeProxy");
+        let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>();
         let (req_sender, _req_recvr) = mpsc::channel(1);
         let mut iface_manager = FakeIfaceManager::new(proxy.clone(), req_sender);
 
@@ -1970,8 +1960,7 @@ mod tests {
     #[fuchsia::test(add_test_attr = false)]
     fn test_stop_client_connections(stop_client_connections_succeeds: bool) {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
-            .expect("failed to create ClientSmeProxy");
+        let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>();
         let (req_sender, _req_recvr) = mpsc::channel(1);
         let mut iface_manager = FakeIfaceManager::new(proxy.clone(), req_sender);
 

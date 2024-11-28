@@ -97,6 +97,9 @@ open protocol WifiChip {
     flexible RemoveStaIface(resource table {
         1: iface_name string:16;
     }) -> () error zx.Status;
+    flexible SetCountryCode(resource table {
+        1: code array<byte, 2>;
+    }) -> () error zx.Status;
     /// Get a set of operation modes that the chip supports.
     /// This combination encodes what iface types and how many can be created,
     /// and which ones can run concurrently.
@@ -139,6 +142,15 @@ open protocol SupplicantStaIface {
         1: network server_end:SupplicantStaNetwork;
     });
     flexible Disconnect() -> ();
+    flexible SetPowerSave(resource table {
+        1: enable bool;
+    }) -> ();
+    flexible SetSuspendModeEnabled(resource table {
+        1: enable bool;
+    }) -> ();
+    flexible SetStaCountryCode(resource table {
+        1: code array<byte, 2>;
+    }) -> () error zx.Status;
 };
 
 open protocol SupplicantStaIfaceCallback {

@@ -23,7 +23,7 @@ impl crate::RemotableCapability for Router<Dict> {
 impl From<Router<Dict>> for fsandbox::Capability {
     fn from(router: Router<Dict>) -> Self {
         let (client_end, sender_stream) =
-            fidl::endpoints::create_request_stream::<fsandbox::DictionaryRouterMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<fsandbox::DictionaryRouterMarker>();
         router.serve_and_register(sender_stream, client_end.get_koid().unwrap());
         fsandbox::Capability::DictionaryRouter(client_end)
     }

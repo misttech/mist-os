@@ -149,7 +149,7 @@ impl JoinCommand {
             .await
             .context("Unable to get device instance")?;
         let (client_end, server_end) = create_endpoints::<ProvisioningMonitorMarker>();
-        let monitor = client_end.into_proxy()?;
+        let monitor = client_end.into_proxy();
         device_extra.join_network(&join_args, server_end).context("Unable to send join command")?;
         loop {
             match monitor.watch_progress().await? {

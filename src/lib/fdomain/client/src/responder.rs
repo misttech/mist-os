@@ -215,7 +215,7 @@ impl Responder {
                 ret
             }
             Err(e) => {
-                let _ = sender.send(Err(e.clone().into()));
+                let _ = sender.send(Err(e.into()));
                 Ok(ResponderStatus::Ok)
             }
         }

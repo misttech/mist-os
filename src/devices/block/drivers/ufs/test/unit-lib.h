@@ -9,18 +9,16 @@
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/power/cpp/testing/fake_element_control.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/internal/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
+#include <lib/driver/testing/cpp/driver_test.h>
+#include <lib/inspect/testing/cpp/inspect.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "mock-device/ufs-mock-device.h"
 #include "src/devices/block/drivers/ufs/ufs.h"
+#include "src/devices/pci/testing/pci_protocol_fake.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace ufs {
 
@@ -143,7 +141,7 @@ class FakeSystemActivityGovernor
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    ADD_FAILURE("%s is not implemented", name.c_str());
+    ADD_FAILURE() << "Unexpected SCSI command";
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
@@ -312,25 +310,6 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
   std::vector<PowerElement> servers_;
 };
 
-struct IncomingNamespace {
-  IncomingNamespace() {
-    zx::event::create(0, &exec_opportunistic);
-    zx::event::create(0, &wake_assertive);
-    zx::event exec_opportunistic_dupe, wake_assertive_dupe;
-    ASSERT_OK(exec_opportunistic.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_opportunistic_dupe));
-    ASSERT_OK(wake_assertive.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_assertive_dupe));
-    system_activity_governor.emplace(std::move(exec_opportunistic_dupe),
-                                     std::move(wake_assertive_dupe));
-  }
-
-  fdf_testing::TestNode node{"root"};
-  fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
-  FakePci pci_server;
-  zx::event exec_opportunistic, wake_assertive;
-  std::optional<FakeSystemActivityGovernor> system_activity_governor;
-  FakePowerBroker power_broker;
-};
-
 class TestUfs : public Ufs {
  public:
   TestUfs(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
@@ -352,21 +331,66 @@ class TestUfs : public Ufs {
   static ufs_mock_device::UfsMockDevice* mock_device_;
 };
 
-// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
-// library.
-// TODO(https://fxbug.dev/42075643): This should use fdf_testing::DriverTestFixture.
-class UfsTest : public inspect::InspectTestHelper, public zxtest::Test {
+class Environment : public fdf_testing::Environment {
  public:
-  UfsTest()
-      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        incoming_(env_dispatcher_->async_dispatcher(), std::in_place) {}
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    // Serve device_server_
+    device_server_.Init(component::kDefaultInstance, "root");
+    device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
+
+    // Serve (fake) pci_server_
+    auto result = to_driver_vfs.AddService<fuchsia_hardware_pci::Service>(
+        pci_server_.GetInstanceHandler(), "pci");
+    EXPECT_EQ(ZX_OK, result.status_value());
+
+    // Serve (fake) system_activity_governor.
+    zx::event::create(0, &exec_opportunistic_);
+    zx::event::create(0, &wake_assertive_);
+    zx::event exec_opportunistic_dupe, wake_assertive_dupe;
+    EXPECT_EQ(exec_opportunistic_.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_opportunistic_dupe), ZX_OK);
+    EXPECT_EQ(wake_assertive_.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_assertive_dupe), ZX_OK);
+    system_activity_governor_.emplace(std::move(exec_opportunistic_dupe),
+                                      std::move(wake_assertive_dupe));
+    auto result_sag =
+        to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_system::ActivityGovernor>(
+            system_activity_governor_->CreateHandler());
+    EXPECT_EQ(ZX_OK, result_sag.status_value());
+
+    // Serve (fake) power_broker.
+    auto result_pb = to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_broker::Topology>(
+        power_broker_.CreateHandler());
+    EXPECT_EQ(ZX_OK, result_pb.status_value());
+
+    return zx::ok();
+  }
+
+  FakePci& pci_server() { return pci_server_; }
+  FakePowerBroker& power_broker() { return power_broker_; }
+  FakeSystemActivityGovernor& system_activity_governor() { return *system_activity_governor_; }
+
+ private:
+  FakePci pci_server_;
+  compat::DeviceServer device_server_;
+  zx::event exec_opportunistic_, wake_assertive_;
+  std::optional<FakeSystemActivityGovernor> system_activity_governor_;
+  FakePowerBroker power_broker_;
+};
+
+class TestConfig final {
+ public:
+  using DriverType = TestUfs;
+  using EnvironmentType = Environment;
+};
+
+class UfsTest : public ::testing::Test {
+ public:
+  void SetUp() override;
+  void TearDown() override;
 
   void InitMockDevice();
   void StartDriver(bool supply_power_framework = false);
 
-  void SetUp() override;
-
-  void TearDown() override;
+  fdf_testing::ForegroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
 
   zx::result<fdf::MmioBuffer> GetMmioBuffer(zx::vmo vmo) {
     return zx::ok(mock_device_.GetMmioBuffer(std::move(vmo)));
@@ -393,6 +417,14 @@ class UfsTest : public inspect::InspectTestHelper, public zxtest::Test {
 
   zx::result<uint32_t> ReadAttribute(Attributes attribute, uint8_t index = 0);
   zx::result<> WriteAttribute(Attributes attribute, uint32_t value, uint8_t index = 0);
+
+  zx::result<> DisableBackgroundOp() { return dut_->GetDeviceManager().DisableBackgroundOp(); }
+
+  // This function is a wrapper to avoid the thread annotation of ReserveAdminSlot().
+  zx::result<uint8_t> ReserveAdminSlot() {
+    std::lock_guard<std::mutex> lock(dut_->GetTransferRequestProcessor().admin_slot_lock_);
+    return dut_->GetTransferRequestProcessor().ReserveAdminSlot();
+  }
 
   ufs_mock_device::UfsMockDevice mock_device_;
 
@@ -423,10 +455,8 @@ class UfsTest : public inspect::InspectTestHelper, public zxtest::Test {
   }
 
  protected:
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
-  fdf_testing::internal::DriverUnderTest<TestUfs> dut_;
+  fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
+  TestConfig::DriverType* dut_;
 };
 
 }  // namespace ufs

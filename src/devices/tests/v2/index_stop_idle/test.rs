@@ -113,7 +113,7 @@ async fn test_index_stop_on_idle() -> Result<()> {
     {
         let driver_dev = realm.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
 
-        let (node_spec, server) = fidl::endpoints::create_proxy()?;
+        let (node_spec, server) = fidl::endpoints::create_proxy();
         driver_dev.get_composite_node_specs(None, server)?;
         loop {
             let mut specs = node_spec.get_next().await?;
@@ -140,7 +140,7 @@ async fn test_index_stop_on_idle() -> Result<()> {
     {
         let driver_dev = realm.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
 
-        let (node_spec, server) = fidl::endpoints::create_proxy()?;
+        let (node_spec, server) = fidl::endpoints::create_proxy();
         driver_dev.get_composite_node_specs(None, server)?;
 
         loop {

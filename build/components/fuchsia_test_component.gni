@@ -5,17 +5,19 @@
 import("fuchsia_component.gni")
 
 type_moniker_map = {
-  chromium = "/core/testing:chromium-tests"
-  component_framework = "/core/testing:component-framework-tests"
-  ctf = "/core/testing:ctf-tests"
-  device = "/core/testing:devices-tests"
-  drm = "/core/testing:drm-tests"
-  starnix = "/core/testing:starnix-tests"
-  system = "/core/testing:system-tests"
-  system_validation = "/core/testing:system-validation-tests"
-  test_arch = "/core/testing:test-arch-tests"
-  vfs_compliance = "/core/testing:vfs-compliance-tests"
-  vulkan = "/core/testing:vulkan-tests"
+  chromium = "/core/testing/chromium-tests"
+  component_framework = "/core/testing/component-framework-tests"
+  ctf = "/core/testing/ctf-tests"
+  device = "/core/testing/devices-tests"
+  drm = "/core/testing/drm-tests"
+  starnix = "/core/testing/starnix-tests"
+  system = "/core/testing/system-tests"
+  system_validation = "/core/testing/system-validation-tests"
+  test_arch = "/core/testing/test-arch-tests"
+  vfs_compliance = "/core/testing/vfs-compliance-tests"
+  vulkan = "/core/testing/vulkan-tests"
+  bootstrap_driver_system = "/bootstrap/testing/driver-system-tests"
+  driver_system = "/core/testing/driver-system-tests"
 }
 
 # Defines a Fuchsia component that is testonly.

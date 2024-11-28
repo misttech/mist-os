@@ -268,9 +268,9 @@ impl MappingFlags {
         mapping_flags | Self::from_bits_truncate(prot_flags.access_flags().bits())
     }
 
-    #[cfg(feature = "alternate_anon_allocs")]
+    #[cfg(any(feature = "alternate_anon_allocs", test))]
     fn options(&self) -> MappingOptions {
-        MappingOptions::from_bits_truncate(self.bits() << 3)
+        MappingOptions::from_bits_truncate(self.bits() >> 3)
     }
 
     fn from_access_flags_and_options(prot_flags: ProtectionFlags, options: MappingOptions) -> Self {
@@ -631,9 +631,6 @@ pub struct MemoryManagerState {
 struct PrivateAnonymousMemoryManager {
     /// Memory object backing private, anonymous memory allocations in this address space.
     backing: Arc<MemoryObject>,
-
-    /// Memory object used to make address allocations for private, anonymous memory allocations in this address space.
-    allocation: MemoryObject,
 }
 
 #[cfg(feature = "alternate_anon_allocs")]
@@ -642,14 +639,7 @@ impl PrivateAnonymousMemoryManager {
         let backing = Arc::new(MemoryObject::from(
             zx::Vmo::create(backing_size).unwrap().replace_as_executable(&VMEX_RESOURCE).unwrap(),
         ));
-        // The allocation memory object is mapped to find available address ranges. Pages in it are never
-        // modified and the actual size does not matter. To allow creating mappings that might
-        // fault (if permissions were to allow) this mapping has to be resizable. It will never be
-        // resized.
-        let allocation =
-            MemoryObject::from(zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).unwrap());
-
-        Self { backing, allocation }
+        Self { backing }
     }
 
     fn read_memory<'a>(
@@ -669,19 +659,6 @@ impl PrivateAnonymousMemoryManager {
             .op_range(zx::VmoOp::ZERO, addr.ptr() as u64, length as u64)
             .map_err(|_| errno!(EFAULT))?;
         Ok(length)
-    }
-
-    fn allocate_address_range(
-        &self,
-        user_vmar: &zx::Vmar,
-        user_vmar_info: &zx::VmarInfo,
-        addr: DesiredAddress,
-        length: usize,
-        options: MappingOptions,
-    ) -> Result<UserAddress, Errno> {
-        // Create a mapping with no protection in order to allocate address space for this mapping.
-        let flags = MappingFlags::from_access_flags_and_options(ProtectionFlags::empty(), options);
-        map_in_vmar(user_vmar, user_vmar_info, addr, &self.allocation, 0, length, flags, false)
     }
 
     fn move_pages(
@@ -710,10 +687,6 @@ impl PrivateAnonymousMemoryManager {
                     .create_child(zx::VmoChildOptions::SNAPSHOT, 0, backing_size)
                     .map_err(impossible_error)?
                     .replace_as_executable(&VMEX_RESOURCE)
-                    .map_err(impossible_error)?,
-            ),
-            allocation: MemoryObject::from(
-                zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0)
                     .map_err(impossible_error)?,
             ),
         })
@@ -762,7 +735,7 @@ impl DerefMut for MemoryManagerState {
 fn map_in_vmar(
     vmar: &zx::Vmar,
     vmar_info: &zx::VmarInfo,
-    addr: DesiredAddress,
+    addr: SelectedAddress,
     memory: &MemoryObject,
     memory_offset: u64,
     length: usize,
@@ -774,9 +747,8 @@ fn map_in_vmar(
 
     let base_addr = UserAddress::from_ptr(vmar_info.base);
     let (vmar_offset, vmar_extra_flags) = match addr {
-        DesiredAddress::Hint(_) | DesiredAddress::Any => unreachable!(),
-        DesiredAddress::Fixed(addr) => (addr - base_addr, zx::VmarFlags::SPECIFIC),
-        DesiredAddress::FixedOverwrite(addr) => (addr - base_addr, ZX_VM_SPECIFIC_OVERWRITE),
+        SelectedAddress::Fixed(addr) => (addr - base_addr, zx::VmarFlags::SPECIFIC),
+        SelectedAddress::FixedOverwrite(addr) => (addr - base_addr, ZX_VM_SPECIFIC_OVERWRITE),
     };
 
     if populate {
@@ -944,29 +916,15 @@ impl MemoryManagerState {
         self.get_occupied_address_ranges(&(hint_addr..hint_end)).next().is_none()
     }
 
-    fn select_desired_address(
+    fn select_address(
         &self,
-        mut addr: DesiredAddress,
+        addr: DesiredAddress,
         length: usize,
         flags: MappingFlags,
-    ) -> Result<DesiredAddress, Errno> {
+    ) -> Result<SelectedAddress, Errno> {
         let adjusted_length = round_up_to_system_page_size(length)?;
 
-        // If the hint is not acceptable, strip it.
-        if let DesiredAddress::Hint(mut hint_addr) = addr {
-            // Round down to page size
-            hint_addr =
-                UserAddress::from_ptr(hint_addr.ptr() - hint_addr.ptr() % *PAGE_SIZE as usize);
-            addr = if self.is_hint_acceptable(hint_addr, adjusted_length) {
-                DesiredAddress::Fixed(hint_addr)
-            } else {
-                DesiredAddress::Any
-            };
-        }
-
-        // If the address is not known at this point, choose one. If LOWER_32BIT is set, choose at
-        // random, otherwise choose the highest available gap.
-        if addr == DesiredAddress::Any {
+        let find_address = || -> Result<SelectedAddress, Errno> {
             profile_duration!("FindAddressForMmap");
             let new_addr = if flags.contains(MappingFlags::LOWER_32BIT) {
                 // MAP_32BIT specifies that the memory allocated will
@@ -981,16 +939,30 @@ impl MemoryManagerState {
                 self.find_next_unused_range(adjusted_length).ok_or_else(|| errno!(ENOMEM))?
             };
 
-            addr = DesiredAddress::Fixed(new_addr)
-        }
+            Ok(SelectedAddress::Fixed(new_addr))
+        };
 
-        Ok(addr)
+        Ok(match addr {
+            DesiredAddress::Any => find_address()?,
+            DesiredAddress::Hint(hint_addr) => {
+                // Round down to page size
+                let hint_addr =
+                    UserAddress::from_ptr(hint_addr.ptr() - hint_addr.ptr() % *PAGE_SIZE as usize);
+                if self.is_hint_acceptable(hint_addr, adjusted_length) {
+                    SelectedAddress::Fixed(hint_addr)
+                } else {
+                    find_address()?
+                }
+            }
+            DesiredAddress::Fixed(addr) => SelectedAddress::Fixed(addr),
+            DesiredAddress::FixedOverwrite(addr) => SelectedAddress::FixedOverwrite(addr),
+        })
     }
 
     // Map the memory without updating `self.mappings`.
-    fn map_internal(
+    fn map_in_user_vmar(
         &self,
-        addr: DesiredAddress,
+        addr: SelectedAddress,
         memory: &MemoryObject,
         memory_offset: u64,
         length: usize,
@@ -1000,7 +972,7 @@ impl MemoryManagerState {
         map_in_vmar(
             &self.user_vmar,
             &self.user_vmar_info,
-            self.select_desired_address(addr, length, flags)?,
+            addr,
             memory,
             memory_offset,
             length,
@@ -1034,8 +1006,14 @@ impl MemoryManagerState {
     ) -> Result<UserAddress, Errno> {
         self.validate_addr(addr, length)?;
 
-        let mapped_addr =
-            self.map_internal(addr, &memory, memory_offset, length, flags, populate)?;
+        let mapped_addr = self.map_in_user_vmar(
+            self.select_address(addr, length, flags)?,
+            &memory,
+            memory_offset,
+            length,
+            flags,
+            populate,
+        )?;
 
         #[cfg(any(test, debug_assertions))]
         {
@@ -1076,20 +1054,11 @@ impl MemoryManagerState {
         self.validate_addr(addr, length)?;
 
         let flags = MappingFlags::from_access_flags_and_options(prot_flags, options);
-        let addr = self.select_desired_address(addr, length, flags)?;
+        let selected_addr = self.select_address(addr, length, flags)?;
+        let backing_memory_offset = selected_addr.addr().ptr();
 
-        let target_addr = self.private_anonymous.allocate_address_range(
-            &self.user_vmar,
-            &self.user_vmar_info,
-            addr,
-            length,
-            options,
-        )?;
-
-        let backing_memory_offset = target_addr.ptr();
-
-        let mapped_addr = self.map_internal(
-            DesiredAddress::FixedOverwrite(target_addr),
+        let mapped_addr = self.map_in_user_vmar(
+            selected_addr,
             &self.private_anonymous.backing,
             backing_memory_offset as u64,
             length,
@@ -1308,8 +1277,8 @@ impl MemoryManagerState {
                 let growth_start = original_range.end;
                 let growth_length = new_length - old_length;
                 // Map new pages to back the growth.
-                self.map_internal(
-                    DesiredAddress::FixedOverwrite(growth_start),
+                self.map_in_user_vmar(
+                    SelectedAddress::FixedOverwrite(growth_start),
                     &self.private_anonymous.backing,
                     growth_start.ptr() as u64,
                     growth_length,
@@ -1422,13 +1391,8 @@ impl MemoryManagerState {
             }
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => {
-                let dst_addr = self.private_anonymous.allocate_address_range(
-                    &self.user_vmar,
-                    &self.user_vmar_info,
-                    self.select_desired_address(dst_addr_for_map, dst_length, src_mapping.flags)?,
-                    dst_length,
-                    src_mapping.flags.options(),
-                )?;
+                let dst_addr =
+                    self.select_address(dst_addr_for_map, dst_length, src_mapping.flags)?.addr();
 
                 let length_to_move = std::cmp::min(dst_length, src_length) as u64;
 
@@ -1438,8 +1402,8 @@ impl MemoryManagerState {
                     self.private_anonymous.move_pages(&range_to_move, dst_addr)?;
                 }
 
-                self.map_internal(
-                    DesiredAddress::FixedOverwrite(dst_addr),
+                self.map_in_user_vmar(
+                    SelectedAddress::FixedOverwrite(dst_addr),
                     &self.private_anonymous.backing,
                     dst_addr.ptr() as u64,
                     dst_length,
@@ -1449,7 +1413,7 @@ impl MemoryManagerState {
 
                 if dst_length > src_length {
                     // The mapping has grown, map new pages in to cover the growth.
-                    let growth_start_addr = dst_addr + dst_length;
+                    let growth_start_addr = dst_addr + length_to_move;
                     let growth_length = dst_length - src_length;
 
                     self.map_private_anonymous(
@@ -1505,16 +1469,17 @@ impl MemoryManagerState {
     // An operation may be forbidden if the target mapping only partially covers
     // an existing mapping with the `MappingOptions::DONT_SPLIT` flag set.
     fn check_has_unauthorized_splits(&self, addr: UserAddress, length: usize) -> bool {
-        let target_mapping = addr..addr.saturating_add(length);
-        let mut intersection = self.mappings.intersection(target_mapping.clone());
+        let query_range = addr..addr.saturating_add(length);
+        let mut intersection = self.mappings.intersection(query_range.clone());
 
         // A mapping is not OK if it disallows splitting and the target range
         // does not fully cover the mapping range.
         let check_if_mapping_has_unauthorized_split =
             |mapping: Option<(&Range<UserAddress>, &Mapping)>| {
-                mapping.is_some_and(|(range, mapping)| {
+                mapping.is_some_and(|(mapping_range, mapping)| {
                     mapping.flags.contains(MappingFlags::DONT_SPLIT)
-                        && (range.start < target_mapping.start || target_mapping.end < range.end)
+                        && (mapping_range.start < query_range.start
+                            || query_range.end < mapping_range.end)
                 })
             };
 
@@ -1662,8 +1627,8 @@ impl MemoryManagerState {
                 backing.base = range.start;
                 backing.memory_offset = 0;
 
-                self.map_internal(
-                    DesiredAddress::FixedOverwrite(range.start),
+                self.map_in_user_vmar(
+                    SelectedAddress::FixedOverwrite(range.start),
                     &backing.memory,
                     0,
                     child_length,
@@ -3429,7 +3394,7 @@ impl MemoryManager {
                             map_in_vmar(
                                 &state.user_vmar,
                                 &state.user_vmar_info,
-                                DesiredAddress::FixedOverwrite(range.start),
+                                SelectedAddress::FixedOverwrite(range.start),
                                 replaced_memory,
                                 memory_offset,
                                 length,
@@ -3469,10 +3434,8 @@ impl MemoryManager {
                     }
 
                     let target_memory_offset = range.start.ptr() as u64;
-                    map_in_vmar(
-                        &target_state.user_vmar,
-                        &target_state.user_vmar_info,
-                        DesiredAddress::FixedOverwrite(range.start),
+                    target_state.map_in_user_vmar(
+                        SelectedAddress::FixedOverwrite(range.start),
                         &target_state.private_anonymous.backing,
                         target_memory_offset,
                         length,
@@ -4171,6 +4134,25 @@ pub enum DesiredAddress {
     FixedOverwrite(UserAddress),
 }
 
+/// The user-space address at which a mapping should be placed. Used by [`map_in_vmar`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SelectedAddress {
+    /// See DesiredAddress::Fixed.
+    Fixed(UserAddress),
+    /// See DesiredAddress::FixedOverwrite.
+    FixedOverwrite(UserAddress),
+}
+
+impl SelectedAddress {
+    #[cfg(feature = "alternate_anon_allocs")]
+    fn addr(&self) -> UserAddress {
+        match self {
+            SelectedAddress::Fixed(addr) => *addr,
+            SelectedAddress::FixedOverwrite(addr) => *addr,
+        }
+    }
+}
+
 fn write_map(
     task: &Task,
     sink: &mut DynamicFileBuf,
@@ -4426,6 +4408,20 @@ mod tests {
     };
     use std::ffi::CString;
     use zerocopy::KnownLayout;
+
+    #[::fuchsia::test]
+    fn test_mapping_flags() {
+        let options = MappingOptions::ANONYMOUS;
+        let access_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
+        let mapping_flags = MappingFlags::from_access_flags_and_options(access_flags, options);
+        assert_eq!(mapping_flags.access_flags(), access_flags);
+        assert_eq!(mapping_flags.options(), options);
+
+        let new_access_flags = ProtectionFlags::READ | ProtectionFlags::EXEC;
+        let adusted_mapping_flags = mapping_flags.with_access_flags(new_access_flags);
+        assert_eq!(adusted_mapping_flags.access_flags(), new_access_flags);
+        assert_eq!(adusted_mapping_flags.options(), options);
+    }
 
     #[::fuchsia::test]
     async fn test_brk() {

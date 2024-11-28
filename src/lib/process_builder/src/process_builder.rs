@@ -255,10 +255,7 @@ impl ProcessBuilder {
         if ldsvc.is_invalid_handle() {
             return Err(ProcessBuilderError::BadHandle("Invalid loader service handle"));
         }
-        self.ldsvc =
-            Some(ldsvc.into_proxy().map_err(|e| {
-                ProcessBuilderError::Internal("Failed to get LoaderProxy", e.into())
-            })?);
+        self.ldsvc = Some(ldsvc.into_proxy());
         Ok(())
     }
 

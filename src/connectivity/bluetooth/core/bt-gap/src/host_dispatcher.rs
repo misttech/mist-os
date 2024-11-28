@@ -391,7 +391,7 @@ impl HostDispatcherState {
     }
 
     fn add_host(&mut self, id: HostId, host: HostDevice) {
-        if self.host_devices.insert(id, host.clone()).is_some() {
+        if self.host_devices.insert(id, host).is_some() {
             warn!("Host replaced: {}", id.to_string())
         } else {
             info!("Host added: {}", id.to_string());
@@ -493,7 +493,7 @@ impl HostDispatcher {
     }
 
     pub fn get_name(&self) -> String {
-        self.state.read().name.clone().unwrap_or(DEFAULT_DEVICE_NAME.to_string())
+        self.state.read().name.clone().unwrap_or_else(|| DEFAULT_DEVICE_NAME.to_string())
     }
 
     pub fn get_appearance(&self) -> Appearance {
@@ -601,7 +601,7 @@ impl HostDispatcher {
                     // On errors all session_watchers will be dropped, signaling receivers of
                     // the error.
                     if let Ok(session) = self.start_discovery().await {
-                        let _ = sender.send(session.clone());
+                        let _ = sender.send(session);
                     }
                 }
             }
@@ -968,7 +968,7 @@ impl HostDispatcher {
             .map_err(|e| e.as_failure())
             .context(format!("{:?}: failed to set name of bt-host", dbg_ids))?;
 
-        let (gatt_server_proxy, remote_gatt_server) = fidl::endpoints::create_proxy()?;
+        let (gatt_server_proxy, remote_gatt_server) = fidl::endpoints::create_proxy();
         host_device
             .proxy()
             .request_protocol(ProtocolRequest::Gatt2Server(remote_gatt_server))
@@ -1074,7 +1074,8 @@ impl HostDispatcher {
                 drop(discovery_on_closed_task);
                 drop(discovery_proxy);
 
-                let session = session.upgrade().ok_or(format_err!("failed to upgrade session"))?;
+                let session =
+                    session.upgrade().ok_or_else(|| format_err!("failed to upgrade session"))?;
 
                 // Restart discovery.
                 let (session_sender, session_receiver) = oneshot::channel();
@@ -1110,7 +1111,7 @@ impl HostDispatcher {
                     // On errors, sender will be dropped, signaling receivers of
                     // the error.
                     if let Ok(session) = self.start_discovery().await {
-                        let _ = sender.send(session.clone());
+                        let _ = sender.send(session);
                     }
                 }
             }
@@ -1293,7 +1294,7 @@ async fn assign_host_data(
     let data = match hd.stash().get_host_data(address.clone()).await? {
         Some(host_data) => {
             trace!("restored IRK");
-            host_data.clone()
+            host_data
         }
         None => {
             // Generate a new IRK.
@@ -1394,13 +1395,13 @@ pub(crate) mod test {
                 })) => {
                     // don't respond at all on the server side.
                     info!("Storing Gatt Server");
-                    let mut gatt_server = server.into_stream().unwrap();
+                    let mut gatt_server = server.into_stream();
                     info!("GAS Server was started, waiting for publish");
                     // The Generic Access Service now publishes itself.
                     match gatt_server.next().await {
                         Some(Ok(Server_Request::PublishService { info, service, responder })) => {
                             info!("Captured publish of GAS Service: {:?}", info);
-                            gas_endpoints.service = Some(service.into_proxy().unwrap());
+                            gas_endpoints.service = Some(service.into_proxy());
                             let _ = responder.send(Ok(()));
                         }
                         x => error!("Got unexpected GAS Server request: {:?}", x),
@@ -1413,7 +1414,7 @@ pub(crate) mod test {
                 }
                 Some(Ok(HostRequest::SetBondingDelegate { delegate, .. })) => {
                     info!("Storing Bonding Delegate");
-                    bonding_delegate = Some(delegate.into_stream().unwrap());
+                    bonding_delegate = Some(delegate.into_stream());
                 }
                 Some(Ok(req)) => info!("Unhandled Host Request in add: {:?}", req),
                 Some(Err(e)) => error!("Error in host server: {:?}", e),

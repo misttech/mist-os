@@ -151,9 +151,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   //
   // The default implementation returns |ZX_ERR_NOT_SUPPORTED|.
   // Subclasses may override this behavior to serve custom protocols over the channel.
-  //
-  // TODO(b/324112857): This function should only consume |channel| on success so that we can close
-  // the channel with an epitaph on failure.
   virtual zx_status_t ConnectService(zx::channel channel);
 
   virtual zx_status_t WatchDir(FuchsiaVfs* vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,

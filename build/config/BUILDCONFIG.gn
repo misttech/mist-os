@@ -4,6 +4,8 @@
 # found in the LICENSE file.
 
 import("//build/config/compilation_modes.gni")
+import("//build/config/python_interpreter.gni")
+import("//build/icu/build_config.gni")
 import("//build/rust/build.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/restat.gni")
@@ -80,15 +82,6 @@ set_default_toolchain(target_toolchain)
 # Some projects expect a default value for sources_assignment_filter.
 sources_assignment_filter = []
 
-# Variables used to refer to the in-tree python interpreter.
-python_exe_src = "//prebuilt/third_party/python3/${host_platform}/bin/python3"
-python_include_dir = "//prebuilt/third_party/python3/${host_platform}/include"
-
-# Variables used to refer to the in-tree python pip.
-pip_version = "3.11"
-pip_exe_src =
-    "//prebuilt/third_party/python3/${host_platform}/bin/pip${pip_version}"
-
 # These files are needed when enabling 'restat' behavior through this wrapper
 # script.  'restat' preserves old timestamps on unchanged outputs.
 restat_wrapper_inputs = [
@@ -141,6 +134,7 @@ if (!defined(toolchain_variant.name)) {
   toolchain_variant.remove_common_configs = []
   toolchain_variant.remove_shared_configs = []
   toolchain_variant.deps = []
+  toolchain_variant.executable_deps = []
   toolchain_variant.is_pic_default = false
   toolchain_variant.with_shared = true
   toolchain_variant.instrumented = false
@@ -1300,7 +1294,7 @@ foreach(_target_type,
           # BUILDCONFIG.gn can't directly import those .gni files because
           # there's a circularity.  But the template expansion can do the
           # imports where they'll happen in an initialized toolchain context.
-          import("//build/config/clang/clang.gni")
+          import("//build/config/clang/clang_prefix.gni")
           import("//build/toolchain/zircon/gcc.gni")
         }
 
@@ -1659,6 +1653,11 @@ declare_args() {
   #       [list of labels] Added to the deps of every target linked in
   #       this variant (as well as the automatic `${label}_deps` for
   #       each label in configs).
+  #
+  #   `executable_deps`
+  #       [list of labels] Added to the deps of every executable() target
+  #       linked in this variant (as well as `deps`, above, and the automatic
+  #       `${label}_deps` for each label in configs).
   #
   #   `name` (required if configs is omitted)
   #       [string] Name of the variant as used in
@@ -2301,6 +2300,7 @@ if (in_default_toolchain) {
         remove_common_configs = []
         remove_shared_configs = []
         deps = []
+        executable_deps = []
         tags = []
         if (variant == false) {
           name = ""
@@ -2887,6 +2887,9 @@ template("variant_target") {
         target_type = target_type
         deps = []
         forward_variables_from(target_invoker, "*")
+        if (target_type == "executable") {
+          deps += toolchain_variant.executable_deps
+        }
         deps += toolchain_variant.deps
         foreach(config,
                 toolchain_variant.configs +
@@ -2894,6 +2897,9 @@ template("variant_target") {
                     toolchain_variant.remove_common_configs) {
           # Expand the label so it always has a `:name` part.
           config = get_label_info(config, "label_no_toolchain")
+          if (target_type == "executable") {
+            deps += [ "${config}_executable_deps" ]
+          }
           deps += [ "${config}_deps" ]
         }
         if (defined(visibility)) {

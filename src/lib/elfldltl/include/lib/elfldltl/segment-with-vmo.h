@@ -284,7 +284,8 @@ class SegmentWithVmo {
   // immutable by replacing the segment .vmo() handle without ZX_RIGHT_WRITE.
   template <class Diagnostics, class LoadInfo>
   [[nodiscard]] static bool AlignSegments(Diagnostics& diag, LoadInfo& info, zx::unowned_vmo vmo,
-                                          size_t page_size, bool readonly = false) {
+                                          typename LoadInfo::size_type page_size,
+                                          bool readonly = false) {
     using DataWithZeroFillSegment = typename LoadInfo::DataWithZeroFillSegment;
     auto align_segment = [vmo, page_size, readonly, &diag](auto& segment) {
       using Segment = std::decay_t<decltype(segment)>;

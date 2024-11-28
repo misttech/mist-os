@@ -476,8 +476,14 @@ impl Timer<BootTimeline> {
     /// If the kernel reports no memory available to create a timer or the process' job policy
     /// denies timer creation.
     pub fn create() -> Self {
-        // TODO(https://fxbug.dev/328306129) change the clock ID to the boot clock
-        Self(MonotonicTimer::create().0, std::marker::PhantomData)
+        let mut out = 0;
+        let opts = 0;
+        let status = unsafe {
+            sys::zx_timer_create(opts, 1 /*ZX_CLOCK_BOOT*/, &mut out)
+        };
+        ok(status)
+            .expect("timer creation always succeeds except with OOM or when job policy denies it");
+        unsafe { Self::from(Handle::from_raw(out)) }
     }
 }
 

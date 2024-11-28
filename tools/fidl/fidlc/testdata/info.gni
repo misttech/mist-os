@@ -65,10 +65,6 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
-      "fidlgen_rust_next",
-    ]
   },
   {
     name = "arrays"
@@ -93,10 +89,6 @@ fidl_testdata_info = [
   {
     name = "bits"
     target = "//tools/fidl/fidlc/testdata:test.bits"
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
-      "fidlgen_rust_next",
-    ]
   },
   {
     name = "byte_and_bytes"
@@ -112,8 +104,8 @@ fidl_testdata_info = [
       "fidlgen_cpp",
       "fidlgen_go",
     ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
+    host_build_denylist = [
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -126,18 +118,11 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
       "fidlgen_go",
-
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
-      "fidlgen_rust_next",
     ]
   },
   {
     name = "bits_constants"
     target = "//tools/fidl/fidlc/testdata:test.bitsconstants"
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
-      "fidlgen_rust_next",
-    ]
   },
   {
     name = "doc_comments"
@@ -152,7 +137,7 @@ fidl_testdata_info = [
       "fidlgen_cpp",
     ]
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support services yet.
       "fidlgen_rust_next",
     ]
   },
@@ -305,10 +290,6 @@ fidl_testdata_info = [
   {
     name = "imported_const_values"
     target = "//tools/fidl/fidlc/testdata/imported_const_values:test.importedconstvalues"
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support dependencies yet.
-      "fidlgen_rust_next",
-    ]
   },
   {
     name = "inheritance"
@@ -350,7 +331,7 @@ fidl_testdata_info = [
       "fidlgen_rust",
       "fidlgen_syzkaller",
 
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support newtypes yet.
       "fidlgen_rust_next",
     ]
   },
@@ -496,9 +477,6 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42121485): Syzkaller does not support enum member references
       # in struct defaults.
       "fidlgen_syzkaller",
-
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support dependencies yet.
-      "fidlgen_rust_next",
     ]
   },
   {
@@ -513,10 +491,6 @@ fidl_testdata_info = [
   {
     name = "transitive_dependencies"
     target = "//tools/fidl/fidlc/testdata/transitive_dependencies:test.transitivedependencies"
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support dependencies yet.
-      "fidlgen_rust_next",
-    ]
   },
   {
     name = "transitive_dependencies_compose"
@@ -573,7 +547,7 @@ fidl_testdata_info = [
       "fidlgen_cpp",
     ]
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support type aliases yet.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support services yet.
       "fidlgen_rust_next",
     ]
   },

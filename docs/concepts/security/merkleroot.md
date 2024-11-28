@@ -2,7 +2,7 @@
 
 [Merkle Trees][merkletree] are used in various places in the Fuchsia ecosystem,
 including the [FAR Archive Format][far], the Blob Storage Filesystem, and the
-[Package Manager][pm].
+[package management tools included in ffx][ffx].
 
 In [Zircon][zircon] `zx-verity` provides an API for application components to
 read data from local storage. When retrieving data the integrity of the data is
@@ -83,5 +83,5 @@ the SHA-256 of 12 0 bytes, the block identity of a single 0 length block.
 [merkletree]: https://en.wikipedia.org/wiki/Merkle_tree "Merkle Tree"
 [dmverity]: https://www.chromium.org/chromium-os/chromiumos-design-docs/verified-boot "Chrome OS Verified Boot"
 [far]: /docs/development/source_code/archive_format.md "Archive Format"
-[pm]: /src/sys/pkg/bin/pm/README.md "Package Manager"
+[ffx]: https://fuchsia.dev/reference/tools/sdk/ffx "Package management tools in ffx"
 [zircon]: /zircon/README.md "Zircon"

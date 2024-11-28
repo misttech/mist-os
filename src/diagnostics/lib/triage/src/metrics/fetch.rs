@@ -195,8 +195,8 @@ impl TryFrom<String> for SelectorString {
     fn try_from(full_selector: String) -> Result<Self, Self::Error> {
         let mut string_parts = full_selector.splitn(2, ':');
         let selector_type =
-            SelectorType::from_str(string_parts.next().ok_or(anyhow!("Empty selector"))?)?;
-        let body = string_parts.next().ok_or(anyhow!("Selector needs a :"))?.to_owned();
+            SelectorType::from_str(string_parts.next().ok_or_else(|| anyhow!("Empty selector"))?)?;
+        let body = string_parts.next().ok_or_else(|| anyhow!("Selector needs a :"))?.to_owned();
         let parsed_selector = selectors::parse_selector::<VerboseError>(&body)?;
         Ok(SelectorString { full_selector, selector_type, body, parsed_selector })
     }
@@ -315,13 +315,16 @@ impl TryFrom<Vec<JsonValue>> for InspectFetcher {
 
     fn try_from(component_vec: Vec<JsonValue>) -> Result<Self, Self::Error> {
         fn extract_json_value<'a>(
-            component: &'a JsonValue,
+            component: &'a mut JsonValue,
             key: &'_ str,
-        ) -> Result<&'a JsonValue, Error> {
-            component.get(key).ok_or_else(|| anyhow!("'{}' not found in Inspect component", key))
+        ) -> Result<JsonValue, Error> {
+            Ok(component
+                .get_mut(key)
+                .ok_or_else(|| anyhow!("'{}' not found in Inspect component", key))?
+                .take())
         }
 
-        fn moniker_from(component: &JsonValue) -> Result<ExtendedMoniker, anyhow::Error> {
+        fn moniker_from(component: &mut JsonValue) -> Result<ExtendedMoniker, anyhow::Error> {
             let value = extract_json_value(component, "moniker")
                 .or_else(|_| bail!("'moniker' not found in Inspect component"))?;
             let moniker = ExtendedMoniker::parse_str(
@@ -332,44 +335,38 @@ impl TryFrom<Vec<JsonValue>> for InspectFetcher {
             Ok(moniker)
         }
 
-        let components: Vec<_> = component_vec
-            .iter()
-            .map(|raw_component| {
-                let moniker = moniker_from(raw_component)?;
-                let tree_name = match extract_json_value(
-                    extract_json_value(raw_component, "metadata")?,
-                    "name",
-                ) {
-                    Ok(n) => n.as_str().unwrap_or(DEFAULT_TREE_NAME).to_string(),
-                    // the "name" field might be missing from older systems
-                    Err(_) => DEFAULT_TREE_NAME.to_string(),
-                };
-                let raw_contents = extract_json_value(raw_component, "payload").or_else(|_| {
-                    extract_json_value(raw_component, "contents").or_else(|_| {
-                        bail!("Neither 'payload' nor 'contents' found in Inspect component")
-                    })
-                })?;
-                let processed_data: DiagnosticsHierarchy = match raw_contents {
-                    v if v.is_null() => {
-                        // If the payload is null, leave the hierarchy empty.
-                        DiagnosticsHierarchy::new_root()
-                    }
-                    raw_contents => {
-                        serde_json::from_value(raw_contents.clone()).with_context(|| {
-                            format!(
-                                "Unable to deserialize Inspect contents for {} to node hierarchy",
-                                moniker,
-                            )
-                        })?
-                    }
-                };
-                Ok(ComponentInspectInfo { moniker, processed_data, tree_name })
-            })
-            .collect::<Vec<_>>();
+        let components = component_vec.into_iter().map(|mut raw_component| {
+            let moniker = moniker_from(&mut raw_component)?;
+            let tree_name = match extract_json_value(
+                &mut extract_json_value(&mut raw_component, "metadata")?,
+                "name",
+            ) {
+                Ok(n) => n.as_str().unwrap_or(DEFAULT_TREE_NAME).to_string(),
+                // the "name" field might be missing from older systems
+                Err(_) => DEFAULT_TREE_NAME.to_string(),
+            };
+            let raw_contents = extract_json_value(&mut raw_component, "payload").or_else(|_| {
+                extract_json_value(&mut raw_component, "contents").or_else(|_| {
+                    bail!("Neither 'payload' nor 'contents' found in Inspect component")
+                })
+            })?;
+            let processed_data: DiagnosticsHierarchy = match raw_contents {
+                v if v.is_null() => {
+                    // If the payload is null, leave the hierarchy empty.
+                    DiagnosticsHierarchy::new_root()
+                }
+                raw_contents => serde_json::from_value(raw_contents).with_context(|| {
+                    format!(
+                        "Unable to deserialize Inspect contents for {} to node hierarchy",
+                        moniker,
+                    )
+                })?,
+            };
+            Ok(ComponentInspectInfo { moniker, processed_data, tree_name })
+        });
 
         let mut component_errors = vec![];
         let components = components
-            .into_iter()
             .filter_map(|v| match v {
                 Ok(component) => Some(component),
                 Err(e) => {

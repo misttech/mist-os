@@ -9,7 +9,7 @@
 #include <cinttypes>
 #include <cstdint>
 
-namespace display {
+namespace display_coordinator {
 
 const char* DebugStringFromClientPriority(ClientPriority client_priority) {
   switch (client_priority) {
@@ -23,4 +23,4 @@ const char* DebugStringFromClientPriority(ClientPriority client_priority) {
   return nullptr;
 }
 
-}  // namespace display
+}  // namespace display_coordinator

@@ -20,7 +20,7 @@
 #include <fbl/vector.h>
 #include <hwreg/bitfields.h>
 
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/edid/internal/iterators.h"
 
 // References

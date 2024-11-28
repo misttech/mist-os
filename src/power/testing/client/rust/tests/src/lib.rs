@@ -21,11 +21,11 @@ async fn test_connect_and_call_all_protocols() -> Result<()> {
     let realm = realm_builder.build().await?;
 
     let topology = realm.root.connect_to_protocol_at_exposed_dir::<fbroker::TopologyMarker>()?;
-    let (_current_level, current_level_server_end) = create_proxy::<fbroker::CurrentLevelMarker>()?;
+    let (_current_level, current_level_server_end) = create_proxy::<fbroker::CurrentLevelMarker>();
     let (_required_level, required_level_server_end) =
-        create_proxy::<fbroker::RequiredLevelMarker>()?;
+        create_proxy::<fbroker::RequiredLevelMarker>();
     let (_element_control, element_control_server_end) =
-        create_proxy::<fbroker::ElementControlMarker>()?;
+        create_proxy::<fbroker::ElementControlMarker>();
 
     topology
         .add_element(fbroker::ElementSchema {

@@ -343,8 +343,7 @@ fn get_library_description(maybe_attributes: &Vec<Value>) -> String {
     for attribute in maybe_attributes {
         if to_lower_snake_case(attribute["name"].as_str().unwrap_or("")) == ATTR_NAME_DOC {
             return get_attribute_standalone_arg_value(attribute)
-                .expect("Unable to retrieve string value for library description")
-                .to_string();
+                .expect("Unable to retrieve string value for library description");
         }
     }
     "".to_string()

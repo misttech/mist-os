@@ -21,6 +21,26 @@ import (
 	utils "go.fuchsia.dev/fuchsia/tools/orchestrate/utils"
 )
 
+type pathType struct {
+	File string `json:"file"`
+	URL  string `json:"url"`
+}
+
+type repoServerList struct {
+	Result struct {
+		Data []struct {
+			Name                          string   `json:"name"`
+			Address                       string   `json:"address"`
+			RepoPath                      pathType `json:"repo_path"`
+			RegistrationAliases           []string `json:"registration_aliases"`
+			RegistrationStorageType       string   `json:"registration_storage_type"`
+			RegistrationAliasConflictMode string   `json:"registration_alias_conflict_mode"`
+			ServerMode                    string   `json:"server_mode"`
+			PID                           int      `json:"pid"`
+		} `json:"data"`
+	} `json:"ok"`
+}
+
 // XDG_ENV_VARS are leaky environment variables to override. See ApplyEnv.
 var XDG_ENV_VARS = [...]string{
 	"HOME",
@@ -297,4 +317,27 @@ func writeConfigFile(configPath string, opt Option, socketPath string) error {
 		return fmt.Errorf("writing ffx config to file: %w", err)
 	}
 	return nil
+}
+
+// isRunning returns true if the package server is currently running and responds to HTTP requests.
+func (f *Ffx) IsPackageServerRunning(repoName string) (bool, error) {
+
+	args := []string{"--machine", "json", "repository", "server", "list"}
+	out, err := f.RunCmdSync(args...)
+	if err != nil {
+		return false, fmt.Errorf("ffx repository server list: output: %s, error: %w", out, err)
+	}
+	var repoList repoServerList
+	if err := json.Unmarshal([]byte(out), &repoList); err != nil {
+		return false, err
+	}
+	repoNamePrefix := fmt.Sprintf("%s.", repoName)
+	for _, status := range repoList.Result.Data {
+		// product bundle based repo servers use the repoName as a prefix.
+		if status.Name == repoName || strings.HasPrefix(status.Name, repoNamePrefix) {
+			return true, nil
+		}
+	}
+	// We don't need to differentiate between a stopped package server, no server found, etc.
+	return false, nil
 }

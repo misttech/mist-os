@@ -210,8 +210,8 @@ class SdhciBanjoServer : public ddk::SdhciProtocol<SdhciBanjoServer> {
 class Environment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    device_server_.Init(component::kDefaultInstance, "root", std::nullopt,
-                        sdhci_banjo_server_.GetBanjoConfig());
+    device_server_.Initialize(component::kDefaultInstance, std::nullopt,
+                              sdhci_banjo_server_.GetBanjoConfig());
     return zx::make_result(
         device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
   }
@@ -1282,10 +1282,10 @@ TEST_F(SdhciTest, CommandSettingsSingleBlock) {
 
   const TransferMode transfer_mode = TransferMode::Get().ReadFrom(driver_test().driver()->mmio_);
   EXPECT_TRUE(transfer_mode.dma_enable());
-  EXPECT_FALSE(transfer_mode.block_count_enable());
   EXPECT_EQ(transfer_mode.auto_cmd_enable(), TransferMode::kAutoCmdDisable);
   EXPECT_TRUE(transfer_mode.read());
   EXPECT_FALSE(transfer_mode.multi_block());
+  // The controller ignores block count enable if multi block is cleared.
 
   EXPECT_EQ(BlockSize::Get().ReadFrom(driver_test().driver()->mmio_).reg_value(), 128u);
   EXPECT_EQ(BlockCount::Get().ReadFrom(driver_test().driver()->mmio_).reg_value(), 1u);

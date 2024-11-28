@@ -46,7 +46,7 @@ DeviceInspect DeviceInspect::CreateChild(std::string name, uint32_t protocol_id)
 
 void DeviceInspect::SetStaticValues(
     const std::string& topological_path, uint32_t protocol_id, const std::string& type,
-    const cpp20::span<const fuchsia_driver_framework::wire::NodeProperty>& properties,
+    const cpp20::span<const fuchsia_driver_framework::wire::NodeProperty2>& properties,
     const std::string& driver_url) {
   protocol_id_ = protocol_id;
   device_node_.CreateString("topological_path", topological_path, &static_values_);
@@ -64,20 +64,7 @@ void DeviceInspect::SetStaticValues(
   for (uint32_t i = 0; i < properties.size(); ++i) {
     auto inspect_property = properties_array.CreateChild(std::to_string(i));
     auto& property = properties[i];
-    switch (property.key.Which()) {
-      case fuchsia_driver_framework::wire::NodePropertyKey::Tag::kIntValue:
-        inspect_property.CreateUint("key", property.key.int_value(), &static_values_);
-        break;
-      case fuchsia_driver_framework::wire::NodePropertyKey::Tag::kStringValue: {
-        inspect_property.CreateString("key", std::string(property.key.string_value().get()),
-                                      &static_values_);
-        break;
-      }
-      default: {
-        inspect_property.CreateString("key", "UNKNOWN KEY TYPE", &static_values_);
-        break;
-      }
-    }
+    inspect_property.CreateString("key", std::string(property.key.get()), &static_values_);
 
     switch (property.value.Which()) {
       case fuchsia_driver_framework::wire::NodePropertyValue::Tag::kStringValue:

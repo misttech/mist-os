@@ -126,7 +126,7 @@ async fn exit_code_execution_controller(exit_code: i64) {
     let realm_proxy =
         realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
     let (controller, controller_server_end) =
-        fidl::endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fcomponent::ControllerMarker>();
     let () = realm_proxy
         .open_controller(
             &fdecl::ChildRef { name: EXIT_WITH_CODE.to_string(), collection: None },
@@ -137,7 +137,7 @@ async fn exit_code_execution_controller(exit_code: i64) {
         .unwrap();
 
     let (execution_controller, execution_controller_server_end) =
-        fidl::endpoints::create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fcomponent::ExecutionControllerMarker>();
     let () = controller
         .start(fcomponent::StartChildArgs::default(), execution_controller_server_end)
         .await

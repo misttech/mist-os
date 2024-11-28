@@ -52,7 +52,8 @@ fn get_operating_system_macos(
     assert!(status.success());
 
     let re = Regex::new(r"(\d+)\.(\d+)(?:\.\d+)?")?;
-    let caps = re.captures(&stdout).ok_or(anyhow!("unexpected output from `defaults read`"))?;
+    let caps =
+        re.captures(&stdout).ok_or_else(|| anyhow!("unexpected output from `defaults read`"))?;
     let major: u32 = caps.get(1).unwrap().as_str().parse()?;
     let minor: u32 = caps.get(2).unwrap().as_str().parse()?;
     Ok(OperatingSystem::MacOS(major, minor))

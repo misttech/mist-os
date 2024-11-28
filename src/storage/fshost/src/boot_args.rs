@@ -13,7 +13,7 @@ pub struct BootArgs {
 
 impl BootArgs {
     pub async fn new() -> Self {
-        Self::new_helper().await.unwrap_or(BootArgs::default())
+        Self::new_helper().await.unwrap_or_else(|_| BootArgs::default())
     }
 
     pub async fn new_helper() -> Result<Self, Error> {

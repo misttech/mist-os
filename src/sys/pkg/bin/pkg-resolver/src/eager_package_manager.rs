@@ -716,8 +716,7 @@ mod tests {
     }
 
     fn get_mock_pkg_cache() -> (cache::Client, PackageCacheRequestStream) {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>();
         (cache::Client::from_proxy(proxy), stream)
     }
 
@@ -738,14 +737,14 @@ mod tests {
                         continue;
                     }
                     assert_eq!(gc_protection, fpkg::GcProtection::OpenPackageTracking);
-                    let mut needed_blobs = needed_blobs.into_stream().unwrap();
+                    let mut needed_blobs = needed_blobs.into_stream();
                     while let Some(request) = needed_blobs.try_next().await.unwrap() {
                         match request {
                             NeededBlobsRequest::OpenMetaBlob { responder } => {
                                 responder.send(Ok(None)).unwrap();
                             }
                             NeededBlobsRequest::GetMissingBlobs { iterator, control_handle: _ } => {
-                                let mut stream = iterator.into_stream().unwrap();
+                                let mut stream = iterator.into_stream();
                                 let BlobInfoIteratorRequest::Next { responder } =
                                     stream.next().await.unwrap().unwrap();
                                 responder.send(&[]).unwrap();

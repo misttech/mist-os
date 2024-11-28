@@ -6,7 +6,9 @@ import("//build/fidl/fidl.gni")
 
 fidl("fidl") {
   name = "test.time"
+  versioned = "fuchsia:HEAD"
   testonly = true
+
   sources = [ "time_source_control.test.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.time.external" ]
 }

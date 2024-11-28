@@ -16,7 +16,7 @@ async fn send_single_response_and_exit(
     match stream.try_next().await.unwrap().unwrap() {
         fsandbox::ReceiverRequest::Receive { channel, control_handle: _ } => {
             let server_end = endpoints::ServerEnd::<EchoMarker>::new(channel.into());
-            let event = server_end.into_stream().unwrap().try_next().await.unwrap().unwrap();
+            let event = server_end.into_stream().try_next().await.unwrap().unwrap();
             let EchoRequest::EchoString { value, responder } = event;
             match value {
                 Some(_) => responder.send(Some(&response)),
@@ -67,7 +67,7 @@ async fn create_child_with_specialized_name(
 ) {
     // Create our connector.
     let (receiver, receiver_stream) =
-        endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+        endpoints::create_request_stream::<fsandbox::ReceiverMarker>();
     let connector_id = id_gen.next();
     store.connector_create(connector_id, receiver).await.unwrap().unwrap();
 

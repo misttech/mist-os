@@ -24,18 +24,20 @@ pub async fn daemonize(
     let mut stdout = Stdio::null();
     let mut stderr = Stdio::null();
 
-    if ffx_config::logging::is_enabled(&context).await {
+    if ffx_config::logging::is_enabled(&context) {
         let file = PathBuf::from(format!("{log_basename}.log"));
-        stdout = Stdio::from(
-            ffx_config::logging::log_file(&context, &file, LogDirHandling::WithDirWithRotate)
-                .await?,
-        );
+        stdout = Stdio::from(ffx_config::logging::log_file(
+            &context,
+            &file,
+            LogDirHandling::WithDirWithRotate,
+        )?);
         // Third argument says not to rotate the logs.  We rotated the logs once
         // for the call above, we shouldn't do it again.
-        stderr = Stdio::from(
-            ffx_config::logging::log_file(&context, &file, LogDirHandling::WithDirWithoutRotate)
-                .await?,
-        );
+        stderr = Stdio::from(ffx_config::logging::log_file(
+            &context,
+            &file,
+            LogDirHandling::WithDirWithoutRotate,
+        )?);
     }
 
     cmd.stdin(Stdio::null()).stdout(stdout).stderr(stderr).env("RUST_BACKTRACE", "full");

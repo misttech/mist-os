@@ -209,7 +209,7 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
                 self.device.ffx,
                 TEST_URL,
                 self.test_case_path,
-                ffx_test_args=["--realm", "/core/testing:system-tests"],
+                ffx_test_args=["--realm", "/core/testing/system-tests"],
                 test_component_args=[
                     "-p",
                     "--quiet",

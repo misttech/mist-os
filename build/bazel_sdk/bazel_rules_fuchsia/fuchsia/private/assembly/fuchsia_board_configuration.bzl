@@ -117,9 +117,16 @@ def _fuchsia_board_configuration_impl(ctx):
 
         paths_map = {}
         for source, dest in script.post_processing_script_inputs.items():
-            source_path = source.files.to_list()[0].path
-            board_files.extend(source.files.to_list())
-            paths_map[source_path] = dest
+            # The sources come from two resource: passed in Label or python related files. If
+            # the source is a file, we directly use it, otherwise it is a label, we pick
+            # the first item of the files, and copy it into board configuration directory.
+            if type(source) == "File":
+                source_file = source
+            else:
+                source_file = source.files.to_list()[0]
+
+            board_files.append(source_file)
+            paths_map[source_file.path] = dest
         args += [
             "--script-inputs",
             str(paths_map),

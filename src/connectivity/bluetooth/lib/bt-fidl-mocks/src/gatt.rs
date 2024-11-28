@@ -22,7 +22,7 @@ impl RemoteServiceMock {
     pub fn new(
         timeout: MonotonicDuration,
     ) -> Result<(RemoteServiceProxy, RemoteServiceMock), Error> {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<RemoteServiceMarker>()?;
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<RemoteServiceMarker>();
         Ok((proxy, RemoteServiceMock { stream, timeout }))
     }
 

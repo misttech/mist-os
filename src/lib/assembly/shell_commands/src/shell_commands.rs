@@ -4,8 +4,8 @@
 
 use anyhow::{Context, Result};
 use assembly_config_schema::assembly_config::ShellCommands;
+use assembly_constants::{BootfsPackageDestination, PackageDestination};
 use assembly_package_utils::PackageInternalPathBuf;
-use assembly_util::{BootfsPackageDestination, PackageDestination};
 use camino::{Utf8Path, Utf8PathBuf};
 use fidl::persist;
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
@@ -120,7 +120,7 @@ impl ShellCommandsBuilder {
 
             let file_name = &binary_path
                 .file_name()
-                .ok_or(anyhow::anyhow!("Unable to acquire filename {}", &binary_path))?;
+                .ok_or_else(|| anyhow::anyhow!("Unable to acquire filename {}", &binary_path))?;
             let target_path = format!("bin/{}", &file_name.to_string());
             package_builder.add_contents_as_blob(
                 &target_path,

@@ -9,6 +9,7 @@
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
+#include <algorithm>
 #include <string_view>
 
 #include <fbl/string.h>
@@ -30,7 +31,7 @@ template <size_t N>
 class __OWNER(char) StringBuffer final {
  public:
   // Creates an empty string buffer.
-  constexpr StringBuffer() : length_(0U) { data_[0] = 0; }
+  constexpr StringBuffer() = default;
 
   // Creates a string buffer containing exactly one character and a null
   // terminator.  This constructor is constinit in practice so that it can be
@@ -131,10 +132,10 @@ class __OWNER(char) StringBuffer final {
     return *this;
   }
 
-  // Appends content to the string buffer from a string piece.
+  // Appends content to the string buffer from a string view.
   // The result is truncated if the appended content does not fit completely.
-  StringBuffer& Append(std::string_view piece) {
-    AppendInternal(piece.data(), piece.length());
+  StringBuffer& Append(std::string_view view) {
+    AppendInternal(view.data(), view.length());
     return *this;
   }
 
@@ -165,23 +166,24 @@ class __OWNER(char) StringBuffer final {
   // Gets the buffer's contents as a string.
   fbl::String ToString() const { return fbl::String(data(), length()); }
 
-  // Creates a string piece backed by the string.
-  // The string piece does not take ownership of the data so the string
-  // must outlast the string piece.
+  // Creates a string view backed by the string.
+  // The string view does not take ownership of the data so the string
+  // must outlast the string view.
+  //
+  // NOLINTNEXTLINE(google-explicit-constructor)
   operator std::string_view() const { return {data(), length()}; }
 
  private:
   void AppendInternal(const char* data, size_t length) {
     size_t remaining = N - length_;
-    if (length > remaining)
-      length = remaining;
+    length = std::min(length, remaining);
     memcpy(data_ + length_, data, length);
     length_ += length;
     data_[length_] = 0;
   }
 
   size_t length_ = 0U;
-  char data_[N + 1U];
+  char data_[N + 1U] = {0};
 };
 
 }  // namespace fbl

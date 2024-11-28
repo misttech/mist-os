@@ -85,10 +85,6 @@ pub mod test {
 
     #[async_trait(?Send)]
     impl Fastboot for TestFastbootInterface {
-        async fn prepare(&mut self, _listener: Sender<RebootEvent>) -> Result<(), FastbootError> {
-            Ok(())
-        }
-
         async fn get_var(&mut self, name: &str) -> Result<String, FastbootError> {
             let mut state = self.state.lock().unwrap();
             match state.variables.get_mut(name) {
@@ -202,6 +198,6 @@ pub mod test {
     pub fn setup_connection_factory(
     ) -> (Arc<Mutex<FakeServiceCommands>>, impl FastbootConnectionFactory) {
         let state = Arc::new(Mutex::new(FakeServiceCommands::default()));
-        (state.clone(), TestConnectionFactory { state: state.clone() })
+        (state.clone(), TestConnectionFactory { state: state })
     }
 }

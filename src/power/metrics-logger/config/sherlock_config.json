@@ -1,24 +1,24 @@
 {
     "temperature_drivers": [
         {
-            "name": "soc_ddr",
-            "topo_path_suffix": "/thermal"
+            "alias": "soc_ddr",
+            "sensor_name": "aml-thermal-ddr"
         },
         {
-            "name": "soc_pll",
-            "topo_path_suffix": "/aml_thermal_pll/thermal"
+            "alias": "soc_pll",
+            "sensor_name": "CPU thermal"
         },
         {
-            "name": "therm_ambient",
-            "topo_path_suffix": "/thermistor-device/therm-ambient"
+            "alias": "therm_ambient",
+            "sensor_name": "therm-ambient"
         },
         {
-            "name": "therm_audio",
-            "topo_path_suffix": "/thermistor-device/therm-audio"
+            "alias": "therm_audio",
+            "sensor_name": "therm-audio"
         },
         {
-            "name": "therm_base",
-            "topo_path_suffix": "/thermistor-device/therm-base"
+            "alias": "therm_base",
+            "sensor_name": "therm-base"
         }
     ]
 }

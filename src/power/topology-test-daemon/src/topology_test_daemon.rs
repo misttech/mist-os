@@ -31,7 +31,7 @@ enum IncomingRequest {
 
 async fn lease(lessor: &fbroker::LessorProxy, level: u8) -> Result<fbroker::LeaseControlProxy> {
     let lease_control =
-        lessor.lease(level).await?.map_err(|e| anyhow::anyhow!("{e:?}"))?.into_proxy()?;
+        lessor.lease(level).await?.map_err(|e| anyhow::anyhow!("{e:?}"))?.into_proxy();
 
     Ok(lease_control)
 }

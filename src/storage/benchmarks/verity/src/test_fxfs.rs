@@ -54,11 +54,8 @@ async fn main() {
                                 fio::PERM_WRITABLE | fio::PERM_READABLE,
                             )
                             .unwrap();
-                            let root_dir_for_main = fuchsia_fs::directory::clone_no_describe(
-                                &root_dir_for_starnix,
-                                Some(fio::OpenFlags::CLONE_SAME_RIGHTS),
-                            )
-                            .unwrap();
+                            let root_dir_for_main =
+                                fuchsia_fs::directory::clone(&root_dir_for_starnix).unwrap();
 
                             data_dir
                                 .add_entry_may_overwrite(

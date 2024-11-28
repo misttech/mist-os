@@ -107,12 +107,10 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn try_from_set_converts_supplied_params() {
-        let (proxy, server) = fidl::endpoints::create_proxy::<PrivacyMarker>()
-            .expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<PrivacyMarker>();
         let _fut = proxy
             .set(&PrivacySettings { user_data_sharing_consent: Some(true), ..Default::default() });
-        let mut request_stream: PrivacyRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: PrivacyRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await
@@ -126,11 +124,9 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn try_from_watch_converts_supplied_params() {
-        let (proxy, server) = fidl::endpoints::create_proxy::<PrivacyMarker>()
-            .expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<PrivacyMarker>();
         let _fut = proxy.watch();
-        let mut request_stream: PrivacyRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: PrivacyRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await

@@ -61,10 +61,10 @@ fn handle_one_request(
                 ind: fullmac_to_mlme::convert_roam_result_indication(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::AuthInd { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::AuthInd { payload, responder } => {
             responder.send().context("Failed to respond to AuthInd")?;
             driver_event_sink.0.send(FullmacDriverEvent::AuthInd {
-                ind: fullmac_to_mlme::convert_authenticate_indication(resp),
+                ind: fullmac_to_mlme::convert_authenticate_indication(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::DeauthConf { payload, responder } => {
@@ -73,28 +73,28 @@ fn handle_one_request(
                 resp: fullmac_to_mlme::convert_deauthenticate_confirm(payload),
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::DeauthInd { ind, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::DeauthInd { payload, responder } => {
             responder.send().context("Failed to respond to DeauthInd")?;
             driver_event_sink.0.send(FullmacDriverEvent::DeauthInd {
-                ind: fullmac_to_mlme::convert_deauthenticate_indication(ind),
+                ind: fullmac_to_mlme::convert_deauthenticate_indication(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::AssocInd { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::AssocInd { payload, responder } => {
             responder.send().context("Failed to respond to AssocInd")?;
             driver_event_sink.0.send(FullmacDriverEvent::AssocInd {
-                ind: fullmac_to_mlme::convert_associate_indication(resp),
+                ind: fullmac_to_mlme::convert_associate_indication(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::DisassocConf { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::DisassocConf { payload, responder } => {
             responder.send().context("Failed to respond to DisassocConf")?;
             driver_event_sink.0.send(FullmacDriverEvent::DisassocConf {
-                resp: fullmac_to_mlme::convert_disassociate_confirm(resp),
+                resp: fullmac_to_mlme::convert_disassociate_confirm(payload),
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::DisassocInd { ind, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::DisassocInd { payload, responder } => {
             responder.send().context("Failed to respond to DisassocInd")?;
             driver_event_sink.0.send(FullmacDriverEvent::DisassocInd {
-                ind: fullmac_to_mlme::convert_disassociate_indication(ind),
+                ind: fullmac_to_mlme::convert_disassociate_indication(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::StartConf { resp, responder } => {
@@ -190,8 +190,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (driver_event_sender, driver_event_receiver) = mpsc::unbounded();
         let (ifc_proxy, ifc_req_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fullmac::WlanFullmacImplIfcMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fullmac::WlanFullmacImplIfcMarker>();
 
         let driver_event_sink = FullmacDriverEventSink(UnboundedSink::new(driver_event_sender));
         let mut server_fut =

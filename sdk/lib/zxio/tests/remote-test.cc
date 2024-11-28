@@ -115,11 +115,12 @@ TEST_F(Remote, Borrow) {
 
 class TestCloneServer : public TestServerBase {
  public:
-  using CloneFunc = fit::function<void(CloneRequestView request, CloneCompleter::Sync& completer)>;
+  using CloneFunc =
+      fit::function<void(Clone2RequestView request, Clone2Completer::Sync& completer)>;
 
   void set_clone_func(CloneFunc clone_func) { clone_func_ = std::move(clone_func); }
 
-  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override {
+  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) override {
     clone_func_(request, completer);
   }
 
@@ -136,8 +137,7 @@ class CloneTest : public zxtest::Test {
     ASSERT_OK(server_end.status_value());
 
     node_server_.set_clone_func(
-        [this](TestCloneServer::CloneRequestView request,
-               TestCloneServer::CloneCompleter::Sync& completer) { Clone(request, completer); });
+        [this](auto request, auto& completer) { Clone2(request, completer); });
 
     fidl::BindServer(server_loop_.dispatcher(), std::move(server_end.value()), &node_server_);
 
@@ -149,22 +149,13 @@ class CloneTest : public zxtest::Test {
   fidl::ClientEnd<fio::Node> TakeClientEnd() { return std::move(client_end_); }
 
  private:
-  void Clone(TestCloneServer::CloneRequestView request,
-             TestCloneServer::CloneCompleter::Sync& completer) {
+  void Clone2(TestCloneServer::Clone2RequestView request,
+              TestCloneServer::Clone2Completer::Sync& completer) {
     auto server = std::make_unique<TestServerBase>();
     auto binding_ref =
-        fidl::BindServer(server_loop_.dispatcher(), std::move(request->object), server.get());
+        fidl::BindServer(server_loop_.dispatcher(),
+                         fidl::ServerEnd<fio::Node>{request->request.TakeChannel()}, server.get());
     cloned_servers_.push_back(std::move(server));
-
-    if (request->flags & fio::wire::OpenFlags::kDescribe) {
-      fio::wire::FileObject file_object;
-      const fidl::Status result =
-          fidl::WireSendEvent(binding_ref)
-              ->OnOpen(ZX_OK,
-                       fio::wire::NodeInfoDeprecated::WithFile(
-                           fidl::ObjectView<fio::wire::FileObject>::FromExternal(&file_object)));
-      ASSERT_TRUE(result.ok()) << result.FormatDescription();
-    }
   }
 
   TestCloneServer node_server_;

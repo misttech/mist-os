@@ -39,7 +39,7 @@
 //!     ) -> BoxFuture<'a, Result<Self::Protocol, Self::ConnectError>> {
 //!         async move {
 //!             let (protocol_proxy, server_end) =
-//!                 fidl::endpoints::create_proxy().context("creating server endpoints failed")?;
+//!                 fidl::endpoints::create_proxy();
 //!             let protocol_factory = connect_to_protocol::<ProtocolFactoryMarker>()
 //!                 .context("Failed to connect to test.protocol.ProtocolFactory")?;
 //!
@@ -340,8 +340,7 @@ mod test {
             &'a mut self,
         ) -> BoxFuture<'a, Result<Self::Protocol, Self::ConnectError>> {
             async move {
-                let (protocol_proxy, server_end) =
-                    fidl::endpoints::create_proxy().context("creating server endpoints failed")?;
+                let (protocol_proxy, server_end) = fidl::endpoints::create_proxy();
                 let protocol_factory = self
                     .0
                     .root
@@ -418,12 +417,8 @@ mod test {
                 {
                     let close_after = close_after.map(|ca| Arc::new(AtomicU8::new(ca)));
                     responder.send(Ok(())).expect("Replying to CreateProtocol caller failed");
-                    let _ = protocol_mock(
-                        protocol.into_stream().expect("Converting ServerEnd to stream failed"),
-                        calls_made.clone(),
-                        close_after,
-                    )
-                    .await;
+                    let _ = protocol_mock(protocol.into_stream(), calls_made.clone(), close_after)
+                        .await;
                 }
             }));
         });

@@ -8,10 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, Weak};
 use vfs::directory::helper::DirectlyMutable as _;
 
-/// A directory with an entry for each partition, used to allow other components to discover and
-/// connect to partitions.
-/// Each entry has a "block" node which serves the fuchsia.hardware.block.partition.Partition
-/// protocol.
+/// A directory of instances of the fuchsia.storagehost.PartitionService service.
 pub struct PartitionsDirectory {
     node: Arc<vfs::directory::immutable::Simple>,
     entries: Mutex<BTreeMap<String, PartitionsDirectoryEntry>>,
@@ -46,7 +43,7 @@ impl PartitionsDirectory {
     }
 }
 
-/// A node which hosts all of the per-partition services.  See fuchsia.storagehost.PartitionService.
+/// A node which hosts an instance of fuchsia.storagehost.PartitionService.
 pub struct PartitionsDirectoryEntry {
     node: Arc<vfs::directory::immutable::Simple>,
 }
@@ -64,43 +61,36 @@ impl PartitionsDirectoryEntry {
         gpt_index: usize,
     ) -> Self {
         let node = vfs::directory::immutable::simple();
-        let svc_dir = vfs::directory::immutable::simple();
-        node.add_entry("svc", svc_dir.clone()).unwrap();
-        let service = vfs::directory::immutable::simple();
-        svc_dir.add_entry("fuchsia.storagehost.PartitionService", service.clone()).unwrap();
-
-        service
-            .add_entry(
-                "volume",
-                vfs::service::host(move |requests| {
-                    let server = block_server.clone();
-                    async move {
-                        if let Some(server) = server.upgrade() {
-                            if let Err(err) = server.handle_requests(requests).await {
-                                tracing::error!(?err, "Error handling requests");
-                            }
+        node.add_entry(
+            "volume",
+            vfs::service::host(move |requests| {
+                let server = block_server.clone();
+                async move {
+                    if let Some(server) = server.upgrade() {
+                        if let Err(err) = server.handle_requests(requests).await {
+                            tracing::error!(?err, "Error handling requests");
                         }
                     }
-                }),
-            )
-            .unwrap();
-        service
-            .add_entry(
-                "partition",
-                vfs::service::host(move |requests| {
-                    let manager = gpt_manager.clone();
-                    async move {
-                        if let Some(manager) = manager.upgrade() {
-                            if let Err(err) =
-                                manager.handle_partitions_requests(gpt_index, requests).await
-                            {
-                                tracing::error!(?err, "Error handling requests");
-                            }
+                }
+            }),
+        )
+        .unwrap();
+        node.add_entry(
+            "partition",
+            vfs::service::host(move |requests| {
+                let manager = gpt_manager.clone();
+                async move {
+                    if let Some(manager) = manager.upgrade() {
+                        if let Err(err) =
+                            manager.handle_partitions_requests(gpt_index, requests).await
+                        {
+                            tracing::error!(?err, "Error handling requests");
                         }
                     }
-                }),
-            )
-            .unwrap();
+                }
+            }),
+        )
+        .unwrap();
 
         Self { node }
     }

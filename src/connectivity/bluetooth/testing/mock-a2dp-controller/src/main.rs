@@ -12,19 +12,14 @@ use futures::StreamExt;
 async fn handle_controller_requests(mut stream: ControllerRequestStream) {
     while let Some(request) = stream.next().await {
         if let Ok(ControllerRequest::Suspend { token, responder, .. }) = request {
-            if let Ok(token_stream) = token.into_stream() {
-                let _ = token_stream.control_handle().send_on_suspended();
-                // Keeps the suspend active for as long as the client wants.
-                fasync::Task::spawn(async move {
-                    token_stream.map(|_| ()).collect::<()>().await;
-                    let _ = responder.send();
-                })
-                .detach();
-            } else {
-                // There is some error with the suspend request token - the mock doesn't really care
-                // and we can just terminate the request.
+            let token_stream = token.into_stream();
+            let _ = token_stream.control_handle().send_on_suspended();
+            // Keeps the suspend active for as long as the client wants.
+            fasync::Task::spawn(async move {
+                token_stream.map(|_| ()).collect::<()>().await;
                 let _ = responder.send();
-            }
+            })
+            .detach();
         }
     }
 }

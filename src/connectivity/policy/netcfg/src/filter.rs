@@ -207,7 +207,7 @@ fn generate_initial_filter_changes(
     // at interface installation time that are rooted in these routines.
     fn installed_routine_from_id(id: RoutineId, hook: IpHook) -> Routine {
         Routine {
-            id: id.clone(),
+            id: id,
             routine_type: RoutineType::Ip(Some(InstalledIpRoutine { hook, priority: 0i32 })),
         }
     }

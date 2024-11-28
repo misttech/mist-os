@@ -47,7 +47,7 @@ mod tests {
 
     async fn common_setup() -> Result<(MockDriver, Vsock), anyhow::Error> {
         let (driver_client, driver_server) = endpoints::create_endpoints::<DeviceMarker>();
-        let mut driver_server = driver_server.into_stream()?;
+        let mut driver_server = driver_server.into_stream();
 
         // Vsock::new expects to be able to communication with a running driver instance.
         // As we don't have a driver instance we spin up an asynchronous thread that will
@@ -58,13 +58,13 @@ mod tests {
         fasync::Task::spawn(async move {
             let (cb, responder) =
                 unwrap_msg!(DeviceRequest::Start{cb, responder} from driver_server);
-            let driver_callbacks = cb.into_proxy().unwrap();
+            let driver_callbacks = cb.into_proxy();
             responder.send(Ok(())).unwrap();
             let _ = tx.send((driver_server, driver_callbacks));
         })
         .detach();
 
-        let (service, event_loop) = Vsock::new(None, Some(driver_client.into_proxy()?)).await?;
+        let (service, event_loop) = Vsock::new(None, Some(driver_client.into_proxy())).await?;
         fasync::Task::local(event_loop.map_err(|x| panic!("Event loop stopped {}", x)).map(|_| ()))
             .detach();
         let (driver_server, driver_callbacks) = rx.await?;
@@ -75,17 +75,17 @@ mod tests {
     fn make_con() -> Result<(zx::Socket, ConnectionProxy, ConnectionTransport), anyhow::Error> {
         let (client_socket, server_socket) = zx::Socket::create_stream();
         let (client_end, server_end) = endpoints::create_endpoints::<ConnectionMarker>();
-        let client_end = client_end.into_proxy()?;
+        let client_end = client_end.into_proxy();
         let con = ConnectionTransport { data: server_socket, con: server_end };
         Ok((client_socket, client_end, con))
     }
 
     fn make_client(service: &Vsock) -> Result<ConnectorProxy, anyhow::Error> {
         let (app_client, app_remote) = endpoints::create_endpoints::<ConnectorMarker>();
-        let app_client = app_client.into_proxy()?;
+        let app_client = app_client.into_proxy();
         // Run the client
         fasync::Task::local(
-            Vsock::run_client_connection(service.clone(), app_remote.into_stream()?)
+            Vsock::run_client_connection(service.clone(), app_remote.into_stream())
                 .then(|_| future::ready(())),
         )
         .detach();
@@ -111,7 +111,7 @@ mod tests {
         // Listen on a reasonable value.
         let (acceptor_remote, acceptor_client) = endpoints::create_endpoints::<AcceptorMarker>();
         assert_eq!(app_client.listen(8000, acceptor_remote).await?, Ok(()));
-        let mut acceptor_client = acceptor_client.into_stream()?;
+        let mut acceptor_client = acceptor_client.into_stream();
 
         // Validate that we cannot listen twice
         {
@@ -162,7 +162,7 @@ mod tests {
             Err(zx::sys::ZX_ERR_ALREADY_BOUND)
         );
 
-        let listener_client = listener_client.into_proxy().unwrap();
+        let listener_client = listener_client.into_proxy();
         assert_eq!(listener_client.listen(1).await?, Ok(()));
 
         // Create a connection from the driver
@@ -223,7 +223,7 @@ mod tests {
         // Start a listener
         let (acceptor_remote, acceptor_client) = endpoints::create_endpoints::<AcceptorMarker>();
         assert_eq!(app_client.listen(9000, acceptor_remote).await?, Ok(()));
-        let mut acceptor_client = acceptor_client.into_stream()?;
+        let mut acceptor_client = acceptor_client.into_stream();
 
         // Perform a transport reset
         drop(server_data_socket_request);

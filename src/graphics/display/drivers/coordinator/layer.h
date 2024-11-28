@@ -17,12 +17,12 @@
 
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
-#include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
+#include "src/graphics/display/lib/api-types/cpp/event-id.h"
 
-namespace display {
+namespace display_coordinator {
 
 class FenceCollection;
 class Layer;
@@ -34,9 +34,9 @@ struct LayerNode : public fbl::DoublyLinkedListable<LayerNode*> {
 };
 
 // Almost-POD used by Client to manage layer state. Public state is used by Controller.
-class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
+class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> {
  public:
-  explicit Layer(DriverLayerId id);
+  explicit Layer(display::DriverLayerId id);
   ~Layer();
 
   fbl::RefPtr<Image> current_image() const { return displayed_image_; }
@@ -49,13 +49,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
 
   bool in_use() const { return current_node_.InContainer() || pending_node_.InContainer(); }
 
-  const image_metadata_t& pending_image_metadata() const {
-    return pending_layer_.cfg.primary.image_metadata;
-  }
-  uint64_t pending_image_handle() const { return pending_layer_.cfg.primary.image_handle; }
-
-  auto current_type() const { return current_layer_.type; }
-  auto pending_type() const { return pending_layer_.type; }
+  const image_metadata_t& pending_image_metadata() const { return pending_layer_.image_metadata; }
+  uint64_t pending_image_handle() const { return pending_layer_.image_handle; }
 
   // If the layer properties were changed in the pending configuration, this
   // retires all images as they are invalidated with layer properties change.
@@ -72,7 +67,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   //   layers to determine the current frame state.
   //
   // Returns false if there were any errors.
-  bool ResolvePendingImage(FenceCollection* fence, ConfigStamp stamp = kInvalidConfigStamp);
+  bool ResolvePendingImage(FenceCollection* fence,
+                           display::ConfigStamp stamp = display::kInvalidConfigStamp);
 
   // Make the staged config current.
   void ApplyChanges(const display_mode_t& mode);
@@ -95,7 +91,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   // Get the stamp of configuration that is associated (at ResolvePendingImage)
   // with the image that is currently being displayed on the device.
   // If no image is being displayed on this layer, returns nullopt.
-  std::optional<ConfigStamp> GetCurrentClientConfigStamp() const;
+  std::optional<display::ConfigStamp> GetCurrentClientConfigStamp() const;
 
   // Adds the pending_layer_ to the end of a display list.
   //
@@ -108,7 +104,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
       fuchsia_math::wire::RectU image_source, fuchsia_math::wire::RectU display_destination);
   void SetPrimaryAlpha(fuchsia_hardware_display_types::wire::AlphaMode mode, float val);
   void SetColorConfig(fuchsia_hardware_display_types::wire::Color color);
-  void SetImage(fbl::RefPtr<Image> image_id, EventId wait_event_id, EventId signal_event_id);
+  void SetImage(fbl::RefPtr<Image> image_id, display::EventId wait_event_id);
 
  private:
   // Retires the `pending_image_`.
@@ -129,8 +125,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   bool config_change_;
 
   // Event ids passed to SetLayerImage which haven't been applied yet.
-  EventId pending_wait_event_id_;
-  EventId pending_signal_event_id_;
+  display::EventId pending_wait_event_id_;
 
   // The image given to SetLayerImage which hasn't been applied yet.
   fbl::RefPtr<Image> pending_image_;
@@ -145,19 +140,15 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   uint64_t pending_image_config_gen_ = 0;
   uint64_t current_image_config_gen_ = 0;
 
-  // Storage for a color layer's color data bytes.
-  uint8_t pending_color_bytes_[8];
-  uint8_t current_color_bytes_[8];
-
   LayerNode pending_node_;
   LayerNode current_node_;
 
   // The display this layer was most recently displayed on
-  DisplayId current_display_id_;
+  display::DisplayId current_display_id_;
 
   bool is_skipped_;
 };
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_LAYER_H_

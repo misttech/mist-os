@@ -62,7 +62,7 @@ class SpdxWriter:
                 ),
                 name=public_package_name,
                 extracted_text=license_text,
-                cross_refs=[license_label.code_search_url()],
+                cross_refs=[license_label.url()],
                 debug_hint=collection_hints,
             )
             self.builder.add_license(license)

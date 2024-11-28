@@ -162,7 +162,7 @@ mod tests {
             ],
         };
 
-        let (outgoing_dir_proxy, outgoing_dir_server_end) = create_proxy().unwrap();
+        let (outgoing_dir_proxy, outgoing_dir_server_end) = create_proxy();
 
         let _directory_task = fasync::Task::local(read_only_directory(
             directory_name.clone(),

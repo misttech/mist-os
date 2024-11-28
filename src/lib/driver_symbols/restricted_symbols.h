@@ -30,7 +30,6 @@ namespace driver_symbols {
 // To remove items from the allowlist, please send a change to one of the OWNERS of
 // this file to remove an element from the list below.
 const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
-    "#meta/acpi-arm64.cm",
     "#meta/aml-g12-pdm.cm",
     "#meta/aml-g12-tdm-dai.cm",
     "#meta/aml-g12-tdm.cm",
@@ -195,6 +194,29 @@ const std::set<std::string> kCreateThreadSymbols = {
     "thrd_create",
     "thrd_create_with_name",
     "pthread_create",
+};
+
+//  ________  _________  ________  ________
+// |\   ____\|\___   ___\\   __  \|\   __  \
+// \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+//  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+//   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+//     ____\_\  \   \ \__\ \ \_______\ \__\
+//    |\_________\   \|__|  \|_______|\|__|
+//    \|_________|
+//
+// No additional drivers should be added to this list.
+//
+// TODO(https://fxbug.dev/380482978): this list should be deleted once possible.
+const std::set<std::string> kAdditionalThreadSymbolsDriversAllowlist = {
+    "#meta/nanohub_driver.cm"};
+
+// The set of restricted symbols for manipulating threads which are only allowed for drivers in
+// |kAdditionalThreadSymbolsDriversAllowlist|.
+//
+// TODO(https://fxbug.dev/380482978): this list should be deleted once possible.
+const std::set<std::string> kAdditionalThreadSymbols = {
+    "pthread_sigmask",
 };
 
 // LINT.IfChange
@@ -524,7 +546,8 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "freeifaddrs",
     "__freelocale",
     "freopen",
-    "frexp",
+    // TODO(https://fxbug.dev/380482978): Re-add `frexp` and `sigfillset` when their usage
+    // are removed
     "frexpf",
     "frexpl",
     "fscanf",
@@ -961,7 +984,6 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "pthread_setcancelstate",
     "pthread_setcanceltype",
     "pthread_setconcurrency",
-    "pthread_sigmask",
     "pthread_spin_destroy",
     "pthread_spin_init",
     "pthread_spin_lock",
@@ -1130,7 +1152,6 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "sigandset",
     "sigdelset",
     "sigemptyset",
-    "sigfillset",
     "siginterrupt",
     "sigisemptyset",
     "sigismember",

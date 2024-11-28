@@ -88,10 +88,10 @@ impl MemoryReporter {
             detailed_attribution: component.get_outgoing_directory().and_then(
                 |outgoing_directory| {
                     let (server, client) = fidl::Channel::create();
-                    fdio::open_at_deprecated(
+                    fdio::open_at(
                         outgoing_directory.channel(),
                         &format!("svc/{}", fattribution::ProviderMarker::PROTOCOL_NAME),
-                        fio::OpenFlags::empty(),
+                        fio::Flags::empty(),
                         server,
                     )
                     .unwrap();
@@ -135,12 +135,12 @@ mod tests {
     fn test_attribute_memory() {
         let mut exec = fasync::TestExecutor::new();
         let (_runtime_dir, runtime_dir_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let start_info = lifecycle_startinfo(runtime_dir_server);
 
         let runner = new_elf_runner_for_test();
         let (snapshot_provider, snapshot_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>();
         runner.serve_memory_reporter(snapshot_request_stream);
 
         // Run a component.
@@ -149,8 +149,7 @@ mod tests {
             Moniker::try_from("foo/bar").unwrap(),
         ));
         let (_controller, server_controller) =
-            fidl::endpoints::create_proxy::<fcrunner::ComponentControllerMarker>()
-                .expect("could not create component controller endpoints");
+            fidl::endpoints::create_proxy::<fcrunner::ComponentControllerMarker>();
         exec.run_singlethreaded(&mut runner.start(start_info, server_controller).boxed());
 
         // Ask about the memory usage of components.

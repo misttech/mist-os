@@ -107,7 +107,7 @@ impl TilingWm {
 
                 // Create a Viewport that houses the view we are creating.
                 let (tile_watcher, tile_watcher_request) =
-                    create_proxy::<ui_comp::ChildViewWatcherMarker>()?;
+                    create_proxy::<ui_comp::ChildViewWatcherMarker>();
                 let viewport_content_id = self.id_generator.next_content_id();
                 let viewport_properties = ui_comp::ViewportProperties {
                     logical_size: Some(self.layout_info.logical_size.unwrap()),
@@ -267,11 +267,9 @@ impl TilingWm {
 
         // Create the root view for tiles.
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
-            create_proxy::<ui_comp::ParentViewportWatcherMarker>()
-                .expect("Failed to create ParentViewportWatcher channel");
+            create_proxy::<ui_comp::ParentViewportWatcherMarker>();
         let (view_focuser, view_focuser_request) =
-            fidl::endpoints::create_proxy::<ui_views::FocuserMarker>()
-                .expect("Failed to create Focuser channel");
+            fidl::endpoints::create_proxy::<ui_views::FocuserMarker>();
         let view_identity = ui_views::ViewIdentityOnCreation::from(ViewRefPair::new()?);
         let view_bound_protocols = ui_comp::ViewBoundProtocols {
             view_focuser: Some(view_focuser_request),
@@ -486,27 +484,10 @@ fn handle_graphical_presenter_request(
             responder,
         } => {
             // "Unwrap" the optional element::AnnotationControllerProxy.
-            let annotation_controller = match annotation_controller {
-                Some(proxy) => match proxy.into_proxy() {
-                    Ok(proxy) => Some(proxy),
-                    Err(e) => {
-                        warn!("Failed to obtain AnnotationControllerProxy: {}", e);
-                        None
-                    }
-                },
-                None => None,
-            };
+            let annotation_controller = annotation_controller.map(|proxy| proxy.into_proxy());
             // "Unwrap" the optional element::ViewControllerRequestStream.
-            let view_controller_request_stream = match view_controller_request {
-                Some(request_stream) => match request_stream.into_stream() {
-                    Ok(request_stream) => Some(request_stream),
-                    Err(e) => {
-                        warn!("Failed to obtain ViewControllerRequestStream: {}", e);
-                        None
-                    }
-                },
-                None => None,
-            };
+            let view_controller_request_stream =
+                view_controller_request.map(|request_stream| request_stream.into_stream());
             internal_sender
                 .unbounded_send(
                     MessageInternal::GraphicalPresenterPresentView {

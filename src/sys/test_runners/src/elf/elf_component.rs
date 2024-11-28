@@ -158,6 +158,9 @@ pub struct Component {
 
     /// The structured config vmo.
     pub config_vmo: Option<zx::Vmo>,
+
+    /// Component instance token, used only in tracing
+    pub component_instance: Option<fidl::Event>,
 }
 
 pub struct BuilderArgs {
@@ -243,8 +246,7 @@ impl Component {
         let lib_loader_cache_builder = connect_to_protocol::<LibraryLoaderCacheBuilderMarker>()
             .map_err(|e| ComponentError::LibraryLoadError(url.clone(), e))?;
 
-        let (lib_loader_cache, server_end) = create_proxy::<LibraryLoaderCacheMarker>()
-            .map_err(|e| ComponentError::Fidl("Cannot create proxy".into(), e))?;
+        let (lib_loader_cache, server_end) = create_proxy::<LibraryLoaderCacheMarker>();
         lib_loader_cache_builder
             .create(lib_proxy.into_channel().unwrap().into_zx_channel().into(), server_end)
             .map_err(|e| {
@@ -275,6 +277,7 @@ impl Component {
                     zx::ProcessOptions::empty()
                 },
                 config_vmo,
+                component_instance: start_info.component_instance,
             },
             outgoing_dir,
             runtime_dir,
@@ -317,8 +320,7 @@ impl Component {
         let lib_loader_cache_builder = connect_to_protocol::<LibraryLoaderCacheBuilderMarker>()
             .map_err(|e| ComponentError::LibraryLoadError(args.url.clone(), e))?;
 
-        let (lib_loader_cache, server_end) = create_proxy::<LibraryLoaderCacheMarker>()
-            .map_err(|e| ComponentError::Fidl("Cannot create proxy".into(), e))?;
+        let (lib_loader_cache, server_end) = create_proxy::<LibraryLoaderCacheMarker>();
         lib_loader_cache_builder
             .create(lib_proxy.into_channel().unwrap().into_zx_channel().into(), server_end)
             .map_err(|e| {
@@ -337,6 +339,7 @@ impl Component {
             executable_vmo,
             options: args.options,
             config_vmo: None,
+            component_instance: None,
         })
     }
 }
@@ -569,10 +572,7 @@ where
     .detach();
 
     let server_end = take_server_end(server_end);
-    let (controller_stream, control) =
-        server_end.into_stream_and_control_handle().map_err(|e| {
-            ComponentError::Fidl("failed to convert server end to controller".to_owned(), e)
-        })?;
+    let (controller_stream, control) = server_end.into_stream_and_control_handle();
     let controller =
         runner::component::Controller::new(component_runtime, controller_stream, control);
 
@@ -701,7 +701,7 @@ mod tests {
             runtime_dir: None,
             ..Default::default()
         };
-        let (client_controller, server_controller) = endpoints::create_proxy().unwrap();
+        let (client_controller, server_controller) = endpoints::create_proxy();
         let get_test_server = || DummyServer {};
         let err = start_component(start_info, server_controller, get_test_server, |_| Ok(())).await;
         assert_matches!(err, Err(ComponentError::MissingResolvedUrl));

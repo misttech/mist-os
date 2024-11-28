@@ -89,10 +89,7 @@ use {
         expectation::asynchronous::{ExpectableExt, ExpectableState},
         types::Address,
     },
-    futures::{
-        future::{err, Either},
-        Future,
-    },
+    futures::Future,
     hci_emulator_client::types::{ControllerParameters, LegacyAdvertisingState},
     std::{collections::HashMap, convert::AsRef},
 };
@@ -142,35 +139,29 @@ pub fn add_le_peer(
     mut parameters: PeerParameters,
     adv_data: Option<Vec<u8>>,
 ) -> impl Future<Output = Result<PeerProxy, Error>> {
-    match fidl::endpoints::create_proxy() {
-        Ok((local, remote)) => {
-            let address = parameters.address.clone();
-            parameters.channel = Some(remote);
-            let fut = proxy.add_low_energy_peer(parameters);
-            Either::Right(async move {
-                let _ = fut
-                    .await?
-                    .map_err(|e| format_err!("Failed to add emulated LE peer: {:?}", e))?;
+    let (local, remote) = fidl::endpoints::create_proxy();
+    let address = parameters.address.clone();
+    parameters.channel = Some(remote);
+    let fut = proxy.add_low_energy_peer(parameters);
+    async move {
+        let _ = fut.await?.map_err(|e| format_err!("Failed to add emulated LE peer: {:?}", e))?;
 
-                if adv_data.is_some() {
-                    let request = PeerSetLeAdvertisementRequest {
-                        le_address: Some(address.unwrap().into()),
-                        advertisement: Some(AdvertisingData {
-                            data: Some(adv_data.unwrap()),
-                            __source_breaking: fidl::marker::SourceBreaking,
-                        }),
-                        scan_response: Some(AdvertisingData {
-                            data: None,
-                            __source_breaking: fidl::marker::SourceBreaking,
-                        }),
-                        __source_breaking: fidl::marker::SourceBreaking,
-                    };
-                    let _ = local.set_le_advertisement(&request).await.unwrap();
-                }
-                Ok(local)
-            })
+        if adv_data.is_some() {
+            let request = PeerSetLeAdvertisementRequest {
+                le_address: Some(address.unwrap().into()),
+                advertisement: Some(AdvertisingData {
+                    data: Some(adv_data.unwrap()),
+                    __source_breaking: fidl::marker::SourceBreaking,
+                }),
+                scan_response: Some(AdvertisingData {
+                    data: None,
+                    __source_breaking: fidl::marker::SourceBreaking,
+                }),
+                __source_breaking: fidl::marker::SourceBreaking,
+            };
+            let _ = local.set_le_advertisement(&request).await.unwrap();
         }
-        Err(e) => Either::Left(err(e.into())),
+        Ok::<PeerProxy, Error>(local)
     }
 }
 
@@ -178,18 +169,13 @@ pub fn add_bredr_peer(
     proxy: &EmulatorProxy,
     mut parameters: PeerParameters,
 ) -> impl Future<Output = Result<PeerProxy, Error>> {
-    match fidl::endpoints::create_proxy() {
-        Ok((local, remote)) => {
-            parameters.channel = Some(remote);
-            let fut = proxy.add_bredr_peer(parameters);
-            Either::Right(async {
-                let _ = fut
-                    .await?
-                    .map_err(|e| format_err!("Failed to add emulated BR/EDR peer: {:?}", e))?;
-                Ok(local)
-            })
-        }
-        Err(e) => Either::Left(err(e.into())),
+    let (local, remote) = fidl::endpoints::create_proxy();
+    parameters.channel = Some(remote);
+    let fut = proxy.add_bredr_peer(parameters);
+    async {
+        let _ =
+            fut.await?.map_err(|e| format_err!("Failed to add emulated BR/EDR peer: {:?}", e))?;
+        Ok::<PeerProxy, Error>(local)
     }
 }
 

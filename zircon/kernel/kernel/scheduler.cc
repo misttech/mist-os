@@ -1204,7 +1204,10 @@ inline void Scheduler::UpdateEstimatedEnergyConsumption(Thread* current_thread,
   // Time in a low-power idle state should only accrue when running the idle
   // thread.
   const SchedDuration idle_processor_time_ns{IdlePowerThread::TakeProcessorIdleTime()};
-  DEBUG_ASSERT(idle_processor_time_ns <= actual_runtime_ns);
+  DEBUG_ASSERT_MSG(
+      idle_processor_time_ns <= actual_runtime_ns,
+      "idle_processor_time_ns=%" PRId64 " actual_runtime_ns=%" PRId64 " current_thread=%s",
+      idle_processor_time_ns.raw_value(), actual_runtime_ns.raw_value(), current_thread->name());
 
   // Subtract any time the processor spent in the low-power idle state from the
   // runtime to ensure that active vs. idle power consumption is attributed
@@ -1535,6 +1538,11 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     SchedulerQueueState& sqs = next_thread->scheduler_queue_state();
     DEBUG_ASSERT(sqs.transient_state == TransientState::Rescheduling);
     sqs.transient_state = TransientState::None;
+  }
+
+  // Update stall contributions of the current and next thread.
+  if (thread_changed) {
+    StallAccumulator::ApplyContextSwitch(current_thread, next_thread);
   }
 
   // Update the state of the current and next thread.

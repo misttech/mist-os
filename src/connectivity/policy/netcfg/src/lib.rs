@@ -482,7 +482,7 @@ impl InterfaceState {
     /// Handles the interface being discovered.
     async fn on_discovery(
         &mut self,
-        properties: &fnet_interfaces_ext::Properties,
+        properties: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::DefaultInterest>,
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
         dhcpv6_client_provider: Option<&fnet_dhcpv6::ClientProviderProxy>,
         dhcpv4_server: Option<&fnet_dhcp::Server_Proxy>,
@@ -563,7 +563,10 @@ pub struct NetCfg<'a> {
     // TODO(https://fxbug.dev/42146318): These hashmaps are all indexed by
     // interface ID and store per-interface state, and should be merged.
     interface_states: HashMap<InterfaceId, InterfaceState>,
-    interface_properties: HashMap<InterfaceId, fnet_interfaces_ext::PropertiesAndState<()>>,
+    interface_properties: HashMap<
+        InterfaceId,
+        fnet_interfaces_ext::PropertiesAndState<(), fnet_interfaces_ext::DefaultInterest>,
+    >,
     interface_metrics: InterfaceMetrics,
 
     dns_servers: DnsServers,
@@ -612,7 +615,9 @@ fn static_source_from_ip(f: std::net::IpAddr) -> fnet_name::DnsServer_ {
 async fn svc_connect<S: fidl::endpoints::DiscoverableProtocolMarker>(
     svc_dir: &fio::DirectoryProxy,
 ) -> Result<S::Proxy, anyhow::Error> {
-    optional_svc_connect::<S>(svc_dir).await?.ok_or(anyhow::anyhow!("service does not exist"))
+    optional_svc_connect::<S>(svc_dir)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("service does not exist"))
 }
 
 /// Attempt to connect to a service, returning `None` if the service does not
@@ -639,7 +644,7 @@ fn start_dhcpv6_client(
         port_class: _,
         has_default_ipv4_route: _,
         has_default_ipv6_route: _,
-    }: &fnet_interfaces_ext::Properties,
+    }: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::DefaultInterest>,
     duid: fnet_dhcpv6::Duid,
     dhcpv6_client_provider: &fnet_dhcpv6::ClientProviderProxy,
     pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
@@ -765,7 +770,12 @@ enum Dhcpv4ConfigurationHandlerResult {
 // Events associated with provisioning a device.
 #[derive(Debug)]
 enum ProvisioningEvent {
-    InterfaceWatcherResult(Result<Option<fidl_fuchsia_net_interfaces::Event>, fidl::Error>),
+    InterfaceWatcherResult(
+        Result<
+            Option<fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::DefaultInterest>>,
+            fidl::Error,
+        >,
+    ),
     DnsWatcherResult(
         Option<(
             dns_server_watcher::DnsServersUpdateSource,
@@ -1243,8 +1253,9 @@ impl<'a> NetCfg<'a> {
                     .context("handle interface watcher event")?;
             }
             ProvisioningEvent::DnsWatcherResult(dns_watchers_res) => {
-                let (source, res) = dns_watchers_res
-                    .ok_or(anyhow::anyhow!("dns watchers stream should never be exhausted"))?;
+                let (source, res) = dns_watchers_res.ok_or_else(|| {
+                    anyhow::anyhow!("dns watchers stream should never be exhausted")
+                })?;
                 let servers = match res {
                     Ok(s) => s,
                     Err(e) => {
@@ -1615,7 +1626,7 @@ impl<'a> NetCfg<'a> {
     /// Handles an interface watcher event (existing, added, changed, or removed).
     async fn handle_interface_watcher_event(
         &mut self,
-        event: fnet_interfaces::Event,
+        event: fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::DefaultInterest>,
         watchers: &mut DnsServerWatchers<'_>,
         virtualization_handler: &mut impl virtualization::Handler,
     ) -> Result<(), anyhow::Error> {
@@ -1709,7 +1720,11 @@ impl<'a> NetCfg<'a> {
     // rather than `&mut self` directly, because `update_result` already holds a reference into
     // `self.interface_properties`.
     async fn handle_interface_update_result(
-        update_result: &fnet_interfaces_ext::UpdateResult<'_, ()>,
+        update_result: &fnet_interfaces_ext::UpdateResult<
+            '_,
+            (),
+            fnet_interfaces_ext::DefaultInterest,
+        >,
         watchers: &mut DnsServerWatchers<'_>,
         dns_servers: &mut DnsServers,
         dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
@@ -2492,9 +2507,7 @@ impl<'a> NetCfg<'a> {
     ) -> Result<(), errors::Error> {
         let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-        >()
-        .context("address state provider: failed to create fidl endpoints")
-        .map_err(errors::Error::Fatal)?;
+        >();
 
         // Handle on-demand interface enabling by using either implementation of Filter.
         filter_enabled_state
@@ -2650,10 +2663,8 @@ impl<'a> NetCfg<'a> {
         prefix: fidl::endpoints::ServerEnd<fnet_dhcpv6::PrefixControlMarker>,
         dns_watchers: &mut DnsServerWatchers<'_>,
     ) -> Result<(), errors::Error> {
-        let (prefix_control_request_stream, control_handle) = prefix
-            .into_stream_and_control_handle()
-            .context("fuchsia.net.dhcpv6/PrefixControl server end to stream and control handle")
-            .map_err(errors::Error::NonFatal)?;
+        let (prefix_control_request_stream, control_handle) =
+            prefix.into_stream_and_control_handle();
 
         let dhcpv6_client_provider = if let Some(s) = self.dhcpv6_client_provider.as_ref() {
             s
@@ -3294,7 +3305,8 @@ fn map_address_state_provider_error(
                 errors::Error::NonFatal
             }
             fnet_interfaces_ext::admin::AddressStateProviderError::AddressRemoved(e) => match e {
-                fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::Invalid => {
+                fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::Invalid
+                | fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::InvalidProperties => {
                     errors::Error::Fatal
                 }
                 fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::AlreadyAssigned
@@ -3383,33 +3395,24 @@ mod tests {
     fn test_netcfg(
         with_dhcpv4_client_provider: bool,
     ) -> Result<(NetCfg<'static>, ServerEnds), anyhow::Error> {
-        let (stack, _stack_server) = fidl::endpoints::create_proxy::<fnet_stack::StackMarker>()
-            .context("error creating stack endpoints")?;
+        let (stack, _stack_server) = fidl::endpoints::create_proxy::<fnet_stack::StackMarker>();
         let (lookup_admin, lookup_admin_server) =
-            fidl::endpoints::create_proxy::<fnet_name::LookupAdminMarker>()
-                .context("error creating lookup_admin endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_name::LookupAdminMarker>();
         let (filter, _filter_server) =
-            fidl::endpoints::create_proxy::<fnet_filter_deprecated::FilterMarker>()
-                .context("create filter endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_filter_deprecated::FilterMarker>();
         let filter_control = FilterControl::Deprecated(filter);
         let (interface_state, _interface_state_server) =
-            fidl::endpoints::create_proxy::<fnet_interfaces::StateMarker>()
-                .context("create interface state endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_interfaces::StateMarker>();
         let (dhcp_server, dhcp_server_server_end) =
-            fidl::endpoints::create_proxy::<fnet_dhcp::Server_Marker>()
-                .context("error creating dhcp_server endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_dhcp::Server_Marker>();
         let (dhcpv4_client_provider, dhcpv4_client_provider_server) =
-            fidl::endpoints::create_proxy::<fnet_dhcp::ClientProviderMarker>()
-                .context("error creating dhcpv4_client_provider endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_dhcp::ClientProviderMarker>();
         let (dhcpv6_client_provider, dhcpv6_client_provider_server) =
-            fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientProviderMarker>()
-                .context("error creating dhcpv6_client_provider endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientProviderMarker>();
         let (installer, _installer_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
-                .context("error creating installer endpoints")?;
+            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>();
         let (route_set_v4_provider, route_set_v4_provider_server) =
-            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV4Marker>()
-                .context("error creating route set v4 provider endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV4Marker>();
 
         Ok((
             NetCfg {
@@ -3440,15 +3443,9 @@ mod tests {
                 interface_provisioning_policy: Default::default(),
             },
             ServerEnds {
-                lookup_admin: lookup_admin_server
-                    .into_stream()
-                    .context("error converting lookup_admin server to stream")?,
-                dhcpv4_client_provider: dhcpv4_client_provider_server
-                    .into_stream()
-                    .context("error converting dhcpv4_client_provider server to stream")?,
-                dhcpv6_client_provider: dhcpv6_client_provider_server
-                    .into_stream()
-                    .context("error converting dhcpv6_client_provider server to stream")?,
+                lookup_admin: lookup_admin_server.into_stream(),
+                dhcpv4_client_provider: dhcpv4_client_provider_server.into_stream(),
+                dhcpv6_client_provider: dhcpv6_client_provider_server.into_stream(),
                 route_set_v4_provider: route_set_v4_provider_server,
                 dhcpv4_server: dhcp_server_server_end,
             },
@@ -3481,11 +3478,10 @@ mod tests {
     });
 
     fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
-        fnet_interfaces_ext::Address {
+        fnet_interfaces_ext::Address::<fnet_interfaces_ext::DefaultInterest> {
             addr,
-            valid_until: fnet_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
-            preferred_lifetime_info: fnet_interfaces_ext::PreferredLifetimeInfo::preferred_forever(
-            ),
+            valid_until: fnet_interfaces_ext::NoInterest,
+            preferred_lifetime_info: fnet_interfaces_ext::NoInterest,
             assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
         }
         .into()
@@ -3514,7 +3510,9 @@ mod tests {
             addresses,
             ..Default::default()
         });
-        netcfg.handle_interface_watcher_event(event, dns_watchers, &mut virtualization::Stub).await
+        netcfg
+            .handle_interface_watcher_event(event.into(), dns_watchers, &mut virtualization::Stub)
+            .await
     }
 
     /// Make sure that a new DHCPv6 client was requested, and verify its parameters.
@@ -3557,7 +3555,7 @@ mod tests {
                         }
                     );
 
-                    request.into_stream().context("error converting client server end to stream")?
+                    request.into_stream()
                 }
             };
         assert!(dns_watchers.contains_key(&DHCPV6_DNS_SOURCE), "should have a watcher");
@@ -3622,8 +3620,7 @@ mod tests {
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .expect("create endpoints");
 
-        let mut control_request_stream =
-            control_server_end.into_stream().expect("get control request stream");
+        let mut control_request_stream = control_server_end.into_stream();
 
         let port_class = fidl_fuchsia_hardware_network::PortClass::Virtual;
         let (new_host_result, ()) = futures::join!(
@@ -3657,7 +3654,8 @@ mod tests {
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
                     ..Default::default()
-                }),
+                })
+                .into(),
                 &mut dns_watchers,
                 &mut virtualization::Stub,
             )
@@ -3740,7 +3738,8 @@ mod tests {
                     online,
                     addresses,
                     ..Default::default()
-                }),
+                })
+                .into(),
                 dns_watchers,
                 &mut virtualization::Stub,
             )
@@ -3774,8 +3773,7 @@ mod tests {
 
         // A future representing the DHCPv4 server. Must be polled while feeding
         // updates to Netcfg.
-        let mut dhcpv4_server_req_stream =
-            dhcpv4_server.into_stream().expect("dhcpv4 request stream");
+        let mut dhcpv4_server_req_stream = dhcpv4_server.into_stream();
         let start_serving_fut = dhcpv4_server_req_stream.next().map(|req| {
             match req.expect("dhcpv4 request stream ended").expect("dhcpv4 request") {
                 fnet_dhcp::Server_Request::StartServing { responder } => {
@@ -3816,7 +3814,8 @@ mod tests {
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
                         ..Default::default()
-                    }),
+                    })
+                    .into(),
                     &mut dns_watchers,
                     &mut virt_stub,
                 )
@@ -3880,7 +3879,7 @@ mod tests {
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .expect("create endpoints");
         let port_class = fidl_fuchsia_hardware_network::PortClass::Virtual;
-        let mut control = control_server_end.into_stream().expect("control request stream");
+        let mut control = control_server_end.into_stream();
 
         let (new_host_result, ()) = futures::join!(
             InterfaceState::new_host(
@@ -3925,7 +3924,8 @@ mod tests {
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
                         ..Default::default()
-                    }),
+                    })
+                    .into(),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
                 )
@@ -3960,7 +3960,7 @@ mod tests {
                 } => {
                     assert_eq!(interface_id, INTERFACE_ID.get());
                     assert_eq!(params, dhcpv4::new_client_params());
-                    request.into_stream().expect("error converting client server end to stream")
+                    request.into_stream()
                 }
                 fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {
                     unreachable!("only called at startup")
@@ -4007,7 +4007,7 @@ mod tests {
             let dns_servers = vec![fidl_ip_v4!("192.0.2.1"), fidl_ip_v4!("192.0.2.2")];
             let routers = vec![fidl_ip_v4!("192.0.2.3"), fidl_ip_v4!("192.0.2.4")];
 
-            let (_asp_client, asp_server) = fidl::endpoints::create_proxy().expect("create proxy");
+            let (_asp_client, asp_server) = fidl::endpoints::create_proxy();
 
             responder
                 .send(fnet_dhcp::ClientWatchConfigurationResponse {
@@ -4109,7 +4109,7 @@ mod tests {
                 if remove_interface {
                     netcfg
                         .handle_interface_watcher_event(
-                            fnet_interfaces::Event::Removed(INTERFACE_ID.get()),
+                            fnet_interfaces::Event::Removed(INTERFACE_ID.get()).into(),
                             &mut dns_watchers,
                             &mut virtualization::Stub,
                         )
@@ -4191,7 +4191,7 @@ mod tests {
             None,
             interface::ProvisioningAction::Local,
         );
-        let mut control = control_server_end.into_stream().expect("control request stream");
+        let mut control = control_server_end.into_stream();
         let (new_host_result, ()) =
             futures::join!(new_host_fut, expect_get_interface_auth(&mut control));
 
@@ -4216,7 +4216,8 @@ mod tests {
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
                     ..Default::default()
-                }),
+                })
+                .into(),
                 &mut dns_watchers,
                 &mut virtualization::Stub,
             )
@@ -4237,7 +4238,7 @@ mod tests {
             } => {
                 assert_eq!(interface_id, INTERFACE_ID.get());
                 assert_eq!(params, dhcpv4::new_client_params());
-                request.into_stream().expect("error converting client server end to stream")
+                request.into_stream()
             }
             fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {
                 unreachable!("only called at startup")
@@ -4245,7 +4246,7 @@ mod tests {
         };
 
         let responder = expect_watch_dhcpv4_configuration(&mut client_req_stream);
-        let (_asp_client, asp_server) = fidl::endpoints::create_proxy().expect("create proxy");
+        let (_asp_client, asp_server) = fidl::endpoints::create_proxy();
         responder
             .send(fnet_dhcp::ClientWatchConfigurationResponse {
                 address: Some(fnet_dhcp::Address {
@@ -4340,7 +4341,7 @@ mod tests {
             None,
             interface::ProvisioningAction::Local,
         );
-        let mut control = control_server_end.into_stream().expect("control request stream");
+        let mut control = control_server_end.into_stream();
         let (new_host_result, ()) =
             futures::join!(new_host_fut, expect_get_interface_auth(&mut control));
         assert_matches::assert_matches!(
@@ -4365,7 +4366,8 @@ mod tests {
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
                         ..Default::default()
-                    }),
+                    })
+                    .into(),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
                 )
@@ -4386,9 +4388,7 @@ mod tests {
                 } => {
                     assert_eq!(interface_id, INTERFACE_ID.get());
                     assert_eq!(params, dhcpv4::new_client_params());
-                    request
-                        .into_stream_and_control_handle()
-                        .expect("error converting client server end to stream")
+                    request.into_stream_and_control_handle()
                 }
                 fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {
                     unreachable!("only called at startup")
@@ -4473,8 +4473,7 @@ mod tests {
         let (control, control_server_end) =
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .expect("create endpoints");
-        let mut control_request_stream =
-            control_server_end.into_stream().expect("get control request stream");
+        let mut control_request_stream = control_server_end.into_stream();
         let port_class = fidl_fuchsia_hardware_network::PortClass::Virtual;
         let (new_host_result, ()) = futures::join!(
             InterfaceState::new_host(
@@ -4506,7 +4505,8 @@ mod tests {
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
                     ..Default::default()
-                }),
+                })
+                .into(),
                 &mut dns_watchers,
                 &mut virtualization::Stub,
             )
@@ -4654,7 +4654,7 @@ mod tests {
         let ((), ()) = future::join(
             netcfg
                 .handle_interface_watcher_event(
-                    fnet_interfaces::Event::Removed(INTERFACE_ID.get()),
+                    fnet_interfaces::Event::Removed(INTERFACE_ID.get()).into(),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
                 )
@@ -4792,8 +4792,7 @@ mod tests {
                         DISALLOWED_UPSTREAM_DEVICE_CLASS
                     };
 
-                    let mut control_request_stream =
-                        control_server_end.into_stream().expect("get control request stream");
+                    let mut control_request_stream = control_server_end.into_stream();
 
                     let (new_host_result, ()) = futures::join!(
                         InterfaceState::new_host(
@@ -4845,7 +4844,7 @@ mod tests {
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
                         ..Default::default()
-                    }),
+                    }).into(),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
                 )
@@ -4939,8 +4938,7 @@ mod tests {
                          request,
                          control_handle: _,
                      }| async move {
-                        let mut new_stream =
-                            request.into_stream().expect("fuchsia.net.dhcpv6/Client into_stream");
+                        let mut new_stream = request.into_stream();
                         // NetCfg always keeps the server hydrated with a pending hanging-get.
                         expect_watch_prefixes(&mut new_stream).await;
                         (interface_id, config, new_stream)
@@ -5036,8 +5034,7 @@ mod tests {
 
         // Making an AcquirePrefix call should trigger restarting DHCPv6 w/ PD.
         let (prefix_control, server_end) =
-            fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
-                .expect("create fuchsia.net.dhcpv6/PrefixControl endpoints");
+            fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>();
         let mut lookup_admin_fut = lookup_admin_request_stream
             .try_for_each(|req| {
                 let (_, responder): (Vec<fnet::SocketAddress>, _) =
@@ -5188,8 +5185,7 @@ mod tests {
         let mut dns_watchers = DnsServerWatchers::empty();
 
         let (_prefix_control, server_end) =
-            fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
-                .expect("create fuchsia.net.dhcpv6/PrefixControl endpoints");
+            fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>();
         netcfg
             .handle_dhcpv6_acquire_prefix(
                 fnet_dhcpv6::AcquirePrefixConfig::default(),
@@ -5212,8 +5208,7 @@ mod tests {
             } else {
                 DISALLOWED_UPSTREAM_DEVICE_CLASS
             };
-            let mut control_request_stream =
-                control_server_end.into_stream().expect("get control request stream");
+            let mut control_request_stream = control_server_end.into_stream();
 
             let (new_host_result, ()) = futures::join!(
                 InterfaceState::new_host(
@@ -5250,7 +5245,7 @@ mod tests {
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
                         ..Default::default()
-                    }),
+                    }).into(),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
                 )

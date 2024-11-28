@@ -78,7 +78,7 @@ impl Header {
         self.pslice_count
             .checked_mul(std::mem::size_of::<SliceEntry>() as u64)
             .and_then(|n| n.checked_next_multiple_of(BLOCK_SIZE))
-            .ok_or(anyhow!("Bad pslice_count"))
+            .ok_or_else(|| anyhow!("Bad pslice_count"))
             .map(|n| n as usize)
     }
 
@@ -859,7 +859,7 @@ impl Component {
         device: ClientEnd<BlockMarker>,
         _options: StartOptions,
     ) -> Result<(), Error> {
-        let mut fvm = Fvm::open(RemoteBlockClient::new(device.into_proxy()?).await?).await?;
+        let mut fvm = Fvm::open(RemoteBlockClient::new(device.into_proxy()).await?).await?;
 
         for (&index, partition) in &fvm.inner.get_mut().metadata.partitions {
             self.add_volume_to_volumes_directory(index, &partition.name()).unwrap();
@@ -992,7 +992,7 @@ impl Component {
         };
 
         let key = if let Some(crypt) = options.crypt {
-            let crypt_proxy = crypt.into_proxy().unwrap();
+            let crypt_proxy = crypt.into_proxy();
             Some(if format {
                 zxcrypt::Key::format(&fvm, partition_index, &crypt_proxy).await.unwrap()
             } else {
@@ -1048,7 +1048,7 @@ impl Component {
 
             impl BlockConnector for Server {
                 fn connect_volume(&self) -> Result<ClientEnd<fvolume::VolumeMarker>, Error> {
-                    let (client, stream) = fidl::endpoints::create_request_stream()?;
+                    let (client, stream) = fidl::endpoints::create_request_stream();
                     let block_server = self.1.clone();
                     self.0.spawn(async move {
                         let _ = block_server.handle_requests(stream).await;
@@ -1595,7 +1595,7 @@ async fn main() -> Result<(), Error> {
     component
         .serve(
             fuchsia_runtime::take_startup_handle(HandleType::DirectoryRequest.into())
-                .ok_or(anyhow!("Missing startup handle"))
+                .ok_or_else(|| anyhow!("Missing startup handle"))
                 .unwrap()
                 .into(),
         )
@@ -1698,12 +1698,12 @@ mod tests {
 
         async fn from_fake_server(fake_server: Arc<FakeServer>) -> Self {
             let (outgoing_dir, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let fixture =
                 Fixture { component: Arc::new(Component::new()), outgoing_dir, fake_server };
             let fake_server = fixture.fake_server.clone();
             let (block_client, block_server) =
-                fidl::endpoints::create_request_stream::<BlockMarker>().unwrap();
+                fidl::endpoints::create_request_stream::<BlockMarker>();
             fasync::Task::spawn(async move {
                 let _ = fake_server.serve(block_server.cast_stream()).await;
             })
@@ -1740,8 +1740,7 @@ mod tests {
             .unwrap();
 
             let (dir_proxy, dir_server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             volume_proxy
                 .mount(dir_server_end, MountOptions::default())
                 .await
@@ -1774,8 +1773,7 @@ mod tests {
         )
         .unwrap();
 
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         volume_proxy
             .mount(dir_server_end, MountOptions::default())
             .await
@@ -1826,8 +1824,7 @@ mod tests {
         )
         .unwrap();
 
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         volume_proxy
             .mount(dir_server_end, MountOptions::default())
             .await
@@ -1864,8 +1861,7 @@ mod tests {
                 connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
 
             let (dir_proxy, dir_server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             volumes_proxy
                 .create(
                     "foo",
@@ -1917,8 +1913,7 @@ mod tests {
             "volumes/foo",
         )
         .unwrap();
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         volume_proxy
             .mount(dir_server_end, MountOptions::default())
             .await
@@ -1953,8 +1948,7 @@ mod tests {
 
                 loop {
                     let (_dir_proxy, dir_server_end) =
-                        fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                            .expect("Create proxy to succeed");
+                        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                     match volumes_proxy
                         .create(
                             &format!("foo {partition_count}"),
@@ -1992,8 +1986,7 @@ mod tests {
                 .unwrap();
 
                 let (_dir_proxy, dir_server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("Create proxy to succeed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_proxy
                     .mount(dir_server_end, MountOptions::default())
                     .await
@@ -2010,8 +2003,7 @@ mod tests {
         let volumes_proxy =
             connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
 
-        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         volumes_proxy
             .create(
                 "foo",
@@ -2024,8 +2016,7 @@ mod tests {
             .expect("create failed");
 
         // Creating another volume should fail because there won't be enough space.
-        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         assert_eq!(
             volumes_proxy
                 .create(
@@ -2052,8 +2043,7 @@ mod tests {
         volumes_proxy.remove("foo").await.expect("remove failed (FIDL)").expect("remove failed");
 
         // Creating should now succeed.
-        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         volumes_proxy
             .create(
                 "bar",
@@ -2104,8 +2094,7 @@ mod tests {
         )
         .unwrap();
 
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         volume_proxy
             .mount(dir_server_end, MountOptions::default())
             .await
@@ -2149,8 +2138,7 @@ mod tests {
         )
         .unwrap();
 
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         volume_proxy
             .mount(dir_server_end, MountOptions::default())
             .await
@@ -2287,8 +2275,7 @@ mod tests {
             .unwrap();
 
             let (dir_proxy, dir_server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             blobfs_volume
                 .mount(dir_server_end, MountOptions::default())
                 .await
@@ -2304,8 +2291,7 @@ mod tests {
             // Create a new volume.
 
             let (dir_proxy, dir_server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             volumes_proxy
                 .create(
                     "foo",
@@ -2467,8 +2453,7 @@ mod tests {
             "volumes/foo",
         )
         .unwrap();
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         volume_proxy
             .mount(dir_server_end, MountOptions::default())
             .await
@@ -2494,8 +2479,7 @@ mod tests {
         )
         .unwrap();
 
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         blobfs_volume
             .mount(dir_server_end, MountOptions::default())
             .await
@@ -2585,8 +2569,7 @@ mod tests {
         )
         .unwrap();
 
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         volume_proxy
             .mount(dir_server_end, MountOptions::default())
             .await
@@ -2641,8 +2624,7 @@ mod tests {
 
         assert!(!flush_called.load(Ordering::Relaxed));
 
-        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         volumes_proxy
             .create(
                 "foo",
@@ -2665,8 +2647,7 @@ mod tests {
         let fixture = Fixture::new(10 * SLICE_SIZE).await;
         let volumes_proxy =
             connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         volumes_proxy
             .create(

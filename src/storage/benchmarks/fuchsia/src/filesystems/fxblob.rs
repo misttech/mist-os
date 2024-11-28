@@ -34,6 +34,7 @@ impl FilesystemConfig for Fxblob {
         let fxblob = FsManagementFilesystemInstance::new(
             fs_management::Fxfs::default(),
             block_device,
+            None,
             /*as_blob=*/ true,
         )
         .await;
@@ -94,7 +95,7 @@ impl BlobFilesystem for FxblobInstance {
             .await
             .expect("transport error on BlobCreator.Create")
             .expect("failed to create blob");
-        let writer = writer_client_end.into_proxy().unwrap();
+        let writer = writer_client_end.into_proxy();
         let mut blob_writer = BlobWriter::create(writer, blob.data.len() as u64)
             .await
             .expect("failed to create BlobWriter");

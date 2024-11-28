@@ -305,8 +305,7 @@ impl SmeForClientStateMachine {
         req: &fidl_sme::ConnectRequest,
     ) -> Result<(fidl_sme::ConnectResult, fidl_sme::ConnectTransactionEventStream), anyhow::Error>
     {
-        let (connect_txn, remote) =
-            create_proxy().map_err(|e| format_err!("Failed to create proxy: {:?}", e))?;
+        let (connect_txn, remote) = create_proxy();
 
         self.proxy
             .connect(req, Some(remote))
@@ -338,6 +337,10 @@ impl SmeForClientStateMachine {
                 Err(format_err!("Timed out waiting for disconnect"))
             })
             .await
+    }
+
+    pub fn roam(&self, req: &fidl_sme::RoamRequest) -> Result<(), Error> {
+        self.proxy.roam(req).map_err(|e| format_err!("Failed to send roam command: {:}", e))
     }
 
     pub fn take_event_stream(&self) -> fidl_sme::ClientSmeEventStream {
@@ -513,7 +516,7 @@ mod tests {
     use test_case::test_case;
     use wlan_common::channel::Cbw;
     use wlan_common::sequestered::Sequestered;
-    use wlan_common::{assert_variant, RadioConfig};
+    use wlan_common::{assert_variant, random_fidl_bss_description, RadioConfig};
     use {
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
@@ -1080,8 +1083,7 @@ mod tests {
             Poll::Ready(Some(IfaceManagerRequest::GetScanProxy(ScanProxyRequest{
                 responder
             }))) => {
-                let (proxy, _) = create_proxy::<fidl_sme::ClientSmeMarker>()
-                    .expect("failed to create scan sme proxy");
+                let (proxy, _) = create_proxy::<fidl_sme::ClientSmeMarker>();
                 let (defect_sender, _defect_receiver) = mpsc::channel(100);
                 responder.send(Ok(SmeForScan{proxy, iface_id: 0, defect_sender})).expect("failed to send scan sme proxy");
             }
@@ -1581,11 +1583,10 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Build an SME specifically for scanning.
-        let (proxy, server_end) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (proxy, server_end) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let sme = SmeForScan::new(proxy, 0, defect_sender);
-        let mut sme_stream = server_end.into_stream().expect("failed to create SME stream");
+        let mut sme_stream = server_end.into_stream();
 
         // Construct a scan request.
         let scan_request = fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
@@ -1614,8 +1615,7 @@ mod tests {
         let _exec = fasync::TestExecutor::new();
 
         // Build an SME specifically for scanning.
-        let (proxy, _) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (proxy, _) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -1645,8 +1645,7 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         // Create the SmeForScan
-        let (proxy, _server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (proxy, _server) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -1682,8 +1681,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Build an SME wrapper.
-        let (proxy, sme_fut) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (proxy, sme_fut) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -1695,8 +1693,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ack the disconnect request.
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{
@@ -1716,8 +1713,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Build an SME wrapper.
-        let (proxy, _) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (proxy, _) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -1735,8 +1731,7 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         // Build an SME wrapper.
-        let (proxy, _sme_fut) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (proxy, _sme_fut) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -1763,6 +1758,34 @@ mod tests {
         );
     }
 
+    #[fuchsia::test]
+    fn state_machine_sme_roam_sends_request() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, sme_fut) = create_proxy::<fidl_sme::ClientSmeMarker>();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Request a roam via the sme proxy
+        let roam_request =
+            fidl_sme::RoamRequest { bss_description: random_fidl_bss_description!() };
+        let _ = sme.roam(&roam_request).unwrap();
+
+        // Verify SME gets the request
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ClientSmeRequest::Roam {
+                req, ..
+            }) => {
+                assert_eq!(req, roam_request);
+            }
+        );
+    }
+
     fn generate_connect_request() -> fidl_sme::ConnectRequest {
         let connection_selection = generate_connect_selection();
         fidl_sme::ConnectRequest {
@@ -1779,8 +1802,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Build an SME wrapper.
-        let (proxy, sme_fut) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (proxy, sme_fut) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -1796,8 +1818,7 @@ mod tests {
         }
 
         // Ack the connect request.
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{
@@ -1805,7 +1826,7 @@ mod tests {
                 ..
             }) => {
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
                     .send_on_connect_result(&fidl_sme::ConnectResult {
                         code: fidl_ieee80211::StatusCode::Success,
@@ -1841,8 +1862,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Build an SME wrapper.
-        let (proxy, sme_fut) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (proxy, sme_fut) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -1858,8 +1878,7 @@ mod tests {
         }
 
         // Ack the connect request.
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{
@@ -1867,7 +1886,7 @@ mod tests {
                 ..
             }) => {
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
                     .send_on_connect_result(&fidl_sme::ConnectResult {
                         code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
@@ -1903,8 +1922,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Build an SME wrapper.
-        let (proxy, _) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (proxy, _) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -1926,8 +1944,7 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         // Build an SME wrapper.
-        let (proxy, _sme_fut) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (proxy, _sme_fut) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -1965,7 +1982,7 @@ mod tests {
     #[fuchsia::test]
     fn wait_for_connect_result_error() {
         let mut exec = fasync::TestExecutor::new();
-        let (connect_txn, remote) = create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+        let (connect_txn, remote) = create_proxy::<fidl_sme::ConnectTransactionMarker>();
         let mut response_stream = connect_txn.take_event_stream();
 
         let fut = wait_for_connect_result(&mut response_stream);
@@ -1981,8 +1998,8 @@ mod tests {
     #[fuchsia::test]
     fn wait_for_connect_result_ignores_other_events() {
         let mut exec = fasync::TestExecutor::new();
-        let (connect_txn, remote) = create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
-        let request_handle = remote.into_stream().unwrap().control_handle();
+        let (connect_txn, remote) = create_proxy::<fidl_sme::ConnectTransactionMarker>();
+        let request_handle = remote.into_stream().control_handle();
         let mut response_stream = connect_txn.take_event_stream();
 
         let fut = wait_for_connect_result(&mut response_stream);
@@ -2025,8 +2042,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Build an SME wrapper.
-        let (proxy, sme_fut) =
-            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (proxy, sme_fut) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -2039,8 +2055,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Respond to the start request.
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_ap_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start { responder, .. }) => {
@@ -2061,7 +2076,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Build an SME wrapper.
-        let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -2080,8 +2095,7 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         // Build an SME wrapper.
-        let (proxy, _sme_fut) =
-            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (proxy, _sme_fut) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -2114,8 +2128,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Build an SME wrapper.
-        let (proxy, sme_fut) =
-            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (proxy, sme_fut) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -2127,8 +2140,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Respond to the stop request.
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_ap_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop { responder }) => {
@@ -2149,7 +2161,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Build an SME wrapper.
-        let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -2167,8 +2179,7 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         // Build an SME wrapper.
-        let (proxy, _sme_fut) =
-            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (proxy, _sme_fut) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -2200,8 +2211,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Build an SME wrapper.
-        let (proxy, sme_fut) =
-            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (proxy, sme_fut) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -2213,8 +2223,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Respond to the status request.
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_ap_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
@@ -2235,7 +2244,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Build an SME wrapper.
-        let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
@@ -2253,8 +2262,7 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         // Build an SME wrapper.
-        let (proxy, _sme_fut) =
-            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (proxy, _sme_fut) = create_proxy::<fidl_sme::ApSmeMarker>();
         let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();

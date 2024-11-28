@@ -2,23 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::time::Duration;
-
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error, FfxError};
+use fdomain_client::fidl::DiscoverableProtocolMarker;
+use fdomain_fuchsia_developer_remotecontrol::{
+    RemoteControlMarker as FRemoteControlMarker, RemoteControlProxy as FRemoteControlProxy,
+};
+use fdomain_fuchsia_io as fio_fdomain;
 use ffx_command_error::FfxContext;
 use ffx_config::EnvironmentContext;
 use ffx_core::{downcast_injector_error, FfxInjectorError, Injector};
 use ffx_daemon::{get_daemon_proxy_single_link, is_daemon_running_at_path, DaemonConfig};
 use ffx_metrics::add_ffx_rcs_protocol_event;
 use ffx_target::{get_remote_proxy, open_target_with_fut};
-use fidl::endpoints::Proxy;
+use fidl::endpoints::{ClientEnd, Proxy};
 use fidl_fuchsia_developer_ffx::{DaemonError, DaemonProxy, TargetInfo, TargetProxy, VersionInfo};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use futures::FutureExt;
+use fidl_fuchsia_io::DirectoryMarker;
+use futures::{FutureExt, SinkExt};
 use std::future::Future;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use timeout::timeout;
 
 /// The different ways to check the daemon's version against the local process' information
@@ -28,7 +33,7 @@ pub enum DaemonVersionCheck {
     SameBuildId(String),
     /// Compare details from VersionInfo other than buildid, requires the daemon to have been
     /// spawned by the same overall build.
-    SameVersionInfo(VersionInfo),
+    SameVersionInfo(ffx_build_version::VersionInfo),
     /// Checks to see if the API level matches.
     CheckApiLevel(version_history::ApiLevel),
 }
@@ -91,6 +96,12 @@ pub struct Injection {
     node: Arc<overnet_core::Router>,
     daemon_once: ProxyState<DaemonProxy>,
     remote_once: ProxyState<RemoteControlProxy>,
+    fdomain: Mutex<
+        Option<(
+            Arc<fdomain_client::Client>,
+            futures::channel::mpsc::Sender<ClientEnd<DirectoryMarker>>,
+        )>,
+    >,
 }
 
 pub const CONFIG_DAEMON_AUTOSTART: &str = "daemon.autostart";
@@ -115,6 +126,7 @@ impl Injection {
             target_spec,
             daemon_once: Default::default(),
             remote_once: Default::default(),
+            fdomain: Mutex::new(None),
         }
     }
 
@@ -293,12 +305,75 @@ impl Injector for Injection {
         proxy
     }
 
+    #[tracing::instrument]
+    async fn remote_factory_fdomain(&self) -> Result<FRemoteControlProxy> {
+        let rcs = self.remote_factory().await?;
+        let toolbox = rcs::toolbox::open_toolbox(&rcs)
+            .await?
+            .into_client_end()
+            .expect("Directory proxy couldn't become an endpoint despite being brand new!");
+
+        let fdomain = self.fdomain.lock().unwrap().clone();
+        let (fdomain, mut sender) = if let Some(fdomain) = fdomain {
+            fdomain
+        } else {
+            let (sender, receiver) = futures::channel::mpsc::channel(1);
+            let receiver = Mutex::new(receiver);
+            let client = fdomain_local::local_client(move || {
+                let ret = receiver
+                    .lock()
+                    .unwrap()
+                    .try_next()
+                    .map_err(|_| fidl::Status::INTERNAL)
+                    .transpose()
+                    .unwrap_or_else(|| Err(fidl::Status::INTERNAL));
+
+                if ret.is_err() {
+                    tracing::debug!(
+                        "Somehow didn't get the proxy we created to answer this request."
+                    )
+                }
+                ret
+            });
+
+            let mut fdomain = self.fdomain.lock().unwrap();
+            fdomain.get_or_insert((client, sender)).clone()
+        };
+
+        sender.send(toolbox).await?;
+
+        let namespace = fdomain.namespace().await?;
+        let namespace =
+            fdomain_client::fidl::ClientEnd::<fio_fdomain::DirectoryMarker>::new(namespace)
+                .into_proxy()?;
+        let (proxy, server_end) = fdomain.create_proxy::<FRemoteControlMarker>().await?;
+        namespace.open3(
+            FRemoteControlMarker::PROTOCOL_NAME,
+            fio_fdomain::Flags::PROTOCOL_SERVICE,
+            &fio_fdomain::Options::default(),
+            server_end.into_channel(),
+        )?;
+        Ok(proxy)
+    }
+
     async fn is_experiment(&self, key: &str) -> bool {
         self.env_context.get(key).unwrap_or(false)
     }
 
     async fn build_info(&self) -> Result<VersionInfo> {
-        Ok::<VersionInfo, anyhow::Error>(ffx_build_version::build_info())
+        let version_info = ffx_build_version::build_info();
+        let ffx_version_info = VersionInfo {
+            commit_hash: version_info.commit_hash,
+            commit_timestamp: version_info.commit_timestamp,
+            build_version: version_info.build_version,
+            abi_revision: version_info.abi_revision,
+            api_level: version_info.api_level,
+            exec_path: version_info.exec_path,
+            build_id: version_info.build_id,
+            ..Default::default()
+        };
+
+        Ok(ffx_version_info)
     }
 }
 
@@ -413,7 +488,6 @@ async fn init_daemon_proxy(
 mod test {
     use super::*;
     use async_lock::Mutex;
-    use async_net::unix::UnixListener;
     use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd};
     use fidl_fuchsia_developer_ffx::{
         DaemonMarker, DaemonRequest, DaemonRequestStream, TargetCollectionMarker,
@@ -422,7 +496,9 @@ mod test {
     };
     use fuchsia_async::Task;
     use futures::{AsyncReadExt, StreamExt, TryStreamExt};
+    use netext::{TokioAsyncReadExt, UnixListenerStream};
     use std::path::PathBuf;
+    use tokio::net::UnixListener;
 
     /// Retry a future until it succeeds or retries run out.
     async fn retry_with_backoff<E, F>(
@@ -540,12 +616,12 @@ mod test {
 
         let listen_task = Task::local(async move {
             // let (sock, _addr) = listener.accept().await.unwrap();
-            let mut stream = listener.incoming();
+            let mut stream = UnixListenerStream(listener);
             while let Some(sock) = stream.try_next().await.unwrap_or(None) {
                 fuchsia_async::Timer::new(Duration::from_secs(sleep_secs)).await;
                 let node_clone = Arc::clone(&daemon);
                 link_tasks1.lock().await.push(Task::local(async move {
-                    let (mut rx, mut tx) = sock.split();
+                    let (mut rx, mut tx) = sock.into_multithreaded_futures_stream().split();
                     ascendd::run_stream(node_clone, &mut rx, &mut tx)
                         .map(|r| eprintln!("link error: {:?}", r))
                         .await;
@@ -717,7 +793,7 @@ mod test {
         let local_node = overnet_core::Router::new(None).unwrap();
 
         fn start_target_task(target_handle: ServerEnd<TargetMarker>) -> Task<()> {
-            let mut stream = target_handle.into_stream().unwrap();
+            let mut stream = target_handle.into_stream();
 
             Task::local(async move {
                 while let Some(request) = stream.try_next().await.unwrap() {
@@ -823,7 +899,7 @@ mod test {
             target_handle: ServerEnd<TargetMarker>,
             errors: Arc<Mutex<Vec<TargetConnectionError>>>,
         ) -> Task<()> {
-            let mut stream = target_handle.into_stream().unwrap();
+            let mut stream = target_handle.into_stream();
 
             let errors = errors.clone();
             Task::local(async move {
@@ -843,7 +919,7 @@ mod test {
                                 continue;
                             }
                             Task::local(async move {
-                                let mut stream = remote_control.into_stream().unwrap();
+                                let mut stream = remote_control.into_stream();
                                 while let Ok(Some(request)) = stream.try_next().await {
                                     eprintln!("Got a request for RCS proxy: {request:?}");
                                 }

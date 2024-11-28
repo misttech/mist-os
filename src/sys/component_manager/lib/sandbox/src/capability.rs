@@ -32,6 +32,9 @@ pub enum ConversionError {
     #[error("conversion to type is not supported")]
     NotSupported,
 
+    #[error("conversion failed because a capability could not be cloned")]
+    NotCloneable,
+
     #[error("value at `{key}` could not be converted: {err}")]
     Nested {
         key: String,
@@ -89,6 +92,7 @@ pub enum Capability {
     ConnectorRouter(crate::Router<crate::Connector>),
     DictionaryRouter(crate::Router<crate::Dict>),
     DirEntryRouter(crate::Router<crate::DirEntry>),
+    DirConnectorRouter(crate::Router<crate::DirConnector>),
     DataRouter(crate::Router<crate::Data>),
     Instance(crate::WeakInstanceToken),
     DirEntry(crate::DirEntry),
@@ -103,22 +107,25 @@ impl Capability {
     }
 
     pub fn try_clone(&self) -> Result<Self, ()> {
-        let out = match self {
-            Self::Connector(s) => Self::Connector(s.clone()),
-            Self::DirConnector(s) => Self::DirConnector(s.clone()),
-            Self::ConnectorRouter(s) => Self::ConnectorRouter(s.clone()),
-            Self::DictionaryRouter(s) => Self::DictionaryRouter(s.clone()),
-            Self::DirEntryRouter(s) => Self::DirEntryRouter(s.clone()),
-            Self::DataRouter(s) => Self::DataRouter(s.clone()),
-            Self::Dictionary(s) => Self::Dictionary(s.clone()),
-            Self::Data(s) => Self::Data(s.clone()),
-            Self::Unit(s) => Self::Unit(s.clone()),
-            Self::Directory(s) => Self::Directory(s.clone()),
-            Self::Handle(s) => Self::Handle(s.try_clone()?),
-            Self::Instance(s) => Self::Instance(s.clone()),
-            Self::DirEntry(s) => Self::DirEntry(s.clone()),
-        };
-        Ok(out)
+        match self {
+            Self::Connector(s) => Ok(Self::Connector(s.clone())),
+            Self::DirConnector(s) => Ok(Self::DirConnector(s.clone())),
+            Self::ConnectorRouter(s) => Ok(Self::ConnectorRouter(s.clone())),
+            Self::DictionaryRouter(s) => Ok(Self::DictionaryRouter(s.clone())),
+            Self::DirEntryRouter(s) => Ok(Self::DirEntryRouter(s.clone())),
+            Self::DirConnectorRouter(s) => Ok(Self::DirConnectorRouter(s.clone())),
+            Self::DataRouter(s) => Ok(Self::DataRouter(s.clone())),
+            Self::Dictionary(s) => Ok(Self::Dictionary(s.clone())),
+            Self::Data(s) => Ok(Self::Data(s.clone())),
+            Self::Unit(s) => Ok(Self::Unit(s.clone())),
+            Self::Directory(_) => {
+                // Not supported.
+                Err(())
+            }
+            Self::Handle(s) => Ok(Self::Handle(s.try_clone()?)),
+            Self::Instance(s) => Ok(Self::Instance(s.clone())),
+            Self::DirEntry(s) => Ok(Self::DirEntry(s.clone())),
+        }
     }
 
     pub fn debug_typename(&self) -> &'static str {
@@ -128,6 +135,7 @@ impl Capability {
             Self::ConnectorRouter(_) => crate::Router::<crate::Connector>::debug_typename(),
             Self::DictionaryRouter(_) => crate::Router::<crate::Dict>::debug_typename(),
             Self::DirEntryRouter(_) => crate::Router::<crate::DirEntry>::debug_typename(),
+            Self::DirConnectorRouter(_) => crate::Router::<crate::DirConnector>::debug_typename(),
             Self::DataRouter(_) => crate::Router::<crate::Data>::debug_typename(),
             Self::Dictionary(_) => crate::Dict::debug_typename(),
             Self::Data(_) => crate::Data::debug_typename(),
@@ -234,6 +242,17 @@ impl TryFrom<Capability> for Router<crate::Dict> {
     fn try_from(c: Capability) -> Result<Self, Self::Error> {
         match c {
             Capability::DictionaryRouter(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for Router<crate::DirConnector> {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::DirConnectorRouter(c) => Ok(c),
             _ => Err(()),
         }
     }

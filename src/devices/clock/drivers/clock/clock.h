@@ -7,47 +7,25 @@
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.clockimpl/cpp/driver/wire.h>
-#include <fuchsia/hardware/clockimpl/cpp/banjo.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
 
+#include <ddk/metadata/clock.h>
 #include <ddktl/device.h>
 
-class ClockImplProxy {
+class ClockDevice : public fidl::WireServer<fuchsia_hardware_clock::Clock> {
  public:
-  ClockImplProxy(const ddk::ClockImplProtocolClient& clock_banjo,
-                 fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> clock_fidl)
-      : clock_banjo_(clock_banjo), clock_fidl_(std::move(clock_fidl)) {}
+  using AddChildCallback = fit::callback<zx_status_t(
+      std::string_view, const fuchsia_driver_framework::NodePropertyVector&,
+      const std::vector<fuchsia_driver_framework::Offer>&)>;
 
-  zx_status_t Enable(uint32_t id) const;
-  zx_status_t Disable(uint32_t id) const;
-  zx_status_t IsEnabled(uint32_t id, bool* out_enabled) const;
-  zx_status_t SetRate(uint32_t id, uint64_t hz) const;
-  zx_status_t QuerySupportedRate(uint32_t id, uint64_t hz, uint64_t* out_hz) const;
-  zx_status_t GetRate(uint32_t id, uint64_t* out_hz) const;
-  zx_status_t SetInput(uint32_t id, uint32_t idx) const;
-  zx_status_t GetNumInputs(uint32_t id, uint32_t* out_n) const;
-  zx_status_t GetInput(uint32_t id, uint32_t* out_index) const;
+  explicit ClockDevice(uint32_t id) : id_(id) {}
 
- private:
-  ddk::ClockImplProtocolClient clock_banjo_;
-  fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> clock_fidl_;
-};
-
-class ClockDevice;
-using ClockDeviceType = ddk::Device<ClockDevice>;
-
-class ClockDevice : public ClockDeviceType, public fidl::WireServer<fuchsia_hardware_clock::Clock> {
- public:
-  ClockDevice(zx_device_t* parent, ClockImplProxy clock, uint32_t id)
-      : ClockDeviceType(parent), clock_(std::move(clock)), id_(id) {}
-
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
-
-  // Device protocol implementation
-  void DdkRelease();
-
-  zx_status_t ServeOutgoing(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+  zx_status_t Init(const std::shared_ptr<fdf::Namespace>& incoming,
+                   const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
+                   const std::optional<std::string>& node_name,
+                   AddChildCallback add_child_callback);
 
  private:
   // fuchsia.hardware.clock/Clock protocol implementation
@@ -65,28 +43,32 @@ class ClockDevice : public ClockDeviceType, public fidl::WireServer<fuchsia_hard
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_clock::Clock> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  const ClockImplProxy clock_;
+  fdf::Arena arena_{'CLOC'};
+  fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> clock_impl_;
   const uint32_t id_;
-
-  async_dispatcher_t* dispatcher_{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
-  component::OutgoingDirectory outgoing_{dispatcher_};
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_node_;
   fidl::ServerBindingGroup<fuchsia_hardware_clock::Clock> bindings_;
+  compat::SyncInitializedDeviceServer compat_server_;
 };
 
-class ClockInitDevice;
-using ClockInitDeviceType = ddk::Device<ClockInitDevice>;
-
-class ClockInitDevice : public ClockInitDeviceType {
+class ClockDriver : public fdf::DriverBase {
  public:
-  static void Create(zx_device_t* parent, const ClockImplProxy& clock);
+  static constexpr char kDriverName[] = "clock";
 
-  explicit ClockInitDevice(zx_device_t* parent) : ClockInitDeviceType(parent) {}
+  ClockDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
 
-  void DdkRelease() { delete this; }
+  zx::result<> Start() override;
 
  private:
-  static zx_status_t ConfigureClocks(const fuchsia_hardware_clockimpl::wire::InitMetadata& metadata,
-                                     const ClockImplProxy& clock);
+  static zx_status_t ConfigureClocks(
+      const fuchsia_hardware_clockimpl::wire::InitMetadata& metadata,
+      fdf::ClientEnd<fuchsia_hardware_clockimpl::ClockImpl> clock_impl);
+
+  zx_status_t CreateClockDevices();
+
+  std::vector<std::unique_ptr<ClockDevice>> clock_devices_;
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> clock_init_child_node_;
 };
 
 #endif  // SRC_DEVICES_CLOCK_DRIVERS_CLOCK_CLOCK_H_

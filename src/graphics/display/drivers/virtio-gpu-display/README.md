@@ -41,12 +41,12 @@ driver must be validated using this manual test.
    Test: ffx target ssh display-tool squares
    ```
 
-These instructions will work with a `core.x64` build that includes the
+These instructions will work with a `workbench_eng.x64` build that includes the
 `//src/graphics/display:tools` GN target. The `//src/graphics/display:tests`
 target is also recommended, as it builds the automated unit tests.
 
 ```posix-terminal
-fx set --auto-dir core.x64 --with //src/graphics/display:tools \
+fx set --auto-dir workbench_eng.x64 --with //src/graphics/display:tools \
     --with //src/graphics/display:tests
 ```
 

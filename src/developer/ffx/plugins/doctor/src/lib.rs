@@ -9,6 +9,7 @@ use async_lock::Mutex;
 use async_trait::async_trait;
 use doctor_utils::{DaemonManager, DefaultDaemonManager, DoctorRecorder, Recorder};
 use errors::{ffx_bail, ffx_error};
+use ffx_build_version::VersionInfo;
 use ffx_config::environment::EnvironmentContext;
 use ffx_config::{get, global_env_context, print_config};
 use ffx_daemon::DaemonConfig;
@@ -22,7 +23,7 @@ use fidl::endpoints::create_proxy;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
     TargetCollectionMarker, TargetCollectionProxy, TargetCollectionReaderMarker,
-    TargetCollectionReaderRequest, TargetInfo, TargetMarker, TargetQuery, TargetState, VersionInfo,
+    TargetCollectionReaderRequest, TargetInfo, TargetMarker, TargetQuery, TargetState,
 };
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
 use fuchsia_lockfile::{LockfileCreateError, LockfileCreateErrorKind};
@@ -416,7 +417,7 @@ async fn list_targets(query: Option<&str>, tc: &TargetCollectionProxy) -> Result
         reader,
     )?;
     let mut res = Vec::new();
-    let mut stream = server.into_stream()?;
+    let mut stream = server.into_stream();
     while let Ok(Some(TargetCollectionReaderRequest::Next { entry, responder })) =
         stream.try_next().await
     {
@@ -443,15 +444,15 @@ fn get_platform_info() -> Result<String> {
     Ok(serde_json::to_string_pretty(&platform_info)?)
 }
 
-fn get_api_level(v: VersionInfo) -> String {
-    match v.api_level {
+fn get_api_level(api_level: Option<u64>) -> String {
+    match api_level {
         Some(api) => format!("{}", api),
         None => "UNKNOWN".to_string(),
     }
 }
 
-fn get_abi_revision(v: VersionInfo) -> String {
-    match v.abi_revision {
+fn get_abi_revision(revision: Option<u64>) -> String {
+    match revision {
         Some(abi) => format!("{:#X}", abi),
         None => "UNKNOWN".to_string(),
     }
@@ -829,19 +830,19 @@ async fn daemon_restart<W: Write>(
 
     match timeout(retry_delay, daemon_proxy.get_version_info()).await {
         Ok(Ok(v)) => {
-            let daemon_version = v.build_version.clone().unwrap_or("UNKNOWN".to_string());
+            let daemon_version = v.build_version.clone().unwrap_or_else(|| "UNKNOWN".to_string());
             let node = ledger
                 .add_node(&format!("Daemon version: {}", daemon_version), LedgerMode::Automatic)?;
             ledger.set_outcome(node, LedgerOutcome::Success)?;
 
             let node = ledger.add_node(
-                &format!("abi-revision: {}", get_abi_revision(v.clone())),
+                &format!("abi-revision: {}", get_abi_revision(v.abi_revision)),
                 LedgerMode::Automatic,
             )?;
             ledger.set_outcome(node, LedgerOutcome::Success)?;
 
             let node = ledger.add_node(
-                &format!("api-level: {}", get_api_level(v.clone())),
+                &format!("api-level: {}", get_api_level(v.api_level)),
                 LedgerMode::Automatic,
             )?;
             ledger.set_outcome(node, LedgerOutcome::Success)?;
@@ -912,19 +913,20 @@ async fn doctor_summary<W: Write>(
     }
 
     let mut main_node = ledger.add_node("FFX doctor", LedgerMode::Automatic)?;
-    let frontend_version = version_info.build_version.clone().unwrap_or("UNKNOWN".to_string());
+    let frontend_version =
+        version_info.build_version.clone().unwrap_or_else(|| "UNKNOWN".to_string());
     let version_node =
         ledger.add_node(&format!("Frontend version: {}", frontend_version), LedgerMode::Verbose)?;
     ledger.set_outcome(version_node, LedgerOutcome::Success)?;
 
     let abi_revision_node = ledger.add_node(
-        &format!("abi-revision: {}", get_abi_revision(version_info.clone())),
+        &format!("abi-revision: {}", get_abi_revision(version_info.abi_revision)),
         LedgerMode::Verbose,
     )?;
     ledger.set_outcome(abi_revision_node, LedgerOutcome::Success)?;
 
     let api_level_node = ledger.add_node(
-        &format!("api-level: {}", get_api_level(version_info.clone())),
+        &format!("api-level: {}", get_api_level(version_info.api_level)),
         LedgerMode::Verbose,
     )?;
     ledger.set_outcome(api_level_node, LedgerOutcome::Success)?;
@@ -1091,7 +1093,7 @@ async fn doctor_summary<W: Write>(
 
     match timeout(retry_delay, daemon_proxy.get_version_info()).await {
         Ok(Ok(v)) => {
-            let daemon_version = v.build_version.clone().unwrap_or("UNKNOWN".to_string());
+            let daemon_version = v.build_version.clone().unwrap_or_else(|| "UNKNOWN".to_string());
             let node = ledger
                 .add_node(&format!("Daemon version: {}", daemon_version), LedgerMode::Verbose)?;
             ledger.set_outcome(node, LedgerOutcome::Success)?;
@@ -1121,13 +1123,13 @@ async fn doctor_summary<W: Write>(
             }
 
             let node = ledger.add_node(
-                &format!("abi-revision: {}", get_abi_revision(v.clone())),
+                &format!("abi-revision: {}", get_abi_revision(v.abi_revision)),
                 LedgerMode::Verbose,
             )?;
             ledger.set_outcome(node, LedgerOutcome::Success)?;
 
             let node = ledger.add_node(
-                &format!("api-level: {}", get_api_level(v.clone())),
+                &format!("api-level: {}", get_api_level(v.api_level)),
                 LedgerMode::Verbose,
             )?;
             ledger.set_outcome(node, LedgerOutcome::Success)?;
@@ -1157,7 +1159,7 @@ async fn doctor_summary<W: Write>(
                 if t.is_none() || t.as_ref().unwrap().is_empty() {
                     "(none)".to_string()
                 } else {
-                    t.clone().unwrap()
+                    t.unwrap()
                 }
             };
             let node = ledger.add_node(
@@ -1176,7 +1178,7 @@ async fn doctor_summary<W: Write>(
     ledger.close(main_node)?;
     main_node = ledger.add_node("Searching for targets", LedgerMode::Automatic)?;
 
-    let (tc_proxy, tc_server) = fidl::endpoints::create_proxy::<TargetCollectionMarker>()?;
+    let (tc_proxy, tc_server) = fidl::endpoints::create_proxy::<TargetCollectionMarker>();
     match timeout(
         retry_delay,
         daemon_proxy
@@ -1239,7 +1241,7 @@ async fn doctor_summary<W: Write>(
     main_node = ledger.add(verify_inode)?;
 
     for target in targets.iter() {
-        let target_name = target.nodename.clone().unwrap_or("UNKNOWN".to_string());
+        let target_name = target.nodename.clone().unwrap_or_else(|| "UNKNOWN".to_string());
 
         // Note: this match statement intentionally does not have a fallback case in order to
         // ensure that behavior is considered when we add a new state.
@@ -1296,7 +1298,7 @@ async fn doctor_summary<W: Write>(
         ledger.set_outcome(message_node, outcome)?;
 
         //TODO(https://fxbug.dev/42167543): Offer a fix when we cannot connect to a device via RCS.
-        let (target_proxy, target_server) = fidl::endpoints::create_proxy::<TargetMarker>()?;
+        let (target_proxy, target_server) = fidl::endpoints::create_proxy::<TargetMarker>();
         match timeout(
             retry_delay,
             tc_proxy.open_target(
@@ -1328,7 +1330,7 @@ async fn doctor_summary<W: Write>(
             }
         }
 
-        let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()?;
+        let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>();
 
         match timeout(retry_delay, target_proxy.open_remote_control(remote_server_end)).await {
             Ok(Ok(res)) => {
@@ -1866,7 +1868,7 @@ mod test {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
                     TargetCollectionRequest::ListTargets { query, reader, .. } => {
-                        let reader = reader.into_proxy().unwrap();
+                        let reader = reader.into_proxy();
                         let list_closure = list_closure.clone();
                         let results = (list_closure)(query);
                         if !results.is_empty() {
@@ -1892,7 +1894,7 @@ mod test {
         F: Fn(TargetRequest) -> () + 'static,
     {
         fuchsia_async::Task::local(async move {
-            let mut stream = target_handle.into_stream().unwrap();
+            let mut stream = target_handle.into_stream();
             while let Ok(Some(req)) = stream.try_next().await {
                 (handler)(req)
             }
@@ -1930,12 +1932,11 @@ mod test {
                 }
             }
         })
-        .unwrap()
     }
 
     fn serve_responsive_rcs(server_end: ServerEnd<RemoteControlMarker>) {
         serve_stream::<RemoteControlMarker, _, _>(
-            server_end.into_stream().unwrap(),
+            server_end.into_stream(),
             move |req| async move {
                 match req {
                     RemoteControlRequest::IdentifyHost { responder } => responder
@@ -1954,7 +1955,7 @@ mod test {
         server_end: ServerEnd<RemoteControlMarker>,
         waiter: Shared<Receiver<()>>,
     ) {
-        serve_stream::<RemoteControlMarker, _, _>(server_end.into_stream().unwrap(), move |req| {
+        serve_stream::<RemoteControlMarker, _, _>(server_end.into_stream(), move |req| {
             let waiter = waiter.clone();
             async move {
                 match req {
@@ -2005,7 +2006,6 @@ mod test {
                 }
             }
         })
-        .unwrap()
     }
 
     fn setup_responsive_daemon_server_with_targets(
@@ -2114,7 +2114,6 @@ mod test {
                 }
             }
         })
-        .unwrap()
     }
 
     fn setup_daemon_server_list_fails() -> DaemonProxy {
@@ -2132,7 +2131,6 @@ mod test {
                 }
             }
         })
-        .unwrap()
     }
 
     fn setup_daemon_server_echo_hangs(waiter: Shared<Receiver<()>>) -> DaemonProxy {
@@ -2149,7 +2147,6 @@ mod test {
                 }
             }
         })
-        .unwrap()
     }
 
     fn ffx_path() -> String {
@@ -2171,8 +2168,8 @@ mod test {
         }
     }
 
-    fn daemon_version_info() -> VersionInfo {
-        VersionInfo {
+    fn daemon_version_info() -> fidl_fuchsia_developer_ffx::VersionInfo {
+        fidl_fuchsia_developer_ffx::VersionInfo {
             commit_hash: None,
             commit_timestamp: None,
             build_version: Some(DAEMON_VERSION.to_string()),

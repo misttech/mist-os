@@ -41,6 +41,7 @@ use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
 use zerocopy::SplitByteSlice;
 
+use crate::device::CommonAddressProperties;
 use crate::internal::base::{
     DeviceIpLayerMetadata, IpCounters, IpDeviceMtuContext, IpPacketDestination,
 };
@@ -60,10 +61,11 @@ use crate::internal::device::state::{
     Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig,
     Ipv6AddrSlaacConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration,
     Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState, Ipv6NetworkLearnedParameters, Lifetime,
+    PreferredLifetime,
 };
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
-use crate::internal::gmp::{GmpHandler, GmpQueryHandler, GroupJoinResult, GroupLeaveResult};
+use crate::internal::gmp::{GmpHandler, GroupJoinResult, GroupLeaveResult};
 
 /// An IP device timer.
 ///
@@ -302,8 +304,8 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt {
         + PartialEq
         + Debug;
 
-    /// Gets the lifetime of an address from its configuration.
-    fn get_valid_until<I: Instant>(config: &Self::AddressConfig<I>) -> Lifetime<I>;
+    /// Gets the common properties of an address from its configuration.
+    fn get_common_props<I: Instant>(config: &Self::AddressConfig<I>) -> CommonAddressProperties<I>;
 
     /// Returns whether the address is currently assigned based on state.
     fn is_addr_assigned<I: Instant>(addr_state: &Self::AddressState<I>) -> bool;
@@ -331,8 +333,8 @@ impl IpDeviceIpExt for Ipv4 {
     type ConfigurationUpdate = Ipv4DeviceConfigurationUpdate;
     type ConfigurationAndFlags = Ipv4DeviceConfigurationAndFlags;
 
-    fn get_valid_until<I: Instant>(config: &Self::AddressConfig<I>) -> Lifetime<I> {
-        config.valid_until
+    fn get_common_props<I: Instant>(config: &Self::AddressConfig<I>) -> CommonAddressProperties<I> {
+        config.common
     }
 
     fn is_addr_assigned<I: Instant>(addr_state: &Ipv4AddressState<I>) -> bool {
@@ -364,8 +366,11 @@ impl IpDeviceIpExt for Ipv6 {
     type ConfigurationUpdate = Ipv6DeviceConfigurationUpdate;
     type ConfigurationAndFlags = Ipv6DeviceConfigurationAndFlags;
 
-    fn get_valid_until<I: Instant>(config: &Self::AddressConfig<I>) -> Lifetime<I> {
-        config.valid_until()
+    fn get_common_props<I: Instant>(config: &Self::AddressConfig<I>) -> CommonAddressProperties<I> {
+        CommonAddressProperties {
+            valid_until: config.valid_until(),
+            preferred_lifetime: config.preferred_lifetime(),
+        }
     }
 
     fn is_addr_assigned<I: Instant>(addr_state: &Ipv6AddressState<I>) -> bool {
@@ -421,6 +426,8 @@ pub enum IpDeviceEvent<DeviceId, I: Ip, Instant> {
         state: IpAddressState,
         /// The lifetime for which the address is valid.
         valid_until: Lifetime<Instant>,
+        /// The  preferred lifetime information for the address.
+        preferred_lifetime: PreferredLifetime<Instant>,
     },
     /// Address was unassigned.
     AddressRemoved {
@@ -448,6 +455,8 @@ pub enum IpDeviceEvent<DeviceId, I: Ip, Instant> {
         addr: SpecifiedAddr<I::Addr>,
         /// The new `valid_until` lifetime.
         valid_until: Lifetime<Instant>,
+        /// The new preferred lifetime information.
+        preferred_lifetime: PreferredLifetime<Instant>,
     },
     /// IP was enabled/disabled on the device
     EnabledChanged {
@@ -462,9 +471,19 @@ impl<DeviceId, I: Ip, Instant> IpDeviceEvent<DeviceId, I, Instant> {
     /// Changes the device id type with `map`.
     pub fn map_device<N, F: FnOnce(DeviceId) -> N>(self, map: F) -> IpDeviceEvent<N, I, Instant> {
         match self {
-            IpDeviceEvent::AddressAdded { device, addr, state, valid_until } => {
-                IpDeviceEvent::AddressAdded { device: map(device), addr, state, valid_until }
-            }
+            IpDeviceEvent::AddressAdded {
+                device,
+                addr,
+                state,
+                valid_until,
+                preferred_lifetime,
+            } => IpDeviceEvent::AddressAdded {
+                device: map(device),
+                addr,
+                state,
+                valid_until,
+                preferred_lifetime,
+            },
             IpDeviceEvent::AddressRemoved { device, addr, reason } => {
                 IpDeviceEvent::AddressRemoved { device: map(device), addr, reason }
             }
@@ -474,9 +493,17 @@ impl<DeviceId, I: Ip, Instant> IpDeviceEvent<DeviceId, I, Instant> {
             IpDeviceEvent::EnabledChanged { device, ip_enabled } => {
                 IpDeviceEvent::EnabledChanged { device: map(device), ip_enabled }
             }
-            IpDeviceEvent::AddressPropertiesChanged { device, addr, valid_until } => {
-                IpDeviceEvent::AddressPropertiesChanged { device: map(device), addr, valid_until }
-            }
+            IpDeviceEvent::AddressPropertiesChanged {
+                device,
+                addr,
+                valid_until,
+                preferred_lifetime,
+            } => IpDeviceEvent::AddressPropertiesChanged {
+                device: map(device),
+                addr,
+                valid_until,
+                preferred_lifetime,
+            },
         }
     }
 }
@@ -730,7 +757,6 @@ pub trait IpDeviceConfigurationContext<
         + 's;
     /// Provides access to device state.
     type DeviceAddressAndGroupsAccessor<'s>: IpDeviceStateContext<I, BC, DeviceId = Self::DeviceId>
-        + GmpQueryHandler<I, BC>
         + 's;
 
     /// Calls the function with an immutable reference to the IP device
@@ -1256,7 +1282,7 @@ fn enable_ipv6_device_with_config<
             );
         });
 
-    // TODO(https://fxbug.dev/42178008): Generate link-local address with opaque
+    // TODO(https://fxbug.dev/42148800): Generate link-local address with opaque
     // IIDs.
     if config.slaac_config.enable_stable_addresses {
         if let Some(iid) = core_ctx.get_eui64_iid(device_id) {
@@ -1290,15 +1316,7 @@ fn enable_ipv6_device_with_config<
         }
     }
 
-    // As per RFC 4861 section 6.3.7,
-    //
-    //    A host sends Router Solicitations to the all-routers multicast
-    //    address.
-    //
-    // If we are operating as a router, we do not solicit routers.
-    if !config.ip_config.unicast_forwarding_enabled {
-        RsHandler::start_router_solicitation(core_ctx, bindings_ctx, device_id);
-    }
+    RsHandler::start_router_solicitation(core_ctx, bindings_ctx, device_id);
 }
 
 fn disable_ipv6_device_with_config<
@@ -1623,7 +1641,8 @@ pub fn add_ip_addr_subnet_with_config<
     _device_config: &I::Configuration,
 ) -> Result<CC::AddressId, ExistsError> {
     info!("adding addr {addr_sub:?} config {addr_config:?} to device {device_id:?}");
-    let valid_until = I::get_valid_until(&addr_config);
+    let CommonAddressProperties { valid_until, preferred_lifetime } =
+        I::get_common_props(&addr_config);
     let addr_id = core_ctx.add_ip_address(device_id, addr_sub, addr_config)?;
     assert_eq!(addr_id.addr().addr(), addr_sub.addr().get());
 
@@ -1640,6 +1659,7 @@ pub fn add_ip_addr_subnet_with_config<
         addr: addr_sub.to_witness(),
         state,
         valid_until,
+        preferred_lifetime,
     });
 
     if ip_enabled {

@@ -38,10 +38,11 @@ async fn list_devices(usb_device_dir: &fio::DirectoryProxy, args: &Args) -> Resu
         .await
         .context("FIDL call to get next device returned an error")?
     {
-        let filename = filename.to_str().ok_or(format_err!("to_str for filename failed"))?;
+        let filename =
+            filename.to_str().ok_or_else(|| format_err!("to_str for filename failed"))?;
 
         let (device, server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>()?;
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>();
         usb_device_dir.open(
             fio::OpenFlags::NOT_DIRECTORY,
             fio::ModeType::empty(),
@@ -323,10 +324,11 @@ async fn list_tree(usb_device_dir: &fio::DirectoryProxy, args: &Args) -> Result<
         .await
         .context("FIDL call to get next device returned an error")?
     {
-        let filename = filename.to_str().ok_or(format_err!("to_str for filename failed"))?;
+        let filename =
+            filename.to_str().ok_or_else(|| format_err!("to_str for filename failed"))?;
 
         let (device, server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>()?;
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>();
         usb_device_dir.open(
             fio::OpenFlags::NOT_DIRECTORY,
             fio::ModeType::empty(),
@@ -522,8 +524,7 @@ mod test {
     async fn smoke_test() {
         let (device, stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_hardware_usb_device::DeviceMarker,
-        >()
-        .unwrap();
+        >();
 
         let server_task = run_usb_server(stream).fuse();
         let test_task = async move {

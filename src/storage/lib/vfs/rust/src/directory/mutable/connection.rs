@@ -488,8 +488,7 @@ mod tests {
             let mut cur_id = self.cur_id.lock().unwrap();
             let dir = MockDirectory::new(*cur_id, self.clone());
             *cur_id += 1;
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             flags.to_object_request(server_end).handle(|object_request| {
                 object_request.spawn_connection(
                     self.scope.clone(),

@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import subprocess
-from typing import List, Text, Tuple
+from typing import Any, List, Optional, Text, Tuple
 
 import ffxtestcase
 from honeydew.errors import FfxCommandError
@@ -89,49 +89,96 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
 
         return (ssh_pub, ssh_priv)
 
+    def _run_strict_ffx(
+        self, cmd: List[str], target: Optional[str] = None
+    ) -> Any:
+        ssh_args = self._get_ssh_key_information()
+        all_args = [
+            "--strict",
+            "--machine",
+            "json",
+            "-o",
+            "/dev/null",
+            *build_strict_config_args(*ssh_args),
+        ]
+        if target is not None:
+            all_args += ["-t", target]
+        all_args += cmd
+        return json.loads(self.run_ffx(all_args))
+
     def test_target_echo_no_start_daemon(self) -> None:
         """Test `ffx --strict target echo` does not affect daemon state."""
-        ssh_args = self._get_ssh_key_information()
-        output = self.run_ffx(
+        self._get_ssh_key_information()
+        output = self._run_strict_ffx(
             [
-                "--strict",
-                "-t",
-                f"{self.dut_ssh_address}",
-                "--machine",
-                "json",
-                "-o",
-                "/dev/null",
-                *build_strict_config_args(*ssh_args),
                 "target",
                 "echo",
                 "From a Test",
-            ]
+            ],
+            f"{self.dut_ssh_address}",
         )
-        output_json = json.loads(output)
 
-        asserts.assert_equal(output_json, {"message": "From a Test"})
+        asserts.assert_equal(output, {"message": "From a Test"})
         with asserts.assert_raises(FfxCommandError):
             self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
     def test_strict_errors_with_target_name(self) -> None:
         """Test `ffx --strict target echo` fails when attempt discovery."""
-        ssh_args = self._get_ssh_key_information()
+        self._get_ssh_key_information()
         with asserts.assert_raises(subprocess.CalledProcessError):
-            self.run_ffx(
+            self._run_strict_ffx(
                 [
-                    "--strict",
-                    "-t",
-                    f"{self.dut_name}",
-                    "--machine",
-                    "json",
-                    "-o",
-                    "/dev/null",
-                    *build_strict_config_args(*ssh_args),
                     "target",
                     "echo",
                     "From a Test",
-                ]
+                ],
+                self.dut_name,
             )
+
+    def test_strict_can_check_for_no_target(self) -> None:
+        """Test `ffx --strict target echo` requires a target."""
+        self._get_ssh_key_information()
+        with asserts.assert_raises(subprocess.CalledProcessError):
+            try:
+                self._run_strict_ffx(["target", "echo"], None)
+            except subprocess.CalledProcessError as e:
+                asserts.assert_true(
+                    b"ffx strict requires that the target be explicitly specified"
+                    in e.stderr,
+                    "The command should require a target",
+                )
+                raise
+
+    def test_strict_can_accept_no_target(self) -> None:
+        """Test `ffx --strict product download` doesn't require a target."""
+        self._get_ssh_key_information()
+        with asserts.assert_raises(subprocess.CalledProcessError):
+            try:
+                self._run_strict_ffx(
+                    ["product", "download", "http://0.0.0.0:12345", "foo"], None
+                )
+            except subprocess.CalledProcessError as e:
+                asserts.assert_false(
+                    b"ffx strict requires that the target be explicitly specified"
+                    in e.stderr,
+                    "The command should not require a target",
+                )
+                raise
+
+    def test_target_list_strict(self) -> None:
+        """Test `ffx --strict target list` does not affect daemon state."""
+        self._get_ssh_key_information()
+        output = self._run_strict_ffx(
+            [
+                "target",
+                "list",
+                self.dut_name,
+            ],
+            None,
+        )
+        asserts.assert_equal(output[0]["rcs_state"], "Y")
+        with asserts.assert_raises(FfxCommandError):
+            self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
 
 if __name__ == "__main__":

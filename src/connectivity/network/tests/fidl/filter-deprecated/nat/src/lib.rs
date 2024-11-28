@@ -227,15 +227,16 @@ pub async fn setup_masquerade_nat_network<'a>(
 
     if *cycle_dst_net {
         let router_ep2_id = router_ep2.id();
-        let state_stream =
-            router_ep2.get_interface_event_stream().expect("error getting interface event stream");
+        let state_stream = router_realm
+            .get_interface_event_stream()
+            .expect("error getting interface event stream");
         let mut state_stream = pin!(state_stream);
 
         // Make sure the interfaces watcher stream knows about router_ep2's existence
         // so we can reliably observe its removal later.
         let mut router_ep2_interface_state = fnet_interfaces_ext::existing(
             &mut state_stream,
-            fnet_interfaces_ext::InterfaceState::<()>::Unknown(router_ep2_id),
+            fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(router_ep2_id),
         )
         .await
         .expect("error reading existing interface event");

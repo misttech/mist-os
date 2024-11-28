@@ -767,7 +767,7 @@ mod tests {
 
             fn add_device(&mut self) -> Result<Box<dyn InputDevice>, Error> {
                 let (proxy, event_stream) =
-                    endpoints::create_proxy_and_stream::<InputDeviceMarker>()?;
+                    endpoints::create_proxy_and_stream::<InputDeviceMarker>();
                 self.event_stream = Some(event_stream);
                 Ok(Box::new(FakeInputDevice::new(proxy)))
             }

@@ -93,7 +93,8 @@ impl<'a> CpuDeviceHandlerBuilder<'a> {
 
     pub fn build(self) -> Result<Rc<CpuDeviceHandler>, Error> {
         // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
         let inspect = InspectData::new(
             inspect_root,
             format!("CpuDeviceHandler (perf_rank: {})", self.perf_rank),
@@ -183,7 +184,7 @@ impl CpuDeviceHandler {
 
         proxy
             .as_ref()
-            .ok_or(format_err!("Missing driver_proxy"))
+            .ok_or_else(|| format_err!("Missing driver_proxy"))
             .or_debug_panic()?
             .get_current_operating_point()
             .await
@@ -234,7 +235,7 @@ impl CpuDeviceHandler {
         // Make the FIDL call
         let _out_opp = proxy
             .as_ref()
-            .ok_or(format_err!("Missing driver_proxy"))
+            .ok_or_else(|| format_err!("Missing driver_proxy"))
             .or_debug_panic()?
             .set_current_operating_point(in_opp)
             .await
@@ -459,7 +460,7 @@ mod tests {
         };
 
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fcpu_ctrl::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcpu_ctrl::DeviceMarker>();
 
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {

@@ -424,7 +424,7 @@ pub(crate) async fn serve_rule_table<I: FidlRuleAdminIpExt>(
                 let (rule_work_sink, receiver) = mpsc::unbounded();
                 match ctx.bindings_ctx().routes.new_rule_set(priority, receiver).await {
                     Ok(()) => {
-                        let rule_set_request_stream = rule_set.into_stream()?;
+                        let rule_set_request_stream = rule_set.into_stream();
                         let rule_set = UserRuleSet {
                             rule_work_sink,
                             priority,

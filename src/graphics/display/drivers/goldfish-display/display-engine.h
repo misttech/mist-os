@@ -23,9 +23,9 @@
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 
 namespace goldfish {
 
@@ -144,13 +144,6 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
     // and destroyed.
     std::list<async::WaitOnce> pending_config_waits;
   };
-
-  // Initializes the sysmem Allocator client used to import incoming buffer
-  // collection tokens.
-  //
-  // On success, returns ZX_OK and the sysmem allocator client will be open
-  // until the device is released.
-  zx_status_t InitSysmemAllocatorClient();
 
   zx::result<display::DriverImageId> ImportVmoImage(
       const image_metadata_t& image_metadata, const fuchsia_images2::PixelFormat& pixel_format,

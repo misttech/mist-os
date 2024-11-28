@@ -115,7 +115,7 @@ impl FuchsiaBootResolver {
         let canonicalized_package_path = fuchsia_fs::canonicalize_path(boot_url.path());
         match &self.boot_package_resolver {
             Some(boot_package_resolver) => {
-                let (proxy, server) = fidl::endpoints::create_proxy().unwrap();
+                let (proxy, server) = fidl::endpoints::create_proxy();
                 let () = boot_package_resolver
                     .resolve_name(
                         fuchsia_url::PackageName::from_str(canonicalized_package_path).map_err(
@@ -272,7 +272,7 @@ impl ComponentResolverCapabilityProvider {
 impl InternalCapabilityProvider for ComponentResolverCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fresolution::ResolverMarker>::new(server_end);
-        if let Err(error) = self.component_resolver.serve(server_end.into_stream().unwrap()).await {
+        if let Err(error) = self.component_resolver.serve(server_end.into_stream()).await {
             tracing::warn!(%error, "FuchsiaBootResolver::serve failed");
         }
     }
@@ -378,14 +378,10 @@ impl FuchsiaBootPackageResolver {
             .hash_for_package(&package_path)
             .ok_or(fpkg::ResolveError::PackageNotFound)?;
 
-        let blob_proxy = fuchsia_fs::directory::clone_no_describe(&self.boot_blob_storage, None)
-            .map_err(|e| {
-                tracing::warn!(
-                    "Creating duplicate connection to /boot/blob directory failed: {:?}",
-                    e
-                );
-                fpkg::ResolveError::Internal
-            })?;
+        let blob_proxy = fuchsia_fs::directory::clone(&self.boot_blob_storage).map_err(|e| {
+            tracing::warn!("Creating duplicate connection to /boot/blob directory failed: {:?}", e);
+            fpkg::ResolveError::Internal
+        })?;
 
         let () = package_directory::serve(
             // scope is used to spawn an async task, which will continue until all features complete.
@@ -530,7 +526,7 @@ mod tests {
 
     fn serve_vfs_dir(root: Arc<impl Directory>) -> (Task<()>, fio::DirectoryProxy) {
         let fs_scope = ExecutionScope::new();
-        let (client, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = create_proxy::<fio::DirectoryMarker>();
         root.open(
             fs_scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -592,7 +588,7 @@ mod tests {
         let ResolvedPackage { url: package_url, directory: package_dir, .. } = package.unwrap();
         assert_eq!(package_url, "fuchsia-boot:///");
 
-        let dir_proxy = package_dir.into_proxy().unwrap();
+        let dir_proxy = package_dir.into_proxy();
         let path = "meta/hello-world-rust.cm";
         let file_proxy =
             fuchsia_fs::directory::open_file_async(&dir_proxy, path, fio::PERM_READABLE)
@@ -641,8 +637,7 @@ mod tests {
             .await
             .expect("failed to open capability");
         // Create a client-side resolver proxy to submit resolve requests with.
-        let resolver_proxy =
-            client_channel.into_proxy().expect("failed converting endpoint into proxy");
+        let resolver_proxy = client_channel.into_proxy();
         // Test that the client resolve request is served by the CapabilityProvider successfully.
         assert!(resolver_proxy.resolve("fuchsia-boot:///#meta/hello-world-rust.cm").await.is_ok());
     }

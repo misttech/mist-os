@@ -15,8 +15,6 @@ use crate::protocols::ToFlags as _;
 
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
-#[cfg(any(fuchsia_api_level_less_than = "23", fuchsia_api_level_at_least = "PLATFORM"))]
-use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_io as fio;
 use std::convert::TryInto as _;
 use storage_trace::{self as trace, TraceFutureExt};
@@ -167,19 +165,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
             }
-            #[cfg(any(
-                fuchsia_api_level_less_than = "23",
-                fuchsia_api_level_at_least = "PLATFORM"
-            ))]
-            fio::DirectoryRequest::Open2 {
-                path: _,
-                protocols: _,
-                object_request,
-                control_handle: _,
-            } => {
-                trace::duration!(c"storage", c"Directory::Open2");
-                let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
-            }
             fio::DirectoryRequest::AdvisoryLock { request: _, responder } => {
                 trace::duration!(c"storage", c"Directory::AdvisoryLock");
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
@@ -267,7 +252,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
             }
-            #[cfg(fuchsia_api_level_at_least = "24")]
             fio::DirectoryRequest::_UnknownMethod { .. } => (),
         }
         Ok(ConnectionState::Alive)
@@ -488,8 +472,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_open_not_found() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
         dir.open(
@@ -499,8 +482,7 @@ mod tests {
             ServerEnd::new(dir_server_end.into_channel()),
         );
 
-        let (node_proxy, node_server_end) =
-            fidl::endpoints::create_proxy().expect("Create proxy to succeed");
+        let (node_proxy, node_server_end) = fidl::endpoints::create_proxy();
 
         // Try to open a file that doesn't exist.
         assert_matches!(
@@ -526,8 +508,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_open_not_found_event_stream() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
         dir.open(
@@ -537,8 +518,7 @@ mod tests {
             ServerEnd::new(dir_server_end.into_channel()),
         );
 
-        let (node_proxy, node_server_end) =
-            fidl::endpoints::create_proxy().expect("Create proxy to succeed");
+        let (node_proxy, node_server_end) = fidl::endpoints::create_proxy();
 
         // Try to open a file that doesn't exist.
         assert_matches!(
@@ -566,8 +546,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_open_with_describe_not_found() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
         dir.open(
@@ -577,8 +556,7 @@ mod tests {
             ServerEnd::new(dir_server_end.into_channel()),
         );
 
-        let (node_proxy, node_server_end) =
-            fidl::endpoints::create_proxy().expect("Create proxy to succeed");
+        let (node_proxy, node_server_end) = fidl::endpoints::create_proxy();
 
         // Try to open a file that doesn't exist.
         assert_matches!(
@@ -606,8 +584,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_open_describe_not_found_event_stream() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
         dir.open(
@@ -617,8 +594,7 @@ mod tests {
             ServerEnd::new(dir_server_end.into_channel()),
         );
 
-        let (node_proxy, node_server_end) =
-            fidl::endpoints::create_proxy().expect("Create proxy to succeed");
+        let (node_proxy, node_server_end) = fidl::endpoints::create_proxy();
 
         // Try to open a file that doesn't exist.
         assert_matches!(

@@ -77,16 +77,45 @@ struct MmioBaseAddress : public BaseAddress {
 
 }  // namespace config
 
-constexpr zx_paddr_t bdf_to_ecam_offset(pci_bdf_t bdf, uint8_t start_bus) {
-  // Find the offset into the ecam region for the given bdf address. Every bus
-  // has 32 devices, every device has 8 functions, and each function has an
-  // extended config space of 4096 bytes. The base address of the vmo provided
-  // to the bus driver corresponds to the start_bus_num, so offset the bdf address
-  // based on the bottom of our ecam.
-  zx_vaddr_t bdf_start = (bdf.bus_id - start_bus) * PCIE_ECAM_BYTES_PER_BUS;
-  bdf_start += bdf.device_id * PCI_MAX_FUNCTIONS_PER_DEVICE * PCIE_EXTENDED_CONFIG_SIZE;
-  bdf_start += bdf.function_id * PCIE_EXTENDED_CONFIG_SIZE;
-  return bdf_start;
+// Per spec (quoting Linux DT host-generic bindings):
+// For CAM, this 24-bit offset is:
+//         cfg_offset(bus, device, function, register) =
+//                    bus << 16 | device << 11 | function << 8 | register
+// While ECAM extends this by 4 bits to accommodate 4k of function space:
+//         cfg_offset(bus, device, function, register) =
+//                    bus << 20 | device << 15 | function << 12 | register
+struct CamOffset {
+  zx_vaddr_t offset = 0;
+  DEF_SUBFIELD(offset, 23, 16, bus);
+  DEF_SUBFIELD(offset, 15, 11, device);
+  DEF_SUBFIELD(offset, 10, 8, function);
+};
+
+struct EcamOffset {
+  zx_vaddr_t offset = 0;
+  DEF_SUBFIELD(offset, 27, 20, bus);
+  DEF_SUBFIELD(offset, 19, 15, device);
+  DEF_SUBFIELD(offset, 14, 12, function);
+};
+
+template <class CamType>
+constexpr zx_vaddr_t GetConfigOffsetInCam(pci_bdf_t bdf, uint8_t start_bus) {
+  zx_vaddr_t bus_offset = CamType().set_bus(start_bus).offset;
+  zx_vaddr_t bdf_offset =
+      CamType().set_bus(bdf.bus_id).set_device(bdf.device_id).set_function(bdf.function_id).offset;
+  return bdf_offset - bus_offset;
+}
+
+// Find the offset into the cam region for the given bdf address. Every bus
+// has 32 devices, every device has 8 functions, and each function has a
+// configuration access region of 256 bytes base, 4096 if extended. The base
+// address of the vmo provided to the bus driver corresponds to the
+// start_bus_num, so offset the bdf address based on the bottom of our ecam.
+constexpr zx_vaddr_t GetConfigOffsetInCam(pci_bdf_t bdf, uint8_t start_bus, bool is_extended) {
+  if (is_extended) {
+    return GetConfigOffsetInCam<EcamOffset>(bdf, start_bus);
+  }
+  return GetConfigOffsetInCam<CamOffset>(bdf, start_bus);
 }
 
 class PciReg8 {
@@ -214,8 +243,9 @@ class Config {
 // ecam and can be directly accessed with standard IO operations.t
 class MmioConfig : public Config {
  public:
-  static zx_status_t Create(pci_bdf_t bdf, fdf::MmioBuffer* ecam_, uint8_t start_bus,
-                            uint8_t end_bus, std::unique_ptr<Config>* config);
+  static zx::result<std::unique_ptr<Config>> Create(pci_bdf_t bdf, const fdf::MmioBuffer& ecam_,
+                                                    uint8_t start_bus, uint8_t end_bus,
+                                                    bool is_extended);
   uint8_t Read(PciReg8 addr) const final;
   uint16_t Read(PciReg16 addr) const final;
   uint32_t Read(PciReg32 addr) const final;
@@ -227,7 +257,7 @@ class MmioConfig : public Config {
 
  private:
   friend class FakeMmioConfig;
-  MmioConfig(pci_bdf_t bdf, fdf::MmioView&& view) : Config(bdf), view_(view) {}
+  MmioConfig(pci_bdf_t bdf, const fdf::MmioView& view) : Config(bdf), view_(view) {}
   const fdf::MmioView view_;
 };
 
@@ -241,8 +271,8 @@ class MmioConfig : public Config {
 // protocol implementation hosted in the same devhost as the pci bus driver.
 class ProxyConfig final : public Config {
  public:
-  static zx_status_t Create(pci_bdf_t bdf, ddk::PcirootProtocolClient* proto,
-                            std::unique_ptr<Config>* config);
+  static zx::result<std::unique_ptr<Config>> Create(pci_bdf_t bdf,
+                                                    ddk::PcirootProtocolClient* proto);
   uint8_t Read(PciReg8 addr) const final;
   uint16_t Read(PciReg16 addr) const final;
   uint32_t Read(PciReg32 addr) const final;

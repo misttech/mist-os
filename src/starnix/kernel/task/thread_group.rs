@@ -1171,7 +1171,7 @@ impl ThreadGroup {
             .lock()
             .keys()
             .filter(|tracee_pid| selector.do_match(**tracee_pid, &pids))
-            .map(|tracee_pid| pids.get_task(*tracee_pid).clone())
+            .map(|tracee_pid| pids.get_task(*tracee_pid))
         {
             if let Some(task_ref) = tracee.clone().upgrade() {
                 let task_state = task_ref.write();

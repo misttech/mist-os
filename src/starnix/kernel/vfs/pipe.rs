@@ -421,7 +421,7 @@ impl FileSystemOps for PipeFs {
         Ok(default_statfs(PIPEFS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
-        "pipe".into()
+        "pipefs".into()
     }
 }
 fn pipe_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {

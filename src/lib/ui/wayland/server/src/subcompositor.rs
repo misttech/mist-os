@@ -158,7 +158,7 @@ impl Subsurface {
 
     fn attach_to_parent(&self, client: &mut Client) -> Result<(), Error> {
         let flatland = match self.parent_ref.get(client)?.flatland() {
-            Some(s) => s.clone(),
+            Some(s) => s,
             None => return Err(format_err!("Parent surface has no flatland instance!")),
         };
         self.surface_ref.get_mut(client)?.set_flatland(flatland.clone())?;

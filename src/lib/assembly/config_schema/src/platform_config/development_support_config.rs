@@ -52,6 +52,11 @@ pub struct DevelopmentSupportConfig {
     /// Tools to enable along with development support
     #[serde(default)]
     pub tools: ToolsConfig,
+
+    /// Whether to include the bootstrap testing framework which will allow running tests in a
+    /// bringup-like environment using the run-test-suite command line tool.
+    #[serde(default)]
+    pub include_bootstrap_testing_framework: bool,
 }
 
 /// Platform-provided tools for development and debugging.

@@ -46,16 +46,6 @@ source_set("common_base") {
   }
 }
 
-if (is_host) {
-  group("host_test_data") {
-    testonly = true
-    deps = [
-      "assets:host_assets($host_toolchain)",
-      "//src/ui/lib/escher/shaders:host_shader_data($host_toolchain)",
-    ]
-  }
-}
-
 # "class Demo" is the base class for all demos that can be run by DemoHarness.
 # Split into a separate source_set so that it can be used in tests that don't use DemoHarness.
 source_set("demo_base") {

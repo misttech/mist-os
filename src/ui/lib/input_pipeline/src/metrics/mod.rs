@@ -16,8 +16,7 @@ fn create_metrics_logger() -> Result<metrics::MetricEventLoggerProxy, Error> {
             .context("connecting to metrics")?;
 
     let (cobalt_proxy, cobalt_server) =
-        fidl::endpoints::create_proxy::<metrics::MetricEventLoggerMarker>()
-            .context("creating MetricEventLoggerProxy")?;
+        fidl::endpoints::create_proxy::<metrics::MetricEventLoggerMarker>();
 
     let project_spec = metrics::ProjectSpec {
         customer_id: None, // defaults to fuchsia

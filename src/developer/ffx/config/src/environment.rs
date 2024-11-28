@@ -39,16 +39,20 @@ pub struct Environment {
 
 impl Environment {
     /// Creates a new empty env that will be saved to a specific path, but is initialized
-    /// with no settings. For internal use only, when loading the global environment fails.
+    /// with no settings. For internal use only, when loading the global environment fails,
+    /// or when --no-environment is specified.
     pub(crate) fn new_empty(context: EnvironmentContext) -> Self {
         let files = EnvironmentFiles::default();
         Self { context, files }
     }
 
     fn load(context: &EnvironmentContext) -> Result<Self> {
-        let path = context.env_file_path()?;
-
-        Self::load_env_file(&path, context)
+        Ok(if context.has_no_environment() {
+            Self::new_empty(context.clone())
+        } else {
+            let path = context.env_file_path()?;
+            Self::load_env_file(&path, context)?
+        })
     }
 
     pub fn context(&self) -> &EnvironmentContext {

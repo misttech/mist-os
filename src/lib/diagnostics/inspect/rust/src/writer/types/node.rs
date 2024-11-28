@@ -52,7 +52,7 @@ impl Node {
                     .map(|block_index| Node::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
-            .unwrap_or(Node::new_no_op())
+            .unwrap_or_else(Node::new_no_op)
     }
 
     /// Creates and keeps track of a child with the given `name`.
@@ -105,7 +105,7 @@ impl Node {
                     .map(|block_index| IntProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
-            .unwrap_or(IntProperty::new_no_op())
+            .unwrap_or_else(IntProperty::new_no_op)
     }
 
     /// Records a new `IntProperty` with the given `name` and `value`.
@@ -129,7 +129,7 @@ impl Node {
                     .map(|block_index| UintProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
-            .unwrap_or(UintProperty::new_no_op())
+            .unwrap_or_else(UintProperty::new_no_op)
     }
 
     /// Records a new `UintProperty` with the given `name` and `value`.
@@ -153,7 +153,7 @@ impl Node {
                     .map(|block_index| DoubleProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
-            .unwrap_or(DoubleProperty::new_no_op())
+            .unwrap_or_else(DoubleProperty::new_no_op)
     }
 
     /// Records a new `DoubleProperty` with the given `name` and `value`.
@@ -183,7 +183,7 @@ impl Node {
                     })
                     .ok()
             })
-            .unwrap_or(StringArrayProperty::new_no_op())
+            .unwrap_or_else(StringArrayProperty::new_no_op)
     }
 
     /// Creates a new `IntArrayProperty` with the given `name` and `slots`.
@@ -215,7 +215,7 @@ impl Node {
                     .map(|block_index| IntArrayProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
-            .unwrap_or(IntArrayProperty::new_no_op())
+            .unwrap_or_else(IntArrayProperty::new_no_op)
     }
 
     /// Creates a new `UintArrayProperty` with the given `name` and `slots`.
@@ -247,7 +247,7 @@ impl Node {
                     .map(|block_index| UintArrayProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
-            .unwrap_or(UintArrayProperty::new_no_op())
+            .unwrap_or_else(UintArrayProperty::new_no_op)
     }
 
     /// Creates a new `DoubleArrayProperty` with the given `name` and `slots`.
@@ -281,7 +281,7 @@ impl Node {
                     })
                     .ok()
             })
-            .unwrap_or(DoubleArrayProperty::new_no_op())
+            .unwrap_or_else(DoubleArrayProperty::new_no_op)
     }
 
     /// Creates a new `IntLinearHistogramProperty` with the given `name` and `params`.
@@ -370,7 +370,7 @@ impl Node {
                     .map(|block_index| LazyNode::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
-            .unwrap_or(LazyNode::new_no_op())
+            .unwrap_or_else(LazyNode::new_no_op)
     }
 
     /// Records a new lazy child with the given `name` and `callback`.
@@ -411,7 +411,7 @@ impl Node {
                     .map(|block_index| LazyNode::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
-            .unwrap_or(LazyNode::new_no_op())
+            .unwrap_or_else(LazyNode::new_no_op)
     }
 
     /// Records a new inline lazy node with the given `name` and `callback`.
@@ -450,7 +450,7 @@ impl Node {
                     .map(|block_index| StringProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
-            .unwrap_or(StringProperty::new_no_op())
+            .unwrap_or_else(StringProperty::new_no_op)
     }
 
     /// Creates and saves a string property for the lifetime of the node.
@@ -483,7 +483,7 @@ impl Node {
                     .map(|block_index| BytesProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
-            .unwrap_or(BytesProperty::new_no_op())
+            .unwrap_or_else(BytesProperty::new_no_op)
     }
 
     /// Creates and saves a bytes property for the lifetime of the node.
@@ -507,7 +507,7 @@ impl Node {
                     .map(|block_index| BoolProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
-            .unwrap_or(BoolProperty::new_no_op())
+            .unwrap_or_else(BoolProperty::new_no_op)
     }
 
     /// Creates and saves a bool property for the lifetime of the node.

@@ -122,7 +122,8 @@ impl<'a> LidShutdownBuilder<'a> {
         };
 
         // In tests use the provided inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
 
         let node = Rc::new(LidShutdown {
             mutable_inner: RefCell::new(mutable_inner),
@@ -196,7 +197,7 @@ impl LidShutdown {
             .borrow()
             .driver_proxy
             .as_ref()
-            .ok_or(format_err!("Missing driver_proxy"))
+            .ok_or_else(|| format_err!("Missing driver_proxy"))
             .or_debug_panic()?
             .clone();
 
@@ -332,7 +333,7 @@ async fn open_sensor(
     let controller = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
         ControllerMarker,
     >(directory, filename)?;
-    let (device, server_end) = fidl::endpoints::create_proxy::<DeviceMarker>()?;
+    let (device, server_end) = fidl::endpoints::create_proxy::<DeviceMarker>();
     let () = controller.open_session(server_end)?;
     check_sensor(device).await
 }
@@ -457,7 +458,7 @@ mod tests {
             let report_event_clone =
                 report_event.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
 
-            let (proxy, mut stream) = create_proxy_and_stream::<DeviceMarker>().unwrap();
+            let (proxy, mut stream) = create_proxy_and_stream::<DeviceMarker>();
 
             let server_task = fasync::Task::local(async move {
                 while let Ok(req) = stream.try_next().await {
@@ -500,8 +501,7 @@ mod tests {
     // Creates a mock device proxy that receives GetReportDesc requests and returns the supplied
     // HID descriptor.
     fn mock_device_proxy(desc: Vec<u8>) -> DeviceProxy {
-        let (device_proxy, mut stream) =
-            create_proxy_and_stream::<DeviceMarker>().expect("Failed to create proxy and stream");
+        let (device_proxy, mut stream) = create_proxy_and_stream::<DeviceMarker>();
         fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {

@@ -137,7 +137,7 @@ async fn find_buses(path: &str) -> Result<Vec<BusProxy>, Error> {
         let bus_name = format!("{}/bus", dir_name);
         let dir_proxy = open_in_namespace(&dir_name, PERM_READABLE)?;
         if dir_contains(&dir_proxy, "bus").await? {
-            let (proxy, server) = fidl::endpoints::create_proxy::<BusMarker>()?;
+            let (proxy, server) = fidl::endpoints::create_proxy::<BusMarker>();
             match fdio::service_connect(&bus_name, server.into_channel()) {
                 Ok(_) => proxies.push(proxy),
                 Err(status) => {

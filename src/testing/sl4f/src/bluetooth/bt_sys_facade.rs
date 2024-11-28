@@ -387,7 +387,7 @@ impl BluetoothSysFacade {
         } else {
             let token = match &self.inner.read().access_proxy {
                 Some(proxy) => {
-                    let (token, token_server) = fidl::endpoints::create_proxy()?;
+                    let (token, token_server) = fidl::endpoints::create_proxy();
                     let resp = proxy.make_discoverable(token_server).await?;
                     if let Err(err) = resp {
                         let err_msg = format_err!("Error: {:?}", err);
@@ -439,7 +439,7 @@ impl BluetoothSysFacade {
         } else {
             let token = match &self.inner.read().access_proxy {
                 Some(proxy) => {
-                    let (token, token_server) = fidl::endpoints::create_proxy()?;
+                    let (token, token_server) = fidl::endpoints::create_proxy();
                     let resp = proxy.start_discovery(token_server).await?;
                     if let Err(err) = resp {
                         let err_msg = format_err!("Error: {:?}", err);

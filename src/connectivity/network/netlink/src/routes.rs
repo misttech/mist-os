@@ -380,8 +380,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         interface_id: u64,
     ) -> fnet_interfaces_ext::admin::Control {
         let (control, server_end) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-                .expect("create Control proxy");
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
         interfaces_proxy.get_admin(interface_id, server_end).expect("send get admin request");
         fnet_interfaces_ext::admin::Control::new(control)
     }
@@ -752,7 +751,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
                             })
                             .for_each(|message| {
                                 client.send_unicast(
-                                    message.clone().into_rtnl_new_route(sequence_number, true),
+                                    message.into_rtnl_new_route(sequence_number, true),
                                 )
                             });
                         RequestHandled::Done(Ok(()), client, completer)
@@ -1633,15 +1632,15 @@ mod tests {
         route_clients.add_client(wrong_client);
 
         let (route_set_from_main_table_proxy, _route_set_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_set_proxy, _route_set_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_table_proxy, _route_table_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
         let (unmanaged_route_set_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_table_provider, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>();
 
         let mut route_table = RouteTableMap::new(
             route_table_proxy.clone(),
@@ -1862,17 +1861,16 @@ mod tests {
         route_clients.add_client(wrong_client);
 
         let (main_route_table_proxy, _route_table_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
         let (unmanaged_route_set_proxy, _unmanaged_route_set_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_set_from_main_table_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_table_proxy, _route_table_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
-        let (route_set_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
+        let (route_set_proxy, _server_end) = fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_table_provider, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>();
 
         let mut route_table = RouteTableMap::new(
             main_route_table_proxy,
@@ -2161,8 +2159,7 @@ mod tests {
         let (interfaces_handler, _interfaces_handler_sink) = FakeInterfacesHandler::new();
         let (request_sink, request_stream) = mpsc::channel(1);
         let (interfaces_proxy, interfaces) =
-            fidl::endpoints::create_proxy::<fnet_root::InterfacesMarker>()
-                .expect("create proxy should succeed");
+            fidl::endpoints::create_proxy::<fnet_root::InterfacesMarker>();
 
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
@@ -2194,15 +2191,12 @@ mod tests {
             base_inputs,
             |base_inputs| {
                 let (v4_routes_state, routes_state) =
-                    fidl::endpoints::create_proxy::<fnet_routes::StateV4Marker>()
-                        .expect("create proxy should succeed");
+                    fidl::endpoints::create_proxy::<fnet_routes::StateV4Marker>();
                 let (v4_main_route_table, routes_set_provider) =
-                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV4Marker>()
-                        .expect("create proxy should succeed");
-                let (v4_route_table_provider, route_table_provider) =
-                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableProviderV4Marker>(
-                    )
-                    .expect("create proxy should succeed");
+                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV4Marker>();
+                let (v4_route_table_provider, route_table_provider) = fidl::endpoints::create_proxy::<
+                    fnet_routes_admin::RouteTableProviderV4Marker,
+                >();
                 let inputs = crate::eventloop::EventLoopInputs {
                     v4_routes_state: EventLoopComponent::Present(v4_routes_state),
                     v4_main_route_table: EventLoopComponent::Present(v4_main_route_table),
@@ -2215,15 +2209,12 @@ mod tests {
             },
             |base_inputs| {
                 let (v6_routes_state, routes_state) =
-                    fidl::endpoints::create_proxy::<fnet_routes::StateV6Marker>()
-                        .expect("create proxy should succeed");
+                    fidl::endpoints::create_proxy::<fnet_routes::StateV6Marker>();
                 let (v6_main_route_table, routes_set_provider) =
-                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV6Marker>()
-                        .expect("create proxy should succeed");
-                let (v6_route_table_provider, route_table_provider) =
-                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableProviderV6Marker>(
-                    )
-                    .expect("create proxy should succeed");
+                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV6Marker>();
+                let (v6_route_table_provider, route_table_provider) = fidl::endpoints::create_proxy::<
+                    fnet_routes_admin::RouteTableProviderV6Marker,
+                >();
                 let inputs = crate::eventloop::EventLoopInputs {
                     v6_routes_state: EventLoopComponent::Present(v6_routes_state),
                     v6_main_route_table: EventLoopComponent::Present(v6_main_route_table),
@@ -2238,9 +2229,9 @@ mod tests {
 
         let ServerEnds { routes_state, routes_set_provider, route_table_provider } = server_ends;
 
-        let state_stream = routes_state.into_stream().expect("into stream").boxed_local();
+        let state_stream = routes_state.into_stream().boxed_local();
 
-        let interfaces_request_stream = interfaces.into_stream().expect("into stream");
+        let interfaces_request_stream = interfaces.into_stream();
 
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
@@ -2263,7 +2254,7 @@ mod tests {
                             options: _,
                             watcher,
                             control_handle: _,
-                        } => WatcherRequestWrapper { watcher: watcher.into_stream().unwrap() },
+                        } => WatcherRequestWrapper { watcher: watcher.into_stream() },
                         fnet_routes::StateV4Request::GetRuleWatcherV4 {
                             options: _,
                             watcher: _,
@@ -2275,7 +2266,7 @@ mod tests {
                             options: _,
                             watcher,
                             control_handle: _,
-                        } => WatcherRequestWrapper { watcher: watcher.into_stream().unwrap() },
+                        } => WatcherRequestWrapper { watcher: watcher.into_stream() },
                         fnet_routes::StateV6Request::GetRuleWatcherV6 {
                             options: _,
                             watcher: _,
@@ -2327,8 +2318,7 @@ mod tests {
             )
             .map(|item| (MAIN_FIDL_TABLE_ID, item));
 
-        let route_table_provider_request_stream =
-            route_table_provider.into_stream().expect("into stream should succeed");
+        let route_table_provider_request_stream = route_table_provider.into_stream();
 
         let table_id = AtomicU32::new(OTHER_FIDL_TABLE_ID.get());
 
@@ -2707,10 +2697,8 @@ mod tests {
             route_clients
         });
 
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336606)
         let mut event_loop_fut = pin!(run_event_loop::<A::Version>(event_loop_inputs)
             .map(|res| match res {
-                Ok(never) => match never {},
                 Err(e) => {
                     log_debug!("event_loop_fut exiting with error {:?}", e);
                     Err::<std::convert::Infallible, _>(e)
@@ -3195,7 +3183,7 @@ mod tests {
                                 control_handle: _,
                             } => {
                                 pretty_assertions::assert_eq!(id, DEV1 as u64);
-                                Some(control.into_stream().unwrap())
+                                Some(control.into_stream())
                             }
                             req => unreachable!("unexpected interfaces request: {req:?}"),
                         })
@@ -4300,7 +4288,7 @@ mod tests {
                                     control_handle: _,
                                 } => {
                                     pretty_assertions::assert_eq!(id, DEV1 as u64);
-                                    let control = control.into_stream().unwrap();
+                                    let control = control.into_stream();
                                     let control = control.control_handle();
                                     control.shutdown();
                                 }
@@ -4468,17 +4456,16 @@ mod tests {
         let _executor = fuchsia_async::TestExecutor::new();
 
         let (main_route_table_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
         let (own_route_table_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
-        let (route_set_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
+        let (route_set_proxy, _server_end) = fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_set_from_main_table_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (unmanaged_route_set_proxy, _unmanaged_route_set_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_table_provider, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>();
 
         let mut route_table_map = RouteTableMap::<I>::new(
             main_route_table_proxy,
@@ -4807,10 +4794,8 @@ mod tests {
             .fuse());
 
         let mut watcher_stream = pin!(watcher_stream.fuse());
-        let mut route_table_provider_stream = pin!(route_table_provider_server_end
-            .into_stream()
-            .expect("into stream should succeed")
-            .fuse());
+        let mut route_table_provider_stream =
+            pin!(route_table_provider_server_end.into_stream().fuse());
 
         let mut event_loop = {
             let included_workers = match I::VERSION {
@@ -4897,8 +4882,7 @@ mod tests {
                         route_table_provider_stream.next().await.expect("should not have ended"),
                     )
                     .expect("should not get error");
-                let mut route_table_stream =
-                    server_end.into_stream().expect("into stream should succeed").boxed().fuse();
+                let mut route_table_stream = server_end.into_stream().boxed().fuse();
 
                 let request = I::into_route_table_request_result(
                     route_table_stream.by_ref().next().await.expect("should not have ended"),
@@ -4920,8 +4904,7 @@ mod tests {
                     RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => route_set,
                     _ => panic!("should be NewRouteSet"),
                 };
-                let mut route_set_stream =
-                    server_end.into_stream().expect("into stream should succeed").boxed().fuse();
+                let mut route_set_stream = server_end.into_stream().boxed().fuse();
 
                 let request = I::into_route_set_request_result(
                     route_set_stream.by_ref().next().await.expect("should not have ended"),

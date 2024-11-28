@@ -732,7 +732,7 @@ impl SuperBlock {
     pub fn block_size(&self) -> Result<u64, ParsingError> {
         let bs = 2u64
             .checked_pow(self.e2fs_log_bsize.get() + 10)
-            .ok_or(ParsingError::BlockSizeInvalid(self.e2fs_log_bsize.get()))?;
+            .ok_or_else(|| ParsingError::BlockSizeInvalid(self.e2fs_log_bsize.get()))?;
         if bs == 1024 || bs == 2048 || bs == 4096 || bs == 65536 {
             Ok(bs)
         } else {

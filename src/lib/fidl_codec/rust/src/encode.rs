@@ -63,10 +63,12 @@ impl<'n> EncodeBuffer<'n> {
             _ => Err(Error::LibraryError(format!("Could not find protocol '{}'.", protocol_name))),
         }?;
 
-        let method = protocol.methods.get(method_name).ok_or(Error::LibraryError(format!(
-            "Could not find method '{}' on protocol '{}'",
-            method_name, protocol_name
-        )))?;
+        let method = protocol.methods.get(method_name).ok_or_else(|| {
+            Error::LibraryError(format!(
+                "Could not find method '{}' on protocol '{}'",
+                method_name, protocol_name
+            ))
+        })?;
 
         let (ty, has) = match direction {
             Direction::Request => {

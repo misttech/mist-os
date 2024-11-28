@@ -102,7 +102,7 @@ where
         marks: crate::SocketMarks,
     ) -> impl Future<Output = Result<Result<Self, fposix::Errno>, Error>> {
         async move {
-            let proxy = self.into_proxy()?;
+            let proxy = self.into_proxy();
             Ok(
                 match Result::and(
                     proxy.mark(MarkDomain::Mark1, marks.mark_1).await?,

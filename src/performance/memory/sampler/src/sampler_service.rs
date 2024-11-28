@@ -167,7 +167,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_process_sampler_requests_full_profile() -> Result<(), Error> {
-        let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
+        let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>();
         let (mut tx, _rx) = mpsc::channel(1);
         let profile_future = process_sampler_requests(request_stream, &mut tx);
 
@@ -231,7 +231,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_process_sampler_request_partial_profile_on_size() -> Result<(), Error> {
-        let (_client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
+        let (_client, request_stream) = create_proxy_and_stream::<SamplerMarker>();
         let (mut tx, mut rx) = mpsc::channel(1);
         const TEST_NAME: &str = "test process";
         let mut builder = ProfileBuilder::default();
@@ -279,7 +279,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_process_sampler_request_partial_profile_on_time() -> Result<(), Error> {
-        let (_client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
+        let (_client, request_stream) = create_proxy_and_stream::<SamplerMarker>();
         let (mut tx, mut rx) = mpsc::channel(1);
         const TEST_NAME: &str = "test process";
         let mut builder = ProfileBuilder::default();
@@ -317,7 +317,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_process_sampler_requests_set_process_info() -> Result<(), Error> {
-        let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
+        let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>();
         let (mut tx, _rx) = mpsc::channel(1);
         let profile_future = process_sampler_requests(request_stream, &mut tx);
 
@@ -372,7 +372,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_process_sampler_requests_multiple_set_process_info() -> Result<(), Error> {
-        let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
+        let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>();
         let (mut tx, _rx) = mpsc::channel(1);
         let profile_future = process_sampler_requests(request_stream, &mut tx);
 
@@ -433,7 +433,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_process_sampler_requests_allocate() -> Result<(), Error> {
-        let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
+        let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>();
         let (mut tx, _rx) = mpsc::channel(1);
         let profile_future = process_sampler_requests(request_stream, &mut tx);
 
@@ -456,7 +456,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_process_sampler_requests_deallocate() -> Result<(), Error> {
-        let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
+        let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>();
         let (mut tx, _rx) = mpsc::channel(1);
         let profile_future = process_sampler_requests(request_stream, &mut tx);
 

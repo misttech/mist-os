@@ -43,8 +43,7 @@ pub(crate) async fn serve_watcher<E: FidlWatcherEvent, WI: WatcherInterest<E>>(
         dispatcher.connect_new_client(interest)
     };
 
-    let request_stream =
-        server_end.into_stream().expect("failed to acquire request_stream from server_end");
+    let request_stream = server_end.into_stream();
 
     let canceled_fut = watcher.canceled.wait();
 

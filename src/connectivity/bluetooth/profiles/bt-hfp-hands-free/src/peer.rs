@@ -55,8 +55,7 @@ impl Peer {
         }
 
         let (peer_handler_proxy, peer_handler_request_stream) =
-            create_proxy_and_stream::<fidl_hfp::PeerHandlerMarker>()
-                .expect("Unable to create proxy and stream for PeerHandler protocol");
+            create_proxy_and_stream::<fidl_hfp::PeerHandlerMarker>();
 
         let task = PeerTask::spawn(self.peer_id, self.config, peer_handler_request_stream, channel);
         self.task = Some(task);
@@ -87,8 +86,7 @@ impl Peer {
         };
 
         let (peer_handler_proxy, peer_handler_request_stream) =
-            create_proxy_and_stream::<fidl_hfp::PeerHandlerMarker>()
-                .expect("Unable to create proxy for PeerHandler");
+            create_proxy_and_stream::<fidl_hfp::PeerHandlerMarker>();
 
         let task = PeerTask::spawn(self.peer_id, self.config, peer_handler_request_stream, channel);
         self.task = Some(task);

@@ -382,7 +382,7 @@ impl Node {
         quality: Quality,
     ) -> impl Future<Output = Result<()>> + Send {
         let peers = Arc::clone(&self.peers);
-        let new_stream_sender = new_stream_sender.clone();
+        let new_stream_sender = new_stream_sender;
         let node_id = self.node_id.clone();
         let mut new_peer_sender = self.new_peer_sender.clone();
 

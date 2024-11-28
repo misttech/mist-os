@@ -266,8 +266,7 @@ async fn run_all_futures() -> Result<(), Error> {
             // If it is not possible to acquire a metrics logging proxy, create a disconnected
             // proxy and attempt to serve the policy API with metrics disabled.
             let (proxy, _) =
-                fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-                    .context("failed to create MetricEventLoggerMarker endponts")?;
+                fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
             proxy
         }
     };
@@ -342,7 +341,7 @@ async fn run_all_futures() -> Result<(), Error> {
     let configurator =
         legacy::deprecated_configuration::DeprecatedConfigurator::new(phy_manager.clone());
 
-    let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy()?;
+    let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy();
     monitor_svc.watch_devices(watcher_server_end)?;
 
     let (client_sender, client_receiver) = mpsc::unbounded();

@@ -10,8 +10,8 @@ use assembly_config_schema::platform_config::connectivity_config::{
     NetstackVersion, NetworkingConfig, PlatformConnectivityConfig, WlanPolicyLayer,
     WlanRecoveryProfile, WlanRoamingMode, WlanRoamingPolicy, WlanRoamingProfile,
 };
+use assembly_constants::{FileEntry, PackageDestination, PackageSetDestination};
 use assembly_file_relative_path::FileRelativePathBuf;
-use assembly_util::{FileEntry, PackageDestination, PackageSetDestination};
 
 pub(crate) struct ConnectivitySubsystemConfig;
 impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySubsystemConfig {
@@ -101,9 +101,10 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 }
             }
 
-            let config_src = connectivity_config.network.netcfg_config_path.clone().unwrap_or(
-                FileRelativePathBuf::Resolved(context.get_resource("netcfg_default.json")),
-            );
+            let config_src =
+                connectivity_config.network.netcfg_config_path.clone().unwrap_or_else(|| {
+                    FileRelativePathBuf::Resolved(context.get_resource("netcfg_default.json"))
+                });
             let config_dir = builder
                 .add_domain_config(PackageSetDestination::Blob(PackageDestination::NetcfgConfig))
                 .directory("netcfg-config");

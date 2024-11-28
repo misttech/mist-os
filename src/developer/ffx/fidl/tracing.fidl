@@ -4,6 +4,7 @@
 library fuchsia.developer.ffx;
 
 using fuchsia.tracing.controller;
+using fuchsia.tracing;
 
 /// The maximum length allowed for paths passed to tracing commands.
 ///
@@ -128,6 +129,7 @@ closed protocol Tracing {
     }) -> (struct {
         target TargetInfo;
         output_file string:MAX_PATH_LENGTH;
+        categories fuchsia.tracing.EnabledCategoryList;
         result fuchsia.tracing.controller.StopResult;
     }) error RecordingError;
 

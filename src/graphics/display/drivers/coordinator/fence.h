@@ -5,10 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_FENCE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_FENCE_H_
 
-#ifndef _ALL_SOURCE
-#define _ALL_SOURCE  // To get MTX_INIT
-#endif
-
 #include <lib/async/cpp/wait.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
@@ -24,9 +20,9 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/graphics/display/drivers/coordinator/id-map.h"
-#include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/event-id.h"
 
-namespace display {
+namespace display_coordinator {
 
 class FenceReference;
 class Fence;
@@ -46,7 +42,7 @@ class FenceCallback {
 // be created and destroyed on the same fdf::Dispatcher where the Fence is
 // created.
 class Fence : public fbl::RefCounted<Fence>,
-              public IdMappable<fbl::RefPtr<Fence>, EventId>,
+              public IdMappable<fbl::RefPtr<Fence>, display::EventId>,
               public fbl::SinglyLinkedListable<fbl::RefPtr<Fence>> {
  public:
   // `Fence` must be created on a dispatcher managed by the driver framework.
@@ -57,7 +53,8 @@ class Fence : public fbl::RefCounted<Fence>,
   // created.
   //
   // `event_dispatcher` must not be null and must outlive Fence.
-  Fence(FenceCallback* cb, async_dispatcher_t* event_dispatcher, EventId id, zx::event event);
+  Fence(FenceCallback* cb, async_dispatcher_t* event_dispatcher, display::EventId id,
+        zx::event event);
   ~Fence();
 
   Fence(const Fence& other) = delete;
@@ -134,8 +131,6 @@ class FenceReference : public fbl::RefCounted<FenceReference>,
 
   zx_status_t StartReadyWait();
   void ResetReadyWait();
-  // Sets the fence which will be signaled immediately when this fence is ready.
-  void SetImmediateRelease(fbl::RefPtr<FenceReference>&& fence);
 
   void OnReady();
 
@@ -173,9 +168,9 @@ class FenceCollection : private FenceCallback {
   // Explicit destruction step. Use this to control when fences are destroyed.
   void Clear() __TA_EXCLUDES(mtx_);
 
-  zx_status_t ImportEvent(zx::event event, EventId id) __TA_EXCLUDES(mtx_);
-  void ReleaseEvent(EventId id) __TA_EXCLUDES(mtx_);
-  fbl::RefPtr<FenceReference> GetFence(EventId id) __TA_EXCLUDES(mtx_);
+  zx_status_t ImportEvent(zx::event event, display::EventId id) __TA_EXCLUDES(mtx_);
+  void ReleaseEvent(display::EventId id) __TA_EXCLUDES(mtx_);
+  fbl::RefPtr<FenceReference> GetFence(display::EventId id) __TA_EXCLUDES(mtx_);
 
  private:
   // |FenceCallback|
@@ -190,6 +185,6 @@ class FenceCollection : private FenceCallback {
   fit::function<void(FenceReference*)> on_fence_fired_;
 };
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_FENCE_H_

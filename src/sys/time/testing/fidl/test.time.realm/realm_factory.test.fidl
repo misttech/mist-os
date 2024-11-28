@@ -10,6 +10,7 @@
 /// The realm is created by calling `RealmFactory.CreateRealm`, which allows
 /// configuring some realm parameters. Refer to the appropriate docs below for
 /// details.
+@available(platform="fuchsia", added=HEAD)
 library test.time.realm;
 
 using fuchsia.io;

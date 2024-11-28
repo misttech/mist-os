@@ -53,8 +53,7 @@ async fn connect_to_hermetic_network_realm_protocol<
     let realm_proxy = realm
         .connect_to_protocol::<fcomponent::RealmMarker>()
         .expect("failed to connect to realm protocol");
-    let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-        .expect("failed to create Directory proxy");
+    let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let child_ref = network_test_realm::create_hermetic_network_realm_child_ref();
     realm_proxy
         .open_exposed_dir(&child_ref, server_end)

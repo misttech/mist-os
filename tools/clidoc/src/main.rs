@@ -242,7 +242,7 @@ fn run(opt: Opt) -> Result<()> {
 
     write_toc(
         output_path,
-        opt.toc_prefix.unwrap_or(PathBuf::from("/reference/tools/sdk")),
+        opt.toc_prefix.unwrap_or_else(|| PathBuf::from("/reference/tools/sdk")),
         command_summary,
     )?;
 
@@ -496,7 +496,7 @@ fn write_formatted_output(
     // Write output for cmd and all of its subcommands.
     let cmd_description = recurse_cmd_output(&cmd_name, &cmd_path, output_writer, &cmd_sequence)?;
 
-    Ok((cmd_name.into(), cmd_description, output_md_path.clone()))
+    Ok((cmd_name.into(), cmd_description, output_md_path))
 }
 
 /// Generate a vector of full paths to each command in the allow_list.

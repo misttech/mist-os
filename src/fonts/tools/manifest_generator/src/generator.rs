@@ -100,8 +100,7 @@ pub fn generate_manifest(
                                 // full_name is optional, but, if present, must be unique
                                 if let Some(full_name) = full_name {
                                     if let Some((prev_file_name, prev_face_index)) =
-                                        full_name_to_typeface
-                                            .insert(full_name.clone(), face_key.clone())
+                                        full_name_to_typeface.insert(full_name.clone(), face_key)
                                     {
                                         errors.push(GeneratorError::DuplicateFullName {
                                             full_name,

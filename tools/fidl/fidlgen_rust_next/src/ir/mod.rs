@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 mod attribute;
-mod comp_ident;
-mod constant;
+mod bits;
+mod r#const;
 mod decl_type;
 mod r#enum;
 mod handle;
+mod ident;
 mod library;
 mod literal;
 mod primitive;
@@ -20,13 +21,14 @@ mod type_shape;
 mod union;
 
 pub use self::attribute::*;
-pub use self::comp_ident::*;
-pub use self::constant::*;
+pub use self::bits::*;
 pub use self::decl_type::*;
 pub use self::handle::*;
+pub use self::ident::*;
 pub use self::library::*;
 pub use self::literal::*;
 pub use self::primitive::*;
+pub use self::r#const::*;
 pub use self::r#enum::*;
 pub use self::r#struct::*;
 pub use self::r#type::*;

@@ -158,7 +158,7 @@ impl ZirconClient {
 
     /// Equivalent to the module level [`create_proxy`]
     pub async fn create_proxy<T: ProtocolMarker>(&self) -> Result<(T::Proxy, ServerEnd<T>), Error> {
-        create_proxy::<T>()
+        Ok(create_proxy::<T>())
     }
 }
 
@@ -323,30 +323,28 @@ pub trait MemberOpener {
 
 /// Utility that spawns a new task to handle requests of a particular type, requiring a
 /// singlethreaded executor. The requests are handled one at a time.
-// TODO(https://fxbug.dev/319159026) this should be infallible
-pub fn spawn_local_stream_handler<P, F, Fut>(f: F) -> Result<P, Error>
+pub fn spawn_local_stream_handler<P, F, Fut>(f: F) -> P
 where
     P: Proxy,
     F: FnMut(Request<P::Protocol>) -> Fut + 'static,
     Fut: Future<Output = ()> + 'static,
 {
-    let (proxy, stream) = create_proxy_and_stream::<P::Protocol>()?;
+    let (proxy, stream) = create_proxy_and_stream::<P::Protocol>();
     fasync::Task::local(for_each_or_log(stream, f)).detach();
-    Ok(proxy)
+    proxy
 }
 
 /// Utility that spawns a new task to handle requests of a particular type. The request handler
 /// must be threadsafe. The requests are handled one at a time.
-// TODO(https://fxbug.dev/319159026) this should be infallible
-pub fn spawn_stream_handler<P, F, Fut>(f: F) -> Result<P, Error>
+pub fn spawn_stream_handler<P, F, Fut>(f: F) -> P
 where
     P: Proxy,
     F: FnMut(Request<P::Protocol>) -> Fut + 'static + Send,
     Fut: Future<Output = ()> + 'static + Send,
 {
-    let (proxy, stream) = create_proxy_and_stream::<P::Protocol>()?;
+    let (proxy, stream) = create_proxy_and_stream::<P::Protocol>();
     fasync::Task::spawn(for_each_or_log(stream, f)).detach();
-    Ok(proxy)
+    proxy
 }
 
 fn for_each_or_log<St, F, Fut>(stream: St, mut f: F) -> impl Future<Output = ()>
@@ -386,15 +384,12 @@ impl<T> ClientEnd<T> {
 
 impl<T: ProtocolMarker> ClientEnd<T> {
     /// Convert the `ClientEnd` into a `Proxy` through which FIDL calls may be made.
-    // TODO(https://fxbug.dev/319159026) this should be infallible
-    pub fn into_proxy(self) -> Result<T::Proxy, Error> {
-        Ok(T::Proxy::from_channel(AsyncChannel::from_channel(self.inner)))
-    }
-
-    /// Soft-transition affordance for https://fxbug.dev/319159026.
-    // TODO(https://fxbug.dev/319159026) delete this function
-    pub fn try_into_proxy(self) -> Result<T::Proxy, Error> {
-        self.into_proxy()
+    ///
+    /// # Panics
+    ///
+    /// If called outside the context of an active async executor.
+    pub fn into_proxy(self) -> T::Proxy {
+        T::Proxy::from_channel(AsyncChannel::from_channel(self.inner))
     }
 
     /// Convert the `ClientEnd` into a `SynchronousProxy` through which thread-blocking FIDL calls
@@ -471,21 +466,11 @@ impl<T> ServerEnd<T> {
     /// # Panics
     ///
     /// If called outside the context of an active async executor.
-    // TODO(https://fxbug.dev/319159026) this should be infallible
-    pub fn into_stream(self) -> Result<T::RequestStream, Error>
+    pub fn into_stream(self) -> T::RequestStream
     where
         T: ProtocolMarker,
     {
-        Ok(T::RequestStream::from_channel(AsyncChannel::from_channel(self.inner)))
-    }
-
-    /// Soft-transition affordance for https://fxbug.dev/319159026.
-    // TODO(https://fxbug.dev/319159026) delete this function
-    pub fn try_into_stream(self) -> Result<T::RequestStream, Error>
-    where
-        T: ProtocolMarker,
-    {
-        self.into_stream()
+        T::RequestStream::from_channel(AsyncChannel::from_channel(self.inner))
     }
 
     /// Create a stream of requests and an event-sending handle
@@ -494,16 +479,15 @@ impl<T> ServerEnd<T> {
     /// # Panics
     ///
     /// If called outside the context of an active async executor.
-    // TODO(https://fxbug.dev/319159026) this should be infallible
     pub fn into_stream_and_control_handle(
         self,
-    ) -> Result<(T::RequestStream, <T::RequestStream as RequestStream>::ControlHandle), Error>
+    ) -> (T::RequestStream, <T::RequestStream as RequestStream>::ControlHandle)
     where
         T: ProtocolMarker,
     {
-        let stream = self.into_stream()?;
+        let stream = self.into_stream();
         let control_handle = stream.control_handle();
-        Ok((stream, control_handle))
+        (stream, control_handle)
     }
 
     /// Writes an epitaph into the underlying channel before closing it.
@@ -566,16 +550,9 @@ pub fn create_endpoints<T: ProtocolMarker>() -> (ClientEnd<T>, ServerEnd<T>) {
 /// # Panics
 ///
 /// If called outside the context of an active async executor.
-// TODO(https://fxbug.dev/319159026) this should be infallible
-pub fn create_proxy<T: ProtocolMarker>() -> Result<(T::Proxy, ServerEnd<T>), Error> {
+pub fn create_proxy<T: ProtocolMarker>() -> (T::Proxy, ServerEnd<T>) {
     let (client, server) = create_endpoints();
-    Ok((client.into_proxy()?, server))
-}
-
-/// Soft-transition affordance for https://fxbug.dev/319159026.
-// TODO(https://fxbug.dev/319159026) delete this function
-pub fn try_create_proxy<T: ProtocolMarker>() -> Result<(T::Proxy, ServerEnd<T>), Error> {
-    create_proxy::<T>()
+    (client.into_proxy(), server)
 }
 
 /// Create a synchronous client proxy and a server endpoint connected to it by a channel.
@@ -596,18 +573,9 @@ pub fn create_sync_proxy<T: ProtocolMarker>() -> (T::SynchronousProxy, ServerEnd
 /// # Panics
 ///
 /// If called outside the context of an active async executor.
-// TODO(https://fxbug.dev/319159026) this should be infallible
-pub fn create_request_stream<T: ProtocolMarker>() -> Result<(ClientEnd<T>, T::RequestStream), Error>
-{
+pub fn create_request_stream<T: ProtocolMarker>() -> (ClientEnd<T>, T::RequestStream) {
     let (client, server) = create_endpoints();
-    Ok((client, server.into_stream()?))
-}
-
-/// Soft-transition affordance for https://fxbug.dev/319159026.
-// TODO(https://fxbug.dev/319159026) delete this function
-pub fn try_create_request_stream<T: ProtocolMarker>(
-) -> Result<(ClientEnd<T>, T::RequestStream), Error> {
-    create_request_stream::<T>()
+    (client, server.into_stream())
 }
 
 /// Create a request stream and proxy connected to one another.
@@ -618,17 +586,9 @@ pub fn try_create_request_stream<T: ProtocolMarker>(
 /// # Panics
 ///
 /// If called outside the context of an active async executor.
-// TODO(https://fxbug.dev/319159026) this should be infallible
-pub fn create_proxy_and_stream<T: ProtocolMarker>() -> Result<(T::Proxy, T::RequestStream), Error> {
+pub fn create_proxy_and_stream<T: ProtocolMarker>() -> (T::Proxy, T::RequestStream) {
     let (client, server) = create_endpoints::<T>();
-    Ok((client.into_proxy()?, server.into_stream()?))
-}
-
-/// Soft-transition affordance for https://fxbug.dev/319159026.
-// TODO(https://fxbug.dev/319159026) delete this function
-pub fn try_create_proxy_and_stream<T: ProtocolMarker>(
-) -> Result<(T::Proxy, T::RequestStream), Error> {
-    create_proxy_and_stream::<T>()
+    (client.into_proxy(), server.into_stream())
 }
 
 /// Create a request stream and synchronous proxy connected to one another.
@@ -639,12 +599,11 @@ pub fn try_create_proxy_and_stream<T: ProtocolMarker>(
 /// # Panics
 ///
 /// If called outside the context of an active async executor.
-// TODO(https://fxbug.dev/319159026) this should be infallible
 #[cfg(target_os = "fuchsia")]
-pub fn create_sync_proxy_and_stream<T: ProtocolMarker>(
-) -> Result<(T::SynchronousProxy, T::RequestStream), Error> {
+pub fn create_sync_proxy_and_stream<T: ProtocolMarker>() -> (T::SynchronousProxy, T::RequestStream)
+{
     let (client, server) = create_endpoints::<T>();
-    Ok((client.into_sync_proxy(), server.into_stream()?))
+    (client.into_sync_proxy(), server.into_stream())
 }
 
 /// The type of a client-initiated method.

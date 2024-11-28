@@ -306,8 +306,7 @@ impl MouseInjectorHandler {
         }
 
         // Create a new injector.
-        let (device_proxy, device_server) = create_proxy::<pointerinjector::DeviceMarker>()
-            .context("Failed to create DeviceProxy.")?;
+        let (device_proxy, device_server) = create_proxy::<pointerinjector::DeviceMarker>();
         let context = fuchsia_scenic::duplicate_view_ref(&self.context_view_ref)
             .context("Failed to duplicate context view ref.")?;
         let target = fuchsia_scenic::duplicate_view_ref(&self.target_view_ref)
@@ -672,8 +671,7 @@ mod tests {
                     responder,
                     ..
                 }) => {
-                    let injector_stream =
-                        injector.into_stream().expect("Failed to get stream from server end.");
+                    let injector_stream = injector.into_stream();
                     let _ = injector_sender.send(injector_stream);
                     responder.send().expect("failed to respond");
                 }
@@ -698,8 +696,7 @@ mod tests {
             })) => (injector, responder),
             other => panic!("expected register request, but got {:?}", other),
         };
-        let injector_stream: pointerinjector::DeviceRequestStream =
-            injector.into_stream().expect("Failed to get stream from server end.");
+        let injector_stream: pointerinjector::DeviceRequestStream = injector.into_stream();
         responder.send().expect("failed to respond");
         injector_stream
             .for_each(|request| {
@@ -781,14 +778,11 @@ mod tests {
 
         // Set up fidl streams.
         let (aggregator_proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let (sender, _) = futures::channel::mpsc::channel::<CursorMessage>(0);
 
         let inspector = fuchsia_inspect::Inspector::default();
@@ -814,8 +808,7 @@ mod tests {
 
         // Add an injector.
         let (injector_device_proxy, mut injector_device_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::DeviceMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::DeviceMarker>();
         mouse_handler.inner_mut().injectors.insert(1, injector_device_proxy);
 
         // This nested block is used to bound the lifetime of `watch_viewport_fut`.
@@ -964,14 +957,11 @@ mod tests {
     ) {
         // Set up fidl streams.
         let (aggregator_proxy, aggregator_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
 
@@ -1073,14 +1063,11 @@ mod tests {
 
         // Set up fidl streams.
         let (aggregator_proxy, aggregator_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
 
@@ -1222,14 +1209,11 @@ mod tests {
     ) {
         // Set up fidl streams.
         let (aggregator_proxy, aggregator_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
 
@@ -1331,14 +1315,11 @@ mod tests {
     async fn down_up_event() {
         // Set up fidl streams.
         let (aggregator_proxy, aggregator_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
 
@@ -1478,14 +1459,11 @@ mod tests {
     async fn down_down_up_up_event() {
         // Set up fidl streams.
         let (aggregator_proxy, aggregator_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
 
@@ -1699,14 +1677,11 @@ mod tests {
     async fn down_move_up_event() {
         // Set up fidl streams.
         let (aggregator_proxy, aggregator_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
 
@@ -1895,14 +1870,11 @@ mod tests {
     async fn handler_ignores_handled_events() {
         // Set up fidl streams.
         let (aggregator_proxy, aggregator_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
 
@@ -2113,14 +2085,11 @@ mod tests {
     async fn scroll(event: input_device::InputEvent, want_event: pointerinjector::Event) {
         // Set up fidl streams.
         let (aggregator_proxy, aggregator_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
 
@@ -2191,14 +2160,11 @@ mod tests {
     async fn down_scroll_up_scroll() {
         // Set up fidl streams.
         let (aggregator_proxy, aggregator_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
 
@@ -2383,8 +2349,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn mouse_injector_handler_initialized_with_inspect_node() {
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
         let (sender, _) = futures::channel::mpsc::channel::<CursorMessage>(1);
@@ -2421,14 +2386,11 @@ mod tests {
     async fn mouse_injector_handler_inspect_counts_events() {
         // Set up fidl streams.
         let (aggregator_proxy, aggregator_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let (configuration_proxy, mut configuration_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
-                .expect("Failed to create pointerinjector Setup proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>();
         let (injector_registry_proxy, injector_registry_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
-                .expect("Failed to create pointerinjector Registry proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>();
         let (sender, _) = futures::channel::mpsc::channel::<CursorMessage>(1);
 
         let inspector = fuchsia_inspect::Inspector::default();

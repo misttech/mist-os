@@ -28,7 +28,7 @@ pub fn spawn_inspect_server(mut stream: InspectRequestStream, node: NodeObject) 
                         responder.send(&names)?;
                     }
                     InspectRequest::OpenChild { child_name, child_channel, responder } => {
-                        let stream = child_channel.into_stream()?;
+                        let stream = child_channel.into_stream();
                         let ok = match &node {
                             NodeObject::Root(table) => {
                                 spawn_inspect_server(stream, NodeObject::Table(table.clone()));

@@ -63,9 +63,9 @@ impl ForcedFDR {
         fidl_fuchsia_recovery::FactoryResetRequestStream,
     ) {
         let (info_proxy, info_stream) =
-            fidl::endpoints::create_proxy_and_stream::<ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ProviderMarker>();
         let (fdr_proxy, fdr_stream) =
-            fidl::endpoints::create_proxy_and_stream::<FactoryResetMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<FactoryResetMarker>();
 
         (
             ForcedFDR { data_dir, config_data_dir, info_proxy, factory_reset_proxy: fdr_proxy },

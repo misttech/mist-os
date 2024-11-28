@@ -130,7 +130,7 @@ async fn early_boot_profile<W: 'static + Write + Send + Sync>(
         &run_test_suite_lib::output::DirectoryArtifactType::Debug,
         None,
     ) {
-        Ok(o) => run_test_suite_lib::copy_debug_data(client.into_proxy()?, o).await,
+        Ok(o) => run_test_suite_lib::copy_debug_data(client.into_proxy(), o).await,
         Err(e) => {
             writeln!(writer, "Cannot create output directory: {}", e)?;
             return Err(e.into());
@@ -378,7 +378,7 @@ async fn get_tests<W: Write>(
         .await
         .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
     let writer = &mut write;
-    let (iterator_proxy, iterator) = create_proxy().unwrap();
+    let (iterator_proxy, iterator) = create_proxy();
 
     tracing::info!("launching test suite {}", cmd.test_url);
 
@@ -512,13 +512,13 @@ mod test {
     impl FakeRemoteControllerProvider {
         fn new() -> FakeRemoteControllerProvider {
             let (remote_control, mut stream) =
-                create_proxy_and_stream::<fremotecontrol::RemoteControlMarker>().unwrap();
+                create_proxy_and_stream::<fremotecontrol::RemoteControlMarker>();
             let _task = fuchsia_async::Task::spawn(async move {
                 while let Some(request) = stream.try_next().await.unwrap() {
                     // store channels so that they do not die.
                     let mut server_channels = vec![];
                     match request {
-                        fremotecontrol::RemoteControlRequest::OpenCapability {
+                        fremotecontrol::RemoteControlRequest::DeprecatedOpenCapability {
                             moniker,
                             capability_set,
                             capability_name,
@@ -886,7 +886,7 @@ mod test {
     }
 
     async fn fake_debug_data_iterator(iterator: ServerEnd<DebugDataIteratorMarker>) {
-        let mut stream = iterator.into_stream().unwrap();
+        let mut stream = iterator.into_stream();
 
         // we just need to send once sample file and not test full logic as that is tested inside the library.
         let (s1, s2) = fidl::Socket::create_stream();
@@ -895,10 +895,15 @@ mod test {
             socket: s1.into(),
             ..Default::default()
         }];
-        s2.write(&[1, 2, 3, 4, 5]).unwrap();
+        let mut compressor = zstd::bulk::Compressor::new(0).unwrap();
+        let bytes = compressor.compress(&[1, 2, 3, 4, 5]).unwrap();
+        s2.write(bytes.as_slice()).unwrap();
         while let Some(request) = stream.try_next().await.unwrap() {
             match request {
-                ftest_manager::DebugDataIteratorRequest::GetNext { responder } => {
+                ftest_manager::DebugDataIteratorRequest::GetNext { .. } => {
+                    panic!("Not Implemented");
+                }
+                ftest_manager::DebugDataIteratorRequest::GetNextCompressed { responder } => {
                     responder.send(debug_data.drain(..).collect()).unwrap();
                 }
             }
@@ -908,12 +913,12 @@ mod test {
     #[fuchsia::test]
     async fn test_early_boot_profile() {
         let (remote_control, mut stream) =
-            create_proxy_and_stream::<fremotecontrol::RemoteControlMarker>().unwrap();
+            create_proxy_and_stream::<fremotecontrol::RemoteControlMarker>();
         let task = fuchsia_async::Task::spawn(async move {
             let mut once = false;
             while let Some(request) = stream.try_next().await.unwrap() {
                 match request {
-                    fremotecontrol::RemoteControlRequest::OpenCapability {
+                    fremotecontrol::RemoteControlRequest::DeprecatedOpenCapability {
                         moniker,
                         capability_set,
                         capability_name,

@@ -40,8 +40,10 @@ async fn main() -> Result<(), Error> {
             .try_next()
             .await
             .with_context(|| format!("Getting a file from {}", DEV_CLASS_VSOCK))?;
-        let path = path.ok_or(anyhow::anyhow!("Could not find device in {}", DEV_CLASS_VSOCK))?;
-        let path = path.to_str().ok_or(anyhow::anyhow!("Expected valid utf-8 device name"))?;
+        let path =
+            path.ok_or_else(|| anyhow::anyhow!("Could not find device in {}", DEV_CLASS_VSOCK))?;
+        let path =
+            path.to_str().ok_or_else(|| anyhow::anyhow!("Expected valid utf-8 device name"))?;
         let path = format!("{path}/device_protocol");
 
         Some(

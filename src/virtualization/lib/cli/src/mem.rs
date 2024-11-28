@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::platform::PlatformServices;
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, Error};
 use fidl_fuchsia_virtualization::{
     GuestMarker, GuestStatus, MemControllerMarker, MemControllerProxy,
 };
@@ -63,16 +63,14 @@ async fn connect_to_mem_controller<P: PlatformServices>(
 
     let guest_info = manager.get_info().await?;
     if guest_info.guest_status.expect("guest status should be set") == GuestStatus::Running {
-        let (guest_endpoint, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>()
-            .map_err(|err| anyhow!("failed to create guest proxy: {}", err))?;
+        let (guest_endpoint, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>();
         manager
             .connect(guest_server_end)
             .await
             .map_err(|err| anyhow!("failed to get a connect response: {}", err))?
             .map_err(|err| anyhow!("connect failed with: {:?}", err))?;
 
-        let (controller, server_end) = fidl::endpoints::create_proxy::<MemControllerMarker>()
-            .context("failed to make mem controller")?;
+        let (controller, server_end) = fidl::endpoints::create_proxy::<MemControllerMarker>();
 
         guest_endpoint
             .get_mem_controller(server_end)
@@ -122,7 +120,7 @@ mod test {
 
     #[fasync::run_until_stalled(test)]
     async fn mem_valid_request_plugged_returns_ok() {
-        let (proxy, mut stream) = create_proxy_and_stream::<MemControllerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<MemControllerMarker>();
         let size = 12345;
         let expected_string = format!("Resizing dynamically plugged memory to {} bytes!\n", size);
 
@@ -141,7 +139,7 @@ mod test {
 
     #[fasync::run_until_stalled(test)]
     async fn mem_valid_stats_returns_ok() {
-        let (proxy, mut stream) = create_proxy_and_stream::<MemControllerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<MemControllerMarker>();
         let (block_size, region_size, usable_region_size, plugged_size, requested_size) =
             (1, 2, 3, 4, 5);
 

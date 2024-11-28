@@ -79,7 +79,7 @@ mod tests {
         let resource = get_debuglog_resource().await?;
         let read_only_log = ReadOnlyLog::new(resource);
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fboot::ReadOnlyLogMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fboot::ReadOnlyLogMarker>();
         fasync::Task::local(
             read_only_log
                 .serve(stream)
@@ -101,7 +101,7 @@ mod tests {
         let write_only_log =
             WriteOnlyLog::new(zx::DebugLog::create(&resource, zx::DebugLogOpts::empty()).unwrap());
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fboot::WriteOnlyLogMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fboot::WriteOnlyLogMarker>();
         fasync::Task::local(
             write_only_log
                 .serve(stream)

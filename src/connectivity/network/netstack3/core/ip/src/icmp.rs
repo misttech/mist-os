@@ -46,9 +46,9 @@ use packet_formats::ipv6::{ExtHdrParseError, Ipv6Header};
 use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{
-    AddressStatus, IpDeviceStateContext, IpLayerHandler, IpPacketDestination, IpSendFrameError,
-    IpTransportContext, Ipv6PresentAddressStatus, ReceiveIpPacketMeta, SendIpPacketMeta,
-    TransportReceiveError, IPV6_DEFAULT_SUBNET,
+    AddressStatus, IpDeviceIngressStateContext, IpLayerHandler, IpPacketDestination,
+    IpSendFrameError, IpTransportContext, Ipv6PresentAddressStatus, ReceiveIpPacketMeta,
+    SendIpPacketMeta, TransportReceiveError, IPV6_DEFAULT_SUBNET,
 };
 use crate::internal::device::nud::{ConfirmationFlags, NudIpHandler};
 use crate::internal::device::route_discovery::Ipv6DiscoveredRoute;
@@ -1145,7 +1145,7 @@ fn receive_ndp_packet<
     CC: InnerIcmpv6Context<BC>
         + Ipv6DeviceHandler<BC>
         + IpDeviceHandler<Ipv6, BC>
-        + IpDeviceStateContext<Ipv6>
+        + IpDeviceIngressStateContext<Ipv6>
         + NudIpHandler<Ipv6, BC>
         + IpLayerHandler<Ipv6, BC>
         + CounterContext<NdpCounters>,
@@ -1551,7 +1551,7 @@ impl<
             + InnerIcmpContext<Ipv6, BC>
             + Ipv6DeviceHandler<BC>
             + IpDeviceHandler<Ipv6, BC>
-            + IpDeviceStateContext<Ipv6>
+            + IpDeviceIngressStateContext<Ipv6>
             + PmtuHandler<Ipv6, BC>
             + NudIpHandler<Ipv6, BC>
             + IpLayerHandler<Ipv6, BC>
@@ -2860,6 +2860,7 @@ mod tests {
     use packet_formats::utils::NonZeroDuration;
 
     use super::*;
+    use crate::internal::base::IpDeviceEgressStateContext;
     use crate::internal::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx};
     use crate::internal::socket::{
         IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, SendOptions,
@@ -3328,7 +3329,7 @@ mod tests {
         }
     }
 
-    impl IpDeviceStateContext<Ipv6> for FakeIcmpCoreCtx<Ipv6> {
+    impl IpDeviceEgressStateContext<Ipv6> for FakeIcmpCoreCtx<Ipv6> {
         fn with_next_packet_id<O, F: FnOnce(&()) -> O>(&self, cb: F) -> O {
             cb(&())
         }
@@ -3344,7 +3345,9 @@ mod tests {
         fn get_hop_limit(&mut self, _device_id: &Self::DeviceId) -> NonZeroU8 {
             unimplemented!()
         }
+    }
 
+    impl IpDeviceIngressStateContext<Ipv6> for FakeIcmpCoreCtx<Ipv6> {
         fn address_status_for_device(
             &mut self,
             _addr: SpecifiedAddr<Ipv6Addr>,

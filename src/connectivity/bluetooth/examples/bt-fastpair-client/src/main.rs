@@ -57,7 +57,7 @@ async fn main() -> Result<(), Error> {
         .context("failed to connect to `fastpair.Provider` service")?;
     let pairing_svc = connect_to_protocol::<PairingMarker>()
         .context("failed to connect to `sys.Pairing` service")?;
-    let (fastpair_client, fastpair_server) = create_request_stream::<ProviderWatcherMarker>()?;
+    let (fastpair_client, fastpair_server) = create_request_stream::<ProviderWatcherMarker>();
 
     if let Err(e) = fast_pair_svc.enable(fastpair_client).await {
         warn!("Couldn't enable Fast Pair Provider service: {:?}", e);
@@ -65,7 +65,7 @@ async fn main() -> Result<(), Error> {
     }
     info!("Enabled Fast Pair Provider");
 
-    let (pairing_client, pairing_server) = create_request_stream::<PairingDelegateMarker>()?;
+    let (pairing_client, pairing_server) = create_request_stream::<PairingDelegateMarker>();
     if let Err(e) = pairing_svc.set_pairing_delegate(
         InputCapability::None,
         OutputCapability::None,
@@ -101,7 +101,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (pairing_client, pairing_server) =
-            fidl::endpoints::create_proxy_and_stream::<PairingDelegateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PairingDelegateMarker>();
         let pairing_fut = process_pairing_events(pairing_server);
         pin_mut!(pairing_fut);
         exec.run_until_stalled(&mut pairing_fut).expect_pending("server active");
@@ -138,7 +138,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (provider_client, provider_server) =
-            fidl::endpoints::create_proxy_and_stream::<ProviderWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ProviderWatcherMarker>();
         let provider_fut = process_provider_events(provider_server);
         pin_mut!(provider_fut);
         exec.run_until_stalled(&mut provider_fut).expect_pending("server active");

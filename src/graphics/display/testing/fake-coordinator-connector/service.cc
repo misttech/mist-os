@@ -108,8 +108,9 @@ void FakeDisplayCoordinatorConnector::ConnectClient(OpenCoordinatorRequest reque
   state->MarkCoordinatorClaimed(use_virtcon_coordinator);
   std::weak_ptr<State> state_weak_ptr = state;
 
-  ClientPriority client_priority =
-      request.is_virtcon ? ClientPriority::kVirtcon : ClientPriority::kPrimary;
+  display_coordinator::ClientPriority client_priority =
+      request.is_virtcon ? display_coordinator::ClientPriority::kVirtcon
+                         : display_coordinator::ClientPriority::kPrimary;
   zx_status_t status = state->fake_display_stack->coordinator_controller()->CreateClient(
       client_priority, std::move(request.coordinator_request),
       std::move(request.coordinator_listener_client_end),

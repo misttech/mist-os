@@ -184,7 +184,7 @@ mod tests {
 
         let search_id = ServiceClassProfileIdentifier::AudioSink;
         let attrs = vec![0, 1, 2];
-        let (proxy, _server) = create_proxy::<SearchResultsMarker>().unwrap();
+        let (proxy, _server) = create_proxy::<SearchResultsMarker>();
         let handle = search_mgr.add(search_id, attrs, proxy);
         let _ = expected_searches.insert(search_id);
         assert_eq!(expected_searches, search_mgr.get_active_searches());
@@ -203,7 +203,7 @@ mod tests {
 
         let search_id1 = ServiceClassProfileIdentifier::AudioSink;
         let attrs1 = vec![0, 1, 2];
-        let (proxy1, _server1) = create_proxy::<SearchResultsMarker>().unwrap();
+        let (proxy1, _server1) = create_proxy::<SearchResultsMarker>();
         let handle1 = search_mgr.add(search_id1, attrs1, proxy1);
         let _ = expected_searches.insert(search_id1);
         assert_eq!(expected_searches, search_mgr.get_active_searches());
@@ -211,14 +211,14 @@ mod tests {
         // Adding another search for the same ServiceClassID is OK.
         let search_id2 = ServiceClassProfileIdentifier::AudioSink;
         let attrs2 = vec![0, 2];
-        let (proxy2, _server2) = create_proxy::<SearchResultsMarker>().unwrap();
+        let (proxy2, _server2) = create_proxy::<SearchResultsMarker>();
         let handle2 = search_mgr.add(search_id2, attrs2, proxy2);
         assert_eq!(expected_searches, search_mgr.get_active_searches());
 
         // Adding a differing search is OK.
         let search_id3 = ServiceClassProfileIdentifier::AvRemoteControl;
         let attrs3 = vec![];
-        let (proxy3, _server3) = create_proxy::<SearchResultsMarker>().unwrap();
+        let (proxy3, _server3) = create_proxy::<SearchResultsMarker>();
         let handle3 = search_mgr.add(search_id3, attrs3, proxy3);
         let _ = expected_searches.insert(search_id3);
         assert_eq!(expected_searches, search_mgr.get_active_searches());
@@ -244,7 +244,7 @@ mod tests {
 
         let search_id1 = ServiceClassProfileIdentifier::AudioSink;
         let attrs1 = vec![0, 1, 2];
-        let (proxy1, mut server) = create_proxy_and_stream::<SearchResultsMarker>().unwrap();
+        let (proxy1, mut server) = create_proxy_and_stream::<SearchResultsMarker>();
         let _handle1 = search_mgr.add(search_id1, attrs1, proxy1);
 
         let server_fut = server.next();

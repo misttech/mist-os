@@ -42,7 +42,7 @@ class TestForegroundDispatcher : public ::testing::Test {
     EXPECT_EQ(ZX_OK, result.status_value());
 
     device_server_.emplace();
-    device_server_->Init(component::kDefaultInstance);
+    device_server_->Initialize(component::kDefaultInstance);
     EXPECT_EQ(ZX_OK, device_server_->Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                            &test_environment_->incoming_directory()));
 
@@ -118,7 +118,7 @@ class TestForegroundDriverBackgroundEnv : public ::testing::Test {
       outgoing_ptr = &test_env->incoming_directory();
     });
     device_server.SyncCall([outgoing_ptr](compat::DeviceServer* device_server) {
-      device_server->Init(component::kDefaultInstance);
+      device_server->Initialize(component::kDefaultInstance);
       EXPECT_EQ(ZX_OK, device_server->Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                             outgoing_ptr));
     });

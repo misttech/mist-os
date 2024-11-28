@@ -231,6 +231,12 @@ struct UnitDescriptor {
 } __PACKED;
 static_assert(sizeof(UnitDescriptor) == 45, "UnitDescriptor struct must be 45 bytes");
 
+enum LUWriteProtect {
+  kNoWriteProtect = 0x00,
+  kPowerOnWriteProtect = 0x01,
+  kPermanentWriteProtect = 0x02,
+};
+
 // UFS Specification Version 3.1, section 14.1.4.6 "RPMB Unit Descriptor".
 // RpmbUnitDescriptor use big-endian byte ordering.
 struct RpmbUnitDescriptor {

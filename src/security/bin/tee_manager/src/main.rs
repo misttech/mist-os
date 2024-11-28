@@ -158,8 +158,7 @@ mod tests {
     where
         F: Future,
     {
-        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<DeviceConnectorMarker>()
-            .expect("Failed to create DeviceConnector proxy and server.");
+        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<DeviceConnectorMarker>();
 
         fasync::Task::local(async move {
             while let Some(request) = stream.try_next().await.unwrap() {
@@ -174,7 +173,7 @@ mod tests {
     fn get_storage(provider_proxy: &ProviderProxy) -> fio::DirectoryProxy {
         let (client_end, server_end) = endpoints::create_endpoints::<fio::DirectoryMarker>();
         assert!(provider_proxy.request_persistent_storage(server_end).is_ok());
-        client_end.into_proxy().expect("Failed to convert ClientEnd to DirectoryProxy")
+        client_end.into_proxy()
     }
 
     fn is_closed_with_status(error: Error, status: Status) -> bool {
@@ -206,10 +205,7 @@ mod tests {
                     assert!(service_provider.is_some());
                     assert!(!application_request.channel().is_invalid_handle());
 
-                    let provider_proxy = service_provider
-                        .unwrap()
-                        .into_proxy()
-                        .expect("Failed to convert ClientEnd to ProviderProxy");
+                    let provider_proxy = service_provider.unwrap().into_proxy();
 
                     assert_is_valid_storage(&get_storage(&provider_proxy)).await;
 
@@ -233,8 +229,7 @@ mod tests {
 
         let (app_client, app_server) = endpoints::create_endpoints::<ApplicationMarker>();
 
-        let app_proxy =
-            app_client.into_proxy().expect("Failed to convert ClientEnd to DeviceProxy");
+        let app_proxy = app_client.into_proxy();
         sender
             .try_send(IncomingRequest::Application(app_server, app_uuid))
             .expect("Unable to send Application Request");
@@ -273,9 +268,7 @@ mod tests {
         let (device_info_client, device_info_server) =
             endpoints::create_endpoints::<DeviceInfoMarker>();
 
-        let device_info_proxy = device_info_client
-            .into_proxy()
-            .expect("Failed to convert ClientEnd to DeviceInfoProxy");
+        let device_info_proxy = device_info_client.into_proxy();
 
         sender
             .try_send(IncomingRequest::DeviceInfo(device_info_server))
@@ -288,8 +281,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn tee_device_closed() {
         let (dev_connector_proxy, dev_connector_server) =
-            fidl::endpoints::create_proxy::<DeviceConnectorMarker>()
-                .expect("Unable to create DeviceConnectorProxy");
+            fidl::endpoints::create_proxy::<DeviceConnectorMarker>();
         let (_sender, receiver) = mpsc::channel::<IncomingRequest>(1);
 
         dev_connector_server

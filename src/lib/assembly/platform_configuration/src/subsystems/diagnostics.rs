@@ -9,7 +9,8 @@ use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueTyp
 use assembly_config_schema::platform_config::diagnostics_config::{
     ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, PipelineType, Severity,
 };
-use assembly_util::{read_config, BootfsPackageDestination, FileEntry, PackageSetDestination};
+use assembly_constants::{BootfsPackageDestination, FileEntry, PackageSetDestination};
+use assembly_util::read_config;
 use sampler_config::ComponentIdInfoList;
 use std::collections::BTreeSet;
 
@@ -53,8 +54,9 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             "fuchsia.component.PersistenceBinder",
             "fuchsia.component.SamplerBinder",
         ]);
-        let mut num_threads = 4;
+        // fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader default:
         let mut maximum_concurrent_snapshots_per_reader = 4;
+        // fuchsia.diagnostics.LogsMaxCachedOriginalBytes default:
         let mut logs_max_cached_original_bytes = 4194304;
 
         match (context.build_type, context.feature_set_level) {
@@ -76,7 +78,6 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         match archivist {
             Some(ArchivistConfig::Default) | None => {}
             Some(ArchivistConfig::LowMem) => {
-                num_threads = 2;
                 logs_max_cached_original_bytes = 2097152;
                 maximum_concurrent_snapshots_per_reader = 2;
             }
@@ -107,10 +108,6 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         builder.set_config_capability(
             "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
             Config::new(ConfigValueType::Uint64, maximum_concurrent_snapshots_per_reader.into()),
-        )?;
-        builder.set_config_capability(
-            "fuchsia.diagnostics.NumThreads",
-            Config::new(ConfigValueType::Uint64, num_threads.into()),
         )?;
         builder.set_config_capability(
             "fuchsia.diagnostics.AllowSerialLogs",
@@ -170,10 +167,9 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                 insert_disabled(pipelines, name)?;
             } else {
                 for file in files {
-                    let filename = file.file_name().ok_or(anyhow!(
-                        "Failed to get filename for archivist pipeline: {}",
-                        &file
-                    ))?;
+                    let filename = file.file_name().ok_or_else(|| {
+                        anyhow!("Failed to get filename for archivist pipeline: {}", &file)
+                    })?;
                     pipelines.entry(FileEntry {
                         source: file.clone(),
                         destination: format!("{name}/{filename}"),
@@ -211,9 +207,9 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         }
 
         for metrics_config in &sampler.metrics_configs {
-            let filename = metrics_config
-                .file_name()
-                .ok_or(anyhow!("Failed to get filename for metrics config: {}", &metrics_config))?;
+            let filename = metrics_config.file_name().ok_or_else(|| {
+                anyhow!("Failed to get filename for metrics config: {}", &metrics_config)
+            })?;
             builder
                 .package("sampler")
                 .config_data(FileEntry {
@@ -226,9 +222,9 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             // Ensure that the fire_config is the correct format.
             let _ = read_config::<ComponentIdInfoList>(&fire_config)
                 .with_context(|| format!("Parsing fire config: {}", &fire_config))?;
-            let filename = fire_config
-                .file_name()
-                .ok_or(anyhow!("Failed to get filename for fire config: {}", &fire_config))?;
+            let filename = fire_config.file_name().ok_or_else(|| {
+                anyhow!("Failed to get filename for fire config: {}", &fire_config)
+            })?;
             builder
                 .package("sampler")
                 .config_data(FileEntry {
@@ -335,10 +331,6 @@ mod tests {
             Value::Number(Number::from(4))
         );
         assert_eq!(
-            config.configuration_capabilities["fuchsia.diagnostics.NumThreads"].value(),
-            Value::Number(Number::from(4))
-        );
-        assert_eq!(
             config.configuration_capabilities["fuchsia.diagnostics.AllowSerialLogs"].value(),
             Value::Array(ALLOWED_SERIAL_LOG_COMPONENTS.iter().cloned().map(Into::into).collect())
         );
@@ -402,10 +394,6 @@ mod tests {
         let config = builder.build();
 
         assert_eq!(
-            config.configuration_capabilities["fuchsia.diagnostics.NumThreads"].value(),
-            Value::Number(Number::from(2))
-        );
-        assert_eq!(
             config.configuration_capabilities["fuchsia.diagnostics.LogsMaxCachedOriginalBytes"]
                 .value(),
             Value::Number(Number::from(2097152))
@@ -442,10 +430,6 @@ mod tests {
         .unwrap();
         let config = builder.build();
 
-        assert_eq!(
-            config.configuration_capabilities["fuchsia.diagnostics.NumThreads"].value(),
-            Value::Number(Number::from(4))
-        );
         assert_eq!(
             config.configuration_capabilities["fuchsia.diagnostics.BindServices"].value(),
             Value::Array(Vec::new())

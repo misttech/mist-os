@@ -94,6 +94,6 @@ impl BlobFixture for TestFixture {
             .expect("failed to connect to the BlobCreator service");
         let blob_writer =
             blob_proxy.create(hash, allow_existing).await.expect("transport error on create")?;
-        Ok(blob_writer.into_proxy().expect("into_proxy failed"))
+        Ok(blob_writer.into_proxy())
     }
 }

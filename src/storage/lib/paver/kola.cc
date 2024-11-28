@@ -39,11 +39,22 @@ zx::result<std::unique_ptr<DevicePartitioner>> KolaPartitioner::Initialize(
   if (gpt.is_error()) {
     return gpt.take_error();
   }
+  if (gpt->initialize_partition_tables) {
+    LOG("Found GPT but it was missing expected partitions.  The device should be re-initialized "
+        "via fastboot.\n");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
 
   auto partitioner = WrapUnique(new KolaPartitioner(std::move(gpt->gpt)));
 
   LOG("Successfully initialized Kola Device Partitioner\n");
   return zx::ok(std::move(partitioner));
+}
+
+const paver::BlockDevices& KolaPartitioner::Devices() const { return gpt_->devices(); }
+
+fidl::UnownedClientEnd<fuchsia_io::Directory> KolaPartitioner::SvcRoot() const {
+  return gpt_->svc_root();
 }
 
 bool KolaPartitioner::SupportsPartition(const PartitionSpec& spec) const {
@@ -165,8 +176,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> KolaPartitionerFactory::New(
 
 class KolaAbrClient : public abr::Client {
  public:
-  static zx::result<std::unique_ptr<abr::Client>> Create(
-      std::unique_ptr<KolaPartitioner> partitioner) {
+  static zx::result<std::unique_ptr<abr::Client>> Create(const KolaPartitioner* partitioner) {
     zx::result<FindPartitionDetailsResult> zircon_a =
         partitioner->FindPartitionDetails(PartitionSpec(Partition::kZirconA));
     if (zircon_a.is_error()) {
@@ -181,15 +191,15 @@ class KolaAbrClient : public abr::Client {
       return zircon_b.take_error();
     }
 
-    return zx::ok(new KolaAbrClient(std::move(partitioner), std::move(zircon_a.value()),
-                                    std::move(zircon_b.value())));
+    return zx::ok(
+        new KolaAbrClient(partitioner, std::move(zircon_a.value()), std::move(zircon_b.value())));
   }
 
  private:
-  KolaAbrClient(std::unique_ptr<KolaPartitioner> partitioner, FindPartitionDetailsResult zircon_a,
+  KolaAbrClient(const KolaPartitioner* partitioner, FindPartitionDetailsResult zircon_a,
                 FindPartitionDetailsResult zircon_b)
       : Client(/*custom=*/true),
-        partitioner_(std::move(partitioner)),
+        partitioner_(partitioner),
         zircon_a_(std::move(zircon_a)),
         zircon_b_(std::move(zircon_b)) {}
 
@@ -388,23 +398,13 @@ class KolaAbrClient : public abr::Client {
 
   zx::result<> Flush() override { return zx::make_result(partitioner_->GetGpt()->Sync()); }
 
-  std::unique_ptr<KolaPartitioner> partitioner_;
+  const KolaPartitioner* partitioner_;
   FindPartitionDetailsResult zircon_a_;
   FindPartitionDetailsResult zircon_b_;
 };
 
-zx::result<std::unique_ptr<abr::Client>> KolaAbrClientFactory::New(
-    const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-    std::shared_ptr<paver::Context> context) {
-  auto partitioner = KolaPartitioner::Initialize(devices, svc_root, {});
-
-  if (partitioner.is_error()) {
-    ERROR("Failed to initialize Kola partitioner: %s\n", partitioner.status_string());
-    return partitioner.take_error();
-  }
-
-  auto* ptr = static_cast<KolaPartitioner*>(partitioner.value().release());
-  return KolaAbrClient::Create(WrapUnique(ptr));
+zx::result<std::unique_ptr<abr::Client>> KolaPartitioner::CreateAbrClient() const {
+  return KolaAbrClient::Create(this);
 }
 
 }  // namespace paver

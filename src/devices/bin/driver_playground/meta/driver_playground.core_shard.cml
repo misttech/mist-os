@@ -25,10 +25,11 @@
             to: "#driver_playground",
         },
         {
-            directory: "dev-topological",
+            directory: "dev-class",
             from: "parent",
+            as: "dev-class-wlan-factory",
             to: "#driver_playground",
-            rights: [ "r*" ],
+            subdir: "wlan-factory",
         },
     ],
     expose: [

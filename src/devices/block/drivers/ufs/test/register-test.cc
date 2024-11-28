@@ -44,10 +44,10 @@ TEST_F(RegisterTest, InterruptStatus) {
       .ReadFrom(&dut_->GetMmio())
       .set_reg_value(0xffffffff)
       .WriteTo(&dut_->GetMmio());
-  EXPECT_EQ(InterruptStatusReg::Get().ReadFrom(&dut_->GetMmio()).reg_value(), 0);
+  EXPECT_EQ(InterruptStatusReg::Get().ReadFrom(&dut_->GetMmio()).reg_value(), 0U);
 
   // Send UIC command to set |uic_command_completion_status|
-  DmeLinkStartUpUicCommand link_startup_command(**dut_);
+  DmeLinkStartUpUicCommand link_startup_command(*dut_);
   EXPECT_TRUE(link_startup_command.SendCommand().is_ok());
 
   // InterruptStatus is cleared by SendUicCommand().
@@ -99,7 +99,7 @@ TEST_F(RegisterTest, InterruptStatus) {
   ASSERT_OK(dut_->WaitWithTimeout(wait_for, kTimeoutUs, timeout_message));
 
   // Verify that the ISR has processed all interruptStatus
-  EXPECT_EQ(InterruptStatusReg::Get().ReadFrom(&dut_->GetMmio()).reg_value(), 0);
+  EXPECT_EQ(InterruptStatusReg::Get().ReadFrom(&dut_->GetMmio()).reg_value(), 0U);
 }
 
 TEST_F(RegisterTest, InterruptEnable) {
@@ -146,9 +146,10 @@ TEST_F(RegisterTest, InterruptEnable) {
 
 TEST_F(RegisterTest, HostControllerStatus) {
   // Read only register
-  EXPECT_EQ(HostControllerStatusReg::Get().ReadFrom(&dut_->GetMmio()).target_lun_of_utp_error(), 0);
-  EXPECT_EQ(HostControllerStatusReg::Get().ReadFrom(&dut_->GetMmio()).task_tag_of_utp_error(), 0);
-  EXPECT_EQ(HostControllerStatusReg::Get().ReadFrom(&dut_->GetMmio()).utp_error_code(), 0);
+  EXPECT_EQ(HostControllerStatusReg::Get().ReadFrom(&dut_->GetMmio()).target_lun_of_utp_error(),
+            0U);
+  EXPECT_EQ(HostControllerStatusReg::Get().ReadFrom(&dut_->GetMmio()).task_tag_of_utp_error(), 0U);
+  EXPECT_EQ(HostControllerStatusReg::Get().ReadFrom(&dut_->GetMmio()).utp_error_code(), 0U);
   EXPECT_EQ(HostControllerStatusReg::Get()
                 .ReadFrom(&dut_->GetMmio())
                 .uic_power_mode_change_request_status(),

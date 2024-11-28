@@ -160,13 +160,14 @@ impl InterfaceIdentifier {
             Self::Id(id) => Ok(*id),
             Self::Name(name) => {
                 let interfaces_state = crate::connect_with_context(connector).await?;
-                let stream = finterfaces_ext::event_stream_from_state(
-                    &interfaces_state,
-                    finterfaces_ext::IncludedAddresses::OnlyAssigned,
+                let stream = finterfaces_ext::event_stream_from_state::<
+                    finterfaces_ext::AllInterest,
+                >(
+                    &interfaces_state, finterfaces_ext::IncludedAddresses::OnlyAssigned
                 )?;
                 let response = finterfaces_ext::existing(
                     stream,
-                    HashMap::<NonZeroU64, finterfaces_ext::PropertiesAndState<()>>::new(),
+                    HashMap::<NonZeroU64, finterfaces_ext::PropertiesAndState<(), _>>::new(),
                 )
                 .await?;
                 response

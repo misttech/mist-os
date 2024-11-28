@@ -8,7 +8,7 @@ use assembly_config_schema::developer_overrides::{
     DeveloperOnlyOptions, FeedbackBuildTypeConfig, ForensicsOptions,
 };
 use assembly_config_schema::platform_config::forensics_config::ForensicsConfig;
-use assembly_util::FileEntry;
+use assembly_constants::FileEntry;
 
 pub(crate) struct ForensicsSubsystem;
 impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {

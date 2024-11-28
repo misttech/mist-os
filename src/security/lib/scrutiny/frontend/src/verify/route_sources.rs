@@ -169,7 +169,7 @@ impl Matches<Vec<RouteSegment>> for SourceDeclSpec {
                     let source_path = &decl.source_path.as_ref().unwrap();
                     let subdirs = get_subdirs(other);
                     let source_path_str = subdirs.iter().fold(source_path.to_path_buf(), |path_buf, next| {
-                            let mut next_buf = path_buf.clone();
+                            let mut next_buf = path_buf;
                             next_buf.push(next.to_path_buf());
                             next_buf
                         }).to_str().ok_or_else(|| anyhow!("Failed to format PathBuf as string; components; {:?} appended with {:?}", decl.source_path, subdirs))?.to_string();

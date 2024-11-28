@@ -6,9 +6,7 @@ use anyhow::Result;
 use async_utils::hanging_get::server::HangingGet;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
-use fidl_fuchsia_power_system::{
-    self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, WakeHandlingLevel,
-};
+use fidl_fuchsia_power_system::{self as fsystem, ApplicationActivityLevel, ExecutionStateLevel};
 use fuchsia_component::client as fclient;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
@@ -32,12 +30,8 @@ type StateHangingGet =
     HangingGet<fctrl::SystemActivityGovernorState, fctrl::StateWatchResponder, NotifyFn>;
 
 async fn lease(controller: &PowerElementContext, level: u8) -> Result<fbroker::LeaseControlProxy> {
-    let lease_control = controller
-        .lessor
-        .lease(level)
-        .await?
-        .map_err(|e| anyhow::anyhow!("{e:?}"))?
-        .into_proxy()?;
+    let lease_control =
+        controller.lessor.lease(level).await?.map_err(|e| anyhow::anyhow!("{e:?}"))?.into_proxy();
 
     let mut lease_status = LeaseStatus::Unknown;
     while lease_status != LeaseStatus::Satisfied {
@@ -110,7 +104,7 @@ impl SystemActivityGovernorControl {
             .unwrap()
             .unwrap()
             .into_iter()
-            .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+            .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy()))
             .collect();
 
         let es_status = status_endpoints.remove("execution_state").unwrap();
@@ -125,16 +119,9 @@ impl SystemActivityGovernorControl {
         )
         .unwrap();
 
-        let wh_status = status_endpoints.remove("wake_handling").unwrap();
-        let initial_wake_handling_level = WakeHandlingLevel::from_primitive(
-            wh_status.watch_power_level().await.unwrap().unwrap(),
-        )
-        .unwrap();
-
         let state = fctrl::SystemActivityGovernorState {
             execution_state_level: Some(initial_execution_state_level),
             application_activity_level: Some(initial_application_activity_level),
-            wake_handling_level: Some(initial_wake_handling_level),
             ..Default::default()
         };
         let current_state = Rc::new(Mutex::new(state.clone()));
@@ -199,24 +186,6 @@ impl SystemActivityGovernorControl {
         })
         .detach();
 
-        let publisher = state_publisher.clone();
-        let current_state_clone = current_state.clone();
-        let required_state_clone = required_state.clone();
-        fasync::Task::local(async move {
-            loop {
-                let new_status = WakeHandlingLevel::from_primitive(
-                    wh_status.watch_power_level().await.unwrap().unwrap(),
-                )
-                .unwrap();
-                current_state_clone.lock().await.wake_handling_level.replace(new_status);
-                let state = current_state_clone.lock().await.clone();
-                if state == *required_state_clone.lock().await {
-                    publisher.set(state);
-                }
-            }
-        })
-        .detach();
-
         Rc::new(Self {
             application_activity_controller: application_activity_controller.into(),
             hanging_get: RefCell::new(hanging_get),
@@ -230,7 +199,7 @@ impl SystemActivityGovernorControl {
     }
 
     pub async fn run(self: Rc<Self>, fs: &mut ServiceFs<ServiceObjLocal<'_, ()>>) {
-        let this = self.clone();
+        let this = self;
         fs.dir("svc")
             .add_fidl_service(move |mut stream: fctrl::StateRequestStream| {
                 let this = this.clone();
@@ -291,15 +260,17 @@ impl SystemActivityGovernorControl {
         self: &Rc<Self>,
         sag_state: fctrl::SystemActivityGovernorState,
     ) -> fctrl::StateSetResult {
-        let required_execution_state_level = sag_state
-            .execution_state_level
-            .unwrap_or(self.current_state.lock().await.execution_state_level.unwrap());
-        let required_application_activity_level = sag_state
-            .application_activity_level
-            .unwrap_or(self.current_state.lock().await.application_activity_level.unwrap());
-        let required_wake_handling_level = sag_state
-            .wake_handling_level
-            .unwrap_or(self.current_state.lock().await.wake_handling_level.unwrap());
+        let required_execution_state_level = if let Some(r) = sag_state.execution_state_level {
+            r
+        } else {
+            self.current_state.lock().await.execution_state_level.unwrap()
+        };
+        let required_application_activity_level =
+            if let Some(r) = sag_state.application_activity_level {
+                r
+            } else {
+                self.current_state.lock().await.application_activity_level.unwrap()
+            };
         self.required_state
             .lock()
             .await
@@ -310,13 +281,11 @@ impl SystemActivityGovernorControl {
             .await
             .application_activity_level
             .replace(required_application_activity_level);
-        self.required_state.lock().await.wake_handling_level.replace(required_wake_handling_level);
 
         match required_execution_state_level {
             ExecutionStateLevel::Inactive => {
                 if *self.boot_complete.lock().await == false
                     || required_application_activity_level != ApplicationActivityLevel::Inactive
-                    || required_wake_handling_level != WakeHandlingLevel::Inactive
                 {
                     return Err(fctrl::SetSystemActivityGovernorStateError::NotSupported);
                 }
@@ -331,7 +300,6 @@ impl SystemActivityGovernorControl {
             ExecutionStateLevel::Suspending => {
                 if *self.boot_complete.lock().await == false
                     || required_application_activity_level != ApplicationActivityLevel::Inactive
-                        && required_wake_handling_level == WakeHandlingLevel::Inactive
                 {
                     return Err(fctrl::SetSystemActivityGovernorStateError::NotSupported);
                 }

@@ -28,11 +28,6 @@ group("vkcube-skip-present") {
   public_deps = [ "//third_party/Vulkan-Tools/cube:vkcube-skip-present" ]
 }
 
-group("vkcube-on-wayland") {
-  testonly = true
-  public_deps = [ "//third_party/Vulkan-Tools/cube:cube-wayland" ]
-}
-
 group("vkproto") {
   testonly = true
   public_deps = [ "vkproto" ]

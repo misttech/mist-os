@@ -90,11 +90,13 @@ async fn get_folder_items_with_attrs<'a>(
                 let mut attributes = vec![];
                 for a in attrs {
                     let raw_attr = a.parse::<u32>()?;
-                    attributes.push(MediaAttributeId::from_primitive(raw_attr).ok_or(
-                        format_err!(
+                    attributes.push(MediaAttributeId::from_primitive(raw_attr).ok_or_else(
+                        || {
+                            format_err!(
                             "Invalid MediaAttributeId value: {:?}. Valid value range is [1 - 8]",
                             raw_attr,
-                        ),
+                        )
+                        },
                     )?);
                 }
                 AttributeRequestOption::AttributeList(attributes)
@@ -429,7 +431,7 @@ async fn handle_cmd<'a>(
             Ok(Cmd::IsConnected) => {
                 is_connected(args, &test_controller, &test_browse_controller).await
             }
-            Ok(Cmd::Help) => Ok(Cmd::help_msg().to_string()),
+            Ok(Cmd::Help) => Ok(Cmd::help_msg()),
             Ok(Cmd::Exit) | Ok(Cmd::Quit) => return Ok(ReplControl::Break),
             Err(_) => Ok(format!("\"{}\" is not a valid command", raw_cmd)),
         }?;
@@ -613,13 +615,10 @@ async fn main() -> Result<(), Error> {
 
     // setup repl
 
-    let controller = c_client.into_proxy().expect("error obtaining controller client proxy");
-    let test_controller =
-        t_client.into_proxy().expect("error obtaining test controller client proxy");
-    let browse_controller =
-        bc_client.into_proxy().expect("error obtaining browse controller client proxy");
-    let test_browse_controller =
-        tb_client.into_proxy().expect("error obtaining test browse controller client proxy");
+    let controller = c_client.into_proxy();
+    let test_controller = t_client.into_proxy();
+    let browse_controller = bc_client.into_proxy();
+    let test_browse_controller = tb_client.into_proxy();
 
     let evt_stream = controller.clone().take_event_stream();
 
@@ -761,7 +760,7 @@ mod tests {
     /// Tests a set_volume command with no input args does not result in error.
     /// Instead, a help message should be returned.
     async fn test_set_volume_no_args() {
-        let (proxy, _stream) = create_proxy::<ControllerMarker>().expect("Creation should work");
+        let (proxy, _stream) = create_proxy::<ControllerMarker>();
         let args = [];
 
         let res = set_volume(&args, &proxy).await;

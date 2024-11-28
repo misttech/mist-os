@@ -164,7 +164,7 @@ impl FactoryResetHandler {
             while let Some(request_result) = stream.next().await {
                 let watcher = request_result?
                     .into_watch()
-                    .ok_or(anyhow!("Failed to get FactoryResetCoundown Watcher"))?;
+                    .ok_or_else(|| anyhow!("Failed to get FactoryResetCoundown Watcher"))?;
                 subscriber.register(watcher)?;
             }
 
@@ -471,8 +471,7 @@ mod tests {
         reset_handler: Rc<FactoryResetHandler>,
     ) -> FactoryResetCountdownProxy {
         let (countdown_proxy, countdown_stream) =
-            create_proxy_and_stream::<FactoryResetCountdownMarker>()
-                .expect("Failed to create countdown proxy");
+            create_proxy_and_stream::<FactoryResetCountdownMarker>();
 
         let stream_fut =
             reset_handler.clone().handle_factory_reset_countdown_request_stream(countdown_stream);
@@ -488,8 +487,7 @@ mod tests {
     }
 
     fn create_recovery_policy_proxy(reset_handler: Rc<FactoryResetHandler>) -> DeviceProxy {
-        let (device_proxy, device_stream) = create_proxy_and_stream::<DeviceMarker>()
-            .expect("Failed to create recovery policy device proxy");
+        let (device_proxy, device_stream) = create_proxy_and_stream::<DeviceMarker>();
 
         Task::local(async move {
             if reset_handler

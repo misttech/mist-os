@@ -97,13 +97,6 @@
             availability: "optional",
         },
         {
-            protocol: "fuchsia.ui.composition.Screenshot",
-            from: "#ui",
-            to: "#feedback",
-            dependency: "weak",
-            source_availability: "unknown",
-        },
-        {
             protocol: "fuchsia.feedback.CrashReporter",
             from: "#feedback",
             to: "#exceptions",

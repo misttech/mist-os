@@ -20,7 +20,7 @@ template <typename WlanSoftmacServer,
 class CustomEnvironment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) final {
-    device_server_.Init(component::kDefaultInstance, "root");
+    device_server_.Initialize(component::kDefaultInstance);
     ZX_ASSERT(ZX_OK == device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                             &to_driver_vfs));
 

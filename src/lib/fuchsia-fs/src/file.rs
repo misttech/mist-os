@@ -86,7 +86,7 @@ mod fuchsia {
     /// filesystem server doesn't exist, this will still return success. Instead, the returned
     /// FileProxy channel pair will be closed with an epitaph.
     pub fn open_in_namespace(path: &str, flags: fio::Flags) -> Result<fio::FileProxy, OpenError> {
-        let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
+        let (node, request) = fidl::endpoints::create_proxy();
         open_channel_in_namespace(path, flags, request)?;
         Ok(node)
     }
@@ -207,8 +207,9 @@ mod fuchsia {
                     actual: Kind::kind_of2(&representation),
                 }),
             },
-            #[cfg(fuchsia_api_level_at_least = "24")]
-            fio::FileEvent::_UnknownEvent { .. } => Ok(None),
+            fio::FileEvent::_UnknownEvent { ordinal, .. } => {
+                Err(OpenError::UnknownEvent { ordinal })
+            }
         }
     }
 
@@ -770,13 +771,14 @@ mod tests {
     }
 
     fn serve_file(file: Arc<VmoFile>, flags: fio::OpenFlags) -> fio::FileProxy {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
         flags.to_object_request(server_end).handle(|object_request| {
             vfs::file::serve(file, ExecutionScope::new(), &flags, object_request)
         });
         proxy
     }
 
+    // TODO(https://fxbug.dev/324111518): Transition this to fuchsia.io/Flags instead of OpenFlags.
     #[fasync::run_singlethreaded(test)]
     async fn read_file_with_on_open_event_with_stream() {
         let data = b"file-contents".repeat(1000);

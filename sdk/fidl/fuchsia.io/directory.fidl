@@ -134,17 +134,14 @@ const INHERITED_WRITE_PERMISSIONS Operations
         = Operations.WRITE_BYTES | Operations.ENUMERATE | Operations.MODIFY_DIRECTORY | Operations.UPDATE_ATTRIBUTES;
 
 /// Set of permissions that are expected when opening a node as readable.
-@available(added=HEAD)
 const PERM_READABLE Flags
         = Flags.PERM_CONNECT | Flags.PERM_ENUMERATE | Flags.PERM_TRAVERSE | Flags.PERM_READ | Flags.PERM_GET_ATTRIBUTES;
 
 /// Set of permissions that are expected when opening a node as writable.
-@available(added=HEAD)
 const PERM_WRITABLE Flags
         = Flags.PERM_CONNECT | Flags.PERM_ENUMERATE | Flags.PERM_TRAVERSE | Flags.PERM_WRITE | Flags.PERM_MODIFY | Flags.PERM_SET_ATTRIBUTES;
 
 /// Set of permissions that are expected when opening a node as executable.
-@available(added=HEAD)
 const PERM_EXECUTABLE Flags
         = Flags.PERM_CONNECT | Flags.PERM_ENUMERATE | Flags.PERM_TRAVERSE | Flags.PERM_EXECUTE;
 
@@ -336,7 +333,7 @@ type WatchMask = strict bits : uint32 {
 
 /// Directory defines a node which is capable of containing other Objects.
 @discoverable
-closed(removed=24) open(added=24) protocol Directory {
+open protocol Directory {
     compose AdvisoryLocking;
     compose Node;
 
@@ -370,41 +367,6 @@ closed(removed=24) open(added=24) protocol Directory {
         path string:MAX_PATH_LENGTH;
 
         object server_end:Node;
-    });
-
-    /// Opens or creates a new node relative to this directory node.
-    ///
-    /// This method requires the following rights on the current connection:
-    ///
-    /// * [`Rights.ENUMERATE`]
-    /// * [`Rights.TRAVERSE`]
-    ///
-    /// Errors are presented as an epitaph on the `object_request` channel.
-    ///
-    /// * error `ZX_ERR_ACCESS_DENIED` if the requested rights exceeds what is allowed.
-    /// * error `ZX_ERR_BAD_PATH` if `path` is invalid.
-    @available(removed=23)
-    @selector("fuchsia.io/Directory.Open")
-    strict Open2(resource struct {
-        /// Identifies the node to open.
-        ///
-        /// If it contains multiple segments, then the directory is traversed one segment at a time,
-        /// relative to the directory represented by this connection.
-        path Path;
-
-        /// The representations accepted by the caller to support a form of protocol negotiation on
-        /// the node being opened.
-        protocols @generated_name("ConnectionProtocols") flexible union {
-            /// Requests that the node's underlying protocol be served on the connection.
-            1: connector @generated_name("ConnectorFlags") flexible bits : uint64 {};
-
-            /// Requests that the underlying [`Node`] protocol be served on the connection.
-            2: node NodeOptions;
-        };
-
-        /// The server end of a channel created for the new connection. The caller may proceed to
-        /// send messages on the corresponding client end right away.
-        object_request zx.Handle:CHANNEL;
     });
 
     /// Open (or create) a node relative to this directory. Any errors are communicated via an

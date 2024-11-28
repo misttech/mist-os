@@ -105,6 +105,7 @@ impl ZbiExtractController {
                             // Clone paths out of `reader` to avoid simultaneous immutable borrow
                             // from `reader.blob_paths()` and mutable borrow from
                             // `reader.read_blob()`.
+                            #[allow(clippy::needless_collect)] // collecting avoids lifetime issues
                             let blob_paths: Vec<PathBuf> =
                                 reader.blob_paths().map(PathBuf::clone).collect();
                             for blob_path in blob_paths.into_iter() {

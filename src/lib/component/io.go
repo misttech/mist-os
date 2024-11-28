@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//go:build !build_with_native_toolchain
-
 // This library implements a *very basic* fuchsia.io implementation for directories, files, and
 // services. Most functionality is not available, nor does this library enforce any kind of
 // connection rights. However, nodes are read-only from a client perspective (e.g. writing to files
@@ -398,11 +396,6 @@ func (dirState *directoryState) Open(ctx fidl.Context, flags io.OpenFlags, mode 
 	}
 
 	return respondDeprecated(flags, req, &zx.Error{Status: zx.ErrNotFound}, dirState)
-}
-
-func (dirState *directoryState) Open2(ctx fidl.Context, path string, protocols io.ConnectionProtocols, channel zx.Channel) error {
-	// TODO(https://fxbug.dev/348698584): Remove.
-	return CloseWithEpitaph(channel, zx.ErrNotSupported)
 }
 
 func (dirState *directoryState) Open3(ctx fidl.Context, path string, flags io.Flags, options io.Options, channel zx.Channel) error {

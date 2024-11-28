@@ -28,7 +28,7 @@ impl<T> PairingRequests<T> {
         self.inner
             .inner_mut()
             .entry(host)
-            .or_insert(Box::pin(FuturesUnordered::new()))
+            .or_insert_with(|| Box::pin(FuturesUnordered::new()))
             .push(request.tagged(peer))
     }
     /// Remove all pending requests for a given host, returning the PeerIds of those requests

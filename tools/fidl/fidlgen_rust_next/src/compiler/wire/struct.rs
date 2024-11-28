@@ -4,21 +4,21 @@
 
 use std::io::{Error, Write};
 
-use crate::compiler::util::emit_doc_string;
+use crate::compiler::util::{emit_doc_string, IdExt as _};
 use crate::compiler::wire::{emit_type, emit_type_check};
 use crate::compiler::Compiler;
-use crate::ir::CompIdent;
+use crate::ir::CompId;
 
 pub fn emit_struct<W: Write>(
     compiler: &mut Compiler<'_>,
     out: &mut W,
-    ident: &CompIdent,
+    ident: &CompId,
 ) -> Result<(), Error> {
     let s = &compiler.schema.struct_declarations[ident];
 
     let is_static = s.shape.max_out_of_line == 0;
 
-    let name = s.name.type_name();
+    let name = s.name.decl_name().camel();
     let params = if is_static { "" } else { "<'buf>" };
 
     // Write wire struct
@@ -39,9 +39,9 @@ pub fn emit_struct<W: Write>(
     )?;
 
     for member in &s.members {
-        let name = &member.name;
+        let member_name = member.name.snake();
 
-        write!(out, "pub {name}: ")?;
+        write!(out, "pub {member_name}: ")?;
         emit_type(compiler, out, &member.ty)?;
         writeln!(out, ",")?;
     }
@@ -83,20 +83,22 @@ pub fn emit_struct<W: Write>(
     writeln!(out, "            let Self {{")?;
 
     for member in &s.members {
-        let name = &member.name;
-        writeln!(out, "                mut {name},")?;
+        let member_name = member.name.snake();
+        writeln!(out, "                mut {member_name},")?;
     }
 
     writeln!(out, "            }} = slot;")?;
     writeln!(out, "        }}")?;
 
     for member in &s.members {
-        let name = &member.name;
-        write!(out, "::fidl_next::Decode::decode({name}.as_mut(), decoder)?;")?;
+        let member_name = member.name.snake();
+        write!(out, "::fidl_next::Decode::decode({member_name}.as_mut(), decoder)?;")?;
         emit_type_check(
             out,
-            |out| writeln!(out, "let {name} = unsafe {{ {name}.deref_unchecked() }};"),
-            name,
+            |out| {
+                writeln!(out, "let {member_name} = unsafe {{ {member_name}.deref_unchecked() }};")
+            },
+            &member_name,
             &member.ty,
         )?;
     }

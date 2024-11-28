@@ -160,7 +160,7 @@ async fn test_disconnecting_keyboard_client_disconnects_listener_with_connection
 
     // Create fake client.
     let (listener_client_end, mut listener) =
-        fidl::endpoints::create_request_stream::<ui_input3::KeyboardListenerMarker>()?;
+        fidl::endpoints::create_request_stream::<ui_input3::KeyboardListenerMarker>();
     let view_ref = scenic::ViewRefPair::new()?.view_ref;
 
     keyboard_service_client
@@ -170,7 +170,7 @@ async fn test_disconnecting_keyboard_client_disconnects_listener_with_connection
 
     // Create another fake client.
     let (other_listener_client_end, mut other_listener) =
-        fidl::endpoints::create_request_stream::<ui_input3::KeyboardListenerMarker>()?;
+        fidl::endpoints::create_request_stream::<ui_input3::KeyboardListenerMarker>();
     let other_view_ref = scenic::ViewRefPair::new()?.view_ref;
 
     keyboard_service_other_client
@@ -246,7 +246,7 @@ async fn test_sync_cancel_with_connections(
 ) -> Result<()> {
     // Create fake client.
     let (listener_client_end_a, mut listener_a) =
-        fidl::endpoints::create_request_stream::<ui_input3::KeyboardListenerMarker>()?;
+        fidl::endpoints::create_request_stream::<ui_input3::KeyboardListenerMarker>();
     let view_ref_a = scenic::ViewRefPair::new()?.view_ref;
 
     keyboard_service_client_a
@@ -256,7 +256,7 @@ async fn test_sync_cancel_with_connections(
 
     // Create another fake client.
     let (listener_client_end_b, mut listener_b) =
-        fidl::endpoints::create_request_stream::<ui_input3::KeyboardListenerMarker>()?;
+        fidl::endpoints::create_request_stream::<ui_input3::KeyboardListenerMarker>();
     let view_ref_b = scenic::ViewRefPair::new()?.view_ref;
 
     keyboard_service_client_b
@@ -370,12 +370,8 @@ impl TestHandles {
         let _test_env = TestEnvironment::new().await?;
 
         // Create fake client.
-        let (listener_client_end, listener_stream) = create_request_stream::<
-            ui_input3::KeyboardListenerMarker,
-        >()
-        .with_context(|| {
-            format!("create_request_stream for {}", ui_input3::KeyboardListenerMarker::DEBUG_NAME)
-        })?;
+        let (listener_client_end, listener_stream) =
+            create_request_stream::<ui_input3::KeyboardListenerMarker>();
         let _view_ref = scenic::ViewRefPair::new()?.view_ref;
 
         let _keyboard_service: ui_input3::KeyboardProxy =

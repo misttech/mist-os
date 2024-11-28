@@ -295,7 +295,7 @@ func Parse(fname string, r io.Reader) (*NinjaLog, error) {
 	}
 	lineno++
 	line := scanner.Text()
-	if line != "# ninja log v5" && line != "# ninja log v6" {
+	if line != "# ninja log v5" && line != "# ninja log v6" && line != "# ninja log v7" {
 		return nil, fmt.Errorf("unexpected format: %s", line)
 	}
 	nlog.Start = lineno

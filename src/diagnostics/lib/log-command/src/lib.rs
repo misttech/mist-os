@@ -574,7 +574,7 @@ mod test {
 
     #[fuchsia::test]
     async fn maybe_set_interest_errors_if_ambiguous_selector() {
-        let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
+        let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>();
         let getter = FakeInstanceGetter {
             expected_selector: Some("ambiguous_selector".into()),
             output: vec![
@@ -597,7 +597,7 @@ mod test {
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
-            let request = settings_server.into_stream().unwrap().next().await;
+            let request = settings_server.into_stream().next().await;
             // The channel should be closed without sending any requests.
             assert_matches!(request, None);
         }));
@@ -635,13 +635,13 @@ ffx log --force-set-severity.
             output: vec![Moniker::try_from("core/some/ambiguous_selector").unwrap()],
         };
         let mut scheduler = FuturesUnordered::new();
-        let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
+        let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>();
         scheduler.push(Either::Left(async {
             set_interest_result = Some(cmd.maybe_set_interest(&settings_proxy, &getter).await);
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
-            let request = settings_server.into_stream().unwrap().next().await;
+            let request = settings_server.into_stream().next().await;
             let (selectors, responder) = assert_matches!(
                 request,
                 Some(Ok(LogSettingsRequest::SetInterest { selectors, responder })) =>
@@ -675,13 +675,13 @@ ffx log --force-set-severity.
         };
         let mut set_interest_result = None;
         let mut scheduler = FuturesUnordered::new();
-        let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
+        let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>();
         scheduler.push(Either::Left(async {
             set_interest_result = Some(cmd.maybe_set_interest(&settings_proxy, &getter).await);
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
-            let request = settings_server.into_stream().unwrap().next().await;
+            let request = settings_server.into_stream().next().await;
             let (selectors, responder) = assert_matches!(
                 request,
                 Some(Ok(LogSettingsRequest::SetInterest { selectors, responder })) =>
@@ -715,13 +715,13 @@ ffx log --force-set-severity.
         };
         let mut set_interest_result = None;
         let mut scheduler = FuturesUnordered::new();
-        let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
+        let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>();
         scheduler.push(Either::Left(async {
             set_interest_result = Some(cmd.maybe_set_interest(&settings_proxy, &getter).await);
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
-            let request = settings_server.into_stream().unwrap().next().await;
+            let request = settings_server.into_stream().next().await;
             let (selectors, responder) = assert_matches!(
                 request,
                 Some(Ok(LogSettingsRequest::SetInterest { selectors, responder })) =>

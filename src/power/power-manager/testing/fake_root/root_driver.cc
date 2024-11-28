@@ -9,6 +9,7 @@
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/powermanager_bindlib/cpp/bind.h>
 
 namespace {
@@ -78,7 +79,7 @@ class RootDriver : public fdf::DriverBase,
                      .class_name("test");
 
     auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
-    properties[0] = fdf::MakeProperty(arena, 1 /* BIND_PROTOCOL */,
+    properties[0] = fdf::MakeProperty(arena, bind_fuchsia::PROTOCOL,
                                       bind_fuchsia_powermanager_driver::BIND_PROTOCOL_PLATFORM);
 
     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
@@ -102,7 +103,7 @@ class RootDriver : public fdf::DriverBase,
     // TODO(b/313922891): This is a temporary solution for a test to add a driver without disrupting
     // other tests.
     auto temp_properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
-    temp_properties[0] = fdf::MakeProperty(arena, 1 /* BIND_PROTOCOL */,
+    temp_properties[0] = fdf::MakeProperty(arena, bind_fuchsia::PROTOCOL,
                                            bind_fuchsia_powermanager_driver::BIND_PROTOCOL_TEMP);
 
     auto temp_args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)

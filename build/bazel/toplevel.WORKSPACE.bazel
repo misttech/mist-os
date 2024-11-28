@@ -182,12 +182,12 @@ go_wrap_sdk(
 go_rules_dependencies()
 go_register_toolchains()
 
-# Create @fuchsia_workspace
+# Create @rules_fuchsia
 # NOTE: The following repository is only valid for bootstraping other
 # repositories (eg: cipd, clang, fuchsia sdk).
 # Once @fuchsia_sdk is initialized, it should be used whenever possible.
 local_repository(
-    name = "fuchsia_workspace",
+    name = "rules_fuchsia",
     path = "build/bazel_sdk/bazel_rules_fuchsia",
 )
 
@@ -277,7 +277,7 @@ fuchsia_idk_repository(
 
 # buildifier: disable=load-on-top
 load(
-    "@fuchsia_workspace//fuchsia:deps.bzl",
+    "@rules_fuchsia//fuchsia:deps.bzl",
     "fuchsia_sdk_repository",
     "rules_fuchsia_deps",
 )
@@ -320,7 +320,7 @@ load("@fuchsia_build_info//:args.bzl", "clang_prefix")
 
 # buildifier: disable=load-on-top
 load(
-    "@fuchsia_workspace//fuchsia:clang.bzl",
+    "@rules_fuchsia//fuchsia:clang.bzl",
     "fuchsia_clang_repository",
 )
 

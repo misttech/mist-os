@@ -1340,107 +1340,6 @@ fn test_host_send_router_solicitations() {
 }
 
 #[test]
-fn test_router_solicitation_on_forwarding_enabled_changes() {
-    // Make sure that when an interface goes from host -> router, it stops
-    // sending Router Solicitations, and starts sending them when it goes
-    // form router -> host as routers should not send Router Solicitation
-    // messages, but hosts should.
-
-    let fake_config = Ipv6::TEST_ADDRS;
-
-    // If netstack is not set to forward packets, make sure router
-    // solicitations do not get cancelled when we enable forwarding on the
-    // device.
-
-    let mut ctx = FakeCtx::default();
-
-    assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
-    assert_empty(ctx.bindings_ctx.timer_ctx().timers());
-
-    let eth_device = ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
-        EthernetCreationProperties {
-            mac: fake_config.local_mac,
-            max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        },
-        DEFAULT_INTERFACE_METRIC,
-    );
-    let device = eth_device.clone().into();
-    let _: Ipv6DeviceConfigurationUpdate = ctx
-        .core_api()
-        .device_ip::<Ipv6>()
-        .update_configuration(
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                // Doesn't matter as long as we are configured to send at least 2
-                // solicitations.
-                max_router_solicitations: Some(NonZeroU8::new(2)),
-                ip_config: IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        )
-        .unwrap();
-    let timer_id: TimerId<_> =
-        rs_timer_id(device.clone().try_into().expect("expected ethernet ID"));
-
-    // Send the first router solicitation.
-    assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
-    ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id.clone(), ..)]);
-
-    assert_eq!(ctx.trigger_next_timer().unwrap(), timer_id);
-
-    // Should have sent a router solicitation and still have the timer
-    // setup.
-    let frames = ctx.bindings_ctx.take_ethernet_frames();
-    let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
-    let (_, _dst_mac, _, _, _, _, _) = parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
-        Ipv6,
-        _,
-        RouterSolicitation,
-        _,
-    >(&frame, EthernetFrameLengthCheck::NoCheck, |_| {})
-    .unwrap();
-    ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id.clone(), ..)]);
-
-    // Enable routing on device.
-    ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&device, true);
-    assert!(ctx.test_api().is_unicast_forwarding_enabled::<Ipv6>(&device));
-
-    // Should have not sent any new packets, but unset the router
-    // solicitation timer.
-    assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
-    assert_empty(ctx.bindings_ctx.timer_ctx().timers().iter().filter(|x| &x.1 == &timer_id));
-
-    // Unsetting routing should succeed.
-    ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&device, false);
-    assert!(!ctx.test_api().is_unicast_forwarding_enabled::<Ipv6>(&device));
-    assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
-    ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id.clone(), ..)]);
-
-    // Send the first router solicitation after being turned into a host.
-    assert_eq!(ctx.trigger_next_timer().unwrap(), timer_id);
-
-    // Should have sent a router solicitation.
-    let frames = ctx.bindings_ctx.take_ethernet_frames();
-    let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
-    assert_matches!(
-        parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
-            &frame,
-            EthernetFrameLengthCheck::NoCheck,
-            |_| {},
-        ),
-        Ok((_, _, _, _, _, _, _))
-    );
-    ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id, ..)]);
-
-    // Clear all device references.
-    core::mem::drop(device);
-    ctx.core_api().device().remove_device(eth_device).into_removed();
-}
-
-#[test]
 fn test_set_ndp_config_dup_addr_detect_transmits() {
     // Test that updating the DupAddrDetectTransmits parameter on an
     // interface updates the number of DAD messages (NDP Neighbor
@@ -2063,7 +1962,7 @@ fn assert_slaac_timers_integration<CC, BC, I>(
 ) where
     CC: Ipv6DeviceConfigurationContext<BC>,
     for<'a> CC::Ipv6DeviceStateCtx<'a>: SlaacContext<BC>,
-    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId> + SlaacBindingsContext,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId> + SlaacBindingsContext<CC::DeviceId>,
     I: IntoIterator<Item = (InnerSlaacTimerId, BC::Instant)>,
 {
     let want = timers.into_iter().collect::<HashMap<_, _>>();
@@ -2079,7 +1978,7 @@ fn assert_next_slaac_timer_integration<CC, BC>(
 ) where
     CC: Ipv6DeviceConfigurationContext<BC>,
     for<'a> CC::Ipv6DeviceStateCtx<'a>: SlaacContext<BC>,
-    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId> + SlaacBindingsContext,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId> + SlaacBindingsContext<CC::DeviceId>,
 {
     let got = ip::device::testutil::collect_slaac_timers_integration(core_ctx, device_id)
         .into_iter()

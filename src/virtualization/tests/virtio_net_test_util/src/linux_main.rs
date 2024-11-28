@@ -37,7 +37,7 @@ fn get_interface(mac_address: String) -> std::io::Result<String> {
             return entry
                 .file_name()
                 .into_string()
-                .or(Err(Error::new(ErrorKind::Other, "Failed to read device name")));
+                .map_err(|_| Error::new(ErrorKind::Other, "Failed to read device name"));
         }
     }
     Err(Error::new(ErrorKind::NotFound, "Could not find interface"))

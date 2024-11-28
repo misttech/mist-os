@@ -69,8 +69,7 @@ mod tests {
         dir.add_service_at("A", FidlService::from(InputDeviceRequestStream::InputDeviceA));
 
         // Create a directory proxy to access the input devices.
-        let (dev, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .context("Failed to create FIDL proxy")?;
+        let (dev, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         service_fs.serve_connection(server_end).context("Failed to serve connection")?;
 
         // Run the command and mock input device servers.
@@ -102,7 +101,7 @@ mod tests {
         input_reports: Vec<fir::InputReport>,
         reader: ServerEnd<fir::InputReportsReaderMarker>,
     ) -> Result<()> {
-        let reader = reader.into_stream().context("Failed to convert reader into a stream")?;
+        let reader = reader.into_stream();
         Task::spawn(async move {
             if let Err(e) = reader
                 .map(|result| result.context("Failed input report reader request"))

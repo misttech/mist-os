@@ -204,8 +204,7 @@ mod tests {
     #[fuchsia::test]
     async fn fails_if_all_devices_not_found() {
         let (proxy, _requests) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .expect("endpoints");
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
 
         let setup_result = DaiAudioControl::setup(vec![], proxy.clone()).await;
         assert!(matches!(setup_result, Err(AudioError::DiscoveryFailed)));
@@ -229,8 +228,7 @@ mod tests {
     #[fuchsia::test]
     async fn starts_dai() {
         let (proxy, audio_requests) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .expect("endpoints");
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
 
         let (send, mut new_client_recv) = mpsc::channel(1);
         let _audio_req_task = fasync::Task::spawn(handle_audio_requests(audio_requests, send));
@@ -275,8 +273,7 @@ mod tests {
     #[fuchsia::test]
     async fn stop_dai() {
         let (proxy, audio_requests) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .expect("endpoints");
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
 
         let (send, mut new_client_recv) = mpsc::channel(1);
         let _audio_req_task = fasync::Task::spawn(handle_audio_requests(audio_requests, send));
@@ -352,7 +349,7 @@ mod tests {
                 valid_bits_per_sample: pcm_formats.valid_bits_per_sample.as_ref().unwrap()[0],
                 frame_rate: pcm_formats.frame_rates.as_ref().unwrap()[0],
             });
-            let (proxy, server_end) = fidl::endpoints::create_proxy()?;
+            let (proxy, server_end) = fidl::endpoints::create_proxy();
             self.client.create_ring_buffer(
                 &audio::Format { pcm_format, ..Default::default() },
                 server_end,
@@ -376,7 +373,7 @@ mod tests {
                     let dev = TestAudioClient {
                         _name: device_name.to_owned(),
                         is_input,
-                        client: channel.into_proxy().unwrap(),
+                        client: channel.into_proxy(),
                     };
                     if let Err(e) = stream_proxies.feed(dev).await {
                         panic!("Couldn't send new device: {:?}", e);

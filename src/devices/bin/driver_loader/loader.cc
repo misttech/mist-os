@@ -25,12 +25,11 @@ namespace {
 
 zx::result<zx::vmo> GetStubLdVmo() {
   constexpr char kPath[] = "/pkg/lib/ld-stub.so";
-  const fio::wire::OpenFlags kFlags = fio::wire::OpenFlags::kNotDirectory |
-                                      fio::wire::OpenFlags::kRightReadable |
-                                      fio::wire::OpenFlags::kRightExecutable;
+  const fio::wire::Flags kFlags =
+      fio::wire::Flags::kProtocolFile | fio::wire::kPermReadable | fio::wire::kPermExecutable;
   fbl::unique_fd fd;
   zx_status_t status =
-      fdio_open_fd(kPath, static_cast<uint32_t>(kFlags), fd.reset_and_get_address());
+      fdio_open3_fd(kPath, static_cast<uint64_t>(kFlags), fd.reset_and_get_address());
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -193,10 +192,10 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
 zx::result<zx::vmo> Loader::GetDepVmo(fidl::UnownedClientEnd<fuchsia_io::Directory> lib_dir,
                                       const char* libname) {
   auto [client_end, server_end] = fidl::Endpoints<fio::File>::Create();
-  zx_status_t status = fdio_open_at(
-      lib_dir.channel()->get(), libname,
-      static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightExecutable),
-      server_end.TakeChannel().release());
+  zx_status_t status =
+      fdio_open3_at(lib_dir.channel()->get(), libname,
+                    static_cast<uint64_t>(fio::wire::kPermReadable | fio::wire::kPermExecutable),
+                    server_end.TakeChannel().release());
   if (status != ZX_OK) {
     return zx::error(status);
   }

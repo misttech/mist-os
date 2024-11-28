@@ -348,8 +348,7 @@ async fn starts_device_in_multicast_promiscuous<N: Netstack>(name: &str) {
     let device_control = netstack_testing_common::devices::install_device(&realm, netdevice);
     let port_id = dev_port.get_info().await.expect("get info").id.expect("missing port id");
     let (control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
     device_control
         .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
         .expect("create interface");
@@ -406,8 +405,7 @@ async fn device_minimum_tx_frame_size<N: Netstack>(
     let device_control = netstack_testing_common::devices::install_device(&realm, netdevice);
     let port_id = dev_port.get_info().await.expect("get info").id.expect("missing port id");
     let (control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
     device_control
         .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
         .expect("create interface");
@@ -511,8 +509,7 @@ async fn tx_queue_drops<N: Netstack>(name: &str) {
     let device_control = netstack_testing_common::devices::install_device(&realm, netdevice);
     let port_id = dev_port.get_info().await.expect("get info").id.expect("missing port id");
     let (control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
     device_control
         .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
         .expect("create interface");

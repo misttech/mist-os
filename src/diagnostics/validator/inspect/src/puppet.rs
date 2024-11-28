@@ -152,7 +152,7 @@ impl Connection {
             validate::InitializationParams { vmo_size: Some(VMO_SIZE), ..Default::default() };
         let response = fidl.initialize_tree(&params).await;
         if let Ok((Some(tree_client_end), validate::TestResult::Ok)) = response {
-            tree_client_end.into_proxy().ok()
+            Some(tree_client_end.into_proxy())
         } else {
             None
         }
@@ -232,7 +232,7 @@ pub(crate) mod tests {
     // will hold forever). Trying to create a uint property will return Unimplemented.
     // Other actions will give various kinds of incorrect results.
     pub(crate) async fn local_incomplete_puppet() -> Result<Puppet, Error> {
-        let (client_end, server_end) = create_proxy().unwrap();
+        let (client_end, server_end) = create_proxy();
         spawn_local_puppet(server_end).await;
         Puppet::connect_local(client_end).await
     }

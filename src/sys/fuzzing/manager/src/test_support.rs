@@ -100,8 +100,7 @@ impl TestRealm {
 }
 
 pub fn connect_to_manager(test_realm: Rc<RefCell<TestRealm>>) -> Result<fuzz::ManagerProxy> {
-    let (manager_proxy, manager_stream) = create_proxy_and_stream::<fuzz::ManagerMarker>()
-        .context("failed to create Manager endpoints")?;
+    let (manager_proxy, manager_stream) = create_proxy_and_stream::<fuzz::ManagerMarker>();
     test_realm.borrow_mut().manager_streams.push(manager_stream);
     Ok(manager_proxy)
 }
@@ -117,8 +116,7 @@ pub async fn read_async(socket: &zx::Socket) -> Result<String> {
 
 pub async fn serve_test_realm(test_realm: Rc<RefCell<TestRealm>>) -> Result<()> {
     // Create a fake registry that serves requests from the fuzz-manager.
-    let (registry_proxy, registry_stream) = create_proxy_and_stream::<fuzz::RegistryMarker>()
-        .context("failed to create Registry endpoints")?;
+    let (registry_proxy, registry_stream) = create_proxy_and_stream::<fuzz::RegistryMarker>();
     let registry_fut = serve_registry(registry_stream, Rc::clone(&test_realm)).fuse();
 
     // Create a fake test_manager that serves requests from the fuzz-manager.
@@ -235,7 +233,7 @@ impl FakeTestManager {
         let receiver = self.receiver.borrow_mut().take().unwrap();
         receiver
             .for_each_concurrent(MAX_CONCURRENT, |server_end| async {
-                let stream = server_end.into_stream().expect("failed to create stream");
+                let stream = server_end.into_stream();
                 serve_run_builder(stream, Rc::clone(&test_realm))
                     .await
                     .expect("failed to serve run builder");
@@ -258,7 +256,7 @@ impl FakeRunBuilderEndpoint {
 
 impl FidlEndpoint<RunBuilderMarker> for FakeRunBuilderEndpoint {
     fn create_proxy(&self) -> Result<RunBuilderProxy> {
-        let (proxy, server_end) = create_proxy::<RunBuilderMarker>()?;
+        let (proxy, server_end) = create_proxy::<RunBuilderMarker>();
         self.sender.unbounded_send(server_end)?;
         Ok(proxy)
     }
@@ -282,8 +280,7 @@ async fn serve_run_builder(
             controller,
             control_handle: _,
         })) => {
-            let suite_stream =
-                controller.into_stream().context("invalid suite controller stream")?;
+            let suite_stream = controller.into_stream();
             (test_url, suite_stream)
         }
         _ => unreachable!(),
@@ -291,7 +288,7 @@ async fn serve_run_builder(
 
     let run_stream = match stream.next().await {
         Some(Ok(RunBuilderRequest::Build { controller, control_handle: _ })) => {
-            let run_stream = controller.into_stream().context("invalid run controller stream")?;
+            let run_stream = controller.into_stream();
             run_stream
         }
         _ => unreachable!(),
@@ -303,8 +300,7 @@ async fn serve_run_builder(
         None => {
             fuzzers.launch(&url);
             let (batch_client, batch_stream) =
-                create_request_stream::<fdiagnostics::BatchIteratorMarker>()
-                    .context("failed to create fuchsia.diagnostics.BatchIterator stream")?;
+                create_request_stream::<fdiagnostics::BatchIteratorMarker>();
             let (syslog_sender, syslog_receiver) = mpsc::unbounded::<String>();
             (Some(batch_client), Some(batch_stream), Some(syslog_sender), Some(syslog_receiver))
         }

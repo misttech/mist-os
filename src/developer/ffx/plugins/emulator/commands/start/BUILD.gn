@@ -40,6 +40,7 @@ if (is_host) {
     ]
     test_deps = [
       "//build/sdk/meta:rust",
+      "//src/developer/ffx/lib/writer:lib",
       "//src/lib/assembly/assembly_manifest",
       "//src/lib/assembly/partitions_config",
       "//src/lib/fuchsia",

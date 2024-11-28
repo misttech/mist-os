@@ -70,7 +70,7 @@ async fn get_hosts(state: &Mutex<State>) -> Result<String, Error> {
             addresses_to_custom_string(&host.addresses, "\n"),
             host.active.to_string(),
             format!("{:?}", host.technology),
-            host.local_name.clone().unwrap_or("(unknown)".to_string()),
+            host.local_name.clone().unwrap_or_else(|| "(unknown)".to_string()),
             host.discoverable.to_string(),
             host.discovering.to_string(),
         ]);
@@ -223,7 +223,7 @@ async fn set_discovery(
         return Ok(String::new());
     }
 
-    let (token, token_server) = fidl::endpoints::create_proxy()?;
+    let (token, token_server) = fidl::endpoints::create_proxy();
     match access_svc.start_discovery(token_server).await? {
         Ok(_) => {
             state.lock().discovery_token = Some(token);
@@ -394,7 +394,7 @@ fn create_pairing_task(
     pairing_svc: &PairingProxy,
 ) -> Result<(fasync::Task<()>, mpsc::Receiver<(PeerId, bool)>), Error> {
     let (pairing_delegate_client, delegate_stream) =
-        fidl::endpoints::create_request_stream::<PairingDelegateMarker>()?;
+        fidl::endpoints::create_request_stream::<PairingDelegateMarker>();
     let (sender, recv) = mpsc::channel(0);
     let pairing_delegate_server = pairing_delegate::handle_requests(delegate_stream, sender);
 
@@ -471,7 +471,7 @@ async fn set_discoverable(
         if state.lock().discoverable_token.is_some() {
             return Ok(String::new());
         }
-        let (token, token_server) = fidl::endpoints::create_proxy()?;
+        let (token, token_server) = fidl::endpoints::create_proxy();
         match access_svc.make_discoverable(token_server).await? {
             Ok(_) => {
                 state.lock().discoverable_token = Some(token);

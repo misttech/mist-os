@@ -1,0 +1,10 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+using fuchsia.hardware.platform.bus;
+using fuchsia.platform;
+
+fuchsia.hardware.platform.bus.Service == fuchsia.hardware.platform.bus.Service.DriverTransport;
+fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.CROSVM;
+fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.CROSVM;

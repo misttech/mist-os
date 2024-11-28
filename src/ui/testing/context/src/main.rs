@@ -59,7 +59,7 @@ async fn run_realm_factory_server(stream: ui_test_context::RealmFactoryRequestSt
                         assemble_puppet_realm(payload.display_rotation, payload.device_pixel_ratio)
                             .await;
 
-                    let request_stream = realm_server.into_stream().expect("into stream");
+                    let request_stream = realm_server.into_stream();
                     task_group.spawn(async move {
                         realm_proxy::service::serve(realm, request_stream)
                             .await

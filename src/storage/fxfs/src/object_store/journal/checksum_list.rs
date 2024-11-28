@@ -5,7 +5,7 @@
 use crate::checksum::{fletcher64, Checksum};
 use crate::errors::FxfsError;
 use crate::range::RangeExt;
-use anyhow::{ensure, Error};
+use anyhow::{anyhow, ensure, Error};
 use std::collections::BTreeMap;
 use std::ops::Range;
 use storage_device::Device;
@@ -114,7 +114,8 @@ impl ChecksumList {
             ensure!(
                 (entry.device_range.end - entry.device_range.start) / entry.checksums.len() as u64
                     == chunk_size,
-                FxfsError::Inconsistent
+                anyhow!(FxfsError::Inconsistent)
+                    .context("Wrong number of checksums for device range"),
             );
 
             let overlap = std::cmp::max(device_range.start, entry.device_range.start)

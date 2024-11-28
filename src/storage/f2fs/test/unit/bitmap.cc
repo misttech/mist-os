@@ -16,7 +16,6 @@ class BitmapTest : public F2fsFakeDevTestFixture {
  public:
   BitmapTest()
       : F2fsFakeDevTestFixture(TestOptions{
-            .block_count = 100 * 1024 * 1024 / kDefaultSectorSize,
             .mount_options = {{MountOption::kInlineDentry, 1}},
         }) {}
 

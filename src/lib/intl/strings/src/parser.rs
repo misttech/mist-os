@@ -237,7 +237,7 @@ impl Instance {
             XmlEvent::StartElement { ref name, .. } => {
                 // Needs a better way to compare namespace and element.
                 let ns = name.namespace.clone();
-                if name.local_name != "g" && ns.unwrap_or("".to_string()) != "xliff" {
+                if name.local_name != "g" && ns.unwrap_or_else(|| "".to_string()) != "xliff" {
                     return Err(anyhow!("unexpected StartElement({:?})", &e));
                 }
                 // xliff:g is starting
@@ -246,7 +246,7 @@ impl Instance {
             XmlEvent::Characters(chars) => {
                 // There are probably more ways in which we can get characters, like cdata
                 // and such.
-                self.state = State::String { name: token_name, text: text.to_owned() + &chars };
+                self.state = State::String { name: token_name, text: text + &chars };
             }
             XmlEvent::EndElement { ref name, .. } => {
                 if name.local_name != "string" {
@@ -282,11 +282,11 @@ impl Instance {
             XmlEvent::Characters(chars) => {
                 // There are probably more ways in which we can get characters, like cdata
                 // and such.
-                self.state = State::XliffG { name: token_name, text: text.to_owned() + &chars };
+                self.state = State::XliffG { name: token_name, text: text + &chars };
             }
             XmlEvent::EndElement { ref name, .. } => {
                 let ns = name.namespace.clone();
-                if name.local_name != "g" && ns.unwrap_or("".to_string()) != "xliff" {
+                if name.local_name != "g" && ns.unwrap_or_else(|| "".to_string()) != "xliff" {
                     return Err(anyhow!("expected EndElement(xliff:g), got: {:?}", &e));
                 }
                 self.state = State::String { name: token_name, text };

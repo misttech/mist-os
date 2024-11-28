@@ -100,7 +100,7 @@ mod test {
 
         let digger = Digger(move || {
             let (proxy, server) =
-                fidl::endpoints::create_proxy_and_stream::<fnet_name::LookupMarker>()?;
+                fidl::endpoints::create_proxy_and_stream::<fnet_name::LookupMarker>();
             *stream_ref.lock().unwrap() = Some(server);
             Ok(proxy)
         });
@@ -135,7 +135,7 @@ mod test {
 
         let digger = Digger(move || {
             let (proxy, server) =
-                fidl::endpoints::create_proxy_and_stream::<fnet_name::LookupMarker>()?;
+                fidl::endpoints::create_proxy_and_stream::<fnet_name::LookupMarker>();
             *stream_ref.lock().unwrap() = Some(server);
             Ok(proxy)
         });
@@ -166,7 +166,7 @@ mod test {
 
         let digger = Digger(move || {
             let (proxy, server) =
-                fidl::endpoints::create_proxy_and_stream::<fnet_name::LookupMarker>()?;
+                fidl::endpoints::create_proxy_and_stream::<fnet_name::LookupMarker>();
             *stream_ref.lock().unwrap() = Some(server);
             Ok(proxy)
         });
@@ -189,7 +189,7 @@ mod test {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
 
         let digger = Digger(move || {
-            let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<fnet_name::LookupMarker>()?;
+            let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<fnet_name::LookupMarker>();
             Ok(proxy)
         });
         let dns_lookup_fut = digger.dig("", DNS_DOMAIN);

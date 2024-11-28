@@ -4,7 +4,7 @@
 #ifndef SRC_STORAGE_LIB_RAMDEVICE_CLIENT_CPP_INCLUDE_RAMDEVICE_CLIENT_TEST_RAMNANDCTL_H_
 #define SRC_STORAGE_LIB_RAMDEVICE_CLIENT_CPP_INCLUDE_RAMDEVICE_CLIENT_TEST_RAMNANDCTL_H_
 
-#include <lib/driver-integration-test/fixture.h>
+#include <fbl/unique_fd.h>
 
 #include "src/storage/lib/ramdevice_client/cpp/include/ramdevice-client/ramnand.h"
 
@@ -12,11 +12,8 @@ namespace ramdevice_client_test {
 
 class RamNandCtl {
  public:
-  // Creates an isolated devmgr and spawns a ram_nand_ctl device in it.
-  static zx_status_t Create(std::unique_ptr<RamNandCtl>* out);
-
-  static zx_status_t CreateWithRamNand(fuchsia_hardware_nand::wire::RamNandInfo config,
-                                       std::optional<ramdevice_client::RamNand>* out);
+  // Creates a ram_nand_ctl device in the given devfs instance.
+  static zx_status_t Create(fbl::unique_fd devfs_root, std::unique_ptr<RamNandCtl>* out);
 
   zx_status_t CreateRamNand(fuchsia_hardware_nand::wire::RamNandInfo config,
                             std::optional<ramdevice_client::RamNand>* out) const;
@@ -25,14 +22,13 @@ class RamNandCtl {
 
   const fidl::ClientEnd<fuchsia_hardware_nand::RamNandCtl>& ctl() const { return ctl_; }
 
-  const fbl::unique_fd& devfs_root() const { return devmgr_.devfs_root(); }
+  const fbl::unique_fd& devfs_root() const { return devfs_root_; }
 
  private:
-  RamNandCtl(driver_integration_test::IsolatedDevmgr devmgr,
-             fidl::ClientEnd<fuchsia_hardware_nand::RamNandCtl> ctl)
-      : devmgr_(std::move(devmgr)), ctl_(std::move(ctl)) {}
+  RamNandCtl(fbl::unique_fd devfs_root, fidl::ClientEnd<fuchsia_hardware_nand::RamNandCtl> ctl)
+      : devfs_root_(std::move(devfs_root)), ctl_(std::move(ctl)) {}
 
-  driver_integration_test::IsolatedDevmgr devmgr_;
+  fbl::unique_fd devfs_root_;
   const fidl::ClientEnd<fuchsia_hardware_nand::RamNandCtl> ctl_;
 };
 

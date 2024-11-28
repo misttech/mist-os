@@ -125,7 +125,7 @@ class BasicWlanSoftmacServer : public UnimplementedWlanSoftmacServer {
         .hardware_capability(0);
 
     fuchsia_wlan_softmac::WlanSoftmacBandCapability band_capability;
-    band_capability.band(fuchsia_wlan_common::WlanBand::kTwoGhz)
+    band_capability.band(fuchsia_wlan_ieee80211::WlanBand::kTwoGhz)
         .basic_rates(std::vector<uint8_t>{1})
         .operating_channels(std::vector<uint8_t>{1});
     response.band_caps(

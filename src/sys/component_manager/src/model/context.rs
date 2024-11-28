@@ -135,7 +135,7 @@ impl ModelContext {
             .await
             .get(&moniker)
             .cloned()
-            .unwrap_or(HashMap::new())
+            .unwrap_or_else(HashMap::new)
     }
 
     /// Removes the configuration overrides for the component identified by

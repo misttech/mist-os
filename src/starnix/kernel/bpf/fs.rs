@@ -5,7 +5,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use crate::bpf::map::Map;
+use crate::bpf::map::{Map, PinnedMap};
 use crate::bpf::program::Program;
 use crate::bpf::syscalls::BpfTypeFormat;
 use crate::mm::memory::MemoryObject;
@@ -35,12 +35,16 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub enum BpfHandle {
     Program(Arc<Program>),
-    Map(Arc<Map>),
+
+    // Stub used to fake loading of programs of unknown types.
+    ProgramStub(u32),
+
+    Map(PinnedMap),
     BpfTypeFormat(Arc<BpfTypeFormat>),
 }
 
 impl BpfHandle {
-    pub fn as_map(&self) -> Result<&Arc<Map>, Errno> {
+    pub fn as_map(&self) -> Result<&PinnedMap, Errno> {
         match self {
             Self::Map(ref map) => Ok(map),
             _ => error!(EINVAL),
@@ -62,7 +66,7 @@ impl From<Program> for BpfHandle {
 
 impl From<Map> for BpfHandle {
     fn from(map: Map) -> Self {
-        Self::Map(Arc::new(map))
+        Self::Map(Arc::pin(map))
     }
 }
 

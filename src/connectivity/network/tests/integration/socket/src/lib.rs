@@ -305,7 +305,6 @@ enum UdpCacheInvalidationReason {
     InterfaceDisabled,
     AddressRemoved,
     SetConfigurationCalled,
-    SetInterfaceIpForwardingDeprecatedCalled,
     RouteRemoved,
     RouteAdded,
 }
@@ -364,7 +363,7 @@ async fn setup_fastudp_network<'a>(
             .expect("create datagram socket");
         match datagram_socket {
             fposix_socket::ProviderDatagramSocketResponse::DatagramSocket(socket) => {
-                socket.into_proxy().expect("failed to create proxy")
+                socket.into_proxy()
             }
             socket => panic!("unexpected datagram socket variant: {:?}", socket),
         }
@@ -461,7 +460,6 @@ trait UdpSendMsgPreflightTestIpExt: Ip {
     const REACHABLE_ADDR2: fnet::SocketAddress;
     const UNREACHABLE_ADDR: fnet::SocketAddress;
     const OTHER_SUBNET: fnet::Subnet;
-    const FIDL_IP_VERSION: fnet::IpVersion;
 
     fn forwarding_config() -> fnet_interfaces_admin::Configuration;
 }
@@ -486,7 +484,6 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv4 {
             port: Self::PORT,
         });
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("203.0.113.0/24");
-    const FIDL_IP_VERSION: fnet::IpVersion = fnet::IpVersion::V4;
 
     fn forwarding_config() -> fnet_interfaces_admin::Configuration {
         fnet_interfaces_admin::Configuration {
@@ -522,7 +519,6 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv6 {
             zone_index: 0,
         });
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("2001:db8:eeee:eeee::/64");
-    const FIDL_IP_VERSION: fnet::IpVersion = fnet::IpVersion::V6;
 
     fn forwarding_config() -> fnet_interfaces_admin::Configuration {
         fnet_interfaces_admin::Configuration {
@@ -619,10 +615,6 @@ fn assert_preflights_invalidated(
 #[test_case("Control.Disable", UdpCacheInvalidationReason::InterfaceDisabled)]
 #[test_case("Control.RemoveAddress", UdpCacheInvalidationReason::AddressRemoved)]
 #[test_case("Control.SetConfiguration", UdpCacheInvalidationReason::SetConfigurationCalled)]
-#[test_case(
-    "Stack.SetInterfaceIpForwardingDeprecated",
-    UdpCacheInvalidationReason::SetInterfaceIpForwardingDeprecatedCalled
-)]
 #[test_case("route_removed", UdpCacheInvalidationReason::RouteRemoved)]
 #[test_case("route_added", UdpCacheInvalidationReason::RouteAdded)]
 async fn udp_send_msg_preflight_fidl<N: Netstack, I: UdpSendMsgPreflightTestIpExt>(
@@ -682,15 +674,6 @@ async fn udp_send_msg_preflight_fidl<N: Netstack, I: UdpSendMsgPreflightTestIpEx
                 .await
                 .expect("set_configuration fidl error")
                 .expect("failed to set interface configuration");
-        }
-        UdpCacheInvalidationReason::SetInterfaceIpForwardingDeprecatedCalled => {
-            let () = iface
-                .connect_stack()
-                .expect("connect stack")
-                .set_interface_ip_forwarding_deprecated(iface.id(), I::FIDL_IP_VERSION, true)
-                .await
-                .expect("set_interface_ip_forwarding_deprecated fidl error")
-                .expect("failed to set IP forwarding on interface");
         }
     }
 
@@ -862,9 +845,9 @@ async fn udp_send_msg_preflight_fidl_ndp<N: Netstack>(
 
             // Wait until a default IPv6 route is added in response to the RA.
             let mut interface_state =
-                fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id());
+                fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id());
             fnet_interfaces_ext::wait_interface_with_id(
-                iface.get_interface_event_stream().expect("get interface event stream"),
+                realm.get_interface_event_stream().expect("get interface event stream"),
                 &mut interface_state,
                 |iface| iface.properties.has_default_ipv6_route.then_some(()),
             )
@@ -921,9 +904,9 @@ async fn udp_send_msg_preflight_fidl_ndp<N: Netstack>(
 
             // Wait until the default IPv6 route is removed.
             let mut interface_state =
-                fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id());
+                fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id());
             fnet_interfaces_ext::wait_interface_with_id(
-                iface.get_interface_event_stream().expect("get interface event stream"),
+                realm.get_interface_event_stream().expect("get interface event stream"),
                 &mut interface_state,
                 |iface| (!iface.properties.has_default_ipv6_route).then_some(()),
             )
@@ -1061,12 +1044,12 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation<N: Netstack>(name: &st
 
     // Wait for an address to be auto generated.
     let autogen_address = fnet_interfaces_ext::wait_interface_with_id(
-        fnet_interfaces_ext::event_stream_from_state(
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
             &interfaces_state,
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("create event stream"),
-        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             iface.properties.addresses.iter().find_map(
                 |fnet_interfaces_ext::Address {
@@ -1105,12 +1088,12 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation<N: Netstack>(name: &st
 
     // Wait for the address to be invalidated and removed.
     fnet_interfaces_ext::wait_interface_with_id(
-        fnet_interfaces_ext::event_stream_from_state(
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
             &interfaces_state,
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("create event stream"),
-        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             (!iface.properties.addresses.iter().any(
                 |fnet_interfaces_ext::Address {
@@ -1166,8 +1149,7 @@ async fn udp_send_msg_preflight_dad_failure<N: Netstack>(name: &str) {
     let fake_ep = net.create_fake_endpoint().expect("create fake endpoint");
 
     let (address_state_provider, server) =
-        fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
     // Create the state stream before adding the address to ensure that all
     // generated events are observed.
     let state_stream = fnet_interfaces_ext::admin::assignment_state_stream(address_state_provider);
@@ -1372,7 +1354,7 @@ async fn udp_recv_msg_postflight_fidl<N: Netstack>(
         socket => panic!("unexpected datagram socket variant: {:?}", socket),
     };
 
-    let proxy = datagram_socket.into_proxy().expect("failed to create proxy");
+    let proxy = datagram_socket.into_proxy();
 
     // Expect no cmsgs requested by default.
     let response = proxy
@@ -2010,8 +1992,7 @@ async fn install_ip_device(
     };
     let device_control = {
         let (control, server_end) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>();
         let () = installer.install_device(device, server_end).expect("install device");
         control
     };
@@ -2031,8 +2012,7 @@ async fn install_ip_device(
         .for_each_concurrent(None, |subnet| {
             let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
                 fnet_interfaces_admin::AddressStateProviderMarker,
-            >()
-            .expect("create proxy");
+            >();
 
             // We're not interested in maintaining the address' lifecycle through
             // the proxy.
@@ -2221,8 +2201,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
     let tun = fuchsia_component::client::connect_to_protocol::<fnet_tun::ControlMarker>()
         .expect("failed to connect to tun protocol");
 
-    let (tun_dev, req) = fidl::endpoints::create_proxy::<fnet_tun::DeviceMarker>()
-        .expect("failed to create endpoints");
+    let (tun_dev, req) = fidl::endpoints::create_proxy::<fnet_tun::DeviceMarker>();
     let () = tun
         .create_device(
             &fnet_tun::DeviceConfig { base: None, blocking: Some(true), ..Default::default() },
@@ -2231,8 +2210,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         .expect("failed to create tun pair");
 
     let (_tun_port, port) = {
-        let (tun_port, server_end) = fidl::endpoints::create_proxy::<fnet_tun::PortMarker>()
-            .expect("failed to create endpoints");
+        let (tun_port, server_end) = fidl::endpoints::create_proxy::<fnet_tun::PortMarker>();
         let () = tun_dev
             .add_port(
                 &fnet_tun::DevicePortConfig {
@@ -2246,8 +2224,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
             )
             .expect("add_port failed");
 
-        let (port, server_end) = fidl::endpoints::create_proxy::<fhardware_network::PortMarker>()
-            .expect("failed to create endpoints");
+        let (port, server_end) = fidl::endpoints::create_proxy::<fhardware_network::PortMarker>();
         let () = tun_port.get_port(server_end).expect("get_port failed");
         (tun_port, port)
     };
@@ -3067,11 +3044,11 @@ async fn test_udp_source_address_has_zone<N: Netstack>(name: &str) {
     server_ep.apply_nud_flake_workaround().await.expect("apply NUD flake workaround");
 
     // Get the link local address for the client.
-    let link_local_addr = std::pin::pin!(client_ep
+    let link_local_addr = std::pin::pin!(client
         .get_interface_event_stream()
         .expect("get_interface_event_stream failed")
         .filter_map(|event| async {
-            match event.expect("event error") {
+            match event.expect("event error").into_inner() {
                 fnet_interfaces::Event::Existing(properties)
                 | fnet_interfaces::Event::Added(properties) => {
                     if let Some(addresses) = properties.addresses {
@@ -3240,14 +3217,15 @@ async fn get_bound_device_errors_after_device_deleted<N: Netstack>(name: &str) {
     let interface_state =
         host.connect_to_protocol::<fnet_interfaces::StateMarker>().expect("connect to protocol");
 
-    let stream = fnet_interfaces_ext::event_stream_from_state(
-        &interface_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
-    .expect("error getting interface state event stream");
+    let stream =
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
+            &interface_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("error getting interface state event stream");
     let mut stream = pin!(stream);
     let mut state =
-        std::collections::HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new();
+        std::collections::HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<(), _>>::new();
 
     // Wait for the interface to be present.
     fnet_interfaces_ext::wait_interface(stream.by_ref(), &mut state, |interfaces| {
@@ -3513,12 +3491,8 @@ async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconS
                 .await
                 .expect("call stream socket")
                 .expect("request stream socket");
-            let fposix_socket::StreamSocketDescribeResponse { socket, .. } = socket
-                .into_proxy()
-                .expect("client end into proxy")
-                .describe()
-                .await
-                .expect("call describe");
+            let fposix_socket::StreamSocketDescribeResponse { socket, .. } =
+                socket.into_proxy().describe().await.expect("call describe");
             socket
         }
         ProtocolWithZirconSocket::FastUdp => {
@@ -3536,12 +3510,8 @@ async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconS
                 }
                 fposix_socket::ProviderDatagramSocketResponse::DatagramSocket(socket) => socket,
             };
-            let fposix_socket::DatagramSocketDescribeResponse { socket, .. } = socket
-                .into_proxy()
-                .expect("client end into proxy")
-                .describe()
-                .await
-                .expect("call describe");
+            let fposix_socket::DatagramSocketDescribeResponse { socket, .. } =
+                socket.into_proxy().describe().await.expect("call describe");
             socket
         }
     };

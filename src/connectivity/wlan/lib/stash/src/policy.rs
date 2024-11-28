@@ -183,8 +183,7 @@ async fn init_telemetry_channel() -> Result<fidl_fuchsia_metrics::MetricEventLog
     >()?;
 
     let (cobalt_proxy, cobalt_1dot1_server) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-            .context("failed to create MetricEventLoggerMarker endponts")?;
+        fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
     let project_spec = fidl_fuchsia_metrics::ProjectSpec {
         customer_id: None, // defaults to fuchsia
@@ -565,8 +564,7 @@ mod tests {
     async fn test_migration_with_bad_stash() {
         let store_id = rand_string();
 
-        let (client, mut request_stream) = create_request_stream::<fidl_stash::SecureStoreMarker>()
-            .expect("create_request_stream failed");
+        let (client, mut request_stream) = create_request_stream::<fidl_stash::SecureStoreMarker>();
 
         // This will be set to true if stash is accessed, so that the test can check whether stash
         // was read by the migration code.
@@ -584,7 +582,7 @@ mod tests {
                         SecureStoreRequest::CreateAccessor { accessor_request, .. } => {
                             let read_from_stash = read_from_stash.clone();
                             fuchsia_async::Task::spawn(async move {
-                                let mut request_stream = accessor_request.into_stream().unwrap();
+                                let mut request_stream = accessor_request.into_stream();
                                 while let Some(request) = request_stream.next().await {
                                     match request.unwrap() {
                                         StoreAccessorRequest::ListPrefix { .. } => {
@@ -605,7 +603,7 @@ mod tests {
 
         // Initialize the store but switch out with the stash we made to act corrupted.
         let mut store = PolicyStorage::new_with_id(&store_id).await;
-        let proxy_fn = client.into_proxy().unwrap();
+        let proxy_fn = client.into_proxy();
         store.legacy_stash = StashStore::from_secure_store_proxy(&store_id, proxy_fn);
 
         // Try and load the config. It should provide empty config.
@@ -636,8 +634,7 @@ mod tests {
     fn migration_metrics_test_values() -> MetricsTestValues {
         let (cobalt_proxy, cobalt_stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_metrics::MetricEventLoggerMarker,
-        >()
-        .expect("failed to create MetricsEventLogger proxy");
+        >();
 
         let (legacy_stash, stash_stream) = stash_for_test();
         let root = StorageStore::new(format!("{FILE_PATH_FORMAT}{}", rand_string()));
@@ -647,9 +644,8 @@ mod tests {
     }
 
     fn stash_for_test() -> (Result<StashStore, Error>, fidl_stash::SecureStoreRequestStream) {
-        let (client, stash_stream) = create_request_stream::<fidl_stash::SecureStoreMarker>()
-            .expect("create_request_stream failed");
-        let proxy_fn = client.into_proxy().unwrap();
+        let (client, stash_stream) = create_request_stream::<fidl_stash::SecureStoreMarker>();
+        let proxy_fn = client.into_proxy();
         let id = rand_string();
         let legacy_stash = StashStore::from_secure_store_proxy(&id, proxy_fn);
 
@@ -689,7 +685,7 @@ mod tests {
             exec.run_until_stalled(&mut stash_stream.next()),
             Poll::Ready(Some(Ok(SecureStoreRequest::CreateAccessor { accessor_request, .. }))) =>
         {
-            accessor_request.into_stream().unwrap()
+            accessor_request.into_stream()
         });
 
         accessor_req_stream
@@ -706,7 +702,7 @@ mod tests {
         });
         match request.unwrap() {
             StoreAccessorRequest::ListPrefix { it, .. } => {
-                let mut iter = it.into_stream().expect("failed to make iterator into stream");
+                let mut iter = it.into_stream();
                 assert_variant!(
                     exec.run_until_stalled(&mut iter.try_next()),
                     Poll::Ready(Ok(Some(fidl_stash::ListIteratorRequest::GetNext { responder }))) => {

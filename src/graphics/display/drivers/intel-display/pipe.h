@@ -24,9 +24,9 @@
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 
 namespace intel_display {
 
@@ -108,7 +108,7 @@ class Pipe {
   registers::Platform platform() const { return platform_; }
 
  private:
-  void ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* primary, bool enable_csc,
+  void ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, bool enable_csc,
                              bool* scaler_1_claimed, registers::pipe_arming_regs* regs,
                              display::ConfigStamp config_stamp,
                              const SetupGttImageFunc& setup_gtt_image,

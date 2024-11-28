@@ -159,7 +159,7 @@ fn dictionary_from_map(in_obj: Map<String, Value>) -> Result<fdata::Dictionary, 
 fn value_to_dictionary_value(value: Value) -> Result<Option<Box<fdata::DictionaryValue>>, Error> {
     match value {
         Value::Null => Ok(None),
-        Value::String(s) => Ok(Some(Box::new(fdata::DictionaryValue::Str(s.clone())))),
+        Value::String(s) => Ok(Some(Box::new(fdata::DictionaryValue::Str(s)))),
         Value::Array(arr) => {
             if arr.iter().all(Value::is_string) {
                 let strs =

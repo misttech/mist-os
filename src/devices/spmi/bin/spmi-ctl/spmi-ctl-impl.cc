@@ -271,8 +271,8 @@ int SpmiCtl::Execute(int argc, char** argv) {
           ShowUsage(false);
           return -1;
         }
-        if (read_bytes < 1 || read_bytes > 8) {
-          std::cerr << "Read failed: read_bytes must be between 1 and 8 inclusive" << std::endl;
+        if (read_bytes < 1) {
+          std::cerr << "Read failed: must read at least 1 byte" << std::endl;
           return -1;
         }
 

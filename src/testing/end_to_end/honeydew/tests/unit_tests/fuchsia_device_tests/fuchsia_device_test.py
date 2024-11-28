@@ -21,13 +21,9 @@ from fuchsia_controller_py import ZxStatus
 from parameterized import param, parameterized
 
 from honeydew import errors
-from honeydew.affordances.connectivity.wlan.wlan import (
-    wlan_using_fc,
-    wlan_using_sl4f,
-)
+from honeydew.affordances.connectivity.wlan.wlan import wlan_using_fc
 from honeydew.affordances.connectivity.wlan.wlan_policy import (
     wlan_policy_using_fc,
-    wlan_policy_using_sl4f,
 )
 from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
@@ -515,14 +511,6 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             fuchsia_device_close=self.fd_fc_obj,
         )
 
-    def test_wlan_policy_using_sl4f(self) -> None:
-        """Test case to make sure fuchsia_device supports SL4F based wlan_policy
-        affordance."""
-        self.assertIsInstance(
-            self.fd_sl4f_obj.wlan_policy,
-            wlan_policy_using_sl4f.WlanPolicy,
-        )
-
     @mock.patch.object(
         ffx_transport.FFX,
         "run",
@@ -554,13 +542,6 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             fuchsia_controller=self.fd_fc_obj.fuchsia_controller,
             reboot_affordance=self.fd_fc_obj,
             fuchsia_device_close=self.fd_fc_obj,
-        )
-
-    def test_wlan_using_sl4f(self) -> None:
-        """Test case to make sure fuchsia_device supports SL4F based wlan affordance."""
-        self.assertIsInstance(
-            self.fd_sl4f_obj.wlan,
-            wlan_using_sl4f.Wlan,
         )
 
     # List all the tests related to static properties

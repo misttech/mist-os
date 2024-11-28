@@ -123,8 +123,6 @@ class TestDirectory final : public fidl::testing::TestBase<fio::Directory> {
   void SetOpenHandler(OpenHandler open_handler) { open_handler_ = std::move(open_handler); }
 
  private:
-  void Clone(CloneRequest& request, CloneCompleter::Sync& completer) override;
-
   void Open(OpenRequest& request, OpenCompleter::Sync& completer) override;
 
   void Open3(Open3Request& request, Open3Completer::Sync& completer) override;

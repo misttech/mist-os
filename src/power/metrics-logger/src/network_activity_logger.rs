@@ -33,7 +33,7 @@ pub async fn generate_network_devices() -> Result<Vec<fhwnet::DeviceProxy>> {
             fidl::endpoints::create_endpoints::<fhwnet::DeviceMarker>();
         device_instance_proxy.get_device(device_server_end)?;
 
-        proxies.push(device.into_proxy()?);
+        proxies.push(device.into_proxy());
     }
     Ok(proxies)
 }
@@ -56,7 +56,7 @@ async fn watch_and_update_ports(
 ) {
     // TODO(https://fxbug.dev/42061512): Return `RecorderError::INTERNAL` instead of unwrap.
     let (port_watcher, port_watcher_server_end) =
-        fidl::endpoints::create_proxy::<fhwnet::PortWatcherMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fhwnet::PortWatcherMarker>();
     device.get_port_watcher(port_watcher_server_end).unwrap();
 
     match port_watcher.watch().await.unwrap() {
@@ -68,8 +68,7 @@ async fn watch_and_update_ports(
         }
         // When watcher was created, ports might already exist.
         fhwnet::DevicePortEvent::Added(port_id) | fhwnet::DevicePortEvent::Existing(port_id) => {
-            let (port, port_server_end) =
-                fidl::endpoints::create_proxy::<fhwnet::PortMarker>().unwrap();
+            let (port, port_server_end) = fidl::endpoints::create_proxy::<fhwnet::PortMarker>();
             device.get_port(&port_id, port_server_end).unwrap();
 
             match port.get_info().await {
@@ -446,8 +445,7 @@ pub mod tests {
     fn setup_fake_network_port(
         mut get_counter: impl FnMut() -> fhwnet::PortGetCountersResponse + 'static,
     ) -> (fhwnet::PortProxy, fasync::Task<()>) {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fhwnet::PortMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<fhwnet::PortMarker>();
         let task = fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {

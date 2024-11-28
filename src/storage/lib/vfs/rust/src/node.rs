@@ -222,7 +222,6 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::QueryFilesystem { responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw(), None)?;
             }
-            #[cfg(fuchsia_api_level_at_least = "24")]
             fio::NodeRequest::_UnknownMethod { .. } => (),
         }
         Ok(ConnectionState::Alive)
@@ -257,9 +256,8 @@ impl<N: Node> Connection<N> {
             options: self.options,
         };
         self.scope.spawn(async move {
-            if let Ok(requests) = server_end.into_stream() {
-                connection.handle_requests(requests).await;
-            }
+            let requests = server_end.into_stream();
+            connection.handle_requests(requests).await;
         });
     }
 }

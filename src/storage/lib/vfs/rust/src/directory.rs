@@ -80,5 +80,5 @@ pub fn spawn_directory_with_options<D: Directory + ?Sized>(
     let scope = ExecutionScope::new();
     let rights = options.to_io1();
     dir.open(scope, rights, Path::dot(), ServerEnd::new(server_end.into_channel()));
-    client_end.into_proxy().unwrap()
+    client_end.into_proxy()
 }

@@ -1109,8 +1109,8 @@ impl OverlayStack {
         let upper = resolve_dir_param(locked, current_task, &options.params, "upperdir".into())?;
         let work = resolve_dir_param(locked, current_task, &options.params, "workdir".into())?;
 
-        let lower_fs = lower.entry().node.fs().clone();
-        let upper_fs = upper.entry().node.fs().clone();
+        let lower_fs = lower.entry().node.fs();
+        let upper_fs = upper.entry().node.fs();
 
         if !Arc::ptr_eq(&upper_fs, &work.entry().node.fs()) {
             log_error!("overlayfs: upperdir and workdir must be on the same FS");
@@ -1147,8 +1147,8 @@ impl OverlayStack {
             mount: MountInfo::detached(),
         };
 
-        let lower_fs = rootfs.clone();
-        let upper_fs = invisible_tmp.clone();
+        let lower_fs = rootfs;
+        let upper_fs = invisible_tmp;
 
         let stack = Arc::new(OverlayStack { lower_fs, upper_fs, work });
         let root_node = OverlayNode::new(stack.clone(), Some(lower), Some(upper), None);

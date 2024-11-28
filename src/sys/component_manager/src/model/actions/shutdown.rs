@@ -181,6 +181,7 @@ impl ShutdownJob {
         // Look for any children that have no dependents
         let mut stop_targets = vec![];
 
+        #[allow(clippy::needless_collect)] // avoid overlapping mutable and immutable borrows
         for component_ref in
             self.source_to_targets.keys().map(|key| key.clone()).collect::<Vec<_>>()
         {
@@ -584,7 +585,7 @@ fn get_dependencies_from_uses(instance: &impl Component) -> Dependencies {
             | UseDecl::Runner(UseRunnerDecl { source, .. }) => match source {
                 UseSource::Child(name) => instance
                     .find_child(name.as_str(), None)
-                    .map(|child| ComponentRef::from(child.moniker.clone())),
+                    .map(|child| ComponentRef::from(child.moniker)),
                 UseSource::Self_ => {
                     if use_.is_from_dictionary() {
                         let path = use_.source_path();
@@ -706,7 +707,7 @@ fn find_offer_sources(
     match source {
         OfferSource::Child(ChildRef { name, collection }) => {
             match instance.find_child(name.as_str(), collection.as_ref()) {
-                Some(child) => vec![child.moniker.clone().into()],
+                Some(child) => vec![child.moniker.into()],
                 None => {
                     error!(
                         "offer source doesn't exist: (name: {:?}, collection: {:?})",

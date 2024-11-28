@@ -28,7 +28,7 @@ use assert_matches::assert_matches;
 use bit_vec::BitVec;
 use futures::stream::{FuturesOrdered, FuturesUnordered};
 use futures::{try_join, TryStreamExt};
-use fxfs_crypto::{FindKeyResult, Key, KeyPurpose, XtsCipher, XtsCipherSet};
+use fxfs_crypto::{Cipher, CipherSet, FindKeyResult, Key, KeyPurpose};
 use fxfs_trace::trace;
 use static_assertions::const_assert;
 use std::cmp::min;
@@ -694,14 +694,14 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let (key, unwrapped_key) = crypt.create_key(self.object_id, KeyPurpose::Data).await?;
 
         // Merge in unwrapped_key.
-        unwrapped_keys.push(XtsCipher::new(VOLUME_DATA_KEY_ID, &unwrapped_key));
-        let unwrapped_keys = Arc::new(XtsCipherSet::from(unwrapped_keys));
+        unwrapped_keys.push(Cipher::new(VOLUME_DATA_KEY_ID, &unwrapped_key));
+        let unwrapped_keys = Arc::new(CipherSet::from(unwrapped_keys));
 
         // Arrange for the key to be added to the cache when (and if) the transaction
         // commits.
         struct UnwrappedKeys {
             object_id: u64,
-            new_keys: Arc<XtsCipherSet>,
+            new_keys: Arc<CipherSet>,
         }
 
         impl AssociatedObject for UnwrappedKeys {
@@ -1782,7 +1782,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     }
 
     /// Returns a future that will pre-fetches the keys so as to avoid paying the performance
-    /// penalty later.
+    /// penalty later. Must ensure that the object is not removed before the future completes.
     pub fn pre_fetch_keys(&self) -> Option<impl Future<Output = ()>> {
         if let Encryption::CachedKeys = self.encryption {
             let owner = self.owner.clone();
@@ -1790,13 +1790,14 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             Some(async move {
                 let store = owner.as_ref().as_ref();
                 if let Some(crypt) = store.crypt() {
-                    let _: Result<_, _> = store
+                    let _ = store
                         .key_manager
-                        .pre_fetch(
+                        .get_keys(
                             object_id,
                             crypt.as_ref(),
-                            store.get_keys(object_id),
+                            &mut Some(store.get_keys(object_id)),
                             /* permanent= */ false,
+                            /* force= */ false,
                         )
                         .await;
                 }

@@ -16,6 +16,7 @@
 #include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "src/devices/bin/driver_manager/controller_allowlist_passthrough.h"
+#include "src/devices/bin/driver_manager/node_property_conversion.h"
 #include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
@@ -38,10 +39,10 @@ const std::string kUnboundUrl = "unbound";
 constexpr bool kEnableCompositeNodeSpecRebind = false;
 
 // Return a clone of `node_properties`. The data referenced by the clone is owned by `arena`.
-std::vector<fuchsia_driver_framework::wire::NodeProperty> CloneNodeProperties(
+std::vector<fuchsia_driver_framework::wire::NodeProperty2> CloneNodeProperties(
     fidl::AnyArena& arena,
-    const std::vector<::fuchsia_driver_framework::NodeProperty>& node_properties) {
-  std::vector<fuchsia_driver_framework::wire::NodeProperty> clone;
+    const std::vector<fuchsia_driver_framework::NodeProperty2>& node_properties) {
+  std::vector<fuchsia_driver_framework::wire::NodeProperty2> clone;
   clone.reserve(node_properties.size());
   for (const auto& node_property : node_properties) {
     clone.emplace_back(fidl::ToWire(arena, node_property));
@@ -51,17 +52,17 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CloneNodeProperties(
 
 // Return a clone of the node properties of `parents`. The data referenced by the clone is owned by
 // `arena`.
-std::vector<fuchsia_driver_framework::wire::NodePropertyEntry> GetParentNodePropertyEntries(
+std::vector<fuchsia_driver_framework::wire::NodePropertyEntry2> GetParentNodePropertyEntries(
     fidl::AnyArena& arena,
-    const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties) {
-  std::vector<fuchsia_driver_framework::wire::NodePropertyEntry> entries;
+    const std::vector<fuchsia_driver_framework::NodePropertyEntry2>& parent_properties) {
+  std::vector<fuchsia_driver_framework::wire::NodePropertyEntry2> entries;
   for (const auto& parent : parent_properties) {
-    std::vector<fuchsia_driver_framework::wire::NodeProperty> properties_clone =
+    std::vector<fuchsia_driver_framework::wire::NodeProperty2> properties_clone =
         CloneNodeProperties(arena, parent.properties());
 
-    entries.emplace_back(fuchsia_driver_framework::wire::NodePropertyEntry{
+    entries.emplace_back(fuchsia_driver_framework::wire::NodePropertyEntry2{
         .name = fidl::StringView(arena, parent.name()),
-        .properties = fuchsia_driver_framework::wire::NodePropertyVector(arena, properties_clone)});
+        .properties = fuchsia_driver_framework::wire::NodeProperties(arena, properties_clone)});
   }
   return entries;
 }
@@ -132,7 +133,7 @@ fit::result<fdf::wire::NodeError, fdecl::Offer> ProcessNodeOffer(fdecl::Offer ad
 // Processes the offer by validating it has a source_name and adding a source ref to it.
 // Returns a tuple containing the offer as well as node property that provides transport
 // information for the offer.
-fit::result<fdf::wire::NodeError, std::tuple<fdecl::Offer, fdf::NodeProperty>>
+fit::result<fdf::wire::NodeError, std::tuple<fdecl::Offer, fdf::NodeProperty2>>
 ProcessNodeOfferWithTransportProperty(fdecl::Offer add_offer, fdecl::Ref source,
                                       const std::string& transport_for_property) {
   auto result = ProcessNodeOffer(std::move(add_offer), std::move(source));
@@ -142,12 +143,12 @@ ProcessNodeOfferWithTransportProperty(fdecl::Offer add_offer, fdecl::Ref source,
 
   auto processed_offer = std::move(result.value());
 
-  std::optional<fdf::NodeProperty> node_property = std::nullopt;
+  std::optional<fdf::NodeProperty2> node_property = std::nullopt;
   VisitOffer<bool>(processed_offer, [&node_property, &transport_for_property](const auto& decl) {
     auto& name = decl->source_name();
     if (name.has_value()) {
       const std::string& name_str = name.value();
-      node_property.emplace(fdf::MakeProperty(name_str, name_str + "." + transport_for_property));
+      node_property.emplace(fdf::MakeProperty2(name_str, name_str + "." + transport_for_property));
     }
 
     return true;
@@ -352,7 +353,7 @@ Node::Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents,
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<std::weak_ptr<Node>> parents,
     std::vector<std::string> parents_names,
-    const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties,
+    const std::vector<fuchsia_driver_framework::NodePropertyEntry2>& parent_properties,
     NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index) {
   ZX_ASSERT(!parents.empty());
 
@@ -775,36 +776,36 @@ std::shared_ptr<BindResultTracker> Node::CreateBindResultTracker() {
 }
 
 void Node::SetNonCompositeProperties(
-    cpp20::span<const fuchsia_driver_framework::NodeProperty> properties) {
-  std::vector<fuchsia_driver_framework::wire::NodeProperty> wire;
+    cpp20::span<const fuchsia_driver_framework::NodeProperty2> properties) {
+  std::vector<fuchsia_driver_framework::wire::NodeProperty2> wire;
   wire.reserve(properties.size() + 1);  // + 1 for DFv2 prop.
   for (const auto& property : properties) {
     wire.emplace_back(fidl::ToWire(arena_, property));
   }
-  wire.emplace_back(fdf::MakeProperty(arena_, bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION,
-                                      static_cast<uint32_t>(2)));
+  wire.emplace_back(fdf::MakeProperty2(arena_, bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION,
+                                       static_cast<uint32_t>(2)));
 
-  std::vector<fuchsia_driver_framework::wire::NodePropertyEntry> entries;
-  entries.emplace_back(fuchsia_driver_framework::wire::NodePropertyEntry{
+  std::vector<fuchsia_driver_framework::wire::NodePropertyEntry2> entries;
+  entries.emplace_back(fuchsia_driver_framework::wire::NodePropertyEntry2{
       .name = "default",
-      .properties = fuchsia_driver_framework::wire::NodePropertyVector(arena_, wire)});
+      .properties = fuchsia_driver_framework::wire::NodeProperties(arena_, wire)});
 
-  properties_ = fuchsia_driver_framework::wire::NodePropertyDictionary(arena_, entries);
+  properties_ = fuchsia_driver_framework::wire::NodePropertyDictionary2(arena_, entries);
   SynchronizePropertiesDict();
 }
 
 void Node::SetCompositeParentProperties(
-    const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties) {
+    const std::vector<fuchsia_driver_framework::NodePropertyEntry2>& parent_properties) {
   auto entries = GetParentNodePropertyEntries(arena_, parent_properties);
 
   ZX_ASSERT(primary_index_ < parents_.size());
   const auto default_node_properties = entries[primary_index_].properties.get();
-  entries.emplace_back(fuchsia_driver_framework::wire::NodePropertyEntry{
+  entries.emplace_back(fuchsia_driver_framework::wire::NodePropertyEntry2{
       .name = "default",
-      .properties = fuchsia_driver_framework::wire::NodePropertyVector::FromExternal(
+      .properties = fuchsia_driver_framework::wire::NodeProperties::FromExternal(
           default_node_properties.data(), default_node_properties.size())});
 
-  properties_ = fuchsia_driver_framework::wire::NodePropertyDictionary(arena_, entries);
+  properties_ = fuchsia_driver_framework::wire::NodePropertyDictionary2(arena_, entries);
   SynchronizePropertiesDict();
 }
 
@@ -851,15 +852,25 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
   if (args.offers().has_value()) {
     LOGF(ERROR, "Failed to add Node '%.*s', offers() is no longer supported.",
          static_cast<int>(name.size()), name.data());
-    return fit::as_error(fdf::wire::NodeError::kInternal);
+    return fit::as_error(fdf::wire::NodeError::kUnsupportedArgs);
   }
 
   auto& fdf_offers = args.offers2();
-  std::vector<fuchsia_driver_framework::NodeProperty> properties;
+  std::vector<fuchsia_driver_framework::NodeProperty2> properties;
   const auto& arg_properties = args.properties();
   if (arg_properties.has_value()) {
-    properties = arg_properties.value();
+    properties.reserve(arg_properties->size());
+    for (auto& property : arg_properties.value()) {
+      if (property.key().Which() == fuchsia_driver_framework::NodePropertyKey::Tag::kIntValue) {
+        LOGF(ERROR,
+             "Failed to add Node '%.*s'. Found integer-based key %zu which is no longer supported.",
+             static_cast<int>(name.size()), name.data(), property.key().int_value().value());
+        return fit::as_error(fdf::wire::NodeError::kUnsupportedArgs);
+      }
+      properties.emplace_back(ToProperty2(property));
+    }
   }
+
   if (fdf_offers.has_value()) {
     size_t n = 0;
     if (fdf_offers.has_value()) {
@@ -1454,13 +1465,28 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
   Remove(RemovalSet::kAll, nullptr);
 }
 
-std::optional<cpp20::span<const fuchsia_driver_framework::wire::NodeProperty>>
+std::optional<cpp20::span<const fuchsia_driver_framework::wire::NodeProperty2>>
 Node::GetNodeProperties(std::string_view parent_name) const {
   auto it = properties_dict_.find(std::string(parent_name));
   if (it == properties_dict_.end()) {
     return std::nullopt;
   }
   return {it->second};
+}
+
+std::optional<std::vector<fuchsia_driver_framework::NodeProperty>>
+Node::GetDeprecatedNodeProperties(std::string_view parent_name) const {
+  auto node_properties = GetNodeProperties(parent_name);
+  if (!node_properties) {
+    return std::nullopt;
+  }
+
+  std::vector<fuchsia_driver_framework::NodeProperty> deprecated_properties;
+  deprecated_properties.reserve(node_properties->size());
+  for (auto& property : node_properties.value()) {
+    deprecated_properties.emplace_back(ToDeprecatedProperty(property));
+  }
+  return deprecated_properties;
 }
 
 Node::DriverComponent::DriverComponent(
@@ -1483,17 +1509,15 @@ void Node::SetAndPublishInspect() {
   constexpr char kDeviceTypeString[] = "Device";
   constexpr char kCompositeDeviceTypeString[] = "Composite Device";
 
-  cpp20::span<const fuchsia_driver_framework::wire::NodeProperty> property_vector;
+  cpp20::span<const fuchsia_driver_framework::wire::NodeProperty2> property_vector;
   uint32_t protocol_id = 0;
   if (type_ == NodeType::kNormal) {
     auto properties = GetNodeProperties();
     ZX_ASSERT_MSG(properties.has_value(), "Non-composite node \"%s\" missing node properties",
                   name_.c_str());
     for (auto& node_property : properties.value()) {
-      if (node_property.key.is_string_value() && node_property.value.is_int_value()) {
-        if (node_property.key.string_value().get() == bind_fuchsia::PROTOCOL) {
-          protocol_id = node_property.value.int_value();
-        }
+      if (node_property.key.get() == bind_fuchsia::PROTOCOL && node_property.value.is_int_value()) {
+        protocol_id = node_property.value.int_value();
       }
     }
 

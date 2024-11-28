@@ -38,8 +38,9 @@ void MkfsWorker::InitGlobalParameters() {
   params_.sector_size = kDefaultSectorSize;
   params_.sectors_per_blk = kDefaultSectorsPerBlock;
   params_.blks_per_seg = kDefaultBlocksPerSegment;
-  params_.reserved_segments = 0;
-  params_.overprovision = mkfs_options_.overprovision_ratio;
+  params_.reserved_segments = kMinReservedSectionsForGc * mkfs_options_.segs_per_sec;
+  params_.op_segments = 0;
+  params_.op_ratio = mkfs_options_.overprovision_ratio;
   params_.segs_per_sec = mkfs_options_.segs_per_sec;
   params_.secs_per_zone = mkfs_options_.secs_per_zone;
   params_.heap = (mkfs_options_.heap_based_allocation ? 1 : 0);
@@ -107,37 +108,39 @@ void MkfsWorker::ConfigureExtensionList() {
 
 zx_status_t MkfsWorker::WriteToDisk(void *buf, block_t bno) { return bc_->Writeblk(bno, buf); }
 
-zx::result<uint32_t> MkfsWorker::GetCalculatedOp(uint32_t user_op) const {
-  uint32_t max_op = 0;
-  uint32_t max_user_segments = 0;
+zx::result<> MkfsWorker::SetSpace() {
+  const uint32_t segs_per_sec = params_.segs_per_sec;
+  uint32_t main_sections = LeToCpu(super_block_.segment_count_main) / segs_per_sec;
+  uint32_t reserved_sections = params_.reserved_segments / segs_per_sec;
 
-  if (user_op < 100 && user_op > 0)
-    return zx::ok(user_op);
-
-  for (uint32_t calc_op = 1; calc_op < 100; ++calc_op) {
-    uint32_t reserved_segments =
-        (2 * (100 / calc_op + 1) + kNrCursegType) * super_block_.segs_per_sec;
-
-    if ((safemath::CheckSub(LeToCpu(super_block_.segment_count_main), 2).ValueOrDie()) <
-        reserved_segments) {
-      continue;
-    }
-    uint32_t user_segments =
-        (super_block_.segment_count_main -
-         (safemath::CheckSub(super_block_.segment_count_main, reserved_segments) * calc_op / 100) -
-         reserved_segments)
-            .ValueOrDie();
-
-    if (user_segments > max_user_segments &&
-        safemath::CheckSub(super_block_.segment_count_main, 2).ValueOrDie() >= reserved_segments) {
-      max_user_segments = user_segments;
-      max_op = calc_op;
-    }
+  // TODO(b/374811602): Add an mkfs option for users to set a larger space for reserved sections by
+  // 2 * (100 / calc_op + 1) + kNrCursegType. The option sets reserved space inversely proportional
+  // to a OP value in order to secure enough GC buffer space and minimize the number of checkpoint
+  // writes during GC while sacrificing user space.
+  if (main_sections <= reserved_sections) {
+    // TODO(b/374811602): If there is not enough space, retry it with IPU and single temperature.
+    return zx::error(ZX_ERR_NO_SPACE);
   }
-
-  if (max_op == 0)
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  return zx::ok(max_op);
+  size_t user_sections = main_sections - reserved_sections;
+  uint32_t &op_ratio = params_.op_ratio;
+  if (!op_ratio) {
+    op_ratio = kDefaultOpRatio;
+  }
+  size_t op_sections = std::max(1UL, CheckedDivRoundUp(user_sections * op_ratio, 100UL));
+  while (op_sections && user_sections <= op_sections) {
+    --op_sections;
+  }
+  if (!op_sections || user_sections < kNrCursegType) {
+    // TODO(b/374811602): If there is not enough space, retry it with IPU and single temperature.
+    return zx::error(ZX_ERR_NO_SPACE);
+  }
+  params_.op_segments = safemath::checked_cast<uint32_t>(op_sections * segs_per_sec);
+  params_.reserved_segments = safemath::checked_cast<uint32_t>(reserved_sections * segs_per_sec);
+  FX_LOGS(INFO) << " main_segments : " << main_sections * segs_per_sec;
+  FX_LOGS(INFO) << " user_segments : " << (user_sections - op_sections) * segs_per_sec;
+  FX_LOGS(INFO) << " reserved_segments : " << reserved_sections * segs_per_sec;
+  FX_LOGS(INFO) << " op_segments : " << op_sections * segs_per_sec << ", " << op_ratio << "%";
+  return zx::ok();
 }
 
 zx_status_t MkfsWorker::PrepareSuperblock() {
@@ -314,28 +317,8 @@ zx_status_t MkfsWorker::PrepareSuperblock() {
   super_block_.segment_count_main =
       CpuToLe(LeToCpu(super_block_.section_count) * params_.segs_per_sec);
 
-  auto op = GetCalculatedOp(params_.overprovision);
-  if (op.is_error()) {
+  if (SetSpace().is_error()) {
     FX_LOGS(WARNING) << "device size is not sufficient for F2FS volume";
-    return ZX_ERR_NO_SPACE;
-  }
-  params_.overprovision = op.value();
-
-  // The number of reserved_segments depends on the OP value. Assuming OP is 20%, 20% of a dirty
-  // segment is invalid. That is, running GC on 5 dirty segments can obtain one free segment.
-  // Therefore, the required reserved_segments can be obtained with 100 / OP.
-  // If the data page is moved to another segment due to GC, the dnode that refers to it should be
-  // modified. This requires twice the reserved_segments.
-  // Current active segments have the next segment in advance, of which require 6 additional
-  // segments.
-  params_.reserved_segments =
-      (2 * (100 / params_.overprovision + 1) + kNrCursegType) * params_.segs_per_sec;
-
-  if ((safemath::CheckSub(LeToCpu(super_block_.segment_count_main), 2).ValueOrDie()) <
-      params_.reserved_segments) {
-    FX_LOGS(ERROR) << "device size is not sufficient for F2FS volume which needs "
-                   << params_.reserved_segments - (LeToCpu(super_block_.segment_count_main) - 2)
-                   << " more segments";
     return ZX_ERR_NO_SPACE;
   }
 
@@ -464,11 +447,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
   checkpoint->cur_data_blkoff[0] = CpuToLe(uint16_t{1});
   checkpoint->valid_block_count = CpuToLe(2UL);
   checkpoint->rsvd_segment_count = CpuToLe(params_.reserved_segments);
-  checkpoint->overprov_segment_count = CpuToLe(safemath::checked_cast<uint32_t>(
-      (safemath::CheckSub(LeToCpu(super_block_.segment_count_main),
-                          LeToCpu(checkpoint->rsvd_segment_count)) *
-       params_.overprovision / 100)
-          .ValueOrDie()));
+  checkpoint->overprov_segment_count = CpuToLe(params_.op_segments);
   checkpoint->overprov_segment_count = CpuToLe(LeToCpu(checkpoint->overprov_segment_count) +
                                                LeToCpu(checkpoint->rsvd_segment_count));
 

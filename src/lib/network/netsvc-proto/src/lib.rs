@@ -55,7 +55,7 @@ where
     /// null character or an empty slice.
     fn truncate_null(self) -> (Self, B) {
         let Self(bytes) = self;
-        let split = find_null_termination(&bytes).unwrap_or(bytes.as_ref().len());
+        let split = find_null_termination(&bytes).unwrap_or_else(|| bytes.as_ref().len());
         let (bytes, rest) = bytes.split_at(split).ok().unwrap();
         (Self(bytes), rest)
     }

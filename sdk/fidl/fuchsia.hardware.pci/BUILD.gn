@@ -8,6 +8,9 @@ fidl("fuchsia.hardware.pci") {
   sdk_category = "partner"
   stable = true
   sdk_area = "Drivers"
-  sources = [ "pci.fidl" ]
+  sources = [
+    "metadata.fidl",
+    "pci.fidl",
+  ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

@@ -152,17 +152,16 @@ impl TestService {
                         usage, usage_watcher, ..
                     })) = request_stream.next().await
                     {
-                        match (usage, usage_watcher.into_proxy()) {
-                            (Usage::RenderUsage(usage), Ok(usage_watcher)) => {
+                        match usage {
+                            Usage::RenderUsage(usage) => {
                                 new_usage_watchers_sink
-                                    .send((usage, usage_watcher))
+                                    .send((usage, usage_watcher.into_proxy()))
                                     .await
                                     .expect("Forwarding new UsageWatcher from service under test");
                             }
-                            (_, Ok(_)) => {
+                            _ => {
                                 println!("Service under test tried to watch a capture usage")
                             }
-                            (_, Err(e)) => println!("Service under test sent bad request: {:?}", e),
                         }
                     }
                 }));
@@ -178,19 +177,13 @@ impl TestService {
     fn new_watcher(&self, watch_options: WatchOptions) -> Result<TestWatcher> {
         let (watcher_client, watcher_server) = create_endpoints();
         self.discovery.watch_sessions(&watch_options, watcher_client)?;
-        Ok(TestWatcher {
-            watcher: watcher_server.into_stream().context("Turning watcher into stream")?,
-        })
+        Ok(TestWatcher { watcher: watcher_server.into_stream() })
     }
 
     fn new_observer_watcher(&self, watch_options: WatchOptions) -> Result<TestWatcher> {
         let (watcher_client, watcher_server) = create_endpoints();
         self.observer_discovery.watch_sessions(&watch_options, watcher_client)?;
-        Ok(TestWatcher {
-            watcher: watcher_server
-                .into_stream()
-                .context("Turning observer watcher into stream")?,
-        })
+        Ok(TestWatcher { watcher: watcher_server.into_stream() })
     }
 
     async fn dequeue_watcher(&mut self) {
@@ -286,8 +279,7 @@ struct TestPlayer {
 
 impl TestPlayer {
     async fn new(service: &TestService) -> Result<Self> {
-        let (player_client, requests) =
-            create_request_stream().context("Creating player request stream")?;
+        let (player_client, requests) = create_request_stream();
         let id = service
             .publisher
             .publish(
@@ -498,7 +490,7 @@ async fn player_controls_are_proxied() -> Result<()> {
     let _watch_request = player.requests.try_next().await?;
 
     let (session_client, session_server) = create_endpoints();
-    let session: SessionControlProxy = session_client.into_proxy()?;
+    let session: SessionControlProxy = session_client.into_proxy();
     session.play()?;
     service.discovery.connect_to_session(id, session_server)?;
 
@@ -531,7 +523,7 @@ async fn player_disconnection_propagates() -> Result<()> {
     let (id, _) = updates.remove(0);
 
     let (session_client, session_server) = create_endpoints();
-    let session: SessionControlProxy = session_client.into_proxy()?;
+    let session: SessionControlProxy = session_client.into_proxy();
     service.discovery.connect_to_session(id, session_server)?;
 
     drop(player);
@@ -617,7 +609,7 @@ async fn player_status() -> Result<()> {
         })
         .await?;
 
-    let (session, session_request) = create_proxy()?;
+    let (session, session_request) = create_proxy();
     service.discovery.connect_to_session(player.id, session_request)?;
     let status = session.watch_status().await.expect("Watching player status");
     let actual_player_status = status.player_status.expect("Unwrapping player status");
@@ -645,7 +637,7 @@ async fn player_capabilities() -> Result<()> {
         })
         .await?;
 
-    let (session, session_request) = create_proxy()?;
+    let (session, session_request) = create_proxy();
     service.discovery.connect_to_session(player.id, session_request)?;
     let status = session.watch_status().await.expect("Watching player capabilities");
     let actual_player_capabilities =
@@ -692,7 +684,7 @@ async fn media_images() -> Result<()> {
         })
         .await?;
 
-    let (session, session_request) = create_proxy()?;
+    let (session, session_request) = create_proxy();
     service.discovery.connect_to_session(player.id, session_request)?;
     let status = session.watch_status().await.expect("Watching media images");
     let actual_media_images = status.media_images.expect("Unwrapping media images");
@@ -722,7 +714,7 @@ async fn session_controllers_can_watch_session_status() -> Result<()> {
     let mut player1 = TestPlayer::new(&service).await?;
     let mut player2 = TestPlayer::new(&service).await?;
 
-    let (session1, session1_request) = create_proxy()?;
+    let (session1, session1_request) = create_proxy();
     player1.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let _updates = watcher.wait_for_n_updates(1).await?;
 
@@ -756,7 +748,7 @@ async fn session_observers_can_watch_session_status() -> Result<()> {
     player1.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let _updates = watcher.wait_for_n_updates(1).await?;
 
-    let (session1, session1_request) = create_proxy()?;
+    let (session1, session1_request) = create_proxy();
     service.observer_discovery.connect_to_session(player1.id, session1_request)?;
     let status1 = session1.watch_status().await.context("Watching session status (1st time)")?;
     assert_matches!(
@@ -786,7 +778,7 @@ async fn player_disconnection_disconects_observers() -> Result<()> {
     player.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let _updates = watcher.wait_for_n_updates(1).await?;
 
-    let (session, session_request) = create_proxy()?;
+    let (session, session_request) = create_proxy();
     service.observer_discovery.connect_to_session(player.id, session_request)?;
     assert!(session.watch_status().await.is_ok());
 
@@ -808,7 +800,7 @@ async fn observers_caught_up_with_state_of_session() -> Result<()> {
     player.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let _updates = watcher.wait_for_n_updates(1).await?;
 
-    let (session1, session1_request) = create_proxy()?;
+    let (session1, session1_request) = create_proxy();
     service.observer_discovery.connect_to_session(player.id, session1_request)?;
     let status1 = session1.watch_status().await.context("Watching session status (1st time)")?;
     assert_matches!(
@@ -816,7 +808,7 @@ async fn observers_caught_up_with_state_of_session() -> Result<()> {
         Some(PlayerStatus { player_state: Some(PlayerState::Playing), .. })
     );
 
-    let (session2, session2_request) = create_proxy()?;
+    let (session2, session2_request) = create_proxy();
     service.observer_discovery.connect_to_session(player.id, session2_request)?;
     let status2 = session2.watch_status().await.context("Watching session status (2nd time)")?;
     assert_matches!(
@@ -928,7 +920,7 @@ async fn player_paused_before_interruption_is_not_resumed_by_its_end() -> Result
 async fn player_paused_during_interruption_is_not_resumed_by_its_end() -> Result<()> {
     let mut service = TestService::new().await?;
     let mut player = TestPlayer::new(&service).await?;
-    let (session, session_server) = create_proxy()?;
+    let (session, session_server) = create_proxy();
     service.discovery.connect_to_session(player.id, session_server)?;
 
     player
@@ -1025,7 +1017,7 @@ async fn active_session_initializes_clients_with_active_player() -> Result<()> {
         .await
         .context("Watching the active session")?;
     let session = session.expect("Unwrapping active session channel");
-    let session = session.into_proxy().expect("Creating session proxy");
+    let session = session.into_proxy();
     session.play().context("Sending play command to session")?;
 
     player
@@ -1076,7 +1068,7 @@ async fn active_session_falls_back_when_session_removed() -> Result<()> {
         .await
         .context("Watching the active session 2nd time")?;
     let session = session.expect("Unwrapping active session channel 2nd time");
-    let session = session.into_proxy().expect("Creating session proxy 2nd time");
+    let session = session.into_proxy();
 
     let info_delta = session.watch_status().await.expect("Watching session status");
     assert_eq!(

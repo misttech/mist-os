@@ -14,10 +14,12 @@ use anyhow::{anyhow, Context as _};
 use fidl::Peered;
 use futures::future::{join_all, BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+use futures::AsyncReadExt;
 use std::borrow::Borrow;
 use std::collections::VecDeque;
 use std::io::Write;
 use std::path::PathBuf;
+use test_diagnostics::zstd_compress::Decoder;
 use tracing::{debug, warn};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
@@ -72,7 +74,7 @@ where
             let directory_artifact = reporter
                 .new_directory_artifact(&DirectoryArtifactType::Custom, component_moniker)?;
             Ok(async move {
-                let directory = directory.into_proxy()?;
+                let directory = directory.into_proxy();
                 let result =
                     artifacts::copy_custom_artifact_directory(directory, directory_artifact).await;
                 // TODO(https://fxbug.dev/42165719): Remove this signal once Overnet
@@ -88,7 +90,7 @@ where
         ftest_manager::Artifact::DebugData(iterator) => {
             let output_directory = reporter
                 .new_directory_artifact(&DirectoryArtifactType::Debug, None /* moniker */)?;
-            Ok(artifacts::copy_debug_data(iterator.into_proxy()?, output_directory)
+            Ok(artifacts::copy_debug_data(iterator.into_proxy(), output_directory)
                 .map(|()| Ok(None))
                 .named("debug_data")
                 .boxed())
@@ -125,14 +127,55 @@ async fn copy_socket_artifact<W: Write>(
     }
 }
 
+/// Copy and decompress (zstd) the artifact reported over a socket.
+/// Returns (decompressed, compressed) sizes.
+async fn copy_socket_artifact_and_decompress<W: Write>(
+    socket: fidl::Socket,
+    mut artifact: W,
+) -> Result<(usize, usize), anyhow::Error> {
+    let mut async_socket = fidl::AsyncSocket::from_socket(socket);
+    let mut buf = vec![0u8; 1024 * 1024 * 2];
+
+    let (mut decoder, mut receiver) = Decoder::new();
+    let task: fasync::Task<Result<usize, anyhow::Error>> = fasync::Task::spawn(async move {
+        let mut len = 0;
+        loop {
+            let l = async_socket.read(&mut buf).await?;
+            match l {
+                0 => {
+                    decoder.finish().await?;
+                    break;
+                }
+                _ => {
+                    len += l;
+                    decoder.decompress(&buf[..l]).await?;
+                }
+            }
+        }
+        Ok(len)
+    });
+
+    let mut decompressed_len = 0;
+    while let Some(buf) = receiver.next().await {
+        decompressed_len += buf.len();
+        artifact.write_all(&buf)?;
+    }
+    artifact.flush()?;
+
+    let compressed_len = task.await?;
+    return Ok((decompressed_len, compressed_len));
+}
+
 /// Copy debug data reported over a debug data iterator to an output directory.
 pub async fn copy_debug_data(
     iterator: ftest_manager::DebugDataIteratorProxy,
     output_directory: Box<DynDirectoryArtifact>,
 ) {
+    let start = std::time::Instant::now();
     const PIPELINED_REQUESTS: usize = 4;
     let unprocessed_data_stream =
-        futures::stream::repeat_with(move || iterator.get_next()).buffered(PIPELINED_REQUESTS);
+        futures::stream::repeat_with(move || iterator.get_next_compressed())
+            .buffered(PIPELINED_REQUESTS);
     let terminated_event_stream =
         unprocessed_data_stream.take_until_stop_after(|result| match &result {
             Ok(events) => events.is_empty(),
@@ -163,15 +206,28 @@ pub async fn copy_debug_data(
                     debug_data.socket.ok_or_else(|| anyhow!("Missing profile socket handle"))?;
                 debug!("Reading run profile \"{:?}\"", debug_data.name);
                 let start = std::time::Instant::now();
-                let len = copy_socket_artifact(socket, &mut output).await?;
-                debug!("Copied file {:?}: {} bytes in {:?}", debug_data.name, len, start.elapsed());
+                let (decompressed_len, compressed_len) =
+                    copy_socket_artifact_and_decompress(socket, &mut output).await.map_err(
+                        |e| {
+                            warn!("Error copying artifact '{:?}': {:?}", debug_data.name, e);
+                            e
+                        },
+                    )?;
+
+                debug!(
+                    "Copied file {:?}: {}({} - compressed) bytes in {:?}",
+                    debug_data.name,
+                    decompressed_len,
+                    compressed_len,
+                    start.elapsed()
+                );
                 Ok::<(), anyhow::Error>(())
             })
         })
         .collect::<Vec<_>>()
         .await;
     join_all(data_futs).await;
-    debug!("All profiles downloaded");
+    debug!("All profiles downloaded in {:?}", start.elapsed());
 }
 
 /// Copy a directory into a directory artifact.
@@ -292,8 +348,10 @@ mod file_tests {
     ) {
         let mut served_files = vec![];
         expected_files.iter().for_each(|(path, content)| {
+            let mut compressor = zstd::bulk::Compressor::new(0).unwrap();
+            let bytes = compressor.compress(&content).unwrap();
             let (client, server) = zx::Socket::create_stream();
-            fasync::Task::spawn(serve_content_over_socket(content.clone(), server)).detach();
+            fasync::Task::spawn(serve_content_over_socket(bytes, server)).detach();
             served_files.push(ftest_manager::DebugData {
                 name: Some(path.display().to_string()),
                 socket: Some(client.into()),
@@ -302,12 +360,18 @@ mod file_tests {
         });
 
         let (iterator_proxy, mut iterator_stream) =
-            fidl::endpoints::create_proxy_and_stream::<ftest_manager::DebugDataIteratorMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ftest_manager::DebugDataIteratorMarker>();
         let serve_fut = async move {
             let mut files_iter = served_files.into_iter();
             while let Ok(Some(request)) = iterator_stream.try_next().await {
-                let ftest_manager::DebugDataIteratorRequest::GetNext { responder } = request;
+                let responder = match request {
+                    ftest_manager::DebugDataIteratorRequest::GetNext { .. } => {
+                        panic!("Not Implemented");
+                    }
+                    ftest_manager::DebugDataIteratorRequest::GetNextCompressed { responder } => {
+                        responder
+                    }
+                };
                 let resp: Vec<_> = files_iter.by_ref().take(3).collect();
                 let _ = responder.send(resp);
             }
@@ -324,7 +388,7 @@ mod file_tests {
         directory_writer: InMemoryDirectoryWriter,
     ) {
         let (directory_client, directory_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         fake_dir.open(
             scope,

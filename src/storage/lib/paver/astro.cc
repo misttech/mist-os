@@ -5,6 +5,7 @@
 #include "src/storage/lib/paver/astro.h"
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
+#include <lib/component/incoming/cpp/clone.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 
@@ -52,6 +53,12 @@ bool GetBool(fidl::WireSyncClient<fuchsia_boot::Arguments>& client, ::fidl::Stri
 }
 
 }  // namespace
+
+const paver::BlockDevices& AstroPartitioner::Devices() const { return skip_block_->devices(); }
+
+fidl::UnownedClientEnd<fuchsia_io::Directory> AstroPartitioner::SvcRoot() const {
+  return svc_root_.borrow();
+}
 
 bool AstroPartitioner::CanSafelyUpdateLayout(std::shared_ptr<Context> context) {
   // Condition: one successful slot + one unbootable slot
@@ -168,7 +175,8 @@ zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitioner::Initialize(
   std::unique_ptr<SkipBlockDevicePartitioner> skip_block(
       new SkipBlockDevicePartitioner(devices.Duplicate()));
 
-  return zx::ok(new AstroPartitioner(std::move(skip_block), std::move(context)));
+  return zx::ok(new AstroPartitioner(std::move(skip_block), component::MaybeClone(svc_root),
+                                     std::move(context)));
 }
 
 // Astro bootloader types:
@@ -299,19 +307,10 @@ zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitionerFactory::New(
   return AstroPartitioner::Initialize(devices, svc_root, context);
 }
 
-zx::result<std::unique_ptr<abr::Client>> AstroAbrClientFactory::New(
-    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-    std::shared_ptr<paver::Context> context) {
-  auto status = AstroPartitioner::Initialize(devices, svc_root, context);
-  if (status.is_error()) {
-    return status.take_error();
-  }
-  std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
-
+zx::result<std::unique_ptr<abr::Client>> AstroPartitioner::CreateAbrClient() const {
   // ABR metadata has no need of a content type since it's always local rather
   // than provided in an update package, so just use the default content type.
-  auto status_or_part =
-      partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+  auto status_or_part = FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
   if (status_or_part.is_error()) {
     return status_or_part.take_error();
   }

@@ -29,7 +29,7 @@ impl Capturer {
         format: Format,
         gain_settings: Option<fac::GainSettings>,
     ) -> Result<Self, Error> {
-        let (proxy, capturer_server_end) = create_proxy::<fmedia::AudioCapturerMarker>().unwrap();
+        let (proxy, capturer_server_end) = create_proxy::<fmedia::AudioCapturerMarker>();
 
         match source {
             fac::RecordSource::Capturer(capturer_type) => match capturer_type {
@@ -45,7 +45,7 @@ impl Capturer {
 
                     if let Some(gain_settings) = gain_settings {
                         let (gain_control_proxy, gain_control_server_end) =
-                            create_proxy::<fmedia_audio::GainControlMarker>().unwrap();
+                            create_proxy::<fmedia_audio::GainControlMarker>();
 
                         proxy.bind_gain_control(gain_control_server_end)?;
 

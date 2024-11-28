@@ -29,8 +29,7 @@ async fn accessor_truncation_test() {
             .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
             .await
             .unwrap()
-            .into_proxy()
-            .unwrap();
+            .into_proxy();
 
         writer.emit_example_inspect_data().await.unwrap();
         writers.push(writer);

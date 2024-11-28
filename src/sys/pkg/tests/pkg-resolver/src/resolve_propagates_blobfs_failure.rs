@@ -58,9 +58,8 @@ struct BlobFsWithFileCreateOverride {
 
 impl lib::Blobfs for BlobFsWithFileCreateOverride {
     fn root_dir_handle(&self) -> ClientEnd<fio::DirectoryMarker> {
-        let inner = self.wrapped.root_dir_handle().unwrap().into_proxy().unwrap();
-        let (client, server) =
-            fidl::endpoints::create_request_stream::<fio::DirectoryMarker>().unwrap();
+        let inner = self.wrapped.root_dir_handle().unwrap().into_proxy();
+        let (client, server) = fidl::endpoints::create_request_stream::<fio::DirectoryMarker>();
         DirectoryWithFileCreateOverride { inner, target: self.target.clone() }.spawn(server);
         client
     }
@@ -83,16 +82,11 @@ impl DirectoryWithFileCreateOverride {
     async fn serve(self, mut stream: fio::DirectoryRequestStream) {
         while let Some(req) = stream.next().await {
             match req.unwrap() {
-                fio::DirectoryRequest::Clone { flags, object, control_handle: _ } => {
-                    assert_eq!(flags, fio::OpenFlags::CLONE_SAME_RIGHTS);
-                    let stream = object.into_stream().unwrap().cast_stream();
-                    self.clone().spawn(stream);
-                }
                 fio::DirectoryRequest::Open { flags, mode, path, object, control_handle: _ } => {
                     let is_create = flags.intersects(fio::OpenFlags::CREATE);
 
                     if path == "." {
-                        let stream = object.into_stream().unwrap().cast_stream();
+                        let stream = object.into_stream().cast_stream();
                         self.clone().spawn(stream);
                     } else if path == self.target.0 && is_create {
                         let server_end = ServerEnd::<fio::FileMarker>::new(object.into_channel());
@@ -141,9 +135,7 @@ impl DirectoryWithFileCreateOverride {
                         Ok(())
                     });
                 }
-                fio::DirectoryRequest::Close { .. } => (),
-                fio::DirectoryRequest::GetToken { .. } => (),
-                req => panic!("DirectoryStreamHandler unhandled request {:?}", req),
+                request => panic!("Unhandled fuchsia.io/Directory request: {request:?}"),
             }
         }
     }
@@ -165,8 +157,7 @@ impl FakeFile {
     }
 
     async fn handle_file_stream(self, server_end: ServerEnd<fio::FileMarker>) {
-        let (stream, ch) =
-            server_end.into_stream_and_control_handle().expect("split file server end");
+        let (stream, ch) = server_end.into_stream_and_control_handle();
 
         self.stream_handler.handle_file_stream(self.call_count, stream, ch).await;
     }

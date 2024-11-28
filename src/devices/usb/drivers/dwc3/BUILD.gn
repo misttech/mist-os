@@ -80,6 +80,7 @@ fuchsia_driver_component("dwc3") {
 fuchsia_driver_package("package") {
   package_name = "dwc3"
   driver_components = [ ":dwc3" ]
+  export_to_bazel = true
 }
 
 test("dwc3-test-bin") {
@@ -116,6 +117,7 @@ group("tests") {
   ]
 }
 
+# TODO(https://fxbug.dev/379737609): Remove after a soft transition.
 export_fuchsia_package_to_bazel("package_for_bazel") {
   package = ":package"
 }

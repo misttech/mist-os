@@ -202,3 +202,45 @@ def _walk_json(json_dict, visit_node_funcs):
             _enqueue_dictionary_children(node.value)
         if type(node.value) == "list":
             _enqueue_array(node.value)
+
+def combine_directories(ctx, src, dst, inputs, outputs, subdirectories_to_overwrite = None):
+    """Copies a directory to the outdir, replacing the specified subdirectories.
+
+    This is done all as one action to avoid the problem of having actions with
+    outputs inside of a declared directory.
+
+    Args:
+        ctx: the bazel context
+        src: top-level directory to copy
+        dst: destination
+        inputs: inputs for the action
+        outputs: outputs of the action. This is usually a declared directory.
+        subdirectories_to_overwrite: a dict where the keys are source subdirectories
+            and the values are the names of the directories under the top-level directory
+            which are to be replaced.
+    """
+    cmd = """\
+if [ ! -d \"$1\" ]; then
+    echo \"Error: $1 is not a directory\"
+    exit 1
+fi
+
+rm -rf \"$2\" && cp -fR \"$1/\" \"$2\";
+"""
+    if subdirectories_to_overwrite:
+        for src_subdir, dest_subdir in subdirectories_to_overwrite.items():
+            cmd += 'rm -rf \"' + dst + "/" + dest_subdir + '\";\n'
+            cmd += 'cp -fR \"' + src_subdir + "\" \"" + dst + "/" + dest_subdir + '\";\n'
+    mnemonic = "CopyDirectory"
+    progress_message = "Copying directory %s" % src
+
+    ctx.actions.run_shell(
+        inputs = inputs,
+        outputs = outputs,
+        command = cmd,
+        arguments = [src, dst],
+        mnemonic = mnemonic,
+        progress_message = progress_message,
+        use_default_shell_env = True,
+        **LOCAL_ONLY_ACTION_KWARGS
+    )

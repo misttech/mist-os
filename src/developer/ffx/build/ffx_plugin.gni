@@ -106,16 +106,28 @@ template("ffx_plugin") {
   }
 
   if (is_host) {
-    sdk_category = "partner"
+    # The `args_*` parameters should not be passed to other sub-targets, and
+    # the args target handles each one individually. Exclude these parameter
+    # names when forwarding variables from invoker.
+    _args_parameter_names = [
+      "args_deps",
+      "args_source_root",
+      "args_sources",
+      "args_test_deps",
+      "args_with_unit_tests",
+    ]
+
+    # Default to partner.
+    # TODO(https://fxbug.dev/330629017): Remove the default and use
+    # `invoker.sdk_category` directly in the individual targets to avoid
+    # this refereence counting as a use for all of them.
     if (defined(invoker.sdk_category)) {
       sdk_category = invoker.sdk_category
+    } else {
+      sdk_category = "partner"
     }
 
     args_deps = []
-    if (defined(invoker.args_deps)) {
-      args_deps += invoker.args_deps
-    }
-
     cmd_deps = []
     p_deps = []
     json_deps = []
@@ -147,22 +159,20 @@ template("ffx_plugin") {
                ]
         forward_variables_from(invoker,
                                "*",
-                               [
-                                 "configs",
-                                 "name",
-                                 "edition",
-                                 "deps",
-                                 "args_deps",
-                                 "config_data",
-                                 "args_source_root",
-                                 "source_root",
-                                 "sources",
-                                 "args_sources",
-                                 "enforce_source_listing",
-                                 "target_name",
-                                 "with_unit_tests",
-                                 "original_target_name",
-                               ])
+                               _args_parameter_names + [
+                                     "configs",
+                                     "name",
+                                     "edition",
+                                     "deps",
+                                     "config_data",
+                                     "sdk_category",
+                                     "source_root",
+                                     "sources",
+                                     "enforce_source_listing",
+                                     "target_name",
+                                     "with_unit_tests",
+                                     "original_target_name",
+                                   ])
         deps += [ "//sdk:marker-$sdk_category" ]
       }
 
@@ -172,10 +182,6 @@ template("ffx_plugin") {
     }
 
     args_target_name = crate_name + "_args"
-    args_source_root = "src/args.rs"
-    if (defined(invoker.args_source_root)) {
-      args_source_root = invoker.args_source_root
-    }
 
     if (defined(invoker.config_data)) {
       json_deps += invoker.config_data
@@ -199,12 +205,21 @@ template("ffx_plugin") {
     } else {
       _original_target_name = target_name
     }
+
     rustc_library(args_target_name) {
-      source_root = args_source_root
+      if (defined(invoker.args_source_root)) {
+        source_root = invoker.args_source_root
+      } else {
+        source_root = "src/args.rs"
+      }
 
       # Due to size constraints, RBE slows down the build of plugins
       # rather than speeding it up. Disable RBE for plugins.
       disable_rbe = true
+
+      if (defined(invoker.args_deps)) {
+        args_deps += invoker.args_deps
+      }
 
       deps = args_deps + [
                "//src/developer/ffx/core:lib",
@@ -213,7 +228,7 @@ template("ffx_plugin") {
 
       assert(
           defined(invoker.args_sources),
-          "args_sources is required to contain the sources files that provide argh structures for the plugin")
+          "`args_sources` is required to contain the sources files that provide argh structures for the plugin")
       sources = invoker.args_sources
 
       # If the args library has tests enabled, enable them in the library.
@@ -227,19 +242,20 @@ template("ffx_plugin") {
       original_target_name = _original_target_name
       forward_variables_from(invoker,
                              "*",
-                             [
-                               "name",
-                               "configs",
-                               "config_data",
-                               "deps",
-                               "source_root",
-                               "sources",
-                               "non_rust_deps",
-                               "target_name",
-                               "with_unit_tests",
-                               "original_target_name",
-                               "test_deps",
-                             ])
+                             _args_parameter_names + [
+                                   "name",
+                                   "configs",
+                                   "config_data",
+                                   "deps",
+                                   "sdk_category",
+                                   "source_root",
+                                   "sources",
+                                   "target_name",
+                                   "with_unit_tests",
+                                   "original_target_name",
+                                   "test_deps",
+                                 ])
+      deps += [ "//sdk:marker-$sdk_category" ]
     }
     if (defined(invoker.args_with_unit_tests) && invoker.args_with_unit_tests) {
       tests_deps += [ ":" + args_target_name + "_test" ]
@@ -252,9 +268,10 @@ template("ffx_plugin") {
 
     includes_execution = false
     if (defined(invoker.sources)) {
-      plugin_source_root = "src/lib.rs"
       if (defined(invoker.source_root)) {
         plugin_source_root = invoker.source_root
+      } else {
+        plugin_source_root = "src/lib.rs"
       }
       foreach(i, invoker.sources) {
         if (i == plugin_source_root) {
@@ -262,21 +279,20 @@ template("ffx_plugin") {
         }
       }
     }
+    assert(
+        includes_execution || !defined(invoker.source_root),
+        "The path specified by `source_root` was not found in `sources`. Ensure it is included or do not specify `source_root`.")
 
     plugins_name = crate_name + "_plugins"
     plugins(plugins_name) {
       output_name = "plugins.rs"
       args = args_target_name
       if (defined(invoker.plugin_deps)) {
+        plugin_deps = invoker.plugin_deps
         sub_command = sub_cmd
       }
+      includes_execution = includes_execution
       execution_lib = crate_name
-      forward_variables_from(invoker,
-                             "*",
-                             [
-                               "name",
-                               "config_data",
-                             ])
     }
 
     suite_deps = lib_deps + p_deps
@@ -291,15 +307,6 @@ template("ffx_plugin") {
 
     if (includes_execution) {
       rustc_library(crate_name) {
-        deps = lib_deps
-        if (defined(invoker.deps)) {
-          deps += invoker.deps
-        }
-
-        if (defined(invoker.configs)) {
-          configs += invoker.configs
-        }
-
         # This template is used to generate plugins.rs via the
         # plugins GN template. If the template changes, then
         # all plugin dependencies need to be regenerated, so
@@ -309,23 +316,27 @@ template("ffx_plugin") {
         disable_rustdoc = true
         forward_variables_from(invoker,
                                "*",
-                               [
-                                 "name",
-                                 "configs",
-                                 "config_data",
-                                 "deps",
-                                 "non_rust_deps",
-                                 "target_name",
-                                 "original_target_name",
-                               ])
+                               _args_parameter_names + [
+                                     "config_data",
+                                     "name",
+                                     "original_target_name",
+                                     "sdk_category",
+                                     "target_name",
+                                   ])
         original_target_name = _original_target_name
-        deps += [ "//sdk:marker-$sdk_category" ]
+        if (!defined(deps)) {
+          deps = []
+        }
+        deps += lib_deps + [ "//sdk:marker-$sdk_category" ]
       }
       suite_deps += [ ":" + crate_name ]
 
       if (defined(invoker.with_unit_tests) && invoker.with_unit_tests) {
         tests_deps += [ ":" + crate_name + "_test" ]
       }
+    } else {
+      # TODO(https://fxbug.dev/378585405): Address presenence of unused `deps`
+      # parameter when not building the execution library.
     }
 
     rustc_library(crate_name + "_suite") {
@@ -338,21 +349,27 @@ template("ffx_plugin") {
 
       forward_variables_from(invoker,
                              "*",
-                             [
-                               "name",
-                               "configs",
-                               "config_data",
-                               "deps",
-                               "edition",
-                               "non_rust_deps",
-                               "target_name",
-                               "sources",
-                               "enforce_source_listing",
-                               "with_unit_tests",
-                               "original_target_name",
-                             ])
+                             _args_parameter_names + [
+                                   "name",
+                                   "configs",
+                                   "config_data",
+                                   "deps",
+                                   "edition",
+                                   "sdk_category",
+                                   "target_name",
+                                   "sources",
+                                   "enforce_source_listing",
+                                   "with_unit_tests",
+                                   "original_target_name",
+                                 ])
 
-      # make sure no fidl libraries not in the SDK are used if it's public
+      # For plugins that are not internal only (in other words, in the SDK),
+      # ensure all FIDL dependencies are available and stable. Use the
+      # "partner_internal" SDK category and greater as an approximation of this.
+      # However, note that not everything in those categories is stable.
+      # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
+      # Also, there are exceptions - see https://fxbug.dev/42081073 and
+      # https://fxbug.dev/326090508.
       # This target includes all other targets defined above, so this
       # `assert_no_deps` covers all of them.
       # TODO(b/314822328): improve this logic to cascade properly

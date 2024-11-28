@@ -204,11 +204,9 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn try_from_watch_light_groups_request() {
         // Connect to the Light service and make a watch request.
-        let (proxy, server) =
-            fidl::endpoints::create_proxy::<LightMarker>().expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<LightMarker>();
         let _fut = proxy.watch_light_groups();
-        let mut request_stream: LightRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: LightRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await
@@ -227,11 +225,9 @@ mod tests {
     /// This method creates a FIDL proxy to make requests through because directly creating FIDL
     /// request objects is difficult and not intended by the API.
     async fn signature_from_watch_light_group_request(light_name: &str) -> Signature {
-        let (proxy, server) =
-            fidl::endpoints::create_proxy::<LightMarker>().expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<LightMarker>();
         let _fut = proxy.watch_light_group(light_name);
-        let mut request_stream: LightRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: LightRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await
@@ -268,11 +264,9 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn try_from_set_light_group_values_request() {
         // Connect to the Light service and make a set request.
-        let (proxy, server) =
-            fidl::endpoints::create_proxy::<LightMarker>().expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<LightMarker>();
         let _fut = proxy.set_light_group_values("arbitrary name", &[]);
-        let mut request_stream: LightRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: LightRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await

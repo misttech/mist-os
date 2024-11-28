@@ -20,7 +20,7 @@
 
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"
 
-namespace display {
+namespace display_coordinator {
 
 class TestBase : public testing::Test {
  public:
@@ -50,9 +50,9 @@ class TestBase : public testing::Test {
   async::Loop loop_;
   thrd_t loop_thrd_ = 0;
 
-  std::unique_ptr<FakeDisplayStack> tree_;
+  std::unique_ptr<display::FakeDisplayStack> tree_;
 };
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_BASE_H_

@@ -39,13 +39,13 @@
 #include <fbl/string_buffer.h>
 #include <fbl/vector.h>
 
-#include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/event-id.h"
-#include "src/graphics/display/lib/api-types-cpp/image-id.h"
-#include "src/graphics/display/lib/api-types-cpp/layer-id.h"
-#include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
+#include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-id.h"
+#include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 #include "src/graphics/display/testing/client-utils/display.h"
 #include "src/graphics/display/testing/client-utils/virtual-layer.h"
 
@@ -139,18 +139,17 @@ fidl::SyncClient<sysmem2::BufferCollection> collection_;
 zx::vmo capture_vmo;
 
 enum TestBundle {
-  SIMPLE = 0,  // BUNDLE0
-  FLIP,        // BUNDLE1
-  INTEL,       // BUNDLE2
-  BUNDLE3,
+  SIMPLE = 0,
+  FLIP,
   BLANK,
   BUNDLE_COUNT,
 };
 
+static constexpr const char* testbundle_names[] = {"SIMPLE", "FLIP", "BLANK"};
+
 enum Platforms {
   INTEL_PLATFORM = 0,
   AMLOGIC_PLATFORM,
-  MEDIATEK_PLATFORM,
   AEMU_PLATFORM,
   QEMU_PLATFORM,
   UNKNOWN_PLATFORM,
@@ -279,48 +278,47 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
   return true;
 }
 
-std::optional<fhdt::wire::ConfigStamp> apply_config() {
-  auto result = dc->CheckConfig(false);
-  if (!result.ok()) {
-    printf("Failed to make check call: %s\n", result.FormatDescription().c_str());
-    return std::nullopt;
+zx_status_t apply_config(fhdt::wire::ConfigStamp stamp) {
+  auto check_result = dc->CheckConfig(false);
+  if (!check_result.ok()) {
+    printf("Failed to make check call: %s\n", check_result.FormatDescription().c_str());
+    return check_result.error().status();
   }
 
-  if (result.value().res != fhdt::wire::ConfigResult::kOk) {
-    printf("Config not valid (%d)\n", static_cast<uint32_t>(result.value().res));
-    for (const auto& op : result.value().ops) {
+  if (check_result.value().res != fhdt::wire::ConfigResult::kOk) {
+    printf("Config not valid (%d)\n", static_cast<uint32_t>(check_result.value().res));
+    for (const auto& op : check_result.value().ops) {
       printf("Client composition op (display %ld, layer %ld): %hhu\n", op.display_id.value,
              op.layer_id.value, static_cast<uint8_t>(op.opcode));
     }
-    return std::nullopt;
+    return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!dc->ApplyConfig().ok()) {
+  fidl::Arena arena;
+  auto builder = fhd::wire::CoordinatorApplyConfig3Request::Builder(arena);
+  builder.stamp(stamp);
+  auto apply_result = dc->ApplyConfig3(builder.Build());
+  if (!apply_result.ok()) {
     printf("Apply failed\n");
-    return std::nullopt;
+    return apply_result.error().status();
   }
 
-  auto config_stamp_result = dc->GetLatestAppliedConfigStamp();
-  if (!config_stamp_result.ok()) {
-    printf("GetLatestAppliedConfigStamp failed\n");
-    return std::nullopt;
-  }
-
-  return config_stamp_result.value().stamp;
+  return ZX_OK;
 }
 
 zx_status_t wait_for_vsync(async::Loop& coordinator_listener_loop,
                            fhdt::wire::ConfigStamp expected_stamp) {
   zx_status_t status = coordinator_listener_loop.Run(zx::time::infinite(), /*once=*/true);
   if (status != ZX_OK) {
-    printf("Failed to run coordinator listener loop: %s", zx_status_get_string(status));
+    printf("wait_for_vsync(): Failed to run coordinator listener loop: %s",
+           zx_status_get_string(status));
     return status;
   }
   if (!g_coordinator_listener.has_ownership()) {
     return ZX_ERR_NEXT;
   }
   if (g_coordinator_listener.displays().empty()) {
-    printf("Display disconnected\n");
+    printf("wait_for_vsync(): Display disconnected\n");
     return ZX_ERR_STOP;
   }
 
@@ -663,16 +661,10 @@ void usage(void) {
       "--bundle N       : Run test from test bundle N as described below\n\n"
       "                   bundle %d: Display a single pattern using single buffer\n"
       "                   bundle %d: Flip between two buffers to display a pattern\n"
-      "                   bundle %d: Run the standard Intel-based display tests. This includes\n"
-      "                             hardware composition of 1 color layer and 3 primary layers.\n"
-      "                             The tests include alpha blending, translation, scaling\n"
-      "                             and rotation\n"
-      "                   bundle %d: 4 layer hardware composition with alpha blending\n"
-      "                             and image translation\n"
       "                   bundle %d: Blank the screen and sleep for --num-frames.\n"
-      "                   (default: bundle %d)\n\n"
+      "                   (default: %d on Intel / Amlogic platforms, %d otherwise)\n\n"
       "--help           : Show this help message\n",
-      SIMPLE, FLIP, INTEL, BUNDLE3, BLANK, INTEL);
+      SIMPLE, FLIP, BLANK, FLIP, SIMPLE);
 }
 
 Platforms GetPlatform() {
@@ -708,10 +700,6 @@ Platforms GetPlatform() {
       board_name_cmp.find("nelson") != std::string_view::npos ||
       board_name_cmp.find("luis") != std::string_view::npos) {
     return AMLOGIC_PLATFORM;
-  }
-  if (board_name_cmp.find("cleo") != std::string_view::npos ||
-      board_name_cmp.find("mt8167s_ref") != std::string_view::npos) {
-    return MEDIATEK_PLATFORM;
   }
   if (board_name_cmp.find("qemu") != std::string_view::npos ||
       board_name_cmp.find("Standard PC (Q35 + ICH9, 2009)") != std::string_view::npos) {
@@ -753,16 +741,13 @@ int main(int argc, const char* argv[]) {
 
   platform = GetPlatform();
 
+  // Select a "test bundle" based on the platform.  This bundle is a configuration flag which
+  // controls the initialization of various test objects.
   TestBundle testbundle;
   switch (platform) {
     case INTEL_PLATFORM:
-      testbundle = INTEL;
-      break;
     case AMLOGIC_PLATFORM:
       testbundle = FLIP;
-      break;
-    case MEDIATEK_PLATFORM:
-      testbundle = BUNDLE3;
       break;
     default:
       testbundle = SIMPLE;
@@ -1005,107 +990,9 @@ int main(int argc, const char* argv[]) {
   std::optional<int32_t> max_apply_configs(num_frames);
 
   fbl::AllocChecker ac;
-  if (testbundle == INTEL) {
-    // Intel only supports 90/270 rotation for Y-tiled images, so enable it for testing.
-    constexpr fuchsia_images2::wire::PixelFormatModifier kIntelYTilingModifier =
-        fuchsia_images2::wire::PixelFormatModifier::kIntelI915YTiled;
 
-    // Color layer which covers all displays
-    std::unique_ptr<ColorLayer> layer0 = fbl::make_unique_checked<ColorLayer>(&ac, displays);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-    layers.push_back(std::move(layer0));
-
-    // Layer which covers all displays and uses page flipping.
-    std::unique_ptr<PrimaryLayer> layer1 = fbl::make_unique_checked<PrimaryLayer>(&ac, displays);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-    layer1->SetLayerFlipping(true);
-    layer1->SetAlpha(true, .75);
-    layer1->SetFormatModifier(kIntelYTilingModifier);
-    layers.push_back(std::move(layer1));
-
-    // Layer which covers the left half of the of the first display
-    // and toggles on and off every frame.
-    std::unique_ptr<PrimaryLayer> layer2 =
-        fbl::make_unique_checked<PrimaryLayer>(&ac, &displays[0]);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-    layer2->SetImageDimens(displays[0].mode().horizontal_resolution / 2,
-                           displays[0].mode().vertical_resolution);
-    layer2->SetLayerToggle(true);
-    layer2->SetScaling(true);
-    layer2->SetFormatModifier(kIntelYTilingModifier);
-    layers.push_back(std::move(layer2));
-
-    // Layer which is smaller than the display and bigger than its image
-    // and which animates back and forth across all displays and also
-    // its src image and also rotates.
-    std::unique_ptr<PrimaryLayer> layer3 = fbl::make_unique_checked<PrimaryLayer>(&ac, displays);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-    // Width is the larger of disp_width/2, display_height/2, but we also need
-    // to make sure that it's less than the smaller display dimension.
-    uint32_t width = std::min(
-        std::max(displays[0].mode().vertical_resolution / 2,
-                 displays[0].mode().horizontal_resolution / 2),
-        std::min(displays[0].mode().vertical_resolution, displays[0].mode().horizontal_resolution));
-    uint32_t height = std::min(displays[0].mode().vertical_resolution / 2,
-                               displays[0].mode().horizontal_resolution / 2);
-    layer3->SetImageDimens(width * 2, height);
-    layer3->SetDisplayDestination(width, height);
-    layer3->SetImageSource(width, height);
-    layer3->SetPanDest(true);
-    layer3->SetPanSrc(true);
-    layer3->SetRotates(true);
-    layer3->SetFormatModifier(kIntelYTilingModifier);
-    layers.push_back(std::move(layer3));
-  } else if (testbundle == BUNDLE3) {
-    // Mediatek display test
-    uint32_t width = displays[0].mode().horizontal_resolution;
-    uint32_t height = displays[0].mode().vertical_resolution;
-    std::unique_ptr<PrimaryLayer> layer1 = fbl::make_unique_checked<PrimaryLayer>(&ac, displays);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-    layer1->SetAlpha(true, (float)0.2);
-    layer1->SetImageDimens(width, height);
-    layer1->SetImageSource(width / 2, height / 2);
-    layer1->SetDisplayDestination(width / 2, height / 2);
-    layer1->SetPanSrc(true);
-    layer1->SetPanDest(true);
-    layers.push_back(std::move(layer1));
-
-    // Layer which covers the left half of the of the first display
-    // and toggles on and off every frame.
-    float alpha2 = (float)0.5;
-    std::unique_ptr<PrimaryLayer> layer2 = fbl::make_unique_checked<PrimaryLayer>(&ac, displays);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-    layer2->SetLayerFlipping(true);
-    layer2->SetAlpha(true, alpha2);
-    layers.push_back(std::move(layer2));
-
-    float alpha3 = (float)0.2;
-    std::unique_ptr<PrimaryLayer> layer3 = fbl::make_unique_checked<PrimaryLayer>(&ac, displays);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-    layer3->SetAlpha(true, alpha3);
-    layers.push_back(std::move(layer3));
-
-    std::unique_ptr<PrimaryLayer> layer4 = fbl::make_unique_checked<PrimaryLayer>(&ac, displays);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-    layer4->SetAlpha(true, (float)0.3);
-    layers.push_back(std::move(layer4));
-  } else if (testbundle == FLIP) {
+  printf("Using TestBundle: %s\n", testbundle_names[testbundle]);
+  if (testbundle == FLIP) {
     // Amlogic display test
     std::unique_ptr<PrimaryLayer> layer1 = fbl::make_unique_checked<PrimaryLayer>(
         &ac, displays, image_pattern, fgcolor_rgba, bgcolor_rgba);
@@ -1162,6 +1049,8 @@ int main(int argc, const char* argv[]) {
   if (capture) {
     printf("Capturing every frame. Verification is %s\n", verify_capture ? "enabled" : "disabled");
   }
+
+  fhdt::wire::ConfigStamp last_applied_stamp = {.value = fhdt::wire::kInvalidConfigStampValue};
   bool capture_result = true;
   for (int i = 0; !num_frames || i < num_frames; i++) {
     for (auto& layer : layers) {
@@ -1169,7 +1058,25 @@ int main(int argc, const char* argv[]) {
       // so we won't necessarily need to wait.
       layer->StepLayout(i);
 
-      if (!layer->WaitForReady()) {
+      // Wait for previous config to be applied before deciding whether images are OK for rendering.
+      if (last_applied_stamp.value > 0) {
+        while (true) {
+          zx_status_t vsync_status = wait_for_vsync(coordinator_listener_loop, last_applied_stamp);
+
+          if (vsync_status == ZX_OK) {
+            ZX_ASSERT(g_coordinator_listener.latest_config_stamp() ==
+                      display::ToConfigStamp(last_applied_stamp));
+            break;
+          } else if (vsync_status == ZX_ERR_NEXT) {
+            zx::nanosleep(zx::deadline_after(zx::msec(100)));
+            continue;
+          } else {
+            ZX_PANIC("Failed to wait for Vsync: %s", zx_status_get_string(vsync_status));
+          }
+        }
+      }
+
+      if (!layer->ReadyToRender(display::ToConfigStamp(last_applied_stamp))) {
         printf("Buffer failed to become free\n");
         return -1;
       }
@@ -1188,14 +1095,12 @@ int main(int argc, const char* argv[]) {
     // in order to observe any tearing effects
     zx_nanosleep(zx_deadline_after(ZX_MSEC(delay)));
 
-    fhdt::wire::ConfigStamp expected_stamp = {.value = fhdt::wire::kInvalidConfigStampValue};
     if (!max_apply_configs || i < max_apply_configs) {
       for (uint32_t cpv = 0; cpv < configs_per_vsync; cpv++) {
-        auto maybe_expected_stamp = apply_config();
-        if (!maybe_expected_stamp.has_value()) {
+        last_applied_stamp.value++;
+        if (zx_status_t status; (status = apply_config(last_applied_stamp)) != ZX_OK) {
+          printf("apply_config() failed with status: %s\n", zx_status_get_string(status));
           return -1;
-        } else {
-          expected_stamp = *maybe_expected_stamp;
         }
       }
     }
@@ -1205,8 +1110,8 @@ int main(int argc, const char* argv[]) {
     }
 
     zx_status_t status = ZX_OK;
-    while (layers.size() != 0 &&
-           (status = wait_for_vsync(coordinator_listener_loop, expected_stamp)) == ZX_ERR_NEXT) {
+    while (layers.size() != 0 && (status = wait_for_vsync(coordinator_listener_loop,
+                                                          last_applied_stamp)) == ZX_ERR_NEXT) {
     }
     ZX_ASSERT(status == ZX_OK);
     if (capture) {

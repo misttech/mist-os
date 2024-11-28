@@ -38,7 +38,7 @@ class DriverHost {
 
   // Components that will be sent to the driver host when requesting to start a driver.
   struct DriverStartArgs {
-    DriverStartArgs(fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
+    DriverStartArgs(fuchsia_driver_framework::wire::NodePropertyDictionary2 node_properties,
                     fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
                     fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
                     fuchsia_component_runner::wire::ComponentStartInfo start_info)
@@ -51,7 +51,7 @@ class DriverHost {
           offers_(fidl::ToNatural(offers)),
           start_info_(fidl::ToNatural(start_info)) {}
 
-    std::optional<fuchsia_driver_framework::NodePropertyDictionary> node_properties_;
+    std::optional<fuchsia_driver_framework::NodePropertyDictionary2> node_properties_;
     std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>> symbols_;
     std::optional<std::vector<fuchsia_driver_framework::Offer>> offers_;
     fuchsia_component_runner::ComponentStartInfo start_info_;
@@ -59,7 +59,7 @@ class DriverHost {
 
   virtual void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end,
                      std::string node_name,
-                     fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
+                     fuchsia_driver_framework::wire::NodePropertyDictionary2 node_properties,
                      fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
                      fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
                      fuchsia_component_runner::wire::ComponentStartInfo start_info,
@@ -87,7 +87,7 @@ class DriverHostComponent final
                       std::shared_ptr<bool> server_connected);
 
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_name,
-             fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
+             fuchsia_driver_framework::wire::NodePropertyDictionary2 node_properties,
              fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
              fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
              fuchsia_component_runner::wire::ComponentStartInfo start_info,
@@ -125,7 +125,7 @@ class DynamicLinkerDriverHostComponent final
       fbl::DoublyLinkedList<std::unique_ptr<DynamicLinkerDriverHostComponent>>* driver_hosts);
 
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
-             fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
+             fuchsia_driver_framework::wire::NodePropertyDictionary2 node_properties,
              fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
              fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
              fuchsia_component_runner::wire::ComponentStartInfo start_info,

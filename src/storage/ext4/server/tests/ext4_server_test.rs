@@ -28,7 +28,7 @@ async fn make_ramdisk() -> (RamdiskClient, RemoteBlockClient) {
     let client = RamdiskClient::builder(RAMDISK_BLOCK_SIZE, RAMDISK_BLOCK_COUNT);
     let ramdisk = client.build().await.expect("RamdiskClientBuilder.build() failed");
     let client_end = ramdisk.open().expect("ramdisk.open failed");
-    let proxy = client_end.into_proxy().expect("into_proxy failed");
+    let proxy = client_end.into_proxy();
     let block_client = RemoteBlockClient::new(proxy).await.expect("new failed");
 
     assert_eq!(block_client.block_size(), 1024);
@@ -77,7 +77,7 @@ async fn ext4_server_mounts_block_device(
     block_client.close().await.unwrap();
 
     let ext4_binary_path = CString::new("/pkg/bin/ext4_readonly").unwrap();
-    let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     let _process = scoped_task::spawn_etc(
         &scoped_task::job_default(),
@@ -121,7 +121,7 @@ async fn ext4_server_mounts_block_device_and_dies_on_close() -> Result<(), Error
     block_client.close().await.unwrap();
 
     let ext4_binary_path = CString::new("/pkg/bin/ext4_readonly").unwrap();
-    let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     let process = scoped_task::spawn_etc(
         &scoped_task::job_default(),
@@ -162,7 +162,7 @@ async fn ext4_server_mounts_vmo_one_file() -> Result<(), Error> {
     let vmo = zx::Vmo::create(size)?;
     vmo.write(&temp_buf, 0)?;
 
-    let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let result = ext4.mount_vmo(vmo, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
@@ -186,7 +186,7 @@ async fn ext4_server_mounts_vmo_nested_dirs() -> Result<(), Error> {
     let vmo = zx::Vmo::create(size)?;
     vmo.write(&temp_buf, 0)?;
 
-    let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let result = ext4.mount_vmo(vmo, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
@@ -216,7 +216,7 @@ async fn ext4_unified_service_mounts_vmo() -> Result<(), Error> {
     let vmo = zx::Vmo::create(size)?;
     vmo.write(&temp_buf, 0)?;
 
-    let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let result = ext4.mount_vmo(vmo, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 

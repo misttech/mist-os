@@ -13,7 +13,7 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_sync::RwLock;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
-use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
+use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::fidl_ip_v6;
 use net_types::ip::IpAddress;
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -168,20 +168,16 @@ struct UnhandledResolveErrorKindStats {
 }
 
 impl UnhandledResolveErrorKindStats {
-    fn increment(&mut self, resolve_error_kind: &ResolveErrorKind) {
+    /// Increments the counter for the given error kind. Returns a string
+    /// containing the name of that kind so the caller doesn't have to perform
+    /// the processing if they want to log it.
+    fn increment(&mut self, resolve_error_kind: &ResolveErrorKind) -> String {
         let Self { resolve_error_kind_counts } = self;
-        // We just want to keep the part of the debug string that indicates
-        // which enum variant this is.
-        // See https://doc.rust-lang.org/reference/identifiers.html
-        let truncated_debug = {
-            let debug = format!("{:?}", resolve_error_kind);
-            match debug.find(|c: char| !c.is_xid_continue() && !c.is_xid_start()) {
-                Some(i) => debug[..i].to_string(),
-                None => debug,
-            }
-        };
-        let count = resolve_error_kind_counts.entry(truncated_debug).or_insert(0);
-        *count += 1
+        let truncated_debug = enum_variant_string(resolve_error_kind);
+        let count = resolve_error_kind_counts.entry(truncated_debug.clone()).or_insert(0);
+        *count += 1;
+
+        truncated_debug
     }
 }
 
@@ -243,8 +239,8 @@ impl FailureStats {
             // TODO(https://github.com/rust-lang/rust/issues/89554): remove once
             // we're able to apply the non_exhaustive_omitted_patterns lint
             kind => {
-                error!("unhandled variant {:?}", kind);
-                unhandled_resolve_error_kind.increment(kind)
+                let variant = unhandled_resolve_error_kind.increment(kind);
+                error!("unhandled variant: {variant}");
             }
         }
     }
@@ -301,6 +297,18 @@ impl QueryWindow {
         *failure_count += 1;
         *failure_elapsed_time += elapsed_time;
         failure_stats.increment(error)
+    }
+}
+
+/// Returns the name of the enum variant that was set.
+fn enum_variant_string(variant: &impl std::fmt::Debug) -> String {
+    let debug = format!("{:?}", variant);
+    // We just want to keep the part of the debug string that indicates
+    // which enum variant this is.
+    // See https://doc.rust-lang.org/reference/identifiers.html
+    match debug.find(|c: char| !c.is_xid_continue() && !c.is_xid_start()) {
+        Some(i) => debug[..i].to_string(),
+        None => debug,
     }
 }
 
@@ -379,10 +387,64 @@ impl ResolverLookup for Resolver {
     }
 }
 
+#[derive(Debug)]
+enum LookupIpErrorSource {
+    Ipv4,
+    Ipv6,
+    CanonicalName,
+}
+
+#[derive(Default)]
+struct LookupIpErrorsFromSource {
+    ipv4: Option<ResolveError>,
+    ipv6: Option<ResolveError>,
+    canonical_name: Option<ResolveError>,
+}
+
+impl LookupIpErrorsFromSource {
+    fn any_error(&self) -> Option<&ResolveError> {
+        let Self { ipv4, ipv6, canonical_name } = self;
+        ipv4.as_ref().or_else(|| ipv6.as_ref()).or_else(|| canonical_name.as_ref())
+    }
+
+    fn accumulate(&mut self, src: LookupIpErrorSource, error: ResolveError) {
+        let Self { ipv4, ipv6, canonical_name } = self;
+        let target = match src {
+            LookupIpErrorSource::Ipv4 => ipv4,
+            LookupIpErrorSource::Ipv6 => ipv6,
+            LookupIpErrorSource::CanonicalName => canonical_name,
+        };
+        debug_assert!(target.is_none(), "multiple errors observed for {src:?}");
+        *target = Some(error)
+    }
+
+    fn handle(self) -> fname::LookupError {
+        let Self { ipv4, ipv6, canonical_name } = self;
+        let mut ret = None;
+        for (src, err) in [
+            ("LookupIp(IPv4)", ipv4),
+            ("LookupIp(IPv6)", ipv6),
+            ("LookupIp(CanonicalName)", canonical_name),
+        ]
+        .into_iter()
+        .filter_map(|(src, err)| err.map(|e| (src, e)))
+        {
+            // We want to log all errors, but only convert one of them to the
+            // return. The fixed order IPv4, IPv6, CanonicalName is chosen to
+            // maximize the likelihood of the reported error being useful.
+            let err = handle_err(src, err);
+            if ret.is_none() {
+                ret = Some(err)
+            }
+        }
+        ret.unwrap_or(fname::LookupError::InternalError)
+    }
+}
+
 fn handle_err(source: &str, err: ResolveError) -> fname::LookupError {
     use trust_dns_proto::error::ProtoErrorKind;
 
-    let (lookup_err, ioerr) = match err.kind() {
+    let (lookup_err, ioerr): (_, Option<(std::io::ErrorKind, _)>) = match err.kind() {
         // The following mapping is based on the analysis of `ResolveError` enumerations.
         // For cases that are not obvious such as `ResolveErrorKind::Msg` and
         // `ResolveErrorKind::Message`, I (chunyingw) did code searches to have more insights.
@@ -405,7 +467,9 @@ fn handle_err(source: &str, err: ResolveError) -> fname::LookupError {
             ProtoErrorKind::Busy | ProtoErrorKind::Canceled(_) | ProtoErrorKind::Timeout => {
                 (fname::LookupError::Transient, None)
             }
-            ProtoErrorKind::Io(inner) => (fname::LookupError::Transient, Some(inner)),
+            ProtoErrorKind::Io(inner) => {
+                (fname::LookupError::Transient, Some((inner.kind(), inner.raw_os_error())))
+            }
             ProtoErrorKind::BadQueryCount(_)
             | ProtoErrorKind::CharacterDataTooLong { max: _, len: _ }
             | ProtoErrorKind::LabelOverlapsWithOther { label: _, other: _ }
@@ -441,11 +505,13 @@ fn handle_err(source: &str, err: ResolveError) -> fname::LookupError {
             // https://github.com/bluejekyll/trust-dns/blob/v0.21.0-alpha.1/crates/proto/src/error.rs#L66
             // So we have to include a wildcard match.
             kind => {
-                error!("unhandled variant {:?}", kind);
+                error!("unhandled variant {:?}", enum_variant_string(kind));
                 (fname::LookupError::InternalError, None)
             }
         },
-        ResolveErrorKind::Io(inner) => (fname::LookupError::Transient, Some(inner)),
+        ResolveErrorKind::Io(inner) => {
+            (fname::LookupError::Transient, Some((inner.kind(), inner.raw_os_error())))
+        }
         ResolveErrorKind::Timeout => (fname::LookupError::Transient, None),
         ResolveErrorKind::Msg(_)
         | ResolveErrorKind::Message(_)
@@ -454,18 +520,20 @@ fn handle_err(source: &str, err: ResolveError) -> fname::LookupError {
         // https://github.com/bluejekyll/trust-dns/blob/v0.21.0-alpha.1/crates/resolver/src/error.rs#L29
         // So we have to include a wildcard match.
         kind => {
-            error!("unhandled variant {:?}", kind);
+            error!("unhandled variant {:?}", enum_variant_string(kind));
             (fname::LookupError::InternalError, None)
         }
     };
 
-    if let Some(ioerr) = ioerr {
-        match ioerr.raw_os_error() {
-            Some(libc::EHOSTUNREACH) => debug!("{} error: {}; (IO error {:?})", source, err, ioerr),
-            _ => warn!("{} error: {}; (IO error {:?})", source, err, ioerr),
+    if let Some((ioerr, raw_os_error)) = ioerr {
+        match raw_os_error {
+            Some(libc::EHOSTUNREACH | libc::ENETUNREACH) => {
+                debug!("{} error: {:?}; (IO error {:?})", source, lookup_err, ioerr)
+            }
+            _ => warn!("{} error: {:?}; (IO error {:?})", source, lookup_err, ioerr),
         }
     } else {
-        warn!("{} error: {}", source, err)
+        warn!("{} error: {:?}", source, lookup_err);
     }
 
     lookup_err
@@ -811,14 +879,26 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                     let start_time = fasync::MonotonicInstant::now();
                     let (ret1, ret2, ret3) = futures::future::join3(
                         futures::future::OptionFuture::from(
-                            ipv4_lookup.then(|| resolver.lookup(hostname, RecordType::A)),
+                            ipv4_lookup.then(|| {
+                                resolver
+                                    .lookup(hostname, RecordType::A)
+                                    .map_err(|e| (LookupIpErrorSource::Ipv4, e))
+                            }),
                         ),
                         futures::future::OptionFuture::from(
-                            ipv6_lookup.then(|| resolver.lookup(hostname, RecordType::AAAA)),
+                            ipv6_lookup.then(|| {
+                                resolver
+                                    .lookup(hostname, RecordType::AAAA)
+                                    .map_err(|e| (LookupIpErrorSource::Ipv6, e))
+                            }),
                         ),
                         futures::future::OptionFuture::from(
                             canonical_name_lookup
-                                .then(|| resolver.lookup(hostname, RecordType::CNAME)),
+                                .then(|| {
+                                    resolver
+                                        .lookup(hostname, RecordType::CNAME)
+                                        .map_err(|e| (LookupIpErrorSource::CanonicalName, e))
+                                }),
                         ),
                     )
                     .await;
@@ -828,14 +908,11 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                     }
                     let (addrs, cnames, error) =
                         result.into_iter().filter_map(std::convert::identity).fold(
-                            (Vec::new(), Vec::new(), None),
+                            (Vec::new(), Vec::new(), LookupIpErrorsFromSource::default()),
                             |(mut addrs, mut cnames, mut error), result| {
                                 let () = match result {
-                                    Err(err) => match error.as_ref() {
-                                        Some(_err) => {}
-                                        None => {
-                                            error = Some(err);
-                                        }
+                                    Err((src, err)) => {
+                                        error.accumulate(src, err);
                                     },
                                     Ok(lookup) => lookup.iter().for_each(|rdata| match rdata {
                                         RData::A(addr) if ipv4_lookup => addrs
@@ -861,35 +938,42 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                         });
                     let count = match NonZeroUsize::try_from(addrs.len() + cnames.len()) {
                         Ok(count) => Ok(count),
-                        Err(std::num::TryFromIntError { .. }) => {
-                            match error {
-                                None => {
-                                    // TODO(https://fxbug.dev/42062388): Remove
-                                    // this once Trust-DNS enforces that all
-                                    // responses with no records return a
-                                    // `NoRecordsFound` error.
-                                    //
-                                    // Note that returning here means that query
-                                    // stats for inspect will not get logged.
-                                    // This is ok since this case should be rare
-                                    // and is considered to be temporary.
-                                    // Moreover, the failed query counters are
-                                    // based on the `ResolverError::kind`, which
-                                    // isn't applicable here.
-                                    error!("resolver response unexpectedly contained no records and no error. See https://fxbug.dev/42062388.");
-                                    return Err(fname::LookupError::NotFound);
-                                },
-                                Some(e) => Err(e),
+                        Err(std::num::TryFromIntError { .. }) => match error.any_error() {
+                            None => {
+                                // TODO(https://fxbug.dev/42062388): Remove this
+                                // once Trust-DNS enforces that all responses
+                                // with no records return a `NoRecordsFound`
+                                // error.
+                                //
+                                // Note that returning here means that query
+                                // stats for inspect will not get logged. This
+                                // is ok since this case should be rare and is
+                                // considered to be temporary. Moreover, the
+                                // failed query counters are based on the
+                                // `ResolverError::kind`, which isn't applicable
+                                // here.
+                                error!("resolver response unexpectedly contained no records \
+                                        and no error. See https://fxbug.dev/42062388.");
+                                return Err(fname::LookupError::NotFound);
+                            },
+                            Some(any_err) => {
+                                Err(any_err)
                             }
                         }
                     };
                     let () = stats
                         .finish_query(
                             start_time,
-                            count.as_ref().copied().map_err(ResolveError::kind),
+                            count.as_ref().copied().map_err(|e| e.kind()),
                         )
                         .await;
-                    let _: NonZeroUsize = count.map_err(|err| handle_err("LookupIp", err))?;
+                    match count {
+                        Ok(_) => {},
+                        Err(_any_err) => {
+                            // Handle all the errors instead of just the one used for stats.
+                            return Err(error.handle());
+                        }
+                    }
                     let addrs = if sort_addresses {
                         sort_preferred_addresses(addrs, &routes).await?
                     } else {
@@ -897,8 +981,8 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                     };
                     let addrs = if addrs.len() > fname::MAX_ADDRESSES.into() {
                         warn!(
-                            "Lookup({}, {:?}): {} addresses, truncating to {}",
-                            hostname, options, addrs.len(), fname::MAX_ADDRESSES
+                            "Lookup(_, {:?}): {} addresses, truncating to {}",
+                            options, addrs.len(), fname::MAX_ADDRESSES
                         );
                         let mut addrs = addrs;
                         addrs.truncate(fname::MAX_ADDRESSES.into());
@@ -919,8 +1003,8 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                                 acc
                             });
                         warn!(
-                            "Lookup({}, {:?}): multiple CNAMEs: {:?}",
-                            hostname, options, cnames
+                            "Lookup(_, {:?}): multiple CNAMEs: {:?}",
+                            options, cnames
                         )
                     }
                     let cname = {
@@ -936,8 +1020,8 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                 .await;
                 responder.send(lookup_result.as_ref().map_err(|e| *e)).unwrap_or_else(|e|
                     warn!(
-                        "failed to send IP lookup result {:?} due to FIDL error: {}",
-                        lookup_result, e
+                        "failed to send IP lookup result due to FIDL error: {}",
+                        e
                     )
                 )
             }
@@ -1221,8 +1305,7 @@ mod tests {
 
     async fn setup_namelookup_service() -> (fname::LookupProxy, impl futures::Future<Output = ()>) {
         let (name_lookup_proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>()
-                .expect("failed to create NamelookupProxy");
+            fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>();
 
         let mut resolver_opts = ResolverOpts::default();
         resolver_opts.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
@@ -1233,8 +1316,7 @@ mod tests {
         );
         let stats = Arc::new(QueryStats::new());
         let (routes_proxy, routes_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>()
-                .expect("failed to create routes.StateProxy");
+            fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>();
         let routes_fut =
             routes_stream.try_for_each(|req| -> futures::future::Ready<Result<(), fidl::Error>> {
                 panic!("Should not call routes/State. Received request {:?}", req)
@@ -1479,12 +1561,10 @@ mod tests {
             R: Fn(fnet_routes::StateRequest),
         {
             let (name_lookup_proxy, name_lookup_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>()
-                    .expect("failed to create LookupProxy");
+                fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>();
 
             let (routes_proxy, routes_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>()
-                    .expect("failed to create routes.StateProxy");
+                fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>();
 
             let (sender, recv) = mpsc::channel(MAX_PARALLEL_REQUESTS);
             let Self { shared_resolver, config_state: _, stats } = self;
@@ -1504,8 +1584,7 @@ mod tests {
             F: FnOnce(fname::LookupAdminProxy) -> Fut,
         {
             let (lookup_admin_proxy, lookup_admin_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fname::LookupAdminMarker>()
-                    .expect("failed to create AdminResolverProxy");
+                fidl::endpoints::create_proxy_and_stream::<fname::LookupAdminMarker>();
             let Self { shared_resolver, config_state, stats: _ } = self;
             let ((), ()) = futures::future::try_join(
                 run_lookup_admin(shared_resolver, config_state, lookup_admin_stream)
@@ -1962,9 +2041,15 @@ mod tests {
     fn test_unhandled_resolve_error_kind_stats() {
         use ResolveErrorKind::{Msg, Timeout};
         let mut unhandled_resolve_error_kind_stats = UnhandledResolveErrorKindStats::default();
-        unhandled_resolve_error_kind_stats.increment(&Msg(String::from("abcdefgh")));
-        unhandled_resolve_error_kind_stats.increment(&Msg(String::from("ijklmn")));
-        unhandled_resolve_error_kind_stats.increment(&Timeout);
+        assert_eq!(
+            unhandled_resolve_error_kind_stats.increment(&Msg(String::from("abcdefgh"))),
+            "Msg"
+        );
+        assert_eq!(
+            unhandled_resolve_error_kind_stats.increment(&Msg(String::from("ijklmn"))),
+            "Msg"
+        );
+        assert_eq!(unhandled_resolve_error_kind_stats.increment(&Timeout), "Timeout");
         assert_eq!(
             unhandled_resolve_error_kind_stats,
             UnhandledResolveErrorKindStats {
@@ -2391,8 +2476,7 @@ mod tests {
         // requests to be used for testing.
         let requests = {
             let (name_lookup_proxy, name_lookup_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>()
-                    .expect("failed to create LookupProxy");
+                fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>();
             const NUM_REQUESTS: usize = MAX_PARALLEL_REQUESTS * 2 + 2;
             for _ in 0..NUM_REQUESTS {
                 // Don't await on this future because we are using these
@@ -2449,8 +2533,7 @@ mod tests {
             ));
             let stats = Arc::new(QueryStats::new());
             let (routes_proxy, _routes_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>()
-                    .expect("failed to create routes.StateProxy");
+                fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>();
             async move { create_ip_lookup_fut(&resolver, stats.clone(), routes_proxy, recv).await }
                 .fuse()
         });
@@ -2737,8 +2820,7 @@ mod tests {
             std_ip!("2001::2"),
         ];
         let (routes_proxy, routes_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>()
-                .expect("failed to create routes.StateProxy");
+            fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>();
         let routes_fut =
             routes_stream.map(|r| r.context("stream FIDL error")).try_for_each(|req| {
                 let (destination, responder) = assert_matches!(

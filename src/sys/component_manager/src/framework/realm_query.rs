@@ -175,10 +175,7 @@ impl FrameworkCapability for RealmQuery {
         scope: WeakComponentInstance,
         _target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider> {
-        Box::new(RealmQueryCapabilityProvider {
-            query: self.clone(),
-            scope_moniker: scope.moniker.clone(),
-        })
+        Box::new(RealmQueryCapabilityProvider { query: self.clone(), scope_moniker: scope.moniker })
     }
 }
 
@@ -191,7 +188,7 @@ struct RealmQueryCapabilityProvider {
 impl InternalCapabilityProvider for RealmQueryCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fsys::RealmQueryMarker>::new(server_end);
-        self.query.serve(self.scope_moniker, server_end.into_stream().unwrap()).await;
+        self.query.serve(self.scope_moniker, server_end.into_stream()).await;
     }
 }
 
@@ -633,9 +630,8 @@ async fn connect_to_storage_admin(
     };
 
     task_group.spawn(async move {
-        if let Err(error) = storage_admin
-            .serve(storage_decl, instance.as_weak(), server_end.into_stream().unwrap())
-            .await
+        if let Err(error) =
+            storage_admin.serve(storage_decl, instance.as_weak(), server_end.into_stream()).await
         {
             warn!(
                 %moniker, %error, "StorageAdmin created by LifecycleController failed to serve",
@@ -732,7 +728,7 @@ async fn serve_instance_iterator(
     instances: Vec<fsys::Instance>,
 ) {
     let mut remaining_instances = &instances[..];
-    let mut stream: fsys::InstanceIteratorRequestStream = server_end.into_stream().unwrap();
+    let mut stream: fsys::InstanceIteratorRequestStream = server_end.into_stream();
     while let Some(Ok(fsys::InstanceIteratorRequest::Next { responder })) = stream.next().await {
         let mut bytes_used: usize = FIDL_HEADER_BYTES + FIDL_VECTOR_HEADER_BYTES;
         let mut instance_count = 0;
@@ -765,7 +761,7 @@ async fn serve_manifest_bytes_iterator(
     server_end: ServerEnd<fsys::ManifestBytesIteratorMarker>,
     mut bytes: Vec<u8>,
 ) {
-    let mut stream: fsys::ManifestBytesIteratorRequestStream = server_end.into_stream().unwrap();
+    let mut stream: fsys::ManifestBytesIteratorRequestStream = server_end.into_stream();
 
     while let Some(Ok(fsys::ManifestBytesIteratorRequest::Next { responder })) = stream.next().await
     {
@@ -815,7 +811,7 @@ mod tests {
             let env = test.builtin_environment.lock().await;
             env.realm_query.clone().unwrap()
         };
-        let (proxy, server) = endpoints::create_proxy::<fsys::RealmQueryMarker>().unwrap();
+        let (proxy, server) = endpoints::create_proxy::<fsys::RealmQueryMarker>();
         capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
         (proxy, host)
     }
@@ -885,7 +881,7 @@ mod tests {
         test.model.start().await;
 
         let iterator = query.get_resolved_declaration("./").await.unwrap().unwrap();
-        let iterator = iterator.into_proxy().unwrap();
+        let iterator = iterator.into_proxy();
 
         let mut bytes = vec![];
 
@@ -1060,7 +1056,7 @@ mod tests {
         // should just be closed.
         assert!(is_closed(runtime_dir));
 
-        let (pkg_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (pkg_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
             .open(
@@ -1075,7 +1071,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
             .open(
@@ -1090,7 +1086,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let (svc_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (svc_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
             .open(
@@ -1155,7 +1151,7 @@ mod tests {
         // Test resolvers provide a pkg dir with a fake file
         let pkg_entry = ns.remove(0);
         assert_eq!(pkg_entry.path.unwrap(), "/pkg");
-        let pkg_dir = pkg_entry.directory.unwrap().into_proxy().unwrap();
+        let pkg_dir = pkg_entry.directory.unwrap().into_proxy();
 
         let entries = fuchsia_fs::directory::readdir(&pkg_dir).await.unwrap();
         assert_eq!(
@@ -1169,7 +1165,7 @@ mod tests {
         // The component requested the `foo` protocol.
         let svc_entry = ns.remove(0);
         assert_eq!(svc_entry.path.unwrap(), "/svc");
-        let svc_dir = svc_entry.directory.unwrap().into_proxy().unwrap();
+        let svc_dir = svc_entry.directory.unwrap().into_proxy();
 
         let entries = fuchsia_fs::directory::readdir(&svc_dir).await.unwrap();
         assert_eq!(
@@ -1216,12 +1212,11 @@ mod tests {
 
         test.model.start().await;
 
-        let (storage_admin, server_end) = create_proxy::<fsys::StorageAdminMarker>().unwrap();
+        let (storage_admin, server_end) = create_proxy::<fsys::StorageAdminMarker>();
 
         query.connect_to_storage_admin("./", "data", server_end).await.unwrap().unwrap();
 
-        let (it_proxy, it_server) =
-            create_proxy::<fsys::StorageIteratorMarker>().expect("create iterator");
+        let (it_proxy, it_server) = create_proxy::<fsys::StorageIteratorMarker>();
 
         storage_admin.list_storage_in_realm("./", it_server).await.unwrap().unwrap();
 

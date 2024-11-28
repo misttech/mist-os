@@ -21,7 +21,7 @@ use std::time::Duration;
 pub fn spawn_server(
     inspector: Inspector,
 ) -> Result<(TreeProxy, BoxFuture<'static, Result<(), anyhow::Error>>), anyhow::Error> {
-    let (tree, request_stream) = fidl::endpoints::create_proxy_and_stream::<TreeMarker>()?;
+    let (tree, request_stream) = fidl::endpoints::create_proxy_and_stream::<TreeMarker>();
     let tree_server_fut =
         handle_request_stream(inspector, TreeServerSendPreference::default(), request_stream);
     Ok((tree, tree_server_fut.boxed()))

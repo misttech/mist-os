@@ -181,6 +181,7 @@ pub struct NamedFieldStruct<'a> {
     struct_decl: StructDecl<'a>,
     checks: CheckCollection,
     vcc: VariableCreationCollection<'a>,
+    pub requires_target: bool,
 }
 
 fn extract_command_field<'a>(
@@ -189,7 +190,7 @@ fn extract_command_field<'a>(
     let command_field_idx = fields
         .iter()
         .position(|f| matches!(f, NamedFieldTy::Command(_)))
-        .ok_or(ParseError::CommandRequired(Span::call_site()))?;
+        .ok_or_else(|| ParseError::CommandRequired(Span::call_site()))?;
     let NamedFieldTy::Command(f) = fields.remove(command_field_idx) else { unreachable!() };
     Ok(f)
 }
@@ -204,18 +205,23 @@ impl<'a> NamedFieldStruct<'a> {
         let command_field_decl = CommandFieldTypeDecl(extract_command_field(&mut fields)?);
         let struct_decl = StructDecl(&parent_ast);
         let attrs = FromEnvAttributes::from_attrs(&parent_ast.attrs)?;
+        let no_target_attr = "no_target".to_string();
+        let requires_target = !(parent_ast
+            .attrs
+            .iter()
+            .any(|a| crate::types::attr_name(a).is_ok_and(|aname| aname == no_target_attr)));
         let checks = CheckCollection(attrs.checks);
         let mut vcc = VariableCreationCollection::new();
         for field in fields.into_iter() {
             vcc.add_field(field)?;
         }
-        Ok(Self { command_field_decl, struct_decl, checks, vcc })
+        Ok(Self { command_field_decl, struct_decl, checks, vcc, requires_target })
     }
 }
 
 impl ToTokens for NamedFieldStruct<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let Self { command_field_decl, struct_decl, checks, vcc } = self;
+        let Self { command_field_decl, struct_decl, checks, vcc, requires_target } = self;
         let command_field_name = command_field_decl.0.field_name;
         let join_results_names = &vcc.join_results_names;
         let span = Span::call_site();
@@ -247,6 +253,9 @@ impl ToTokens for NamedFieldStruct<'_> {
                 }
                 fn has_schema(&self) -> bool {
                     <<Self as fho::FfxMain>::Writer as fho::ToolIO>::has_schema()
+                }
+                fn requires_target() -> bool {
+                    #requires_target
                 }
             }
         };
@@ -344,5 +353,44 @@ mod tests {
             quote! { let bar = fho::TryFromEnvWith::try_from_env_with(something("stuff"), &_env).await ? ; }.to_string(),
             vcc.into_token_stream().to_string(),
         );
+    }
+
+    #[test]
+    fn test_no_target() {
+        let ast = parse_macro_derive(
+            r#"
+            #[derive(FfxTool)]
+            #[no_target]
+            struct Foo {
+                #[command]
+                bar: bool,
+            }
+            "#,
+        );
+        let ds = crate::extract_struct_info(&ast).unwrap();
+        let syn::Fields::Named(fields) = &ds.fields else {
+            unreachable!();
+        };
+        let nfs = NamedFieldStruct::new(&ast, &fields).unwrap();
+        assert!(!nfs.requires_target);
+    }
+
+    #[test]
+    fn test_no_no_target() {
+        let ast = parse_macro_derive(
+            r#"
+            #[derive(FfxTool)]
+            struct Foo {
+                #[command]
+                bar: bool,
+            }
+            "#,
+        );
+        let ds = crate::extract_struct_info(&ast).unwrap();
+        let syn::Fields::Named(fields) = &ds.fields else {
+            unreachable!();
+        };
+        let nfs = NamedFieldStruct::new(&ast, &fields).unwrap();
+        assert!(nfs.requires_target);
     }
 }

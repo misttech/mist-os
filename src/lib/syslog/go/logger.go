@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//go:build !build_with_native_toolchain
-
 package syslog
 
 import (
@@ -186,7 +184,7 @@ func NewLogger(options LogInitOptions) (*Logger, error) {
 			return nil, err
 		}
 		l.socket = localS
-		if err := logSink.Connect(context.Background(), peerS); err != nil {
+		if err := logSink.ConnectStructured(context.Background(), peerS); err != nil {
 			_ = l.Close()
 			return nil, err
 		}
@@ -269,53 +267,69 @@ func (l *Logger) logToWriter(writer io.Writer, time zx.Time, logLevel LogLevel, 
 	return err
 }
 
+func PutUint64Arg(buffer []byte, name string, value uint64) int {
+	roundedNameLen := (len(name) + 7) &^ 7
+	binary.LittleEndian.PutUint64(buffer[0:], uint64(4|(2+roundedNameLen/8)<<4|(1<<15|len(name))<<16))
+	copy(buffer[8:], []byte(name))
+	binary.LittleEndian.PutUint64(buffer[8+roundedNameLen:], value)
+	return 16 + roundedNameLen
+}
+
+func PutStringArg(buffer []byte, name string, value ...string) int {
+	roundedNameLen := (len(name) + 7) &^ 7
+	var valueLen = 0
+	for _, v := range value {
+		valueLen += len(v)
+	}
+	roundedValueLen := (valueLen + 7) &^ 7
+	wordCount := 1 + (roundedNameLen+roundedValueLen)/8
+	binary.LittleEndian.PutUint64(buffer[0:], uint64(6|wordCount<<4|(1<<15|len(name))<<16|(1<<15|valueLen)<<32))
+	copy(buffer[8:], []byte(name))
+	var pos = 8 + roundedNameLen
+	for _, v := range value {
+		pos += copy(buffer[pos:], []byte(v))
+	}
+	return wordCount * 8
+}
+
 func (l *Logger) logToSocket(time zx.Time, logLevel LogLevel, tag, msg string) error {
 	const golangThreadID = 0
 
 	var buffer [logger.MaxDatagramLenBytes]byte
 
-	pos := 0
-	for _, i := range [...]uint64{
-		l.pid,
-		golangThreadID,
-		uint64(time),
-	} {
-		binary.LittleEndian.PutUint64(buffer[pos:], i)
-		pos += 8
-	}
-	for _, i := range [...]uint32{
-		uint32(logLevel),
-		atomic.LoadUint32(&l.droppedLogs),
-	} {
-		binary.LittleEndian.PutUint32(buffer[pos:], i)
-		pos += 4
+	binary.LittleEndian.PutUint64(buffer[8:], uint64(time))
+
+	var pos = 16
+
+	pos += PutUint64Arg(buffer[pos:], "pid", l.pid)
+	pos += PutUint64Arg(buffer[pos:], "tid", golangThreadID)
+
+	var dropped = atomic.LoadUint32(&l.droppedLogs)
+	if dropped > 0 {
+		pos += PutUint64Arg(buffer[pos:], "num_dropped", uint64(dropped))
 	}
 
 	// Write global tags
 	for _, tag := range l.options.Tags {
 		if length := len(tag); length != 0 {
-			buffer[pos] = byte(length)
-			pos += 1
-			pos += copy(buffer[pos:], tag)
+			pos += PutStringArg(buffer[pos:], "tag", tag)
 		}
 	}
 
 	// Write local tags
 	if length := len(tag); length != 0 {
-		buffer[pos] = byte(length)
-		pos += 1
-		pos += copy(buffer[pos:], tag)
+		pos += PutStringArg(buffer[pos:], "tag", tag)
 	}
 
 	const ellipsis = "..."
 
-	// Write msg
-	buffer[pos] = 0
-	pos += 1
-
 	payload := msg
-	if len(payload)+1 > len(buffer)-pos {
-		payload = payload[:len(buffer)-pos-1-len(ellipsis)]
+
+	// The message argument uses a two word header
+	const messageArgHeaderLen = 16
+
+	if len(payload)+messageArgHeaderLen > len(buffer)-pos {
+		payload = payload[:len(buffer)-pos-messageArgHeaderLen-len(ellipsis)]
 
 		// Remove the last byte until the result is valid UTF-8.
 		for {
@@ -324,14 +338,14 @@ func (l *Logger) logToSocket(time zx.Time, logLevel LogLevel, tag, msg string) e
 			}
 			payload = payload[:len(payload)-1]
 		}
-	}
-	pos += copy(buffer[pos:], payload)
-	if payload != msg {
-		pos += copy(buffer[pos:], ellipsis)
+
+		pos += PutStringArg(buffer[pos:], "message", payload, ellipsis)
+	} else {
+		pos += PutStringArg(buffer[pos:], "message", payload)
 	}
 
-	buffer[pos] = 0
-	pos += 1
+	// Write the header
+	binary.LittleEndian.PutUint64(buffer[0:], 9|uint64(pos/8)<<4|uint64(logLevel)<<56)
 
 	if _, err := l.socket.Write(buffer[:pos], 0); err != nil {
 		atomic.AddUint32(&l.droppedLogs, 1)

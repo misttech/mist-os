@@ -9,8 +9,7 @@ function list_optional_features {
     "incremental" \
     "incremental_legacy" \
     "incremental_new" \
-    "legacy_fastboot" \
-    "legacy_fxtest"
+    "legacy_fastboot"
 }
 
 # Return 0 (true) if the default of the given feature is enabled, 1 (false) otherwise.
@@ -21,7 +20,6 @@ function is_feature_enabled_by_default {
   "incremental_legacy") return 1 ;;
   "incremental_new") return 1 ;;
   "legacy_fastboot") return 1 ;;
-  "legacy_fxtest") return 1 ;;
   esac
 
   # global default is enabled
@@ -54,11 +52,6 @@ function help_optional_feature {
   "legacy_fastboot")
     h=(
       "Device provisioning based on legacy fastboot instead of ffx."
-      )
-    ;;
-  "legacy_fxtest")
-    h=(
-      "Use the old Dart implementation of fx test rather than the new Python one."
       )
     ;;
   esac

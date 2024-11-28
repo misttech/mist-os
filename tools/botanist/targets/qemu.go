@@ -106,8 +106,6 @@ func (b *qemuCommandBuilder) AddTapNetwork(mac string, interfaceName string) {
 	b.baseQEMUCommandBuilder.AddNetwork(netdev)
 }
 
-func (b *qemuCommandBuilder) HasFFXSupport() bool { return true }
-
 func (b *qemuCommandBuilder) BuildFFXConfig() (*qemu.Config, error) {
 	b.setQEMUSpecifics()
 	cfg, err := b.baseQEMUCommandBuilder.BuildConfig()

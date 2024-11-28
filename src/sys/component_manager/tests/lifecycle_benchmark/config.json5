@@ -5,21 +5,12 @@
     debug: false,
     use_builtin_process_launcher: true,
     log_destination: "syslog",
-    namespace_capabilities: [
-        {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.tracing.provider.Registry",
-                "fuchsia.pkg.PackageResolver",
-            ],
-        },
-    ],
     builtin_capabilities: [
         {
             protocol: "fuchsia.process.Launcher",
         },
         {
-            runner: "builtin",
+            runner: "builtin_elf_runner",
         },
         {
             runner: "realm_builder",

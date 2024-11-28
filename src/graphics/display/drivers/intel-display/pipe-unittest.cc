@@ -17,7 +17,7 @@
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 
 namespace intel_display {
 
@@ -67,12 +67,12 @@ const GttRegion& GetGttImageHandle(const image_metadata_t& image_metadata, uint6
 }
 
 layer_t CreatePrimaryLayerConfig(uint64_t handle) {
-  uint32_t kWidth = 1024u;
-  uint32_t kHeight = 768u;
+  static constexpr uint32_t kWidth = 1024;
+  static constexpr uint32_t kHeight = 768;
 
-  layer_t layer;
-  layer.type = LAYER_TYPE_PRIMARY;
-  layer.cfg.primary = {
+  return layer_t{
+      .display_destination = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
+      .image_source = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
       .image_handle = handle,
       .image_metadata =
           {
@@ -82,10 +82,7 @@ layer_t CreatePrimaryLayerConfig(uint64_t handle) {
           },
       .alpha_mode = ALPHA_DISABLE,
       .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
-      .image_source = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
-      .display_destination = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
   };
-  return layer;
 }
 
 }  // namespace

@@ -184,7 +184,7 @@ pub mod test {
         async fn serve_partition(self) {
             let server_end: ServerEnd<PartitionMarker> =
                 ServerEnd::new(fidl::Channel::from(self.channel));
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             while let Some(req) = stream.try_next().await.unwrap() {
                 match req {
                     PartitionRequest::GetTypeGuid { responder } => {
@@ -200,7 +200,7 @@ pub mod test {
         async fn serve_block(self) {
             let server_end: ServerEnd<BlockMarker> =
                 ServerEnd::new(fidl::Channel::from(self.channel));
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             if let Ok(Some(_)) = stream.try_next().await {
                 panic!("Did not expect to get any requests!");
             }
@@ -218,7 +218,7 @@ pub mod test {
         fs.serve_connection(remote).unwrap();
         let _fs_task = fasync::Task::spawn(fs.for_each(|part| async { part.serve().await }));
 
-        let dir = local.into_proxy().expect("into proxy");
+        let dir = local.into_proxy();
 
         let dev_dir = fuchsia_fs::directory::open_directory(&dir, "dev", fio::PERM_READABLE)
             .await
@@ -240,7 +240,7 @@ pub mod test {
         fs.serve_connection(remote).unwrap();
         let _fs_task = fasync::Task::spawn(fs.for_each(|part| async { part.serve().await }));
 
-        let dir = local.into_proxy().expect("into proxy");
+        let dir = local.into_proxy();
 
         let dev_dir = fuchsia_fs::directory::open_directory(&dir, "dev", fio::PERM_READABLE)
             .await
@@ -262,7 +262,7 @@ pub mod test {
         fs.serve_connection(remote).unwrap();
         let _fs_task = fasync::Task::spawn(fs.for_each(|part| async { part.serve().await }));
 
-        let dir = local.into_proxy().expect("into proxy");
+        let dir = local.into_proxy();
 
         let dev_dir = fuchsia_fs::directory::open_directory(&dir, "dev", fio::PERM_READABLE)
             .await
@@ -306,7 +306,7 @@ pub mod test {
     }
 
     fn open_root(dev: &FatDevice) -> fio::DirectoryProxy {
-        let (proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let root = dev.get_root().unwrap();
         let () = root.clone().open(
             dev.scope.clone(),

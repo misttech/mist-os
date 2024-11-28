@@ -67,7 +67,7 @@ impl GenerateValueManifest {
                 let config_value =
                     config_value_file::field::config_value_from_json_value(value, &config.type_)?;
                 Ok(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                    name: config.source_name.clone(),
+                    name: config.source_name,
                     value: config_value,
                 }))
             })

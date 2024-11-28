@@ -11,7 +11,7 @@ group("fidl") {
     "fidlc:host",
     "fidlcparsequality:host",
     "fidldoc($host_toolchain)",
-    "fidlgen_cpp:host",
+    "fidlgen_cpp:host($host_toolchain)",
     "fidlgen_go:host",
     "fidlgen_hlcpp:host",
     "fidlgen_libfuzzer:host",
@@ -21,7 +21,7 @@ group("fidl") {
     "fidlmerge:host",
     "gidl:host",
     "gidl-format:host",
-    "lib",
+    "lib:lib($host_toolchain)",
     "measure-tape/src:host",
   ]
 }

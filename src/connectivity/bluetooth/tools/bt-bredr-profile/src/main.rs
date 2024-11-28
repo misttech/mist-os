@@ -95,9 +95,9 @@ async fn connection_receiver(
             let ConnectionReceiverRequest::Connected { channel, .. } = event else {
                     return Err(anyhow!("ConnectionReceiverRequest: unknown method"));
             };
-            let socket = channel.socket.ok_or(anyhow!("{}: missing socket", tag))?;
-            let mode = channel.channel_mode.ok_or(anyhow!("{}: missing channel mode", tag))?;
-            let max_tx_sdu_size = channel.max_tx_sdu_size.ok_or(anyhow!("{}: missing max tx sdu", tag))?;
+            let socket = channel.socket.ok_or_else(|| anyhow!("{}: missing socket", tag))?;
+            let mode = channel.channel_mode.ok_or_else(|| anyhow!("{}: missing channel mode", tag))?;
+            let max_tx_sdu_size = channel.max_tx_sdu_size.ok_or_else(|| anyhow!("{}: missing max tx sdu", tag))?;
             let chan_id = state.lock().await.l2cap_channels.insert(L2capChannel { socket, mode, max_tx_sdu_size });
             print!("{} Channel Connected to service {}:\n  Channel:\n    Id: {}\n    Mode: {:?}\n    Max Tx Sdu Size: {}\n", RESET_LINE, service_id, chan_id, mode, max_tx_sdu_size);
         },
@@ -150,8 +150,7 @@ async fn advertise(
         ..Default::default()
     }];
 
-    let (connect_client, connect_requests) =
-        create_request_stream().context("ConnectionReceiver creation")?;
+    let (connect_client, connect_requests) = create_request_stream();
 
     let _ = profile_svc
         .advertise(ProfileAdvertiseRequest {
@@ -195,7 +194,12 @@ async fn remove_service(state: Arc<Mutex<ProfileState>>, args: &Vec<String>) -> 
     let service_id =
         args[0].parse::<u32>().map_err(|_| anyhow!("service-id must be a positive number"))?;
 
-    let _ = state.lock().await.services.remove(&service_id).ok_or(anyhow!("Unknown service"))?;
+    let _ = state
+        .lock()
+        .await
+        .services
+        .remove(&service_id)
+        .ok_or_else(|| anyhow!("Unknown service"))?;
     Ok(())
 }
 
@@ -538,9 +542,9 @@ mod tests {
     #[fuchsia::test]
     async fn disconnect_l2cap_channel_succeeds() {
         let (profile, _profile_server) =
-            fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ProfileMarker>();
         let (rfcomm_test, _rfcomm_test_server) =
-            fidl::endpoints::create_proxy_and_stream::<RfcommTestMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<RfcommTestMarker>();
         let state = Arc::new(Mutex::new(ProfileState::new(RfcommManager::from_proxy(
             profile,
             rfcomm_test,

@@ -47,7 +47,7 @@ impl FfxMain for RepoStopTool {
     async fn main(self, mut writer: Self::Writer) -> Result<()> {
         match self.stop().await {
             Ok(info) => {
-                let message = info.unwrap_or("Stopped the repository server".into());
+                let message = info.unwrap_or_else(|| "Stopped the repository server".into());
                 writer.machine_or(&CommandStatus::Ok { message: message.clone() }, message)?;
                 Ok(())
             }
@@ -435,7 +435,7 @@ mod tests {
         make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<RepositoryRegistryMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<RepositoryRegistryMarker>();
         drop(stream);
         let repos = Deferred::from_output(Ok(proxy));
 

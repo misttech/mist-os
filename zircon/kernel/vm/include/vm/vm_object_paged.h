@@ -266,10 +266,10 @@ class VmObjectPaged final : public VmObject {
   // physmap due to not being cached.
   bool CanDedupZeroPagesLocked() TA_REQ(lock());
 
-  // This performs a very expensive validation that checks if pages have been split correctly in
-  // this VMO and is intended as a debugging aid. A return value of false indicates that the VMO
-  // hierarchy is corrupt and the system should probably panic as soon as possible. As a result,
-  // if false is returned this may write various additional information to the debuglog.
+  // This performs a very expensive validation that checks if pages owned by this VMO are shared
+  // correctly with children and is intended as a debugging aid. A return value of false indicates
+  // that the VMO hierarchy is corrupt and the system should probably panic as soon as possible. As
+  // a result, if false is returned this may write various additional information to the debuglog.
   bool DebugValidatePageSharing() const {
     Guard<CriticalMutex> guard{lock()};
     return cow_pages_locked()->DebugValidatePageSharingLocked();

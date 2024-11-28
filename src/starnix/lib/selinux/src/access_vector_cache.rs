@@ -22,6 +22,12 @@ pub trait Query {
     ) -> AccessDecision;
 }
 
+/// An interface through which statistics may be obtained from each cache.
+pub trait HasCacheStats {
+    /// Returns statistics for the cache implementation.
+    fn cache_stats(&self) -> CacheStats;
+}
+
 /// An interface for computing the rights permitted to a source accessing a target of a particular
 /// SELinux object type.
 pub trait QueryMut {
@@ -48,14 +54,14 @@ impl<Q: Query> QueryMut for Q {
 
 /// An interface for emptying caches that store [`Query`] input/output pairs. This interface
 /// requires implementers to update state via interior mutability.
-trait Reset {
+pub(super) trait Reset {
     /// Removes all entries from this cache and any reset delegate caches encapsulated in this
     /// cache. Returns true only if the cache is still valid after reset.
     fn reset(&self) -> bool;
 }
 
 /// An interface for emptying caches that store [`Query`] input/output pairs.
-trait ResetMut {
+pub(super) trait ResetMut {
     /// Removes all entries from this cache and any reset delegate caches encapsulated in this
     /// cache. Returns true only if the cache is still valid after reset.
     fn reset(&mut self) -> bool;
@@ -148,6 +154,7 @@ pub(super) struct Fixed<D = DenyAll, const SIZE: usize = DEFAULT_FIXED_SIZE> {
     next_index: usize,
     is_full: bool,
     delegate: D,
+    stats: CacheStats,
 }
 
 impl<D, const SIZE: usize> Fixed<D, SIZE> {
@@ -156,14 +163,17 @@ impl<D, const SIZE: usize> Fixed<D, SIZE> {
     /// # Panics
     ///
     /// This will panic when `SIZE` is 0; i.e., for any `Fixed<D, 0>`.
-    ///
-    /// TODO: Eliminate `dead_code` guard.
-    #[allow(dead_code)]
     pub fn new(delegate: D) -> Self {
         if SIZE == 0 {
             panic!("cannot instantiate fixed access vector cache of size 0");
         }
-        Self { cache: std::array::from_fn(|_| None), next_index: 0, is_full: false, delegate }
+        Self {
+            cache: std::array::from_fn(|_| None),
+            next_index: 0,
+            is_full: false,
+            delegate,
+            stats: CacheStats::default(),
+        }
     }
 
     /// Returns a boolean indicating whether the local cache is empty.
@@ -175,7 +185,14 @@ impl<D, const SIZE: usize> Fixed<D, SIZE> {
     /// Inserts `query_and_result` into the cache.
     #[inline]
     fn insert(&mut self, query_and_result: QueryAndResult) {
-        self.cache[self.next_index] = Some(query_and_result);
+        let entry = &mut self.cache[self.next_index];
+
+        self.stats.allocs += 1;
+        if entry.is_some() {
+            self.stats.reclaims += 1;
+        }
+
+        *entry = Some(query_and_result);
         self.next_index = (self.next_index + 1) % SIZE;
         if self.next_index == 0 {
             self.is_full = true;
@@ -190,6 +207,8 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
+        self.stats.lookups += 1;
+
         if !self.is_empty() {
             let mut index = if self.next_index == 0 { SIZE - 1 } else { self.next_index - 1 };
             loop {
@@ -201,6 +220,7 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
                     && &target_sid == &query_and_result.target_sid
                     && &target_class == &query_and_result.target_class
                 {
+                    self.stats.hits += 1;
                     return query_and_result.access_decision.clone();
                 }
 
@@ -211,6 +231,8 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
                 index = if index == 0 { SIZE - 1 } else { index - 1 };
             }
         }
+
+        self.stats.misses += 1;
 
         let access_decision = self.delegate.query(source_sid, target_sid, target_class.clone());
 
@@ -225,10 +247,17 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
     }
 }
 
+impl<D, const SIZE: usize> HasCacheStats for Fixed<D, SIZE> {
+    fn cache_stats(&self) -> CacheStats {
+        self.stats.clone()
+    }
+}
+
 impl<D, const SIZE: usize> ResetMut for Fixed<D, SIZE> {
     fn reset(&mut self) -> bool {
         self.next_index = 0;
         self.is_full = false;
+        self.stats = CacheStats::default();
         true
     }
 }
@@ -253,9 +282,6 @@ impl<D> Clone for Locked<D> {
 
 impl<D> Locked<D> {
     /// Constructs a locked access vector cache that delegates to `delegate`.
-    ///
-    /// TODO: Eliminate `dead_code` guard.
-    #[allow(dead_code)]
     pub fn new(delegate: D) -> Self {
         Self { delegate: Arc::new(Mutex::new(delegate)) }
     }
@@ -269,6 +295,12 @@ impl<D: QueryMut> Query for Locked<D> {
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
         self.delegate.lock().query(source_sid, target_sid, target_class)
+    }
+}
+
+impl<D: HasCacheStats> HasCacheStats for Locked<D> {
+    fn cache_stats(&self) -> CacheStats {
+        self.delegate.lock().cache_stats()
     }
 }
 
@@ -361,9 +393,6 @@ pub(super) struct ThreadLocalQuery<D = DenyAll> {
 
 impl<D> ThreadLocalQuery<D> {
     /// Constructs a [`ThreadLocalQuery`] that delegates to `delegate`.
-    ///
-    /// TODO: Eliminate `dead_code` guard.
-    #[allow(dead_code)]
     pub fn new(active_version: Arc<AtomicVersion>, delegate: D) -> Self {
         Self { delegate, current_version: Default::default(), active_version }
     }
@@ -407,9 +436,6 @@ impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize>
 {
     /// Constructs a [`Manager`] that initially has no security server delegate (i.e., will default
     /// to deny all requests).
-    ///
-    /// TODO: Eliminate `dead_code` guard.
-    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             shared_cache: Locked::new(Fixed::new(Weak::<SS>::new())),
@@ -458,6 +484,24 @@ impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize> Reset
         self.thread_local_version.reset();
         true
     }
+}
+
+/// Describes the performance statistics of a cache implementation.
+#[derive(Default, Debug, Clone)]
+pub struct CacheStats {
+    /// Cumulative count of lookups performed on the cache.
+    pub lookups: u64,
+    /// Cumulative count of lookups that returned data from an existing cache entry.
+    pub hits: u64,
+    /// Cumulative count of lookups that did not match any existing cache entry.
+    pub misses: u64,
+    /// Cumulative count of insertions into the cache.
+    pub allocs: u64,
+    /// Cumulative count of evictions from the cache, to make space for a new insertion.
+    pub reclaims: u64,
+    /// Cumulative count of evictions from the cache due to no longer being deemed relevant.
+    /// This is not used in our current implementation.
+    pub frees: u64,
 }
 
 /// Test constants and helpers shared by `tests` and `starnix_tests`.

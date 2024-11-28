@@ -50,7 +50,7 @@ pub fn get_authenticator(
                 "Failed to negotiate authentication for BSS ({:?}) with mutually supported
                 security protocols: {:?}, and credential type: {:?}.",
                 bssid,
-                mutual_security_protocols.clone(),
+                mutual_security_protocols,
                 credential.type_str()
             );
             None

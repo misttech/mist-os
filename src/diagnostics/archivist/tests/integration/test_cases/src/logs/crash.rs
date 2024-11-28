@@ -33,8 +33,7 @@ async fn logs_from_crashing_component() -> Result<(), anyhow::Error> {
         .watch_component(PUPPET_NAME, ftest::ExitStatus::Crash)
         .await
         .expect("subscribe to component crash")
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     // Connect to the puppet, tell it to log some messages and then crash itself.
     let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME)

@@ -94,13 +94,7 @@ impl LowEnergyAdvertisement {
         };
 
         // Keep the `connection` handle alive so that the LE connection is persisted.
-        let connection = match connection.into_proxy() {
-            Ok(conn) => conn,
-            Err(e) => {
-                warn!("ConnectionProxy already closed: {:?}", e);
-                return None;
-            }
-        };
+        let connection = connection.into_proxy();
 
         let id = peer.id;
         // Resolves when the remote peer disconnects.
@@ -287,7 +281,7 @@ impl LowEnergyAdvertiser {
         };
 
         let (connect_client, connect_server) =
-            fidl::endpoints::create_request_stream::<AdvertisedPeripheralMarker>()?;
+            fidl::endpoints::create_request_stream::<AdvertisedPeripheralMarker>();
         let advertise_fut = self.peripheral.advertise(&parameters, connect_client);
 
         let advertisement_stream = LowEnergyAdvertisement::new(advertise_fut, connect_server);
@@ -373,7 +367,7 @@ mod tests {
             .unwrap();
         let (_, adv_peripheral_client, responder) =
             adv_request.into_advertise().expect("Peripheral.Advertise");
-        (adv_peripheral_client.into_proxy().unwrap(), responder)
+        (adv_peripheral_client.into_proxy(), responder)
     }
 
     #[fuchsia::test]
@@ -381,7 +375,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (c, mut upstream_server) =
-            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>();
         let mut advertiser = LowEnergyAdvertiser::from_proxy(c);
         // Initially, with no advertisement, the advertiser Stream shouldn't be terminated.
         assert!(!advertiser.is_terminated());
@@ -423,7 +417,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (c, mut upstream_server) =
-            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>();
         let mut advertiser = LowEnergyAdvertiser::from_proxy(c);
 
         // Make a request to advertise the Model ID.
@@ -466,7 +460,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (c, mut upstream_server) =
-            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>();
         let mut advertiser = LowEnergyAdvertiser::from_proxy(c);
 
         make_model_id_advertise(&mut exec, &mut advertiser).expect("can advertise");
@@ -481,7 +475,7 @@ mod tests {
             ..Default::default()
         };
         let (connect_client1, connect_server1) =
-            fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<ConnectionMarker>();
         let connected_fut1 = adv_peripheral_client.on_connected(&example_peer1, connect_client1);
         let mut connected_fut1 = pin!(connected_fut1);
         let _ = exec
@@ -494,7 +488,7 @@ mod tests {
             ..Default::default()
         };
         let (connect_client2, connect_server2) =
-            fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<ConnectionMarker>();
         let connected_fut2 = adv_peripheral_client.on_connected(&example_peer2, connect_client2);
         let mut connected_fut2 = pin!(connected_fut2);
         let _ = exec
@@ -523,7 +517,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (c, mut upstream_server) =
-            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>();
         let mut advertiser = LowEnergyAdvertiser::from_proxy(c);
 
         make_model_id_advertise(&mut exec, &mut advertiser).expect("can advertise");
@@ -533,7 +527,7 @@ mod tests {
 
         // Upstream server notifies with an invalidly formatted peer (missing all mandatory data).
         let (connect_client, _connect_server) =
-            fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<ConnectionMarker>();
         let connected_fut =
             adv_peripheral_client.on_connected(&le::Peer::default(), connect_client);
         let mut connected_fut = pin!(connected_fut);
@@ -547,8 +541,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn stop_advertising_with_no_active_advertisement_is_no_op() {
-        let (c, _upstream_server) =
-            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
+        let (c, _upstream_server) = fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>();
         let mut advertiser = LowEnergyAdvertiser::from_proxy(c);
         assert!(!advertiser.stop_advertising().await);
     }

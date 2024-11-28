@@ -40,7 +40,7 @@ impl From<DiscoveryRequest> for Event {
         // Only expect WatchSessions request in this integration test.
         match src {
             DiscoveryRequest::WatchSessions { session_watcher, .. } => {
-                let watcher = session_watcher.into_proxy().unwrap();
+                let watcher = session_watcher.into_proxy();
                 Self::Media { _sessions_watcher: Some(watcher) }
             }
             r => panic!("Expected Watch but got {:?}", r),
@@ -53,7 +53,7 @@ impl From<PeerManagerRequest> for Event {
         // Only expect RegisterTargetHandler requests in this integration test.
         match src {
             PeerManagerRequest::RegisterTargetHandler { handler, responder, .. } => {
-                let handler = handler.into_proxy().unwrap();
+                let handler = handler.into_proxy();
                 responder.send(Ok(())).expect("Failed to respond");
                 Self::Avrcp { _target_handler: Some(handler) }
             }

@@ -97,8 +97,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn add_test() {
-        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>()
-            .expect("Failed to create proxy and stream.");
+        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>();
 
         // Run two tasks: The calculator_fake & the calculator_line method we're interested
         // in testing.
@@ -118,8 +117,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn subtract_test() {
-        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>()
-            .expect("Failed to create proxy and stream.");
+        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>();
 
         // Run two tasks: The calculator_fake & the calculator_line method we're interested
         // in testing.
@@ -139,8 +137,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn multiply_test() {
-        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>()
-            .expect("Failed to create proxy and stream.");
+        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>();
 
         // Run two tasks: The calculator_fake & the calculator_line method we're interested
         // in testing.
@@ -160,8 +157,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn divide_test() {
-        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>()
-            .expect("Failed to create proxy and stream.");
+        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>();
 
         // Run two tasks: The calculator_fake & the calculator_line method we're interested
         // in testing.
@@ -181,8 +177,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn pow_test() {
-        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>()
-            .expect("Failed to create proxy and stream.");
+        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>();
 
         // Run two tasks: The calculator_fake & the calculator_line method we're interested
         // in testing.

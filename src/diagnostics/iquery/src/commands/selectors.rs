@@ -6,9 +6,11 @@ use crate::commands::types::*;
 use crate::commands::utils;
 use crate::types::Error;
 use argh::{ArgsInfo, FromArgs};
-use diagnostics_data::{Inspect, InspectData};
+use diagnostics_data::{Inspect, InspectData, InspectHandleName};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
-use serde::Serialize;
+use fidl_fuchsia_diagnostics as fdiagnostics;
+use serde::ser::{Error as _, SerializeSeq};
+use serde::{Serialize, Serializer};
 use std::fmt;
 
 /// Lists all available full selectors (component selector + tree selector).
@@ -37,7 +39,7 @@ pub struct SelectorsCommand {
     /// A string specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to.
     /// This can be copied from the output of `ffx inspect list-accessors`.
     /// The selector will be in the form of:
-    /// <moniker>:<directory>:fuchsia.diagnostics.ArchiveAccessorName
+    /// <moniker>:fuchsia.diagnostics.ArchiveAccessorName
     pub accessor: Option<String>,
 }
 
@@ -63,8 +65,13 @@ impl Command for SelectorsCommand {
             )
             .await?
         } else if let Some(manifest) = self.manifest {
-            utils::get_selectors_for_manifest(manifest, self.selectors, &self.accessor, provider)
-                .await?
+            utils::get_selectors_for_manifest(
+                manifest,
+                self.selectors,
+                self.accessor.clone(),
+                provider,
+            )
+            .await?
         } else {
             utils::process_fuzzy_inputs(self.selectors, provider).await?
         };
@@ -72,7 +79,7 @@ impl Command for SelectorsCommand {
         let selectors = utils::expand_selectors(selectors, None)?;
 
         let mut results =
-            provider.snapshot::<Inspect>(&self.accessor, selectors.into_iter()).await?;
+            provider.snapshot::<Inspect>(self.accessor.as_deref(), selectors.into_iter()).await?;
         for result in results.iter_mut() {
             if let Some(hierarchy) = &mut result.payload {
                 hierarchy.sort();
@@ -82,44 +89,102 @@ impl Command for SelectorsCommand {
     }
 }
 
-#[derive(Serialize)]
-pub struct SelectorsResult(Vec<String>);
+pub struct SelectorsResult(Vec<fdiagnostics::Selector>);
+
+impl Serialize for SelectorsResult {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
+        let mut stringified = self
+            .0
+            .iter()
+            .map(|item| {
+                selectors::selector_to_string(
+                    item,
+                    selectors::SelectorDisplayOptions::never_wrap_in_quotes(),
+                )
+                .map_err(|e| S::Error::custom(format!("failed to serialize: {:#?}", e)))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        stringified.sort();
+        for item in stringified {
+            seq.serialize_element(&item)?;
+        }
+
+        seq.end()
+    }
+}
 
 impl fmt::Display for SelectorsResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for item in self.0.iter() {
-            writeln!(f, "{}", item)?;
+        let mut stringified = self
+            .0
+            .iter()
+            .map(|item| {
+                selectors::selector_to_string(item, selectors::SelectorDisplayOptions::default())
+                    .map_err(|_| fmt::Error)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        stringified.sort();
+        for item in stringified {
+            writeln!(f, "{item}")?;
         }
         Ok(())
     }
 }
 
-fn get_selectors(moniker: String, hierarchy: DiagnosticsHierarchy) -> Vec<String> {
-    let component_selector = selectors::sanitize_moniker_for_selectors(&moniker);
+fn get_selectors(
+    moniker: String,
+    hierarchy: DiagnosticsHierarchy,
+    name: InspectHandleName,
+) -> Vec<fdiagnostics::Selector> {
     hierarchy
         .property_iter()
         .flat_map(|(node_path, maybe_property)| maybe_property.map(|prop| (node_path, prop)))
         .map(|(node_path, property)| {
-            let node_selector = node_path
+            let node_path = node_path
                 .iter()
-                .map(|s| selectors::sanitize_string_for_selectors(s))
-                .collect::<Vec<_>>()
-                .join("/");
-            let property_selector = selectors::sanitize_string_for_selectors(property.name());
-            format!("{}:{}:{}", component_selector, node_selector, property_selector)
+                .map(|s| fdiagnostics::StringSelector::ExactMatch(s.to_string()))
+                .collect::<Vec<_>>();
+
+            let target_properties =
+                fdiagnostics::StringSelector::ExactMatch(property.name().to_string());
+
+            let tree_selector = Some(fdiagnostics::TreeSelector::PropertySelector(
+                fdiagnostics::PropertySelector { node_path, target_properties },
+            ));
+
+            let tree_names = Some(fdiagnostics::TreeNames::Some(vec![name.to_string()]));
+
+            let component_selector = Some(fdiagnostics::ComponentSelector {
+                moniker_segments: Some(
+                    moniker
+                        .split("/")
+                        .map(|segment| {
+                            fdiagnostics::StringSelector::ExactMatch(segment.to_string())
+                        })
+                        .collect(),
+                ),
+                ..Default::default()
+            });
+
+            fdiagnostics::Selector {
+                component_selector,
+                tree_selector,
+                tree_names,
+                ..Default::default()
+            }
         })
         .collect()
 }
 
-fn inspect_to_selectors(inspect_data: Vec<InspectData>) -> Vec<String> {
-    let mut result = inspect_data
+fn inspect_to_selectors(inspect_data: Vec<InspectData>) -> Vec<fdiagnostics::Selector> {
+    inspect_data
         .into_iter()
         .filter_map(|schema| {
             let moniker = schema.moniker;
-            schema.payload.map(|hierarchy| get_selectors(moniker.to_string(), hierarchy))
+            let name = schema.metadata.name;
+            schema.payload.map(|hierarchy| get_selectors(moniker.to_string(), hierarchy, name))
         })
         .flatten()
-        .collect::<Vec<_>>();
-    result.sort();
-    result
+        .collect()
 }

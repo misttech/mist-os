@@ -46,7 +46,7 @@ use crate::object_store::object_manager::ObjectManager;
 use crate::object_store::object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue};
 use crate::object_store::transaction::{
     lock_keys, AllocatorMutation, Mutation, MutationV32, MutationV33, MutationV37, MutationV38,
-    MutationV40, MutationV41, ObjectStoreMutation, Options, Transaction, TxnMutation,
+    MutationV40, MutationV41, MutationV43, ObjectStoreMutation, Options, Transaction, TxnMutation,
     TRANSACTION_MAX_JOURNAL_USAGE,
 };
 use crate::object_store::{
@@ -112,16 +112,17 @@ pub struct JournalCheckpointV32 {
     pub version: Version,
 }
 
-pub type JournalRecord = JournalRecordV42;
+pub type JournalRecord = JournalRecordV43;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum JournalRecordV42 {
+pub enum JournalRecordV43 {
     // Indicates no more records in this block.
     EndBlock,
     // Mutation for a particular object.  object_id here is for the collection i.e. the store or
     // allocator.
-    Mutation { object_id: u64, mutation: MutationV41 },
+    Mutation { object_id: u64, mutation: MutationV43 },
     // Commits records in the transaction.
     Commit,
     // Discard all mutations with offsets greater than or equal to the given offset.
@@ -143,6 +144,17 @@ pub enum JournalRecordV42 {
     // extents, we only check the checksums for a block if it has been written to for the first
     // time since the last flush, because otherwise we can't roll it back anyway so it doesn't
     // matter. For copy-on-write extents, the bool is always true.
+    DataChecksums(Range<u64>, ChecksumsV38, bool),
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(JournalRecordV43)]
+pub enum JournalRecordV42 {
+    EndBlock,
+    Mutation { object_id: u64, mutation: MutationV41 },
+    Commit,
+    Discard(u64),
+    DidFlushDevice(u64),
     DataChecksums(Range<u64>, ChecksumsV38, bool),
 }
 
@@ -621,13 +633,15 @@ impl Journal {
                     },
                 ..
             }) => {
-                checksum_list.push(
-                    journal_offset,
-                    *device_offset..*device_offset + range.length().unwrap(),
-                    checksums.maybe_as_ref().context("Malformed snooped checksums")?,
-                    // Cow mode extents are always writing for the first time
-                    true,
-                )?;
+                checksum_list
+                    .push(
+                        journal_offset,
+                        *device_offset..*device_offset + range.length().unwrap(),
+                        checksums.maybe_as_ref().context("Malformed snooped checksums")?,
+                        // Cow mode extents are always writing for the first time
+                        true,
+                    )
+                    .context("Pushing snooped checksums to checksum list")?;
             }
             Mutation::ObjectStore(_) => {}
             Mutation::Allocator(AllocatorMutation::Deallocate { device_range, .. }) => {
@@ -736,8 +750,10 @@ impl Journal {
         }
 
         let mut reader = JournalReader::new(handle, &super_block.journal_checkpoint);
-        let JournaledTransactions { mut transactions, device_flushed_offset } =
-            self.read_transactions(&mut reader, None, INVALID_OBJECT_ID).await?;
+        let JournaledTransactions { mut transactions, device_flushed_offset } = self
+            .read_transactions(&mut reader, None, INVALID_OBJECT_ID)
+            .await
+            .context("Reading transactions for replay")?;
 
         // Validate all the mutations.
         let mut checksum_list = ChecksumList::new(device_flushed_offset);
@@ -753,12 +769,14 @@ impl Journal {
         } in &transactions
         {
             for JournaledChecksums { device_range, checksums, first_write } in checksums {
-                checksum_list.push(
-                    checkpoint.file_offset,
-                    device_range.clone(),
-                    checksums.maybe_as_ref().context("Malformed checksums")?,
-                    *first_write,
-                )?;
+                checksum_list
+                    .push(
+                        checkpoint.file_offset,
+                        device_range.clone(),
+                        checksums.maybe_as_ref().context("Malformed checksums")?,
+                        *first_write,
+                    )
+                    .context("Pushing journal checksum records to checksum list")?;
             }
             for mutation in root_parent_mutations
                 .iter()
@@ -869,7 +887,7 @@ impl Journal {
                 .context("Failed to replay mutations")?;
         }
 
-        allocator.on_replay_complete().await?;
+        allocator.on_replay_complete().await.context("Failed to complete replay for allocator")?;
 
         let discarded_to =
             if last_checkpoint.file_offset != reader.journal_file_checkpoint().file_offset {
@@ -1546,7 +1564,7 @@ impl Journal {
                     .terminate_reason
                     .as_ref()
                     .map(|e| format!("Journal closed with error: {:?}", e))
-                    .unwrap_or("Journal closed".to_string());
+                    .unwrap_or_else(|| "Journal closed".to_string());
                 Poll::Ready(Err(anyhow!(FxfsError::JournalFlushError).context(context)))
             } else {
                 inner.sync_waker = Some(ctx.waker().clone());
@@ -1606,7 +1624,7 @@ impl Journal {
                         .terminate_reason
                         .as_ref()
                         .map(|e| format!("Journal closed with error: {:?}", e))
-                        .unwrap_or("Journal closed".to_string());
+                        .unwrap_or_else(|| "Journal closed".to_string());
                     break Err(anyhow!(FxfsError::JournalFlushError).context(context));
                 }
                 if self.objects.last_end_offset()

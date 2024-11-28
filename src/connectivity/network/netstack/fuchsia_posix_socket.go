@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//go:build !build_with_native_toolchain
-
 package netstack
 
 import (
@@ -4963,6 +4961,10 @@ func (s *packetSocketImpl) SendMsg(_ fidl.Context, addr *packetsocket.PacketInfo
 		panic(fmt.Sprintf("got sendMsg(..) = %d, want = %d", n, want))
 	}
 	return packetsocket.SocketSendMsgResultWithResponse(packetsocket.SocketSendMsgResponse{}), nil
+}
+
+func (s *packetSocketImpl) AttachBpfFilterUnsafe(_ fidl.Context, program []uint64) (packetsocket.SocketAttachBpfFilterUnsafeResult, error) {
+	return packetsocket.SocketAttachBpfFilterUnsafeResultWithErr(posix.ErrnoEopnotsupp), nil
 }
 
 var _ packetsocket.ProviderWithCtx = (*packetProviderImpl)(nil)

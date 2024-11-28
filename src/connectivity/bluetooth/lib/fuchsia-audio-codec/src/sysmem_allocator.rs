@@ -125,7 +125,7 @@ impl SysmemAllocation {
         // Ignore errors since only debug information is being sent.
         set_allocator_name(&allocator, debug_info).context("Setting alloocator name")?;
         let (client_token, client_token_request) =
-            fidl::endpoints::create_proxy::<BufferCollectionTokenMarker>()?;
+            fidl::endpoints::create_proxy::<BufferCollectionTokenMarker>();
         allocator
             .allocate_shared_collection(AllocatorAllocateSharedCollectionRequest {
                 token_request: Some(client_token_request),
@@ -169,7 +169,7 @@ impl SysmemAllocation {
         constraints: BufferCollectionConstraints,
     ) -> Result<Self, Error> {
         let (buffer_collection, collection_request) =
-            fidl::endpoints::create_proxy::<BufferCollectionMarker>()?;
+            fidl::endpoints::create_proxy::<BufferCollectionMarker>();
         allocator.bind_shared_collection(AllocatorBindSharedCollectionRequest {
             token: Some(token),
             buffer_collection_request: Some(collection_request),
@@ -326,7 +326,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut allocator_requests) =
-            fidl::endpoints::create_proxy_and_stream::<AllocatorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<AllocatorMarker>();
 
         let (sender, mut receiver) = futures::channel::oneshot::channel();
 
@@ -358,13 +358,13 @@ mod tests {
         let mut token_requests_1 = match exec.run_until_stalled(&mut allocator_requests.next()) {
             Poll::Ready(Some(Ok(AllocatorRequest::AllocateSharedCollection {
                 payload, ..
-            }))) => payload.token_request.unwrap().into_stream().expect("request into stream"),
+            }))) => payload.token_request.unwrap().into_stream(),
             x => panic!("Expected a shared allocation request, got {:?}", x),
         };
 
         let mut token_requests_2 = match exec.run_until_stalled(&mut token_requests_1.next()) {
             Poll::Ready(Some(Ok(BufferCollectionTokenRequest::Duplicate { payload, .. }))) => {
-                payload.token_request.unwrap().into_stream().expect("duplicate request into stream")
+                payload.token_request.unwrap().into_stream()
             }
             x => panic!("Expected a duplication request, got {:?}", x),
         };
@@ -373,12 +373,8 @@ mod tests {
             .run_until_stalled(&mut allocator_requests.next())
         {
             Poll::Ready(Some(Ok(AllocatorRequest::BindSharedCollection { payload, .. }))) => (
-                payload.token.unwrap().into_proxy().unwrap(),
-                payload
-                    .buffer_collection_request
-                    .unwrap()
-                    .into_stream()
-                    .expect("collection request into stream"),
+                payload.token.unwrap().into_proxy(),
+                payload.buffer_collection_request.unwrap().into_stream(),
             ),
             x => panic!("Expected Bind Shared Collection, got: {:?}", x),
         };
@@ -411,7 +407,7 @@ mod tests {
         assert!(exec.run_until_stalled(&mut allocation).is_pending());
 
         let token_client_2 = match receiver.try_recv() {
-            Ok(Some(token)) => token.into_proxy().unwrap(),
+            Ok(Some(token)) => token.into_proxy(),
             x => panic!("Should have a token sent to the fn, got {:?}", x),
         };
 
@@ -510,7 +506,7 @@ mod tests {
         let token = token.expect("receive token");
 
         let (buffer_collection_client, buffer_collection_requests) =
-            fidl::endpoints::create_proxy::<BufferCollectionMarker>().expect("proxy creation");
+            fidl::endpoints::create_proxy::<BufferCollectionMarker>();
         sysmem_client
             .bind_shared_collection(AllocatorBindSharedCollectionRequest {
                 token: Some(token),

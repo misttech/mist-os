@@ -42,10 +42,9 @@ pub(crate) async fn discovery_service_mock(
                         control_handle: _,
                     } = req
                     {
-                        if let Ok(proxy) = session_watcher.into_proxy() {
-                            watchers.lock().await.push(proxy);
-                            watcher_sender.send(()).await.expect("watch sent");
-                        }
+                        let proxy = session_watcher.into_proxy();
+                        watchers.lock().await.push(proxy);
+                        watcher_sender.send(()).await.expect("watch sent");
                     }
                 }
             })

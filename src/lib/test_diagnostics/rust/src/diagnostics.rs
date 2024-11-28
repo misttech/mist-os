@@ -88,16 +88,15 @@ mod fuchsia {
     impl BatchLogStream {
         #[cfg(test)]
         pub fn new() -> Result<(Self, ftest_manager::LogsIterator), fidl::Error> {
-            fidl::endpoints::create_proxy::<BatchIteratorMarker>().map(|(proxy, server_end)| {
-                let subscription = Subscription::new(proxy);
-                (Self { subscription }, ftest_manager::LogsIterator::Batch(server_end))
-            })
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>();
+            let subscription = Subscription::new(proxy);
+            Ok((Self { subscription }, ftest_manager::LogsIterator::Batch(server_end)))
         }
 
         pub fn from_client_end(
             client_end: ClientEnd<BatchIteratorMarker>,
         ) -> Result<Self, fidl::Error> {
-            Ok(Self { subscription: Subscription::new(client_end.into_proxy()?) })
+            Ok(Self { subscription: Subscription::new(client_end.into_proxy()) })
         }
     }
 
@@ -147,7 +146,7 @@ mod tests {
             server_end: ServerEnd<BatchIteratorMarker>,
             opts: BatchIteratorOpts,
         ) {
-            let mut request_stream = server_end.into_stream().expect("got stream");
+            let mut request_stream = server_end.into_stream();
             let mut values = vec![1i64, 2, 3].into_iter();
             while let Some(request) = request_stream.try_next().await.expect("get next request") {
                 match request {

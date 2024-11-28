@@ -85,6 +85,16 @@ type Options struct {
 	LLVMProfdataPath string
 }
 
+// ScaleTestTimeout multiplies the timeout by a factor set by the TEST_TIMEOUT_SCALE_FACTOR
+// environment variable. This allows us to scale timeouts on environments where
+// processes run much slower than others.
+func ScaleTestTimeout(timeout time.Duration) time.Duration {
+	if n, err := strconv.Atoi(os.Getenv(constants.TestTimeoutScaleFactor)); err == nil {
+		return timeout * time.Duration(n)
+	}
+	return timeout
+}
+
 func SetupAndExecute(ctx context.Context, opts Options, testsPath string) error {
 	// Our mDNS library doesn't use the logger library.
 	const logFlags = log.Ltime | log.Lmicroseconds | log.Lshortfile
@@ -589,7 +599,7 @@ func (b *stdioBuffer) Write(p []byte) (n int, err error) {
 // fails, only if an unrecoverable error occurs or testing should otherwise stop.
 func runTestOnce(
 	ctx context.Context,
-	test testsharder.Test,
+	origTest testsharder.Test,
 	t Tester,
 	outDir string,
 	testIndex int,
@@ -614,6 +624,10 @@ func runTestOnce(
 	if _, ok := t.(*FuchsiaSerialTester); ok && againstQEMU {
 		multistdout = io.MultiWriter(stdio, stdoutForParsing)
 	}
+
+	test := origTest
+	test.Timeout = ScaleTestTimeout(test.Timeout)
+	logger.Debugf(ctx, "test timeout: %v, orig timeout: %v\n", test.Timeout, origTest.Timeout)
 
 	startTime := clock.Now(ctx)
 

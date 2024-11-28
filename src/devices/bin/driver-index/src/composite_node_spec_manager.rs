@@ -133,7 +133,7 @@ impl CompositeNodeSpecManager {
         composite_drivers: Vec<&ResolvedDriver>,
     ) -> Result<(), i32> {
         // Get and validate the name.
-        let name = spec.name.clone().ok_or(Status::INVALID_ARGS.into_raw())?;
+        let name = spec.name.clone().ok_or_else(|| Status::INVALID_ARGS.into_raw())?;
         if let Ok(name_regex) = Regex::new(NAME_REGEX) {
             if !name_regex.is_match(&name) {
                 tracing::error!(
@@ -145,7 +145,7 @@ impl CompositeNodeSpecManager {
             tracing::warn!("Regex failure. Unable to validate spec name");
         }
 
-        let parents = spec.parents.clone().ok_or(Status::INVALID_ARGS.into_raw())?;
+        let parents = spec.parents.clone().ok_or_else(|| Status::INVALID_ARGS.into_raw())?;
 
         if self.spec_list.contains_key(&name) {
             return Err(Status::ALREADY_EXISTS.into_raw());
@@ -172,7 +172,7 @@ impl CompositeNodeSpecManager {
             self.parent_refs
                 .entry(properties)
                 .and_modify(|refs| refs.push(parent_ref.clone()))
-                .or_insert(vec![parent_ref]);
+                .or_insert_with(|| vec![parent_ref]);
         }
 
         let matched_composite_result =
@@ -273,14 +273,15 @@ impl CompositeNodeSpecManager {
         spec_name: String,
         composite_drivers: Vec<&ResolvedDriver>,
     ) -> Result<(), zx_status_t> {
-        let composite_info = self.spec_list.get(&spec_name).ok_or(Status::NOT_FOUND.into_raw())?;
+        let composite_info =
+            self.spec_list.get(&spec_name).ok_or_else(|| Status::NOT_FOUND.into_raw())?;
         let parents = composite_info
             .spec
             .as_ref()
-            .ok_or(Status::INTERNAL.into_raw())?
+            .ok_or_else(|| Status::INTERNAL.into_raw())?
             .parents
             .as_ref()
-            .ok_or(Status::INTERNAL.into_raw())?;
+            .ok_or_else(|| Status::INTERNAL.into_raw())?;
         let new_match = self.find_composite_driver_match(parents, &composite_drivers);
         self.spec_list.entry(spec_name).and_modify(|spec| {
             spec.matched_driver = new_match;
@@ -309,14 +310,14 @@ impl CompositeNodeSpecManager {
 
         for spec_name in specs_to_rebind {
             let composite_info =
-                self.spec_list.get(&spec_name).ok_or(Status::NOT_FOUND.into_raw())?;
+                self.spec_list.get(&spec_name).ok_or_else(|| Status::NOT_FOUND.into_raw())?;
             let parents = composite_info
                 .spec
                 .as_ref()
-                .ok_or(Status::INTERNAL.into_raw())?
+                .ok_or_else(|| Status::INTERNAL.into_raw())?
                 .parents
                 .as_ref()
-                .ok_or(Status::INTERNAL.into_raw())?;
+                .ok_or_else(|| Status::INTERNAL.into_raw())?;
             let new_match = self.find_composite_driver_match(parents, &composite_drivers);
             self.spec_list.entry(spec_name).and_modify(|spec| {
                 spec.matched_driver = new_match;
@@ -394,7 +395,7 @@ fn convert_fidl_to_bind_rules(
             return Err(Status::INVALID_ARGS.into_raw());
         }
 
-        let first_val = fidl_rule.values.first().ok_or(Status::INVALID_ARGS.into_raw())?;
+        let first_val = fidl_rule.values.first().ok_or_else(|| Status::INVALID_ARGS.into_raw())?;
         let values = fidl_rule
             .values
             .iter()
@@ -635,7 +636,7 @@ fn get_driver_url(composite: &fdf::CompositeDriverMatch) -> String {
         .as_ref()
         .and_then(|driver| driver.driver_info.as_ref())
         .and_then(|driver_info| driver_info.url.clone())
-        .unwrap_or("".to_string());
+        .unwrap_or_else(|| "".to_string());
 }
 
 #[cfg(test)]

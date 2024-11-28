@@ -136,9 +136,7 @@ pub(super) fn start_client(
         },
         duid: stateful.then_some(duid),
     };
-    let (client, server) = fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientMarker>()
-        .context("error creating DHCPv6 client fidl endpoints")
-        .map_err(errors::Error::Fatal)?;
+    let (client, server) = fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientMarker>();
 
     // Not all environments may have a DHCPv6 client service so we consider this a
     // non-fatal error.

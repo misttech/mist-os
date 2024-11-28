@@ -76,7 +76,8 @@ impl AvrcpVolume {
     /// Convert from a settings volume between 0.0 and 1.0 to a volume that can be sent
     /// through AVRCP (0 to 127 as per the spec)
     fn from_media_volume(value: settings::AudioSettings) -> Result<Self, anyhow::Error> {
-        let streams = value.streams.ok_or(format_err!("No streams in the AudioSettings"))?;
+        let streams =
+            value.streams.ok_or_else(|| format_err!("No streams in the AudioSettings"))?;
 
         // Find the media stream volume
         let volume =
@@ -305,7 +306,7 @@ where
 async fn connect_avrcp_volume(
     avrcp: &mut avrcp::PeerManagerProxy,
 ) -> Result<avrcp::AbsoluteVolumeHandlerRequestStream, Error> {
-    let (client, request_stream) = endpoints::create_request_stream()?;
+    let (client, request_stream) = endpoints::create_request_stream();
 
     if let Err(e) = avrcp.set_absolute_volume_handler(client).await? {
         info!("failed to set absolute volume handler");
@@ -328,11 +329,11 @@ mod tests {
     const INITIAL_AVRCP_VOLUME: u8 = 101;
 
     fn setup_avrcp_proxy() -> (avrcp::PeerManagerProxy, avrcp::PeerManagerRequestStream) {
-        endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>().unwrap()
+        endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>()
     }
 
     fn setup_settings_proxy() -> (settings::AudioProxy, settings::AudioRequestStream) {
-        endpoints::create_proxy_and_stream::<settings::AudioMarker>().unwrap()
+        endpoints::create_proxy_and_stream::<settings::AudioMarker>()
     }
 
     /// Builds all of the Proxies and request streams involved with setting up a Volume Relay
@@ -417,7 +418,7 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
         let audio_watch_responder = expect_audio_watch(&mut exec, audio_request_stream);
 
-        (handler.into_proxy().expect("absolute volume handler proxy"), audio_watch_responder)
+        (handler.into_proxy(), audio_watch_responder)
     }
 
     /// Test that the relay sets up the connection to AVRCP and Sessions and stops on the stop

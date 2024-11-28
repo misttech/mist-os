@@ -23,7 +23,7 @@ async fn read_input_device(
     writer: Arc<Mutex<impl Write + Send + Sync + 'static>>,
 ) -> Result<()> {
     let (input_reports_reader_proxy, server) =
-        fidl::endpoints::create_proxy::<fir::InputReportsReaderMarker>()?;
+        fidl::endpoints::create_proxy::<fir::InputReportsReaderMarker>();
     input_device_proxy
         .get_input_reports_reader(server)
         .context("Failed to get input reports reader")?;

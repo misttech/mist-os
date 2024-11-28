@@ -276,6 +276,7 @@ impl FdTable {
         profile_duration!("DuplicateFd");
         // Drop the removed entry only after releasing the writer lock in case
         // the close() function on the FileOps calls back into the FdTable.
+        #[allow(clippy::collection_is_never_read)]
         let _removed_entry;
         let result = {
             let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
@@ -397,6 +398,22 @@ impl FdTable {
                 maybe_entry.as_ref().map(|_| FdNumber::from_raw(index as i32))
             })
             .collect()
+    }
+
+    /// Executes `predicate(file) => maybe_replacement` on every non-empty table entry. Replaces
+    /// `file` with `replacement_file` in the table when
+    /// `maybe_replacement == Some(replacement_file)`.
+    pub fn remap_fds<F: Fn(&FileHandle) -> Option<FileHandle>>(&self, predicate: F) {
+        let inner = self.inner.lock();
+        let mut store = inner.store.lock();
+
+        for maybe_entry in store.entries.iter_mut() {
+            if let Some(entry) = maybe_entry {
+                if let Some(replacement_file) = predicate(&entry.file) {
+                    entry.file = replacement_file;
+                }
+            }
+        }
     }
 }
 

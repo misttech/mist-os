@@ -4,8 +4,8 @@
 
 use anyhow::{anyhow, Context, Error, Result};
 use assembly_config_schema::BoardDriverArguments;
+use assembly_constants::BootfsDestination;
 use assembly_tool::Tool;
-use assembly_util::BootfsDestination;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -73,7 +73,7 @@ impl ZbiBuilder {
         // will exist under a `blob` directory, and will be identified by
         // its merkle root.
         let bootfs_path = format!("blob/{}", merkle_root);
-        self.bootfs_files.insert(bootfs_path.to_string(), source.into());
+        self.bootfs_files.insert(bootfs_path, source.into());
     }
 
     /// Add a BootFS file to the ZBI.
@@ -223,7 +223,7 @@ impl ZbiBuilder {
         output_path: impl AsRef<Utf8Path>,
     ) -> Result<Vec<String>> {
         // Ensure a kernel is supplied.
-        let kernel = &self.kernel.as_ref().ok_or(anyhow!("No kernel image supplied"))?;
+        let kernel = &self.kernel.as_ref().ok_or_else(|| anyhow!("No kernel image supplied"))?;
 
         let mut args: Vec<String> = Vec::new();
 

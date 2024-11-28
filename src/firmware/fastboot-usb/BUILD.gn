@@ -30,6 +30,7 @@ executable("bin") {
     "//sdk/lib/async-default",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/firmware/lib/fastboot",

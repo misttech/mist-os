@@ -5,6 +5,7 @@
 #ifndef SRC_DEVELOPER_ADB_DRIVERS_USB_ADB_FUNCTION_ADB_FUNCTION_H_
 #define SRC_DEVELOPER_ADB_DRIVERS_USB_ADB_FUNCTION_ADB_FUNCTION_H_
 
+#include <endian.h>
 #include <fidl/fuchsia.hardware.adb/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
@@ -20,6 +21,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 #include <usb-endpoint/usb-endpoint-client.h>
+#include <usb/descriptors.h>
 
 namespace usb_adb_function {
 
@@ -104,7 +106,7 @@ class UsbAdbDevice : public UsbAdb,
 
   // Helper method to perform bookkeeping and insert requests back to the free pool.
   zx_status_t InsertUsbRequest(fuchsia_hardware_usb_request::Request req,
-                               usb_endpoint::UsbEndpoint<UsbAdbDevice>& ep);
+                               usb::EndpointClient<UsbAdbDevice>& ep);
 
   // Helper method to get free request buffer and queue the request for transmitting.
   zx::result<> SendLocked() __TA_REQUIRES(bulk_in_ep_.mutex_);
@@ -207,19 +209,19 @@ class UsbAdbDevice : public UsbAdb,
 
   zx_status_t InitEndpoint(fidl::ClientEnd<fuchsia_hardware_usb_function::UsbFunction>& client,
                            uint8_t direction, uint8_t* ep_addrs,
-                           usb_endpoint::UsbEndpoint<UsbAdbDevice>& ep, uint32_t req_count);
+                           usb::EndpointClient<UsbAdbDevice>& ep, uint32_t req_count);
 
   // Bulk OUT/RX endpoint
-  usb_endpoint::UsbEndpoint<UsbAdbDevice> bulk_out_ep_{usb::EndpointType::BULK, this,
-                                                       std::mem_fn(&UsbAdbDevice::RxComplete)};
+  usb::EndpointClient<UsbAdbDevice> bulk_out_ep_{usb::EndpointType::BULK, this,
+                                                 std::mem_fn(&UsbAdbDevice::RxComplete)};
   // Queue of pending Receive requests from client.
   std::queue<ReceiveCompleter::Async> rx_requests_ __TA_GUARDED(bulk_out_ep_.mutex_);
   // pending_replies_ only used for bulk_out_ep_
   std::queue<fendpoint::Completion> pending_replies_ __TA_GUARDED(bulk_out_ep_.mutex_);
 
   // Bulk IN/TX endpoint
-  usb_endpoint::UsbEndpoint<UsbAdbDevice> bulk_in_ep_{usb::EndpointType::BULK, this,
-                                                      std::mem_fn(&UsbAdbDevice::TxComplete)};
+  usb::EndpointClient<UsbAdbDevice> bulk_in_ep_{usb::EndpointType::BULK, this,
+                                                std::mem_fn(&UsbAdbDevice::TxComplete)};
   // Queue of pending transfer requests that need to be transmitted once the BULK IN request buffers
   // become available.
   std::queue<txn_req_t> tx_pending_reqs_ __TA_GUARDED(bulk_in_ep_.mutex_);

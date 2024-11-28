@@ -30,16 +30,13 @@ primary node "pdev" {
   }
 }
 
-optional node "pwm-little" {
+// For Astro
+optional node "pwm-primary" {
   fuchsia.hardware.pwm.Service == fuchsia.hardware.pwm.Service.ZirconTransport;
   fuchsia.amlogic.platform.PWM_ID == fuchsia.amlogic.platform.PWM_ID.AO_D;
 }
 
-optional node "pwm-big" {
-  fuchsia.hardware.pwm.Service == fuchsia.hardware.pwm.Service.ZirconTransport;
-  fuchsia.amlogic.platform.PWM_ID == fuchsia.amlogic.platform.PWM_ID.A;
-}
-
+// For Vim3
 optional node "vreg-pwm-little" {
   fuchsia.hardware.vreg.Service == fuchsia.hardware.vreg.Service.ZirconTransport;
   fuchsia.regulator.NAME == fuchsia.amlogic.platform.a311d.NAME.PWM_VREG_LITTLE;

@@ -980,10 +980,8 @@ where
         } else {
             // If we don't have a property selector and we reached the end of the node path, then
             // we should add everything under the current node to the result.
-            for (path, property) in node.property_iter() {
+            for (_path, property) in node.property_iter() {
                 if let Some(property) = property {
-                    let mut property_path = explored_path.clone();
-                    property_path.extend_from_slice(&path[1..]);
                     result.push(property);
                 }
             }

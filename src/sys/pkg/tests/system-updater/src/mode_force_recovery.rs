@@ -77,7 +77,7 @@ async fn reboots_regardless_of_reboot_controller() {
         .add_file("images.json", make_images_json_recovery());
 
     // Start the system update.
-    let (reboot_proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (reboot_proxy, server_end) = fidl::endpoints::create_proxy();
     let attempt = start_update(
         &UPDATE_PKG_URL.parse().unwrap(),
         default_options(),

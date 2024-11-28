@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, format_err, Result},
-    argh::FromArgs,
-    serde::{de::DeserializeOwned, Deserialize},
-    std::{
-        fs::{File, OpenOptions},
-        io::{stdin, stdout, BufRead, BufReader, Read, Write},
-        path::PathBuf,
-        process::Command,
-    },
-};
+use anyhow::{bail, format_err, Result};
+use argh::FromArgs;
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
+use std::fs::{File, OpenOptions};
+use std::io::{stdin, stdout, BufRead, BufReader, Read, Write};
+use std::path::PathBuf;
+use std::process::Command;
 
 #[derive(FromArgs, Debug, Default, PartialEq)]
 #[argh(
@@ -89,9 +86,9 @@ where
     R: BufRead,
     W: Write,
 {
-    let fuchsia_dir_root = get_fuchsia_dir_root(cwd)?.ok_or(format_err!(
-        "This command must be run from within the Fuchsia Platform Source Tree"
-    ))?;
+    let fuchsia_dir_root = get_fuchsia_dir_root(cwd)?.ok_or_else(|| {
+        format_err!("This command must be run from within the Fuchsia Platform Source Tree")
+    })?;
     let rfcs_dir = fuchsia_dir_root.join(RFCS_PATH);
 
     let title = cli.get_title()?;

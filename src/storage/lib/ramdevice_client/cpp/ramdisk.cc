@@ -118,8 +118,8 @@ struct ramdisk_client {
   static zx_status_t CreateV2(fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory,
                               zx::eventpair lifeline, std::unique_ptr<ramdisk_client>* out) {
     auto [svc_dir, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    if (zx_status_t status = fdio_open3_at(outgoing_directory.channel().get(), "svc", 0,
-                                           server.TakeChannel().release());
+    if (zx_status_t status = fdio_open_at(outgoing_directory.channel().get(), "svc", 0,
+                                          server.TakeChannel().release());
         status != ZX_OK)
       return status;
 

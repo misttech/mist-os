@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <net/ethernet.h>
+#include <netinet/icmp6.h>
 #include <netinet/in.h>
 #include <netinet/ip_icmp.h>
 #include <poll.h>
@@ -20,6 +22,12 @@
 #include <fbl/unaligned.h>
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+#include <linux/bpf.h>
+#include <linux/capability.h>
+#include <linux/filter.h>
+#include <linux/if_ether.h>
+#include <linux/if_packet.h>
+#include <linux/ipv6.h>
 
 #include "fault_test.h"
 #include "linux/genetlink.h"
@@ -640,3 +648,140 @@ TEST_P(SndRcvBufSockOpt, DoubledOnGet) {
 }
 
 INSTANTIATE_TEST_SUITE_P(SndRcvBufSockOpt, SndRcvBufSockOpt, testing::Values(SO_SNDBUF, SO_RCVBUF));
+
+class BpfTest : public testing::Test {
+ protected:
+  void SetUp() override {
+    if (!test_helper::HasCapability(CAP_NET_RAW)) {
+      GTEST_SKIP() << "Need CAP_NET_RAW to run BpfTest";
+    }
+
+    packet_socket_fd_ = fbl::unique_fd(socket(AF_PACKET, SOCK_RAW, 0));
+    ASSERT_TRUE(packet_socket_fd_) << strerror(errno);
+    sockaddr_ll addr_ll = {
+        .sll_family = AF_PACKET,
+        .sll_protocol = htons(ETH_P_ALL),
+    };
+    ASSERT_EQ(bind(packet_socket_fd_.get(), reinterpret_cast<sockaddr*>(&addr_ll), sizeof(addr_ll)),
+              0);
+  }
+
+  void SendPacketAndCheckReceived(int domain, uint16_t dst_port, bool expected);
+
+  fbl::unique_fd packet_socket_fd_;
+};
+
+void BpfTest::SendPacketAndCheckReceived(int domain, uint16_t dst_port, bool expected) {
+  sockaddr_in addr4 = {
+      .sin_family = AF_INET,
+      .sin_port = htons(dst_port),
+      .sin_addr =
+          {
+              .s_addr = htonl(INADDR_LOOPBACK),
+          },
+  };
+  sockaddr_in6 addr6 = {
+      .sin6_family = AF_INET6,
+      .sin6_port = htons(dst_port),
+      .sin6_addr = IN6ADDR_LOOPBACK_INIT,
+  };
+  sockaddr* addr = domain == AF_INET6 ? reinterpret_cast<sockaddr*>(&addr6)
+                                      : reinterpret_cast<sockaddr*>(&addr4);
+  socklen_t addrlen = domain == AF_INET6 ? sizeof(addr6) : sizeof(addr4);
+
+  const char data[] = "test message";
+  fbl::unique_fd sendfd;
+  ASSERT_TRUE(sendfd = fbl::unique_fd(socket(domain, SOCK_DGRAM, 0))) << strerror(errno);
+  ASSERT_EQ(sendto(sendfd.get(), data, sizeof(data), 0, addr, addrlen),
+            static_cast<int>(sizeof(data)))
+      << strerror(errno);
+
+  pollfd pfd = {
+      .fd = packet_socket_fd_.get(),
+      .events = POLLIN,
+  };
+
+  const int kPositiveCheckTimeoutMs = 10000;
+  const int kNegativeCheckTimeoutMs = 1000;
+  int timeout = expected ? kPositiveCheckTimeoutMs : kNegativeCheckTimeoutMs;
+  int n = poll(&pfd, 1, timeout);
+  ASSERT_GE(n, 0) << strerror(errno);
+  if (expected) {
+    ASSERT_EQ(n, 1);
+    char buf[4096];
+    ASSERT_GT(recv(packet_socket_fd_.get(), buf, sizeof(buf), 0), 0);
+
+    // The packet was sent to loopback, so we expect to receive it twice.
+    ASSERT_EQ(poll(&pfd, 1, 1000), 1);
+    ASSERT_GT(recv(packet_socket_fd_.get(), buf, sizeof(buf), 0), 0);
+  } else {
+    ASSERT_EQ(n, 0);
+  }
+}
+
+TEST_F(BpfTest, SoAttachFilter) {
+  const uint16_t kTestDstPortIpv4 = 1234;
+  const uint16_t kTestDstPortIpv6 = 1236;
+
+  // This filter accepts IPv4 UDP packets on port kTestDstPortIpv4 and IPv6 UDP
+  // packets on port kTestDstPortIpv6.
+  static sock_filter filter_code[] = {
+      // Load the protocol.
+      BPF_STMT(BPF_LD | BPF_H | BPF_ABS, (__u32)SKF_AD_OFF + SKF_AD_PROTOCOL),
+
+      // Check if this is IPv4, skip below otherwise.
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, ETHERTYPE_IP, 0, 8),
+
+      // Check that the protocol is UDP.
+      BPF_STMT(BPF_LD | BPF_B | BPF_ABS, (__u32)SKF_NET_OFF + 9),
+
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, IPPROTO_UDP, 1, 0),
+      BPF_STMT(BPF_RET | BPF_K, 0),
+
+      // Get the IP header length.
+      BPF_STMT(BPF_LDX | BPF_B | BPF_MSH, (__u32)SKF_NET_OFF),
+
+      // Check the destination port.
+      BPF_STMT(BPF_LD | BPF_H | BPF_IND, (__u32)SKF_NET_OFF + 2),
+
+      // Reject if not kTestDstPortIpv4.
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, kTestDstPortIpv4, 1, 0),
+      BPF_STMT(BPF_RET | BPF_K, 0),
+
+      // Accept.
+      BPF_STMT(BPF_RET | BPF_K, 0xFFFFFFFF),
+
+      // Check if this is IPv6.
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, ETHERTYPE_IPV6, 1, 0),
+      BPF_STMT(BPF_RET | BPF_K, 0),
+
+      // Check the protocol is UDP.
+      BPF_STMT(BPF_LD | BPF_B | BPF_ABS, (__u32)SKF_NET_OFF + 6),
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, IPPROTO_UDP, 1, 0),
+      BPF_STMT(BPF_RET | BPF_K, 0),
+
+      // Load destination port, assuming standard, 40-byte IPv6 packet.
+      BPF_STMT(BPF_LD | BPF_H | BPF_ABS, (__u32)SKF_NET_OFF + 42),
+
+      // Check destination port.
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, kTestDstPortIpv6, 1, 0),
+      BPF_STMT(BPF_RET | BPF_K, 0),
+
+      // Accept.
+      BPF_STMT(BPF_RET | BPF_K, 0xFFFFFFFF),
+  };
+
+  static const sock_fprog filter = {
+      sizeof(filter_code) / sizeof(filter_code[0]),
+      filter_code,
+  };
+
+  ASSERT_EQ(
+      setsockopt(packet_socket_fd_.get(), SOL_SOCKET, SO_ATTACH_FILTER, &filter, sizeof(filter)),
+      0);
+
+  SendPacketAndCheckReceived(AF_INET, kTestDstPortIpv4, true);
+  SendPacketAndCheckReceived(AF_INET6, kTestDstPortIpv6, true);
+  SendPacketAndCheckReceived(AF_INET, kTestDstPortIpv6, false);
+  SendPacketAndCheckReceived(AF_INET6, kTestDstPortIpv4, false);
+}

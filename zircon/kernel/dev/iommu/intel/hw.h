@@ -14,6 +14,7 @@
 
 #include <arch/ops.h>
 #include <hwreg/bitfields.h>
+#include <hwreg/mmio.h>
 #include <ktl/atomic.h>
 #include <ktl/type_traits.h>
 

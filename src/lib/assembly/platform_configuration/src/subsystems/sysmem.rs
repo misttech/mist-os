@@ -8,7 +8,7 @@ use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::sysmem_config::{
     BoardSysmemConfig, MemorySize, PlatformSysmemConfig,
 };
-use assembly_util::{BootfsPackageDestination, PackageSetDestination};
+use assembly_constants::{BootfsPackageDestination, PackageSetDestination};
 use camino::Utf8PathBuf;
 use std::collections::HashSet;
 

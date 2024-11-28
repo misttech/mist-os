@@ -26,7 +26,10 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <lib/fit/function.h>
+#include <lib/zbi-format/memory.h>
 #include <zircon/compiler.h>
+
+#include <ktl/optional.h>
 
 __BEGIN_CDECLS
 
@@ -61,11 +64,16 @@ __END_CDECLS
 
 struct pmm_arena_info;
 
-// Invokes |func| on each non-arena backed region of the physmap in ascending order of base address.
+// Invokes |func| on each non-arena backed region of the physmap in ascending order of base address,
+// making sure to avoid any NVRAM range which would not be tracked by the PMM.
 //
 // No locks are held while calling |func|.
+//
+// TODO(https://fxbug.dev/42164859): When set up by physboot, the would-be gaps will be protected
+// or left unmapped from the get-go and redefined more holistically to avoid any NVRAM range.
 void physmap_for_each_gap(fit::inline_function<void(vaddr_t base, size_t size)> func,
-                          pmm_arena_info* arenas, size_t num_arenas);
+                          pmm_arena_info* arenas, size_t num_arenas,
+                          ktl::optional<zbi_nvram_t> nvram = {});
 
 // Protects all the regions of the physmap that are not backed by a PMM arena.
 //

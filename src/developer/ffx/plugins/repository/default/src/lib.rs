@@ -29,7 +29,7 @@ pub async fn exec_repository_default_impl<W: std::io::Write + ToolIO>(
 ) -> Result<()> {
     match &cmd.subcommand {
         SubCommand::Get(_) => {
-            let res: String = ffx_config::get(CONFIG_KEY_DEFAULT).unwrap_or("".to_owned());
+            let res: String = ffx_config::get(CONFIG_KEY_DEFAULT).unwrap_or_else(|_| "".to_owned());
             writeln!(writer, "{}", res).map_err(|e| bug!(e))?;
         }
         SubCommand::Set(set) => {

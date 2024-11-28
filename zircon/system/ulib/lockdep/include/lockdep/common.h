@@ -22,7 +22,7 @@ namespace lockdep {
 // system may override the default by globally defining this name to the desired
 // value. This value is automatically converted to the next suitable prime.
 #ifndef LOCK_DEP_MAX_DEPENDENCIES
-#define LOCK_DEP_MAX_DEPENDENCIES 31
+#define LOCK_DEP_MAX_DEPENDENCIES 97
 #endif
 
 // Configures the level of feature support in lockdep:

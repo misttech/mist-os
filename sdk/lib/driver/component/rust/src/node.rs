@@ -4,13 +4,15 @@
 
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_driver_framework::{
-    NodeAddArgs, NodeControllerMarker, NodeMarker, NodeProperty, NodeProxy,
+    NodeAddArgs, NodeControllerMarker, NodeMarker, NodeProperty, NodeProxy, Offer,
 };
 use tracing::error;
 use zx::Status;
 
+mod offers;
 mod properties;
 
+pub use offers::*;
 pub use properties::*;
 
 /// Holds on to a [`NodeProxy`] and provides simplified methods for adding child nodes.
@@ -105,6 +107,13 @@ impl NodeBuilder {
         let key = key.into().0;
         let value = value.into().0;
         self.0.properties.get_or_insert_with(|| vec![]).push(NodeProperty { key, value });
+        self
+    }
+
+    /// Adds a service offer to the node. The `offer` can be built with the
+    /// [`offers::ZirconServiceOffer`] builder.
+    pub fn add_offer(mut self, offer: Offer) -> Self {
+        self.0.offers2.get_or_insert_with(|| vec![]).push(offer);
         self
     }
 

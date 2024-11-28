@@ -245,7 +245,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             .allocator()
             .mark_allocated(transaction, self.store().store_object_id(), device_range.clone())
             .await?;
-        self.txn_update_size(transaction, new_size).await?;
+        self.txn_update_size(transaction, new_size, None).await?;
         let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
         transaction.add(
             self.store().store_object_id,
@@ -468,13 +468,20 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     /// range is beyond the end of the file, the file size is updated.
     pub async fn allocate(&self, range: Range<u64>) -> Result<(), Error> {
         debug_assert!(range.start < range.end);
-        debug_assert_eq!(range.start % self.block_size(), 0);
-        debug_assert_eq!(range.end % self.block_size(), 0);
+
+        // It's not required that callers of allocate use block aligned ranges, but we need to make
+        // the extents block aligned. Luckily, fallocate in posix is allowed to allocate more than
+        // what was asked for for block alignment purposes. We just need to make sure that the size
+        // of the file is still the non-block-aligned end of the range if the size was changed.
+        let mut new_range = range.clone();
+        new_range.start = round_down(new_range.start, self.block_size());
+        // NB: FxfsError::TooBig turns into EFBIG when passed through starnix, which is the
+        // required error code when the requested range is larger than the file size.
+        new_range.end = round_up(new_range.end, self.block_size()).ok_or(FxfsError::TooBig)?;
 
         let mut transaction = self.new_transaction().await?;
         let mut to_allocate = Vec::new();
         let mut to_switch = Vec::new();
-        let mut new_range = range.clone();
         let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
 
         {
@@ -601,7 +608,10 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         // (either sparse zero or allocated zero). On the other hand, if we don't update the size
         // in the first transaction, overwrite extents may be written past the end of the file
         // which is an fsck error.
-        let new_size = std::cmp::max(new_range.end, self.get_size());
+        //
+        // The potential new size needs to be the non-block-aligned range end - we round up to the
+        // nearest block size for the actual allocation, but shouldn't do that for the file size.
+        let new_size = std::cmp::max(range.end, self.get_size());
         // Make sure the mutation that flips the has_overwrite_extents advisory flag is in the
         // first transaction, in case we split transactions. This makes it okay to only replay the
         // first transaction if power loss occurs - the file will be in an unusual state, but not
@@ -815,7 +825,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         )
         .await?;
         if offset + buf.len() as u64 > self.txn_get_size(transaction) {
-            self.txn_update_size(transaction, offset + buf.len() as u64).await?;
+            self.txn_update_size(transaction, offset + buf.len() as u64, None).await?;
         }
         Ok(())
     }
@@ -1082,6 +1092,9 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         &'a self,
         transaction: &mut Transaction<'a>,
         new_size: u64,
+        // Allow callers to update the has_overwrite_extents metadata if they want. If this is
+        // Some it is set to the value, if None it is left unchanged.
+        update_has_overwrite_extents: Option<bool>,
     ) -> Result<(), Error> {
         let key =
             ObjectKey::attribute(self.object_id(), self.attribute_id(), AttributeKey::Attribute);
@@ -1095,8 +1108,11 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 op: Operation::ReplaceOrInsert,
             }
         };
-        if let ObjectValue::Attribute { size, .. } = &mut mutation.item.value {
+        if let ObjectValue::Attribute { size, has_overwrite_extents } = &mut mutation.item.value {
             *size = new_size;
+            if let Some(update_has_overwrite_extents) = update_has_overwrite_extents {
+                *has_overwrite_extents = update_has_overwrite_extents;
+            }
         } else {
             bail!(anyhow!(FxfsError::Inconsistent).context("Unexpected object value"));
         }
@@ -1123,8 +1139,17 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         size: u64,
     ) -> Result<NeedsTrim, Error> {
         let needs_trim = self.handle.shrink(transaction, self.attribute_id(), size).await?;
-        self.txn_update_size(transaction, size).await?;
-        self.overwrite_ranges.truncate(size);
+        let update_has_overwrite_extents = if self
+            .overwrite_ranges
+            .truncate(round_up(size, self.block_size()).ok_or(FxfsError::TooBig)?)
+        {
+            // This returns true if there were ranges, but this truncate removed them all, which
+            // indicates that we need to flip the has_overwrite_extents metadata flag to false.
+            Some(false)
+        } else {
+            None
+        };
+        self.txn_update_size(transaction, size, update_has_overwrite_extents).await?;
         Ok(needs_trim)
     }
 
@@ -1203,7 +1228,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 }
             }
         }
-        self.txn_update_size(transaction, size).await?;
+        self.txn_update_size(transaction, size, None).await?;
         Ok(())
     }
 
@@ -1343,7 +1368,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         }
         // Update the file size if it changed.
         if file_range.start > round_up(self.txn_get_size(transaction), block_size).unwrap() {
-            self.txn_update_size(transaction, file_range.start).await?;
+            self.txn_update_size(transaction, file_range.start, None).await?;
         }
         self.update_allocated_size(transaction, allocated, 0).await?;
         Ok(ranges)
@@ -1623,7 +1648,7 @@ impl<S: HandleOwner> ReadObjectHandle for DataObjectHandle<S> {
 
 impl<S: HandleOwner> WriteObjectHandle for DataObjectHandle<S> {
     async fn write_or_append(&self, offset: Option<u64>, buf: BufferRef<'_>) -> Result<u64, Error> {
-        let offset = offset.unwrap_or(self.get_size());
+        let offset = offset.unwrap_or_else(|| self.get_size());
         let mut transaction = self.new_transaction().await?;
         self.txn_write(&mut transaction, offset, buf).await?;
         let new_size = self.txn_get_size(&transaction);

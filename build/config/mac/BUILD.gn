@@ -23,7 +23,7 @@ config("compiler") {
   ]
   ldflags = [
     "-nostdlib++",
-    "${rebased_clang_prefix}/../lib/libc++.a",
+    "${rebased_clang_dir}/lib/libc++.a",
   ]
   configs = [
     ":sysroot",

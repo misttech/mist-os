@@ -8,7 +8,7 @@
 #include <cinttypes>
 
 #include "lib/stdcompat/span.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/edid/timings.h"
 
 namespace edid::internal {

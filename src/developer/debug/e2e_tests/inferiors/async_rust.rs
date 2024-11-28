@@ -10,7 +10,7 @@ use std::future::IntoFuture;
 #[fasync::run_singlethreaded]
 async fn main() {
     let _task = fasync::Task::spawn(async {});
-    let scope = fasync::EHandle::local().root_scope().new_child();
+    let scope = fasync::Scope::new();
     let _scope_task = scope.spawn(baz(19));
     let block = async {
         fasync::Task::spawn(baz(20)).detach();
@@ -27,7 +27,7 @@ async fn main() {
 }
 
 async fn foo() {
-    let scope = fasync::EHandle::local().root_scope().new_child();
+    let scope = fasync::Scope::new();
     scope.spawn(baz(7));
     let join_handle = scope.spawn(async {
         baz(8).await;

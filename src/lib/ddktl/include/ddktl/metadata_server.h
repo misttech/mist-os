@@ -49,26 +49,12 @@ struct ObjectDetails {
   inline static const char* Name;
 };
 
-// Returns the path to the fuchsia.driver.metadata/Metadata FIDL service instance for |FidlType|
-// within an incoming namespace at instance |instance_name|.
-template <typename FidlType>
-std::string GetMetadataFidlProtocolPath(std::string_view instance_name) {
-  // The metadata protocol is found within the `ObjectDetails<FidlType>::Name` service directory
-  // and not the `fuchsia_driver_metadata::Service::Name` directory because that is where
-  // `ddk::MetadataServer` is expected to serve the fuchsia.driver.metadata/Metadata protocol.
-  return std::string{ObjectDetails<FidlType>::Name}
-      .append("/")
-      .append(instance_name)
-      .append("/")
-      .append(fuchsia_driver_metadata::Service::Metadata::Name);
-}
-
 // Connects to the FIDL service that provides |FidlType|. This service is found within |device|'s
 // incoming namespace at FIDL service instance |instance_name|.
 template <typename FidlType>
 zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadataServer(
     zx_device_t* device,
-    std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
+    const char* instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
   static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_driver_metadata::Metadata>();
@@ -77,9 +63,9 @@ zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadata
     return endpoints.take_error();
   }
 
-  zx_status_t status = device_connect_ns_protocol(
-      device, GetMetadataFidlProtocolPath<FidlType>(instance_name).c_str(),
-      endpoints->server.TakeChannel().release());
+  zx_status_t status = device_connect_fragment_fidl_protocol(
+      device, instance_name, ObjectDetails<FidlType>::Name,
+      fuchsia_driver_metadata::Service::Metadata::Name, endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to connect to metadata protocol: %s", zx_status_get_string(status));
     return zx::error(status);
@@ -100,7 +86,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadata
 template <typename FidlType>
 zx::result<FidlType> GetMetadata(
     zx_device_t* device,
-    std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
+    const char* instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
   static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
   static_assert(!fidl::IsResource<FidlType>::value,
                 "|FidlType| cannot be a resource type. Resources cannot be persisted.");
@@ -142,7 +128,7 @@ zx::result<FidlType> GetMetadata(
 template <typename FidlType>
 zx::result<std::optional<FidlType>> GetMetadataIfExists(
     zx_device_t* device,
-    std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
+    const char* instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
   static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
   static_assert(!fidl::IsResource<FidlType>::value,
                 "|FidlType| cannot be a resource type. Resources cannot be persisted.");
@@ -153,9 +139,9 @@ zx::result<std::optional<FidlType>> GetMetadataIfExists(
     return endpoints.take_error();
   }
 
-  zx_status_t status = device_connect_ns_protocol(
-      device, GetMetadataFidlProtocolPath<FidlType>(instance_name).c_str(),
-      endpoints->server.TakeChannel().release());
+  zx_status_t status = device_connect_fragment_fidl_protocol(
+      device, instance_name, ObjectDetails<FidlType>::Name,
+      fuchsia_driver_metadata::Service::Metadata::Name, endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     zxlogf(DEBUG, "Failed to connect to metadata protocol: %s", zx_status_get_string(status));
     return zx::ok(std::nullopt);
@@ -273,7 +259,7 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
   // manifest specifies that is uses the `ddk::ObjectDetails<|FidlType|>::Name` service
   zx_status_t ForwardMetadata(
       zx_device_t* device,
-      std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
+      const char* instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
     fidl::WireSyncClient<fuchsia_driver_metadata::Metadata> client{};
     {
       zx::result result = ConnectToMetadataServer<FidlType>(device, instance_name);

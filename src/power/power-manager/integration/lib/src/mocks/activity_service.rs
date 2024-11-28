@@ -66,7 +66,7 @@ impl MockActivityService {
                 let factivity::ProviderRequest::WatchState { listener, .. } =
                     stream.try_next().await.unwrap().unwrap();
                 info!("MockActivityService: received WatchState request");
-                let listener = listener.into_proxy().unwrap();
+                let listener = listener.into_proxy();
                 while let Some(state) = this.state_receiver.lock().await.next().await {
                     info!("MockActivityService: sending activity state: {:?}", state);
                     let _ = listener.on_state_changed(state, 0).await;
@@ -97,7 +97,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_set_activity_state() {
         // Create and serve the mock service
-        let (dir, outgoing_dir) = fidl::endpoints::create_proxy::<DirectoryMarker>().unwrap();
+        let (dir, outgoing_dir) = fidl::endpoints::create_proxy::<DirectoryMarker>();
         let mock = MockActivityService::new();
         let _task = fasync::Task::local(mock.clone().run_inner(outgoing_dir));
 
@@ -107,7 +107,7 @@ mod tests {
 
         // Call the server's `watch_state` method, providing a Listener client end
         let (listener_client, mut listener_stream) =
-            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>();
         provider_client.watch_state(listener_client).unwrap();
 
         // Set `Active` state on the mock and verify the listener sees the correct state

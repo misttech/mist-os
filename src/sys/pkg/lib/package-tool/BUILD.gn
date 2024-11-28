@@ -7,12 +7,6 @@ import("//build/rust/rustc_library.gni")
 import("//build/testing/host_test_data.gni")
 
 if (is_host) {
-  host_test_data("test_tools") {
-    sources = [ "$host_tools_dir/pm" ]
-    outputs = [ "$root_out_dir/test_data/package-tool/{{source_file_part}}" ]
-    deps = [ "//src/sys/pkg/bin/pm:host($host_toolchain)" ]
-  }
-
   relative_root_out_dir = rebase_path(root_out_dir, root_build_dir)
   rustc_library("package-tool") {
     version = "0.1.0"
@@ -44,7 +38,6 @@ if (is_host) {
     ]
 
     test_deps = [
-      ":test_tools",
       "//src/developer/ffx/lib/pkg:empty-repo-keys",
       "//src/developer/ffx/lib/pkg:empty-repo-metadata",
       "//src/lib/assembly/partitions_config",

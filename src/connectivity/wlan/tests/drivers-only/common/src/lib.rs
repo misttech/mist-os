@@ -24,9 +24,8 @@ impl DriversOnlyTestRealm {
             .expect("Could not connect to realm factory protocol");
 
         let (dict_client, dict_server) = create_endpoints();
-        let (dev_topological, dev_topological_server) =
-            create_proxy().expect("Could not create proxy");
-        let (_dev_class, dev_class_server) = create_proxy().expect("Could not create proxy");
+        let (dev_topological, dev_topological_server) = create_proxy();
+        let (_dev_class, dev_class_server) = create_proxy();
 
         let (pkg_client, pkg_server) = create_endpoints();
         fuchsia_fs::directory::open_channel_in_namespace(

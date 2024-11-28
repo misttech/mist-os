@@ -39,6 +39,7 @@ use std::pin::pin;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{ProtocolMarker, ServerEnd};
+use fidl_fuchsia_net_interfaces_ext::{NotPositiveMonotonicInstantError, PositiveMonotonicInstant};
 use fnet_interfaces_admin::GrantForInterfaceAuthorization;
 use futures::future::FusedFuture as _;
 use futures::stream::FusedStream as _;
@@ -51,18 +52,20 @@ use netstack3_core::device::{
     NdpConfiguration, NdpConfigurationUpdate,
 };
 use netstack3_core::ip::{
-    AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, IpDeviceConfiguration,
-    IpDeviceConfigurationUpdate, Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate,
-    Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
-    Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
-    TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
+    AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, CommonAddressProperties,
+    IpDeviceConfiguration, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
+    Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfiguration,
+    Ipv6DeviceConfigurationAndFlags, Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime,
+    SetIpAddressPropertiesError, SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration,
+    UpdateIpConfigurationError,
 };
 use zx::{self as zx, HandleBased, Rights};
 
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fuchsia_async as fasync,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_async as fasync,
 };
 
 use crate::bindings::devices::{
@@ -76,7 +79,9 @@ use crate::bindings::util::{
     IllegalNonPositiveValueError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _,
     TryIntoCore,
 };
-use crate::bindings::{netdevice_worker, BindingId, Ctx, DeviceIdExt as _, Netstack};
+use crate::bindings::{
+    netdevice_worker, BindingId, Ctx, DeviceIdExt as _, LifetimeExt as _, Netstack,
+};
 
 pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerRequestStream) {
     req.filter_map(|req| {
@@ -98,12 +103,8 @@ pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerReq
                 device_control,
                 control_handle: _,
             } => futures::future::ready(Some(fasync::Task::spawn(
-                run_device_control(
-                    ns.clone(),
-                    device,
-                    device_control.into_stream().expect("failed to obtain stream"),
-                )
-                .map(|r| r.unwrap_or_else(|e| warn!("device control finished with {:?}", e))),
+                run_device_control(ns.clone(), device, device_control.into_stream())
+                    .map(|r| r.unwrap_or_else(|e| warn!("device control finished with {:?}", e))),
             ))),
         }
     })
@@ -138,11 +139,9 @@ async fn run_device_control(
     let mut detached = false;
     let mut tasks = futures::stream::FuturesUnordered::new();
     let res = loop {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         let result = futures::select! {
             req = req_stream.try_next() => req,
             r = worker_fut => match r {
-                Ok(never) => match never {},
                 Err(e) => Err(e)
             },
             ready_task = tasks.next() => {
@@ -209,8 +208,7 @@ impl OwnedControlHandle {
     pub(crate) fn new_unowned(
         handle: fidl::endpoints::ServerEnd<fnet_interfaces_admin::ControlMarker>,
     ) -> OwnedControlHandle {
-        let (stream, control) =
-            handle.into_stream_and_control_handle().expect("failed to decompose control handle");
+        let (stream, control) = handle.into_stream_and_control_handle();
         OwnedControlHandle {
             request_stream: stream,
             control_handle: control,
@@ -236,8 +234,7 @@ impl OwnedControlHandle {
         futures::channel::mpsc::Receiver<OwnedControlHandle>,
     ) {
         let (mut sender, receiver) = Self::new_channel();
-        let (stream, control) =
-            handle.into_stream_and_control_handle().expect("failed to decompose control handle");
+        let (stream, control) = handle.into_stream_and_control_handle();
         sender
             .send(OwnedControlHandle {
                 request_stream: stream,
@@ -334,8 +331,7 @@ async fn create_interface(
                 netdevice_worker::Error::DuplicateName(_) => {
                     Some(fnet_interfaces_admin::InterfaceRemovedReason::DuplicateName)
                 }
-                netdevice_worker::Error::SystemResource(_)
-                | netdevice_worker::Error::InvalidPortInfo(_) => None,
+                netdevice_worker::Error::InvalidPortInfo(_) => None,
             };
             if let Some(removed_reason) = removed_reason {
                 // Retrieve the original control handle from the receiver.
@@ -1154,15 +1150,14 @@ fn add_address(
     params: fnet_interfaces_admin::AddressParameters,
     address_state_provider: ServerEnd<fnet_interfaces_admin::AddressStateProviderMarker>,
 ) {
-    let (req_stream, control_handle) = address_state_provider
-        .into_stream_and_control_handle()
-        .expect("failed to decompose AddressStateProvider handle");
+    let (req_stream, control_handle) = address_state_provider.into_stream_and_control_handle();
+    let core_addr = address.addr.into_core();
     let addr_subnet_either: AddrSubnetEither = match address.try_into_core() {
         Ok(addr) => addr,
         Err(e) => {
-            warn!("not adding invalid address {:?} to interface {}: {:?}", address, id, e);
+            warn!("not adding invalid address {} to interface {}: {:?}", core_addr, id, e);
             send_address_removal_event(
-                address.addr.into_core(),
+                core_addr,
                 id,
                 control_handle,
                 fnet_interfaces_admin::AddressRemovalReason::Invalid,
@@ -1171,45 +1166,78 @@ fn add_address(
         }
     };
     let specified_addr = addr_subnet_either.addr();
-
-    if params.temporary.unwrap_or(false) {
-        todo!("https://fxbug.dev/42056881: support adding temporary addresses");
-    }
     const INFINITE_NANOS: i64 = zx::MonotonicInstant::INFINITE.into_nanos();
-    let initial_properties =
-        params.initial_properties.unwrap_or(fnet_interfaces_admin::AddressProperties::default());
-    let valid_lifetime_end = initial_properties.valid_lifetime_end.unwrap_or(INFINITE_NANOS);
 
-    match initial_properties
-        .preferred_lifetime_info
-        .unwrap_or(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(INFINITE_NANOS))
-    {
-        fnet_interfaces::PreferredLifetimeInfo::Deprecated(_) => {
-            todo!("https://fxbug.dev/42056881: support adding deprecated addresses")
-        }
-        fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(preferred_until) => {
-            if preferred_until != INFINITE_NANOS {
-                warn!(
-                    "TODO(https://fxbug.dev/42056881): ignoring preferred_until: {:?}",
-                    preferred_until
-                );
-            }
-        }
-    }
+    let fnet_interfaces_admin::AddressParameters {
+        initial_properties,
+        temporary,
+        add_subnet_route,
+        __source_breaking: fidl::marker::SourceBreaking,
+    } = params;
 
-    let valid_until = if valid_lifetime_end == INFINITE_NANOS {
-        Lifetime::Infinite
-    } else {
-        Lifetime::Finite(StackTime::from_zx(zx::MonotonicInstant::from_nanos(valid_lifetime_end)))
+    let fnet_interfaces_admin::AddressProperties {
+        valid_lifetime_end,
+        preferred_lifetime_info,
+        __source_breaking: fidl::marker::SourceBreaking,
+    } = initial_properties.unwrap_or_default();
+
+    let valid_lifetime_end = valid_lifetime_end.unwrap_or(INFINITE_NANOS);
+    // Disallow non-positive lifetimes.
+    let valid_until = match PositiveMonotonicInstant::try_from(valid_lifetime_end) {
+        Ok(i) => Lifetime::from_zx_time(i.into()),
+        Err(e) => {
+            warn!("not adding address {core_addr} to interface {id}: invalid lifetime {e}",);
+            send_address_removal_event(
+                core_addr,
+                id,
+                control_handle,
+                fnet_interfaces_admin::AddressRemovalReason::InvalidProperties,
+            );
+            return;
+        }
     };
+
+    let preferred_lifetime = preferred_lifetime_info
+        .unwrap_or(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(INFINITE_NANOS));
+    let preferred_lifetime =
+        match fnet_interfaces_ext::PreferredLifetimeInfo::try_from(preferred_lifetime) {
+            Ok(p) => {
+                let p: PreferredLifetime<zx::MonotonicInstant> = p.into_core();
+                p.map_instant(StackTime::from_zx)
+            }
+            Err(e) => {
+                warn!(
+                    "not adding address {} to interface {}: invalid preferred lifetime: {:?}",
+                    core_addr, id, e
+                );
+                send_address_removal_event(
+                    core_addr,
+                    id,
+                    control_handle,
+                    fnet_interfaces_admin::AddressRemovalReason::InvalidProperties,
+                );
+                return;
+            }
+        };
+
+    let temporary = temporary.unwrap_or(false);
+
+    let common = CommonAddressProperties { valid_until, preferred_lifetime };
 
     let addr_subnet_either = match addr_subnet_either {
         AddrSubnetEither::V4(addr_subnet) => {
-            AddrSubnetAndManualConfigEither::V4(addr_subnet, Ipv4AddrConfig { valid_until })
+            // Core doesn't take temporary addresses into account for source
+            // address selection over IPv4 and we don't expose it over the
+            // watcher API at all, so we shouldn't need to keep that around.
+            if temporary {
+                warn!("v4 address {core_addr} requested temporary, ignoring for IPv4");
+            }
+            AddrSubnetAndManualConfigEither::V4(addr_subnet, Ipv4AddrConfig { common })
         }
-        AddrSubnetEither::V6(addr_subnet) => {
-            AddrSubnetAndManualConfigEither::V6(addr_subnet, Ipv6AddrManualConfig { valid_until })
-        }
+        AddrSubnetEither::V6(addr_subnet) => AddrSubnetAndManualConfigEither::V6(
+            addr_subnet,
+            Ipv6AddrManualConfig { common, temporary },
+        ),
     };
 
     let core_id =
@@ -1238,7 +1266,7 @@ fn add_address(
         let worker = fasync::Task::spawn(run_address_state_provider(
             ctx.clone(),
             addr_subnet_either,
-            params.add_subnet_route.unwrap_or(false),
+            add_subnet_route.unwrap_or(false),
             id,
             control_handle,
             req_stream,
@@ -1276,6 +1304,7 @@ fn grant_for_interface(ctx: &mut Ctx, id: BindingId) -> GrantForInterfaceAuthori
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum AddressStateProviderCancellationReason {
+    InvalidProperties,
     UserRemoved,
     DadFailed,
     InterfaceRemoved,
@@ -1292,6 +1321,9 @@ impl From<AddressStateProviderCancellationReason> for fnet_interfaces_admin::Add
             }
             AddressStateProviderCancellationReason::InterfaceRemoved => {
                 fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved
+            }
+            AddressStateProviderCancellationReason::InvalidProperties => {
+                fnet_interfaces_admin::AddressRemovalReason::InvalidProperties
             }
         }
     }
@@ -1563,17 +1595,23 @@ async fn address_state_provider_main_loop(
                         break Some(AddressStateProviderCancellationReason::UserRemoved)
                     }
                     Ok(None) => {}
-                    Err(err @ AddressStateProviderError::PreviousPendingWatchRequest) => {
+                    Err(err) => {
                         warn!(
                             "failed to handle request for address {:?} on interface {}: {}",
                             address, id, err
                         );
-                        break None;
+                        match err {
+                            AddressStateProviderError::PreviousPendingWatchRequest => {
+                                break None;
+                            }
+                            AddressStateProviderError::InvalidPropertiesUpdate { .. } => {
+                                break Some(
+                                    AddressStateProviderCancellationReason::InvalidProperties,
+                                );
+                            }
+                            AddressStateProviderError::Fidl(_) => todo!(),
+                        }
                     }
-                    Err(err @ AddressStateProviderError::Fidl(_)) => error!(
-                        "failed to handle request for address {:?} on interface {}: {}",
-                        address, id, err
-                    ),
                 },
                 Err(e) => {
                     error!(
@@ -1608,9 +1646,9 @@ async fn address_state_provider_main_loop(
             | Some(AddressStateProviderCancellationReason::InterfaceRemoved) => {
                 AddressNeedsExplicitRemovalFromCore::No
             }
-            Some(AddressStateProviderCancellationReason::UserRemoved) | None => {
-                AddressNeedsExplicitRemovalFromCore::Yes
-            }
+            Some(AddressStateProviderCancellationReason::UserRemoved)
+            | Some(AddressStateProviderCancellationReason::InvalidProperties)
+            | None => AddressNeedsExplicitRemovalFromCore::Yes,
         },
         cancelation_reason,
     )
@@ -1624,6 +1662,8 @@ pub(crate) enum AddressStateProviderError {
     PreviousPendingWatchRequest,
     #[error("FIDL error: {0}")]
     Fidl(fidl::Error),
+    #[error("invalid address properties update for {field}: {err}")]
+    InvalidPropertiesUpdate { field: &'static str, err: NotPositiveMonotonicInstantError },
 }
 
 // State Machine for the `WatchAddressAssignmentState` "Hanging-Get" FIDL API.
@@ -1722,30 +1762,44 @@ fn dispatch_address_state_provider_request(
                 fnet_interfaces_admin::AddressProperties {
                     valid_lifetime_end: valid_lifetime_end_nanos,
                     preferred_lifetime_info,
-                    ..
+                    __source_breaking: fidl::marker::SourceBreaking,
                 },
             responder,
         } => {
-            if preferred_lifetime_info.is_some() {
-                warn!("Updating preferred lifetime info is not yet supported (https://fxbug.dev/42058290)");
-            }
             let device_id =
                 ctx.bindings_ctx().devices.get_core_id(id).expect("interface not found");
-            let valid_lifetime_end = valid_lifetime_end_nanos
+            let valid_until = valid_lifetime_end_nanos
                 .map(|nanos| {
-                    Lifetime::Finite(StackTime::from_zx(zx::MonotonicInstant::from_nanos(nanos)))
+                    PositiveMonotonicInstant::try_from(nanos)
+                        .map(|i| Lifetime::from_zx_time(i.into()))
+                        .map_err(|err| AddressStateProviderError::InvalidPropertiesUpdate {
+                            field: "valid_until",
+                            err,
+                        })
                 })
-                .unwrap_or(Lifetime::Infinite);
+                .unwrap_or(Ok(Lifetime::Infinite))?;
+            let preferred_lifetime = preferred_lifetime_info
+                .map(|p| {
+                    fnet_interfaces_ext::PreferredLifetimeInfo::try_from(p).map(|p| p.into_core())
+                })
+                .unwrap_or(Ok(PreferredLifetime::preferred_forever()))
+                .map_err(|err| AddressStateProviderError::InvalidPropertiesUpdate {
+                    field: "preferred_lifetime_info",
+                    err,
+                })?
+                .map_instant(StackTime::from_zx);
+
+            let common_props = CommonAddressProperties { valid_until, preferred_lifetime };
             let result = match address.into() {
                 IpAddr::V4(address) => ctx.api().device_ip::<Ipv4>().set_addr_properties(
                     &device_id,
                     address,
-                    valid_lifetime_end,
+                    common_props,
                 ),
                 IpAddr::V6(address) => ctx.api().device_ip::<Ipv6>().set_addr_properties(
                     &device_id,
                     address,
-                    valid_lifetime_end,
+                    common_props,
                 ),
             };
             match result {
@@ -2031,8 +2085,7 @@ mod tests {
 
         let (device_control_proxy, device_control_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::DeviceControlMarker>(
-            )
-            .expect("create address proxy and stream");
+            );
 
         let device_control_task = fuchsia_async::Task::spawn(run_device_control(
             test_stack.netstack(),
@@ -2041,8 +2094,7 @@ mod tests {
         ));
 
         let (interface_control, control_server_end) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-                .expect("create interface control proxy");
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
 
         device_control_proxy
             .create_interface(
@@ -2073,8 +2125,7 @@ mod tests {
 
         // Add an address.
         let (asp_client_end, asp_server_end) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
-                .expect("create ASP proxy");
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
         let addr = fidl_subnet!("1.1.1.1/32");
         interface_control
             .add_address(
@@ -2092,6 +2143,7 @@ mod tests {
                 addr: address,
                 assignment_state: _,
                 valid_until: _,
+                preferred_lifetime: _,
             }
         }) if (id.get() == binding_id && address.into_fidl() == addr ));
         let mut asp_event_stream = asp_client_end.take_event_stream();

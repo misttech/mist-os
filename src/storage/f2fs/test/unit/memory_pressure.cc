@@ -17,7 +17,10 @@ namespace {
 
 class MemoryPressureTest : public F2fsFakeDevTestFixture {
  public:
-  MemoryPressureTest() : F2fsFakeDevTestFixture() {}
+  MemoryPressureTest()
+      : F2fsFakeDevTestFixture(TestOptions{
+            .block_count = kSectorCount100MiB,
+        }) {}
 
   uint32_t GetCachedVnodeCount() {
     uint32_t cached_vnode_count = 0;

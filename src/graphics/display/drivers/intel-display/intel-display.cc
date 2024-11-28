@@ -61,11 +61,11 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/driver-utils/poll-until.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -106,16 +106,15 @@ const display_config_t* FindBanjoConfig(display::DisplayId display_id,
 }
 
 void GetPostTransformWidth(const layer_t& layer, uint32_t* width, uint32_t* height) {
-  const primary_layer_t* primary = &layer.cfg.primary;
-  if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY ||
-      primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_180 ||
-      primary->image_source_transformation == COORDINATE_TRANSFORMATION_REFLECT_X ||
-      primary->image_source_transformation == COORDINATE_TRANSFORMATION_REFLECT_Y) {
-    *width = primary->image_source.width;
-    *height = primary->image_source.height;
+  if (layer.image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY ||
+      layer.image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_180 ||
+      layer.image_source_transformation == COORDINATE_TRANSFORMATION_REFLECT_X ||
+      layer.image_source_transformation == COORDINATE_TRANSFORMATION_REFLECT_Y) {
+    *width = layer.image_source.width;
+    *height = layer.image_source.height;
   } else {
-    *width = primary->image_source.height;
-    *height = primary->image_source.width;
+    *width = layer.image_source.height;
+    *height = layer.image_source.width;
   }
 }
 
@@ -1098,19 +1097,18 @@ bool Controller::GetPlaneLayer(Pipe* pipe, uint32_t plane,
     if (display_id != pipe_attached_display_id) {
       continue;
     }
-    bool has_color_layer = banjo_display_config.layer_count &&
-                           banjo_display_config.layer_list[0].type == LAYER_TYPE_COLOR;
+    bool has_color_layer = (banjo_display_config.layer_count > 0) &&
+                           (banjo_display_config.layer_list[0].image_source.width == 0 ||
+                            banjo_display_config.layer_list[0].image_source.height == 0);
     for (unsigned layer_index = 0; layer_index < banjo_display_config.layer_count; ++layer_index) {
       const layer_t& layer = banjo_display_config.layer_list[layer_index];
-      if (layer.type == LAYER_TYPE_PRIMARY) {
+      if (layer.image_source.width != 0 && layer.image_source.height != 0) {
         if (plane + (has_color_layer ? 1 : 0) != layer_index) {
           continue;
         }
-      } else if (layer.type == LAYER_TYPE_COLOR) {
-        // color layers aren't a plane
-        continue;
       } else {
-        ZX_ASSERT(false);
+        // Solid color fill layers don't use planes.
+        continue;
       }
       *layer_out = &banjo_display_config.layer_list[layer_index];
       return true;
@@ -1142,11 +1140,11 @@ bool Controller::CalculateMinimumAllocations(
         continue;
       }
 
-      ZX_ASSERT(layer->type == LAYER_TYPE_PRIMARY);
-      const primary_layer_t* primary = &layer->cfg.primary;
+      ZX_ASSERT(layer->image_source.width != 0);
+      ZX_ASSERT(layer->image_source.height != 0);
 
-      if (primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
-          primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
+      if (layer->image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
+          layer->image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
         min_allocs[pipe_id][plane_num] = 8;
       } else {
         uint32_t plane_source_width;
@@ -1162,12 +1160,12 @@ bool Controller::CalculateMinimumAllocations(
         // invalid or obsolete when `CheckConfiguration()` calls this method.
         static constexpr int bytes_per_pixel = 4;
 
-        if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY ||
-            primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
-          plane_source_width = primary->image_source.width;
+        if (layer->image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY ||
+            layer->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
+          plane_source_width = layer->image_source.width;
           min_scan_lines = 8;
         } else {
-          plane_source_width = primary->image_source.height;
+          plane_source_width = layer->image_source.height;
           min_scan_lines = 32 / bytes_per_pixel;
         }
         min_allocs[pipe_id][plane_num] = static_cast<uint16_t>(
@@ -1318,13 +1316,15 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t> banj
       const layer_t* layer;
       if (!GetPlaneLayer(pipe, plane_num, banjo_display_configs, &layer)) {
         data_rate_bytes_per_frame[pipe_id][plane_num] = 0;
-      } else if (layer->type == LAYER_TYPE_PRIMARY) {
-        const primary_layer_t* primary = &layer->cfg.primary;
+      } else {
+        // Color fill layers don't use planes, so GetPlaneLayer() should have returned false.
+        ZX_ASSERT(layer->image_source.width != 0);
+        ZX_ASSERT(layer->image_source.height != 0);
 
-        uint32_t scaled_width = primary->image_source.width * primary->image_source.width /
-                                primary->display_destination.width;
-        uint32_t scaled_height = primary->image_source.height * primary->image_source.height /
-                                 primary->display_destination.height;
+        uint32_t scaled_width = layer->image_source.width * layer->image_source.width /
+                                layer->display_destination.width;
+        uint32_t scaled_height = layer->image_source.height * layer->image_source.height /
+                                 layer->display_destination.height;
 
         // TODO(https://fxbug.dev/42076788): Currently we assume only RGBA/BGRA formats
         // are supported and hardcode the bytes-per-pixel value to avoid pixel
@@ -1333,16 +1333,13 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t> banj
         constexpr int bytes_per_pixel = 4;
         // Plane buffers are recalculated only on valid configurations. So all
         // images must be valid.
-        const display::DriverImageId primary_image_id(primary->image_handle);
+        const display::DriverImageId primary_image_id(layer->image_handle);
         ZX_DEBUG_ASSERT(primary_image_id != display::kInvalidDriverImageId);
         ZX_DEBUG_ASSERT(bytes_per_pixel == ImageFormatStrideBytesPerWidthPixel(
                                                GetImportedImagePixelFormat(primary_image_id)));
 
         data_rate_bytes_per_frame[pipe_id][plane_num] =
             uint64_t{scaled_width} * scaled_height * bytes_per_pixel;
-      } else {
-        // Other layers don't use pipe/planes, so GetPlaneLayer should have returned false
-        ZX_ASSERT(false);
       }
     }
   }
@@ -1523,15 +1520,15 @@ bool Controller::CheckDisplayLimits(
     // is too low, then make the client do any downscaling itself.
     double min_plane_ratio = 1.0;
     for (unsigned i = 0; i < banjo_display_config.layer_count; i++) {
-      if (banjo_display_config.layer_list[i].type != LAYER_TYPE_PRIMARY) {
+      const layer_t& layer = banjo_display_config.layer_list[i];
+      if (layer.image_source.width == 0 || layer.image_source.height == 0) {
         continue;
       }
-      const primary_layer_t* primary = &banjo_display_config.layer_list[i].cfg.primary;
       uint32_t src_width, src_height;
       GetPostTransformWidth(banjo_display_config.layer_list[i], &src_width, &src_height);
 
-      double downscale = std::max(1.0, 1.0 * src_height / primary->display_destination.height) *
-                         std::max(1.0, 1.0 * src_width / primary->display_destination.width);
+      double downscale = std::max(1.0, 1.0 * src_height / layer.display_destination.height) *
+                         std::max(1.0, 1.0 * src_width / layer.display_destination.width);
       double plane_ratio = 1.0 / downscale;
       min_plane_ratio = std::min(plane_ratio, min_plane_ratio);
     }
@@ -1540,15 +1537,15 @@ bool Controller::CheckDisplayLimits(
         static_cast<int64_t>(min_plane_ratio * static_cast<double>(max_pipe_pixel_rate_hz));
     if (max_pipe_pixel_rate_hz < pixel_clock_hz) {
       for (unsigned j = 0; j < banjo_display_config.layer_count; j++) {
-        if (banjo_display_config.layer_list[j].type != LAYER_TYPE_PRIMARY) {
+        const layer_t& layer = banjo_display_config.layer_list[j];
+        if (layer.image_source.width == 0 || layer.image_source.height == 0) {
           continue;
         }
-        const primary_layer_t* primary = &banjo_display_config.layer_list[j].cfg.primary;
         uint32_t src_width, src_height;
         GetPostTransformWidth(banjo_display_config.layer_list[j], &src_width, &src_height);
 
-        if (src_height > primary->display_destination.height ||
-            src_width > primary->display_destination.width) {
+        if (src_height > layer.display_destination.height ||
+            src_width > layer.display_destination.width) {
           current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
         }
       }
@@ -1620,8 +1617,10 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
 
     bool merge_all = false;
     if (banjo_display_config.layer_count > 3) {
-      merge_all = banjo_display_config.layer_count > 4 ||
-                  banjo_display_config.layer_list[0].type != LAYER_TYPE_COLOR;
+      bool layer0_is_solid_color_fill =
+          (banjo_display_config.layer_list[0].image_metadata.width == 0 ||
+           banjo_display_config.layer_list[0].image_metadata.height == 0);
+      merge_all = banjo_display_config.layer_count > 4 || layer0_is_solid_color_fill;
     }
     if (!merge_all && banjo_display_config.cc_flags) {
       if (banjo_display_config.cc_flags & COLOR_CONVERSION_PREOFFSET) {
@@ -1640,90 +1639,85 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
 
     uint32_t total_scalers_needed = 0;
     for (unsigned j = 0; j < banjo_display_config.layer_count; j++) {
-      switch (banjo_display_config.layer_list[j].type) {
-        case LAYER_TYPE_PRIMARY: {
-          const primary_layer_t* primary = &banjo_display_config.layer_list[j].cfg.primary;
-          if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_90 ||
-              primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_270) {
-            // Linear and x tiled images don't support 90/270 rotation
-            if (primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
-                primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
-              current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
-            }
-          } else if (primary->image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY &&
-                     primary->image_source_transformation !=
-                         COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
-            // Cover unsupported rotations
+      const layer_t& layer = banjo_display_config.layer_list[j];
+
+      if (layer.image_metadata.width != 0 && layer.image_metadata.height != 0) {
+        if (layer.image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_90 ||
+            layer.image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_270) {
+          // Linear and x tiled images don't support 90/270 rotation
+          if (layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
+              layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
             current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
           }
+        } else if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY &&
+                   layer.image_source_transformation != COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
+          // Cover unsupported rotations
+          current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
+        }
 
-          uint32_t src_width, src_height;
-          GetPostTransformWidth(banjo_display_config.layer_list[j], &src_width, &src_height);
+        uint32_t src_width, src_height;
+        GetPostTransformWidth(banjo_display_config.layer_list[j], &src_width, &src_height);
 
-          // If the plane is too wide, force the client to do all composition
-          // and just give us a simple configuration.
-          uint32_t max_width;
-          if (primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
-              primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
-            max_width = 8192;
+        // If the plane is too wide, force the client to do all composition
+        // and just give us a simple configuration.
+        uint32_t max_width;
+        if (layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
+            layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
+          max_width = 8192;
+        } else {
+          max_width = 4096;
+        }
+        if (src_width > max_width) {
+          merge_all = true;
+        }
+
+        if (layer.display_destination.width != src_width ||
+            layer.display_destination.height != src_height) {
+          float ratio = registers::PipeScalerControlSkylake::k7x5MaxRatio;
+          uint32_t max_width = static_cast<uint32_t>(static_cast<float>(src_width) * ratio);
+          uint32_t max_height = static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
+          uint32_t scalers_needed = 1;
+          // The 7x5 scaler (i.e. 2 scaler resources) is required if the src width is
+          // >2048 and the required vertical scaling is greater than 1.99.
+          if (layer.image_source.width > 2048) {
+            float ratio = registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
+            uint32_t max_dynamic_height =
+                static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
+            if (max_dynamic_height < layer.display_destination.height) {
+              scalers_needed = 2;
+            }
+          }
+
+          // Verify that there are enough scaler resources
+          // Verify that the scaler input isn't too large or too small
+          // Verify that the required scaling ratio isn't too large
+          bool using_c = display_allocated_to_pipe[PipeId::PIPE_C] == display->id();
+          if ((total_scalers_needed + scalers_needed) >
+                  (using_c ? registers::PipeScalerControlSkylake::kPipeCScalersAvailable
+                           : registers::PipeScalerControlSkylake::kPipeABScalersAvailable) ||
+              src_width > registers::PipeScalerControlSkylake::kMaxSrcWidthPx ||
+              src_width < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
+              src_height < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
+              max_width < layer.display_destination.width ||
+              max_height < layer.display_destination.height) {
+            current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
           } else {
-            max_width = 4096;
+            total_scalers_needed += scalers_needed;
           }
-          if (src_width > max_width) {
-            merge_all = true;
-          }
-
-          if (primary->display_destination.width != src_width ||
-              primary->display_destination.height != src_height) {
-            float ratio = registers::PipeScalerControlSkylake::k7x5MaxRatio;
-            uint32_t max_width = static_cast<uint32_t>(static_cast<float>(src_width) * ratio);
-            uint32_t max_height = static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
-            uint32_t scalers_needed = 1;
-            // The 7x5 scaler (i.e. 2 scaler resources) is required if the src width is
-            // >2048 and the required vertical scaling is greater than 1.99.
-            if (primary->image_source.width > 2048) {
-              float ratio = registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
-              uint32_t max_dynamic_height =
-                  static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
-              if (max_dynamic_height < primary->display_destination.height) {
-                scalers_needed = 2;
-              }
-            }
-
-            // Verify that there are enough scaler resources
-            // Verify that the scaler input isn't too large or too small
-            // Verify that the required scaling ratio isn't too large
-            bool using_c = display_allocated_to_pipe[PipeId::PIPE_C] == display->id();
-            if ((total_scalers_needed + scalers_needed) >
-                    (using_c ? registers::PipeScalerControlSkylake::kPipeCScalersAvailable
-                             : registers::PipeScalerControlSkylake::kPipeABScalersAvailable) ||
-                src_width > registers::PipeScalerControlSkylake::kMaxSrcWidthPx ||
-                src_width < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
-                src_height < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
-                max_width < primary->display_destination.width ||
-                max_height < primary->display_destination.height) {
-              current_display_client_composition_opcodes[j] |=
-                  CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
-            } else {
-              total_scalers_needed += scalers_needed;
-            }
-          }
-          break;
         }
-        case LAYER_TYPE_COLOR: {
-          if (j != 0) {
-            current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
-          }
-          const auto format = static_cast<fuchsia_images2::wire::PixelFormat>(
-              banjo_display_config.layer_list[j].cfg.color.format);
-          if (format != fuchsia_images2::wire::PixelFormat::kB8G8R8A8) {
-            current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
-          }
-          break;
-        }
-        default:
-          current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
+        break;
       }
+
+      if (j != 0) {
+        current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_IMAGE;
+      }
+      const auto format =
+          static_cast<fuchsia_images2::wire::PixelFormat>(layer.fallback_color.format);
+      if (format != fuchsia_images2::wire::PixelFormat::kB8G8R8A8 &&
+          format != fuchsia_images2::wire::PixelFormat::kR8G8B8A8) {
+        current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_IMAGE;
+      }
+      break;
     }
 
     if (merge_all) {

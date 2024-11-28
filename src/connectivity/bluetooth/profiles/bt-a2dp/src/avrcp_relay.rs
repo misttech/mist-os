@@ -285,15 +285,15 @@ impl AvrcpRelay {
                         match res {
                             Ok(Ok(players)) => {
                                 debug!(%peer_id, "Media players: {players:?}");
-                                let valid_players: Vec<&avrcp::MediaPlayerItem> = players.iter().filter_map(|p| {
+                                let mut valid_players = players.iter().filter_map(|p| {
                                     // Return player if and only if it's in active playback status.
                                     use avrcp::PlaybackStatus::*;
                                     match p.playback_status {
                                         Some(Stopped) | Some(Error) | None => None,
                                         _ => Some(p),
                                     }
-                                }).collect();
-                                if valid_players.len() == 0 {
+                                });
+                                if valid_players.next().is_none() {
                                     last_player_status.player_state = sessions2::PlayerState::Idle;
                                     player_status_updated = true;
                                 }
@@ -391,8 +391,9 @@ async fn update_status(
 ) -> Result<(), Error> {
     let avrcp_status =
         controller.get_play_status().await?.or_else(|e| Err(format_err!("AVRCP error: {e:?}")))?;
-    let playback_status =
-        avrcp_status.playback_status.ok_or(format_err!("PlayStatus must have playback status"))?;
+    let playback_status = avrcp_status
+        .playback_status
+        .ok_or_else(|| format_err!("PlayStatus must have playback status"))?;
     status.set_state_from_avrcp(playback_status);
     status.duration =
         avrcp_status.song_length.map(|m| zx::MonotonicDuration::from_millis(m as i64).into_nanos());
@@ -446,8 +447,8 @@ async fn connect_avrcp(
     avrcp: &mut avrcp::PeerManagerProxy,
     peer_id: PeerId,
 ) -> Result<(avrcp::ControllerProxy, avrcp::BrowseControllerProxy), Error> {
-    let (controller, server) = endpoints::create_proxy()?;
-    let (browse_controller, browse_server) = endpoints::create_proxy()?;
+    let (controller, server) = endpoints::create_proxy();
+    let (browse_controller, browse_server) = endpoints::create_proxy();
 
     let _ = avrcp.get_controller_for_target(&peer_id.into(), server).await?;
     let _ = avrcp.get_browse_controller_for_target(&peer_id.into(), browse_server).await?;
@@ -484,9 +485,9 @@ mod tests {
     fn setup_media_relay() -> (sessions2::PlayerProxy, avrcp::PeerManagerRequestStream, impl Future)
     {
         let (player_proxy, player_requests) =
-            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>();
         let (avrcp_proxy, avrcp_requests) =
-            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>();
         let peer_id = PeerId(0);
 
         let relay = AvrcpRelay::default();
@@ -499,9 +500,9 @@ mod tests {
     ) -> (sessions2::PlayerProxy, avrcp::PeerManagerRequestStream, impl Future, TestBatteryManager)
     {
         let (player_proxy, player_requests) =
-            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>();
         let (avrcp_proxy, avrcp_requests) =
-            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>();
         let peer_id = PeerId(1);
 
         let mut setup_fut = pin!(TestBatteryManager::make_battery_client_with_test_manager());
@@ -574,9 +575,7 @@ mod tests {
                 client,
                 responder,
                 ..
-            })) => {
-                responder.send(Ok(())).and_then(|_| client.into_stream()).expect("should have sent")
-            }
+            })) => responder.send(Ok(())).map(|_| client.into_stream()).expect("should have sent"),
             x => panic!("Expected a GetController request, got {:?}", x),
         };
 
@@ -590,9 +589,7 @@ mod tests {
                 client,
                 responder,
                 ..
-            })) => {
-                responder.send(Ok(())).and_then(|_| client.into_stream()).expect("should have sent")
-            }
+            })) => responder.send(Ok(())).map(|_| client.into_stream()).expect("should have sent"),
             x => panic!("Expected a GetBrowseController request, got {:?}", x),
         };
 
@@ -1285,9 +1282,9 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
 
         let (player_client, player_requests) =
-            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>();
         let (avrcp_proxy, avrcp_requests) =
-            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>();
         let peer_id = PeerId(0);
 
         let relay = AvrcpRelay::default()

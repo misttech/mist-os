@@ -84,7 +84,12 @@ impl FakeArchiveAccessor {
         self.selectors_requested.lock().push(
             selectors
                 .into_iter()
-                .map(selectors::selector_to_string)
+                .map(|s| {
+                    selectors::selector_to_string(
+                        &s,
+                        selectors::SelectorDisplayOptions::never_wrap_in_quotes(),
+                    )
+                })
                 .collect::<Result<BTreeSet<_>, Error>>()?,
         );
         if let Some(s) = self.event_signaler.as_ref() {

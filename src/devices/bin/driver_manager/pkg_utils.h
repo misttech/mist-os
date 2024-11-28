@@ -14,10 +14,10 @@ namespace pkg_utils {
 inline zx::result<zx::vmo> OpenPkgFile(fidl::UnownedClientEnd<fuchsia_io::Directory> pkg_dir,
                                        std::string_view relative_binary_path) {
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::File>::Create();
-  zx_status_t status = fdio_open_at(pkg_dir.channel()->get(), relative_binary_path.data(),
-                                    static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable |
-                                                          fuchsia_io::OpenFlags::kRightExecutable),
-                                    server_end.TakeChannel().release());
+  zx_status_t status = fdio_open3_at(
+      pkg_dir.channel()->get(), relative_binary_path.data(),
+      static_cast<uint64_t>(fuchsia_io::wire::kPermReadable | fuchsia_io::wire::kPermExecutable),
+      server_end.TakeChannel().release());
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -38,12 +38,11 @@ inline zx::result<zx::vmo> OpenPkgFile(fidl::UnownedClientEnd<fuchsia_io::Direct
 inline zx::result<fidl::ClientEnd<fuchsia_io::Directory>> OpenLibDir(
     fidl::UnownedClientEnd<fuchsia_io::Directory> pkg_dir) {
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  zx_status_t status =
-      fdio_open_at(pkg_dir.channel()->get(), "lib",
-                   static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory |
-                                         fuchsia_io::wire::OpenFlags::kRightReadable |
-                                         fuchsia_io::wire::OpenFlags::kRightExecutable),
-                   server_end.TakeChannel().release());
+  zx_status_t status = fdio_open3_at(
+      pkg_dir.channel()->get(), "lib",
+      static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory |
+                            fuchsia_io::wire::kPermReadable | fuchsia_io::wire::kPermExecutable),
+      server_end.TakeChannel().release());
   if (status != ZX_OK) {
     return zx::error(status);
   }

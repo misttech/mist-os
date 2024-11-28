@@ -6,22 +6,23 @@
 #define SRC_DEVICES_USB_LIB_USB_ENDPOINT_INCLUDE_USB_ENDPOINT_USB_ENDPOINT_SERVER_H_
 
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
+#include <lib/io-buffer/phys-iter.h>
 
 #include <usb/request-cpp.h>
 #include <usb/request-fidl.h>
 
-namespace usb_endpoint {
+namespace usb {
 
 using RequestVariant = std::variant<usb::BorrowedRequest<void>, usb::FidlRequest>;
 
-// UsbEndpoint is a wrapper around fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint> that
+// EndpointServer is a wrapper around fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint> that
 // implements common functionality surrounding registering and unregistering VMOs, completing
 // requests, etc.
-class UsbEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint> {
+class EndpointServer : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint> {
  public:
-  UsbEndpoint(const zx::bti& bti, uint8_t ep_addr) : bti_(bti), ep_addr_(ep_addr) {}
+  EndpointServer(const zx::bti& bti, uint8_t ep_addr) : bti_(bti), ep_addr_(ep_addr) {}
 
-  // Connects to the UsbEndpoint server.
+  // Connects to the EndpointServer.
   void Connect(async_dispatcher_t* dispatcher,
                fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end);
 
@@ -34,7 +35,8 @@ class UsbEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint>
   void RequestComplete(zx_status_t status, size_t actual, RequestVariant request);
 
   // Gets all the iterators for a request.
-  zx::result<std::vector<ddk::PhysIter>> get_iter(RequestVariant& req, size_t max_length) const;
+  zx::result<std::vector<io_buffer::PhysIter>> get_iter(RequestVariant& req,
+                                                        size_t max_length) const;
 
   const zx::bti& bti() { return bti_; }
   uint8_t ep_addr() const { return ep_addr_; }
@@ -63,6 +65,6 @@ class UsbEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint>
   std::map<uint64_t, RegisteredVmo> registered_vmos_;
 };
 
-}  // namespace usb_endpoint
+}  // namespace usb
 
 #endif  // SRC_DEVICES_USB_LIB_USB_ENDPOINT_INCLUDE_USB_ENDPOINT_USB_ENDPOINT_SERVER_H_

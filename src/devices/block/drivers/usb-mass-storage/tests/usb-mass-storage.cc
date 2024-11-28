@@ -586,8 +586,8 @@ class Environment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
     usb_banjo_server_.SetContext(&context_);
-    device_server_.Init(component::kDefaultInstance, "root", std::nullopt,
-                        usb_banjo_server_.GetBanjoConfig());
+    device_server_.Initialize(component::kDefaultInstance, std::nullopt,
+                              usb_banjo_server_.GetBanjoConfig());
     return zx::make_result(
         device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
   }

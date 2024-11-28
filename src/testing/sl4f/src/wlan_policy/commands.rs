@@ -107,7 +107,7 @@ impl Facade for WlanPolicyFacade {
 fn parse_target_ssid(args: &Value) -> Result<Vec<u8>, Error> {
     args.get("target_ssid")
         .and_then(|ssid| ssid.as_str().map(|ssid| ssid.as_bytes().to_vec()))
-        .ok_or(format_err!("Please provide a target ssid"))
+        .ok_or_else(|| format_err!("Please provide a target ssid"))
 }
 
 /// In ACTS tests we will require a security type is specified for a call that uses a security

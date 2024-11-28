@@ -53,6 +53,7 @@ rustc_library("sandbox") {
     "src/fidl/dict.rs",
     "src/fidl/dictionary_router.rs",
     "src/fidl/dir_connector.rs",
+    "src/fidl/dir_connector_router.rs",
     "src/fidl/dir_entry.rs",
     "src/fidl/dir_entry_router.rs",
     "src/fidl/directory.rs",

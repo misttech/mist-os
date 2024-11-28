@@ -55,8 +55,9 @@ impl TryFrom<fsys::RouteReport> for RouteReport {
     type Error = anyhow::Error;
 
     fn try_from(report: fsys::RouteReport) -> Result<Self> {
-        let decl_type = report.decl_type.ok_or(format_err!("missing decl type"))?.try_into()?;
-        let capability = report.capability.ok_or(format_err!("missing capability name"))?;
+        let decl_type =
+            report.decl_type.ok_or_else(|| format_err!("missing decl type"))?.try_into()?;
+        let capability = report.capability.ok_or_else(|| format_err!("missing capability name"))?;
         let error_summary = if let Some(error) = report.error { error.summary } else { None };
         let source_moniker = report.source_moniker;
         let service_instances = report
@@ -239,7 +240,7 @@ mod test {
         reports: Vec<fsys::RouteReport>,
     ) -> fsys::RouteValidatorProxy {
         let (route_validator, mut stream) =
-            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>();
         fasync::Task::local(async move {
             match stream.try_next().await.unwrap().unwrap() {
                 fsys::RouteValidatorRequest::Validate { .. } => {

@@ -23,7 +23,7 @@ impl Connector {
         let (sender, receiver) = mpsc::unbounded();
         let receiver = Receiver::new(receiver);
         let receiver_task =
-            fasync::Task::spawn(receiver.handle_receiver(receiver_client.into_proxy().unwrap()));
+            fasync::Task::spawn(receiver.handle_receiver(receiver_client.into_proxy()));
         Self::new_internal(sender, Some(Arc::new(receiver_task)))
     }
 }
@@ -78,7 +78,7 @@ mod tests {
 
             // The NODE_REFERENCE connection should be terminated on the sender side.
             let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
-            let node: fio::NodeProxy = client_end.into_proxy().unwrap();
+            let node: fio::NodeProxy = client_end.into_proxy();
             let result = node.take_event_stream().next().await.unwrap();
             assert_matches!(
                 result,
@@ -109,7 +109,7 @@ mod tests {
 
         // Check the client got describe.
         let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
-        let node: fio::NodeProxy = client_end.into_proxy().unwrap();
+        let node: fio::NodeProxy = client_end.into_proxy();
         let result = node.take_event_stream().next().await.unwrap();
         assert_matches!(
             result,
@@ -134,7 +134,7 @@ mod tests {
 
         // Check that there's no event.
         let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
-        let node: fio::NodeProxy = client_end.into_proxy().unwrap();
+        let node: fio::NodeProxy = client_end.into_proxy();
         assert_matches!(node.take_event_stream().next().await, None);
     }
 }

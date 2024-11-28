@@ -211,6 +211,165 @@ zx::result<UnitDescriptor> DeviceManager::ReadUnitDescriptor(uint8_t lun) {
   return ReadDescriptor<UnitDescriptor>(DescriptorType::kUnit, lun);
 }
 
+zx::result<> DeviceManager::SetExceptionEventControl(ExceptionEventControl control) {
+  if (exception_event_control_.value == control.value) {
+    return zx::ok();
+  }
+
+  if (auto result = WriteAttribute(Attributes::wExceptionEventControl, control.value);
+      result.is_error()) {
+    return result.take_error();
+  }
+  exception_event_control_.value = control.value;
+
+  return zx::ok();
+}
+
+zx::result<ExceptionEventStatus> DeviceManager::GetExceptionEventStatus() {
+  auto ee_status_attribute = ReadAttribute(Attributes::wExceptionEventStatus);
+  if (ee_status_attribute.is_error()) {
+    return ee_status_attribute.take_error();
+  }
+
+  ExceptionEventStatus ee_status = {safemath::checked_cast<uint16_t>(ee_status_attribute.value())};
+  return zx::ok(ee_status);
+}
+
+zx::result<> DeviceManager::PostExceptionEventsTask() {
+  zx_status_t status = async::PostTask(controller_.exception_event_dispatcher().async_dispatcher(),
+                                       [this] { HandleExceptionEvents(); });
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to post Exception Event task: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  return zx::ok();
+}
+
+void DeviceManager::HandleExceptionEvents() {
+  zx::result<ExceptionEventStatus> ee_status = GetExceptionEventStatus();
+  if (ee_status.is_error()) {
+    FDF_LOG(ERROR, "Failed to get Exception Event Status");
+  }
+  if (ee_status->urgent_bkops()) {
+    if (auto result = HandleBackgroundOpEvent(); result.is_error()) {
+      FDF_LOG(ERROR, "Failed to handle Background Operations Event");
+    }
+  }
+  if (ee_status->too_high_temp() || ee_status->too_low_temp()) {
+    // TODO(b/42075643): Implement temp exception handler.
+    FDF_LOG(INFO, "A temperature exception has occurred");
+  }
+}
+
+zx::result<> DeviceManager::HandleBackgroundOpEvent() {
+  zx::result<BackgroundOpStatus> bkop_status = GetBackgroundOpStatus();
+  if (bkop_status.is_error()) {
+    return bkop_status.take_error();
+  }
+
+  if (bkop_status.value() >= urgent_bkop_threshold_) {
+    if (zx::result result = EnableBackgroundOp(); result.is_error()) {
+      return result.take_error();
+    }
+  }
+  return zx::ok();
+}
+
+zx::result<> DeviceManager::ConfigureWriteProtect(inspect::Node &wp_node) {
+  zx::result<uint8_t> flag = ReadFlag(Flags::fPowerOnWPEn);
+  if (flag.is_error()) {
+    return flag.take_error();
+  }
+  is_power_on_write_protect_enabled_ = flag.value();
+  properties_.is_power_on_write_protect_enabled =
+      wp_node.CreateBool("is_power_on_write_protect_enabled", is_power_on_write_protect_enabled_);
+  properties_.logical_lun_power_on_write_protect =
+      wp_node.CreateBool("logical_lun_power_on_write_protect", logical_lun_power_on_write_protect_);
+  return zx::ok();
+}
+
+void DeviceManager::SetLogicalLunPowerOnWriteProtect(bool value) {
+  logical_lun_power_on_write_protect_ = value;
+  properties_.logical_lun_power_on_write_protect.Set(value);
+}
+
+zx::result<> DeviceManager::ConfigureBackgroundOp(inspect::Node &bkop_node) {
+  zx::result<uint8_t> flag = ReadFlag(Flags::fBackgroundOpsEn);
+  if (flag.is_error()) {
+    return flag.take_error();
+  }
+  is_background_op_enabled_ = flag.value();
+  properties_.is_background_op_enabled =
+      bkop_node.CreateBool("is_background_op_enabled", is_background_op_enabled_);
+
+  // Currently we allow background operations in the active state. This may have a performance
+  // penalty.
+  // TODO(b/42075643): We should only perform background operations in the power suspended state.
+  if (zx::result<> result = EnableBackgroundOp(); result.is_error()) {
+    return result.take_error();
+  }
+
+  // For stable performance, set threshold of the Background Operation to `Required, not critical`.
+  urgent_bkop_threshold_ = BackgroundOpStatus::kRequiredNotCritical;
+
+  return zx::ok();
+}
+
+zx::result<> DeviceManager::EnableBackgroundOp() {
+  if (is_background_op_enabled_) {
+    return zx::ok();
+  }
+
+  if (zx::result<> result = SetFlag(Flags::fBackgroundOpsEn); result.is_error()) {
+    return result.take_error();
+  }
+  is_background_op_enabled_ = true;
+  properties_.is_background_op_enabled.Set(is_background_op_enabled_);
+
+  // No need for urgent background operation exceptions.
+  ExceptionEventControl control = {exception_event_control_.value};
+  control.set_urgent_bkops_en(false);
+  if (auto result = SetExceptionEventControl(control); result.is_error()) {
+    result.take_error();
+  }
+  return zx::ok();
+}
+
+zx::result<> DeviceManager::DisableBackgroundOp() {
+  if (!is_background_op_enabled_) {
+    return zx::ok();
+  }
+
+  // Need urgent background operation exceptions.
+  ExceptionEventControl control = {exception_event_control_.value};
+  control.set_urgent_bkops_en(true);
+  if (auto result = SetExceptionEventControl(control); result.is_error()) {
+    result.take_error();
+  }
+
+  if (zx::result<> result = ClearFlag(Flags::fBackgroundOpsEn); result.is_error()) {
+    return result.take_error();
+  }
+  is_background_op_enabled_ = false;
+  properties_.is_background_op_enabled.Set(is_background_op_enabled_);
+
+  return zx::ok();
+}
+
+zx::result<BackgroundOpStatus> DeviceManager::GetBackgroundOpStatus() {
+  zx::result<uint32_t> bkop_status_attribute = ReadAttribute(Attributes::bBackgroundOpStatus);
+  if (bkop_status_attribute.is_error()) {
+    return bkop_status_attribute.take_error();
+  }
+  if (bkop_status_attribute.value() > BackgroundOpStatus::kCritical) {
+    FDF_LOG(ERROR, "Invalid BackgroundOpStatus: %d", bkop_status_attribute.value());
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  BackgroundOpStatus background_op_status =
+      static_cast<BackgroundOpStatus>(bkop_status_attribute.value());
+  return zx::ok(background_op_status);
+}
+
 zx::result<> DeviceManager::ConfigureWriteBooster(inspect::Node &wb_node) {
   // Copy to access the unaligned value.
   const ExtendedUfsFeaturesSupport kExtendedUfsFeaturesSupport{
@@ -698,8 +857,18 @@ zx::result<> DeviceManager::SuspendPower() {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  // TODO(https://fxbug.dev/42075643): We need to wait for the in flight I/O.
-  // TODO(https://fxbug.dev/42075643): Disable background operations.
+  // TODO(b/42075643): We need to wait for the in flight I/O.
+
+  // TODO(b/42075643): If we turn off the power(vcc off) while LogicalLunPowerOnWriteProtect is
+  // enabled, we will lose write protection. To avoid this, power should be maintained when write
+  // protect is enabled. This requires more fine-grained power control(VCC, VCCQ, VCCQ2).
+
+  // TODO(b/42075643): In the case of power suspended state, we can apply a policy to perform
+  // background operations in the suspended state. Currently, background operations are not
+  // performed when suspend.
+  if (zx::result<> result = DisableBackgroundOp(); result.is_error()) {
+    return result.take_error();
+  }
 
   // We should check if WriteBooster Flush is needed. If so, we should postpone changing the power
   // mode.
@@ -708,7 +877,7 @@ zx::result<> DeviceManager::SuspendPower() {
     return result.take_error();
   }
   if (result.value()) {
-    // TODO(https://fxbug.dev/42075643): We need to keep the power mode active until the
+    // TODO(b/42075643): We need to keep the power mode active until the
     // Writebooster flush is complete.
     FDF_LOG(WARNING, "WriteBooster buffer flush is needed");
     return zx::ok();
@@ -725,7 +894,7 @@ zx::result<> DeviceManager::SuspendPower() {
 
   DmeHibernateEnterCommand dme_hibernate_enter_command(controller_);
   if (auto result = dme_hibernate_enter_command.SendCommand(); result.is_error()) {
-    // TODO(https://fxbug.dev/42075643): Link has a problem and needs to perform error recovery.
+    // TODO(b/42075643): Link has a problem and needs to perform error recovery.
     return result.take_error();
   }
   current_link_state_ = target_link_state;
@@ -777,6 +946,11 @@ zx::result<> DeviceManager::ResumePower() {
 
   if (zx::result<> result = controller_.Notify(NotifyEvent::kPostPowerModeChange, 0);
       result.is_error()) {
+    return result.take_error();
+  }
+
+  // TODO(b/42075643): We should only perform background operations in the power suspended state.
+  if (zx::result<> result = EnableBackgroundOp(); result.is_error()) {
     return result.take_error();
   }
 

@@ -61,7 +61,7 @@ fn main() -> Result<(), Error> {
         .env("PYTHONPATH", tempdir.path()) // Ensure ambient Python libraries are not used.
         .env("PYTHONUNBUFFERED", "1"); // Set line-buffering for Mobly tests to flush output immediately.
 
-    for test_arg in env::args().skip(1).collect::<Vec<String>>() {
+    for test_arg in env::args().skip(1) {
         // Plumb Mobly test args from the caller through (e.g. ["-c", "config.yaml", "-v"])
         command.arg(test_arg);
     }

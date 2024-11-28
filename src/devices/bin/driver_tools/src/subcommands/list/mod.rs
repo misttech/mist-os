@@ -69,7 +69,7 @@ pub async fn list(
                 driver_to_devices
                     .entry(driver.to_string())
                     .and_modify(|v| v.push(device_name.to_string()))
-                    .or_insert(vec![device_name.to_string()]);
+                    .or_insert_with(|| vec![device_name.to_string()]);
             }
         }
         let driver_to_devices = driver_to_devices;
@@ -164,8 +164,7 @@ mod tests {
         Fut: Future<Output = Result<()>> + Send + Sync,
     {
         let (driver_development_proxy, mut driver_development_requests) =
-            fidl::endpoints::create_proxy_and_stream::<fdd::ManagerMarker>()
-                .context("Failed to create FIDL proxy")?;
+            fidl::endpoints::create_proxy_and_stream::<fdd::ManagerMarker>();
 
         // Run the command and mock driver development server.
         let mut writer = Vec::new();
@@ -191,8 +190,7 @@ mod tests {
         mut driver_infos: Vec<fdf::DriverInfo>,
         iterator: ServerEnd<fdd::DriverInfoIteratorMarker>,
     ) -> Result<()> {
-        let mut iterator =
-            iterator.into_stream().context("Failed to convert iterator into a stream")?;
+        let mut iterator = iterator.into_stream();
         while let Some(res) = iterator.next().await {
             let request = res.context("Failed to get request")?;
             match request {
@@ -211,8 +209,7 @@ mod tests {
         mut device_infos: Vec<fdd::NodeInfo>,
         iterator: ServerEnd<fdd::NodeInfoIteratorMarker>,
     ) -> Result<()> {
-        let mut iterator =
-            iterator.into_stream().context("Failed to convert iterator into a stream")?;
+        let mut iterator = iterator.into_stream();
         while let Some(res) = iterator.next().await {
             let request = res.context("Failed to get request")?;
             match request {

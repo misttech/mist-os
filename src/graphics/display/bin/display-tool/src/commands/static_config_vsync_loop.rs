@@ -77,7 +77,6 @@ pub async fn run<'a>(coordinator: &Coordinator, args: Args<'a>) -> Result<()> {
                 image_id: image.id(),
                 image_metadata: params.into(),
                 unblock_event: None,
-                retirement_event: None,
             },
         }],
     }];

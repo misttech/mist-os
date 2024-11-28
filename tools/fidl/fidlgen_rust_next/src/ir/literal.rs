@@ -6,9 +6,7 @@ use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Literal {
-    #[expect(dead_code)]
     pub kind: LiteralKind,
-    #[expect(dead_code)]
     pub value: String,
 }
 

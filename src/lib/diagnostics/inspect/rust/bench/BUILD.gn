@@ -40,6 +40,10 @@ group("bench") {
   ]
 }
 
+group("build-only") {
+  deps = [ ":rust-inspect-benchmarks" ]
+}
+
 group("tests") {
   testonly = true
   deps = [

@@ -107,8 +107,18 @@ pub enum ElfVersion {
 }
 
 impl ElfIdent {
+    pub fn from_vmo(vmo: &zx::Vmo) -> Result<ElfIdent, ElfParseError> {
+        // Read and parse the ELF file header from the VMO.
+        let field = vmo.read_to_object(0).map_err(|s| ElfParseError::ReadError(s))?;
+        Ok(field)
+    }
+
     pub fn class(&self) -> Result<ElfClass, u8> {
         ElfClass::from_u8(self.class).ok_or(self.class)
+    }
+
+    pub fn is_arch32(&self) -> bool {
+        self.class() == Ok(ElfClass::Elf32)
     }
 
     pub fn data(&self) -> Result<ElfDataEncoding, u8> {
@@ -132,6 +142,27 @@ pub struct Elf64FileHeader {
     pub entry: usize,
     pub phoff: usize,
     pub shoff: usize,
+    pub flags: u32,
+    pub ehsize: u16,
+    pub phentsize: u16,
+    pub phnum: u16,
+    pub shentsize: u16,
+    pub shnum: u16,
+    pub shstrndx: u16,
+}
+
+#[derive(
+    KnownLayout, FromBytes, IntoBytes, Immutable, Debug, Eq, PartialEq, Default, Clone, Copy,
+)]
+#[repr(C)]
+pub struct Elf32FileHeader {
+    pub ident: ElfIdent,
+    pub elf_type: u16,
+    pub machine: u16,
+    pub version: u32,
+    pub entry: u32, // These three are the only differently sized entries.
+    pub phoff: u32, // <--
+    pub shoff: u32, // <--
     pub flags: u32,
     pub ehsize: u16,
     pub phentsize: u16,
@@ -182,10 +213,18 @@ pub const NATIVE_ENCODING: ElfDataEncoding = ElfDataEncoding::BigEndian;
 
 #[cfg(target_arch = "x86_64")]
 pub const CURRENT_ARCH: ElfArchitecture = ElfArchitecture::X86_64;
+#[cfg(target_arch = "x86_64")]
+pub const ARCH32_ARCH: ElfArchitecture = ElfArchitecture::Unknown;
+
 #[cfg(target_arch = "aarch64")]
 pub const CURRENT_ARCH: ElfArchitecture = ElfArchitecture::AARCH64;
+#[cfg(target_arch = "aarch64")]
+pub const ARCH32_ARCH: ElfArchitecture = ElfArchitecture::ARM;
+
 #[cfg(target_arch = "riscv64")]
 pub const CURRENT_ARCH: ElfArchitecture = ElfArchitecture::RISCV;
+#[cfg(target_arch = "riscv64")]
+pub const ARCH32_ARCH: ElfArchitecture = ElfArchitecture::Unknown;
 
 impl Elf64FileHeader {
     pub fn elf_type(&self) -> Result<ElfType, u16> {
@@ -194,6 +233,32 @@ impl Elf64FileHeader {
 
     pub fn machine(&self) -> Result<ElfArchitecture, u16> {
         ElfArchitecture::from_u16(self.machine).ok_or(self.machine)
+    }
+
+    pub fn from_vmo(vmo: &zx::Vmo) -> Result<Box<Elf64FileHeader>, ElfParseError> {
+        // Read and parse the ELF file header from the VMO.
+        let mut header = Box::<Elf64FileHeader>::default();
+        vmo.read(header.as_mut_bytes(), 0).map_err(|s| ElfParseError::ReadError(s))?;
+        header.validate()?;
+        Ok(header)
+    }
+}
+
+impl Elf32FileHeader {
+    pub fn elf_type(&self) -> Result<ElfType, u16> {
+        ElfType::from_u16(self.elf_type).ok_or(self.elf_type)
+    }
+
+    pub fn machine(&self) -> Result<ElfArchitecture, u16> {
+        ElfArchitecture::from_u16(self.machine).ok_or(self.machine)
+    }
+
+    pub fn from_vmo(vmo: &zx::Vmo) -> Result<Box<Elf32FileHeader>, ElfParseError> {
+        // Read and parse the ELF file header from the VMO.
+        let mut header = Box::<Elf32FileHeader>::default();
+        vmo.read(header.as_mut_bytes(), 0).map_err(|s| ElfParseError::ReadError(s))?;
+        header.validate()?;
+        Ok(header)
     }
 }
 
@@ -233,6 +298,65 @@ impl Validate for Elf64FileHeader {
     }
 }
 
+impl Validate for Elf32FileHeader {
+    fn validate(&self) -> Result<(), ElfParseError> {
+        if self.ident.magic != ELF_MAGIC {
+            return Err(ElfParseError::InvalidFileHeader("Invalid ELF magic"));
+        }
+        // If the current arch doesn't support 32-bit ELF, we will fail here
+        if ARCH32_ARCH == ElfArchitecture::Unknown || !self.ident.is_arch32() {
+            return Err(ElfParseError::InvalidFileHeader("Invalid ELF class"));
+        }
+        if self.ident.data() != Ok(NATIVE_ENCODING) {
+            return Err(ElfParseError::InvalidFileHeader("Invalid ELF data encoding"));
+        }
+        if self.ident.version() != Ok(ElfVersion::Current) {
+            return Err(ElfParseError::InvalidFileHeader("Invalid ELF version"));
+        }
+        if self.phentsize as usize != mem::size_of::<Elf32ProgramHeader>() {
+            return Err(ElfParseError::InvalidFileHeader("Invalid ELF program header size"));
+        }
+        if self.phnum == std::u16::MAX {
+            return Err(ElfParseError::InvalidFileHeader(
+                "2^16 or more ELF program headers is unsupported",
+            ));
+        }
+        if self.machine() != Ok(ARCH32_ARCH) {
+            return Err(ElfParseError::InvalidFileHeader("Invalid ELF architecture"));
+        }
+        if self.elf_type() != Ok(ElfType::SharedObject)
+            && self.elf_type() != Ok(ElfType::Executable)
+        {
+            return Err(ElfParseError::InvalidFileHeader(
+                "Invalid or unsupported ELF type, only ET_DYN is supported",
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl Into<Box<Elf64FileHeader>> for Box<Elf32FileHeader> {
+    fn into(self) -> Box<Elf64FileHeader> {
+        // The Validate attribute will fail on this header.
+        Box::new(Elf64FileHeader {
+            ident: self.ident as ElfIdent,
+            elf_type: self.elf_type as u16,
+            machine: self.machine as u16,
+            version: self.version as u32,
+            entry: self.entry as usize,
+            phoff: self.phoff as usize,
+            shoff: self.shoff as usize,
+            flags: self.flags as u32,
+            ehsize: self.ehsize as u16,
+            phentsize: self.phentsize as u16,
+            phnum: self.phnum as u16,
+            shentsize: self.shentsize as u16,
+            shnum: self.shnum as u16,
+            shstrndx: self.shstrndx as u16,
+        })
+    }
+}
+
 #[derive(
     KnownLayout, FromBytes, Immutable, IntoBytes, Debug, Eq, PartialEq, Default, Clone, Copy,
 )]
@@ -246,6 +370,21 @@ pub struct Elf64ProgramHeader {
     pub filesz: u64,
     pub memsz: u64,
     pub align: u64,
+}
+
+#[derive(
+    KnownLayout, FromBytes, Immutable, IntoBytes, Debug, Eq, PartialEq, Default, Clone, Copy,
+)]
+#[repr(C)]
+pub struct Elf32ProgramHeader {
+    pub segment_type: u32,
+    pub offset: u32,
+    pub vaddr: u32,
+    pub paddr: u32,
+    pub filesz: u32,
+    pub memsz: u32,
+    pub flags: u32,
+    pub align: u32,
 }
 
 #[derive(FromPrimitive, Debug, Eq, PartialEq)]
@@ -305,10 +444,38 @@ impl Elf64Dyn {
     }
 }
 
+#[derive(
+    IntoBytes, Immutable, Copy, Clone, KnownLayout, FromBytes, Default, Debug, Eq, PartialEq,
+)]
+#[repr(C)]
+pub struct Elf32Dyn {
+    pub tag: u32,
+    pub value: u32,
+}
+
+impl Elf32Dyn {
+    pub fn tag(&self) -> Result<Elf64DynTag, u32> {
+        // The dyn tags are all int32 regardless of the format.
+        Elf64DynTag::from_u32(self.tag).ok_or(self.tag)
+    }
+}
+
+impl Into<Elf64Dyn> for Elf32Dyn {
+    fn into(self) -> Elf64Dyn {
+        Elf64Dyn { tag: self.tag as u64, value: self.value as u64 }
+    }
+}
+
 pub type Elf64Addr = u64;
 pub type Elf64Half = u16;
 pub type Elf64Word = u32;
 pub type Elf64Xword = u64;
+
+pub type Elf32Addr = u32;
+pub type Elf32Half = u16;
+pub type Elf32Word = u32;
+pub type Elf32SWord = i32;
+pub type Elf32Lword = u64;
 
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
@@ -321,6 +488,18 @@ pub struct elf64_sym {
     pub st_size: Elf64Xword,
 }
 pub type Elf64Sym = elf64_sym;
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
+pub struct elf32_sym {
+    pub st_name: Elf32Word,
+    pub st_info: u8,
+    pub st_other: u8,
+    pub st_shndx: Elf32Half,
+    pub st_value: Elf32Addr,
+    pub st_size: Elf32Word,
+}
+pub type Elf32Sym = elf32_sym;
 
 #[derive(FromPrimitive, Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
@@ -366,6 +545,32 @@ impl Elf64ProgramHeader {
     pub fn flags(&self) -> SegmentFlags {
         // Ignore bits that don't correspond to one of the flags included in SegmentFlags
         SegmentFlags::from_bits_truncate(self.flags)
+    }
+}
+
+impl Elf32ProgramHeader {
+    pub fn segment_type(&self) -> Result<SegmentType, u32> {
+        SegmentType::from_u32(self.segment_type).ok_or(self.segment_type)
+    }
+
+    pub fn flags(&self) -> SegmentFlags {
+        // Ignore bits that don't correspond to one of the flags included in SegmentFlags
+        SegmentFlags::from_bits_truncate(self.flags)
+    }
+}
+
+impl Into<Elf64ProgramHeader> for Elf32ProgramHeader {
+    fn into(self) -> Elf64ProgramHeader {
+        Elf64ProgramHeader {
+            segment_type: self.segment_type,
+            flags: self.flags,
+            offset: self.offset as usize,
+            vaddr: self.vaddr as usize,
+            paddr: self.paddr as usize,
+            filesz: self.filesz as u64,
+            memsz: self.memsz as u64,
+            align: self.align as u64,
+        }
     }
 }
 
@@ -424,6 +629,64 @@ impl Validate for [Elf64ProgramHeader] {
     }
 }
 
+// Ensure we stay in the 32-bit space.
+impl Validate for [Elf32ProgramHeader] {
+    fn validate(&self) -> Result<(), ElfParseError> {
+        let page_size = zx::system_get_page_size() as u32;
+        let mut vaddr_high: u32 = 0;
+        for hdr in self {
+            match hdr.segment_type() {
+                Ok(SegmentType::Load) => {
+                    if hdr.filesz > hdr.memsz {
+                        return Err(ElfParseError::InvalidProgramHeader(
+                            "filesz > memsz in a PT_LOAD segment",
+                        ));
+                    }
+
+                    // Virtual addresses for PT_LOAD segments should not overlap.
+                    if hdr.vaddr < vaddr_high {
+                        return Err(ElfParseError::InvalidProgramHeader(
+                            "Overlap in virtual addresses",
+                        ));
+                    }
+                    vaddr_high = hdr.vaddr.checked_add(hdr.memsz).ok_or_else(|| {
+                        ElfParseError::InvalidProgramHeader(
+                            "load segment overflow the 32-bit memory space",
+                        )
+                    })?;
+
+                    // Segment alignment should be a multiple of the system page size.
+                    if hdr.align % page_size != 0 {
+                        return Err(ElfParseError::InvalidProgramHeader(
+                            "Alignment must be multiple of the system page size",
+                        ));
+                    }
+
+                    // Virtual addresses should be at the same page offset as their offset in the
+                    // file.
+                    if hdr.align != 0 && (hdr.vaddr % hdr.align) != (hdr.offset % hdr.align) {
+                        return Err(ElfParseError::InvalidProgramHeader(
+                            "Virtual address and offset in file are not at same offset in page",
+                        ));
+                    }
+                }
+                Ok(SegmentType::GnuStack) => {
+                    if hdr.flags().contains(SegmentFlags::EXECUTE) {
+                        return Err(ElfParseError::InvalidProgramHeader(
+                            "Fuchsia does not support executable stacks",
+                        ));
+                    }
+                }
+                // No specific validation to perform for these.
+                Ok(SegmentType::Unused) | Ok(SegmentType::Interp) | Ok(SegmentType::Dynamic) => {}
+                // Ignore segment types that we don't care about.
+                Err(_) => {}
+            }
+        }
+        Ok(())
+    }
+}
+
 pub struct Elf64Headers {
     file_header: Box<Elf64FileHeader>,
     // Use a Box<[_]> instead of a Vec<> to communicate/enforce that the slice is not mutated after
@@ -436,9 +699,7 @@ pub struct Elf64Headers {
 impl Elf64Headers {
     pub fn from_vmo(vmo: &zx::Vmo) -> Result<Elf64Headers, ElfParseError> {
         // Read and parse the ELF file header from the VMO.
-        let mut file_header = Box::<Elf64FileHeader>::default();
-        vmo.read(file_header.as_mut_bytes(), 0).map_err(|s| ElfParseError::ReadError(s))?;
-        file_header.validate()?;
+        let file_header = Elf64FileHeader::from_vmo(vmo)?;
 
         // Read and parse the ELF program headers from the VMO. Also support the degenerate case
         // where there are no program headers, which is valid ELF but probably not useful outside
@@ -450,6 +711,36 @@ impl Elf64Headers {
                 .map_err(|s| ElfParseError::ReadError(s))?;
             phdrs.validate()?;
             program_headers = Some(phdrs.into_boxed_slice());
+        }
+
+        Ok(Elf64Headers { file_header, program_headers })
+    }
+
+    pub fn from_vmo_with_arch32(vmo: &zx::Vmo) -> Result<Elf64Headers, ElfParseError> {
+        // Check the class, then load the right one.
+        let ident = ElfIdent::from_vmo(vmo)?;
+        if !ident.is_arch32() {
+            // This is not arch32, so we can just proceed.
+            return Elf64Headers::from_vmo(vmo);
+        }
+        let arch32_headers = Elf32FileHeader::from_vmo(vmo)?;
+        let file_header: Box<Elf64FileHeader> = arch32_headers.into();
+
+        // Read and parse the ELF program headers from the VMO. Also support the degenerate case
+        // where there are no program headers, which is valid ELF but probably not useful outside
+        // tests.
+        let mut program_headers = None;
+        if file_header.phnum > 0 {
+            let mut phdrs = vec![Elf32ProgramHeader::default(); file_header.phnum as usize];
+            vmo.read(phdrs.as_mut_bytes(), file_header.phoff as u64)
+                .map_err(|s| ElfParseError::ReadError(s))?;
+            // We can't just use the 64-bit validation because we need to keep
+            // the addresses within the u32 space (if not <3Gb).
+            phdrs.validate()?;
+            let phdrs64: Vec<Elf64ProgramHeader> = phdrs.iter().map(|&ph| ph.into()).collect();
+            // TODO(drewry) we should be able to get rid of this extra validation.
+            phdrs64.validate()?;
+            program_headers = Some(phdrs64.into_boxed_slice());
         }
 
         Ok(Elf64Headers { file_header, program_headers })
@@ -517,6 +808,27 @@ impl Elf64DynSection {
             vmo.read(entries.as_mut_bytes(), dynamic_header.offset as u64)
                 .map_err(|s| ElfParseError::ReadError(s))?;
             let dyn_entries = entries.into_boxed_slice();
+            return Ok(Elf64DynSection { dyn_entries });
+        }
+        Err(ElfParseError::ParseError("Dynamic header not found"))
+    }
+
+    pub fn from_vmo_with_arch32(vmo: &zx::Vmo) -> Result<Elf64DynSection, ElfParseError> {
+        // Check the class, then load the right one.
+        let ident = ElfIdent::from_vmo(vmo)?;
+        if !ident.is_arch32() {
+            // This is not arch32, so we can just proceed.
+            return Elf64DynSection::from_vmo(vmo);
+        }
+        let headers = Elf64Headers::from_vmo_with_arch32(vmo)?;
+        const ENTRY_SIZE: usize = std::mem::size_of::<Elf32Dyn>();
+        if let Some(dynamic_header) = headers.program_header_with_type(SegmentType::Dynamic)? {
+            let dyn_entries_size = dynamic_header.filesz as usize / ENTRY_SIZE;
+            let mut entries = vec![Elf32Dyn::default(); dyn_entries_size];
+            vmo.read(entries.as_mut_bytes(), dynamic_header.offset as u64)
+                .map_err(|s| ElfParseError::ReadError(s))?;
+            let entries64: Vec<Elf64Dyn> = entries.iter().map(|&dt| dt.into()).collect();
+            let dyn_entries = entries64.into_boxed_slice();
             return Ok(Elf64DynSection { dyn_entries });
         }
         Err(ElfParseError::ParseError("Dynamic header not found"))

@@ -27,7 +27,6 @@ static_library("ddk") {
     "include/lib/ddk/hw/inout.h",
     "include/lib/ddk/io-buffer.h",
     "include/lib/ddk/metadata.h",
-    "include/lib/ddk/phys-iter.h",
     "include/lib/ddk/protodefs.h",
     "include/lib/ddk/trace/event.h",
   ]
@@ -36,7 +35,6 @@ static_library("ddk") {
     sources = [
       "io-buffer.c",
       "macros.h",
-      "phys-iter.c",
     ]
   }
 
@@ -147,7 +145,6 @@ static_library("ddk") {
     "//src/devices/block/drivers/usb-mass-storage:*",
     "//src/devices/block/drivers/zxcrypt:*",
     "//src/devices/block/lib/common:*",
-    "//src/devices/board/drivers/acpi-arm64:*",
     "//src/devices/board/drivers/astro:*",
     "//src/devices/board/drivers/astro/post-init:*",
     "//src/devices/board/drivers/integration-test:*",
@@ -282,6 +279,7 @@ static_library("ddk") {
     "//src/devices/usb/drivers/usb-virtual-bus:*",
     "//src/devices/usb/drivers/xhci:*",
     "//src/devices/usb/lib/usb:*",
+    "//src/devices/usb/lib/usb-endpoint:*",
     "//src/devices/usb/lib/usb/tests:*",
     "//src/devices/usb/testing/usb-virtual-bus-launcher:*",
     "//src/devices/usb/tests/usb-hci-test:*",

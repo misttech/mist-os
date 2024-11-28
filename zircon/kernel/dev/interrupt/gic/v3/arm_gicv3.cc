@@ -189,10 +189,7 @@ zx_status_t gic_init() {
 
   // ensure we're running on cpu 0 and that cpu 0 corresponds to affinity 0.0.0.0
   DEBUG_ASSERT(arch_curr_cpu_num() == 0);
-  DEBUG_ASSERT(arch_cpu_num_to_cpu_id(0u) == 0);      // AFF0
-  DEBUG_ASSERT(arch_cpu_num_to_cluster_id(0u) == 0);  // AFF1
-
-  // TODO(maniscalco): If/when we support AFF2/AFF3, be sure to assert those here.
+  DEBUG_ASSERT(arch_cpu_num_to_mpidr(0) == 0);
 
   // set spi to target cpu 0 (affinity 0.0.0.0). must do this after ARE enable
   uint max_cpu = BITS_SHIFT(typer, 7, 5);
@@ -210,7 +207,24 @@ zx_status_t gic_init() {
   return ZX_OK;
 }
 
-zx_status_t arm_gic_sgi(unsigned int irq, unsigned int flags, unsigned int cpu_mask) {
+// Extract AFF3, AFF2, and AFF1 field out of a mpidr and format according to the ICC_SGI1R register.
+constexpr uint64_t mpidr_aff_mask_to_sgir_mask(uint64_t mpidr) {
+  uint64_t mask = ((mpidr & MPIDR_AFF3_MASK) >> MPIDR_AFF3_SHIFT) << 48;
+  mask |= ((mpidr & MPIDR_AFF2_MASK) >> MPIDR_AFF2_SHIFT) << 32;
+  mask |= ((mpidr & MPIDR_AFF1_MASK) >> MPIDR_AFF1_SHIFT) << 16;
+  return mask;
+}
+
+// Send a pending IPI for the AFF3-1 cluster we've been accumulating a mask for.
+void send_sgi_for_cluster(unsigned int irq, uint64_t aff321, uint64_t aff0_mask) {
+  if (aff0_mask) {
+    DEBUG_ASSERT((aff0_mask & 0xffff) == aff0_mask);
+    const uint64_t sgi1r = ((irq & 0xf) << 24) | mpidr_aff_mask_to_sgir_mask(aff321) | aff0_mask;
+    gic_write_sgi1r(sgi1r);
+  }
+}
+
+zx_status_t arm_gic_sgi(const unsigned int irq, const unsigned int flags, unsigned int cpu_mask) {
   LTRACEF("irq %u, flags %u, cpu_mask %#x\n", irq, flags, cpu_mask);
 
   if (flags != ARM_GIC_SGI_FLAG_NS) {
@@ -223,39 +237,34 @@ zx_status_t arm_gic_sgi(unsigned int irq, unsigned int flags, unsigned int cpu_m
 
   arch::ThreadMemoryBarrier();
 
-  cpu_num_t cpu = 0;
-  uint cluster = 0;
-  uint64_t val = 0;
-  while (cpu_mask && cpu < arch_max_num_cpus()) {
-    unsigned int mask = 0;
+  uint64_t curr_aff321 = 0;  // Current AFF3-1 we're dealing with.
+  uint64_t aff0_mask = 0;    // 16 bit mask of the AFF0 we're accumulating.
 
-    // within a single cluster (aff1) find all of the matching cpus
-    while (cpu < arch_max_num_cpus() && arch_cpu_num_to_cluster_id(cpu) == cluster) {
-      if (cpu_mask & (1u << cpu)) {
-        cpu_mask &= ~(1u << cpu);
-
-        auto aff0 = arch_cpu_num_to_cpu_id(cpu);
-        mask |= 1u << aff0;
-      }
-      cpu += 1;
-    }
-
-    LTRACEF("computed mask %#x for cluster %u\n", mask, cluster);
+  for (cpu_num_t cpu = 0; cpu_mask && cpu < arch_max_num_cpus(); cpu++) {
+    const uint64_t mpidr = arch_cpu_num_to_mpidr(cpu);
+    const uint64_t aff321 = mpidr & (MPIDR_AFF3_MASK | MPIDR_AFF2_MASK | MPIDR_AFF1_MASK);
+    const uint64_t aff0 = mpidr & (MPIDR_AFF0_MASK);
 
     // Without the RS field set, we can only deal with the first
-    // 16 cpus within a single cluster
-    DEBUG_ASSERT((mask & 0xffff) == mask);
+    // 16 cpus within a single cluster.
+    DEBUG_ASSERT(aff0 < 16);
 
-    val = ((irq & 0xf) << 24) | ((cluster & 0xff) << 16) | (mask & 0xffff);
-    cluster += 1;
-
-    // nothing in this cluster intersected with the cpu_mask
-    if (mask == 0) {
-      continue;
+    if (aff321 != curr_aff321) {
+      // AFF3-1 has changed, see if we need to fire a pending IPI
+      send_sgi_for_cluster(irq, curr_aff321, aff0_mask);
+      curr_aff321 = aff321;
+      aff0_mask = 0;
     }
 
-    gic_write_sgi1r(val);
+    // This cpu is within the current aff mask we're looking at, accumulate.
+    if (cpu_mask & (1u << cpu)) {
+      cpu_mask &= ~(1u << cpu);
+      aff0_mask |= 1u << aff0;
+    }
   }
+
+  // Fire any leftover accumulated mask.
+  send_sgi_for_cluster(irq, curr_aff321, aff0_mask);
 
   return ZX_OK;
 }
@@ -436,12 +445,9 @@ void gic_shutdown() {
 [[maybe_unused]] bool is_spi_enabled() {
   DEBUG_ASSERT(arch_ints_disabled());
 
-  cpu_num_t cpu_num = arch_curr_cpu_num();
-
-  // TODO(maniscalco): If/when we support AFF2/AFF3, update the mask below.
-  uint aff0 = arch_cpu_num_to_cpu_id(cpu_num);
-  uint aff1 = arch_cpu_num_to_cluster_id(cpu_num);
-  uint64_t aff_mask = (aff1 << 8) + aff0;
+  const cpu_num_t cpu_num = arch_curr_cpu_num();
+  const uint64_t mpidr = arch_cpu_num_to_mpidr(cpu_num);
+  const uint64_t aff_mask = mpidr & ARM64_MPIDR_MASK;
 
   // Check each SPI to see if it's routed to this CPU.
   for (uint i = 32u; i < gic_max_int; ++i) {

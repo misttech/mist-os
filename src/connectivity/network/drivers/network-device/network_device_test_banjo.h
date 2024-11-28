@@ -31,7 +31,7 @@ struct BanjoTestFixtureEnvironment : public fdf_testing::Environment {
       return compat::DeviceServer::GenericProtocol{.ops = device_impl_.proto().ops,
                                                    .ctx = device_impl_.proto().ctx};
     };
-    device_server_.Init(component::kDefaultInstance, {}, std::nullopt, std::move(banjo_config));
+    device_server_.Initialize(component::kDefaultInstance, std::nullopt, std::move(banjo_config));
     return zx::make_result(
         device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &outgoing));
   }

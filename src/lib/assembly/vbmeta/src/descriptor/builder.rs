@@ -89,7 +89,7 @@ impl RawHashDescriptorBuilder {
 
         HashDescriptor {
             header,
-            image_name: self.name.unwrap_or("".to_owned()),
+            image_name: self.name.unwrap_or_else(|| "".to_owned()),
             salt: self.salt,
             digest: self.digest,
             min_avb_version: self.min_avb_version,

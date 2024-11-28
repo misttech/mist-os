@@ -222,7 +222,7 @@ impl AccessCheckRequest {
 
     async fn resolve_package(&self, package_url: &str) -> fio::DirectoryProxy {
         let (package_directory_proxy, package_directory_server_end) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+            create_proxy::<fio::DirectoryMarker>();
         connect_to_protocol::<PackageResolverMarker>()
             .unwrap()
             .resolve(package_url, package_directory_server_end)
@@ -295,7 +295,7 @@ impl AccessCheckRequest {
 async fn get_storage_for_component_instance(moniker_prefix: &str) -> fio::DirectoryProxy {
     let storage_admin = connect_to_protocol::<StorageAdminMarker>().unwrap();
     let (storage_user_iterator, storage_user_iterator_server_end) =
-        create_proxy::<StorageIteratorMarker>().unwrap();
+        create_proxy::<StorageIteratorMarker>();
     storage_admin
         .list_storage_in_realm(".", storage_user_iterator_server_end)
         .await
@@ -312,7 +312,7 @@ async fn get_storage_for_component_instance(moniker_prefix: &str) -> fio::Direct
         matching_storage_users.append(&mut matches);
     }
     assert_eq!(1, matching_storage_users.len());
-    let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
     storage_admin
         .open_storage(
             matching_storage_users.first().unwrap(),
@@ -347,7 +347,7 @@ async fn perform_update(update_url: &str) {
     // Prevent reboot attempt by signalling that the client (this code) will
     // manage reboot via the provided RebootController.
     let (_reboot_controller_proxy, reboot_controller_server_end) =
-        create_proxy::<RebootControllerMarker>().unwrap();
+        create_proxy::<RebootControllerMarker>();
     installer_proxy
         .start_update(
             &PackageUrl { url: update_url.to_string() },
@@ -364,7 +364,7 @@ async fn perform_update(update_url: &str) {
         .unwrap()
         .unwrap();
 
-    let mut monitor_stream = monitor_server_end.into_stream().unwrap();
+    let mut monitor_stream = monitor_server_end.into_stream();
     while let Some(request) = monitor_stream.try_next().await.unwrap() {
         match request {
             MonitorRequest::OnState { state, responder } => {

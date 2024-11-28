@@ -5,12 +5,18 @@
 // TODO(https://fxbug.dev/360942417): Remove.
 #![allow(unused_variables)]
 
-use fuchsia_sync::{Mutex, MutexGuard};
+use fuchsia_sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::cmp::min;
+use std::collections::btree_map::Entry as BTreeMapEntry;
+use std::collections::hash_map::Entry as HashMapEntry;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::ops::Bound;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tee_internal::{
     Attribute, AttributeId, BufferOrValue, Error, HandleFlags, MemRef, ObjectEnumHandle,
     ObjectHandle, ObjectInfo, Result as TeeResult, Storage, Type, Usage, ValueFields, Whence,
-    OBJECT_ID_MAX_LEN,
+    DATA_MAX_POSITION, OBJECT_ID_MAX_LEN,
 };
 
 static PERSISTENT_OBJECTS: Mutex<Option<Arc<PersistentObjects>>> = Mutex::new(None);
@@ -70,7 +76,47 @@ impl AttributeSet {
 struct PersistentObject {
     type_: Type,
     usage: Usage,
+    base_flags: HandleFlags,
     attributes: AttributeSet,
+    data: zx::Vmo,
+    data_size: usize,
+    id: Vec<u8>,
+
+    // The open handles to this object. Tracking these in this way conveniently
+    // enables their invalidation in the case of object overwriting.
+    handles: HashSet<ObjectHandle>,
+}
+
+impl PersistentObject {
+    fn size_bytes(&self) -> u32 {
+        // TODO(https://fxbug.dev/360942417): Implement me!
+        0
+    }
+
+    fn size_bits(&self) -> u32 {
+        self.size_bytes() * 8
+    }
+
+    fn get_info(&self, data_position: usize) -> ObjectInfo {
+        let all_data_flags = HandleFlags::DATA_ACCESS_READ
+            | HandleFlags::DATA_ACCESS_WRITE
+            | HandleFlags::DATA_ACCESS_WRITE_META
+            | HandleFlags::DATA_SHARE_READ
+            | HandleFlags::DATA_SHARE_WRITE;
+        let flags = self.base_flags.intersection(all_data_flags)
+            | HandleFlags::PERSISTENT
+            | HandleFlags::INITIALIZED;
+        let object_size = self.size_bits();
+        ObjectInfo {
+            object_type: self.type_,
+            max_object_size: object_size,
+            object_size,
+            object_usage: self.usage,
+            data_position: data_position,
+            data_size: self.data_size,
+            handle_flags: flags,
+        }
+    }
 }
 
 // A handle's view into a persistent object.
@@ -78,46 +124,118 @@ struct PersistentObject {
 // TODO(https://fxbug.dev/360942417):Implement me!
 struct PersistentObjectView {
     object: Arc<Mutex<PersistentObject>>,
+    flags: HandleFlags,
+    data_position: usize,
 }
 
 impl PersistentObjectView {
     fn get_info(&self) -> ObjectInfo {
-        unimplemented!();
+        self.object.lock().get_info(self.data_position)
     }
 
     // See read_object_data().
-    fn read_data<'a>(&self, buffer: &mut [u8]) -> TeeResult<&'a [u8]> {
-        unimplemented!();
+    fn read_data<'a>(&mut self, buffer: &'a mut [u8]) -> TeeResult<&'a [u8]> {
+        let obj = self.object.lock();
+        let read_size = min(obj.data_size - self.data_position, buffer.len());
+        let written = &mut buffer[..read_size];
+        if read_size > 0 {
+            obj.data.read(written, self.data_position as u64).unwrap();
+        }
+        self.data_position += read_size;
+        Ok(written)
     }
 
     // See write_object_data().
-    fn write_data(&self, data: &[u8]) -> TeeResult {
-        unimplemented!();
+    fn write_data(&mut self, data: &[u8]) -> TeeResult {
+        if data.is_empty() {
+            return Ok(());
+        }
+        let mut obj = self.object.lock();
+        let write_end = self.data_position + data.len();
+
+        if write_end > DATA_MAX_POSITION {
+            return Err(Error::Overflow);
+        }
+        if write_end > obj.data_size {
+            obj.data.set_size(write_end as u64).unwrap();
+            obj.data_size = write_end;
+        }
+        obj.data.write(data, self.data_position as u64).unwrap();
+        self.data_position = write_end;
+        Ok(())
     }
 
     // See truncate_object_data().
     fn truncate_data(&self, size: usize) -> TeeResult {
-        unimplemented!();
+        let mut obj = self.object.lock();
+
+        // It's okay to set the size past the position in either direction.
+        // However, the spec does not actually cover the case where the
+        // provided size is is larger than DATA_MAX_POSITION. Since any
+        // part of the data stream past that would be inaccessible; it
+        // should be sensible and harmless to not exceed that in resizing.
+        let size = min(size, DATA_MAX_POSITION);
+        obj.data.set_size(size as u64).unwrap();
+        obj.data_size = size;
+        Ok(())
     }
 
     // See seek_object_data().
-    fn seek_data(&self, offset: isize, whence: Whence) -> TeeResult {
-        unimplemented!();
+    fn seek_data(&mut self, offset: isize, whence: Whence) -> TeeResult {
+        let start = match whence {
+            Whence::DataSeekCur => self.data_position,
+            Whence::DataSeekEnd => self.object.lock().data_size,
+            Whence::DataSeekSet => 0,
+        };
+        let new_position = start.saturating_add_signed(offset);
+        if new_position > DATA_MAX_POSITION {
+            Err(Error::Overflow)
+        } else {
+            self.data_position = new_position;
+            Ok(())
+        }
     }
 }
+
+// The state of an object enum handle.
+struct EnumState {
+    // None if in the allocated/unstarted state.
+    id: Option<Vec<u8>>,
+}
+
+// A B-tree since enumeration needs to deal in key (i.e., ID) ordering.
+//
+// Further, the key represents a separately owned copy of the ID; we do this
+// instead of representing the key as an Arc<Vec<u8>> as then we would no
+// longer be able to perform look-up with slices - since Borrow is not
+// implemented for Arc - and would instead have to dynamically allocate a new
+// key for the look-up. Better to not touch the heap when bad inputs are
+// provided.
+type PersistentIdMap = BTreeMap<Vec<u8>, Arc<Mutex<PersistentObject>>>;
+
+type PersistentHandleMap = HashMap<ObjectHandle, Mutex<PersistentObjectView>>;
+type PersistentEnumHandleMap = HashMap<ObjectEnumHandle, Mutex<EnumState>>;
 
 // A class abstraction implementing the persistent storage interface.
 //
 // TODO(https://fxbug.dev/360942417): Implement me!
-struct PersistentObjects {}
+struct PersistentObjects {
+    by_id: RwLock<PersistentIdMap>,
+    by_handle: RwLock<PersistentHandleMap>,
+    enum_handles: RwLock<PersistentEnumHandleMap>,
+    next_handle_value: AtomicU64,
+    next_enum_handle_value: AtomicU64,
+}
 
 impl PersistentObjects {
     fn new() -> Self {
-        Self {}
-    }
-
-    fn is_empty(&self) -> bool {
-        unimplemented!();
+        Self {
+            by_id: RwLock::new(PersistentIdMap::new()),
+            by_handle: RwLock::new(PersistentHandleMap::new()),
+            enum_handles: RwLock::new(HashMap::new()),
+            next_handle_value: AtomicU64::new(1), // Always odd, per the described convention above
+            next_enum_handle_value: AtomicU64::new(1),
+        }
     }
 
     fn create(
@@ -130,53 +248,255 @@ impl PersistentObjects {
         initial_data: &[u8],
     ) -> TeeResult<ObjectHandle> {
         assert!(id.len() <= OBJECT_ID_MAX_LEN);
-        unimplemented!();
+
+        let data = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, initial_data.len() as u64)
+            .unwrap();
+        if !initial_data.is_empty() {
+            data.write(initial_data, 0).unwrap();
+        }
+
+        let obj = PersistentObject {
+            type_,
+            usage,
+            base_flags: flags,
+            attributes,
+            data,
+            data_size: initial_data.len(),
+            id: Vec::from(id),
+            handles: HashSet::new(),
+        };
+
+        let (mut by_handle, mut by_id) = self.lock_for_handle_and_id_writes();
+
+        let obj_ref = match by_id.get(id) {
+            // If there's already an object with that ID, then
+            // DATA_FLAG_OVERWRITE permits overwriting. This results in
+            // existing handles being invalidated.
+            Some(obj_ref) => {
+                if !flags.contains(HandleFlags::DATA_FLAG_OVERWRITE) {
+                    return Err(Error::AccessConflict);
+                }
+                {
+                    let mut obj_old = obj_ref.lock();
+                    for handle in obj_old.handles.iter() {
+                        let removed = by_handle.remove(&handle).is_some();
+                        debug_assert!(removed);
+                    }
+                    *obj_old = obj;
+                }
+                obj_ref.clone()
+            }
+            None => {
+                let id = obj.id.clone();
+                let obj_ref = Arc::new(Mutex::new(obj));
+                let inserted = by_id.insert(id, obj_ref.clone());
+                debug_assert!(inserted.is_none());
+                obj_ref
+            }
+        };
+        Ok(self.open_locked(by_handle, obj_ref, flags))
     }
 
     // See open_persistent_object().
     fn open(&self, id: &[u8], flags: HandleFlags) -> TeeResult<ObjectHandle> {
         assert!(id.len() <= OBJECT_ID_MAX_LEN);
-        unimplemented!();
+
+        let (by_handle, by_id) = self.lock_for_handle_writes_and_id_reads();
+
+        let obj_ref = match by_id.get(id) {
+            Some(obj_ref) => Ok(obj_ref),
+            None => Err(Error::ItemNotFound),
+        }?;
+
+        {
+            let mut obj = obj_ref.lock();
+
+            // At any given time, the number of object references should be
+            // greater than or equal to the number of handle map values + the
+            // number of object ID map values, which should be equal to the #
+            // of open handles to that object + 1.
+            debug_assert!(Arc::strong_count(obj_ref) >= obj.handles.len() + 1);
+
+            // If we previously closed the last handle to the object and are
+            // now reopening its first active handle, overwrite the base flags
+            // with the handle's. The spec doesn't dictate this, but it's hard
+            // to imagine what else an implementation could or should do in
+            // this case.
+            if obj.handles.is_empty() {
+                obj.base_flags = flags;
+            } else {
+                let combined = flags.union(obj.base_flags);
+                let intersection = flags.intersection(obj.base_flags);
+
+                // Check for shared read permissions.
+                if flags.contains(HandleFlags::DATA_ACCESS_READ)
+                    && !(intersection.contains(HandleFlags::DATA_SHARE_READ))
+                {
+                    return Err(Error::AccessConflict);
+                }
+
+                // Check for shared read permission consistency.
+                if combined.contains(HandleFlags::DATA_SHARE_READ)
+                    == intersection.contains(HandleFlags::DATA_SHARE_READ)
+                {
+                    return Err(Error::AccessConflict);
+                }
+
+                // Check for shared write permissions.
+                if flags.contains(HandleFlags::DATA_ACCESS_WRITE)
+                    && !(intersection.contains(HandleFlags::DATA_SHARE_WRITE))
+                {
+                    return Err(Error::AccessConflict);
+                }
+
+                // Check for shared write permission consistency.
+                if combined.contains(HandleFlags::DATA_SHARE_WRITE)
+                    == intersection.contains(HandleFlags::DATA_SHARE_WRITE)
+                {
+                    return Err(Error::AccessConflict);
+                }
+            }
+        }
+
+        Ok(self.open_locked(by_handle, obj_ref.clone(), flags))
+    }
+
+    // The common handle opening subroutine of create() and open(), which
+    // expects the handle map to already be locked for insertion.
+    fn open_locked(
+        &self,
+        mut by_handle: RwLockWriteGuard<'_, PersistentHandleMap>,
+        object: Arc<Mutex<PersistentObject>>,
+        flags: HandleFlags,
+    ) -> ObjectHandle {
+        let handle = self.mint_handle();
+        let inserted = object.lock().handles.insert(handle);
+        debug_assert!(inserted);
+        let view = PersistentObjectView { object, flags, data_position: 0 };
+        let inserted = by_handle.insert(handle, Mutex::new(view)).is_none();
+        debug_assert!(inserted);
+        handle
     }
 
     fn close(&self, handle: ObjectHandle) {
-        unimplemented!();
+        let mut by_handle = self.by_handle.write();
+
+        // Note that even if all handle map entries associated with the object
+        // are removed, the reference to the object in the ID map remains,
+        // keeping it alive for future open() calls.
+        match by_handle.entry(handle) {
+            HashMapEntry::Occupied(entry) => {
+                {
+                    let view = &entry.get().lock();
+                    let mut obj = view.object.lock();
+                    let removed = obj.handles.remove(&handle);
+                    debug_assert!(removed);
+                }
+                let _ = entry.remove();
+            }
+            HashMapEntry::Vacant(_) => panic!("{handle:?} is not a valid handle"),
+        }
     }
 
     // See close_and_delete_persistent_object(). Although unlike that function,
     // this one returns Error::AccessDenied if `handle` was not opened with
     // DATA_ACCESS_WRITE_META.
     fn close_and_delete(&self, handle: ObjectHandle) -> TeeResult {
-        unimplemented!();
+        let (mut by_handle, mut by_id) = self.lock_for_handle_and_id_writes();
+        // With both maps locked, removal of all entries with the associated
+        // object handle should amount to dropping that object.
+        match by_handle.entry(handle) {
+            HashMapEntry::Occupied(entry) => {
+                {
+                    let state = &entry.get().lock();
+                    if !state.flags.contains(HandleFlags::DATA_ACCESS_WRITE_META) {
+                        return Err(Error::AccessDenied);
+                    }
+                    let obj = state.object.lock();
+                    debug_assert_eq!(obj.handles.len(), 1);
+                    let removed = by_id.remove(&obj.id).is_some();
+                    debug_assert!(removed);
+                }
+                let _ = entry.remove();
+                Ok(())
+            }
+            HashMapEntry::Vacant(_) => panic!("{handle:?} is not a valid handle"),
+        }
     }
 
     // See rename_persistent_object(). Although unlike that function, this one
     // returns Error::AccessDenied if `handle` was not opened with
     // DATA_ACCESS_WRITE_META.
     fn rename(&self, handle: ObjectHandle, new_id: &[u8]) -> TeeResult {
-        assert!(new_id.len() <= OBJECT_ID_MAX_LEN);
-        unimplemented!();
+        let (mut by_handle, mut by_id) = self.lock_for_handle_and_id_writes();
+        match by_handle.entry(handle) {
+            HashMapEntry::Occupied(handle_entry) => {
+                let state = handle_entry.get().lock();
+                if !state.flags.contains(HandleFlags::DATA_ACCESS_WRITE_META) {
+                    return Err(Error::AccessDenied);
+                }
+                let new_id = Vec::from(new_id);
+                match by_id.entry(new_id.clone()) {
+                    BTreeMapEntry::Occupied(_) => return Err(Error::AccessConflict),
+                    BTreeMapEntry::Vacant(id_entry) => {
+                        let _ = id_entry.insert(state.object.clone());
+                    }
+                };
+                let mut obj = state.object.lock();
+                let removed = by_id.remove(&obj.id);
+                debug_assert!(removed.is_some());
+                obj.id = new_id;
+                Ok(())
+            }
+            HashMapEntry::Vacant(_) => panic!("{handle:?} is not a valid handle"),
+        }
     }
 
-    // Returns a locked view into the open object corresponding to `handle`,
-    // panicking if the handle is invalid.
-    fn get(&self, handle: ObjectHandle) -> MutexGuard<'_, PersistentObjectView> {
-        unimplemented!();
+    // Given a handle, passes the associated object view into a provided
+    // callback, panicking if the handle is invalid.
+    fn operate<F, R>(&self, handle: ObjectHandle, callback: F) -> R
+    where
+        F: FnOnce(&mut PersistentObjectView) -> R,
+    {
+        let by_handle = self.by_handle.read();
+        let view =
+            by_handle.get(&handle).unwrap_or_else(|| panic!("{handle:?} is not a valid handle"));
+        let mut view = view.lock();
+        callback(&mut view)
     }
 
     // See allocate_persistent_object_enumerator().
     fn allocate_enumerator(&self) -> ObjectEnumHandle {
-        ObjectEnumHandle::from_value(0)
+        let enumerator = self.mint_enumerator_handle();
+
+        let previous = self
+            .enum_handles
+            .write()
+            .insert(enumerator.clone(), Mutex::new(EnumState { id: None }));
+        debug_assert!(previous.is_none());
+        enumerator
     }
 
     // See free_persistent_object_enumerator().
     fn free_enumerator(&self, enumerator: ObjectEnumHandle) -> () {
-        unimplemented!();
+        let mut enum_handles = self.enum_handles.write();
+        match enum_handles.entry(enumerator) {
+            HashMapEntry::Occupied(entry) => {
+                let _ = entry.remove();
+            }
+            HashMapEntry::Vacant(_) => panic!("{enumerator:?} is not a valid enumerator handle"),
+        }
     }
 
     // See reset_persistent_object_enumerator().
     fn reset_enumerator(&self, enumerator: ObjectEnumHandle) -> () {
-        unimplemented!();
+        let enum_handles = self.enum_handles.read();
+        match enum_handles.get(&enumerator) {
+            Some(state) => {
+                state.lock().id = None;
+            }
+            None => panic!("{enumerator:?} is not a valid enumerator handle"),
+        }
     }
 
     // See get_next_persistent_object().
@@ -185,7 +505,66 @@ impl PersistentObjects {
         enumerator: ObjectEnumHandle,
         id_buffer: &'a mut [u8],
     ) -> TeeResult<(ObjectInfo, &'a [u8])> {
-        unimplemented!();
+        let enum_handles = self.enum_handles.read();
+        match enum_handles.get(&enumerator) {
+            Some(state) => {
+                let by_id = self.by_id.read();
+                let mut state = state.lock();
+                let next = if state.id.is_none() {
+                    by_id.first_key_value()
+                } else {
+                    // Since we're dealing with an ID-keyed B-tree, we can
+                    // straightforwardly get the first entry with an ID larger
+                    // than the current.
+                    let curr_id = state.id.as_ref().unwrap();
+                    by_id.range((Bound::Excluded(curr_id.clone()), Bound::Unbounded)).next()
+                };
+                if let Some((id, obj)) = next {
+                    assert!(id_buffer.len() >= id.len());
+                    let written = &mut id_buffer[..id.len()];
+                    written.copy_from_slice(id);
+                    state.id = Some(id.clone());
+                    Ok((obj.lock().get_info(0), written))
+                } else {
+                    Err(Error::ItemNotFound)
+                }
+            }
+            None => panic!("{enumerator:?} is not a valid enumerator handle"),
+        }
+    }
+
+    fn mint_handle(&self) -> ObjectHandle {
+        // Per the described convention above, always odd. (Initial value is 1.)
+        ObjectHandle::from_value(self.next_handle_value.fetch_add(2, Ordering::Relaxed))
+    }
+
+    fn mint_enumerator_handle(&self) -> ObjectEnumHandle {
+        ObjectEnumHandle::from_value(self.next_enum_handle_value.fetch_add(1, Ordering::Relaxed))
+    }
+
+    //
+    // To avoid deadlock, the following two methods establish a locking
+    // discipline to be followed when needing to lock both the handle and ID
+    // maps: always have ID map locking follow handle map locking. Mixing that
+    // ordering with the inverse would cause deadlock, and gaining exclusive
+    // access to global handle state before object consultation by ID seems
+    // better hygienically.
+    //
+
+    fn lock_for_handle_and_id_writes(
+        &self,
+    ) -> (RwLockWriteGuard<'_, PersistentHandleMap>, RwLockWriteGuard<'_, PersistentIdMap>) {
+        let by_handle = self.by_handle.write();
+        let by_id = self.by_id.write();
+        (by_handle, by_id)
+    }
+
+    fn lock_for_handle_writes_and_id_reads(
+        &self,
+    ) -> (RwLockWriteGuard<'_, PersistentHandleMap>, RwLockReadGuard<'_, PersistentIdMap>) {
+        let by_handle = self.by_handle.write();
+        let by_id = self.by_id.read();
+        (by_handle, by_id)
     }
 }
 
@@ -200,7 +579,7 @@ pub fn get_object_info(object: ObjectHandle) -> ObjectInfo {
     if is_transient_handle(object) {
         unimplemented!();
     }
-    persistent_objects().get(object).get_info()
+    persistent_objects().operate(object, |view| view.get_info())
 }
 
 /// Restricts the usage of an open object handle.
@@ -211,10 +590,10 @@ pub fn restrict_object_usage(object: ObjectHandle, usage: Usage) {
         unimplemented!();
     }
 
-    let objects = persistent_objects();
-    let view = objects.get(object);
-    let mut obj = view.object.lock();
-    obj.usage = obj.usage.intersection(usage);
+    persistent_objects().operate(object, |view| {
+        let mut obj = view.object.lock();
+        obj.usage = obj.usage.intersection(usage);
+    })
 }
 
 /// Encapsulates an error of get_object_buffer_attribute(), which includes the
@@ -250,7 +629,9 @@ pub fn get_object_buffer_attribute<'a>(
     let attr = if is_transient_handle(object) {
         unimplemented!();
     } else {
-        persistent_objects().get(object).object.lock().attributes.get(attribute_id).ok_or(NOT_FOUND)
+        persistent_objects().operate(object, |view| {
+            view.object.lock().attributes.get(attribute_id).ok_or(NOT_FOUND)
+        })
     }?;
 
     let bytes = attr.as_memory_reference().as_slice();
@@ -279,13 +660,9 @@ pub fn get_object_value_attribute(
     let attr = if is_transient_handle(object) {
         unimplemented!();
     } else {
-        persistent_objects()
-            .get(object)
-            .object
-            .lock()
-            .attributes
-            .get(attribute_id)
-            .ok_or(Error::ItemNotFound)
+        persistent_objects().operate(object, |view| {
+            view.object.lock().attributes.get(attribute_id).ok_or(Error::ItemNotFound)
+        })
     }?;
     Ok(attr.as_value().clone())
 }
@@ -339,10 +716,10 @@ pub fn copy_object_attributes(src: ObjectHandle, dest: ObjectHandle) -> TeeResul
     let (_, _, _) = if is_transient_handle(src) {
         unimplemented!()
     } else {
-        let objects = persistent_objects();
-        let view = objects.get(src);
-        let obj = view.object.lock();
-        (obj.type_, obj.usage, obj.attributes)
+        persistent_objects().operate(src, |view| {
+            let obj = view.object.lock();
+            (obj.type_, obj.usage, obj.attributes)
+        })
     };
     unimplemented!()
 }
@@ -361,13 +738,13 @@ pub fn generate_key(object: ObjectHandle, key_size: u32, params: &[Attribute]) -
 ///   - The object is currently open and `flags` contains
 ///     DATA_ACCESS_WRITE_META
 ///   - The object is currently open without DATA_ACCESS_READ_SHARE
-///     and `flags` contains DATA_ACCESS_READ;
+///     and `flags` contains DATA_ACCESS_READ or DATA_ACCESS_READ_SHARE;
 ///   - The object is currently open with DATA_ACCESS_READ_SHARE, but `flags`
-///     contains DATA_ACCESS_READ and not DATA_ACCESS_READ_SHARE;
-///   - The object is currently open without DATA_ACCESS_WRITE_SHARE abd
-///     `flags` contains DATA_ACCESS_WRITE;
+///     does not;
+///   - The object is currently open without DATA_ACCESS_WRITE_SHARE and
+///     `flags` contains DATA_ACCESS_WRITE or DATA_ACCESS_WRITE_SHARE;
 ///   - The object is currently open with DATA_ACCESS_WRITE_SHARE, but `flags`
-///     contains DATA_ACCESS_WRITE and not DATA_ACCESS_WRITE_SHARE.
+///     does not.
 pub fn open_persistent_object(
     storage: Storage,
     id: &[u8],
@@ -404,9 +781,10 @@ pub fn create_persistent_object(
     let (type_, usage, attrs) = if attribute_src.is_null() {
         (Type::Data, Usage::default(), AttributeSet::new())
     } else if is_persistent_handle(attribute_src) {
-        let view = objects.get(attribute_src);
-        let obj = view.object.lock();
-        (obj.type_, obj.usage, obj.attributes)
+        persistent_objects().operate(attribute_src, |view| {
+            let obj = view.object.lock();
+            (obj.type_, obj.usage, obj.attributes)
+        })
     } else {
         unimplemented!();
     };
@@ -463,7 +841,7 @@ pub fn start_persistent_object_enumerator(
     enumerator: ObjectEnumHandle,
     storage: Storage,
 ) -> TeeResult {
-    if storage == Storage::Private && !persistent_objects().is_empty() {
+    if storage == Storage::Private {
         reset_persistent_object_enumerator(enumerator);
         Ok(())
     } else {
@@ -491,7 +869,7 @@ pub fn get_next_persistent_object<'a>(
 /// Panics if `object` is invalid or does not have read access.
 pub fn read_object_data<'a>(object: ObjectHandle, buffer: &'a mut [u8]) -> TeeResult<&'a [u8]> {
     assert!(is_persistent_handle(object));
-    persistent_objects().get(object).read_data(buffer)
+    persistent_objects().operate(object, |view| view.read_data(buffer))
 }
 
 /// Writes the provided data to the object's data stream at the handle's
@@ -506,7 +884,7 @@ pub fn read_object_data<'a>(object: ObjectHandle, buffer: &'a mut [u8]) -> TeeRe
 /// Panics if `object` is invalid or does not have write access.
 pub fn write_object_data(object: ObjectHandle, buffer: &[u8]) -> TeeResult {
     assert!(is_persistent_handle(object));
-    persistent_objects().get(object).write_data(buffer)
+    persistent_objects().operate(object, |view| view.write_data(buffer))
 }
 
 /// Truncates or zero-extends the object's data stream to provided size.
@@ -517,7 +895,7 @@ pub fn write_object_data(object: ObjectHandle, buffer: &[u8]) -> TeeResult {
 /// Panics if `object` is invalid or does not have write access.
 pub fn truncate_object_data(object: ObjectHandle, size: usize) -> TeeResult {
     assert!(is_persistent_handle(object));
-    persistent_objects().get(object).truncate_data(size)
+    persistent_objects().operate(object, |view| view.truncate_data(size))
 }
 
 /// Updates the handle's data positition, seeking at an offset from a
@@ -529,5 +907,7 @@ pub fn truncate_object_data(object: ObjectHandle, size: usize) -> TeeResult {
 /// Panics if `object` is invalid.
 pub fn seek_data_object(object: ObjectHandle, offset: isize, whence: Whence) -> TeeResult {
     assert!(is_persistent_handle(object));
-    persistent_objects().get(object).seek_data(offset, whence)
+    persistent_objects().operate(object, |view| view.seek_data(offset, whence))
 }
+
+// TODO(https://fxbug.dev/376093162): Add PersistentObjects testing.

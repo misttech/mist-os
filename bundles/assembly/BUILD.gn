@@ -87,6 +87,7 @@ platform_artifacts("userdebug") {
 
 platform_artifacts("user") {
   deps = user_platform_aib_labels
+  check_production_eligibility = true
 }
 
 ########
@@ -2493,16 +2494,58 @@ assembly_input_bundle("adb_support") {
 # valid build-types: all
 #
 assembly_input_bundle("nanohub_support") {
-  base_packages = [ "//src/starnix/modules/socket-tunnel:sockettunnel" ]
+  base_packages = [ "//src/starnix/modules/nanohub:sockettunnel" ]
   compiled_packages = [
     {
       name = "core"
       components = [
         {
           component_name = "core"
-          shards = [ "//src/starnix/modules/socket-tunnel/meta/sockettunnel.core_shard.cml" ]
+          shards = [
+            "//src/starnix/modules/nanohub/meta/sockettunnel.core_shard.cml",
+          ]
         },
       ]
+    },
+  ]
+}
+
+# This AIB enables minimal testing support for bootstrap environments, and is meant to be used with
+# the `bootstrap_eng` AIB.
+#
+# This includes testing support in the bootfs packages.
+assembly_input_bundle("testing_support_bootstrap") {
+  testonly = true
+
+  bootfs_packages = [
+    # The test runner command.
+    "//src/sys/run_test_suite:package",
+
+    # test-manager and all of its runners, dependencies, and testing realms
+    # are in the same package and loaded using relative urls.
+    "//src/sys/test_manager:pkg_for_bootstrap",
+  ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "bootstrap"
+      components = [
+        {
+          component_name = "bootstrap"
+          shards = [
+            "//src/sys/test_manager/meta/test_manager.bootstrap_shard.cml",
+            "//src/sys/testing/meta/test_realm.bootstrap_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+
+  shell_commands = [
+    {
+      bootfs_package = true
+      package = "run-test-suite"
+      components = [ "run-test-suite" ]
     },
   ]
 }
@@ -4610,6 +4653,15 @@ assembly_input_bundle("kernel_page_scanner_aging_fast") {
 
 assembly_input_bundle("kernel_logs_in_reboot_info") {
   kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
+}
+
+assembly_input_bundle("kernel_page_table_eviction_never") {
+  kernel_cmdline = [ "kernel.page-scanner.page-table-eviction-policy=never" ]
+}
+
+assembly_input_bundle("kernel_page_table_eviction_on_request") {
+  kernel_cmdline =
+      [ "kernel.page-scanner.page-table-eviction-policy=on_request" ]
 }
 
 # Assembly selects whether to include this AIB or not.

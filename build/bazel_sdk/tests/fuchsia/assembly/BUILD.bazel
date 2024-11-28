@@ -11,6 +11,7 @@ load(
     "fuchsia_bootloader_partition",
     "fuchsia_bootstrap_partition",
     "fuchsia_gen_android_starnix_container",
+    "fuchsia_hybrid_product_configuration",
     "fuchsia_package_with_configs",
     "fuchsia_partition",
     "fuchsia_partitions_configuration",
@@ -267,6 +268,14 @@ fuchsia_prebuilt_product_configuration(
     product_config_filename = "prebuilt_product_config.json",
 )
 
+fuchsia_hybrid_product_configuration(
+    name = "hybrid_product_config",
+    product_configuration = ":prebuilt_product_config",
+    replace_packages = {
+        ":prebuilt_ams_light": "prebuilt_ams_light_fuchsia_package_expanded",
+    },
+)
+
 fuchsia_product_configuration_test(
     name = "product_config_with_labels_golden_test",
     golden_file = ":test_data/product_config_with_labels_golden_file.json",
@@ -278,6 +287,13 @@ fuchsia_product_configuration_test(
     name = "prebuilt_product_config_golden_test",
     golden_file = ":test_data/prebuilt_product_config_golden.json",
     product_config = ":prebuilt_product_config",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_product_configuration_test(
+    name = "hybrid_product_config_golden_test",
+    golden_file = ":test_data/prebuilt_product_config_golden.json",
+    product_config = ":hybrid_product_config",
     visibility = ["//visibility:public"],
 )
 

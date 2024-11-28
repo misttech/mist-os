@@ -43,7 +43,7 @@ impl NodeInfoPrinter for Device {
         writeln!(
             writer,
             "     \"{}\" [label=\"{}\"]",
-            self.0.id.as_ref().ok_or(format_err!("Node missing id"))?,
+            self.0.id.as_ref().ok_or_else(|| format_err!("Node missing id"))?,
             self.extract_name()?,
         )?;
         Ok(())
@@ -53,8 +53,8 @@ impl NodeInfoPrinter for Device {
         writeln!(
             writer,
             "     \"{}\" -> \"{}\"",
-            self.0.id.as_ref().ok_or(format_err!("Node missing id"))?,
-            child.id.as_ref().ok_or(format_err!("Child node missing id"))?
+            self.0.id.as_ref().ok_or_else(|| format_err!("Node missing id"))?,
+            child.id.as_ref().ok_or_else(|| format_err!("Child node missing id"))?
         )?;
         Ok(())
     }
@@ -168,8 +168,7 @@ mod tests {
         Fut: Future<Output = Result<()>> + Send + Sync,
     {
         let (driver_development_proxy, mut driver_development_requests) =
-            fidl::endpoints::create_proxy_and_stream::<fdd::ManagerMarker>()
-                .context("Failed to create FIDL proxy")?;
+            fidl::endpoints::create_proxy_and_stream::<fdd::ManagerMarker>();
 
         // Run the command and mock driver development server.
         let mut writer = Vec::new();
@@ -195,8 +194,7 @@ mod tests {
         mut device_infos: Vec<fdd::NodeInfo>,
         iterator: ServerEnd<fdd::NodeInfoIteratorMarker>,
     ) -> Result<()> {
-        let mut iterator =
-            iterator.into_stream().context("Failed to convert iterator into a stream")?;
+        let mut iterator = iterator.into_stream();
         while let Some(res) = iterator.next().await {
             let request = res.context("Failed to get request")?;
             match request {

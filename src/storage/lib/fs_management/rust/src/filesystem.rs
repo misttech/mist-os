@@ -126,8 +126,6 @@ impl Filesystem {
     async fn get_component_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
         let options = self.config.options();
         let component_name = options.component_name;
-        let realm_proxy = connect_to_protocol::<RealmMarker>()?;
-
         match options.component_type {
             ComponentType::StaticChild => open_childs_exposed_directory(component_name, None).await,
             ComponentType::DynamicChild { collection_name } => {
@@ -167,6 +165,7 @@ impl Filesystem {
                         ..Default::default()
                     },
                 ];
+                let realm_proxy = connect_to_protocol::<RealmMarker>()?;
                 for child_decl in child_decls {
                     // Launch a new component in our collection.
                     realm_proxy
@@ -279,8 +278,7 @@ impl Filesystem {
         Ok(ServingSingleVolumeFilesystem {
             component,
             exposed_dir: Some(exposed_dir),
-            root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel())
-                .into_proxy()?,
+            root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel()).into_proxy(),
             binding: None,
         })
     }
@@ -347,8 +345,7 @@ pub struct NamespaceBinding(String);
 impl NamespaceBinding {
     pub fn create(root_dir: &fio::DirectoryProxy, path: String) -> Result<NamespaceBinding, Error> {
         let (client_end, server_end) = create_endpoints();
-        root_dir
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end.into_channel()))?;
+        root_dir.clone2(ServerEnd::new(server_end.into_channel()))?;
         let namespace = fdio::Namespace::installed()?;
         namespace.bind(&path, client_end)?;
         Ok(Self(path))
@@ -597,7 +594,7 @@ impl ServingMultiVolumeFilesystem {
         options: MountOptions,
     ) -> Result<&mut ServingVolume, Error> {
         ensure!(!self.volumes.contains_key(volume), "Already bound");
-        let (exposed_dir, server) = create_proxy::<fio::DirectoryMarker>()?;
+        let (exposed_dir, server) = create_proxy::<fio::DirectoryMarker>();
         connect_to_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumesMarker>(
             self.exposed_dir.as_ref().unwrap(),
         )?
@@ -626,7 +623,7 @@ impl ServingMultiVolumeFilesystem {
         options: MountOptions,
     ) -> Result<&mut ServingVolume, Error> {
         ensure!(!self.volumes.contains_key(volume), "Already bound");
-        let (exposed_dir, server) = create_proxy::<fio::DirectoryMarker>()?;
+        let (exposed_dir, server) = create_proxy::<fio::DirectoryMarker>();
         let path = format!("volumes/{}", volume);
         connect_to_named_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumeMarker>(
             self.exposed_dir.as_ref().unwrap(),
@@ -687,8 +684,7 @@ impl ServingMultiVolumeFilesystem {
             server_end,
         )?;
         Ok(self.volumes.entry(volume).or_insert(ServingVolume {
-            root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel())
-                .into_proxy()?,
+            root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel()).into_proxy(),
             binding: None,
             exposed_dir,
         }))

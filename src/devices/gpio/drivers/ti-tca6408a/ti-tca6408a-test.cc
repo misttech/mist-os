@@ -107,7 +107,7 @@ class TiTca6408aTest : public zxtest::Test {
           incoming->env_.Initialize(std::move(start_args_result->incoming_directory_server));
       ASSERT_TRUE(init_result.is_ok());
 
-      incoming->device_server_.Init("pdev", "");
+      incoming->device_server_.Initialize("pdev");
 
       // Serve fake_i2c_.
       auto result = incoming->env_.incoming_directory().AddService<fuchsia_hardware_i2c::Service>(
@@ -123,9 +123,10 @@ class TiTca6408aTest : public zxtest::Test {
     // Connect to PinImpl.
     auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    zx_status_t status = fdio_open_at(outgoing_directory_client.handle()->get(), "/svc",
-                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      svc_endpoints.server.TakeChannel().release());
+    zx_status_t status =
+        fdio_open3_at(outgoing_directory_client.handle()->get(), "/svc",
+                      static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
+                      svc_endpoints.server.TakeChannel().release());
     EXPECT_EQ(ZX_OK, status);
 
     auto connect_result =

@@ -101,7 +101,7 @@ mod tests {
     #[fuchsia::test(threads = 2)]
     async fn controller_push_changes_reports_invalid_change() {
         let (control_sync, request_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fnet_filter::ControlMarker>().unwrap();
+            fidl::endpoints::create_sync_proxy_and_stream::<fnet_filter::ControlMarker>();
 
         let run_controller = fuchsia_async::Task::spawn(async {
             let mut stream = handle_open_controller(request_stream).await;
@@ -145,7 +145,7 @@ mod tests {
     #[fuchsia::test(threads = 2)]
     async fn controller_commit_reports_invalid_change() {
         let (control_sync, request_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fnet_filter::ControlMarker>().unwrap();
+            fidl::endpoints::create_sync_proxy_and_stream::<fnet_filter::ControlMarker>();
 
         let run_controller = fuchsia_async::Task::spawn(async {
             let mut stream = handle_open_controller(request_stream).await;

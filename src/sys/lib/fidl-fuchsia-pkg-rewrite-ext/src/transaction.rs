@@ -26,7 +26,7 @@ impl EditTransaction {
     /// vector will reflect any changes made to the rewrite rules so far in
     /// this transaction.
     pub async fn list_dynamic(&self) -> Result<Vec<Rule>, EditTransactionError> {
-        let (iter, iter_server_end) = fidl::endpoints::create_proxy()?;
+        let (iter, iter_server_end) = fidl::endpoints::create_proxy();
         self.transaction.list_dynamic(iter_server_end)?;
 
         let mut rules = Vec::new();
@@ -67,8 +67,7 @@ where
 {
     // Make a reasonable effort to retry the edit after a concurrent edit, but don't retry forever.
     for _ in 0..RETRY_ATTEMPTS {
-        let (transaction, transaction_server_end) =
-            fidl::endpoints::create_proxy().map_err(EditTransactionError::Fidl)?;
+        let (transaction, transaction_server_end) = fidl::endpoints::create_proxy();
 
         let () = engine
             .start_edit_transaction(transaction_server_end)
@@ -137,13 +136,13 @@ mod tests {
             let events = Arc::new(Mutex::new(Vec::new()));
             let events_task = Arc::clone(&events);
 
-            let (engine, mut engine_stream) = create_proxy_and_stream::<EngineMarker>().unwrap();
+            let (engine, mut engine_stream) = create_proxy_and_stream::<EngineMarker>();
 
             fasync::Task::local(async move {
                 while let Some(req) = engine_stream.try_next().await.unwrap() {
                     match req {
                         EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
-                            let mut tx_stream = transaction.into_stream().unwrap();
+                            let mut tx_stream = transaction.into_stream();
 
                             while let Some(req) = tx_stream.try_next().await.unwrap() {
                                 match req {
@@ -155,7 +154,7 @@ mod tests {
                                         control_handle: _,
                                     } => {
                                         events_task.lock().unwrap().push(Event::ListDynamic);
-                                        let mut stream = iterator.into_stream().unwrap();
+                                        let mut stream = iterator.into_stream();
 
                                         let mut rules = vec![
                                             rule!("fuchsia.com" => "example.com", "/" => "/"),

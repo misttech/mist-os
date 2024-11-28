@@ -409,7 +409,7 @@ pub fn measure_text_size(face: &FontFace, size: f32, text: &str, visual: bool) -
                 .face
                 .glyph_bounding_box(glyph_index)
                 .and_then(|bounding_box| Some(pixel_size_rect(face, size, bounding_box)))
-                .unwrap_or(Rect::zero());
+                .unwrap_or_else(Rect::zero);
             let horizontal_advance = face.face.glyph_hor_advance(glyph_index).unwrap_or(0);
             let w = horizontal_advance as f32 * scale;
             let position = y_offset + vec2(x, 0.0).to_i32();

@@ -116,6 +116,15 @@ else
   }
 fi
 
+function count-ninja-log-lines {
+  NINJA_LOG_FILE="${FUCHSIA_BUILD_DIR}/.ninja_log"
+  if [[ -f "${NINJA_LOG_FILE}" ]]; then
+    echo "$(wc -l <"${NINJA_LOG_FILE}" 2>/dev/null)"
+  else
+    echo 0
+  fi
+}
+
 function main {
   local switches=() fuchsia_targets=() ninja_switches=()
   local log_file is_logging fint_params_path
@@ -403,6 +412,8 @@ function main {
     rm -f "${last_build_success_stamp}"
   fi
 
+  local -i target_count=0
+  local -i ninja_log_line_count_before="$(count-ninja-log-lines)"
   if [ -n "${fint_params_path}" ]; then
     readonly fint="${FX_CACHE_DIR}/fint"
     "$FUCHSIA_DIR/tools/integration/bootstrap.sh" -o "$fint" || exit $?
@@ -490,13 +501,15 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
   fi
 
   status=$?
+  local -i ninja_log_line_count_after="$(count-ninja-log-lines)"
+  target_count="$(( ninja_log_line_count_after - ninja_log_line_count_before ))"
 
   if [[ "${status}" == 0 && -n "${run_ninja_build}" ]]; then
     touch "${last_build_success_stamp}"
   fi
 
   declare -r end_time="${EPOCHREALTIME/./}"
-  track-build-event "${start_time}" "${end_time}" "${status}" "${ninja_switches[*]}" "${switches[*]}" "${fuchsia_targets[*]}" "${FUCHSIA_BUILD_DIR}" &
+  track-build-event "${start_time}" "${end_time}" "${status}" "${ninja_switches[*]}" "${switches[*]}" "${fuchsia_targets[*]}" "${FUCHSIA_BUILD_DIR}" "${target_count}" &
   exit-with-message
 }
 

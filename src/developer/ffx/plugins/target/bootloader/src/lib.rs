@@ -13,7 +13,7 @@ use ffx_fastboot::boot::boot;
 use ffx_fastboot::common::fastboot::{
     tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
 };
-use ffx_fastboot::common::{from_manifest, prepare};
+use ffx_fastboot::common::from_manifest;
 use ffx_fastboot::file_resolver::resolvers::EmptyResolver;
 use ffx_fastboot::info::info;
 use ffx_fastboot::lock::lock;
@@ -229,7 +229,6 @@ pub async fn bootloader_impl<W: Write>(
             }
             match cred {
                 Some(cred_file) => {
-                    prepare(writer, &mut fastboot_proxy).await?;
                     return unlock(
                         writer,
                         &mut EmptyResolver::new()?,
@@ -248,7 +247,6 @@ pub async fn bootloader_impl<W: Write>(
             }
             match zbi {
                 Some(z) => {
-                    prepare(writer, &mut fastboot_proxy).await?;
                     return boot(
                         writer,
                         &mut EmptyResolver::new()?,

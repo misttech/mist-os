@@ -24,6 +24,8 @@ use hyper::server::accept::from_stream;
 use hyper::server::Server;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, StatusCode};
+#[cfg(not(target_os = "fuchsia"))]
+use netext::TokioAsyncReadExt;
 use std::convert::Infallible;
 use std::net::{Ipv6Addr, SocketAddr};
 use std::pin::Pin;
@@ -160,10 +162,14 @@ impl TestServerBuilder {
 
         let task = fasync::Task::spawn(async move {
             let listener = accept_stream(&mut listener);
-
+            #[cfg(target_os = "fuchsia")]
             let listener = listener
                 .map_err(Error::from)
                 .map_ok(|conn| fuchsia_hyper::TcpStream { stream: conn });
+            #[cfg(not(target_os = "fuchsia"))]
+            let listener = listener.map_err(Error::from).map_ok(|conn| fuchsia_hyper::TcpStream {
+                stream: conn.into_multithreaded_futures_stream(),
+            });
 
             let connections = if let Some(tls_acceptor) = tls_acceptor {
                 // wrap incoming tcp streams
@@ -232,8 +238,8 @@ async fn bind_listener(addr: &SocketAddr) -> fuchsia_async::net::TcpListener {
 }
 
 #[cfg(not(target_os = "fuchsia"))]
-async fn bind_listener(&addr: &SocketAddr) -> async_net::TcpListener {
-    async_net::TcpListener::bind(addr).await.unwrap()
+async fn bind_listener(&addr: &SocketAddr) -> tokio::net::TcpListener {
+    tokio::net::TcpListener::bind(addr).await.unwrap()
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -266,9 +272,9 @@ fn accept_stream<'a>(
 
 #[cfg(not(target_os = "fuchsia"))]
 fn accept_stream<'a>(
-    listener: &'a mut async_net::TcpListener,
-) -> impl Stream<Item = std::io::Result<async_net::TcpStream>> + 'a {
-    listener.incoming()
+    listener: &'a mut tokio::net::TcpListener,
+) -> impl Stream<Item = std::io::Result<tokio::net::TcpStream>> + 'a {
+    netext::TcpListenerRefStream(listener)
 }
 
 fn parse_cert_chain(mut bytes: &[u8]) -> Vec<rustls::Certificate> {

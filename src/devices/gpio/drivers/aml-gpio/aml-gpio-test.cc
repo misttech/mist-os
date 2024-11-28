@@ -214,9 +214,9 @@ class AmlGpioTest : public testing::Test {
     // Connect to the driver through its outgoing directory and get a pinimpl client.
     auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    EXPECT_EQ(fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
-                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                           svc_endpoints.server.TakeChannel().release()),
+    EXPECT_EQ(fdio_open3_at(driver_outgoing_.handle()->get(), "/svc",
+                            static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
+                            svc_endpoints.server.TakeChannel().release()),
               ZX_OK);
 
     zx::result pinimpl_client_end =

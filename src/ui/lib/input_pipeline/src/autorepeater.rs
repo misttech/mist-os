@@ -124,8 +124,8 @@ impl TryInto<InputEvent> for AnyEvent {
         match self {
             AnyEvent::NonKeyboard(ev) => Ok(ev),
             AnyEvent::Keyboard(ev, device_descriptor, event_time, handled) => Ok(InputEvent {
-                device_event: InputDeviceEvent::Keyboard(ev.clone().into_with_folded_event()),
-                device_descriptor: device_descriptor.clone(),
+                device_event: InputDeviceEvent::Keyboard(ev.into_with_folded_event()),
+                device_descriptor: device_descriptor,
                 event_time,
                 handled,
                 trace_id: None,
@@ -412,7 +412,6 @@ impl Autorepeater {
             // In all cases, pass the event onwards.  No events are dropped
             // from the event stream.
             (State::Armed { armed_event, .. }, AnyEvent::Keyboard(ev, descriptor, ..)) => {
-                let ev = ev.clone();
                 match (ev.get_event_type_folded(), repeatability(ev.get_key_meaning())) {
                     (KeyEventType::Pressed, Repeatability::Yes) => {
                         let _delay_timer = new_autorepeat_timer(

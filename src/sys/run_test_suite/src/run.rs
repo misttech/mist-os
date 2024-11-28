@@ -143,7 +143,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
         let suite = run_reporter.new_suite(&params.test_url, &suite_id)?;
         suite.set_tags(params.tags);
         suite_reporters.insert(suite_id, suite);
-        let (suite_controller, suite_server_end) = fidl::endpoints::create_proxy()?;
+        let (suite_controller, suite_server_end) = fidl::endpoints::create_proxy();
         let suite_and_id_fut = RunningSuite::wait_for_start(
             suite_controller,
             params.max_severity_logs,
@@ -168,7 +168,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
     }
 
     request_scheduling_options(&run_params, &builder_proxy).await?;
-    let (run_controller, run_server_end) = fidl::endpoints::create_proxy()?;
+    let (run_controller, run_server_end) = fidl::endpoints::create_proxy();
     let run_controller_ref = &run_controller;
     builder_proxy.build(run_server_end)?;
     let cancel_fut = cancel_fut.shared();
@@ -488,7 +488,7 @@ mod test {
                     let events = suite_events
                         .remove(test_url.as_str())
                         .expect("Got a request for an unexpected test URL");
-                    suite_streams.push((controller.into_stream().expect("into stream"), events));
+                    suite_streams.push((controller.into_stream(), events));
                 }
                 ftest_manager::RunBuilderRequest::Build { controller, .. } => {
                     run_controller = Some(controller);
@@ -512,8 +512,7 @@ mod test {
             "Expected a RunController to be present. RunBuilder/Build() may not have been called."
         );
         assert!(suite_events.is_empty(), "Expected AddSuite to be called for all specified suites");
-        let mut run_stream =
-            run_controller.expect("controller present").into_stream().expect("into stream");
+        let mut run_stream = run_controller.expect("controller present").into_stream();
 
         // Each suite just reports that it started and passed.
         let mut suite_streams = suite_streams
@@ -610,8 +609,7 @@ mod test {
     #[fuchsia::test]
     async fn empty_run_no_events() {
         let (builder_proxy, _run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let reporter = InMemoryReporter::new();
         let run_reporter = RunReporter::new(reporter.clone());
@@ -629,8 +627,7 @@ mod test {
     #[fuchsia::test]
     async fn single_run_no_events() {
         let (builder_proxy, run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let reporter = InMemoryReporter::new();
         let run_reporter = RunReporter::new(reporter.clone());
@@ -664,8 +661,7 @@ mod test {
     #[fuchsia::test]
     async fn single_run_custom_directory() {
         let (builder_proxy, run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let reporter = InMemoryReporter::new();
         let run_reporter = RunReporter::new(reporter.clone());
@@ -734,8 +730,7 @@ mod test {
     #[fuchsia::test]
     async fn record_output_after_internal_error() {
         let (builder_proxy, run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let reporter = InMemoryReporter::new();
         let run_reporter = RunReporter::new(reporter.clone());
@@ -812,8 +807,7 @@ mod test {
     #[fuchsia::test]
     async fn single_run_debug_data() {
         let (builder_proxy, run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let reporter = InMemoryReporter::new();
         let run_reporter = RunReporter::new(reporter.clone());
@@ -830,16 +824,25 @@ mod test {
             fidl::endpoints::create_endpoints::<ftest_manager::DebugDataIteratorMarker>();
         let debug_data_fut = async move {
             let (client, server) = zx::Socket::create_stream();
-            let _ = server.write(b"Not a real profile").unwrap();
-            let mut service = debug_service.into_stream().unwrap();
+            let mut compressor = zstd::bulk::Compressor::new(0).unwrap();
+            let bytes = compressor.compress(b"Not a real profile").unwrap();
+            let _ = server.write(bytes.as_slice()).unwrap();
+            let mut service = debug_service.into_stream();
             let mut data = vec![ftest_manager::DebugData {
                 name: Some("test_file.profraw".to_string()),
                 socket: Some(client.into()),
                 ..Default::default()
             }];
+            drop(server);
             while let Ok(Some(request)) = service.try_next().await {
                 match request {
-                    ftest_manager::DebugDataIteratorRequest::GetNext { responder, .. } => {
+                    ftest_manager::DebugDataIteratorRequest::GetNext { .. } => {
+                        panic!("Not Implemented");
+                    }
+                    ftest_manager::DebugDataIteratorRequest::GetNextCompressed {
+                        responder,
+                        ..
+                    } => {
                         let _ = responder.send(std::mem::take(&mut data));
                     }
                 }
@@ -907,8 +910,7 @@ mod test {
         let expected_max_parallel_suites = Some(max_parallel_suites);
 
         let (builder_proxy, run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let run_params = RunParams {
             timeout_behavior: TimeoutBehavior::Continue,
@@ -937,8 +939,7 @@ mod test {
         let expected_max_parallel_suites = None;
 
         let (builder_proxy, run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let run_params = RunParams {
             timeout_behavior: TimeoutBehavior::Continue,

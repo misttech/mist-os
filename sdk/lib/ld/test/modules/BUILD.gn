@@ -286,6 +286,7 @@ template("_test_data") {
   } else {
     manifest_target = "$main_target.manifest"
   }
+
   _test_prefix_manifest(manifest_target) {
     # This will collect the files from deps that would go into /pkg/... and
     # rewrite their manifest entries to use /pkg/lib/test/$name/... instead.
@@ -302,6 +303,16 @@ template("_test_data") {
     distribution_manifest_host_test_data("$main_target.test-data") {
       deps = [ ":$manifest_target" ]
       outputs = [ "$host_test_data_dir/$main_target" ]
+    }
+
+    # This is used for symbol-filter-elf32.  It provides metadata for putting
+    # these non-Fuchsia binaries in the usual place in a Fuchsia test package.
+    # Each binary target has metadata for its flat name with no subdirectory.
+    # This places them all inside the lib/ subdirectory for this root module;
+    # LdLoadZirconLdsvcTestsBase::GetLibVmo will find them there.
+    _test_prefix_manifest("$main_target.fuchsia-test-data") {
+      prefix = "lib/test/$main_target/lib"
+      deps = invoker.deps
     }
   }
 }
@@ -437,6 +448,9 @@ template("_test_link") {
 
     _test_data(main_target) {
       deps = [ ":$link_target" ]
+      if (defined(invoker.data_deps)) {
+        deps += invoker.data_deps
+      }
     }
   }
 }
@@ -1525,4 +1539,46 @@ test_executable("llvm-profdata") {
 test_executable("backtrace") {
   sources = [ "backtrace.cc" ]
   deps = [ "//zircon/system/public" ]
+}
+
+# Each dep module exports first(), second(), and third() return that multiplier
+# of its value.  TestStart returns first() + second() + third().  So without
+# filtering, the first dep would define them all.  The SymbolFilter test tells
+# relocation to ignore second in dep17 and dep23; and third in dep23.  So the
+# test should get dep17's first, dep23's second, and dep42's third.
+symbol_filter_values = [
+  17,
+  23,
+  42,
+]
+
+# The symbol-filter and symbol-filter-elf32 targets are actually identical, but
+# they will be instantiated in different build environments.  The -elf32
+# version is really only used for one of its dependencies, but this is the
+# simple way to get that packaged in the test under a different name.
+foreach(suffix,
+        [
+          "",
+          "-elf32",
+        ]) {
+  test_executable("symbol-filter$suffix") {
+    sources = [ "symbol-filter.cc" ]
+    deps = []
+    foreach(value, symbol_filter_values) {
+      deps += [ ":symbol-filter-dep$value" ]
+    }
+    if (suffix != "") {
+      # symbol-filter-elf32 is also used in a remote loading test.  For
+      # convenience that test expects the stub packaged with the test modules.
+      data_deps = [ "//sdk/lib/ld:ld-stub" ]
+    }
+  }
+}
+
+foreach(value, symbol_filter_values) {
+  test_shared_library("symbol-filter-dep$value") {
+    sources = [ "symbol-filter-dep.cc" ]
+    defines = [ "VALUE=$value" ]
+    deps = [ "//zircon/system/public" ]
+  }
 }

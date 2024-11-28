@@ -15,6 +15,8 @@ use fidl_fuchsia_developer_ffx::{
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_net as net;
+use fuchsia_async::Timer;
+use futures::future::{pending, Either};
 use futures::{select, Future, FutureExt, TryStreamExt};
 use std::net::IpAddr;
 use std::time::Duration;
@@ -33,7 +35,7 @@ mod fidl_pipe;
 mod resolve;
 mod target_connector;
 
-pub use connection::ConnectionError;
+pub use connection::{Connection, ConnectionError};
 pub use discovery::desc::{Description, FastbootInterface};
 pub use discovery::query::TargetInfoQuery;
 pub use fidl_pipe::{create_overnet_socket, FidlPipe};
@@ -92,7 +94,6 @@ pub async fn get_remote_proxy(
                     _ => {
                         let retry_info =
                             format!("Retrying connection after non-fatal error encountered: {e}");
-                        eprintln!("{}", retry_info.as_str());
                         tracing::info!("{}", retry_info.as_str());
                         // Insert a small delay to prevent too tight of a spinning loop.
                         fuchsia_async::Timer::new(Duration::from_millis(20)).await;
@@ -122,7 +123,7 @@ async fn get_remote_proxy_impl(
     let (target_proxy, target_proxy_fut) =
         open_target_with_fut(target_spec.clone(), daemon_proxy.clone(), *proxy_timeout, context)?;
     let mut target_proxy_fut = target_proxy_fut.boxed_local().fuse();
-    let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()?;
+    let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>();
     let mut open_remote_control_fut =
         target_proxy.open_remote_control(remote_server_end).boxed_local().fuse();
     let res = loop {
@@ -180,8 +181,8 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
     target_timeout: Duration,
     env_context: &'b EnvironmentContext,
 ) -> Result<(TargetProxy, impl Future<Output = Result<()>> + 'a)> {
-    let (tc_proxy, tc_server_end) = create_proxy::<TargetCollectionMarker>()?;
-    let (target_proxy, target_server_end) = create_proxy::<TargetMarker>()?;
+    let (tc_proxy, tc_server_end) = create_proxy::<TargetCollectionMarker>();
+    let (target_proxy, target_server_end) = create_proxy::<TargetMarker>();
     let t_clone = target.clone();
     let target_collection_fut = async move {
         daemon_proxy
@@ -305,15 +306,14 @@ async fn wait_for_device_inner(
                             Err(ffx_command::Error::Unexpected(e.into()))
                         } else {
                             tracing::debug!("error non-critical. retrying.");
-                            async_io::Timer::after(Duration::from_millis(DOWN_REPOLL_DELAY_MS))
-                                .await;
+                            Timer::new(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
                             continue;
                         }
                     }
                 }
                 Ok(()) => {
                     if let WaitFor::DeviceOffline = behavior {
-                        async_io::Timer::after(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
+                        Timer::new(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
                         continue;
                     } else {
                         Ok(())
@@ -323,9 +323,9 @@ async fn wait_for_device_inner(
         }
     };
     let timer = if wait_timeout.is_some() {
-        async_io::Timer::after(wait_timeout.unwrap())
+        Either::Left(fuchsia_async::Timer::new(wait_timeout.unwrap()))
     } else {
-        async_io::Timer::never()
+        Either::Right(pending())
     };
     futures_lite::FutureExt::or(knock_fut, async {
         timer.await;
@@ -393,8 +393,7 @@ async fn knock_target_with_timeout(
             rcs::RCS_KNOCK_TIMEOUT
         )));
     }
-    let (rcs_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()
-        .map_err(|e| KnockError::NonCriticalError(e.into()))?;
+    let (rcs_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>();
     timeout(rcs_timeout, target.open_remote_control(remote_server_end))
         .await
         .context("timing out")?
@@ -414,8 +413,7 @@ pub async fn knock_target_by_name(
     open_timeout: Duration,
     rcs_timeout: Duration,
 ) -> Result<(), KnockError> {
-    let (target_proxy, target_remote) =
-        create_proxy::<TargetMarker>().map_err(|e| KnockError::NonCriticalError(e.into()))?;
+    let (target_proxy, target_remote) = create_proxy::<TargetMarker>();
 
     timeout::timeout(
         open_timeout,
@@ -517,8 +515,7 @@ pub async fn add_manual_target(
     };
 
     let (client, mut stream) =
-        fidl::endpoints::create_request_stream::<ffx::AddTargetResponder_Marker>()
-            .context("create endpoints")?;
+        fidl::endpoints::create_request_stream::<ffx::AddTargetResponder_Marker>();
     target_collection_proxy
         .add_target(
             &addr,
@@ -567,7 +564,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_target_wait_too_short_timeout() {
-        let (proxy, _server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
+        let (proxy, _server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();
         let res = knock_target_with_timeout(&proxy, rcs::RCS_KNOCK_TIMEOUT).await;
         assert!(res.is_err());
         let res = knock_target_with_timeout(

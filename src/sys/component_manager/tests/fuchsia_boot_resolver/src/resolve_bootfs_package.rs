@@ -45,13 +45,13 @@ async fn package_resolution() {
     // Start the root component
     let lifecycle_controller =
         instance.connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>().unwrap();
-    let (_binder, server_end) = endpoints::create_proxy::<fcomponent::BinderMarker>().unwrap();
+    let (_binder, server_end) = endpoints::create_proxy::<fcomponent::BinderMarker>();
     lifecycle_controller.start_instance(".".into(), server_end).await.unwrap().unwrap();
 
     // Connect to the root component's test.checker.Check capability.
     let realm_query =
         instance.connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>().unwrap();
-    let (exposed_dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (exposed_dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
     realm_query
         .open(
             ".".into(),

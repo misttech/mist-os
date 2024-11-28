@@ -7,7 +7,6 @@
 use anyhow::{format_err, Error};
 use async_utils::stream::{StreamItem, StreamWithEpitaph, Tagged, WithEpitaph, WithTag};
 use fidl::endpoints::ClientEnd;
-use fidl::prelude::*;
 use fidl_fuchsia_bluetooth::ErrorCode;
 use fuchsia_bluetooth::profile::Psm;
 use fuchsia_bluetooth::types::PeerId;
@@ -81,7 +80,7 @@ impl MockPiconetServer {
             .detach();
         });
 
-        let observer = observer.into_proxy()?;
+        let observer = observer.into_proxy();
         let mock_peer = MockPeer::new(id, Some(observer));
 
         fasync::Task::spawn(peer_service_fs.collect()).detach();
@@ -140,11 +139,7 @@ impl MockPiconetServer {
                     let _ = responder.send(Err(ErrorCode::InvalidArguments));
                     return;
                 }
-                let proxy = payload
-                    .receiver
-                    .unwrap()
-                    .into_proxy()
-                    .expect("couldn't get connection receiver");
+                let proxy = payload.receiver.unwrap().into_proxy();
                 self.new_advertisement(id, payload.services.unwrap(), proxy, responder);
             }
             bredr::ProfileRequest::Connect { peer_id, connection, responder, .. } => {
@@ -164,15 +159,12 @@ impl MockPiconetServer {
                     panic!("invalid parameters");
                 };
                 let attr_ids = attr_ids.unwrap_or_default();
-                let proxy = results.into_proxy().expect("couldn't get connection receiver");
+                let proxy = results.into_proxy();
                 self.new_search(id, service_uuid, attr_ids, proxy);
             }
             bredr::ProfileRequest::ConnectSco { payload, .. } => {
-                let (_stream, control) = payload
-                    .connection
-                    .unwrap()
-                    .into_stream_and_control_handle()
-                    .expect("couldn't get sco connection");
+                let (_stream, control) =
+                    payload.connection.unwrap().into_stream_and_control_handle();
                 let _ = control.send_on_connection_complete(
                     &bredr::ScoConnectionOnConnectionCompleteRequest::Error(
                         bredr::ScoErrorCode::Failure,
@@ -197,21 +189,11 @@ impl MockPiconetServer {
         info!("Received mock peer request for peer {:?}: {:?}", id, request.method_name());
         match request {
             bredr_test::MockPeerRequest::ConnectProxy_ { interface, responder, .. } => {
-                match interface.into_stream() {
-                    Ok(stream) => {
-                        profile_requests.push(stream.tagged(id).with_epitaph(id));
-                        info!(
-                            "Added ProfileRequestStream from MockPeer request for peer: {:?}",
-                            id
-                        );
-                        if let Err(e) = responder.send() {
-                            warn!("Error sending on responder: {:?}", e);
-                        }
-                    }
-                    Err(e) => {
-                        warn!("Peer {} unable to connect ProfileProxy: {:?}", id, e);
-                        responder.control_handle().shutdown_with_epitaph(zx::Status::BAD_HANDLE);
-                    }
+                let stream = interface.into_stream();
+                profile_requests.push(stream.tagged(id).with_epitaph(id));
+                info!("Added ProfileRequestStream from MockPeer request for peer: {:?}", id);
+                if let Err(e) = responder.send() {
+                    warn!("Error sending on responder: {:?}", e);
                 }
             }
         }
@@ -245,13 +227,7 @@ impl MockPiconetServer {
                     let bredr_test::ProfileTestRequest::RegisterPeer { peer_id, peer, observer, responder, .. } = test_request;
                     let id = peer_id.into();
                     info!("Received ProfileTest request to register peer: {:?}", id);
-                    let request_stream = match peer.into_stream() {
-                        Ok(stream) => stream,
-                        Err(_) => {
-                            responder.control_handle().shutdown_with_epitaph(zx::Status::BAD_HANDLE);
-                            continue;
-                        }
-                    };
+                    let request_stream = peer.into_stream();
                     let registration =
                         self.register_peer(id, observer, profile_stream_sender.clone());
 
@@ -401,7 +377,7 @@ impl MockPiconetServerInner {
         // Clients that require RFCOMM channels should register through the `bt-rfcomm` component.
         let psm = match connection {
             bredr::ConnectParameters::L2cap(params) => {
-                let psm = params.psm.ok_or(format_err!("No PSM provided in connection"))?;
+                let psm = params.psm.ok_or_else(|| format_err!("No PSM provided in connection"))?;
                 Psm::new(psm)
             }
             bredr::ConnectParameters::Rfcomm(_) => return Err(format_err!("RFCOMM not supported")),
@@ -550,10 +526,10 @@ mod tests {
     ) -> (MockPeerProxy, PeerObserverRequestStream, ProfileTestRequest) {
         // Used to simulate behavior of an integration test client. Sends
         // requests using the ProfileTest interface.
-        let (client, mut server) = create_proxy_and_stream::<ProfileTestMarker>().unwrap();
+        let (client, mut server) = create_proxy_and_stream::<ProfileTestMarker>();
 
-        let (mock_peer, mock_peer_server) = create_proxy::<MockPeerMarker>().unwrap();
-        let (observer, observer_stream) = create_request_stream::<PeerObserverMarker>().unwrap();
+        let (mock_peer, mock_peer_server) = create_proxy::<MockPeerMarker>();
+        let (observer, observer_stream) = create_request_stream::<PeerObserverMarker>();
         let reg_fut = client.register_peer(&id.into(), mock_peer_server, observer);
         let mut reg_fut = pin!(reg_fut);
 
@@ -625,9 +601,9 @@ mod tests {
         assert!(mps.contains_peer(&id2));
 
         // Both piconet members can wire up the `bredr.Profile` proxy.
-        let (_c1, s1) = create_proxy::<ProfileMarker>().unwrap();
+        let (_c1, s1) = create_proxy::<ProfileMarker>();
         let mut connect_fut1 = Box::pin(mock_peer1.connect_proxy_(s1));
-        let (_c2, s2) = create_proxy::<ProfileMarker>().unwrap();
+        let (_c2, s2) = create_proxy::<ProfileMarker>();
         let mut connect_fut2 = Box::pin(mock_peer2.connect_proxy_(s2));
 
         assert!(exec.run_until_stalled(&mut connect_fut1).is_pending());
@@ -662,14 +638,14 @@ mod tests {
         assert!(mps.contains_peer(&id));
 
         // Connect the ProfileProxy.
-        let (c, s) = create_proxy::<ProfileMarker>().unwrap();
+        let (c, s) = create_proxy::<ProfileMarker>();
         let connect_fut = mock_peer.connect_proxy_(s);
         let mut connect_fut = pin!(connect_fut);
         exec.run_until_stalled(&mut mps_fut).expect_pending("server should still be running");
         assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(_)));
 
         // Advertise - the request should be handled by the server and remain active.
-        let (target, receiver) = create_request_stream::<ConnectionReceiverMarker>().unwrap();
+        let (target, receiver) = create_request_stream::<ConnectionReceiverMarker>();
         let mut adv_fut = c.advertise(bredr::ProfileAdvertiseRequest {
             services: Some(vec![]),
             receiver: Some(target),

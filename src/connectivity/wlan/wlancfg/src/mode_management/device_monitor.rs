@@ -96,8 +96,7 @@ async fn on_iface_added_legacy(listener: &Listener, iface_id: u16) -> Result<(),
     match response.role {
         fidl_common::WlanMacRole::Client => {
             let legacy_shim = listener.legacy_shim.clone();
-            let (sme, remote) = create_proxy()
-                .map_err(|e| format_err!("Failed to create a FIDL channel: {}", e))?;
+            let (sme, remote) = create_proxy();
 
             let result = service
                 .get_client_sme(iface_id, remote)
@@ -173,10 +172,8 @@ mod tests {
         let phy_manager =
             Arc::new(Mutex::new(FakePhyManager::new(add_phy_succeeds, add_iface_succeeds)));
         let iface_manager = Arc::new(Mutex::new(FakeIfaceManager::new()));
-        let (monitor_proxy, monitor_requests) = create_proxy::<fidl_service::DeviceMonitorMarker>()
-            .expect("failed to create DeviceMonitor proxy");
-        let monitor_stream =
-            monitor_requests.into_stream().expect("failed to convert monitor stream");
+        let (monitor_proxy, monitor_requests) = create_proxy::<fidl_service::DeviceMonitorMarker>();
+        let monitor_stream = monitor_requests.into_stream();
 
         TestValues { phy_manager, iface_manager, monitor_proxy, monitor_stream }
     }
@@ -537,8 +534,7 @@ mod tests {
         }
 
         // Setup the Listener to look like it has an interface.
-        let (sme, _) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create SME proxy");
+        let (sme, _) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let iface_ref = IfaceRef::new();
         iface_ref.set_if_empty(Iface { sme, iface_id: 0 });
 
@@ -575,8 +571,7 @@ mod tests {
         }
 
         // Setup the Listener to look like it has an interface.
-        let (sme, _) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create SME proxy");
+        let (sme, _) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let iface_ref = IfaceRef::new();
         iface_ref.set_if_empty(Iface { sme, iface_id: 0 });
 

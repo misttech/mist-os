@@ -135,7 +135,7 @@ impl DeviceIdServer {
         defs: Vec<bredr::ServiceDefinition>,
     ) -> Result<BrEdrProfileAdvertisement, Error> {
         let (connect_client, connect_stream) =
-            fidl::endpoints::create_request_stream::<bredr::ConnectionReceiverMarker>()?;
+            fidl::endpoints::create_request_stream::<bredr::ConnectionReceiverMarker>();
         // The result of advertise (registered services) is not needed.
         let _advertise_fut = profile.advertise(bredr::ProfileAdvertiseRequest {
             services: Some(defs),
@@ -188,13 +188,7 @@ impl DeviceIdServer {
             }
         }
 
-        let client_request = match token.into_stream() {
-            Err(e) => {
-                let _ = responder.send(Err(zx::Status::CANCELED.into_raw()));
-                return Err(e.into());
-            }
-            Ok(s) => s,
-        };
+        let client_request = token.into_stream();
 
         let bredr_advertisement = match Self::advertise(&self.profile, (&service).into()) {
             Err(e) => {
@@ -238,8 +232,7 @@ pub(crate) mod tests {
 
         let (sender, receiver) = mpsc::channel(0);
         let (profile, profile_server) =
-            fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>()
-                .expect("valid endpoints");
+            fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>();
         let max = max.unwrap_or(DEFAULT_MAX_DEVICE_ID_ADVERTISEMENTS);
         let server = DeviceIdServer::new(max, None, profile, receiver);
 
@@ -254,8 +247,7 @@ pub(crate) mod tests {
     where
         Fut: Future + Unpin,
     {
-        let (c, s) = fidl::endpoints::create_proxy_and_stream::<di::DeviceIdentificationMarker>()
-            .expect("valid endpoints");
+        let (c, s) = fidl::endpoints::create_proxy_and_stream::<di::DeviceIdentificationMarker>();
 
         let send_fut = sender.send(s);
         let (send_result, server_fut) = run_while(exec, server_fut, send_fut);
@@ -272,8 +264,7 @@ pub(crate) mod tests {
     ) -> (di::DeviceIdentificationHandleProxy, QueryResponseFut<Result<(), i32>>) {
         let records = &[minimal_record(primary)];
         let (token_client, token_server) =
-            fidl::endpoints::create_proxy::<di::DeviceIdentificationHandleMarker>()
-                .expect("valid endpoints");
+            fidl::endpoints::create_proxy::<di::DeviceIdentificationHandleMarker>();
         let request_fut = client
             .set_device_identification(records, token_server)
             .check()
@@ -290,7 +281,7 @@ pub(crate) mod tests {
         match exec.run_until_stalled(&mut profile_requests).expect("Should have request") {
             Some(Ok(bredr::ProfileRequest::Advertise { payload, responder, .. })) => {
                 let _ = responder.send(Ok(&bredr::ProfileAdvertiseResponse::default()));
-                payload.receiver.unwrap().into_proxy().unwrap()
+                payload.receiver.unwrap().into_proxy()
             }
             x => panic!("Expected Advertise request, got: {x:?}"),
         }
@@ -422,8 +413,7 @@ pub(crate) mod tests {
 
         let (sender, receiver) = mpsc::channel(0);
         let (profile, mut profile_server) =
-            fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>()
-                .expect("valid endpoints");
+            fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>();
         let default = (&minimal_record(true)).try_into().ok();
         let server =
             DeviceIdServer::new(DEFAULT_MAX_DEVICE_ID_ADVERTISEMENTS, default, profile, receiver);

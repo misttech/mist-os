@@ -109,7 +109,7 @@ async fn screenshot_impl<W: ToolIO<OutputItem = ScreenshotOutput>>(
         None => {
             let dir = default_output_dir();
             fs::create_dir_all(&dir)?;
-            dir.to_path_buf().join("screenshot")
+            dir.join("screenshot")
         }
     };
 
@@ -139,7 +139,7 @@ async fn screenshot_impl<W: ToolIO<OutputItem = ScreenshotOutput>>(
     let img_size = screenshot_response.size.expect("no data size returned from screenshot");
     let client_end = screenshot_response.file.expect("no file returned from screenshot");
 
-    let file_proxy = client_end.into_proxy().expect("could not create file proxy");
+    let file_proxy = client_end.into_proxy();
 
     let mut img_data = read_data(&file_proxy).await?;
     // VMO in |file_proxy| may be padded for alignment.
@@ -219,8 +219,7 @@ mod test {
     fn serve_fake_file(server: ServerEnd<fio::FileMarker>) {
         fuchsia_async::Task::local(async move {
             let data: [u8; 16] = [1, 2, 3, 4, 1, 2, 3, 4, 4, 3, 2, 1, 4, 3, 2, 1];
-            let mut stream =
-                server.into_stream().expect("converting fake file server proxy to stream");
+            let mut stream = server.into_stream();
 
             let mut cc: u32 = 0;
             while let Ok(Some(req)) = stream.try_next().await {

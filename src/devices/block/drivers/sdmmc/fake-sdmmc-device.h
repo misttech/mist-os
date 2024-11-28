@@ -173,6 +173,7 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice>,
   void set_set_bus_freq_status(zx_status_t status) { set_bus_freq_status_ = status; }
   void set_set_timing_status(zx_status_t status) { set_timing_status_ = status; }
   void set_perform_tuning_status(zx_status_t status) { perform_tuning_status_ = status; }
+  void set_in_band_interrupt_supported(bool supported) { in_band_interrupt_supported_ = supported; }
 
   sdmmc_voltage_t signal_voltage() const { return signal_voltage_; }
   sdmmc_bus_width_t bus_width() const { return bus_width_; }
@@ -212,6 +213,7 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice>,
   std::optional<uint32_t> erase_group_start_;
   std::optional<uint32_t> erase_group_end_;
   std::optional<SdmmcVmoStore> registered_vmos_[SDMMC_MAX_CLIENT_ID + 1];
+  bool in_band_interrupt_supported_ = true;
 };
 
 }  // namespace sdmmc

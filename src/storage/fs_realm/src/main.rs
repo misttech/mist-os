@@ -10,7 +10,6 @@ use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
 use fs_management::filesystem::{Filesystem, ServingSingleVolumeFilesystem};
 use fs_management::format::{detect_disk_format, DiskFormat};
 use fs_management::{Blobfs, F2fs, Fxfs, Minfs};
-use fuchsia_fs::directory::clone_no_describe;
 use fuchsia_runtime::{take_startup_handle, HandleType};
 use futures::channel::mpsc;
 use futures::lock::Mutex;
@@ -48,8 +47,8 @@ impl FsRealmState {
             return Err(anyhow!("a filesystem is already mounted at {mount_name}"));
         }
 
-        let device = device.into_proxy()?;
-        let (block_proxy, block_server) = create_proxy::<BlockMarker>()?;
+        let device = device.into_proxy();
+        let (block_proxy, block_server) = create_proxy::<BlockMarker>();
         device.connect_to_device_fidl(block_server.into_channel())?;
         let format = detect_disk_format(&block_proxy).await;
         let mut filesystem = match format {
@@ -82,7 +81,7 @@ impl FsRealmState {
             }
         };
         let fs = filesystem.serve().await?;
-        let node = clone_no_describe(fs.root(), Some(fio::OpenFlags::CLONE_SAME_RIGHTS))?;
+        let node = fuchsia_fs::directory::clone(fs.root())?;
         self.mnt.add_entry(mount_name, vfs::remote::remote_dir(node))?;
         locked_running_filesystems.insert(mount_name.to_string(), fs);
         Ok(())
@@ -113,7 +112,7 @@ async fn format(
     device: ClientEnd<ControllerMarker>,
     options: fs_realm::FormatOptions,
 ) -> Result<(), Error> {
-    let device = device.into_proxy()?;
+    let device = device.into_proxy();
     let mut filesystem = match name.as_ref() {
         "blobfs" => {
             let blobfs = Blobfs { verbose: options.verbose.unwrap_or(false), ..Default::default() };
@@ -139,7 +138,7 @@ async fn format(
 }
 
 async fn check(name: &str, device: ClientEnd<ControllerMarker>) -> Result<(), Error> {
-    let device = device.into_proxy()?;
+    let device = device.into_proxy();
     let mut filesystem = match name.as_ref() {
         "blobfs" => Filesystem::new(device, Blobfs::default()),
         "fxfs" => Filesystem::new(device, Fxfs::default()),

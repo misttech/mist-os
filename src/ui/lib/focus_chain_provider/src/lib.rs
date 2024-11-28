@@ -166,7 +166,7 @@ mod tests {
     async fn smoke_test() {
         let (publisher, stream_handler) = super::make_publisher_and_stream_handler();
         let (client, stream) =
-            fidl::endpoints::create_proxy_and_stream::<focus::FocusChainProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<focus::FocusChainProviderMarker>();
         stream_handler.handle_request_stream(stream).detach();
         assert_eq!(stream_handler.subscriber_count(), 0);
 
@@ -191,7 +191,7 @@ mod tests {
     async fn only_newest_value_is_sent() {
         let (publisher, stream_handler) = super::make_publisher_and_stream_handler();
         let (client, stream) =
-            fidl::endpoints::create_proxy_and_stream::<focus::FocusChainProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<focus::FocusChainProviderMarker>();
         stream_handler.handle_request_stream(stream).detach();
 
         let received_focus_koid_chain = client

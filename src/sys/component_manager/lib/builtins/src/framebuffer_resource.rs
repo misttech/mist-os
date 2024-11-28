@@ -56,7 +56,7 @@ mod tests {
         let framebuffer_resource = get_framebuffer_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::FramebufferResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::FramebufferResourceMarker>();
         fasync::Task::local(
             FramebufferResource::new(framebuffer_resource)
                 .unwrap_or_else(|e| {

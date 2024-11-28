@@ -433,8 +433,7 @@ mod tests {
         holder: Arc<Mutex<AnnotationHolder>>,
     ) -> felement::AnnotationControllerProxy {
         let mut watch_subscriber = holder.lock().unwrap().new_watch_subscriber();
-        let (proxy, mut stream) =
-            create_proxy_and_stream::<felement::AnnotationControllerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<felement::AnnotationControllerMarker>();
         fasync::Task::spawn(async move {
             loop {
                 let _ =
@@ -624,8 +623,7 @@ mod tests {
     async fn watch_annotations_duplicate_requests() -> Result<(), anyhow::Error> {
         let holder = Arc::new(Mutex::new(AnnotationHolder::new()));
         let mut watch_subscriber = holder.lock().unwrap().new_watch_subscriber();
-        let (proxy, mut stream) =
-            create_proxy_and_stream::<felement::AnnotationControllerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<felement::AnnotationControllerMarker>();
 
         // Make the initial request, so that the next one will hang.
         let annotations = proxy.watch_annotations();
@@ -839,8 +837,7 @@ mod tests {
                 )
                 .unwrap()
             }
-        })
-        .unwrap();
+        });
 
         let _ = proxy.update_annotations(
             vec![

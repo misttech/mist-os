@@ -35,7 +35,10 @@ const ENTRY_METRICS: u32 = 256;
 
 fn get_interface_id(
     want_name: &str,
-    intf: &HashMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
+    intf: &HashMap<
+        u64,
+        fnet_interfaces_ext::PropertiesAndState<(), fnet_interfaces_ext::DefaultInterest>,
+    >,
 ) -> Result<u64, Error> {
     intf.values()
         .find_map(
@@ -53,15 +56,14 @@ fn get_interface_id(
                  state: _,
              }| if name == want_name { Some(id.get()) } else { None },
         )
-        .ok_or(anyhow::format_err!("failed to find {}", want_name))
+        .ok_or_else(|| anyhow::format_err!("failed to find {}", want_name))
 }
 
 fn get_interface_control(
     root_interfaces: &fnet_root::InterfacesProxy,
     id: u64,
 ) -> Result<fnet_interfaces_ext::admin::Control, Error> {
-    let (control, server_end) =
-        fidl::endpoints::create_proxy().expect("create proxy should succeed");
+    let (control, server_end) = fidl::endpoints::create_proxy();
     root_interfaces.get_admin(id, server_end).context("FIDL error sending GetAdmin request")?;
     Ok(fnet_interfaces_ext::admin::Control::new(control))
 }
@@ -123,8 +125,7 @@ async fn run_fuchsia_node() -> Result<(), Error> {
     let route_table = client::connect_to_protocol::<fnet_routes_admin::RouteTableV6Marker>()
         .context("failed to connect to fuchsia.net.routes.admin.RouteTableV6")?;
     let (route_set, server_end) =
-        fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV6Marker>()
-            .expect("creating proxy should succeed");
+        fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV6Marker>();
     route_table.new_route_set(server_end).context("failed to send NewRouteSet request")?;
 
     let stream = fnet_interfaces_ext::event_stream_from_state(

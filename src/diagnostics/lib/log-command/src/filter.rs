@@ -156,7 +156,7 @@ impl LogFilterCriteria {
             .filter(|s| data.moniker.matches_component_selector(&s.selector).unwrap_or(false))
             .filter_map(|selector| selector.interest.min_severity)
             .min()
-            .unwrap_or(self.min_severity.into());
+            .unwrap_or_else(|| self.min_severity.into());
         if data.metadata.severity < min_severity {
             return false;
         }

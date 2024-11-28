@@ -118,7 +118,7 @@ impl TestEnv {
         let repo_config_arg_path = _test_dir.path().join("repo_config");
         create_dir(&repo_config_arg_path).expect("create repo_config_arg dir");
 
-        let (svc_proxy, svc_server_end) = fidl::endpoints::create_proxy().expect("create channel");
+        let (svc_proxy, svc_server_end) = fidl::endpoints::create_proxy();
 
         let _env = fs.serve_connection(svc_server_end).expect("serve connection");
 
@@ -229,7 +229,7 @@ impl MockEngineService {
                     control_handle: _control_handle,
                 } => {
                     self.captured_args.lock().push(CapturedEngineRequest::StartEditTransaction);
-                    let mut stream = transaction.into_stream().expect("error here");
+                    let mut stream = transaction.into_stream();
                     while let Some(sub_req) = stream.try_next().await? {
                         match sub_req {
                             EditTransactionRequest::ListDynamic {
@@ -259,7 +259,7 @@ impl MockEngineService {
         &self,
         iterator: ServerEnd<RuleIteratorMarker>,
     ) -> Result<(), Error> {
-        let mut stream = iterator.into_stream().expect("list iterator into_stream");
+        let mut stream = iterator.into_stream();
         let rules =
             self.rules.lock().clone().into_iter().map(|rule| rule.into()).collect::<Vec<_>>();
         let mut iter = rules.chunks(5).fuse();
@@ -321,7 +321,7 @@ impl MockRepositoryManagerService {
                 }
                 RepositoryManagerRequest::List { iterator, control_handle: _control_handle } => {
                     self.captured_args.lock().push(CapturedRepositoryManagerRequest::List);
-                    let mut stream = iterator.into_stream().expect("list iterator into_stream");
+                    let mut stream = iterator.into_stream();
                     let repos: Vec<_> =
                         self.repos.lock().clone().into_iter().map(|r| r.into()).collect();
                     let mut iter = repos.chunks(5).fuse();
@@ -480,12 +480,12 @@ impl MockPackageCacheService {
         let behavior = *self.get_behavior.lock();
         match behavior {
             GetBehavior::AlreadyCached => {
-                let (_, control) = needed_blobs.into_stream_and_control_handle().unwrap();
+                let (_, control) = needed_blobs.into_stream_and_control_handle();
                 let () = control.shutdown_with_epitaph(zx::Status::OK);
                 let () = get_responder.send(Ok(())).unwrap();
             }
             GetBehavior::NotCached => {
-                let mut stream = needed_blobs.into_stream().unwrap();
+                let mut stream = needed_blobs.into_stream();
                 let req = stream.next().await.unwrap().unwrap();
                 let fpkg::NeededBlobsRequest::OpenMetaBlob { responder, .. } = req else {
                     panic!("unexpected NeededBlobsRequest: {req:?}");

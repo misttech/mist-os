@@ -23,9 +23,11 @@ go_library("proto_lib") {
 
 go_library("testsharder_lib") {
   sources = [
+    "builder_deps.go",
     "doc.go",
     "durations.go",
     "durations_test.go",
+    "emu_versions.go",
     "ffx_deps.go",
     "ffx_deps_test.go",
     "images.go",
@@ -45,6 +47,7 @@ go_library("testsharder_lib") {
     ":proto_lib",
     "//third_party/golibs:golang.org/x/exp",
     "//tools/build",
+    "//tools/integration/fint:proto_lib",
     "//tools/lib/color",
     "//tools/lib/ffxutil",
     "//tools/lib/logger",
@@ -82,6 +85,7 @@ if (is_host) {
     "affected tests",
     "arbitrary dimensions",
     "boot test with modifiers",
+    "deps_file",
     "hermetic deps",
     "max shards per env",
     "mixed device types",

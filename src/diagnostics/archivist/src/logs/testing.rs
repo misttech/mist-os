@@ -14,7 +14,6 @@ use fidl::prelude::*;
 use fidl_fuchsia_logger::{
     LogFilterOptions, LogLevelFilter, LogMarker, LogMessage, LogProxy, LogSinkMarker, LogSinkProxy,
 };
-use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol_at_dir_svc;
 use fuchsia_inspect::Inspector;
 use fuchsia_sync::Mutex;
@@ -38,6 +37,7 @@ pub struct TestHarness {
     pending_streams: Vec<Weak<()>>,
     /// LogSinks to retain for inspect attribution tests
     sinks: Option<Vec<LogSinkProxy>>,
+    scope: fasync::Scope,
 }
 
 pub fn create_log_sink_requested_event(
@@ -66,7 +66,7 @@ pub fn create_log_sink_requested_event(
 
 impl Default for TestHarness {
     fn default() -> Self {
-        Self::make(false)
+        Self::new(false)
     }
 }
 
@@ -75,16 +75,17 @@ impl TestHarness {
     /// useful for testing inspect hierarchies for attribution.
     // TODO(https://fxbug.dev/42131398) this will be made unnecessary by historical retention of component stats
     pub fn with_retained_sinks() -> Self {
-        Self::make(true)
+        Self::new(true)
     }
 
-    fn make(hold_sinks: bool) -> Self {
+    fn new(hold_sinks: bool) -> Self {
+        let scope = fasync::Scope::new();
         let inspector = Inspector::default();
-        let log_manager = LogsRepository::new(1_000_000, std::iter::empty(), inspector.root());
-        let log_server = LogServer::new(Arc::clone(&log_manager));
+        let log_manager =
+            LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
+        let log_server = LogServer::new(Arc::clone(&log_manager), scope.new_child());
 
-        let (log_proxy, log_stream) =
-            fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();
+        let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>();
         log_server.spawn(log_stream);
 
         Self {
@@ -94,11 +95,16 @@ impl TestHarness {
             log_proxy,
             pending_streams: vec![],
             sinks: if hold_sinks { Some(vec![]) } else { None },
+            scope,
         }
     }
 
     pub fn create_default_reader(&self, identity: ComponentIdentity) -> Arc<dyn LogReader> {
-        Arc::new(DefaultLogReader::new(Arc::clone(&self.log_manager), Arc::new(identity)))
+        Arc::new(DefaultLogReader::new(
+            Arc::clone(&self.log_manager),
+            Arc::new(identity),
+            self.scope.to_handle(),
+        ))
     }
 
     pub fn create_event_stream_reader(
@@ -110,6 +116,7 @@ impl TestHarness {
             Arc::clone(&self.log_manager),
             target_moniker,
             target_url,
+            self.scope.to_handle(),
         ))
     }
 
@@ -174,7 +181,11 @@ impl TestHarness {
         &mut self,
         identity: Arc<ComponentIdentity>,
     ) -> TestStream<LogPacketWriter> {
-        self.make_stream(Arc::new(DefaultLogReader::new(Arc::clone(&self.log_manager), identity)))
+        self.make_stream(Arc::new(DefaultLogReader::new(
+            Arc::clone(&self.log_manager),
+            identity,
+            self.scope.to_handle(),
+        )))
     }
 
     /// Create a [`TestStream`] which should be dropped before calling `filter_test` or
@@ -192,17 +203,18 @@ impl TestHarness {
         &mut self,
         identity: Arc<ComponentIdentity>,
     ) -> TestStream<StructuredMessageWriter> {
-        self.make_stream(Arc::new(DefaultLogReader::new(Arc::clone(&self.log_manager), identity)))
+        self.make_stream(Arc::new(DefaultLogReader::new(
+            Arc::clone(&self.log_manager),
+            identity,
+            self.scope.to_handle(),
+        )))
     }
 
     fn make_stream<E, P>(&mut self, log_reader: Arc<dyn LogReader>) -> TestStream<E>
     where
         E: LogWriter<Packet = P>,
     {
-        let (log_sender, log_receiver) = mpsc::unbounded();
-        let _log_sink_proxy = log_reader.handle_request(log_sender);
-
-        fasync::Task::spawn(log_receiver.for_each_concurrent(None, |rx| rx)).detach();
+        let _log_sink_proxy = log_reader.handle_request();
 
         let (sin, sout) = zx::Socket::create_datagram();
         E::connect(&_log_sink_proxy, sout);
@@ -264,27 +276,32 @@ impl LogWriter for StructuredMessageWriter {
 
 /// A `LogReader` host a LogSink connection.
 pub trait LogReader {
-    fn handle_request(&self, sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy;
+    fn handle_request(&self) -> LogSinkProxy;
 }
 
 // A LogReader that exercises the handle_log_sink code path.
 pub struct DefaultLogReader {
     log_manager: Arc<LogsRepository>,
     identity: Arc<ComponentIdentity>,
+    scope: fasync::ScopeHandle,
 }
 
 impl DefaultLogReader {
-    fn new(log_manager: Arc<LogsRepository>, identity: Arc<ComponentIdentity>) -> DefaultLogReader {
-        Self { log_manager, identity }
+    fn new(
+        log_manager: Arc<LogsRepository>,
+        identity: Arc<ComponentIdentity>,
+        scope: fasync::ScopeHandle,
+    ) -> DefaultLogReader {
+        Self { log_manager, identity, scope }
     }
 }
 
 impl LogReader for DefaultLogReader {
-    fn handle_request(&self, log_sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy {
+    fn handle_request(&self) -> LogSinkProxy {
         let (log_sink_proxy, log_sink_stream) =
-            fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>();
         let container = self.log_manager.get_log_container(Arc::clone(&self.identity));
-        container.handle_log_sink(log_sink_stream, log_sender);
+        container.handle_log_sink(log_sink_stream, self.scope.clone());
         log_sink_proxy
     }
 }
@@ -295,6 +312,7 @@ pub struct EventStreamLogReader {
     log_manager: Arc<LogsRepository>,
     target_moniker: String,
     target_url: String,
+    scope: fasync::ScopeHandle,
 }
 
 impl EventStreamLogReader {
@@ -302,25 +320,31 @@ impl EventStreamLogReader {
         log_manager: Arc<LogsRepository>,
         target_moniker: impl Into<String>,
         target_url: impl Into<String>,
+        scope: fasync::ScopeHandle,
     ) -> EventStreamLogReader {
-        Self { log_manager, target_moniker: target_moniker.into(), target_url: target_url.into() }
+        Self {
+            log_manager,
+            target_moniker: target_moniker.into(),
+            target_url: target_url.into(),
+            scope,
+        }
     }
 
     async fn handle_event_stream(
         stream: fcomponent::EventStreamProxy,
-        sender: mpsc::UnboundedSender<Task<()>>,
+        scope: fasync::ScopeHandle,
         log_manager: Arc<LogsRepository>,
     ) {
         while let Ok(res) = stream.get_next().await {
             for event in res {
-                Self::handle_event(event, sender.clone(), Arc::clone(&log_manager))
+                Self::handle_event(event, scope.clone(), Arc::clone(&log_manager))
             }
         }
     }
 
     fn handle_event(
         event: fcomponent::Event,
-        sender: mpsc::UnboundedSender<Task<()>>,
+        scope: fasync::ScopeHandle,
         log_manager: Arc<LogsRepository>,
     ) {
         let LogSinkRequestedPayload { component, request_stream } =
@@ -329,16 +353,16 @@ impl EventStreamLogReader {
                 other => unreachable!("should never see {:?} here", other),
             };
         let container = log_manager.get_log_container(component);
-        container.handle_log_sink(request_stream, sender);
+        container.handle_log_sink(request_stream, scope);
     }
 }
 
 impl LogReader for EventStreamLogReader {
-    fn handle_request(&self, log_sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy {
+    fn handle_request(&self) -> LogSinkProxy {
         let (event_stream_proxy, mut event_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fcomponent::EventStreamMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcomponent::EventStreamMarker>();
         let (log_sink_proxy, log_sink_server_end) =
-            fidl::endpoints::create_proxy::<LogSinkMarker>().unwrap();
+            fidl::endpoints::create_proxy::<LogSinkMarker>();
 
         let (tx, mut rx) = mpsc::unbounded();
         tx.unbounded_send(create_log_sink_requested_event(
@@ -347,12 +371,12 @@ impl LogReader for EventStreamLogReader {
             log_sink_server_end.into_channel(),
         ))
         .unwrap();
-        let task = Task::spawn(Self::handle_event_stream(
+        self.scope.spawn(Self::handle_event_stream(
             event_stream_proxy,
-            log_sender.clone(),
+            self.scope.clone(),
             Arc::clone(&self.log_manager),
         ));
-        let event_stream_server = Task::spawn(async move {
+        self.scope.spawn(async move {
             let _tx_clone = tx;
             while let Some(Ok(request)) = event_stream.next().await {
                 match request {
@@ -365,9 +389,6 @@ impl LogReader for EventStreamLogReader {
                 }
             }
         });
-        log_sender.unbounded_send(task).unwrap();
-        log_sender.unbounded_send(event_stream_server).unwrap();
-
         log_sink_proxy
     }
 }
@@ -398,11 +419,13 @@ where
 pub async fn debuglog_test(
     expected: impl IntoIterator<Item = LogMessage>,
     debug_log: TestDebugLog,
+    scope: fasync::Scope,
 ) -> Inspector {
     let inspector = Inspector::default();
-    let lm = LogsRepository::new(1_000_000, std::iter::empty(), inspector.root());
-    let log_server = LogServer::new(Arc::clone(&lm));
-    let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();
+    let lm =
+        LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
+    let log_server = LogServer::new(Arc::clone(&lm), scope);
+    let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>();
     log_server.spawn(log_stream);
     lm.drain_debuglog(debug_log);
 
@@ -590,7 +613,6 @@ pub fn start_listener(directory: &fio::DirectoryProxy) -> mpsc::UnboundedReceive
         run_log_listener_with_proxy(&log_proxy, l, Some(&options), false, None).await.unwrap();
     })
     .detach();
-
     recv_logs
 }
 

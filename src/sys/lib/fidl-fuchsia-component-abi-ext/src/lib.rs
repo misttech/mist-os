@@ -65,8 +65,7 @@ mod tests {
     use vfs::{execution_scope, pseudo_directory};
 
     fn serve_dir(root: Arc<impl Directory>) -> fio::DirectoryProxy {
-        let (dir_proxy, dir_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         root.open(
             execution_scope::ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,

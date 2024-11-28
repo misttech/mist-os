@@ -95,7 +95,7 @@ impl TestSandbox {
         I: IntoIterator,
         I::Item: Into<fnetemul::ChildDef>,
     {
-        let (realm, server) = fidl::endpoints::create_proxy::<fnetemul::ManagedRealmMarker>()?;
+        let (realm, server) = fidl::endpoints::create_proxy::<fnetemul::ManagedRealmMarker>();
         let name = name.into();
         let () = self.sandbox.create_realm(
             server,
@@ -119,7 +119,7 @@ impl TestSandbox {
     /// Connects to the sandbox's `NetworkContext`.
     fn get_network_context(&self) -> Result<fnetemul_network::NetworkContextProxy> {
         let (ctx, server) =
-            fidl::endpoints::create_proxy::<fnetemul_network::NetworkContextMarker>()?;
+            fidl::endpoints::create_proxy::<fnetemul_network::NetworkContextMarker>();
         let () = self.sandbox.get_network_context(server)?;
         Ok(ctx)
     }
@@ -128,7 +128,7 @@ impl TestSandbox {
     pub fn get_network_manager(&self) -> Result<fnetemul_network::NetworkManagerProxy> {
         let ctx = self.get_network_context()?;
         let (network_manager, server) =
-            fidl::endpoints::create_proxy::<fnetemul_network::NetworkManagerMarker>()?;
+            fidl::endpoints::create_proxy::<fnetemul_network::NetworkManagerMarker>();
         let () = ctx.get_network_manager(server)?;
         Ok(network_manager)
     }
@@ -137,7 +137,7 @@ impl TestSandbox {
     pub fn get_endpoint_manager(&self) -> Result<fnetemul_network::EndpointManagerProxy> {
         let ctx = self.get_network_context()?;
         let (ep_manager, server) =
-            fidl::endpoints::create_proxy::<fnetemul_network::EndpointManagerMarker>()?;
+            fidl::endpoints::create_proxy::<fnetemul_network::EndpointManagerMarker>();
         let () = ctx.get_endpoint_manager(server)?;
         Ok(ep_manager)
     }
@@ -164,7 +164,7 @@ impl TestSandbox {
         let () = zx::Status::ok(status).context("create_network failed")?;
         let network = network
             .ok_or_else(|| anyhow::anyhow!("create_network didn't return a valid network"))?
-            .into_proxy()?;
+            .into_proxy();
         Ok(TestNetwork { network, name, sandbox: self })
     }
 
@@ -178,7 +178,7 @@ impl TestSandbox {
         let () = zx::Status::ok(status).context("setup failed")?;
         let handle = handle
             .ok_or_else(|| anyhow::anyhow!("setup didn't return a valid handle"))?
-            .into_proxy()?;
+            .into_proxy();
         Ok(TestNetworkSetup { _setup: handle, _sandbox: self })
     }
 
@@ -207,7 +207,7 @@ impl TestSandbox {
         let () = zx::Status::ok(status).context("create_endpoint failed")?;
         let endpoint = endpoint
             .ok_or_else(|| anyhow::anyhow!("create_endpoint didn't return a valid endpoint"))?
-            .into_proxy()?;
+            .into_proxy();
         Ok(TestEndpoint { endpoint, name, _sandbox: self })
     }
 }
@@ -268,8 +268,7 @@ impl<'a> TestRealm<'a> {
         S: fidl::endpoints::DiscoverableProtocolMarker,
     {
         (|| {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<S>().context("create proxy")?;
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<S>();
             let () = self
                 .connect_to_protocol_with_server_end(server_end)
                 .context("connect to protocol name with server end")?;
@@ -284,8 +283,7 @@ impl<'a> TestRealm<'a> {
         S: fidl::endpoints::DiscoverableProtocolMarker,
     {
         (|| {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<S>().context("create proxy")?;
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<S>();
             let () = self
                 .connect_to_protocol_from_child_at_path_with_server_end(
                     S::PROTOCOL_NAME,
@@ -300,7 +298,7 @@ impl<'a> TestRealm<'a> {
 
     /// Opens the diagnostics directory of a component.
     pub fn open_diagnostics_directory(&self, child_name: &str) -> Result<fio::DirectoryProxy> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let () = self
             .realm
             .open_diagnostics_directory(child_name, server_end)
@@ -495,11 +493,11 @@ impl<'a> TestRealm<'a> {
         // Wait for Netstack to observe interface up so callers can safely
         // assume the state of the world on return.
         let () = fnet_interfaces_ext::wait_interface_with_id(
-            fnet_interfaces_ext::event_stream_from_state(
+            fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
                 &interface_state,
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )?,
-            &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(id),
+            &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(id),
             |properties_and_state| properties_and_state.properties.online.then_some(()),
         )
         .await
@@ -718,15 +716,34 @@ impl<'a> TestRealm<'a> {
             .context("add_entry failed")
     }
 
-    /// Get a stream of interface events from a new watcher.
+    /// Get a stream of interface events from a new watcher with default
+    /// interest.
     pub fn get_interface_event_stream(
         &self,
-    ) -> Result<impl futures::Stream<Item = std::result::Result<fnet_interfaces::Event, fidl::Error>>>
-    {
+    ) -> Result<
+        impl futures::Stream<
+            Item = std::result::Result<
+                fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::DefaultInterest>,
+                fidl::Error,
+            >,
+        >,
+    > {
+        self.get_interface_event_stream_with_interest::<fnet_interfaces_ext::DefaultInterest>()
+    }
+
+    /// Get a stream of interface events from a new watcher with specified
+    /// interest.
+    pub fn get_interface_event_stream_with_interest<I: fnet_interfaces_ext::FieldInterests>(
+        &self,
+    ) -> Result<
+        impl futures::Stream<
+            Item = std::result::Result<fnet_interfaces_ext::EventWithInterest<I>, fidl::Error>,
+        >,
+    > {
         let interface_state = self
             .connect_to_protocol::<fnet_interfaces::StateMarker>()
             .context("connect to protocol")?;
-        fnet_interfaces_ext::event_stream_from_state(
+        fnet_interfaces_ext::event_stream_from_state::<I>(
             &interface_state,
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
@@ -847,8 +864,7 @@ impl<'a> TestNetwork<'a> {
     /// Returns a fake endpoint.
     pub fn create_fake_endpoint(&self) -> Result<TestFakeEndpoint<'a>> {
         let (endpoint, server) =
-            fidl::endpoints::create_proxy::<fnetemul_network::FakeEndpointMarker>()
-                .context("failed to create launcher proxy")?;
+            fidl::endpoints::create_proxy::<fnetemul_network::FakeEndpointMarker>();
         let () = self.network.create_fake_endpoint(server)?;
         return Ok(TestFakeEndpoint { endpoint, _sandbox: self.sandbox });
     }
@@ -940,7 +956,7 @@ impl<'a> TestFakeEndpoint<'a> {
 async fn to_netdevice_inner(
     port: fidl::endpoints::ClientEnd<fnetwork::PortMarker>,
 ) -> Result<(fidl::endpoints::ClientEnd<fnetwork::DeviceMarker>, fnetwork::PortId)> {
-    let port = port.into_proxy()?;
+    let port = port.into_proxy();
     let (device, server_end) = fidl::endpoints::create_endpoints::<fnetwork::DeviceMarker>();
     let () = port.get_device(server_end)?;
     let port_id = port
@@ -994,8 +1010,7 @@ impl<'a> TestEndpoint<'a> {
         let (device, port_id) = self.get_netdevice().await?;
         let device_control = {
             let (control, server_end) =
-                fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>()
-                    .context("create proxy")?;
+                fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>();
             let () = installer.install_device(device, server_end).context("install device")?;
             control
         };
@@ -1499,8 +1514,7 @@ impl<'a> TestInterface<'a> {
             .connect_to_protocol::<fnet_root::RoutesV4Marker>()
             .expect("get fuchsia.net.root.RoutesV4");
         let (route_set, server_end) =
-            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>()
-                .expect("creating route set proxy should succeed");
+            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>();
         root_routes.global_route_set(server_end).expect("calling global_route_set should succeed");
         Ok(route_set)
     }
@@ -1511,8 +1525,7 @@ impl<'a> TestInterface<'a> {
             .connect_to_protocol::<fnet_root::RoutesV6Marker>()
             .expect("get fuchsia.net.root.RoutesV6");
         let (route_set, server_end) =
-            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV6Marker>()
-                .expect("creating route set proxy should succeed");
+            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV6Marker>();
         root_routes.global_route_set(server_end).expect("calling global_route_set should succeed");
         Ok(route_set)
     }
@@ -1521,11 +1534,11 @@ impl<'a> TestInterface<'a> {
     async fn get_properties(
         &self,
         included_addresses: fnet_interfaces_ext::IncludedAddresses,
-    ) -> Result<fnet_interfaces_ext::Properties> {
+    ) -> Result<fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>> {
         let interface_state = self.realm.connect_to_protocol::<fnet_interfaces::StateMarker>()?;
         let properties = fnet_interfaces_ext::existing(
             fnet_interfaces_ext::event_stream_from_state(&interface_state, included_addresses)?,
-            fnet_interfaces_ext::InterfaceState::<()>::Unknown(self.id),
+            fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(self.id),
         )
         .await
         .context("failed to get existing interfaces")?;
@@ -1545,7 +1558,7 @@ impl<'a> TestInterface<'a> {
     pub async fn get_addrs(
         &self,
         included_addresses: fnet_interfaces_ext::IncludedAddresses,
-    ) -> Result<Vec<fnet_interfaces_ext::Address>> {
+    ) -> Result<Vec<fnet_interfaces_ext::Address<fnet_interfaces_ext::AllInterest>>> {
         let fnet_interfaces_ext::Properties { addresses, .. } =
             self.get_properties(included_addresses).await?;
         Ok(addresses)
@@ -1568,29 +1581,12 @@ impl<'a> TestInterface<'a> {
     /// Gets the interface's MAC address.
     pub async fn mac(&self) -> fnet::MacAddress {
         let (port, server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>()
-                .expect("create_proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>();
         self.get_port(server_end).expect("get_port");
         let (mac_addressing, server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::MacAddressingMarker>()
-                .expect("create_proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::MacAddressingMarker>();
         port.get_mac(server_end).expect("get_mac");
         mac_addressing.get_unicast_address().await.expect("get_unicast_address")
-    }
-
-    /// Gets a stream of interface events yielded by calling watch on a new watcher.
-    ///
-    /// The returned watcher will only return assigned addresses.
-    pub fn get_interface_event_stream(
-        &self,
-    ) -> Result<impl futures::Stream<Item = std::result::Result<fnet_interfaces::Event, fidl::Error>>>
-    {
-        let interface_state = self.realm.connect_to_protocol::<fnet_interfaces::StateMarker>()?;
-        fnet_interfaces_ext::event_stream_from_state(
-            &interface_state,
-            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-        )
-        .context("event stream from state")
     }
 
     async fn set_dhcp_client_enabled(&self, enable: bool) -> Result<()> {
@@ -1632,8 +1628,7 @@ impl<'a> TestInterface<'a> {
             .connect_to_protocol::<fnet_routes_admin::RouteTableV4Marker>()
             .expect("get fuchsia.net.routes.RouteTableV4");
         let (route_set, server_end) =
-            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>()
-                .expect("creating route set proxy should succeed");
+            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>();
         route_set_provider.new_route_set(server_end).expect("calling new_route_set should succeed");
         let task = fnet_dhcp_ext::testutil::DhcpClientTask::new(client, id, route_set, control);
         *dhcp_client_task = Some(task);
@@ -1668,8 +1663,7 @@ impl<'a> TestInterface<'a> {
     /// `ASSIGNED`.
     pub async fn add_address(&self, subnet: fnet::Subnet) -> Result<()> {
         let (address_state_provider, server) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
-                .context("create proxy")?;
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
         let () = address_state_provider.detach().context("detach address lifetime")?;
         let () = self
             .control
@@ -1690,8 +1684,7 @@ impl<'a> TestInterface<'a> {
     /// state is `ASSIGNED`.
     pub async fn add_address_and_subnet_route(&self, subnet: fnet::Subnet) -> Result<()> {
         let (address_state_provider, server) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
-                .context("create proxy")?;
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
         address_state_provider.detach().context("detach address lifetime")?;
         self.control
             .add_address(
@@ -1753,7 +1746,7 @@ impl<'a> TestInterface<'a> {
     /// Useful to purge the interface of autogenerated SLAAC addresses.
     pub async fn remove_ipv6_linklocal_addresses(
         &self,
-    ) -> Result<Vec<fnet_interfaces_ext::Address>> {
+    ) -> Result<Vec<fnet_interfaces_ext::Address<fnet_interfaces_ext::AllInterest>>> {
         let mut result = Vec::new();
         for address in self.get_addrs(fnet_interfaces_ext::IncludedAddresses::All).await? {
             let fnet_interfaces_ext::Address { addr: fnet::Subnet { addr, prefix_len }, .. } =

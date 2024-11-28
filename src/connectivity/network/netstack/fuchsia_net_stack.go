@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//go:build !build_with_native_toolchain
-
 package netstack
 
 import (
@@ -112,40 +110,6 @@ func (ni *stackImpl) AddForwardingEntry(_ fidl.Context, entry stack.ForwardingEn
 
 func (ni *stackImpl) DelForwardingEntry(_ fidl.Context, entry stack.ForwardingEntry) (stack.StackDelForwardingEntryResult, error) {
 	return ni.ns.delForwardingEntry(entry), nil
-}
-
-// TODO(https://fxbug.dev/42176374): Remove this.
-func (ni *stackImpl) SetInterfaceIpForwardingDeprecated(_ fidl.Context, id uint64, ip net.IpVersion, enabled bool) (stack.StackSetInterfaceIpForwardingDeprecatedResult, error) {
-	netProto, ok := fidlconv.ToTCPIPNetProto(ip)
-	if !ok {
-		return stack.StackSetInterfaceIpForwardingDeprecatedResultWithErr(stack.ErrorInvalidArgs), nil
-	}
-
-	nicInfo, ok := ni.ns.stack.NICInfo()[tcpip.NICID(id)]
-	if !ok {
-		return stack.StackSetInterfaceIpForwardingDeprecatedResultWithErr(stack.ErrorNotFound), nil
-	}
-
-	// Lock the interface to synchronize changes with
-	// fuchsia.net.interfaces.admin/Control.{Set,Get}Configuration.
-	ifs := nicInfo.Context.(*ifState)
-	ifs.mu.Lock()
-	defer ifs.mu.Unlock()
-
-	// Invalidate all clients' destination caches, as disabling forwarding may
-	// cause an existing cached route to become invalid.
-	ifs.ns.resetDestinationCache()
-
-	// We ignore the returned previous forwarding configuration as this FIDL
-	// method has no use for it.
-	switch _, err := ni.ns.stack.SetNICForwarding(tcpip.NICID(id), netProto, enabled); err.(type) {
-	case nil:
-		return stack.StackSetInterfaceIpForwardingDeprecatedResultWithResponse(stack.StackSetInterfaceIpForwardingDeprecatedResponse{}), nil
-	case *tcpip.ErrUnknownNICID:
-		return stack.StackSetInterfaceIpForwardingDeprecatedResultWithErr(stack.ErrorNotFound), nil
-	default:
-		panic(fmt.Sprintf("ni.ns.stack.SetNICForwarding(tcpip.NICID(%d), %d, %t): %s", id, netProto, enabled, err))
-	}
 }
 
 func (ni *stackImpl) SetDhcpClientEnabled(ctx_ fidl.Context, id uint64, enable bool) (stack.StackSetDhcpClientEnabledResult, error) {

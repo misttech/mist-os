@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use anyhow::Error;
+use anyhow::{Context, Error};
 use fidl_fuchsia_tee::ApplicationRequestStream;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_root};
 use fuchsia_component::server::ServiceFs;
@@ -34,8 +34,7 @@ async fn run_application(mut request: TAConnectRequest, config: TAConfig) {
         startup: Some(fidl_fuchsia_component_decl::StartupMode::Eager),
         ..Default::default()
     };
-    let (child_controller, child_controller_server) =
-        fidl::endpoints::create_proxy().expect("creating child controller channel");
+    let (child_controller, child_controller_server) = fidl::endpoints::create_proxy();
     let create_child_args = fidl_fuchsia_component::CreateChildArgs {
         controller: Some(child_controller_server),
         ..Default::default()
@@ -52,8 +51,7 @@ async fn run_application(mut request: TAConnectRequest, config: TAConfig) {
         return;
     }
 
-    let (ta_exposed_dir, ta_exposed_dir_server) =
-        fidl::endpoints::create_proxy().expect("creating exposed directory channel");
+    let (ta_exposed_dir, ta_exposed_dir_server) = fidl::endpoints::create_proxy();
     if let Err(e) = realm
         .open_exposed_dir(
             &fidl_fuchsia_component_decl::ChildRef {
@@ -135,10 +133,12 @@ async fn main() -> Result<(), Error> {
         for (path, file) in uuid_filenames {
             let uuid = Path::new(&file)
                 .file_stem()
-                .ok_or(anyhow::anyhow!("Expected path with extension"))?;
+                .ok_or_else(|| anyhow::anyhow!("Expected path with extension"))?;
             let config = TAConfig::parse_config(&path)?;
             let _ = configs.insert(
-                uuid.to_str().ok_or(anyhow::anyhow!("UUID string did not decode"))?.to_string(),
+                uuid.to_str()
+                    .ok_or_else(|| anyhow::anyhow!("UUID string did not decode"))?
+                    .to_string(),
                 config,
             );
         }
@@ -155,7 +155,8 @@ async fn main() -> Result<(), Error> {
     }
 
     let system_props =
-        std::fs::read_to_string(std::path::Path::new("/pkg/data/properties/system_properties"))?;
+        std::fs::read_to_string(std::path::Path::new("/pkg/data/properties/system_properties"))
+            .context("Failed to read system properties")?;
     let mut data_dir = fs.dir("data");
     let mut properties_dir = data_dir.dir("properties");
     let vmo = read_only(system_props).get_backing_memory(fio::VmoFlags::READ).await?;

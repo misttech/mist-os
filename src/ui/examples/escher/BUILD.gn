@@ -5,8 +5,6 @@
 import("//build/components.gni")
 import("//build/dist/renamed_binary.gni")
 
-# NOTE: whenever a new example is added, also add it to
-# //src/ui/lib/escher/test:force_waterfall_to_build_on_host
 group("escher") {
   deps = [
     ":escher_rainfall_on_fb",

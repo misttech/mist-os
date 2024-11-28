@@ -16,6 +16,7 @@ group("tests") {
     "alpine:tests",
     "crash_reports:tests",
     "diagnostics:tests",
+    "fp_stack_glue:tests",
     "gvisor:tests",
     "memory_attribution:tests",
     "reboot:tests",
@@ -53,6 +54,10 @@ expect_includes("starnix_test") {
 
 expect_includes("starnix_test_with_expectations") {
   includes = [ "starnix_test_with_expectations.shard.cml" ]
+}
+
+expect_includes("starnix_benchmark") {
+  includes = [ "starnix_benchmark.shard.cml" ]
 }
 
 if (host_os == "linux" && host_cpu == "x64") {

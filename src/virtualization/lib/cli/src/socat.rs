@@ -92,7 +92,7 @@ async fn handle_socat_listen(
     host_port: u32,
 ) -> Result<SocatSuccess, SocatError> {
     let (vsock_accept_client, mut vsock_acceptor_stream) =
-        fidl::endpoints::create_request_stream::<HostVsockAcceptorMarker>()?;
+        fidl::endpoints::create_request_stream::<HostVsockAcceptorMarker>();
 
     vsock_endpoint
         .listen(host_port, vsock_accept_client)
@@ -103,11 +103,11 @@ async fn handle_socat_listen(
     let connection = vsock_acceptor_stream
         .try_next()
         .await?
-        .ok_or(SocatError::InternalFailure("unexpected end of stream".to_string()))?;
+        .ok_or_else(|| SocatError::InternalFailure("unexpected end of stream".to_string()))?;
 
     let (_src_cid, _src_port, port, responder) = connection
         .into_accept()
-        .ok_or(SocatError::InternalFailure("unexpected message on stream".to_string()))?;
+        .ok_or_else(|| SocatError::InternalFailure("unexpected message on stream".to_string()))?;
 
     if port != host_port {
         responder.send(Err(zx_status::Status::CONNECTION_REFUSED.into_raw()))?;
@@ -152,14 +152,14 @@ async fn handle_socat_connect(
 async fn connect_to_vsock_endpoint(
     manager: GuestManagerProxy,
 ) -> Result<HostVsockEndpointProxy, SocatError> {
-    let (guest_endpoint, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>()?;
+    let (guest_endpoint, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>();
     manager
         .connect(guest_server_end)
         .await?
         .map_err(|err| SocatError::InternalFailure(format!("failed to connect: {:?}", err)))?;
 
     let (vsock_endpoint, vsock_server_end) =
-        fidl::endpoints::create_proxy::<HostVsockEndpointMarker>()?;
+        fidl::endpoints::create_proxy::<HostVsockEndpointMarker>();
 
     guest_endpoint
         .get_host_vsock_endpoint(vsock_server_end)
@@ -229,7 +229,7 @@ mod test {
 
     #[fasync::run_until_stalled(test)]
     async fn socat_listen_invalid_host_returns_err() {
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
         let server = async move {
             let (port, _acceptor, responder) = stream
                 .next()
@@ -251,7 +251,7 @@ mod test {
 
     #[fasync::run_until_stalled(test)]
     async fn socat_listen_mismatched_ports_returns_err() {
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
         let server = async move {
             let (port, acceptor, responder) = stream
                 .next()
@@ -262,12 +262,7 @@ mod test {
                 .expect("Unexpected call to Guest Proxy");
             assert_eq!(port, 0);
             responder.send(Ok(())).expect("Failed to send status code to client");
-            let _ = acceptor
-                .into_proxy()
-                .expect("Failed to convert client end into proxy")
-                .accept(0, 0, 1)
-                .await
-                .expect("Failed to accept listener");
+            let _ = acceptor.into_proxy().accept(0, 0, 1).await.expect("Failed to accept listener");
         };
 
         let client = handle_socat_listen(proxy, 0);

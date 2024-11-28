@@ -32,11 +32,8 @@ class Paver : public fidl::WireServer<fuchsia_paver::Paver> {
   void FindDataSink(FindDataSinkRequestView request,
                     FindDataSinkCompleter::Sync& completer) override;
 
-  void UseBlockDevice(UseBlockDeviceRequestView request,
-                      UseBlockDeviceCompleter::Sync& completer) override;
-
-  void UseBlockDevice(BlockAndController block_device,
-                      fidl::ServerEnd<fuchsia_paver::DynamicDataSink> dynamic_data_sink);
+  void FindPartitionTableManager(FindPartitionTableManagerRequestView request,
+                                 FindPartitionTableManagerCompleter::Sync& completer) override;
 
   void FindBootManager(FindBootManagerRequestView request,
                        FindBootManagerCompleter::Sync& completer) override;
@@ -48,7 +45,7 @@ class Paver : public fidl::WireServer<fuchsia_paver::Paver> {
 
   void set_dispatcher(async_dispatcher_t* dispatcher) { dispatcher_ = dispatcher; }
   void set_devfs_root(fbl::unique_fd devfs_root) {
-    devices_ = *BlockDevices::Create(std::move(devfs_root));
+    devices_ = *BlockDevices::CreateDevfs(std::move(devfs_root));
   }
   void set_svc_root(fidl::ClientEnd<fuchsia_io::Directory> svc_root) {
     svc_root_ = std::move(svc_root);
@@ -61,8 +58,7 @@ class Paver : public fidl::WireServer<fuchsia_paver::Paver> {
         svc_root_(std::move(svc_root)),
         context_(std::make_shared<Context>()) {}
 
-  static zx::result<std::unique_ptr<Paver>> Create(fbl::unique_fd devfs_root = {},
-                                                   fbl::unique_fd partitions_root = {});
+  static zx::result<std::unique_ptr<Paver>> Create(fbl::unique_fd devfs_root = {});
 
   void LifecycleStopCallback(fit::callback<void(zx_status_t status)> cb);
 
@@ -187,9 +183,8 @@ class DynamicDataSink : public fidl::WireServer<fuchsia_paver::DynamicDataSink> 
 
   static void Bind(async_dispatcher_t* dispatcher, BlockDevices devices,
                    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-                   BlockAndController block_device,
                    fidl::ServerEnd<fuchsia_paver::DynamicDataSink> server,
-                   std::shared_ptr<Context> context);
+                   std::shared_ptr<Context> context, BlockAndController block = {});
 
   void InitializePartitionTables(InitializePartitionTablesCompleter::Sync& completer) override;
 
@@ -244,11 +239,9 @@ class DynamicDataSink : public fidl::WireServer<fuchsia_paver::DynamicDataSink> 
 
 class BootManager : public fidl::WireServer<fuchsia_paver::BootManager> {
  public:
-  BootManager(std::unique_ptr<abr::Client> abr_client, BlockDevices devices,
-              fidl::ClientEnd<fuchsia_io::Directory> svc_root)
-      : abr_client_(std::move(abr_client)),
-        devices_(std::move(devices)),
-        svc_root_(std::move(svc_root)) {}
+  BootManager(std::unique_ptr<DevicePartitioner> partitioner,
+              std::unique_ptr<abr::Client> abr_client)
+      : partitioner_(std::move(partitioner)), abr_client_(std::move(abr_client)) {}
 
   static void Bind(async_dispatcher_t* dispatcher, BlockDevices devices,
                    fidl::ClientEnd<fuchsia_io::Directory> svc_root,
@@ -285,9 +278,8 @@ class BootManager : public fidl::WireServer<fuchsia_paver::BootManager> {
   }
 
  private:
+  std::unique_ptr<DevicePartitioner> partitioner_;
   std::unique_ptr<abr::Client> abr_client_;
-  BlockDevices devices_;
-  fidl::ClientEnd<fuchsia_io::Directory> svc_root_;
 
   // Returns true if we are currently executing the final boot attempt on the given slot.
   bool IsFinalBootAttempt(const AbrSlotInfo& slot_info,

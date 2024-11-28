@@ -205,8 +205,7 @@ async fn setup_cobalt_proxy() -> Option<fidl_fuchsia_metrics::MetricEventLoggerP
         .context("failed to connect to metrics service")?;
 
         let (cobalt_1dot1_proxy, cobalt_1dot1_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-                .context("failed to create MetricEventLoggerMarker endponts")?;
+            fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
         let project_spec = fidl_fuchsia_metrics::ProjectSpec {
             customer_id: Some(metrics::CUSTOMER_ID),
@@ -277,7 +276,7 @@ mod tests {
             call_chan: mpsc::UnboundedSender<CallType>,
         ) -> Pin<Box<impl Future<Output = ()>>> {
             let server = async move {
-                let mut req_stream = self.chan.into_stream().unwrap();
+                let mut req_stream = self.chan.into_stream();
                 while let Ok(request) = req_stream.try_next().await {
                     match request {
                         Some(fsys::StorageAdminRequest::DeleteAllStorageContents { responder }) => {
@@ -322,11 +321,10 @@ mod tests {
         if let Some(server) = server {
             fasync::Task::spawn(server.run_server(calls_tx)).detach();
         }
-        let client = client.into_proxy().unwrap();
+        let client = client.into_proxy();
         let (cobalt_client, cobalt_events) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_metrics::MetricEventLoggerMarker,
-        >()
-        .unwrap();
+        >();
         (calls_rx, exec, time_step, client, config, cobalt_client, cobalt_events)
     }
 

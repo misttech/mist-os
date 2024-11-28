@@ -57,6 +57,10 @@ type AddressRemovalReason = strict enum {
 
     /// The address was removed from the interface by user action.
     USER_REMOVED = 5;
+
+    /// Invalid address properties or parameters during addition or properties
+    /// update.
+    INVALID_PROPERTIES = 6;
 };
 
 /// Offers state information about an IP address.
@@ -69,17 +73,15 @@ type AddressRemovalReason = strict enum {
 /// - Observing a closure of the server end indicates the object no longer
 ///   exists.
 closed protocol AddressStateProvider {
-    // TODO(https://fxbug.dev/42160986): Currently Netstack2's implementation does
-    // not support this method due to lack of support for updating addresses'
-    // valid and preferred lifetimes, and will send an
-    // `AddressRemovalReason.USER_REMOVED` event and close the server end of
-    // the protocol.
     /// Push an update when the address properties change.
     ///
     /// The client pushes updates on address properties changes, such as the
     /// address becoming deprecated, or the preferred and valid lifetimes being
     /// updated as a result of extending the address' lifetime. The server is
     /// expected to cache address properties.
+    ///
+    /// If `address_properties` contains invalid property values, the address is
+    /// removed and [`AddressRemovalReason.INVALID_PROPERTIES`] is issued.
     ///
     /// + request `address_properties` the updated properties of the address.
     strict UpdateAddressProperties(struct {

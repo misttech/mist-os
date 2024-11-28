@@ -23,8 +23,7 @@ const MAX_REGULATED_BRIGHTNESS: f64 = 1.0;
 
 fn open_backlight() -> Result<BacklightProxy, Error> {
     tracing::info!("Opening backlight");
-    let (proxy, server) = fidl::endpoints::create_proxy::<BacklightMarker>()
-        .context("Failed to create backlight proxy")?;
+    let (proxy, server) = fidl::endpoints::create_proxy::<BacklightMarker>();
     // TODO(kpt): Don't hardcode this path b/138666351
     fdio::service_connect("/dev/class/backlight/000", server.into_channel())
         .context("Failed to connect built-in service")?;
@@ -447,8 +446,7 @@ mod tests {
     use futures_util::stream::StreamExt;
 
     fn mock_backlight() -> (Arc<Backlight>, BacklightRequestStream) {
-        let (backlight_proxy, backlight_stream) =
-            create_proxy_and_stream::<BacklightMarker>().unwrap();
+        let (backlight_proxy, backlight_stream) = create_proxy_and_stream::<BacklightMarker>();
 
         (
             Arc::new(Backlight::without_display_power_internal(backlight_proxy).unwrap()),
@@ -614,7 +612,7 @@ mod dual_state_tests {
         }
 
         pub fn start(&self) -> Result<(BacklightProxy, Task<()>), Error> {
-            let (proxy, stream) = create_proxy_and_stream::<BacklightMarker>()?;
+            let (proxy, stream) = create_proxy_and_stream::<BacklightMarker>();
             let task = Task::local(self.clone().process_requests(stream));
             Ok((proxy, task))
         }
@@ -679,7 +677,7 @@ mod dual_state_tests {
         }
 
         pub fn start(&self) -> Result<(DisplayPowerProxy, Task<()>), Error> {
-            let (proxy, stream) = create_proxy_and_stream::<DisplayPowerMarker>()?;
+            let (proxy, stream) = create_proxy_and_stream::<DisplayPowerMarker>();
             let task = Task::local(self.clone().process_requests(stream));
             Ok((proxy, task))
         }

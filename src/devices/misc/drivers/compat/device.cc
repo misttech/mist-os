@@ -374,8 +374,8 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
     return zx::error(ZX_ERR_PROTOCOL_NOT_SUPPORTED);
   };
 
-  device->device_server_.Init(outgoing_name, "", std::move(service_offers),
-                              std::move(banjo_config));
+  device->device_server_.Initialize(outgoing_name, std::move(service_offers),
+                                    std::move(banjo_config));
 
   // Add the metadata from add_args:
   for (size_t i = 0; i < zx_args->metadata_count; i++) {

@@ -913,11 +913,12 @@ impl ObjectStore {
         let permanent = if let Some(crypt) = crypt {
             store
                 .key_manager
-                .pre_fetch(
+                .get_keys(
                     obj_id,
                     crypt.as_ref(),
-                    store.get_keys(obj_id),
-                    /* permanent: */ true,
+                    &mut Some(store.get_keys(obj_id)),
+                    /* permanent= */ true,
+                    /* force= */ false,
                 )
                 .await?;
             true
@@ -1057,7 +1058,8 @@ impl ObjectStore {
             ..
         } = &mut mutation.item.value
         {
-            *refs = refs.checked_add_signed(delta).ok_or(anyhow!("refs underflow/overflow"))?;
+            *refs =
+                refs.checked_add_signed(delta).ok_or_else(|| anyhow!("refs underflow/overflow"))?;
             refs
         } else {
             bail!(FxfsError::NotFile);

@@ -87,7 +87,7 @@ template("verify_manifest_elf_binaries") {
           invoker.check_unstripped_files) {
         args += [
           "--check-unstripped-files",
-          "--toolchain-lib-dir=${rebased_clang_prefix}/../lib",
+          "--toolchain-lib-dir=${rebased_clang_dir}/lib",
           "--toolchain-lib-dir=${rebased_rustc_prefix}/lib",
         ]
       }

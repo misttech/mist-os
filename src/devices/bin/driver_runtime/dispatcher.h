@@ -33,7 +33,7 @@
 
 #include "src/devices/bin/driver_runtime/async_loop_owned_event_handler.h"
 #include "src/devices/bin/driver_runtime/callback_request.h"
-#include "src/devices/bin/driver_runtime/driver_context.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 #include "src/devices/bin/driver_runtime/token_manager.h"
 
 namespace driver_runtime {
@@ -726,7 +726,7 @@ class Dispatcher : public async_dispatcher_t,
   void IdleCheckLocked() __TA_REQUIRES(&callback_lock_);
 
   // Returns true if the current thread is managed by the driver runtime.
-  bool IsRuntimeManagedThread() { return !driver_context::IsCallStackEmpty(); }
+  bool IsRuntimeManagedThread() { return !thread_context::IsCallStackEmpty(); }
 
   // Returns whether the dispatcher is in the running state.
   bool IsRunningLocked() __TA_REQUIRES(&callback_lock_) {

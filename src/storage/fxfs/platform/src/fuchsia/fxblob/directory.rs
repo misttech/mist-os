@@ -198,7 +198,7 @@ impl BlobDirectory {
     pub(crate) async fn lookup_blob(self: &Arc<Self>, hash: Hash) -> Result<Arc<FxBlob>, Error> {
         // For simplify lookup logic, we re-use `open_blob` just decrement the open count before
         // returning the node handle.
-        self.open_blob(&hash.into()).await?.ok_or(FxfsError::NotFound.into()).map(|blob| {
+        self.open_blob(&hash.into()).await?.ok_or_else(|| FxfsError::NotFound.into()).map(|blob| {
             let node = blob.take();
             node.clone().open_count_sub_one();
             node
@@ -344,11 +344,7 @@ impl BlobDirectory {
         if blob_exists {
             return Err(CreateBlobError::AlreadyExists);
         }
-        let (client_end, request_stream) =
-            create_request_stream::<BlobWriterMarker>().map_err(|e| {
-                tracing::error!("Failed to create request stream for BlobWriter: {:?}", e);
-                CreateBlobError::Internal
-            })?;
+        let (client_end, request_stream) = create_request_stream::<BlobWriterMarker>();
         let writer = DeliveryBlobWriter::new(self, hash).await.map_err(|e| {
             tracing::error!("Failed to create blob writer: {:?}", e);
             CreateBlobError::Internal
@@ -551,8 +547,7 @@ mod tests {
             let compressed_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Always);
 
             let (blob_volume_outgoing_dir, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create dir proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
             fixture
                 .volumes_directory()
@@ -570,7 +565,7 @@ mod tests {
                 .expect("transport error on create")
                 .expect("failed to create blob");
 
-            let writer = blob_writer_client_end.into_proxy().unwrap();
+            let writer = blob_writer_client_end.into_proxy();
             let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
                 .await
                 .expect("failed to create BlobWriter");
@@ -621,8 +616,7 @@ mod tests {
 
             let compressed_data: Vec<u8> = Type1Blob::generate(&datum, CompressionMode::Always);
             let (blob_volume_outgoing_dir, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create dir proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
             fixture
                 .volumes_directory()
@@ -640,7 +634,7 @@ mod tests {
                 .expect("transport error on create")
                 .expect("failed to create blob");
 
-            let writer = blob_writer_client_end.into_proxy().unwrap();
+            let writer = blob_writer_client_end.into_proxy();
             let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
                 .await
                 .expect("failed to create BlobWriter");

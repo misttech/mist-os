@@ -455,7 +455,7 @@ impl TraceSession {
         info!("initializing tracing...");
         let trace_provisioner = connect_to_protocol::<TracingProvisionerMarker>().unwrap();
         let (tracing_controller, server_end) =
-            fidl::endpoints::create_proxy::<TracingSessionMarker>().unwrap();
+            fidl::endpoints::create_proxy::<TracingSessionMarker>();
         let (tracing_socket, tracing_socket_write) = Socket::create_stream();
         let tracing_socket = AsyncSocket::from_socket(tracing_socket);
         trace_provisioner
@@ -496,7 +496,7 @@ async fn run_puppet(url: String) {
     info!("running child component...");
     let realm = connect_to_protocol::<RealmMarker>().unwrap();
 
-    let (component_controller, controller_server) = fidl::endpoints::create_proxy().unwrap();
+    let (component_controller, controller_server) = fidl::endpoints::create_proxy();
     realm
         .create_child(
             &fdecl::CollectionRef { name: COLLECTION_NAME.to_string() },
@@ -512,8 +512,7 @@ async fn run_puppet(url: String) {
         .unwrap()
         .unwrap();
 
-    let (execution_controller, execution_controller_server) =
-        fidl::endpoints::create_proxy().unwrap();
+    let (execution_controller, execution_controller_server) = fidl::endpoints::create_proxy();
     component_controller
         .start(StartChildArgs::default(), execution_controller_server)
         .await

@@ -653,8 +653,7 @@ impl MockPaverService {
 
     /// Spawns a new task to serve the data sink protocol.
     pub fn spawn_data_sink_service(self: &Arc<Self>) -> paver::DataSinkProxy {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<paver::DataSinkMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<paver::DataSinkMarker>();
 
         fasync::Task::spawn(
             Arc::clone(self)
@@ -668,8 +667,7 @@ impl MockPaverService {
 
     /// Spawns a new task to serve the boot manager protocol.
     pub fn spawn_boot_manager_service(self: &Arc<Self>) -> paver::BootManagerProxy {
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy::<paver::BootManagerMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<paver::BootManagerMarker>();
 
         fasync::Task::spawn(
             Arc::clone(self)
@@ -683,8 +681,7 @@ impl MockPaverService {
 
     /// Spawns a new task to serve the paver protocol.
     pub fn spawn_paver_service(self: &Arc<Self>) -> paver::PaverProxy {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<paver::PaverMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<paver::PaverMarker>();
 
         fasync::Task::spawn(
             Arc::clone(self)
@@ -756,7 +753,7 @@ impl MockPaverService {
             return Ok(());
         };
 
-        let mut stream = boot_manager.into_stream()?;
+        let mut stream = boot_manager.into_stream();
 
         'req_stream: while let Some(mut request) = stream.try_next().await? {
             self.push_event(PaverEvent::from_boot_manager_request(&request));
@@ -838,7 +835,7 @@ impl MockPaverService {
                     let paver_service_clone = self.clone();
                     fasync::Task::spawn(
                         paver_service_clone
-                            .run_data_sink_service(data_sink.into_stream()?)
+                            .run_data_sink_service(data_sink.into_stream())
                             .unwrap_or_else(|e| panic!("error running data sink service: {e:?}")),
                     )
                     .detach();
@@ -881,8 +878,7 @@ pub mod tests {
         {
             let paver = f(MockPaverServiceBuilder::new());
             let paver = Arc::new(paver.build());
-            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<paver::PaverMarker>()
-                .expect("Creating paver endpoints");
+            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<paver::PaverMarker>();
 
             fasync::Task::spawn(
                 Arc::clone(&paver)
@@ -891,12 +887,10 @@ pub mod tests {
             )
             .detach();
 
-            let (data_sink, server) = fidl::endpoints::create_proxy::<paver::DataSinkMarker>()
-                .expect("Creating data sink endpoints");
+            let (data_sink, server) = fidl::endpoints::create_proxy::<paver::DataSinkMarker>();
             proxy.find_data_sink(server).expect("Finding data sink");
             let (boot_manager, server) =
-                fidl::endpoints::create_proxy::<paver::BootManagerMarker>()
-                    .expect("Creating boot manager endpoints");
+                fidl::endpoints::create_proxy::<paver::BootManagerMarker>();
             proxy.find_boot_manager(server).expect("Finding boot manager");
 
             MockPaverForTest { paver, data_sink, boot_manager }

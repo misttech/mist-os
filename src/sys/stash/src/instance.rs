@@ -48,7 +48,7 @@ impl Instance {
             self.store_manager.clone(),
             self.enable_bytes,
             read_only,
-            self.client_name.clone().ok_or(format_err!("identify has not been called"))?,
+            self.client_name.clone().ok_or_else(|| format_err!("identify has not been called"))?,
         );
 
         let server_chan = fasync::Channel::from_channel(server_end.into_channel());

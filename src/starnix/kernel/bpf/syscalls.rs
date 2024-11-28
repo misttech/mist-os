@@ -42,6 +42,7 @@ use starnix_uapi::{
     bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info, errno,
     error, BPF_F_RDONLY, BPF_F_RDONLY_PROG, BPF_F_WRONLY, PATH_MAX,
 };
+use std::sync::Arc;
 use zerocopy::{FromBytes, IntoBytes};
 
 /// Read the arguments for a BPF command. The ABI works like this: If the arguments struct
@@ -231,7 +232,6 @@ pub fn sys_bpf(
             let prog_attr: bpf_attr__bindgen_ty_4 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_PROG_LOAD");
 
-            let info = ProgramInfo::from(&prog_attr);
             let user_code = UserRef::<bpf_insn>::new(UserAddress::from(prog_attr.insns));
             let code = current_task.read_objects_to_vec(user_code, prog_attr.insn_cnt as usize)?;
 
@@ -246,22 +246,24 @@ pub fn sys_bpf(
             } else {
                 UserBuffersOutputBuffer::unified_new(current_task, smallvec![])?
             };
-            let program = match Program::new(current_task, info.clone(), &mut log_buffer, code) {
-                Ok(program) => program,
+            let program = ProgramInfo::try_from(&prog_attr)
+                .and_then(|info| Program::new(current_task, info, &mut log_buffer, code));
+            let program_or_stub = match program {
+                Ok(program) => BpfHandle::Program(Arc::new(program)),
                 Err(e) => {
                     if current_task.kernel().features.bpf_v2 {
-                        return Err(e);
+                        return Err(e.into());
                     }
                     // if bpf_v2 is not enabled, only log the error and return a stub. In the
                     // future, return the error unconditionally.
                     log_error!("Unable to load bpf program: {e:?}");
-                    Program::new_stub(info)
+                    BpfHandle::ProgramStub(prog_attr.prog_type)
                 }
             };
             // Ensures the log buffer ends with a 0.
             log_buffer.write(b"\0")?;
 
-            install_bpf_fd(current_task, program)
+            install_bpf_fd(current_task, program_or_stub)
         }
 
         // Attach an eBPF program to a target_fd at the specified attach_type hook.
@@ -344,14 +346,17 @@ pub fn sys_bpf(
                 }
                 .as_bytes()
                 .to_owned(),
-                BpfHandle::Program(_) => {
+                BpfHandle::Program(prog) =>
+                {
                     #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
-                    bpf_prog_info {
-                        // Doesn't matter yet
-                        ..Default::default()
-                    }
-                    .as_bytes()
-                    .to_owned()
+                    bpf_prog_info { type_: prog.info.program_type.into(), ..Default::default() }
+                        .as_bytes()
+                        .to_owned()
+                }
+                BpfHandle::ProgramStub(type_) =>
+                {
+                    #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
+                    bpf_prog_info { type_, ..Default::default() }.as_bytes().to_owned()
                 }
                 _ => {
                     return error!(EINVAL);

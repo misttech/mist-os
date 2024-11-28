@@ -406,7 +406,7 @@ mod tests {
         mock_full_resolver: Arc<fresolution::ResolverProxy>,
     ) -> (fasync::Task<()>, fresolution::ResolverProxy) {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>();
         let subscriber = tracing::subscriber::NoSubscriber::default();
         let task = fasync::Task::local(async move {
             serve_resolver(
@@ -426,8 +426,7 @@ mod tests {
         let pkg_name = "package-one".to_string();
 
         let (resolver_proxy, resolver_request_stream) =
-            create_proxy_and_stream::<fresolution::ResolverMarker>()
-                .expect("failed to create mock full resolver proxy");
+            create_proxy_and_stream::<fresolution::ResolverMarker>();
         let _full_resolver_task = fasync::Task::spawn(async move {
             respond_to_resolve_requests(resolver_request_stream).await;
         });
@@ -477,8 +476,7 @@ mod tests {
         let pkg_name = "package-one".to_string();
 
         let (resolver_proxy, resolver_request_stream) =
-            create_proxy_and_stream::<fresolution::ResolverMarker>()
-                .expect("failed to create mock full resolver proxy");
+            create_proxy_and_stream::<fresolution::ResolverMarker>();
         let _full_resolver_task = fasync::Task::spawn(async move {
             respond_to_resolve_requests(resolver_request_stream).await;
         });
@@ -496,8 +494,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_package_not_allowed() {
-        let (resolver_proxy, _) = create_proxy_and_stream::<fresolution::ResolverMarker>()
-            .expect("failed to create mock full resolver proxy");
+        let (resolver_proxy, _) = create_proxy_and_stream::<fresolution::ResolverMarker>();
 
         let (_task, hermetic_resolver_proxy) = run_resolver(
             "package-two".to_string().into(),
@@ -528,8 +525,7 @@ mod tests {
     #[fuchsia::test]
     async fn other_packages_allowed() {
         let (resolver_proxy, resolver_request_stream) =
-            create_proxy_and_stream::<fresolution::ResolverMarker>()
-                .expect("failed to create mock full resolver proxy");
+            create_proxy_and_stream::<fresolution::ResolverMarker>();
 
         let list = hashset!("package-three".to_string(), "package-four".to_string());
 
@@ -580,8 +576,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_failed_resolve() {
         let (resolver_proxy, resolver_request_stream) =
-            create_proxy_and_stream::<fresolution::ResolverMarker>()
-                .expect("failed to create mock full resolver proxy");
+            create_proxy_and_stream::<fresolution::ResolverMarker>();
         let _full_resolver_task = fasync::Task::spawn(async move {
             respond_to_resolve_requests(resolver_request_stream).await;
         });
@@ -604,8 +599,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_invalid_url() {
-        let (resolver_proxy, _) = create_proxy_and_stream::<fresolution::ResolverMarker>()
-            .expect("failed to create mock full resolver proxy");
+        let (resolver_proxy, _) = create_proxy_and_stream::<fresolution::ResolverMarker>();
 
         let pkg_name = "package-two".to_string();
         let (_task, hermetic_resolver_proxy) = run_resolver(

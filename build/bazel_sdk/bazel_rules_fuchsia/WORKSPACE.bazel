@@ -4,7 +4,7 @@
 
 # Workspace definition for Bazel SDK workspace rules.
 
-workspace(name = "fuchsia_workspace")
+workspace(name = "rules_fuchsia")
 
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")

@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use assembly_config_schema::product_config::BuildInfoConfig;
-use assembly_util::{FileEntry, PackageDestination, PackageSetDestination};
+use assembly_constants::{FileEntry, PackageDestination, PackageSetDestination};
 
 pub(crate) struct BuildInfoSubsystem;
 impl DefineSubsystemConfiguration<Option<BuildInfoConfig>> for BuildInfoSubsystem {

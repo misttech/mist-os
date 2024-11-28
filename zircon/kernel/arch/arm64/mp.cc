@@ -25,17 +25,13 @@
 
 namespace {
 // Mask the MPIDR register to only leave the AFFx ids.
-constexpr uint64_t kMpidAffMask = 0xFF00FFFFFF;
+constexpr uint64_t kMpidAffMask = ARM64_MPIDR_MASK;
 
 // A list of mpids, indexed by cpu_id.
 // We can leave this zero-initialized as MPID 0 is only valid on CPU 0.
 uint64_t arm64_cpu_list[SMP_MAX_CPUS];
 
 }  // namespace
-
-// cpu id to cluster and id within cluster map
-uint arm64_cpu_cluster_ids[SMP_MAX_CPUS] = {0};
-uint arm64_cpu_cpu_ids[SMP_MAX_CPUS] = {0};
 
 // total number of detected cpus
 uint arm_num_cpus = 1;
@@ -44,12 +40,7 @@ uint arm_num_cpus = 1;
 arm64_percpu arm64_percpu_array[SMP_MAX_CPUS];
 
 void arch_register_mpid(uint cpu_id, uint64_t mpid) {
-  // TODO(https://fxbug.dev/42108040) transition off of these maps to the topology.
-  arm64_cpu_cluster_ids[cpu_id] = (mpid & 0xFF00) >> MPIDR_AFF1_SHIFT;  // "cluster" here is AFF1.
-  arm64_cpu_cpu_ids[cpu_id] = mpid & 0xFF;                              // "cpu" here is AFF0.
-
   arm64_percpu_array[cpu_id].cpu_num = cpu_id;
-
   arm64_cpu_list[cpu_id] = mpid;
 }
 

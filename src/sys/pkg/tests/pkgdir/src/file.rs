@@ -7,13 +7,11 @@
 //! meaningful differences in File behavior.
 
 use crate::{dirs_to_test, repeat_by_n, PackageSource};
-use anyhow::{anyhow, Context as _, Error};
 use assert_matches::assert_matches;
 use fidl::endpoints::create_proxy;
 use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::open_file;
-use futures::StreamExt;
 use std::cmp;
 use std::convert::TryFrom as _;
 
@@ -461,10 +459,7 @@ async fn clone_per_package_source(source: PackageSource) {
     let root_dir = &source.dir;
     assert_clone_success(root_dir, "file", "file").await;
     assert_clone_success(root_dir, "meta/file", "meta/file").await;
-    assert_clone_sends_on_open_event(root_dir, "file").await;
-    assert_clone_sends_on_open_event(root_dir, "meta/file").await;
     assert_clone_success(root_dir, "meta", TEST_PKG_HASH).await;
-    assert_clone_sends_on_open_event(root_dir, "meta").await;
 }
 
 async fn assert_clone_success(
@@ -475,40 +470,11 @@ async fn assert_clone_success(
     let parent = open_file(package_root, path, fuchsia_fs::PERM_READABLE)
         .await
         .expect("open parent directory");
-    let (clone, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy");
+    let (clone, server_end) = create_proxy::<fio::FileMarker>();
     let node_request = fidl::endpoints::ServerEnd::new(server_end.into_channel());
-    parent.clone(fio::OpenFlags::RIGHT_READABLE, node_request).expect("cloned node");
+    parent.clone2(node_request).expect("cloned node");
     let bytes = clone.read(fio::MAX_BUF).await.unwrap().map_err(zx::Status::from_raw).unwrap();
     assert_eq!(std::str::from_utf8(&bytes).unwrap(), expected_contents);
-}
-
-async fn assert_clone_sends_on_open_event(package_root: &fio::DirectoryProxy, path: &str) {
-    async fn verify_file_clone_sends_on_open_event(file: fio::FileProxy) -> Result<(), Error> {
-        match file.take_event_stream().next().await {
-            Some(Ok(fio::FileEvent::OnOpen_ { s, info: Some(boxed) })) => {
-                assert_eq!(zx::Status::from_raw(s), zx::Status::OK);
-                match *boxed {
-                    fio::NodeInfoDeprecated::File(_) => Ok(()),
-                    _ => Err(anyhow!("wrong fio::NodeInfoDeprecated returned")),
-                }
-            }
-            Some(Ok(fio::FileEvent::OnRepresentation { payload: _ })) => Ok(()),
-            Some(Ok(other)) => Err(anyhow!("wrong node type returned: {:?}", other)),
-            Some(Err(e)) => Err(e).context("failed to call onopen"),
-            None => Err(anyhow!("no events!")),
-        }
-    }
-
-    let parent = open_file(package_root, path, fuchsia_fs::PERM_READABLE)
-        .await
-        .expect("open parent directory");
-    let (file_proxy, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy");
-
-    parent.clone(fio::OpenFlags::DESCRIBE, server_end.into_channel().into()).expect("clone file");
-
-    if let Err(e) = verify_file_clone_sends_on_open_event(file_proxy).await {
-        panic!("failed to verify clone. parent: {path:?}, error: {e:#}");
-    }
 }
 
 #[fuchsia::test]

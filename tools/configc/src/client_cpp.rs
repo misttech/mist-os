@@ -95,7 +95,7 @@ fn format_source(clang_format: &PathBuf, contents: String) -> Result<String, Err
     process
         .stdin
         .as_mut()
-        .ok_or(format_err!("could not get stdin for clang-format process"))?
+        .ok_or_else(|| format_err!("could not get stdin for clang-format process"))?
         .write_all(contents.as_bytes())
         .context("Could not write unformatted source to stdin of clang-format")?;
     let output =

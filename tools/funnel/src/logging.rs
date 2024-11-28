@@ -34,9 +34,8 @@ fn configure_subscribers(level: LevelFilter) {
     let include_spans = true;
     let stdio_layer = {
         let event_format = LogFormat::new(*LOGGING_ID, include_spans);
-        let format = tracing_subscriber::fmt::layer()
-            .event_format(event_format)
-            .with_filter(filter_targets.clone());
+        let format =
+            tracing_subscriber::fmt::layer().event_format(event_format).with_filter(filter_targets);
         Some(format)
     };
 

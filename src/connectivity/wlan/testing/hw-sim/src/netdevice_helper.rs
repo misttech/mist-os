@@ -15,8 +15,7 @@ pub async fn create_client(
     devfs: &fidl_fuchsia_io::DirectoryProxy,
     mac: fidl_fuchsia_net::MacAddress,
 ) -> Option<(netdevice_client::Client, netdevice_client::Port)> {
-    let (directory, directory_server) =
-        create_proxy::<fidl_fuchsia_io::DirectoryMarker>().expect("create proxy");
+    let (directory, directory_server) = create_proxy::<fidl_fuchsia_io::DirectoryMarker>();
 
     fdio::service_connect_at(
         devfs.as_channel().as_ref(),
@@ -38,8 +37,7 @@ pub async fn create_client(
     // on the first try.
     let results = futures::stream::iter(devices).filter_map(|netdev_device| async move {
         let (device_proxy, device_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::DeviceMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::DeviceMarker>();
         netdev_device.get_device(device_server).expect("get device");
         let client = netdevice_client::Client::new(device_proxy);
 
@@ -61,8 +59,7 @@ pub async fn create_client(
         let netdev_port = port_id.try_into().expect("bad port id");
         let port_proxy = client.connect_port(netdev_port).expect("failed to connect port");
         let (mac_addressing, mac_addressing_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::MacAddressingMarker>()
-                .expect("failed to create proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::MacAddressingMarker>();
         port_proxy.get_mac(mac_addressing_server).expect("failed to get mac addressing");
         let addr = mac_addressing.get_unicast_address().await.expect("failed to get address");
 
@@ -99,7 +96,7 @@ pub async fn start_session(
         .await
         .expect("attach port");
 
-    let (watcher_proxy, watcher_server) = fidl::endpoints::create_proxy().unwrap();
+    let (watcher_proxy, watcher_server) = fidl::endpoints::create_proxy();
     client
         .connect_port(port)
         .expect("Failed to connect to port")

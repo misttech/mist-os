@@ -66,8 +66,7 @@ mod test_get_system_image_hash {
         let mock =
             MockBootArgumentsService::new(HashMap::from([(PKGFS_BOOT_ARG_KEY.to_string(), None)]));
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_boot::ArgumentsMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_boot::ArgumentsMarker>();
         fasync::Task::spawn(Arc::new(mock).handle_request_stream(stream)).detach();
 
         assert_matches!(
@@ -83,8 +82,7 @@ mod test_get_system_image_hash {
             Some("bad-prefix".to_string()),
         )]));
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_boot::ArgumentsMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_boot::ArgumentsMarker>();
         fasync::Task::spawn(Arc::new(mock).handle_request_stream(stream)).detach();
 
         assert_matches!(
@@ -100,8 +98,7 @@ mod test_get_system_image_hash {
             Some("bin/pkgsvr+bad-hash".to_string()),
         )]));
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_boot::ArgumentsMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_boot::ArgumentsMarker>();
         fasync::Task::spawn(Arc::new(mock).handle_request_stream(stream)).detach();
 
         assert_matches!(get_system_image_hash(&proxy).await, Err(SystemImageHashError::BadHash(_)));
@@ -117,8 +114,7 @@ mod test_get_system_image_hash {
             ),
         )]));
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_boot::ArgumentsMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_boot::ArgumentsMarker>();
         fasync::Task::spawn(Arc::new(mock).handle_request_stream(stream)).detach();
 
         assert_eq!(get_system_image_hash(&proxy).await.unwrap(), fuchsia_hash::Hash::from([0; 32]));

@@ -123,7 +123,7 @@ mod tests {
         let (stdio, stdio_server) = zx::Socket::create_stream();
 
         let pty = spawn_pty_forwarder(stdio_server).await.unwrap();
-        let pty = pty.into_proxy().unwrap();
+        let pty = pty.into_proxy();
         let mut stdio = fasync::Socket::from_socket(stdio);
         let mut buf = [0u8, 0u8];
 

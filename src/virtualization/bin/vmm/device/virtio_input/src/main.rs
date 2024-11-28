@@ -23,9 +23,9 @@ async fn run_virtio_input(
     let (start_info, input_type, responder) = virtio_input_fidl
         .try_next()
         .await?
-        .ok_or(anyhow!("Failed to read fidl message from the channel."))?
+        .ok_or_else(|| anyhow!("Failed to read fidl message from the channel."))?
         .into_start()
-        .ok_or(anyhow!("Start should be the first message sent."))?;
+        .ok_or_else(|| anyhow!("Start should be the first message sent."))?;
 
     // Prepare the device builder
     let (device_builder, guest_mem) = machina_virtio_device::from_start_info(start_info)?;
@@ -50,16 +50,12 @@ async fn run_virtio_input(
     );
 
     let mut input_handler: Box<dyn InputHandler> = match input_type {
-        InputType::Keyboard(keyboard_listener) => Box::new(KeyboardDevice::new(
-            input_device,
-            keyboard_listener
-                .into_stream()
-                .context("Failed to create stream from KeyboardListener server end")?,
-        )),
-        InputType::Mouse(mouse_source) => Box::new(MouseDevice::new(
-            input_device,
-            mouse_source.into_proxy().context("Failed to create MouseSourceProxy")?,
-        )),
+        InputType::Keyboard(keyboard_listener) => {
+            Box::new(KeyboardDevice::new(input_device, keyboard_listener.into_stream()))
+        }
+        InputType::Mouse(mouse_source) => {
+            Box::new(MouseDevice::new(input_device, mouse_source.into_proxy()))
+        }
     };
 
     ready_responder.send()?;

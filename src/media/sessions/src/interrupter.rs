@@ -29,7 +29,7 @@ impl Interrupter {
             return Ok(());
         }
 
-        let (usage_watcher, usage_watcher_requests) = create_request_stream()?;
+        let (usage_watcher, usage_watcher_requests) = create_request_stream();
         self.usage_reporter.watch(&Usage::RenderUsage(usage), usage_watcher)?;
 
         self.usage_watcher_requests.insert(usage, usage_watcher_requests);
@@ -113,10 +113,9 @@ mod test {
 
     fn test_interrupter() -> (Interrupter, UsageReporterRequestStream) {
         let (usage_reporter, usage_reporter_requests) =
-            create_request_stream::<UsageReporterMarker>()
-                .expect("Creating usage reporter channel");
+            create_request_stream::<UsageReporterMarker>();
 
-        let usage_reporter = usage_reporter.into_proxy().expect("Creating usage reporter proxy");
+        let usage_reporter = usage_reporter.into_proxy();
         let interrupter = Interrupter::new(usage_reporter);
 
         (interrupter, usage_reporter_requests)
@@ -143,7 +142,7 @@ mod test {
             .into_watch()
             .expect("Reading watch request");
         assert_matches!(usage, Usage::RenderUsage(AudioRenderUsage::Media));
-        let media_watcher = media_watcher.into_proxy().expect("Creating media watcher proxy");
+        let media_watcher = media_watcher.into_proxy();
         let media_send_fut =
             media_watcher.on_state_changed(&usage, &UsageState::Muted(UsageStateMuted::default()));
 
@@ -163,8 +162,7 @@ mod test {
             .into_watch()
             .expect("Reading watch request");
         assert_matches!(usage, Usage::RenderUsage(AudioRenderUsage::Background));
-        let background_watcher =
-            background_watcher.into_proxy().expect("Creating background watcher proxy");
+        let background_watcher = background_watcher.into_proxy();
         let background_send_fut = background_watcher
             .on_state_changed(&usage, &UsageState::Unadjusted(UsageStateUnadjusted::default()));
 
@@ -193,7 +191,7 @@ mod test {
             .expect("Reading watch request");
         assert_matches!(usage, Usage::RenderUsage(AudioRenderUsage::Media));
 
-        let watcher = watcher.into_proxy().expect("Creating watcher proxy");
+        let watcher = watcher.into_proxy();
 
         let send_fut =
             watcher.on_state_changed(&usage, &UsageState::Muted(UsageStateMuted::default()));

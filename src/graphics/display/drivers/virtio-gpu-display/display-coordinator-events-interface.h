@@ -13,8 +13,8 @@
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
 
 namespace virtio_display {
 

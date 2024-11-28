@@ -269,7 +269,7 @@ config("loom") {
   # The loom crate documentation recommends compiling with optimizations since
   # the number of iterations can be large enough to make tests unreasonably slow
   # otherwise.
-  configs = [ "//build/config:optimize_default" ]
+  configs = [ "//build/config:optimize_moderate" ]
 }
 
 config("benchmark") {

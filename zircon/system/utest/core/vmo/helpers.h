@@ -7,6 +7,7 @@
 
 #include <lib/fit/defer.h>
 #include <lib/zx/bti.h>
+#include <lib/zx/process.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
@@ -90,7 +91,16 @@ static inline size_t VmoPopulatedBytes(const zx::vmo& vmo) {
   if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
     return UINT64_MAX;
   }
-  return info.populated_bytes;
+  return info.populated_fractional_scaled_bytes == UINT64_MAX ? info.populated_bytes
+                                                              : info.populated_scaled_bytes;
+}
+
+static inline size_t VmoPopulatedFractionalBytes(const zx::vmo& vmo) {
+  zx_info_vmo_t info;
+  if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
+    return UINT64_MAX;
+  }
+  return info.populated_fractional_scaled_bytes;
 }
 
 // Repeatedly poll |vmo| until the |expected_populated_bytes| is observed.
@@ -98,14 +108,38 @@ static inline size_t VmoPopulatedBytes(const zx::vmo& vmo) {
 // Returns true on success, false on error.
 static inline bool PollVmoPopulatedBytes(const zx::vmo& vmo, size_t expected_populated_bytes) {
   return PollVmoInfoUntil(vmo, [&](const zx_info_vmo_t& info) {
-    if (info.populated_bytes == expected_populated_bytes) {
-      return true;
+    if (info.populated_fractional_scaled_bytes == UINT64_MAX) {
+      if (info.populated_bytes == expected_populated_bytes) {
+        return true;
+      }
+      printf("polling again. actual bytes %zu (%zu pages); expected bytes %zu (%zu pages)\n",
+             info.populated_bytes, info.populated_bytes / zx_system_get_page_size(),
+             expected_populated_bytes, expected_populated_bytes / zx_system_get_page_size());
+    } else {
+      if (info.populated_scaled_bytes == expected_populated_bytes) {
+        return true;
+      }
+      printf("polling again. actual bytes %zu (%zu pages); expected bytes %zu (%zu pages)\n",
+             info.populated_scaled_bytes, info.populated_scaled_bytes / zx_system_get_page_size(),
+             expected_populated_bytes, expected_populated_bytes / zx_system_get_page_size());
     }
-    printf("polling again. actual bytes %zu (%zu pages); expected bytes %zu (%zu pages)\n",
-           info.populated_bytes, info.populated_bytes / zx_system_get_page_size(),
-           expected_populated_bytes, expected_populated_bytes / zx_system_get_page_size());
     return false;
   });
+}
+
+// TODO(https://fxbug.dev/338300808): While in the transition phase of RFC-0254 tests need to be
+// able to check either kind of attribution. This helper exists to simplify this logic in tests and
+// can be removed once fully transitioned and testing of the old model can be removed.
+static inline bool UsingLegacyAttribution() {
+  zx_info_task_stats_t stats;
+  zx_status_t result =
+      zx::process::self()->get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), nullptr, nullptr);
+  ZX_ASSERT(result == ZX_OK);
+  return stats.mem_fractional_scaled_shared_bytes == UINT64_MAX;
+}
+
+static inline uint64_t ValueIfLegacyAttribution(uint64_t legacy_value, uint64_t new_value) {
+  return UsingLegacyAttribution() ? legacy_value : new_value;
 }
 
 // Create a fit::defer which will check a BTI to make certain that it has no

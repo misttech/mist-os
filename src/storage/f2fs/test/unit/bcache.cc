@@ -16,14 +16,13 @@ namespace {
 
 using block_client::FakeBlockDevice;
 
-constexpr uint32_t kMinVolumeSize = 104'857'600;
-constexpr uint32_t kNumBlocks = kMinVolumeSize / kDefaultSectorSize;
-
 TEST(BCacheTest, Trim) {
   {
     bool readonly_device = false;
-    auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
-        .block_count = kNumBlocks, .block_size = kDefaultSectorSize, .supports_trim = false});
+    auto device = std::make_unique<FakeBlockDevice>(
+        FakeBlockDevice::Config{.block_count = kDefaultSectorCount,
+                                .block_size = kDefaultSectorSize,
+                                .supports_trim = false});
     ASSERT_TRUE(device);
     auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
     ASSERT_TRUE(bc_or.is_ok());
@@ -35,8 +34,10 @@ TEST(BCacheTest, Trim) {
   }
   {
     bool readonly_device = false;
-    auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
-        .block_count = kNumBlocks, .block_size = kDefaultSectorSize, .supports_trim = true});
+    auto device = std::make_unique<FakeBlockDevice>(
+        FakeBlockDevice::Config{.block_count = kDefaultSectorCount,
+                                .block_size = kDefaultSectorSize,
+                                .supports_trim = true});
     ASSERT_TRUE(device);
     auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
     ASSERT_TRUE(bc_or.is_ok());
@@ -54,7 +55,7 @@ TEST(BCacheTest, Exception) {
     std::unique_ptr<f2fs::BcacheMapper> bc;
     bool readonly_device = false;
     auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
-        .block_count = kNumBlocks, .block_size = 0, .supports_trim = false});
+        .block_count = kDefaultSectorCount, .block_size = 0, .supports_trim = false});
     ASSERT_TRUE(device);
     auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
     ASSERT_TRUE(bc_or.is_error());
@@ -78,8 +79,10 @@ TEST(BCacheTest, Exception) {
 TEST(BCacheTest, VmoidReuse) {
   std::unique_ptr<f2fs::BcacheMapper> bc;
   bool readonly_device = false;
-  auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
-      .block_count = kNumBlocks, .block_size = kDefaultSectorSize, .supports_trim = false});
+  auto device =
+      std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{.block_count = kDefaultSectorCount,
+                                                                .block_size = kDefaultSectorSize,
+                                                                .supports_trim = false});
   ASSERT_TRUE(device);
 
   auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
@@ -106,8 +109,10 @@ TEST(BCacheTest, VmoidReuse) {
 TEST(BCacheTest, Flag) {
   std::unique_ptr<f2fs::BcacheMapper> bc;
   bool readonly_device = false;
-  auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
-      .block_count = kNumBlocks, .block_size = kDefaultSectorSize, .supports_trim = false});
+  auto device =
+      std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{.block_count = kDefaultSectorCount,
+                                                                .block_size = kDefaultSectorSize,
+                                                                .supports_trim = false});
   ASSERT_TRUE(device);
 
   fuchsia_hardware_block::wire::Flag test_flag = fuchsia_hardware_block::wire::Flag::kReadonly |

@@ -91,7 +91,7 @@ class TestEnvironmentWrapper {
             pdev_.GetInstanceHandler(dispatcher));
     EXPECT_OK(pdev_result.status_value());
 
-    compat_server_.Init("default", "topo");
+    compat_server_.Initialize("default");
     // compat_server_.AddMetadata(DEVICE_METADATA_TRIP, &kTestMetadata, sizeof(kTestMetadata));
     zx_status_t status = compat_server_.Serve(dispatcher, &env_.incoming_directory());
     ZX_ASSERT(status == ZX_OK);

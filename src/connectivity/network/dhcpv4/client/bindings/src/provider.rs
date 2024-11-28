@@ -91,7 +91,7 @@ pub(crate) async fn serve_client_provider(
                     let udp_socket_provider = LibcUdpSocketProvider { interface_id };
 
                     let (client_requests_stream, control_handle) =
-                        request.into_stream_and_control_handle().expect("fidl error");
+                        request.into_stream_and_control_handle();
                     let _handle: InterfaceInUseHandle<'_> = {
                         match interfaces_in_use.mark_interface_in_use(interface_id) {
                             Ok(handle) => handle,

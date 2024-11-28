@@ -20,6 +20,12 @@ class EfiDevicePartitioner : public DevicePartitioner {
       Arch arch, fidl::ClientEnd<fuchsia_device::Controller> block_device,
       std::shared_ptr<Context> context);
 
+  zx::result<std::unique_ptr<abr::Client>> CreateAbrClient() const override;
+
+  const paver::BlockDevices& Devices() const override;
+
+  fidl::UnownedClientEnd<fuchsia_io::Directory> SvcRoot() const override;
+
   bool IsFvmWithinFtl() const override { return false; }
 
   bool SupportsPartition(const PartitionSpec& spec) const override;
@@ -58,13 +64,6 @@ class X64PartitionerFactory : public DevicePartitionerFactory {
       const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       Arch arch, std::shared_ptr<Context> context,
       fidl::ClientEnd<fuchsia_device::Controller> block_device) final;
-};
-
-class X64AbrClientFactory : public abr::ClientFactory {
- public:
-  zx::result<std::unique_ptr<abr::Client>> New(
-      const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-      std::shared_ptr<paver::Context> context) final;
 };
 
 }  // namespace paver

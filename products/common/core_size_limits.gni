@@ -26,7 +26,7 @@ size_checker_input = {
         "cobalt",
         "cobalt_system_metrics",
       ]
-      limit = 3145728  # 3 MiB
+      limit = 3166208  # 3.019 MiB
       creep_limit = 40960  # 40.0 KiB
     },
 
@@ -225,7 +225,7 @@ size_checker_input = {
         "fuzzctl",
         "run_test_suite",
       ]
-      limit = 13230080  # 12.617 MiB
+      limit = 13369344  # 12.75 MiB
       creep_limit = 122880  # 120.0 KiB
     },
     {

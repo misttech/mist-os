@@ -76,9 +76,16 @@ fn parse_config_key_value(
     decls: &Vec<UseConfigurationOrConfigField>,
 ) -> Result<fdecl::ConfigOverride> {
     let mut kv = kv.split("=");
-    let key = kv.next().ok_or(anyhow::anyhow!("invalid key=value formatting"))?.trim().to_string();
-    let value =
-        kv.next().ok_or(anyhow::anyhow!("invalid key=value formatting"))?.trim().to_string();
+    let key = kv
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("invalid key=value formatting"))?
+        .trim()
+        .to_string();
+    let value = kv
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("invalid key=value formatting"))?
+        .trim()
+        .to_string();
     let config_type = decls
         .iter()
         .find_map(|d| match d {
@@ -97,7 +104,7 @@ fn parse_config_key_value(
                 }
             }
         })
-        .ok_or(anyhow::anyhow!("configuration capability not declared for key {key}",))?;
+        .ok_or_else(|| anyhow::anyhow!("configuration capability not declared for key {key}",))?;
     let value = parse_config_value(&value, config_type)?;
     Ok(fdecl::ConfigOverride { key: Some(key), value: Some(value), ..Default::default() })
 }
@@ -192,7 +199,7 @@ mod test {
         expected_kvs: Vec<cm_rust::ConfigOverride>,
     ) -> fsys::ConfigOverrideProxy {
         let (config_override, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fsys::ConfigOverrideMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fsys::ConfigOverrideMarker>();
 
         fuchsia_async::Task::local(async move {
             loop {

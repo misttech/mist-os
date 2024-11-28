@@ -1387,6 +1387,13 @@ closed protocol Object {
     ///     // or otherwise tracked in a way that does not correlate directly to being
     ///     // committed.
     ///     uint64_t populated_bytes;
+    ///
+    ///     uint64_t committed_private_bytes;
+    ///     uint64_t populated_private_bytes;
+    ///     uint64_t committed_scaled_bytes;
+    ///     uint64_t populated_scaled_bytes;
+    ///     uint64_t committed_fractional_scaled_bytes;
+    ///     uint64_t populated_fractional_scaled_bytes;
     /// } zx_info_vmo_t;
     /// ```
     ///
@@ -1501,10 +1508,13 @@ closed protocol Object {
     ///     // physical memory. Some of the memory may be double-mapped, and thus
     ///     // double-counted.
     ///
-    ///     // Committed memory that is only mapped into this task.
+    ///     // Committed memory that is only mapped into this task and is not shared
+    ///     // between multiple VMOs via copy-on-write.
     ///     size_t mem_private_bytes;
     ///
-    ///     // Committed memory that is mapped into this and at least one other task.
+    ///     // Committed memory that is mapped into this and at least one other task,
+    ///     // or is mapped into this task and shared between multiple VMOs via
+    ///     // copy-on-write.
     ///     size_t mem_shared_bytes;
     ///
     ///     // A number that estimates the fraction of mem_shared_bytes that this
@@ -1512,10 +1522,18 @@ closed protocol Object {
     ///     //
     ///     // An estimate of:
     ///     //   For each shared, committed byte:
-    ///     //   mem_scaled_shared_bytes += 1 / (number of tasks mapping this byte)
+    ///     //   share_factor = (number of VMOs sharing this byte) *
+    ///     //                  (number of tasks mapping this byte)
+    ///     //   mem_scaled_shared_bytes += 1 / share_factor
     ///     //
-    ///     // This number is strictly smaller than mem_shared_bytes.
+    ///     // This number is strictly smaller than mem_shared_bytes. Any fractional
+    ///     // bytes are truncated when reporting this value.
     ///     size_t mem_scaled_shared_bytes;
+    ///
+    ///     // The fractional bytes truncated from |mem_scaled_shared_bytes|, expressed
+    ///     // in fixed point with 63 bits of precision. `0x800...` represents a full
+    ///     // byte.
+    ///     uint64_t mem_fractional_scaled_shared_bytes;
     /// } zx_info_task_stats_t;
     /// ```
     ///
@@ -1617,14 +1635,44 @@ closed protocol Object {
     ///     zx_koid_t vmo_koid;
     ///     // Offset into the above VMO or IOB region.
     ///     uint64_t vmo_offset;
-    ///     // The number of PAGE_SIZE pages in the mapped region of the VMO or
-    ///     // IOB region that are backed by physical memory.
-    ///     size_t committed_pages;
-    ///     // The number of PAGE_SIZE pages of content that have been populated and are
-    ///     // being tracked in the mapped region of the VMO or IOB region. This can be
-    ///     // greater than |committed_pages| where pages might be compressed or otherwise
-    ///     // tracked in a way that does not correlate directly to being committed.
-    ///     size_t populated_pages;
+    ///
+    ///    // The number of bytes in the mapped region of the VMO or IOB region that
+    ///    // are backed by physical memory.
+    ///    size_t committed_bytes;
+    ///    // The number of bytes of content that have been populated and are being
+    ///    // tracked in the mapped region of the VMO or IOB region. This can be
+    ///    // greater than |committed_bytes| where pages might be compressed or
+    ///    // otherwise tracked in a way that does not correlate directly to being
+    ///    // committed.
+    ///    size_t populated_bytes;
+    ///    // The number of |committed_bytes| that are private to the VMO or IOB
+    ///    // region (i.e. there are no copy-on-write references to the bytes from
+    ///    // another VMO or IOB region).
+    ///    size_t committed_private_bytes;
+    ///    // The number of |populated_bytes| that are private to the VMO or IOB
+    ///    // region (i.e. there are no copy-on-write references to the bytes from
+    ///    // another VMO or IOB region).
+    ///    size_t populated_private_bytes;
+    ///    // The value of |committed_bytes| when each byte is scaled by the count of
+    ///    // VMOs and IOB regions which have a reference to that byte. Any fractional
+    ///    // bytes are truncated when reporting this value. For example, a byte
+    ///    // shared between 2 VMOs via copy-on-write will only contribute 1/2 to this
+    ///    // value while a private byte will contribute 1.
+    ///    size_t committed_scaled_bytes;
+    ///    // The value of |populated_bytes| when each byte is scaled by the count of
+    ///    // VMOs and IOB regions which have a reference to that byte. Any fractional
+    ///    // bytes are truncated when reporting this value. For example, a byte
+    ///    // shared between 2 VMOs via copy-on-write will only contribute 1/2 to this
+    ///    // value while a private byte will contribute 1.
+    ///    size_t populated_scaled_bytes;
+    ///    // The fractional bytes truncated from |committed_scaled_bytes|, expressed
+    ///    // in fixed point with 63 bits of precision. `0x800...` represents a full
+    ///    // byte.
+    ///    uint64_t committed_fractional_scaled_bytes;
+    ///    // The fractional bytes truncated from |populated_scaled_bytes|, expressed
+    ///    // in fixed point with 63 bits of precision. `0x800...` represents a full
+    ///    // byte.
+    ///    uint64_t populated_fractional_scaled_bytes;
     /// } zx_info_maps_mapping_t;
     /// ```
     ///
@@ -1702,37 +1750,86 @@ closed protocol Object {
     ///     // Bitwise OR of ZX_INFO_VMO_* values.
     ///     uint32_t flags;
     ///
-    ///     // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
-    ///     // memory currently allocated to this VMO; i.e., the amount of physical
-    ///     // memory it consumes. Undefined otherwise.
-    ///     uint64_t committed_bytes;
+    ///    // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
+    ///    // memory currently allocated to this VMO; i.e., the amount of physical
+    ///    // memory it consumes. This includes memory shared between this VMO and
+    ///    // any related copy-on-write clones.
+    ///    //
+    ///    // Undefined otherwise.
+    ///    uint64_t committed_bytes;
     ///
-    ///     // If |flags & ZX_INFO_VMO_VIA_HANDLE|, the handle rights.
-    ///     //
-    ///     // If |flags & ZX_INFO_VMO_VIA_IOB_HANDLE|, the effective combined
-    ///     // handle rights for the IOB region and containing IOB.
-    ///     //
-    ///     // Undefined otherwise.
-    ///     zx_rights_t handle_rights;
+    ///    // If |flags & ZX_INFO_VMO_VIA_HANDLE|, the handle rights.
+    ///    //
+    ///    // If |flags & ZX_INFO_VMO_VIA_IOB_HANDLE|, the effective combined
+    ///    // handle rights for the IOB region and containing IOB.
+    ///    //
+    ///    // Undefined otherwise.
+    ///    zx_rights_t handle_rights;
     ///
-    ///     // VMO mapping cache policy. One of ZX_CACHE_POLICY_*
-    ///     uint32_t cache_policy;
+    ///    // VMO mapping cache policy. One of ZX_CACHE_POLICY_*
+    ///    uint32_t cache_policy;
     ///
-    ///     // Amount of kernel memory, in bytes, allocated to track metadata
-    ///     // associated with this VMO.
-    ///     uint64_t metadata_bytes;
+    ///    // Amount of kernel memory, in bytes, allocated to track metadata
+    ///    // associated with this VMO.
+    ///    uint64_t metadata_bytes;
     ///
-    ///     // Running counter of the number of times the kernel, without user request,
-    ///     // performed actions on this VMO that would have caused |committed_bytes| to
-    ///     // report a different value.
-    ///     uint64_t committed_change_events;
+    ///    // Running counter of the number of times the kernel, without user request,
+    ///    // performed actions on this VMO that would have caused |committed_bytes| to
+    ///    // report a different value.
+    ///    uint64_t committed_change_events;
     ///
-    ///     // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
-    ///     // content that has been populated and is being tracked by this vmo. This
-    ///     // can be greater than |committed_bytes| where content might be compressed
-    ///     // or otherwise tracked in a way that does not correlate directly to being
-    ///     // committed.
-    ///     uint64_t populated_bytes;
+    ///    // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
+    ///    // content that has been populated and is being tracked by this VMO. This
+    ///    // can be greater than |committed_bytes| where content might be compressed
+    ///    // or otherwise tracked in a way that does not correlate directly to being
+    ///    // committed. This includes memory shared between this VMO and any related
+    ///    // copy-on-write clones.
+    ///    //
+    ///    // Undefined otherwise.
+    ///    uint64_t populated_bytes;
+    ///
+    ///    // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
+    ///    // memory currently allocated to only this VMO, i.e., the amount of physical
+    ///    // memory which would be reclaimed if this VMO were closed. This does not
+    ///    // include memry shared between this VMO and any related copy-on-write
+    ///    // clones.
+    ///    //
+    ///    // Undefined otherwise.
+    ///    uint64_t committed_private_bytes;
+    ///
+    ///    // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
+    ///    // content that has been populated and is being tracked by only this VMO.
+    ///    // This can be greater than |committed_private_bytes| where content might
+    ///    // be compressed or otherwise tracked in a way that does not correlate
+    ///    // directly to being committed. This does not includes memory shared between
+    ///    // this VMO and any related copy-on-write clones.
+    ///    //
+    ///    // Undefined otherwise.
+    ///    uint64_t populated_private_bytes;
+    ///
+    ///    // The value of |committed_bytes| when each byte is scaled by the count of
+    ///    // VMOs  which have a reference to that byte. Any fractional bytes are
+    ///    // truncated when reporting this value. For example, a byte shared between
+    ///    // 2 VMOs via copy-on-write will only contribute 1/2 to this value while a
+    ///    // private byte will contribute 1.
+    ///    uint64_t committed_scaled_bytes;
+    ///
+    ///    // The value of |populated_bytes| when each byte is scaled by the count of
+    ///    // VMOs  which have a reference to that byte. Any fractional bytes are
+    ///    // truncated when reporting this value. For example, a byte shared between
+    ///    // 2 VMOs via copy-on-write will only contribute 1/2 to this value while a
+    ///    // private byte will contribute 1.
+    ///    uint64_t populated_scaled_bytes;
+    ///
+    ///    // The fractional bytes truncated from |committed_scaled_bytes|, expressed
+    ///    // in fixed point with 63 bits of precision. `0x800...` represents a full
+    ///    // byte.
+    ///    uint64_t committed_fractional_scaled_bytes;
+    ///
+    ///    // The fractional bytes truncated from |populated_scaled_bytes|, expressed
+    ///    // in fixed point with 63 bits of precision. `0x800...` represents a full
+    ///    // byte.
+    ///    uint64_t populated_fractional_scaled_bytes;
     /// } zx_info_vmo_t;
     /// ```
     ///

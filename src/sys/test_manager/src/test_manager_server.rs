@@ -38,19 +38,9 @@ pub async fn run_test_manager_run_builder_server(
                 test_url,
                 options,
                 controller,
-                control_handle,
+                control_handle: _,
             } => {
-                let controller = match controller.into_stream() {
-                    Ok(c) => c,
-                    Err(e) => {
-                        warn!(
-                            "Cannot add suite {}, invalid controller. Closing connection. error: {}",
-                            test_url,e
-                        );
-                        control_handle.shutdown_with_epitaph(zx::Status::BAD_HANDLE);
-                        break;
-                    }
-                };
+                let controller = controller.into_stream();
 
                 builder.suites.push(Suite {
                     realm: None,
@@ -72,28 +62,8 @@ pub async fn run_test_manager_run_builder_server(
                 controller,
                 control_handle,
             } => {
-                let realm_proxy = match realm.into_proxy() {
-                    Ok(r) => r,
-                    Err(e) => {
-                        warn!(
-                            "Cannot add suite {}, invalid realm. Closing connection. error: {}",
-                            test_url, e
-                        );
-                        control_handle.shutdown_with_epitaph(zx::Status::BAD_HANDLE);
-                        break;
-                    }
-                };
-                let controller = match controller.into_stream() {
-                    Ok(c) => c,
-                    Err(e) => {
-                        warn!(
-                            "Cannot add suite {}, invalid controller. Closing connection. error: {}",
-                            test_url,e
-                        );
-                        control_handle.shutdown_with_epitaph(zx::Status::BAD_HANDLE);
-                        break;
-                    }
-                };
+                let realm_proxy = realm.into_proxy();
+                let controller = controller.into_stream();
                 let offers = match map_offers(offers) {
                     Ok(offers) => offers,
                     Err(e) => {
@@ -117,15 +87,8 @@ pub async fn run_test_manager_run_builder_server(
             ftest_manager::RunBuilderRequest::WithSchedulingOptions { options, .. } => {
                 scheduling_options = Some(options);
             }
-            ftest_manager::RunBuilderRequest::Build { controller, control_handle } => {
-                let controller = match controller.into_stream() {
-                    Ok(c) => c,
-                    Err(e) => {
-                        warn!("Invalid builder controller. Closing connection. error: {}", e);
-                        control_handle.shutdown_with_epitaph(zx::Status::BAD_HANDLE);
-                        break;
-                    }
-                };
+            ftest_manager::RunBuilderRequest::Build { controller, control_handle: _ } => {
+                let controller = controller.into_stream();
 
                 let persist_diagnostics =
                     match scheduling_options.as_ref().map(|options| options.max_parallel_suites) {
@@ -188,17 +151,7 @@ pub async fn run_test_manager_query_server(
                 iterator,
                 responder,
             } => {
-                let realm_proxy = match realm.into_proxy() {
-                    Ok(r) => r,
-                    Err(e) => {
-                        warn!(
-                            "Cannot add suite {}, invalid realm. Closing connection. error: {}",
-                            test_url, e
-                        );
-                        responder.send(Err(LaunchError::InvalidArgs)).ok();
-                        break;
-                    }
-                };
+                let realm_proxy = realm.into_proxy();
                 let offers = match map_offers(offers) {
                     Ok(offers) => offers,
                     Err(e) => {
@@ -221,14 +174,7 @@ pub async fn run_test_manager_query_server(
                 break;
             }
         };
-        let mut iterator = match iterator.into_stream() {
-            Ok(c) => c,
-            Err(e) => {
-                warn!("Cannot query test, invalid iterator {}: {}", test_url, e);
-                responder.send(Err(LaunchError::InvalidArgs)).ok();
-                break;
-            }
-        };
+        let mut iterator = iterator.into_stream();
         let (_processor, sender) = DebugDataProcessor::new(DebugDataDirectory::Isolated {
             parent: constants::ISOLATED_TMP,
         });
@@ -328,14 +274,7 @@ pub async fn serve_early_boot_profiles(
                 iterator,
                 control_handle,
             } => {
-                let iterator = match iterator.into_stream() {
-                    Ok(i) => i,
-                    Err(e) => {
-                        warn!("Invalid debug data iterator: {}", e);
-                        control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
-                        break;
-                    }
-                };
+                let iterator = iterator.into_stream();
                 if let Err(e) = debug_data_server::send_kernel_debug_data(iterator).await {
                     warn!("Err serving kernel profiles: {}", e);
                     control_handle.shutdown_with_epitaph(zx::Status::INTERNAL);
@@ -375,7 +314,7 @@ pub async fn run_test_manager_test_case_enumerator_server(
                 let realm = if let Some(realm_options) = options.realm_options {
                     let realm_proxy = match realm_options
                         .realm
-                        .map(|r| r.into_proxy())
+                        .map(|r| Ok(r.into_proxy()))
                         .unwrap_or(Err(Error::NotNullable))
                     {
                         Ok(r) => r,
@@ -419,14 +358,7 @@ pub async fn run_test_manager_test_case_enumerator_server(
                     None
                 };
 
-                let iterator = match iterator.into_stream() {
-                    Ok(c) => c,
-                    Err(e) => {
-                        warn!("Cannot query test, invalid iterator {}: {}", test_suite_url, e);
-                        responder.send(Err(LaunchError::InvalidArgs)).ok();
-                        break;
-                    }
-                };
+                let iterator = iterator.into_stream();
                 let (_processor, sender) = DebugDataProcessor::new(DebugDataDirectory::Isolated {
                     parent: constants::ISOLATED_TMP,
                 });
@@ -547,7 +479,7 @@ pub async fn run_test_manager_suite_runner_server(
                 let realm = if let Some(realm_options) = options.realm_options {
                     let realm_proxy = match realm_options
                         .realm
-                        .map(|r| r.into_proxy())
+                        .map(|r| Ok(r.into_proxy()))
                         .unwrap_or(Err(Error::NotNullable))
                     {
                         Ok(r) => r,
@@ -588,14 +520,7 @@ pub async fn run_test_manager_suite_runner_server(
                     None
                 };
 
-                let controller = match controller.into_stream() {
-                    Ok(c) => c,
-                    Err(e) => {
-                        warn!("Invalid builder controller. Closing connection. error: {}", e);
-                        control_handle.shutdown_with_epitaph(zx::Status::BAD_HANDLE);
-                        break;
-                    }
-                };
+                let controller = controller.into_stream();
 
                 let suite = Suite {
                     realm: realm.into(),

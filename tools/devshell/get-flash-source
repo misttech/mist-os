@@ -75,10 +75,10 @@ function _build_gn_label {
 
 use_bazel_images_only="$(_query_manifest "${ARGS_JSON}" .use_bazel_images_only)"
 if [[ "${use_bazel_images_only}" == "true" ]]; then
-    main_product_label="$(_query_manifest "${ARGS_JSON}" .main_product_label)"
-    if [[ "${main_product_label}" != "null" ]]; then
-      product_bundle="$(_query_manifest "${PRODUCT_BUNDLES_JSON}" '.[] | select(.label | startswith("'${main_product_label}'")) | .path')"
-      product_bundle_label=${main_product_label}
+    main_pb_label="$(_query_manifest "${ARGS_JSON}" .main_pb_label)"
+    if [[ "${main_pb_label}" != "null" ]]; then
+      product_bundle="$(_query_manifest "${PRODUCT_BUNDLES_JSON}" '.[] | select(.label | startswith("'${main_pb_label}'")) | .path')"
+      product_bundle_label=${main_pb_label}
     else
       product="$(_query_manifest "${ARGS_JSON}" .build_info_product)"
       board="$(_query_manifest "${ARGS_JSON}" .build_info_board)"

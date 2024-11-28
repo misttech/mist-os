@@ -21,7 +21,10 @@ fidl("fuchsia.component.runner") {
     "//zircon/vdso/zx",
   ]
 
-  sources = [ "component_runner.fidl" ]
+  sources = [
+    "component_runner.fidl",
+    "task_provider.fidl",
+  ]
 
   enable_hlcpp = true
 }

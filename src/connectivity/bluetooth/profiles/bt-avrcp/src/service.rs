@@ -54,71 +54,49 @@ where
                 let peer_id = peer_id.into();
                 info!("Received client request for browse controller for peer {}", peer_id);
 
-                match client.into_stream() {
-                    Err(err) => {
-                        warn!("Unable to take client stream: {:?}", err);
-                        responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?;
-                    }
-                    Ok(client_stream) => {
-                        let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
-                        sender.try_send(pcr)?;
-                        let controller = response.into_future().await?;
-                        // BrowseController can remain connected after PeerManager disconnects.
-                        spawn_browse_controller_fn(controller, client_stream).detach();
-                        responder.send(Ok(()))?;
-                    }
-                }
+                let client_stream = client.into_stream();
+                let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
+                sender.try_send(pcr)?;
+                let controller = response.into_future().await?;
+                // BrowseController can remain connected after PeerManager disconnects.
+                spawn_browse_controller_fn(controller, client_stream).detach();
+                responder.send(Ok(()))?;
             }
             PeerManagerRequest::GetControllerForTarget { peer_id, client, responder } => {
                 let peer_id = peer_id.into();
                 info!("Received client request for controller for peer {}", peer_id);
 
-                match client.into_stream() {
-                    Err(err) => {
-                        warn!("Unable to take client stream: {:?}", err);
-                        responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?;
-                    }
-                    Ok(client_stream) => {
-                        let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
-                        sender.try_send(pcr)?;
-                        let controller = response.into_future().await?;
-                        // Controller can remain connected after PeerManager disconnects.
-                        spawn_controller_fn(controller, client_stream).detach();
-                        responder.send(Ok(()))?;
-                    }
-                }
+                let client_stream = client.into_stream();
+                let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
+                sender.try_send(pcr)?;
+                let controller = response.into_future().await?;
+                // Controller can remain connected after PeerManager disconnects.
+                spawn_controller_fn(controller, client_stream).detach();
+                responder.send(Ok(()))?;
             }
             PeerManagerRequest::SetAbsoluteVolumeHandler { handler, responder } => {
                 info!("Received client request to set absolute volume handler");
-                match handler.into_proxy() {
-                    Ok(absolute_volume_handler) => {
-                        let (response, register_absolute_volume_handler_request) =
-                            ServiceRequest::new_register_absolute_volume_handler_request(
-                                absolute_volume_handler,
-                            );
-                        sender.try_send(register_absolute_volume_handler_request)?;
-                        match response.into_future().await? {
-                            Ok(_) => responder.send(Ok(()))?,
-                            Err(_) => responder.send(Err(zx::Status::ALREADY_BOUND.into_raw()))?,
-                        }
-                    }
-                    Err(_) => responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?,
-                };
+                let absolute_volume_handler = handler.into_proxy();
+                let (response, register_absolute_volume_handler_request) =
+                    ServiceRequest::new_register_absolute_volume_handler_request(
+                        absolute_volume_handler,
+                    );
+                sender.try_send(register_absolute_volume_handler_request)?;
+                match response.into_future().await? {
+                    Ok(_) => responder.send(Ok(()))?,
+                    Err(_) => responder.send(Err(zx::Status::ALREADY_BOUND.into_raw()))?,
+                }
             }
             PeerManagerRequest::RegisterTargetHandler { handler, responder } => {
                 info!("Received client request for registering Target Handler");
-                match handler.into_proxy() {
-                    Ok(target_handler) => {
-                        let (response, register_target_handler_request) =
-                            ServiceRequest::new_register_target_handler_request(target_handler);
-                        sender.try_send(register_target_handler_request)?;
-                        match response.into_future().await? {
-                            Ok(_) => responder.send(Ok(()))?,
-                            Err(_) => responder.send(Err(zx::Status::ALREADY_BOUND.into_raw()))?,
-                        }
-                    }
-                    Err(_) => responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?,
-                };
+                let target_handler = handler.into_proxy();
+                let (response, register_target_handler_request) =
+                    ServiceRequest::new_register_target_handler_request(target_handler);
+                sender.try_send(register_target_handler_request)?;
+                match response.into_future().await? {
+                    Ok(_) => responder.send(Ok(()))?,
+                    Err(_) => responder.send(Err(zx::Status::ALREADY_BOUND.into_raw()))?,
+                }
             }
         }
     }
@@ -159,39 +137,25 @@ where
                 let peer_id: PeerId = peer_id.into();
                 info!("New test connection request for {}", peer_id);
 
-                match client.into_stream() {
-                    Err(err) => {
-                        warn!("Unable to take test client stream {:?}", err);
-                        responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?;
-                    }
-                    Ok(client_stream) => {
-                        let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
-                        sender.try_send(pcr)?;
-                        let controller = response.into_future().await?;
-                        // BrowseControllerExt can remain connected after PeerManager disconnects.
-                        spawn_browse_controller_fn(controller, client_stream).detach();
-                        responder.send(Ok(()))?;
-                    }
-                }
+                let client_stream = client.into_stream();
+                let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
+                sender.try_send(pcr)?;
+                let controller = response.into_future().await?;
+                // BrowseControllerExt can remain connected after PeerManager disconnects.
+                spawn_browse_controller_fn(controller, client_stream).detach();
+                responder.send(Ok(()))?;
             }
             PeerManagerExtRequest::GetControllerForTarget { peer_id, client, responder } => {
                 let peer_id: PeerId = peer_id.into();
                 info!("New test connection request for {}", peer_id);
 
-                match client.into_stream() {
-                    Err(err) => {
-                        warn!("Unable to take test client stream {:?}", err);
-                        responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?;
-                    }
-                    Ok(client_stream) => {
-                        let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
-                        sender.try_send(pcr)?;
-                        let controller = response.into_future().await?;
-                        // ControllerExt can remain connected after PeerManager disconnects.
-                        spawn_controller_fn(controller, client_stream).detach();
-                        responder.send(Ok(()))?;
-                    }
-                }
+                let client_stream = client.into_stream();
+                let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
+                sender.try_send(pcr)?;
+                let controller = response.into_future().await?;
+                // ControllerExt can remain connected after PeerManager disconnects.
+                spawn_controller_fn(controller, client_stream).detach();
+                responder.send(Ok(()))?;
             }
         }
     }
@@ -204,7 +168,7 @@ pub fn run_services(
     sender: mpsc::Sender<ServiceRequest>,
 ) -> Result<impl Future<Output = Result<(), Error>> + '_, Error> {
     let sender_avrcp = sender.clone();
-    let sender_test = sender.clone();
+    let sender_test = sender;
     let _ = fs
         .dir("svc")
         .add_fidl_service_at(PeerManagerExtMarker::PROTOCOL_NAME, move |stream| {
@@ -269,7 +233,7 @@ mod tests {
     fn spawn_avrcp_target() {
         let mut exec = fasync::TestExecutor::new();
         let (peer_manager_proxy, peer_manager_requests) =
-            create_proxy_and_stream::<PeerManagerMarker>().unwrap();
+            create_proxy_and_stream::<PeerManagerMarker>();
 
         let (client_sender, mut service_request_receiver) = mpsc::channel(512);
 
@@ -330,7 +294,7 @@ mod tests {
     fn spawn_avrcp_controllers() {
         let mut exec = fasync::TestExecutor::new();
         let (peer_manager_proxy, peer_manager_requests) =
-            create_proxy_and_stream::<PeerManagerMarker>().unwrap();
+            create_proxy_and_stream::<PeerManagerMarker>();
 
         let (client_sender, mut service_request_receiver) = mpsc::channel(512);
 
@@ -339,11 +303,10 @@ mod tests {
         let (spawn_browse_controller_fn, mut spawned_browse_controller_receiver) =
             make_service_spawn_fn::<BrowseControllerRequestStream>();
 
-        let (profile_proxy, _profile_requests) =
-            create_proxy_and_stream::<ProfileMarker>().unwrap();
+        let (profile_proxy, _profile_requests) = create_proxy_and_stream::<ProfileMarker>();
 
-        let (_c_proxy, controller_server) = create_proxy().expect("Controller proxy creation");
-        let (_bc_proxy, bcontroller_server) = create_proxy().expect("Controller proxy creation");
+        let (_c_proxy, controller_server) = create_proxy();
+        let (_bc_proxy, bcontroller_server) = create_proxy();
 
         let handler_fut = handle_peer_manager_requests(
             peer_manager_requests,
@@ -415,7 +378,7 @@ mod tests {
     fn spawn_avrcp_extension_controllers() {
         let mut exec = fasync::TestExecutor::new();
         let (peer_manager_ext_proxy, peer_manager_ext_requests) =
-            create_proxy_and_stream::<PeerManagerExtMarker>().unwrap();
+            create_proxy_and_stream::<PeerManagerExtMarker>();
 
         let (client_sender, mut service_request_receiver) = mpsc::channel(512);
 
@@ -424,11 +387,10 @@ mod tests {
         let (spawn_browse_controller_fn, mut spawned_browse_controller_receiver) =
             make_service_spawn_fn::<BrowseControllerExtRequestStream>();
 
-        let (profile_proxy, _profile_requests) =
-            create_proxy_and_stream::<ProfileMarker>().unwrap();
+        let (profile_proxy, _profile_requests) = create_proxy_and_stream::<ProfileMarker>();
 
-        let (_c_proxy, controller_server) = create_proxy().unwrap();
-        let (_bc_proxy, bcontroller_server) = create_proxy().unwrap();
+        let (_c_proxy, controller_server) = create_proxy();
+        let (_bc_proxy, bcontroller_server) = create_proxy();
 
         let handler_fut = handle_peer_manager_ext_requests(
             peer_manager_ext_requests,
@@ -499,12 +461,12 @@ mod tests {
     ) -> (PeerManager, ProfileRequestStream, PeerManagerProxy, mpsc::Receiver<ServiceRequest>) {
         let (client_sender, service_request_receiver) = mpsc::channel(2);
 
-        let (profile_proxy, profile_requests) = create_proxy_and_stream::<ProfileMarker>().unwrap();
+        let (profile_proxy, profile_requests) = create_proxy_and_stream::<ProfileMarker>();
 
         let peer_manager = PeerManager::new(profile_proxy);
 
         let (peer_manager_proxy, peer_manager_requests) =
-            create_proxy_and_stream::<PeerManagerMarker>().unwrap();
+            create_proxy_and_stream::<PeerManagerMarker>();
 
         fasync::Task::spawn(async move {
             let _ = handle_peer_manager_requests(
@@ -704,14 +666,14 @@ mod tests {
         let mut expected_commands: i64 = 0;
 
         let (peer_manager_proxy, peer_manager_requests) =
-            create_proxy_and_stream::<PeerManagerMarker>().unwrap();
-        let (ext_proxy, ext_requests) = create_proxy_and_stream::<PeerManagerExtMarker>().unwrap();
+            create_proxy_and_stream::<PeerManagerMarker>();
+        let (ext_proxy, ext_requests) = create_proxy_and_stream::<PeerManagerExtMarker>();
 
         let (client_sender, mut peer_controller_request_receiver) = mpsc::channel(512);
 
         let (local, remote) = Channel::create();
         let remote_peer = AvcPeer::new(remote);
-        let (profile_proxy, _requests) = create_proxy::<ProfileMarker>().unwrap();
+        let (profile_proxy, _requests) = create_proxy::<ProfileMarker>();
 
         let mut peer_manager = PeerManager::new(profile_proxy);
 
@@ -744,13 +706,13 @@ mod tests {
         .fuse();
         let mut test_handler_fut = pin!(test_handler_fut);
 
-        let (controller_proxy, controller_server) = create_proxy().unwrap();
+        let (controller_proxy, controller_server) = create_proxy();
         let get_controller_fut = peer_manager_proxy
             .get_controller_for_target(&fake_peer_id.into(), controller_server)
             .fuse();
         let mut get_controller_fut = pin!(get_controller_fut);
 
-        let (controller_ext_proxy, controller_ext_server) = create_proxy().unwrap();
+        let (controller_ext_proxy, controller_ext_server) = create_proxy();
         let get_test_controller_fut =
             ext_proxy.get_controller_for_target(&fake_peer_id.into(), controller_ext_server).fuse();
         let mut get_test_controller_fut = pin!(get_test_controller_fut);

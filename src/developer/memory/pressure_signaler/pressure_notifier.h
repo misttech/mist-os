@@ -5,10 +5,8 @@
 #ifndef SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_PRESSURE_NOTIFIER_H_
 #define SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_PRESSURE_NOTIFIER_H_
 
-#include <fuchsia/feedback/cpp/fidl.h>
-#include <fuchsia/memorypressure/cpp/fidl.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/sys/cpp/component_context.h>
+#include <fidl/fuchsia.feedback/cpp/fidl.h>
+#include <fidl/fuchsia.memorypressure/cpp/fidl.h>
 
 #include <vector>
 
@@ -16,34 +14,44 @@
 
 namespace pressure_signaler {
 
-struct WatcherState {
-  fuchsia::memorypressure::WatcherPtr proxy;
-  Level level_sent;
-  bool pending_callback;
-  bool needs_free;
-};
-
-class PressureNotifier : public fuchsia::memorypressure::Provider {
+class PressureNotifier : public fidl::Server<fuchsia_memorypressure::Provider> {
  public:
+  // This struct contains all the state related to a single registered watchers.
+  //
+  // Note: `proxy` needs an event handler to be initialized, which is why its initialization needs
+  // to be deferred.
+  struct WatcherState : public fidl::AsyncEventHandler<fuchsia_memorypressure::Watcher> {
+   public:
+    WatcherState(Level level_sent, PressureNotifier* notifier)
+        : level_sent(level_sent), notifier(notifier) {}
+    std::optional<fidl::Client<fuchsia_memorypressure::Watcher>> proxy;
+    Level level_sent;
+    bool needs_free = false;
+    bool pending_callback = false;
+    PressureNotifier* notifier;
+    void on_fidl_error(fidl::UnbindInfo info) override { notifier->ReleaseWatcher(this); }
+  };
+
   explicit PressureNotifier(bool watch_for_changes, bool send_critical_pressure_crash_reports,
-                            sys::ComponentContext* context = nullptr,
+                            fidl::Client<fuchsia_feedback::CrashReporter> crash_reporter,
                             async_dispatcher_t* dispatcher = nullptr);
 
   PressureNotifier(const PressureNotifier&) = delete;
   PressureNotifier& operator=(const PressureNotifier&) = delete;
 
   // fuchsia::memorypressure::Provider interface
-  void RegisterWatcher(fidl::InterfaceHandle<fuchsia::memorypressure::Watcher> watcher) override;
+  void RegisterWatcher(RegisterWatcherRequest& request,
+                       RegisterWatcherCompleter::Sync& completer) override;
 
   // Notify watchers of a pressure level change.
   void Notify();
 
   // Notify watchers with a simulated memory pressure |level|. For diagnostic use by MemoryDebugger.
-  void DebugNotify(fuchsia::memorypressure::Level level) const;
+  void DebugNotify(fuchsia_memorypressure::Level level) const;
 
  private:
   void PostLevelChange();
-  void ReleaseWatcher(fuchsia::memorypressure::Watcher* watcher);
+  void ReleaseWatcher(WatcherState* watcher_state);
   void OnLevelChangedCallback(WatcherState* watcher);
   void NotifyWatcher(WatcherState* watcher, Level level);
 
@@ -56,8 +64,6 @@ class PressureNotifier : public fuchsia::memorypressure::Provider {
 
   async::TaskClosureMethod<PressureNotifier, &PressureNotifier::PostLevelChange> post_task_{this};
   async_dispatcher_t* const provider_dispatcher_;
-  sys::ComponentContext* const context_;
-  fidl::BindingSet<fuchsia::memorypressure::Provider> bindings_;
   std::vector<std::unique_ptr<WatcherState>> watchers_;
   PressureObserver observer_;
 
@@ -65,6 +71,7 @@ class PressureNotifier : public fuchsia::memorypressure::Provider {
   zx::time prev_critical_crash_report_time_ = zx::time(ZX_TIME_INFINITE_PAST);
   zx::duration critical_crash_report_interval_ = zx::min(30);
   const bool send_critical_pressure_crash_reports_;
+  fidl::Client<fuchsia_feedback::CrashReporter> crash_reporter_;
 
   friend class test::PressureNotifierUnitTest;
 };

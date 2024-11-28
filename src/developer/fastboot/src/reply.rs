@@ -69,12 +69,13 @@ impl TryFrom<&[u8]> for Reply {
 
         let (reply_type, reply_data) = byte_vec.split_at(MIN_REPLY_LENGTH);
         let reply_type_str = String::from_utf8_lossy(reply_type).to_string().to_ascii_uppercase();
-        let mut reply_data_str = String::from_utf8_lossy(reply_data).to_string();
+        let reply_data_str = String::from_utf8_lossy(reply_data).to_string();
         match reply_type_str.as_ref() {
             "INFO" => Ok(Reply::Info(reply_data_str)),
             "FAIL" => Ok(Reply::Fail(reply_data_str)),
             "OKAY" => Ok(Reply::Okay(reply_data_str)),
             "DATA" => {
+                let reply_data_str = reply_data_str.trim_matches(char::from(0));
                 if reply_data_str.len() != DATA_SIZE_LENGTH {
                     // b/355706900: this should technically be an error as the Fastboot
                     // specification says the length of the data packet is 12
@@ -87,7 +88,6 @@ impl TryFrom<&[u8]> for Reply {
                     };
                     tracing::warn!("{}", mismatched_err);
                 }
-                reply_data_str.shrink_to(8);
                 match u32::from_str_radix(&reply_data_str, 16) {
                     Ok(ds) => Ok(Reply::Data(ds)),
                     Err(e) => Err(ParseReplyError::InvalidDataPacketSize(e)),
@@ -270,6 +270,13 @@ mod test {
         let data_message_uppercase = vec![b'F'; DATA_SIZE_LENGTH];
         let concat_uppercase = [&data_prefix[..], &data_message_uppercase[..]].concat();
         let reply_with_message_uppercase = Reply::try_from(concat_uppercase.as_slice()).unwrap();
+        assert_eq!(reply_with_message_uppercase, Reply::Data(0xffffffff));
+
+        let data_message_uppercase = vec![b'F'; DATA_SIZE_LENGTH];
+        let concat_uppercase_with_nul_term =
+            [&data_prefix[..], &data_message_uppercase[..], &vec![b'\0']].concat();
+        let reply_with_message_uppercase =
+            Reply::try_from(concat_uppercase_with_nul_term.as_slice()).unwrap();
         assert_eq!(reply_with_message_uppercase, Reply::Data(0xffffffff));
     }
 

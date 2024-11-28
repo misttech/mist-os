@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use {
     fdomain_client::fidl::{DiscoverableProtocolMarker, Proxy},
     fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy,
+    fdomain_fuchsia_io as fio,
     fdomain_fuchsia_sys2::OpenDirType,
 };
 
@@ -16,11 +17,69 @@ use {
 use {
     fidl::endpoints::{DiscoverableProtocolMarker, ProxyHasClient},
     fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as sys2,
     fidl_fuchsia_sys2::OpenDirType,
 };
 
 pub const LEGACY_MONIKER: &str = "core/toolbox";
 pub const MONIKER: &str = "toolbox";
+
+/// Open the service directory of the toolbox.
+#[cfg(not(feature = "fdomain"))]
+pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProxy> {
+    let (query, server) = fidl::endpoints::create_proxy::<sys2::RealmQueryMarker>();
+    let e = rcs
+        .deprecated_open_capability(
+            MONIKER,
+            sys2::OpenDirType::NamespaceDir,
+            &format!("svc/{}.root", sys2::RealmQueryMarker::PROTOCOL_NAME),
+            server.into_channel(),
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await?;
+
+    let (query, moniker) = if let Err(_) = e {
+        let (query, server) = fidl::endpoints::create_proxy::<sys2::RealmQueryMarker>();
+        rcs.deprecated_open_capability(
+            LEGACY_MONIKER,
+            sys2::OpenDirType::NamespaceDir,
+            &format!("svc/{}.root", sys2::RealmQueryMarker::PROTOCOL_NAME),
+            server.into_channel(),
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await?
+        .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+
+        (query, LEGACY_MONIKER)
+    } else {
+        (query, MONIKER)
+    };
+
+    let moniker = moniker::Moniker::try_from(moniker)?;
+
+    let namespace_dir = component_debug::dirs::open_instance_dir_root_readable(
+        &moniker,
+        sys2::OpenDirType::NamespaceDir.into(),
+        &query,
+    )
+    .await?;
+
+    let (ret, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    namespace_dir.open3(
+        "svc",
+        fio::Flags::PROTOCOL_DIRECTORY,
+        &fio::Options::default(),
+        server.into(),
+    )?;
+
+    Ok(ret)
+}
+
+/// Open the service directory of the toolbox.
+#[cfg(feature = "fdomain")]
+pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProxy> {
+    rcs.client()?.namespace().await.map_err(Into::into).map(fio::DirectoryProxy::from_channel)
+}
 
 /// Connects to a protocol available in the namespace of the `toolbox` component.
 /// If we fail to connect to the protocol in the namespace of the `toolbox` component, then we'll

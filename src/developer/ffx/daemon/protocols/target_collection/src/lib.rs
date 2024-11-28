@@ -330,7 +330,7 @@ impl FidlProtocol for TargetCollectionProtocol {
         let target_collection = cx.get_target_collection().await?;
         match req {
             ffx::TargetCollectionRequest::ListTargets { reader, query, .. } => {
-                let reader = reader.into_proxy()?;
+                let reader = reader.into_proxy();
                 let query = match query.string_matcher.clone() {
                     Some(query) if !query.is_empty() => Some(TargetInfoQuery::from(query)),
                     _ => None,
@@ -416,7 +416,7 @@ impl FidlProtocol for TargetCollectionProtocol {
             ffx::TargetCollectionRequest::AddTarget {
                 ip, config, add_target_responder, ..
             } => {
-                let add_target_responder = add_target_responder.into_proxy()?;
+                let add_target_responder = add_target_responder.into_proxy();
                 let addr = target_addr_info_to_socketaddr(ip);
                 let node = cx.overnet_node()?;
                 let do_add_target = || {
@@ -481,7 +481,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                 match rcs {
                     Ok(mut rcs) => {
                         let (rcs_proxy, server) =
-                            fidl::endpoints::create_proxy::<RemoteControlMarker>()?;
+                            fidl::endpoints::create_proxy::<RemoteControlMarker>();
                         rcs.copy_to_channel(server.into_channel())?;
                         match rcs::knock_rcs(&rcs_proxy).await {
                             Ok(_) => {
@@ -893,7 +893,7 @@ mod tests {
         )
         .unwrap();
         let mut res = Vec::new();
-        let mut stream = server.into_stream().unwrap();
+        let mut stream = server.into_stream();
         while let Ok(Some(ffx::TargetCollectionReaderRequest::Next { entry, responder })) =
             stream.try_next().await
         {
@@ -1072,7 +1072,7 @@ mod tests {
         server: fidl::endpoints::ServerEnd<ffx::AddTargetResponder_Marker>,
     ) -> impl std::future::Future<Output = Result<(), ffx::AddTargetError>> {
         async {
-            let mut stream = server.into_stream().unwrap();
+            let mut stream = server.into_stream();
             if let Ok(Some(req)) = stream.try_next().await {
                 match req {
                     ffx::AddTargetResponder_Request::Success { .. } => {

@@ -39,7 +39,10 @@ impl TaskGroup {
     /// The TaskGroup can be used to await an arbitrary number of Tasks and may
     /// consume an arbitrary amount of memory.
     pub fn new() -> Self {
-        Self { scope: Scope::new() }
+        #[cfg(target_os = "fuchsia")]
+        return Self { scope: Scope::global().new_child() };
+        #[cfg(not(target_os = "fuchsia"))]
+        return Self { scope: Scope::new() };
     }
 
     /// Spawns a new task in this TaskGroup.

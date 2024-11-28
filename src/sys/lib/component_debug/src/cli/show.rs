@@ -31,6 +31,7 @@ pub struct ShowCmdInstance {
 pub struct ShowCmdResolvedInfo {
     pub resolved_url: String,
     pub merkle_root: Option<String>,
+    pub runner: Option<String>,
     pub incoming_capabilities: Vec<String>,
     pub exposed_capabilities: Vec<String>,
     pub config: Option<Vec<ConfigField>>,
@@ -92,6 +93,18 @@ async fn get_instance_by_query(
             let manifest = get_resolved_declaration(&instance.moniker, &realm_query).await?;
             let structured_config = get_config_fields(&instance.moniker, &realm_query).await?;
             let merkle_root = get_merkle_root(&instance.moniker, &realm_query).await.ok();
+            let runner = if let Some(runner) = manifest.program.and_then(|p| p.runner) {
+                Some(runner.to_string())
+            } else if let Some(runner) = manifest.uses.iter().find_map(|u| match u {
+                cm_rust::UseDecl::Runner(cm_rust::UseRunnerDecl { source_name, .. }) => {
+                    Some(source_name)
+                }
+                _ => None,
+            }) {
+                Some(runner.to_string())
+            } else {
+                None
+            };
             let incoming_capabilities =
                 manifest.uses.into_iter().filter_map(|u| u.path().map(|n| n.to_string())).collect();
             let exposed_capabilities =
@@ -116,6 +129,7 @@ async fn get_instance_by_query(
 
             Some(ShowCmdResolvedInfo {
                 resolved_url,
+                runner,
                 incoming_capabilities,
                 exposed_capabilities,
                 merkle_root,
@@ -183,6 +197,10 @@ fn add_resolved_info_to_table(
         table
             .add_row(row!(r->"Component State:", colorized("Resolved", Colour::Green, with_style)));
         table.add_row(row!(r->"Resolved URL:", resolved.resolved_url));
+
+        if let Some(runner) = &resolved.runner {
+            table.add_row(row!(r->"Runner:", runner));
+        }
 
         let namespace_capabilities = resolved.incoming_capabilities.join("\n");
         table.add_row(row!(r->"Namespace Capabilities:", namespace_capabilities));
@@ -350,14 +368,21 @@ mod tests {
             HashMap::from([(
                 "./my_foo".to_string(),
                 fdecl::Component {
-                    uses: Some(vec![fdecl::Use::Protocol(fdecl::UseProtocol {
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
-                        source_name: Some("fuchsia.foo.bar".to_string()),
-                        target_path: Some("/svc/fuchsia.foo.bar".to_string()),
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        availability: Some(fdecl::Availability::Required),
-                        ..Default::default()
-                    })]),
+                    uses: Some(vec![
+                        fdecl::Use::Protocol(fdecl::UseProtocol {
+                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
+                            source_name: Some("fuchsia.foo.bar".to_string()),
+                            target_path: Some("/svc/fuchsia.foo.bar".to_string()),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }),
+                        fdecl::Use::Runner(fdecl::UseRunner {
+                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
+                            source_name: Some("elf".to_string()),
+                            ..Default::default()
+                        }),
+                    ]),
                     exposes: Some(vec![fdecl::Expose::Protocol(fdecl::ExposeProtocol {
                         source: Some(fdecl::Ref::Self_(fdecl::SelfRef)),
                         source_name: Some("fuchsia.bar.baz".to_string()),
@@ -409,6 +434,7 @@ mod tests {
         assert!(instance.resolved.is_some());
 
         let resolved = instance.resolved.unwrap();
+        assert_eq!(resolved.runner.unwrap(), "elf");
         assert_eq!(resolved.incoming_capabilities.len(), 1);
         assert_eq!(resolved.incoming_capabilities[0], "/svc/fuchsia.foo.bar");
 

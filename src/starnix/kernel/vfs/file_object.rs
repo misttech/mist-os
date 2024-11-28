@@ -1494,7 +1494,8 @@ pub struct FileObject {
 
     _file_write_guard: Option<FileWriteGuard>,
 
-    _security_state: security::FileObjectState,
+    /// Opaque security state associated this file object.
+    pub security_state: security::FileObjectState,
 }
 
 pub type FileHandle = Arc<FileReleaser>;
@@ -1537,7 +1538,7 @@ impl FileObject {
         let fs = name.entry.node.fs();
         let kernel = fs.kernel.upgrade().ok_or_else(|| errno!(ENOENT))?;
         let id = FileObjectId(kernel.next_file_object_id.next());
-        let _security_state = security::file_alloc_security(current_task);
+        let security_state = security::file_alloc_security(current_task);
         let file = FileHandle::new_cyclic(|weak_handle| {
             Self {
                 weak_handle: weak_handle.clone(),
@@ -1551,7 +1552,7 @@ impl FileObject {
                 epoll_files: Default::default(),
                 lease: Default::default(),
                 _file_write_guard: file_write_guard,
-                _security_state,
+                security_state,
             }
             .into()
         });

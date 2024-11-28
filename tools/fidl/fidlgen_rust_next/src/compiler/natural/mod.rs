@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 mod alias;
-mod constant;
+mod bits;
+mod r#const;
 mod r#enum;
 mod r#struct;
 mod table;
@@ -16,7 +17,8 @@ use crate::compiler::Compiler;
 use crate::ir::{DeclType, EndpointRole, InternalSubtype, PrimSubtype, Type, TypeKind};
 
 pub use self::alias::emit_alias;
-pub use self::constant::emit_constant;
+pub use self::bits::emit_bits;
+pub use self::r#const::emit_const;
 pub use self::r#enum::emit_enum;
 pub use self::r#struct::emit_struct;
 pub use self::r#union::emit_union;
@@ -95,7 +97,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
         }
         TypeKind::Identifier { identifier, nullable, .. } => {
             match compiler.schema.get_decl_type(identifier).unwrap() {
-                DeclType::Enum | DeclType::Table => {
+                DeclType::Bits | DeclType::Enum | DeclType::Table => {
                     emit_natural_comp_ident(compiler, out, identifier)?;
                 }
                 DeclType::Struct | DeclType::Union => {
@@ -108,7 +110,6 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                     }
                 }
                 DeclType::Alias => todo!(),
-                DeclType::Bits => todo!(),
                 DeclType::Const => todo!(),
                 DeclType::Resource => todo!(),
                 DeclType::NewType => todo!(),

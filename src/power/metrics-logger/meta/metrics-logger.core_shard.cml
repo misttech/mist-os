@@ -68,5 +68,10 @@
             from: "parent",
             to: "#metrics-logger",
         },
+        {
+            protocol: "fuchsia.ui.activity.Provider",
+            from: "#activity",
+            to: "#metrics-logger",
+        },
     ],
 }

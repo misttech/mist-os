@@ -2,15 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_bluetooth as fidl_bt;
 use fidl_fuchsia_bluetooth_bredr::{
     self as fidl_bredr, ProfileDescriptor, ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
     ATTR_SERVICE_CLASS_ID_LIST,
 };
 use fidl_table_validation::ValidFidlTable;
+#[cfg(target_os = "fuchsia")]
+use fuchsia_inspect as inspect;
+#[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_derive::{AttachError, Inspect, Unit};
 use std::cmp::min;
 use std::collections::HashSet;
-use {fidl_fuchsia_bluetooth as fidl_bt, fuchsia_inspect as inspect};
 
 use crate::assigned_numbers::constants::SERVICE_CLASS_UUIDS;
 use crate::assigned_numbers::AssignedNumber;
@@ -91,17 +94,17 @@ pub fn find_profile_descriptors(
     let attr = attributes
         .iter()
         .find(|a| a.id == Some(ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST))
-        .ok_or(Error::profile("missing profile descriptor"))?;
+        .ok_or_else(|| Error::profile("missing profile descriptor"))?;
 
     let Some(fidl_bredr::DataElement::Sequence(profiles)) = &attr.element else {
         return Err(Error::profile("attribute element is invalidly formatted"));
     };
     let mut result = Vec::new();
     for elem in profiles {
-        let elem = elem.as_ref().ok_or(Error::profile("null DataElement in sequence"))?;
+        let elem = elem.as_ref().ok_or_else(|| Error::profile("null DataElement in sequence"))?;
         result.push(
             elem_to_profile_descriptor(&*elem)
-                .ok_or(Error::profile("couldn't convert to a ProfileDescriptor"))?,
+                .ok_or_else(|| Error::profile("couldn't convert to a ProfileDescriptor"))?,
         );
     }
     if result.is_empty() {
@@ -471,7 +474,7 @@ impl TryFrom<&fidl_bredr::Information> for Information {
     fn try_from(src: &fidl_bredr::Information) -> Result<Information, Self::Error> {
         let language = match src.language.as_ref().map(String::as_str) {
             None | Some("") => return Err(Error::missing("bredr.Information.language")),
-            Some(l) => l.to_string().clone(),
+            Some(l) => l.to_string(),
         };
 
         Ok(Information {
@@ -774,6 +777,7 @@ pub struct ValidScoConnectionParameters {
     pub path: fidl_bredr::DataPath,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl Unit for ValidScoConnectionParameters {
     type Data = inspect::Node;
     fn inspect_create(&self, parent: &inspect::Node, name: impl AsRef<str>) -> Self::Data {
@@ -802,6 +806,7 @@ impl Unit for ValidScoConnectionParameters {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl Inspect for &mut ValidScoConnectionParameters {
     fn iattach(self, parent: &inspect::Node, name: impl AsRef<str>) -> Result<(), AttachError> {
         // The created node is owned by the provided `parent`.

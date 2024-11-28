@@ -6,8 +6,10 @@
 
 #include <dirent.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
+#include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fidl/fuchsia.storagehost/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/fit/defer.h>
@@ -32,8 +34,6 @@ namespace {
 
 using uuid::Uuid;
 
-namespace block = fuchsia_hardware_block;
-
 constexpr size_t ReservedHeaderBlocks(size_t blk_size) {
   constexpr size_t kReservedEntryBlocks{static_cast<size_t>(16) * 1024};
   return (kReservedEntryBlocks + 2 * blk_size) / blk_size;
@@ -50,8 +50,11 @@ zx::result<GptPartitionMetadata> QueryGptPartitionMetadata(
   GptPartitionMetadata metadata;
 
   fidl::WireResult result = fidl::WireCall<Partition>(volume)->GetMetadata();
-  if (!result.ok() || result->is_error()) {
+  if (!result.ok()) {
     return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    return result->take_error();
   }
   if (!result.value()->has_name() || !result.value()->has_type_guid() ||
       !result.value()->has_instance_guid()) {
@@ -62,6 +65,44 @@ zx::result<GptPartitionMetadata> QueryGptPartitionMetadata(
       .type_guid = Uuid(result.value()->type_guid().value.data()),
       .instance_guid = Uuid(result.value()->instance_guid().value.data()),
   });
+}
+
+zx::result<std::unique_ptr<GptDevice>> ConnectToGpt(
+    fidl::ClientEnd<fuchsia_device::Controller> controller) {
+  // Connect to the volume protocol.
+  zx::result volume_endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
+  if (volume_endpoints.is_error()) {
+    ERROR("Warning: failed to create block endpoints: %s\n", volume_endpoints.status_string())
+    return volume_endpoints.take_error();
+  }
+  auto& [device, volume_server] = volume_endpoints.value();
+  if (fidl::OneWayError response =
+          fidl::WireCall(controller)->ConnectToDeviceFidl(volume_server.TakeChannel());
+      !response.ok()) {
+    ERROR("Warning: failed to connect to GPT block protocol: %s\n",
+          response.FormatDescription().c_str());
+    return zx::error(response.status());
+  }
+
+  const fidl::WireResult result = fidl::WireCall(device)->GetInfo();
+  if (!result.ok()) {
+    ERROR("Warning: Could not acquire GPT block info: %s\n", result.FormatDescription().c_str());
+    return zx::error(result.status());
+  }
+  fit::result response = result.value();
+  if (response.is_error()) {
+    ERROR("Warning: Could not acquire GPT block info: %s\n",
+          zx_status_get_string(response.error_value()));
+    return response.take_error();
+  }
+  const fuchsia_hardware_block::wire::BlockInfo& info = response.value()->info;
+
+  zx::result remote_device =
+      block_client::RemoteBlockDevice::Create(std::move(device), std::move(controller));
+  if (!remote_device.is_ok()) {
+    return remote_device.take_error();
+  }
+  return GptDevice::Create(std::move(remote_device.value()), info.block_size, info.block_count);
 }
 
 }  // namespace
@@ -99,8 +140,9 @@ bool FilterByTypeAndName(const GptPartitionMetadata& part, const Uuid& type,
 zx::result<std::vector<GptDevicePartitioner::GptClients>> GptDevicePartitioner::FindGptDevices(
     const fbl::unique_fd& devfs_root) {
   fbl::unique_fd block_fd;
-  if (zx_status_t status =
-          fdio_open3_fd_at(devfs_root.get(), "class/block", 0, block_fd.reset_and_get_address());
+  if (zx_status_t status = fdio_open3_fd_at(devfs_root.get(), "class/block",
+                                            static_cast<uint64_t>(fuchsia_io::wire::kPermReadable),
+                                            block_fd.reset_and_get_address());
       status != ZX_OK) {
     ERROR("Cannot inspect block devices: %s\n", zx_status_get_string(status));
     return zx::error(status);
@@ -199,21 +241,6 @@ zx::result<std::vector<GptDevicePartitioner::GptClients>> GptDevicePartitioner::
 zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::InitializeProvidedGptDevice(
     const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     fidl::UnownedClientEnd<fuchsia_device::Controller> gpt_device) {
-  // Connect to the volume protocol.
-  zx::result volume_endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-  if (volume_endpoints.is_error()) {
-    ERROR("Warning: failed to create block endpoints: %s\n", volume_endpoints.status_string())
-    return volume_endpoints.take_error();
-  }
-  auto& [device, volume_server] = volume_endpoints.value();
-  if (fidl::OneWayError response =
-          fidl::WireCall(gpt_device)->ConnectToDeviceFidl(volume_server.TakeChannel());
-      !response.ok()) {
-    ERROR("Warning: failed to connect to GPT block protocol: %s\n",
-          response.FormatDescription().c_str());
-    return zx::error(response.status());
-  }
-
   // Connect to the controller protocol.
   zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
   if (controller_endpoints.is_error()) {
@@ -230,28 +257,9 @@ zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::Initiali
     return zx::error(response.status());
   }
 
-  const fidl::WireResult result = fidl::WireCall(device)->GetInfo();
-  if (!result.ok()) {
-    ERROR("Warning: Could not acquire GPT block info: %s\n", result.FormatDescription().c_str());
-    return zx::error(result.status());
-  }
-  fit::result response = result.value();
-  if (response.is_error()) {
-    ERROR("Warning: Could not acquire GPT block info: %s\n",
-          zx_status_get_string(response.error_value()));
-    return response.take_error();
-  }
-  const fuchsia_hardware_block::wire::BlockInfo& info = response.value()->info;
-
-  zx::result remote_device =
-      block_client::RemoteBlockDevice::Create(std::move(device), std::move(controller));
-  if (!remote_device.is_ok()) {
-    return remote_device.take_error();
-  }
-  zx::result gpt_result =
-      GptDevice::Create(std::move(remote_device.value()), info.block_size, info.block_count);
+  zx::result gpt_result = ConnectToGpt(std::move(controller));
   if (gpt_result.is_error()) {
-    ERROR("Failed to get GPT info: %s\n", gpt_result.status_string());
+    ERROR("Failed to connect to GPT: %s\n", gpt_result.status_string());
     return zx::error(ZX_ERR_BAD_STATE);
   }
   std::unique_ptr<GptDevice>& gpt = gpt_result.value();
@@ -273,106 +281,144 @@ zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::Initiali
     LOG("Rebound GPT driver successfully\n");
   }
 
-  return zx::ok(new GptDevicePartitioner(devices.Duplicate(), svc_root, std::move(gpt), info));
+  return zx::ok(new GptDevicePartitioner(devices.Duplicate(), svc_root, gpt->TotalBlockCount(),
+                                         static_cast<uint32_t>(gpt->BlockSize()), std::move(gpt)));
 }
 
 zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::InitializeGpt(
     const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     fidl::ClientEnd<fuchsia_device::Controller> block_controller) {
+  zx::result admin = component::ConnectAt<fuchsia_fshost::Admin>(svc_root);
+  if (admin.is_error()) {
+    return admin.take_error();
+  }
+  bool storage_host_enabled = false;
+  {
+    fidl::WireResult storage_host = fidl::WireCall(*admin)->StorageHostEnabled();
+    if (!storage_host.ok()) {
+      ERROR("Failed to query fshost for storage-host: %s\n",
+            storage_host.FormatDescription().c_str());
+    } else {
+      storage_host_enabled = storage_host->enabled;
+    }
+  }
+
   if (block_controller) {
+    if (storage_host_enabled) {
+      // On storage-host, we get the GPT block device from fshost, so it doesn't make sense to have
+      // an explicitly provided device.  The ability to explicitly specify a block device should
+      // eventually be removed, but for now just return ZX_ERR_NOT_SUPPORTED.
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
     return InitializeProvidedGptDevice(devices, svc_root, block_controller);
   }
 
-  zx::result gpt_devices = FindGptDevices(devices.devfs_root());
-  if (gpt_devices.is_error()) {
-    ERROR("Failed to find GPT: %s\n", gpt_devices.status_string());
-    return gpt_devices.take_error();
-  }
-
-  std::vector<fidl::ClientEnd<fuchsia_device::Controller>> non_removable_gpt_devices;
-
-  std::unique_ptr<GptDevicePartitioner> gpt_partitioner;
-  for (auto& gpt_device : gpt_devices.value()) {
-    const fidl::WireResult result = fidl::WireCall(gpt_device.block)->GetInfo();
-    if (!result.ok()) {
-      ERROR("Warning: Could not acquire GPT block info: %s\n", result.FormatDescription().c_str());
-      return zx::error(result.status());
+  std::vector<std::unique_ptr<GptDevicePartitioner>> candidate_gpts;
+  if (storage_host_enabled) {
+    // Fshost takes care of finding the GPT block device.
+    zx::result gpt_device_source = BlockDevices::CreateStorageHost(svc_root);
+    if (gpt_device_source.is_error()) {
+      ERROR("Failed to connect to storage host: %s\n", gpt_device_source.status_string());
+      return gpt_device_source.take_error();
     }
-    fit::result response = result.value();
-    if (response.is_error()) {
+
+    zx::result manager = component::ConnectAt<fuchsia_storagehost::PartitionsManager>(svc_root);
+    if (manager.is_error()) {
+      return manager.take_error();
+    }
+    fidl::WireResult info = fidl::WireCall(*manager)->GetBlockInfo();
+    if (!info.ok()) {
+      ERROR("Warning: Could not acquire GPT block info: %s\n", info.FormatDescription().c_str());
+      return zx::error(info.status());
+    }
+    if (info.value().is_error()) {
       ERROR("Warning: Could not acquire GPT block info: %s\n",
-            zx_status_get_string(response.error_value()));
-      return response.take_error();
+            zx_status_get_string((info.value().error_value())));
+      return info.value().take_error();
+    }
+    auto partitioner = WrapUnique(new GptDevicePartitioner(std::move(*gpt_device_source), svc_root,
+                                                           info->value()->block_count,
+                                                           info->value()->block_size, {}));
+    candidate_gpts.push_back(std::move(partitioner));
+  } else {
+    zx::result gpt_devices = FindGptDevices(devices.devfs_root());
+    if (gpt_devices.is_error()) {
+      ERROR("Failed to find GPT: %s\n", gpt_devices.status_string());
+      return gpt_devices.take_error();
     }
 
-    const fuchsia_hardware_block::wire::BlockInfo& info = response.value()->info;
-    if (info.flags & block::wire::Flag::kRemovable) {
-      continue;
+    for (auto& gpt_device : gpt_devices.value()) {
+      fidl::WireResult info = fidl::WireCall(gpt_device.block)->GetInfo();
+      if (!info.ok()) {
+        ERROR("Warning: Could not acquire GPT block info: %s\n", info.FormatDescription().c_str());
+        return zx::error(info.status());
+      }
+      if (info.value().is_error()) {
+        ERROR("Warning: Could not acquire GPT block info: %s\n",
+              zx_status_get_string(info.value().error_value()));
+        return info.value().take_error();
+      }
+
+      auto [controller, controller_server] = fidl::Endpoints<fuchsia_device::Controller>::Create();
+      if (fidl::OneWayStatus status = fidl::WireCall(gpt_device.controller)
+                                          ->ConnectToController(std::move(controller_server));
+          !status.ok()) {
+        ERROR("Failed to connect to new controller %s\n", status.FormatDescription().c_str());
+        continue;
+      }
+      zx::result result = ConnectToGpt(std::move(controller));
+      if (result.is_error()) {
+        ERROR("Failed to connect to GPT: %s\n", result.status_string());
+        return zx::error(ZX_ERR_BAD_STATE);
+      }
+      if (!result->Valid()) {
+        continue;
+      }
+      auto partitioner = WrapUnique(
+          new GptDevicePartitioner(devices.Duplicate(), svc_root, info->value()->info.block_count,
+                                   info->value()->info.block_size, std::move(result.value())));
+      candidate_gpts.push_back(std::move(partitioner));
     }
+  }
 
-    auto [controller, controller_server] = fidl::Endpoints<fuchsia_device::Controller>::Create();
-    if (fidl::OneWayStatus status = fidl::WireCall(gpt_device.controller)
-                                        ->ConnectToController(std::move(controller_server));
-        !status.ok()) {
-      ERROR("Failed to connect to new controller %s\n", status.FormatDescription().c_str());
-      continue;
-    }
+  if (candidate_gpts.empty()) {
+    ERROR("No candidate GPTs found.\n");
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
 
-    zx::result remote_device = block_client::RemoteBlockDevice::Create(
-        fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(gpt_device.block.TakeChannel()),
-        std::move(gpt_device.controller));
-    if (!remote_device.is_ok()) {
-      return remote_device.take_error();
-    }
-    zx::result gpt_result =
-        GptDevice::Create(std::move(remote_device.value()), info.block_size, info.block_count);
-    if (gpt_result.is_error()) {
-      ERROR("Failed to get GPT info: %s\n", gpt_result.status_string());
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
-    std::unique_ptr<GptDevice>& gpt = gpt_result.value();
-
-    if (!gpt->Valid()) {
-      continue;
-    }
-
-    non_removable_gpt_devices.push_back(std::move(controller));
-
-    auto partitioner =
-        WrapUnique(new GptDevicePartitioner(devices.Duplicate(), svc_root, std::move(gpt), info));
-
+  std::unique_ptr<GptDevicePartitioner> partitioner;
+  bool initialize_partition_tables = false;
+  if (candidate_gpts.size() == 1) {
+    // If there's only one GPT, but it's missing the necessary partitions, bubble that up so the
+    // caller can decide whether to reset the partition tables.
+    partitioner = std::move(candidate_gpts[0]);
     if (partitioner->FindPartition(IsFvmOrAndroidPartition).is_error()) {
-      continue;
+      ERROR(
+          "Unable to find a GPT on this device with the expected partitions.\n"
+          "Attempting to reinitialize partition tables; this will only work on netbooted devices!\n"
+          "If this fails, please run init-partition-tables to re-initialize the device.\n");
+      initialize_partition_tables = true;
     }
-
-    if (gpt_partitioner) {
-      ERROR("Found multiple block devices with valid GPTs. Unsuppported.\n");
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
+  } else {
+    for (auto& candidate : candidate_gpts) {
+      if (candidate->FindPartition(IsFvmOrAndroidPartition).is_ok()) {
+        if (partitioner) {
+          ERROR("Found multiple block devices with valid GPTs. Unsuppported.\n");
+          return zx::error(ZX_ERR_NOT_SUPPORTED);
+        }
+        partitioner = std::move(candidate);
+      }
     }
-    gpt_partitioner = std::move(partitioner);
   }
 
-  if (gpt_partitioner) {
-    return zx::ok(InitializeGptResult{std::move(gpt_partitioner), false});
+  if (partitioner) {
+    return zx::ok(InitializeGptResult{
+        .gpt = std::move(partitioner),
+        .initialize_partition_tables = initialize_partition_tables,
+    });
   }
 
-  if (non_removable_gpt_devices.size() == 1) {
-    // If we only find a single non-removable gpt device, we initialize it's partition table.
-    auto status = InitializeProvidedGptDevice(devices, svc_root, non_removable_gpt_devices[0]);
-    if (status.is_error()) {
-      return status.take_error();
-    }
-    return zx::ok(InitializeGptResult{std::move(status.value()), true});
-  }
-
-  ERROR(
-      "Unable to find a valid GPT on this device with the expected partitions. "
-      "Please run *one* of the following command(s):\n");
-
-  for (const auto& device : gpt_devices.value()) {
-    ERROR("fx init-partition-tables %s\n", device.topological_path.c_str());
-  }
-
+  ERROR("Unable to find a valid GPT on this device with the expected partitions.\n");
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
@@ -395,7 +441,9 @@ zx::result<std::unique_ptr<BlockPartitionClient>> GptDevicePartitioner::FindPart
         fidl::UnownedClientEnd<fuchsia_hardware_block_partition::Partition>(chan.borrow());
     zx::result metadata = QueryGptPartitionMetadata(client);
     if (metadata.is_error()) {
-      ERROR("Failed to query GPT partition metadata: %s\n", metadata.status_string());
+      if (metadata.status_value() != ZX_ERR_NOT_SUPPORTED) {
+        ERROR("Failed to query GPT partition metadata: %s\n", metadata.status_string());
+      }
       return false;
     }
     return filter(*metadata);
@@ -480,15 +528,15 @@ zx::result<> GptDevicePartitioner::WipeFvm() const {
 zx::result<> GptDevicePartitioner::ResetPartitionTables(
     std::vector<GptDevicePartitioner::PartitionInitSpec> partitions) const {
   // Assign offsets and instance GUIDs as needed.
-  uint64_t metadata_blocks = ReservedHeaderBlocks(block_info_.block_size);
-  uint64_t last_available_block = block_info_.block_count - metadata_blocks;
+  uint64_t metadata_blocks = ReservedHeaderBlocks(block_size_);
+  uint64_t last_available_block = block_count_ - metadata_blocks;
   struct Range {
     uint64_t start;
     uint64_t end;
   };
   std::vector<Range> allocations = {
       Range{.start = 0, .end = metadata_blocks},
-      Range{.start = last_available_block, .end = block_info_.block_count},
+      Range{.start = last_available_block, .end = block_count_},
   };
 
   // Returns the position to insert at, and the block offset to use.
@@ -507,11 +555,11 @@ zx::result<> GptDevicePartitioner::ResetPartitionTables(
     if (partition.size_bytes == 0) {
       continue;
     }
-    if (partition.size_bytes % block_info_.block_size > 0) {
+    if (partition.size_bytes % block_size_ > 0) {
       ERROR("Misaligned partition\n");
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
-    uint64_t num_blocks = partition.size_bytes / block_info_.block_size;
+    uint64_t num_blocks = partition.size_bytes / block_size_;
     constexpr const Uuid kNilGuid;
     if (partition.instance == kNilGuid) {
       partition.instance = Uuid::Generate();
@@ -558,7 +606,7 @@ zx::result<> GptDevicePartitioner::ResetPartitionTables(
     fuchsia_storagehost::wire::PartitionInfo info{
         .name = fidl::StringView::FromExternal(partition.name),
         .start_block = partition.start_block,
-        .num_blocks = partition.size_bytes / block_info_.block_size,
+        .num_blocks = partition.size_bytes / block_size_,
         .flags = partition.flags,
     };
     std::copy(partition.type.cbegin(), partition.type.cend(), info.type_guid.value.data());
@@ -567,15 +615,14 @@ zx::result<> GptDevicePartitioner::ResetPartitionTables(
     infos[i] = info;
   }
 
-  zx::result client =
-      component::ConnectAt<fuchsia_storagehost::PartitionsAdmin>(svc_root_.borrow());
-  if (client.is_error()) {
-    return client.take_error();
+  zx::result recovery = component::ConnectAt<fuchsia_fshost::Recovery>(svc_root_.borrow());
+  if (recovery.is_error()) {
+    return recovery.take_error();
   }
-  fidl::WireResult result = fidl::WireCall(*client)->ResetPartitionTable(
+  fidl::WireResult result = fidl::WireCall(*recovery)->InitSystemPartitionTable(
       fidl::VectorView<fuchsia_storagehost::wire::PartitionInfo>::FromExternal(infos));
   if (result.status() != ZX_OK) {
-    ERROR("Failed to reset partitions table: %s\n", result.status_string());
+    ERROR("Failed to reset partitions table: %s\n", result.FormatDescription().c_str());
     return zx::error(result.status());
   }
   return zx::ok();
@@ -591,9 +638,9 @@ zx::result<> GptDevicePartitioner::ResetPartitionTablesLegacy(
     if (partition.size_bytes == 0) {
       continue;
     }
-    zx::result result = gpt_->AddPartition(
-        partition.name.c_str(), partition.type.bytes(), partition.instance.bytes(),
-        partition.start_block, partition.size_bytes / block_info_.block_size, partition.flags);
+    zx::result result = gpt_->AddPartition(partition.name.c_str(), partition.type.bytes(),
+                                           partition.instance.bytes(), partition.start_block,
+                                           partition.size_bytes / block_size_, partition.flags);
     if (result.is_error()) {
       ERROR("Failed to add partition %s at off %" PRIu64 ":  %s\n", partition.name.c_str(),
             partition.start_block, result.status_string());
@@ -609,7 +656,5 @@ zx::result<> GptDevicePartitioner::ResetPartitionTablesLegacy(
   }
   return result;
 }
-
-bool GptDevicePartitioner::StorageHostDetected() const { return devices_.HasPartitionsDirectory(); }
 
 }  // namespace paver

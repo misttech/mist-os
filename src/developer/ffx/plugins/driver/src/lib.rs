@@ -57,10 +57,9 @@ impl DriverConnector {
             moniker: &str,
             capability: &str,
         ) -> Result<S::Proxy> {
-            let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
-                .with_context(|| format!("failed to create proxy to {}", S::DEBUG_NAME))?;
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<S>();
             remote_control
-                .open_capability(
+                .deprecated_open_capability(
                     moniker,
                     fsys::OpenDirType::ExposedDir,
                     capability,

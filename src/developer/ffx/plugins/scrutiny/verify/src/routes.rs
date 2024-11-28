@@ -50,7 +50,7 @@ pub async fn verify(
                 "❌ ERROR: {}\n    Moniker: {}\n    Capability: {}\n    Starting with: {:?}",
                 error.error.to_string(),
                 error.using_node,
-                error.capability.as_ref().map(|c| c.to_string()).unwrap_or("".into()),
+                error.capability.as_ref().map(|c| c.to_string()).unwrap_or_else(|| "".into()),
                 error.target_decl,
             );
             human_readable_errors.push(error);
@@ -61,7 +61,7 @@ pub async fn verify(
                 "⚠️ WARNING: {}\n    Moniker: {}\n    Capability: {}\n    Starting with: {:?}",
                 warning.warning.to_string(),
                 warning.using_node,
-                warning.capability.as_ref().map(|c| c.to_string()).unwrap_or("".into()),
+                warning.capability.as_ref().map(|c| c.to_string()).unwrap_or_else(|| "".into()),
                 warning.target_decl,
             );
             human_readable_errors.push(warning);

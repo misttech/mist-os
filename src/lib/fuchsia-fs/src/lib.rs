@@ -10,48 +10,9 @@ pub mod directory;
 pub mod file;
 pub mod node;
 
-// Reexported from fidl_fuchsia_io for convenience
-pub use fio::{Flags, OpenFlags};
-
-// The following symbols are defined in fuchsia.io for convenience, but they only exist at HEAD.
-// Re-export them here; the actual flag values have been supported since the Flags type was defined.
-// TODO(https://fxbug.dev/324932108): Just use the FIDL definitions once all SDK versions contain
-// them.
-
-/// Set of permissions that are expected when opening a node as readable.
-pub const PERM_READABLE: Flags = Flags::from_bits_truncate(
-    Flags::PERM_CONNECT.bits()
-        | Flags::PERM_ENUMERATE.bits()
-        | Flags::PERM_TRAVERSE.bits()
-        | Flags::PERM_READ.bits()
-        | Flags::PERM_GET_ATTRIBUTES.bits(),
-);
-
-/// Set of permissions that are expected when opening a node as writable.
-pub const PERM_WRITABLE: Flags = Flags::from_bits_truncate(
-    Flags::PERM_CONNECT.bits()
-        | Flags::PERM_ENUMERATE.bits()
-        | Flags::PERM_TRAVERSE.bits()
-        | Flags::PERM_WRITE.bits()
-        | Flags::PERM_MODIFY.bits()
-        | Flags::PERM_SET_ATTRIBUTES.bits(),
-);
-
-/// Set of permissions that are expected when opening a node as executable.
-pub const PERM_EXECUTABLE: Flags = Flags::from_bits_truncate(
-    Flags::PERM_CONNECT.bits()
-        | Flags::PERM_ENUMERATE.bits()
-        | Flags::PERM_TRAVERSE.bits()
-        | Flags::PERM_EXECUTE.bits(),
-);
-
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
-mod assertions {
-    use static_assertions::const_assert;
-    const_assert!(crate::PERM_READABLE.bits() == fidl_fuchsia_io::PERM_READABLE.bits());
-    const_assert!(crate::PERM_WRITABLE.bits() == fidl_fuchsia_io::PERM_WRITABLE.bits());
-    const_assert!(crate::PERM_EXECUTABLE.bits() == fidl_fuchsia_io::PERM_EXECUTABLE.bits());
-}
+// Types/constants re-exported from fidl_fuchsia_io for convenience.
+// TODO(https://324111518): Remove the re-export of OpenFlags.
+pub use fio::{Flags, OpenFlags, PERM_EXECUTABLE, PERM_READABLE, PERM_WRITABLE};
 
 /// canonicalize_path will remove a leading `/` if it exists, since it's always unnecessary and in
 /// some cases disallowed (https://fxbug.dev/42103076).
@@ -149,7 +110,7 @@ mod tests {
             "rw" => remote_dir(dir)
         };
         let (example_dir_proxy, example_dir_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let example_dir_flags =
             fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;

@@ -32,16 +32,7 @@ fn main() {
         )
         .await
         .unwrap();
-        builder
-            .build_in_nested_component_manager_with_passthrough_offers(
-                "#meta/component_manager.cm",
-                vec![
-                    "fuchsia.kernel.VmexResource".parse().unwrap(),
-                    "fuchsia.pkg.PackageResolver".parse().unwrap(),
-                ],
-            )
-            .await
-            .unwrap()
+        builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap()
     });
     let realm_proxy = realm
         .root
@@ -139,7 +130,7 @@ impl ElfComponentLaunchTest {
         mode: SetupMode,
     ) -> fcomponent::ControllerProxy {
         let (controller, controller_server) =
-            endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+            endpoints::create_proxy::<fcomponent::ControllerMarker>();
         let collection_ref = fdecl::CollectionRef { name: "coll".into() };
         let id: u64 = rand::thread_rng().gen();
         let child_name = format!("auto-{:x}", id);
@@ -163,7 +154,7 @@ impl ElfComponentLaunchTest {
             SetupMode::Resolved => {
                 let child =
                     fdecl::ChildRef { name: child_name.into(), collection: Some("coll".into()) };
-                let (_dir, server) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+                let (_dir, server) = endpoints::create_proxy::<fio::DirectoryMarker>();
                 realm
                     .open_exposed_dir(&child, server)
                     .await

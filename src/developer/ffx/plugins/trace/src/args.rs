@@ -109,6 +109,13 @@ pub struct Stop {
     /// non durable bytes written.
     #[argh(switch, short = 'v')]
     pub verbose: bool,
+
+    /// prevent symbolization of the trace file. Defaults to false.
+    /// If the 'kernel:ipc' category is not included in tracing, this flag does
+    /// nothing. Otherwise this flag will prevent the symbolization of the
+    /// kernel IPC traces, leaving only the ordinals in the trace.
+    #[argh(switch)]
+    pub no_symbolize: bool,
 }
 
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
@@ -203,6 +210,9 @@ pub struct Start {
 
     /// whether to run the trace in the background. Defaults to false,
     /// which means the trace will run in "interactive" mode.
+    ///
+    /// For a trace started in the background for a specified duration,
+    /// symbolization is not done by default.
     #[argh(switch)]
     pub background: bool,
 
@@ -231,6 +241,15 @@ pub struct Start {
     /// interactive mode.
     #[argh(option, from_str_fn(trigger_from_str))]
     pub trigger: Vec<Trigger>,
+
+    /// prevent symbolization of the trace file. Defaults to false.
+    /// If the 'kernel:ipc' category is not included in tracing, this flag does
+    /// nothing. Otherwise this flag will prevent the symbolization of the
+    /// kernel IPC traces, leaving the ordinals as is in the trace.
+    ///
+    /// This flag is only used if tracing is manually stopped.
+    #[argh(switch)]
+    pub no_symbolize: bool,
 }
 
 fn try_string_to_action(s: &str) -> Result<Action, String> {

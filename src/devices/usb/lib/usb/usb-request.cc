@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/usb/c/banjo.h>
-#include <lib/ddk/phys-iter.h>
+#include <lib/io-buffer/phys-iter.h>
 #include <lib/trace/event.h>
 #include <stdint.h>
 #include <stdio.h>

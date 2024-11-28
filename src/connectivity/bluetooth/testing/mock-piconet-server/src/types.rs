@@ -155,7 +155,7 @@ impl ServiceRecord {
     ///
     /// Returns an error if the service has not been registered.
     pub fn unique_service_id(&self) -> Result<RegisteredServiceId, Error> {
-        self.reg_id.ok_or(format_err!("The ServiceRecord has not been registered"))
+        self.reg_id.ok_or_else(|| format_err!("The ServiceRecord has not been registered"))
     }
 
     /// Returns true if the provided `id` is specified by this record.
@@ -178,8 +178,10 @@ impl ServiceRecord {
     // TODO(https://fxbug.dev/42128647): Build the full ServiceFoundResponse. Right now, we just
     // build the primary L2CAP Protocol, ServiceClassIdentifiers, and Profile Descriptors.
     pub fn to_service_found_response(&self) -> Result<ServiceFoundResponse, Error> {
-        let peer_id =
-            self.reg_id.ok_or(format_err!("The service has not been registered."))?.peer_id();
+        let peer_id = self
+            .reg_id
+            .ok_or_else(|| format_err!("The service has not been registered."))?
+            .peer_id();
         let mut attributes = vec![];
 
         // The primary protocol list. This is both returned and included in `attributes`.
@@ -188,10 +190,8 @@ impl ServiceRecord {
         attributes.push(protocol_to_attribute(&protocol));
 
         // The service class identifiers.
-        let svc_ids_list: Vec<bredr::ServiceClassProfileIdentifier> =
-            self.svc_ids.iter().cloned().collect();
         let svc_ids_sequence =
-            svc_ids_list.into_iter().map(|id| Some(Box::new(Uuid::from(id).into()))).collect();
+            self.svc_ids.iter().cloned().map(|id| Some(Box::new(Uuid::from(id).into()))).collect();
         attributes.push(bredr::Attribute {
             id: Some(bredr::ATTR_SERVICE_CLASS_ID_LIST),
             element: Some(bredr::DataElement::Sequence(svc_ids_sequence)),

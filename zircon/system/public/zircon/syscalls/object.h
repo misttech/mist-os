@@ -29,12 +29,15 @@ typedef uint32_t zx_object_info_topic_t;
 #define ZX_INFO_THREAD                      ((zx_object_info_topic_t) 10u) // zx_info_thread_t[1]
 #define ZX_INFO_THREAD_EXCEPTION_REPORT_V1  __ZX_INFO_TOPIC(11u, 0) // zx_exception_report_t[1]
 #define ZX_INFO_THREAD_EXCEPTION_REPORT     __ZX_INFO_TOPIC(11u, 1) // zx_exception_report_t[1]
-#define ZX_INFO_TASK_STATS                  ((zx_object_info_topic_t) 12u) // zx_info_task_stats_t[1]
+#define ZX_INFO_TASK_STATS_V1               __ZX_INFO_TOPIC(12u, 0)        // zx_info_task_stats_t[1]
+#define ZX_INFO_TASK_STATS                  __ZX_INFO_TOPIC(12u, 1)        // zx_info_task_stats_t[1]
 #define ZX_INFO_PROCESS_MAPS_V1             __ZX_INFO_TOPIC(13u, 0)        // zx_info_maps_t[n]
-#define ZX_INFO_PROCESS_MAPS                __ZX_INFO_TOPIC(13u, 1)        // zx_info_maps_t[n]
+#define ZX_INFO_PROCESS_MAPS_V2             __ZX_INFO_TOPIC(13u, 1)        // zx_info_maps_t[n]
+#define ZX_INFO_PROCESS_MAPS                __ZX_INFO_TOPIC(13u, 2)        // zx_info_maps_t[n]
 #define ZX_INFO_PROCESS_VMOS_V1             __ZX_INFO_TOPIC(14u, 0)        // zx_info_vmo_t[n]
 #define ZX_INFO_PROCESS_VMOS_V2             __ZX_INFO_TOPIC(14u, 1)        // zx_info_vmo_t[n]
-#define ZX_INFO_PROCESS_VMOS                __ZX_INFO_TOPIC(14u, 2)        // zx_info_vmo_t[n]
+#define ZX_INFO_PROCESS_VMOS_V3             __ZX_INFO_TOPIC(14u, 2)        // zx_info_vmo_t[n]
+#define ZX_INFO_PROCESS_VMOS                __ZX_INFO_TOPIC(14u, 3)        // zx_info_vmo_t[n]
 #define ZX_INFO_THREAD_STATS                ((zx_object_info_topic_t) 15u) // zx_info_thread_stats_t[1]
 #define ZX_INFO_CPU_STATS                   ((zx_object_info_topic_t) 16u) // zx_info_cpu_stats_t[n]
 #define ZX_INFO_KMEM_STATS                  __ZX_INFO_TOPIC(17u, 1)        // zx_info_kmem_stats_t[1]
@@ -46,7 +49,8 @@ typedef uint32_t zx_object_info_topic_t;
 #define ZX_INFO_SOCKET                      ((zx_object_info_topic_t) 22u) // zx_info_socket_t[1]
 #define ZX_INFO_VMO_V1                      __ZX_INFO_TOPIC(23u, 0)        // zx_info_vmo_t[1]
 #define ZX_INFO_VMO_V2                      __ZX_INFO_TOPIC(23u, 1)        // zx_info_vmo_t[1]
-#define ZX_INFO_VMO                         __ZX_INFO_TOPIC(23u, 2)        // zx_info_vmo_t[1]
+#define ZX_INFO_VMO_V3                      __ZX_INFO_TOPIC(23u, 2)        // zx_info_vmo_t[1]
+#define ZX_INFO_VMO                         __ZX_INFO_TOPIC(23u, 3)        // zx_info_vmo_t[1]
 #define ZX_INFO_JOB                         ((zx_object_info_topic_t) 24u) // zx_info_job_t[1]
 #define ZX_INFO_TIMER                       ((zx_object_info_topic_t) 25u) // zx_info_timer_t[1]
 #define ZX_INFO_STREAM                      ((zx_object_info_topic_t) 26u) // zx_info_stream_t[1]
@@ -280,10 +284,13 @@ typedef struct zx_info_task_stats {
     // physical memory. Some of the memory may be double-mapped, and thus
     // double-counted.
 
-    // Committed memory that is only mapped into this task.
+    // Committed memory that is only mapped into this task and is not shared
+    // between multiple VMOs via copy-on-write.
     size_t mem_private_bytes;
 
-    // Committed memory that is mapped into this and at least one other task.
+    // Committed memory that is mapped into this and at least one other task,
+    // or is mapped into this task and shared between multiple VMOs via
+    // copy-on-write.
     size_t mem_shared_bytes;
 
     // A number that estimates the fraction of mem_shared_bytes that this
@@ -291,11 +298,26 @@ typedef struct zx_info_task_stats {
     //
     // An estimate of:
     //   For each shared, committed byte:
-    //   mem_scaled_shared_bytes += 1 / (number of tasks mapping this byte)
+    //   share_factor = (number of VMOs sharing this byte) *
+    //                  (number of tasks mapping this byte)
+    //   mem_scaled_shared_bytes += 1 / share_factor
     //
-    // This number is strictly smaller than mem_shared_bytes.
+    // This number is strictly smaller than mem_shared_bytes. Any fractional
+    // bytes are truncated when reporting this value.
     size_t mem_scaled_shared_bytes;
+
+    // The fractional bytes truncated from |mem_scaled_shared_bytes|, expressed
+    // in fixed point with 63 bits of precision. `0x800...` represents a full
+    // byte.
+    uint64_t mem_fractional_scaled_shared_bytes;
 } zx_info_task_stats_t;
+
+typedef struct zx_info_task_stats_v1 {
+    size_t mem_mapped_bytes;
+    size_t mem_private_bytes;
+    size_t mem_shared_bytes;
+    size_t mem_scaled_shared_bytes;
+} zx_info_task_stats_v1_t;
 
 typedef struct zx_info_vmar {
     // Base address of the region.
@@ -373,15 +395,53 @@ typedef struct zx_info_maps_mapping {
     zx_koid_t vmo_koid;
     // Offset into the above VMO or IOB region.
     uint64_t vmo_offset;
-    // The number of PAGE_SIZE pages in the mapped region of the VMO or
-    // IOB region that are backed by physical memory.
-    size_t committed_pages;
-    // The number of PAGE_SIZE pages of content that have been populated and are
-    // being tracked in the mapped region of the VMO or IOB region. This can be
-    // greater than |committed_pages| where pages might be compressed or otherwise
-    // tracked in a way that does not correlate directly to being committed.
-    size_t populated_pages;
+    // The number of bytes in the mapped region of the VMO or IOB region that
+    // are backed by physical memory.
+    size_t committed_bytes;
+    // The number of bytes of content that have been populated and are being
+    // tracked in the mapped region of the VMO or IOB region. This can be
+    // greater than |committed_bytes| where pages might be compressed or
+    // otherwise tracked in a way that does not correlate directly to being
+    // committed.
+    size_t populated_bytes;
+    // The number of |committed_bytes| that are private to the VMO or IOB
+    // region (i.e. there are no copy-on-write references to the bytes from
+    // another VMO or IOB region).
+    size_t committed_private_bytes;
+    // The number of |populated_bytes| that are private to the VMO or IOB
+    // region (i.e. there are no copy-on-write references to the bytes from
+    // another VMO or IOB region).
+    size_t populated_private_bytes;
+    // The value of |committed_bytes| when each byte is scaled by the count of
+    // VMOs and IOB regions which have a reference to that byte. Any fractional
+    // bytes are truncated when reporting this value. For example, a byte
+    // shared between 2 VMOs via copy-on-write will only contribute 1/2 to this
+    // value while a private byte will contribute 1.
+    size_t committed_scaled_bytes;
+    // The value of |populated_bytes| when each byte is scaled by the count of
+    // VMOs and IOB regions which have a reference to that byte. Any fractional
+    // bytes are truncated when reporting this value. For example, a byte
+    // shared between 2 VMOs via copy-on-write will only contribute 1/2 to this
+    // value while a private byte will contribute 1.
+    size_t populated_scaled_bytes;
+    // The fractional bytes truncated from |committed_scaled_bytes|, expressed
+    // in fixed point with 63 bits of precision. `0x800...` represents a full
+    // byte.
+    uint64_t committed_fractional_scaled_bytes;
+    // The fractional bytes truncated from |populated_scaled_bytes|, expressed
+    // in fixed point with 63 bits of precision. `0x800...` represents a full
+    // byte.
+    uint64_t populated_fractional_scaled_bytes;
 } zx_info_maps_mapping_t;
+
+typedef struct zx_info_maps_mapping_v2 {
+    zx_vm_option_t mmu_flags;
+    uint8_t padding1[4];
+    zx_koid_t vmo_koid;
+    uint64_t vmo_offset;
+    size_t committed_pages;
+    size_t populated_pages;
+} zx_info_maps_mapping_v2_t;
 
 typedef struct zx_info_maps_mapping_v1 {
     zx_vm_option_t mmu_flags;
@@ -421,6 +481,18 @@ typedef struct zx_info_maps {
         // No additional fields for other types.
     } u;
 } zx_info_maps_t;
+
+typedef struct zx_info_maps_v2 {
+    char name[ZX_MAX_NAME_LEN];
+    zx_vaddr_t base;
+    size_t size;
+    size_t depth;
+    zx_info_maps_type_t type;
+    uint8_t padding1[4];
+    union {
+        zx_info_maps_mapping_v2_t mapping;
+    } u;
+} zx_info_maps_v2_t;
 
 typedef struct zx_info_maps_v1 {
     char name[ZX_MAX_NAME_LEN];
@@ -522,7 +594,10 @@ typedef struct zx_info_vmo {
 
     // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
     // memory currently allocated to this VMO; i.e., the amount of physical
-    // memory it consumes. Undefined otherwise.
+    // memory it consumes. This includes memory shared between this VMO and
+    // any related copy-on-write clones.
+    //
+    // Undefined otherwise.
     uint64_t committed_bytes;
 
     // If |flags & ZX_INFO_VMO_VIA_HANDLE|, the handle rights.
@@ -546,12 +621,76 @@ typedef struct zx_info_vmo {
     uint64_t committed_change_events;
 
     // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
-    // content that has been populated and is being tracked by this vmo. This
+    // content that has been populated and is being tracked by this VMO. This
     // can be greater than |committed_bytes| where content might be compressed
     // or otherwise tracked in a way that does not correlate directly to being
-    // committed.
+    // committed. This includes memory shared between this VMO and any related
+    // copy-on-write clones.
+    //
+    // Undefined otherwise.
     uint64_t populated_bytes;
+
+    // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
+    // memory currently allocated to only this VMO, i.e., the amount of physical
+    // memory which would be reclaimed if this VMO were closed. This does not
+    // include memry shared between this VMO and any related copy-on-write
+    // clones.
+    //
+    // Undefined otherwise.
+    uint64_t committed_private_bytes;
+
+    // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
+    // content that has been populated and is being tracked by only this VMO.
+    // This can be greater than |committed_private_bytes| where content might
+    // be compressed or otherwise tracked in a way that does not correlate
+    // directly to being committed. This does not includes memory shared between
+    // this VMO and any related copy-on-write clones.
+    //
+    // Undefined otherwise.
+    uint64_t populated_private_bytes;
+
+    // The value of |committed_bytes| when each byte is scaled by the count of
+    // VMOs  which have a reference to that byte. Any fractional bytes are
+    // truncated when reporting this value. For example, a byte shared between
+    // 2 VMOs via copy-on-write will only contribute 1/2 to this value while a
+    // private byte will contribute 1.
+    uint64_t committed_scaled_bytes;
+
+    // The value of |populated_bytes| when each byte is scaled by the count of
+    // VMOs  which have a reference to that byte. Any fractional bytes are
+    // truncated when reporting this value. For example, a byte shared between
+    // 2 VMOs via copy-on-write will only contribute 1/2 to this value while a
+    // private byte will contribute 1.
+    uint64_t populated_scaled_bytes;
+
+    // The fractional bytes truncated from |committed_scaled_bytes|, expressed
+    // in fixed point with 63 bits of precision. `0x800...` represents a full
+    // byte.
+    uint64_t committed_fractional_scaled_bytes;
+
+    // The fractional bytes truncated from |populated_scaled_bytes|, expressed
+    // in fixed point with 63 bits of precision. `0x800...` represents a full
+    // byte.
+    uint64_t populated_fractional_scaled_bytes;
 } zx_info_vmo_t;
+
+typedef struct zx_info_vmo_v3 {
+    zx_koid_t koid;
+    char name[ZX_MAX_NAME_LEN];
+    uint64_t size_bytes;
+    zx_koid_t parent_koid;
+    size_t num_children;
+    size_t num_mappings;
+    size_t share_count;
+    uint32_t flags;
+    uint8_t padding1[4];
+    uint64_t committed_bytes;
+    zx_rights_t handle_rights;
+    uint32_t cache_policy;
+    uint64_t metadata_bytes;
+    uint64_t committed_change_events;
+    uint64_t populated_bytes;
+} zx_info_vmo_v3_t;
 
 typedef struct zx_info_vmo_v2 {
     zx_koid_t koid;

@@ -21,7 +21,7 @@
 #include "src/graphics/display/drivers/amlogic-display/panel/kd-kd070d82-fitipower-jd9364.h"
 #include "src/graphics/display/drivers/amlogic-display/panel/kd-kd070d82-fitipower-jd9365.h"
 #include "src/graphics/display/drivers/amlogic-display/panel/microtech-mtf050fhdi03-novatek-nt35596.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 
 namespace amlogic_display {
 

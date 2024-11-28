@@ -63,8 +63,7 @@ fn connect_to_hrtimer_async() -> Result<fhrtimer::DeviceProxy, Errno> {
         .into_string()
         .map_err(|e| errno!(EINVAL, format!("Failed to parse the device entry path: {e:?}")))?;
 
-    let (hrtimer, server_end) = fidl::endpoints::create_proxy::<fhrtimer::DeviceMarker>()
-        .map_err(|e| errno!(EINVAL, format!("Failed to create hrtimer proxy: {e}")))?;
+    let (hrtimer, server_end) = fidl::endpoints::create_proxy::<fhrtimer::DeviceMarker>();
     fdio::service_connect(&path, server_end.into_channel())
         .map_err(|e| errno!(EINVAL, format!("Failed to open hrtimer device: {e}")))?;
 
@@ -681,7 +680,7 @@ mod tests {
     /// It should never happen outside of test code.
     fn mock_hrtimer_connection() -> fhrtimer::DeviceSynchronousProxy {
         let (hrtimer, mut stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fhrtimer::DeviceMarker>().unwrap();
+            fidl::endpoints::create_sync_proxy_and_stream::<fhrtimer::DeviceMarker>();
         let fut = async move {
             while let Some(Ok(event)) = stream.next().await {
                 match event {

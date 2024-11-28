@@ -100,16 +100,16 @@ fuchsia_driver_package("pkg") {
 }
 
 _test_deps = [
-  "//sdk/lib/async_patterns/testing/cpp",
   "//sdk/lib/driver/power/cpp/testing",
-  "//sdk/lib/driver/testing/cpp:cpp",
-  "//sdk/lib/inspect/testing/cpp:zxtest",
-  "//src/devices/testing/fake-bti",
+  "//sdk/lib/driver/testing/cpp",
+  "//sdk/lib/inspect/testing/cpp",
+  "//src/devices/pci/testing:pci-protocol-fake",
   "//src/devices/testing/fake-mmio-reg",
+  "//src/lib/fxl/test:gtest_main",
   "//src/lib/json_parser",
+  "//src/lib/testing/predicates",
   "//src/storage/lib/block_client/cpp",
   "//zircon/system/ulib/fdio-caller",
-  "//zircon/system/ulib/zxtest",
   "//zircon/third_party/ulib/safemath",
 ]
 

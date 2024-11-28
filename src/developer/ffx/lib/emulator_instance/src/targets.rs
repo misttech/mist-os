@@ -114,8 +114,10 @@ impl EmulatorWatcherHandler {
         &self,
         instance_path: T,
     ) -> Option<String> {
-        let relative =
-            instance_path.as_ref().strip_prefix(&self.instance_dir).unwrap_or(Path::new(""));
+        let relative = instance_path
+            .as_ref()
+            .strip_prefix(&self.instance_dir)
+            .unwrap_or_else(|_| Path::new(""));
         let mut name: String = "".into();
         if let Some(instance_name) = relative.parent() {
             name = (&instance_name.to_string_lossy()).to_string();

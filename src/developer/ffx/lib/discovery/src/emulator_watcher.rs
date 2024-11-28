@@ -31,7 +31,7 @@ impl EmulatorWatcher {
 
         // Emulator (and therefore notify thread) lifetime should last as long as the task,
         // because it is moved into the loop
-        let mut watcher = emulator_instance::start_emulator_watching(instance_root.clone())?;
+        let mut watcher = emulator_instance::start_emulator_watching(instance_root)?;
         let task = Task::local(async move {
             loop {
                 if let Some(act) = watcher.emulator_target_detected().await {

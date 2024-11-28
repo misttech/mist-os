@@ -58,7 +58,7 @@ mod tests {
     impl MockIteratorServer {
         fn new() -> (Self, impl Stream<Item = Result<Vec<fpkg::BlobInfo>, fidl::Error>>) {
             let (proxy, reqs) =
-                fidl::endpoints::create_proxy_and_stream::<fpkg::BlobInfoIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fpkg::BlobInfoIteratorMarker>();
             (Self { reqs }, fidl_iterator_to_stream(proxy))
         }
 

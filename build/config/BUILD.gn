@@ -8,6 +8,7 @@ import("//build/config/clang/crash_diagnostics.gni")
 import("//build/config/clang/stack_size_section.gni")
 import("//build/config/clang/time_trace.gni")
 import("//build/config/compiler.gni")
+import("//build/config/enable_frame_pointers.gni")
 import("//build/config/fuchsia_cxx_version.gni")
 import("//build/config/linker.gni")
 import("//build/config/lto/config.gni")
@@ -23,22 +24,12 @@ if (support_rust) {
 }
 
 declare_args() {
-  if (is_fuchsia || is_mistos) {
-    # Controls whether the compiler emits full stack frames for function calls.
-    # This reduces performance but increases the ability to generate good
-    # stack traces, especially when we have bugs around unwind table generation.
-    # It applies only for Fuchsia targets (see below where it is unset).
-    #
-    # TODO(https://fxbug.dev/376749368) Enabling frame pointers breaks on RISCV release.
-    enable_frame_pointers = is_debug || target_cpu != "riscv64"
-  }
-
   # Controls whether to promote warnings to errors.
   deny_warnings = true
 }
 
 # No frame pointers for host compiles.
-if (!(is_fuchsia || is_mistos)) {
+if (current_toolchain == host_toolchain) {
   enable_frame_pointers = false
 }
 
@@ -476,7 +467,7 @@ config("optimize_minimal") {
   rustflags = [ "-Copt-level=1" ]
 }
 
-config("optimize_default") {
+config("optimize_moderate") {
   cflags = [ "-O2" ]
   ldflags = cflags
   rustflags = [ "-Copt-level=2" ]
@@ -515,7 +506,7 @@ config("optimize_size") {
 # This is the default optimization level for "release" builds.
 config("optimize_size_lto") {
   if (zircon_toolchain != false) {
-    configs = [ ":optimize_default" ]
+    configs = [ ":optimize_moderate" ]
   } else {
     # Primarily optimize for size.
     configs = [ ":optimize_size" ]
@@ -558,7 +549,7 @@ config("optimize_profile") {
     # For Zircon artifacts, this must always enable optimizations
     # to ensure userboot.so is compiled with -O2
     # See https://fxbug.dev/42146384 for more context.
-    configs = [ ":optimize_default" ]
+    configs = [ ":optimize_moderate" ]
   } else {
     cflags = [ "-O1" ]
     ldflags = cflags
@@ -571,7 +562,7 @@ config("optimize_coverage") {
     # For Zircon artifacts, this must always enable optimizations
     # to ensure userboot.so is compiled with -O2
     # See https://fxbug.dev/42146384 for more context.
-    configs = [ ":optimize_default" ]
+    configs = [ ":optimize_moderate" ]
   } else {
     cflags = [ "-O1" ]
     ldflags = cflags
@@ -694,8 +685,10 @@ config("frame_pointers") {
   }
 }
 
+# Implicit dependencies for frame_pointers config
 group("frame_pointers_deps") {
-  # Implicit dependencies for frame_pointers config
+}
+group("frame_pointers_executable_deps") {
 }
 
 config("no_frame_pointers") {
@@ -1624,5 +1617,8 @@ config("standalone") {
     # instrumentation works fine to collect data, and //src/lib/llvm-profdata
     # can be used to wire up a custom runtime if possible in context.
     ldflags += [ "-noprofilelib" ]
+
+    # Make sure the unwinder isn't implicitly brought in for any reason.
+    ldflags += [ "-unwindlib=none" ]
   }
 }

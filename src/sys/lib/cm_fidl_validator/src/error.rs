@@ -249,7 +249,7 @@ impl Error {
     ) -> Self {
         Error::AvailabilityMustBeOptional(
             DeclField { decl: decl_type, field: keyword.into() },
-            source_name.cloned().unwrap_or("<unnamed>".to_string()),
+            source_name.cloned().unwrap_or_else(|| "<unnamed>".to_string()),
         )
     }
 

@@ -56,7 +56,7 @@ async fn setup_test_bss_started(
                 .expect("Could not send StartConf");
 
             assert_variant!(fullmac_driver.request_stream.next().await,
-                fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online:_ , responder } => {
+                fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload:_ , responder } => {
                     responder.send().expect("Could not respond to OnLinkStateChanged");
             });
         };
@@ -82,7 +82,7 @@ async fn test_start_2ghz_bss_success() {
     ];
 
     // channel support is defined by fullmac driver config
-    let driver_band_cap = &fullmac_driver.config.query_info.band_cap_list[0];
+    let driver_band_cap = &fullmac_driver.config.query_info.band_caps.as_ref().unwrap()[0];
     let supported_channels = &driver_band_cap.operating_channel_list
         [0..driver_band_cap.operating_channel_count as usize];
 
@@ -115,7 +115,7 @@ async fn test_start_2ghz_bss_success() {
             .expect("Could not send StartConf");
 
         assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online:_ , responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload:_ , responder } => {
                 responder.send().expect("Could not respond to OnLinkStateChanged");
         });
     };
@@ -142,7 +142,15 @@ async fn test_start_2ghz_bss_success() {
         })
     );
 
-    assert_eq!(fullmac_request_history[1], FullmacRequest::OnLinkStateChanged(true));
+    assert_eq!(
+        fullmac_request_history[1],
+        FullmacRequest::OnLinkStateChanged(
+            fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest {
+                online: Some(true),
+                ..Default::default()
+            }
+        )
+    );
 
     // Check AP status to see that SME reports that an AP is running.
     // Driver does not take part in this interaction.
@@ -227,7 +235,7 @@ async fn test_stop_bss() {
             .expect("Could not send StopConf");
 
         assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online:_ , responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload:_ , responder } => {
                 responder.send().expect("Could not respond to OnLinkStateChanged");
         });
     };
@@ -247,7 +255,15 @@ async fn test_stop_bss() {
         })
     );
 
-    assert_eq!(fullmac_request_history[1], FullmacRequest::OnLinkStateChanged(false));
+    assert_eq!(
+        fullmac_request_history[1],
+        FullmacRequest::OnLinkStateChanged(
+            fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest {
+                online: Some(false),
+                ..Default::default()
+            }
+        )
+    );
 }
 
 #[fuchsia::test]
@@ -258,9 +274,10 @@ async fn test_remote_client_connected_open() {
     let remote_sta_address: [u8; 6] = rand::thread_rng().gen();
     fullmac_driver
         .ifc_proxy
-        .auth_ind(&fidl_fullmac::WlanFullmacAuthInd {
-            peer_sta_address: remote_sta_address.clone(),
-            auth_type: fidl_fullmac::WlanAuthType::OpenSystem,
+        .auth_ind(&fidl_fullmac::WlanFullmacImplIfcAuthIndRequest {
+            peer_sta_address: Some(remote_sta_address.clone()),
+            auth_type: Some(fidl_fullmac::WlanAuthType::OpenSystem),
+            ..Default::default()
         })
         .await
         .expect("Could not send AuthInd");
@@ -272,12 +289,13 @@ async fn test_remote_client_connected_open() {
 
     fullmac_driver
         .ifc_proxy
-        .assoc_ind(&fidl_fullmac::WlanFullmacAssocInd {
-            peer_sta_address: remote_sta_address.clone(),
-            listen_interval: 100,
-            ssid: vec_to_cssid(&DEFAULT_OPEN_AP_CONFIG.ssid),
-            rsne: vec![],
-            vendor_ie: vec![],
+        .assoc_ind(&fidl_fullmac::WlanFullmacImplIfcAssocIndRequest {
+            peer_sta_address: Some(remote_sta_address.clone()),
+            listen_interval: Some(100),
+            ssid: Some(DEFAULT_OPEN_AP_CONFIG.ssid.clone()),
+            rsne: Some(vec![]),
+            vendor_ie: Some(vec![]),
+            ..Default::default()
         })
         .await
         .expect("Could not send AssocInd");

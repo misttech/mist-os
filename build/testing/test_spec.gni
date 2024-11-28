@@ -96,12 +96,6 @@ if (allowed_device_types == []) {
       "QEMU",
       "crosvm",
     ]
-  } else if (board_name == "qemu-x64") {
-    allowed_device_types = [
-      "AEMU",
-      "QEMU",
-      "crosvm",
-    ]
   } else if (board_name == "astro") {
     allowed_device_types = [ "Astro" ]
   } else if (board_name == "luis") {
@@ -189,10 +183,25 @@ if (allowed_device_types == []) {
 #
 #       emu_dimensions (optional)
 #         [scope] Dimensions to configure emulator with. This only applies if
-#         dimensions specify an emulator device type. Valid dimensions are:
+#         dimensions specify an emulator device type.
+#         TODO(https://fxbug.dev/326129848): Remove once we've switched to
+#         using the virtual_device_spec instead.
+#         Valid dimensions are:
 #
 #           cores (optional)
 #             [int] The number of cores to configure the emulator with.
+#
+#       virtual_device_spec (optional)
+#         [scope] Info about the virtual device spec to run the emulator with.
+#         Valid specs can be found at //build/virtual-devices/BUILD.gn.
+#
+#           name (required)
+#             [string] The name of the virtual device spec.
+#
+#           env_name (optional)
+#             [string] The name to use to append to the environment name when
+#             constructing a unique name for the shard that runs with this env.
+#             By default, it will use the name specified above.
 #
 #       tags (optional)
 #         [list of strings] keys on which tests may be grouped. Tests with

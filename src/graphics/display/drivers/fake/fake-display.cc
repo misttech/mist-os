@@ -40,12 +40,12 @@
 
 #include "src/graphics/display/drivers/coordinator/preferred-scanout-image-type.h"
 #include "src/graphics/display/drivers/fake/image-info.h"
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -351,10 +351,9 @@ config_check_result_t FakeDisplay::DisplayEngineCheckConfiguration(
   if (display_configs[0].layer_count != 1) {
     success = display_configs[0].layer_count == 0;
   } else {
-    const primary_layer_t& layer = display_configs[0].layer_list[0].cfg.primary;
+    const layer_t& layer = display_configs[0].layer_list[0];
     const rect_u_t display_area = {.x = 0, .y = 0, .width = kWidth, .height = kHeight};
-    success = display_configs[0].layer_list[0].type == LAYER_TYPE_PRIMARY &&
-              layer.image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY &&
+    success = layer.image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY &&
               layer.image_metadata.width == kWidth && layer.image_metadata.height == kHeight &&
               memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) == 0 &&
               memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) == 0 &&
@@ -379,7 +378,7 @@ void FakeDisplay::DisplayEngineApplyConfiguration(const display_config_t* displa
     if (display_count == 1 && display_configs[0].layer_count) {
       // Only support one display.
       current_image_to_capture_id_ =
-          display::ToDriverImageId(display_configs[0].layer_list[0].cfg.primary.image_handle);
+          display::ToDriverImageId(display_configs[0].layer_list[0].image_handle);
     } else {
       current_image_to_capture_id_ = display::kInvalidDriverImageId;
     }
@@ -831,10 +830,9 @@ zx_status_t FakeDisplay::Initialize() {
   }
 
   if (!device_config_.manual_vsync_trigger) {
-    status = thrd_status_to_zx_status(thrd_create_with_name(
+    status = thrd_status_to_zx_status(thrd_create(
         &vsync_thread_,
-        [](void* context) { return static_cast<FakeDisplay*>(context)->VSyncThread(); }, this,
-        "vsync_thread"));
+        [](void* context) { return static_cast<FakeDisplay*>(context)->VSyncThread(); }, this));
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "Failed to create VSync thread: %s", zx_status_get_string(status));
       return status;
@@ -843,10 +841,9 @@ zx_status_t FakeDisplay::Initialize() {
   }
 
   if (IsCaptureSupported()) {
-    status = thrd_status_to_zx_status(thrd_create_with_name(
+    status = thrd_status_to_zx_status(thrd_create(
         &capture_thread_,
-        [](void* context) { return static_cast<FakeDisplay*>(context)->CaptureThread(); }, this,
-        "capture_thread"));
+        [](void* context) { return static_cast<FakeDisplay*>(context)->CaptureThread(); }, this));
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "Failed to not create image capture thread: %s", zx_status_get_string(status));
       return status;

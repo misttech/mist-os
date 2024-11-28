@@ -108,6 +108,7 @@ PhysbootHandoff = _start
 
     /* enable caches so atomics and spinlocks work */
     mrs     tmp, sctlr_el1
+    and     tmp, tmp, #~(1<<19) /* Clear WXN */
     orr     tmp, tmp, #(1<<12) /* Enable icache */
     orr     tmp, tmp, #(1<<2)  /* Enable dcache/ucache */
     msr     sctlr_el1, tmp
@@ -142,7 +143,7 @@ ImageFixup = AfterImageFixup
     mov     sp, tmp
 
     /* save the physical address the kernel is loaded at */
-    adr_global x0, __code_start
+    adr_global x0, __executable_start
     adr_global x1, kernel_base_phys
     str     x0, [x1]
 
@@ -182,7 +183,7 @@ ImageFixup = AfterImageFixup
     /* note: mapping the kernel here with full rwx, this will get locked down later in vm initialization; */
     mov     x0, page_table1
     mov     x1, kernel_vaddr
-    adr_global x2, __code_start
+    adr_global x2, __executable_start
     adr_global x3, _end
     sub     x3, x3, x2
     movlit  x4, MMU_PTE_KERNEL_RWX_FLAGS
@@ -265,9 +266,9 @@ ImageFixup = AfterImageFixup
     isb
 
     // Map our current physical PC to the virtual PC and jump there.
-    // PC = next_PC - __code_start + kernel_vaddr
+    // PC = next_PC - __executable_start + kernel_vaddr
     adr     tmp, .Lmmu_on_vaddr
-    adr_global tmp2, __code_start
+    adr_global tmp2, __executable_start
     sub     tmp, tmp, tmp2
     add     tmp, tmp, kernel_vaddr
     br      tmp

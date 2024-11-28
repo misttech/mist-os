@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 
 #### CATEGORY=Test
-### Entry point for all Fuchsia tests (host, target and end-to-end)
+### Entry point for all Fuchsia tests (host, target, and end-to-end)
 
 ## Usage: fx test [testName ...]
 ##
@@ -14,19 +14,13 @@
 ##     --test-filter                     Runs specific test cases in v2 suite. Can be specified multiple
 ##                                       times to pass in multiple patterns.
 ##                                       example: --test-filter glob1 --test-filter glob2
-## --restrict-logs, --no-restrict-logs   If false, do not limit maximum log severity regardless of the
-##                                       test's configuration. Default is true.
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/dart_utils.sh || exit $?
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/host_symbolizer.sh || exit $?
 fx-config-read
 
-# Device discovery and building missing symbolizer are slow operations that
-# don't need to happen when the user requests specific operations, like help and
-# info, or runs tests that only affect the host.
-# In future, we should consider moving these within fx test, which can better determine
-# whether or not the target device is affected by reading tests.json.
+# These pre-parsed properties of the command line can be used to skip expensive operations.
 info_only=false
 has_e2e=false
 host_tests_only=false
@@ -44,44 +38,10 @@ for arg in "$@"; do
   fi
 done
 
-if ! is_feature_enabled "legacy_fxtest" || $info_only || ( ! $has_e2e && $host_tests_only ); then
-  # skip slow operations when not necessary.
-  :
-else
-  # force build of required symbolizer host tools if they don't exist:
-  fx-command-run host-tool --print symbolizer > /dev/null
-
-  # initialize some variables required for E2E tests:
-  export FUCHSIA_DEVICE_ADDR="$(get-fuchsia-device-addr)"
-
-  export FUCHSIA_NODENAME="$(get-device-name)"
-
-  if [[ "$FUCHSIA_DEVICE_ADDR" == "::1" && -z "$SL4F_HTTP_PORT" ]]; then
-    # Device addr is localhost, assume that means that ports were forwarded with
-    # fx serve-remote from a remote workstation/laptop with a device attached.
-    export SL4F_HTTP_PORT=9080
-  fi
-
-  port="$(get-fuchsia-device-port)"
-  if [[ -n "${port}" ]]; then
-    export FUCHSIA_SSH_PORT="${port}"
-  fi
-
-  FUCHSIA_SSH_KEY="$(get-ssh-privkey)" || exit $?
-  export FUCHSIA_SSH_KEY
-
-  # Only set this environment variable if it's empty.
-  [ -z "$FUCHSIA_TEST_OUTDIR" ] && export FUCHSIA_TEST_OUTDIR="${FUCHSIA_OUT_DIR}/test_out/$(date +'%F-%H:%M:%S')"
-fi
-
 args=()
 
-if is_feature_enabled "legacy_fxtest"; then
-  run-dart-tool fxtest "${args[@]}" "$@"
-else
-  fx-command-run host-tool --print symbolizer > /dev/null
-  if [[ ! $host_tests_only ]]; then
-    fx-command-run host-tool --print ffx > /dev/null
-  fi
-  fx-command-run host-tool test2 "${args[@]}" "$@"
+fx-command-run host-tool --print symbolizer > /dev/null
+if [[ ! $host_tests_only ]]; then
+  fx-command-run host-tool --print ffx > /dev/null
 fi
+fx-command-run host-tool test "${args[@]}" "$@"

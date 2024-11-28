@@ -133,12 +133,9 @@ impl View {
 
         // Create view parameters.
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
-            create_proxy::<ui_comp::ParentViewportWatcherMarker>()
-                .expect("failed to create parent viewport watcher channel");
-        let (touch_source, touch_source_request) = create_proxy::<ui_pointer::TouchSourceMarker>()
-            .expect("failed to create touch source channel");
-        let (mouse_source, mouse_source_request) = create_proxy::<ui_pointer::MouseSourceMarker>()
-            .expect("failed to create mouse source channel");
+            create_proxy::<ui_comp::ParentViewportWatcherMarker>();
+        let (touch_source, touch_source_request) = create_proxy::<ui_pointer::TouchSourceMarker>();
+        let (mouse_source, mouse_source_request) = create_proxy::<ui_pointer::MouseSourceMarker>();
         let view_bound_protocols = ui_comp::ViewBoundProtocols {
             touch_source: Some(touch_source_request),
             mouse_source: Some(mouse_source_request),
@@ -324,8 +321,7 @@ impl View {
             .expect("failed to create view creation token pair");
 
         // Create the embedding viewport.
-        let (_, child_view_watcher_request) = create_proxy::<ui_comp::ChildViewWatcherMarker>()
-            .expect("failed to create child view watcher channel");
+        let (_, child_view_watcher_request) = create_proxy::<ui_comp::ChildViewWatcherMarker>();
         self.flatland
             .create_viewport(
                 &content_id,
@@ -779,8 +775,7 @@ impl View {
         keyboard_ready: AsyncEvent,
     ) {
         let (keyboard_client, mut keyboard_stream) =
-            create_request_stream::<ui_input3::KeyboardListenerMarker>()
-                .expect("failed to create keyboard source channel");
+            create_request_stream::<ui_input3::KeyboardListenerMarker>();
 
         keyboard
             .add_listener(view_ref, keyboard_client)

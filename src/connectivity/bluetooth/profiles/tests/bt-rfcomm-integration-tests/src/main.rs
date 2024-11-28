@@ -225,7 +225,7 @@ async fn rfcomm_component_connecting_to_another_rfcomm_component() {
     let other_rfcomm_proxy = other_rfcomm
         .connect_to_protocol::<bredr::ProfileMarker>(&test_topology)
         .expect("can connect to Profile");
-    let (search_client, mut search_results) = fidl::endpoints::create_request_stream().unwrap();
+    let (search_client, mut search_results) = fidl::endpoints::create_request_stream();
     other_rfcomm_proxy
         .search(bredr::ProfileSearchRequest {
             service_uuid: Some(bredr::ServiceClassProfileIdentifier::SerialPort),

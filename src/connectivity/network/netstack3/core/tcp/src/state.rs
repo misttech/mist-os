@@ -593,7 +593,6 @@ impl<I: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> From<SynRcvd<I, In
             snd_wnd_scale,
         }: SynRcvd<I, Infallible>,
     ) -> Self {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match simultaneous_open {
             None => State::SynRcvd(SynRcvd {
                 iss,
@@ -606,7 +605,6 @@ impl<I: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> From<SynRcvd<I, In
                 rcv_wnd_scale,
                 snd_wnd_scale,
             }),
-            Some(infallible) => match infallible {},
         }
     }
 }
@@ -1174,7 +1172,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 panic!("next_seg({:?}) should never fall behind snd.una({:?})", *snd_nxt, *snd_una);
             });
         let available = u32::try_from(readable_bytes + usize::from(FIN_QUEUED) - offset)
-            .unwrap_or(WindowSize::MAX.into());
+            .unwrap_or_else(|_| WindowSize::MAX.into());
         // We can only send the minimum of the open window and the bytes that
         // are available, additionally, if in zero window probe mode, allow at
         // least one byte past the limit to be sent.
@@ -1875,7 +1873,6 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                     snd_wnd_scale,
                                 },
                             ) => {
-                                #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
                                 match simultaneous_open {
                                     None => {
                                         assert_eq!(
@@ -1896,7 +1893,6 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                             NewlyClosed::No
                                         )
                                     }
-                                    Some(infallible) => match infallible {},
                                 }
                                 Some(syn_ack)
                             }

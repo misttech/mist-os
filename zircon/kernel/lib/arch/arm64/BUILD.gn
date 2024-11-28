@@ -13,7 +13,6 @@ library_headers("headers") {
 
   headers = []
   public_deps = [
-    ":gen-arm64-system-asm",
     "//zircon/system/ulib/hwreg:headers",
 
     # <lib/arch/internal/zbi-constants.h> has #include <fidl/zbi/data/asm/zbi.h>
@@ -23,6 +22,10 @@ library_headers("headers") {
     # <lib/arch/internal/zbi-constants.h> has #include <lib/zbi-format/zbi.h>.
     "//sdk/lib/zbi-format",
   ]
+
+  if (!is_host) {
+    public_deps += [ ":gen-arm64-system-asm" ]
+  }
 }
 
 static_library("arm64") {

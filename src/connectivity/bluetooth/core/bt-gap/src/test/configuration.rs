@@ -26,8 +26,7 @@ async fn setup_configuration_test() -> types::Result<(
     let dispatcher = hd_test::make_simple_test_dispatcher();
     let (host_server, _, _gatt_server, _delegate) =
         hd_test::create_and_add_test_host_to_dispatcher(HostId(42), &dispatcher).await?;
-    let (client, server) =
-        fidl::endpoints::create_proxy_and_stream::<ConfigurationMarker>().unwrap();
+    let (client, server) = fidl::endpoints::create_proxy_and_stream::<ConfigurationMarker>();
     Ok((host_server, dispatcher, client, server))
 }
 

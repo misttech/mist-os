@@ -636,7 +636,7 @@ void SymbolizerImpl::WillUnloadModuleSymbols(zxdb::Process* process,
 }
 
 void SymbolizerImpl::OnSymbolLoadFailure(zxdb::Process* process, const zxdb::Err& err) {
-  FX_LOGS(WARNING) << "Symbols failed to load for " << *process << ": " << err.msg() << "\n";
+  FX_LOGS(WARNING) << "Symbols failed to load for " << *process << ": " << err.ToString() << "\n";
 }
 
 void SymbolizerImpl::InitProcess() {

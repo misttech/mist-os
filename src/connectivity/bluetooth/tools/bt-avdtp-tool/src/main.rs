@@ -36,7 +36,7 @@ async fn peer_manager_listener(
         match evt {
             PeerManagerEvent::OnPeerConnected { peer_id } => {
                 let (client, server) = create_endpoints::<PeerControllerMarker>();
-                let peer = client.into_proxy().expect("Error: Couldn't obtain peer client proxy");
+                let peer = client.into_proxy();
 
                 match peer_map.write().entry(peer_id.value.to_string()) {
                     Entry::Occupied(mut entry) => {
@@ -381,8 +381,7 @@ mod tests {
     /// Error case: Invalid id, Error string + help message returned.
     async fn test_get_controller_from_args() {
         let mut peer_map = HashMap::new();
-        let (client_proxy, _server) =
-            create_proxy::<PeerControllerMarker>().expect("Failed to create peer endpoint");
+        let (client_proxy, _server) = create_proxy::<PeerControllerMarker>();
 
         let supported_id = "123";
         let _ = peer_map.insert(supported_id.to_string(), client_proxy.clone());

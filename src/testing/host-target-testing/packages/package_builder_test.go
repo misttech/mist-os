@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	versionHistory "go.fuchsia.dev/fuchsia/src/lib/versioning/version-history/go"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 )
 

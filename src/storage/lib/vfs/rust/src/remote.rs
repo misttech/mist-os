@@ -27,13 +27,11 @@ pub trait RemoteLike {
 
     fn open3(
         self: Arc<Self>,
-        _scope: ExecutionScope,
-        _path: Path,
-        _flags: fio::Flags,
-        _object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
+        scope: ExecutionScope,
+        path: Path,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status>;
 
     /// Returns whether the remote should be opened lazily for the given path.  If true, the remote
     /// won't be opened until the channel in the request is readable.  This request will *not* be

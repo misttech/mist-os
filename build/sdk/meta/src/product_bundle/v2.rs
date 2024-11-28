@@ -221,7 +221,7 @@ impl Canonicalizer for DiskCanonicalizer {
                     let mut ns = self.not_supported.borrow_mut();
                     ns.insert(image_type.clone());
                 }
-                self.product_bundle_dir.join(path).to_owned()
+                self.product_bundle_dir.join(path)
             }
         }
     }
@@ -307,10 +307,10 @@ impl ProductBundleV2 {
             let virtual_devices_path = product_bundle_dir.join(path);
             let dir = virtual_devices_path
                 .parent()
-                .ok_or(anyhow!("No parent: {}", virtual_devices_path))?;
+                .ok_or_else(|| anyhow!("No parent: {}", virtual_devices_path))?;
             let base = virtual_devices_path
                 .file_name()
-                .ok_or(anyhow!("No file name: {}", virtual_devices_path))?;
+                .ok_or_else(|| anyhow!("No file name: {}", virtual_devices_path))?;
 
             // Create the directory to ensure that canonicalize will work.
             if !dir.exists() {
@@ -361,11 +361,13 @@ impl ProductBundleV2 {
             if let Some(system) = system {
                 for image in system.iter_mut() {
                     let path =
-                        diff_utf8_paths(&image.source(), &product_bundle_dir).ok_or(anyhow!(
-                            "failed to rebase the file: {} in {}",
-                            &image.source(),
-                            &product_bundle_dir
-                        ))?;
+                        diff_utf8_paths(&image.source(), &product_bundle_dir).ok_or_else(|| {
+                            anyhow!(
+                                "failed to rebase the file: {} in {}",
+                                &image.source(),
+                                &product_bundle_dir
+                            )
+                        })?;
                     image.set_source(path);
                 }
             }

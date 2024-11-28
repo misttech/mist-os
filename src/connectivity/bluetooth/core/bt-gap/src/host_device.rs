@@ -82,7 +82,7 @@ pub struct HostDebugIdentifiers {
 impl HostDevice {
     pub fn new(device_path: String, proxy: HostProxy, info: Inspectable<HostInfo>) -> Self {
         let (bonding_delegate_proxy, server) =
-            fidl::endpoints::create_proxy::<BondingDelegateMarker>().unwrap();
+            fidl::endpoints::create_proxy::<BondingDelegateMarker>();
         proxy.set_bonding_delegate(server).unwrap();
         HostDevice(Arc::new(HostDeviceState {
             device_path,
@@ -133,7 +133,7 @@ impl HostDevice {
     }
 
     pub fn start_discovery(&self) -> types::Result<DiscoverySessionProxy> {
-        let (proxy, server) = fidl::endpoints::create_proxy::<DiscoverySessionMarker>().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<DiscoverySessionMarker>();
         let result = self.0.proxy.start_discovery(HostStartDiscoveryRequest {
             token: Some(server),
             ..Default::default()
@@ -325,7 +325,7 @@ impl HostDevice {
         let proxy = self.0.proxy.clone();
         async move {
             let (peer_watcher_proxy, peer_watcher_server) =
-                fidl::endpoints::create_proxy::<PeerWatcherMarker>().unwrap();
+                fidl::endpoints::create_proxy::<PeerWatcherMarker>();
             proxy.set_peer_watcher(peer_watcher_server)?;
             loop {
                 match peer_watcher_proxy.get_next().await {
@@ -376,8 +376,7 @@ impl HostDevice {
         id: HostId,
     ) -> (fidl_fuchsia_bluetooth_host::HostRequestStream, HostDevice) {
         let (host_proxy, host_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_bluetooth_host::HostMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_bluetooth_host::HostMarker>();
         let id_val = id.0 as u8;
         let address = Address::Public([id_val; 6]);
         let path = format!("/dev/host{}", id_val);
@@ -511,7 +510,7 @@ pub(crate) mod test {
                              Some(Ok(HostRequest::StartDiscovery { payload, .. })) => {
                                  assert!(!self.host_info.read().discovering);
                                  self.host_info.write().discovering = true;
-                                 self.discovery_stream.set(payload.token.unwrap().into_stream().unwrap());
+                                 self.discovery_stream.set(payload.token.unwrap().into_stream());
                              }
                              Some(Ok(HostRequest::WatchState { responder })) => {
                                  assert_matches::assert_matches!(
@@ -523,11 +522,11 @@ pub(crate) mod test {
                              }
                              Some(Ok(HostRequest::SetPeerWatcher {peer_watcher, ..})) => {
                                 assert!(!self.peer_watcher_stream.is_some());
-                                self.peer_watcher_stream.set(peer_watcher.into_stream().unwrap());
+                                self.peer_watcher_stream.set(peer_watcher.into_stream());
                              }
                              Some(Ok(HostRequest::SetBondingDelegate { delegate, .. })) => {
                                 assert!(!self.bonding_delegate_stream.is_some());
-                                self.bonding_delegate_stream.set(delegate.into_stream().unwrap());
+                                self.bonding_delegate_stream.set(delegate.into_stream());
                              }
                              None => {
                                  return Ok(());

@@ -4,6 +4,8 @@
 
 #include <stdarg.h>
 
+#include <cstddef>
+
 #include <fbl/array.h>
 #include <fbl/string_printf.h>
 #include <zxtest/zxtest.h>

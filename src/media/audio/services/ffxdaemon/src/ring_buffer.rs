@@ -64,7 +64,7 @@ impl HardwareRingBuffer {
             .get_properties()
             .await?
             .driver_transfer_bytes
-            .ok_or(anyhow::anyhow!("driver transfer bytes unavailable"))?
+            .ok_or_else(|| anyhow::anyhow!("driver transfer bytes unavailable"))?
             as u64;
 
         Ok(Self { proxy, vmo_buffer, driver_transfer_bytes })
@@ -132,7 +132,6 @@ impl AudioDeviceRingBuffer {
 
         let rb_format: Format = ring_buffer
             .format
-            .clone()
             .ok_or_else(|| anyhow!("missing 'format'"))?
             .try_into()
             .map_err(|err| anyhow!("invalid ring buffer format: {}", err))?;

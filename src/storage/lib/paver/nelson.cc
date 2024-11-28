@@ -36,11 +36,22 @@ zx::result<std::unique_ptr<DevicePartitioner>> NelsonPartitioner::Initialize(
   if (status_or_gpt.is_error()) {
     return status_or_gpt.take_error();
   }
+  if (status_or_gpt->initialize_partition_tables) {
+    LOG("Found GPT but it was missing expected partitions.  The device should be re-initialized "
+        "via fastboot.\n");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
 
   auto partitioner = WrapUnique(new NelsonPartitioner(std::move(status_or_gpt->gpt)));
 
   LOG("Successfully initialized NelsonPartitioner Device Partitioner\n");
   return zx::ok(std::move(partitioner));
+}
+
+const paver::BlockDevices& NelsonPartitioner::Devices() const { return gpt_->devices(); }
+
+fidl::UnownedClientEnd<fuchsia_io::Directory> NelsonPartitioner::SvcRoot() const {
+  return gpt_->svc_root();
 }
 
 bool NelsonPartitioner::SupportsPartition(const PartitionSpec& spec) const {
@@ -238,18 +249,10 @@ zx::result<std::unique_ptr<DevicePartitioner>> NelsonPartitionerFactory::New(
   return NelsonPartitioner::Initialize(devices, svc_root, std::move(block_device));
 }
 
-zx::result<std::unique_ptr<abr::Client>> NelsonAbrClientFactory::New(
-    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-    std::shared_ptr<paver::Context> context) {
-  zx::result partitioner = NelsonPartitioner::Initialize(devices, svc_root, {});
-
-  if (partitioner.is_error()) {
-    return partitioner.take_error();
-  }
-
+zx::result<std::unique_ptr<abr::Client>> NelsonPartitioner::CreateAbrClient() const {
   // ABR metadata has no need of a content type since it's always local rather
   // than provided in an update package, so just use the default content type.
-  auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+  auto partition = FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
   if (partition.is_error()) {
     return partition.take_error();
   }

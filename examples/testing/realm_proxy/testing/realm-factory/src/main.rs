@@ -62,7 +62,7 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                     // ... code to serve echo here ...
 
                     let (echo_receiver_client, echo_receiver_stream) =
-                        endpoints::create_request_stream::<fsandbox::ReceiverMarker>()?;
+                        endpoints::create_request_stream::<fsandbox::ReceiverMarker>();
                     let connector_id = id_gen.next();
                     store.connector_create(connector_id, echo_receiver_client).await?.unwrap();
                     store

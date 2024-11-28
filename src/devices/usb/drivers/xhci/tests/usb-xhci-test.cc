@@ -292,7 +292,7 @@ class FakeUsbBus : public ddk::UsbBusInterfaceProtocol<FakeUsbBus> {
 class XhciTestEnvironment : fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    device_server_.Init(component::kDefaultInstance, "root");
+    device_server_.Initialize(component::kDefaultInstance);
     EXPECT_OK(
         device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
 

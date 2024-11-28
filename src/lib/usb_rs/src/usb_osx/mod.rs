@@ -132,6 +132,7 @@ pub fn wait_for_devices(notify_added: bool, notify_removed: bool) -> Result<Devi
         let data_ptr = Arc::downgrade(&callback_data).into_raw().cast_mut().cast();
         notify_port.add_matching_notification(
             iokit_usb::kIOFirstMatchNotification,
+            #[allow(clippy::redundant_clone)] // conditional
             matching_dict.clone(),
             Some(added),
             data_ptr,
@@ -142,6 +143,7 @@ pub fn wait_for_devices(notify_added: bool, notify_removed: bool) -> Result<Devi
         let data_ptr = Arc::downgrade(&callback_data).into_raw().cast_mut().cast();
         notify_port.add_matching_notification(
             iokit_usb::kIOTerminatedNotification,
+            #[allow(clippy::redundant_clone)] // conditional
             matching_dict.clone(),
             Some(removed),
             data_ptr,

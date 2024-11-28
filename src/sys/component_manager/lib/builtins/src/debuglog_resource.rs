@@ -55,7 +55,7 @@ mod tests {
         let debuglog_resource = get_debuglog_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::DebuglogResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::DebuglogResourceMarker>();
         fasync::Task::local(
             DebuglogResource::new(debuglog_resource)
                 .unwrap_or_else(|e| panic!("Error while creating debuglog resource service: {}", e))

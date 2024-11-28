@@ -47,7 +47,7 @@ impl PaverFacade {
     pub(super) async fn query_active_configuration(
         &self,
     ) -> Result<QueryActiveConfigurationResult, Error> {
-        let (boot_manager, boot_manager_server_end) = fidl::endpoints::create_proxy()?;
+        let (boot_manager, boot_manager_server_end) = fidl::endpoints::create_proxy();
 
         self.proxy()?.find_boot_manager(boot_manager_server_end)?;
 
@@ -71,7 +71,7 @@ impl PaverFacade {
     pub(super) async fn query_current_configuration(
         &self,
     ) -> Result<QueryCurrentConfigurationResult, Error> {
-        let (boot_manager, boot_manager_server_end) = fidl::endpoints::create_proxy()?;
+        let (boot_manager, boot_manager_server_end) = fidl::endpoints::create_proxy();
 
         self.proxy()?.find_boot_manager(boot_manager_server_end)?;
 
@@ -97,7 +97,7 @@ impl PaverFacade {
         &self,
         args: QueryConfigurationStatusRequest,
     ) -> Result<QueryConfigurationStatusResult, Error> {
-        let (boot_manager, boot_manager_server_end) = fidl::endpoints::create_proxy()?;
+        let (boot_manager, boot_manager_server_end) = fidl::endpoints::create_proxy();
 
         self.proxy()?.find_boot_manager(boot_manager_server_end)?;
 
@@ -120,7 +120,7 @@ impl PaverFacade {
     ///  * connecting to the paver service fails, or
     ///  * the paver service returns an unexpected error
     pub(super) async fn read_asset(&self, args: ReadAssetRequest) -> Result<String, Error> {
-        let (data_sink, data_sink_server_end) = fidl::endpoints::create_proxy()?;
+        let (data_sink, data_sink_server_end) = fidl::endpoints::create_proxy();
 
         self.proxy()?.find_data_sink(data_sink_server_end)?;
 
@@ -359,7 +359,7 @@ mod tests {
             self.push(move |req| match req {
                 PaverRequest::FindBootManager { boot_manager, .. } => {
                     if let Some(mock) = mock {
-                        let stream = boot_manager.into_stream().unwrap();
+                        let stream = boot_manager.into_stream();
                         fuchsia_async::Task::spawn(async move {
                             mock.build(stream).await;
                         })
@@ -375,7 +375,7 @@ mod tests {
         fn expect_find_data_sink(self, mock: MockDataSinkBuilder) -> Self {
             self.push(move |req| match req {
                 PaverRequest::FindDataSink { data_sink, .. } => {
-                    let stream = data_sink.into_stream().unwrap();
+                    let stream = data_sink.into_stream();
                     fuchsia_async::Task::spawn(async move {
                         mock.build(stream).await;
                     })
@@ -386,8 +386,7 @@ mod tests {
         }
 
         fn build(self) -> (PaverFacade, impl Future<Output = ()>) {
-            let (proxy, mut stream) =
-                fidl::endpoints::create_proxy_and_stream::<PaverMarker>().unwrap();
+            let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<PaverMarker>();
             let fut = async move {
                 for expected in self.expected {
                     expected(stream.next().await.unwrap().unwrap());

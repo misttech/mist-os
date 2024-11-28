@@ -128,10 +128,7 @@ async fn watch_connections(harness: PeripheralHarness) -> Result<(), Error> {
     while let Some(e) = events.try_next().await? {
         match e {
             PeripheralEvent::OnPeerConnected { peer, connection } => {
-                harness
-                    .write_state()
-                    .connections
-                    .push((peer.try_into()?, connection.into_proxy()?));
+                harness.write_state().connections.push((peer.try_into()?, connection.into_proxy()));
             }
         }
         harness.notify_state_changed();

@@ -24,10 +24,7 @@ driver_bind_rules("amlogic_display_bind") {
 }
 
 source_set("common_srcs") {
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+  configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   sources = [
     "board-resources.cc",
     "board-resources.h",
@@ -108,7 +105,7 @@ source_set("common_srcs") {
     "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
     "//src/devices/lib/mmio",
-    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/api-types/cpp",
     "//src/graphics/display/lib/designware-dsi:dsi-host-controller",
     "//src/graphics/display/lib/designware-hdmi:hdmi-transmitter-controller-impl",
     "//src/graphics/display/lib/device-protocol-display",
@@ -182,7 +179,6 @@ fuchsia_driver_package("package") {
 }
 
 test("amlogic-display-test") {
-  configs += [ "//build/config:all_source" ]
   sources = [
     "clock-regs-test.cc",
     "clock-test.cc",

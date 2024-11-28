@@ -207,6 +207,13 @@
                 // TODO(https://fxbug.dev/374802310)
                 "inotify03",
                 "inotify12",
+
+                // TODO(https://fxbug.dev/377877724)
+                "getsockopt01",
+                "mlock05",
+                "mmap09",
+                "swapon03",
+                "unlink09",
             ],
         },
         {
@@ -269,13 +276,6 @@
                 // TODO(https://fxbug.dev/373897750): These tests require cgroups to be unlinkable.
                 "cgroup_core03",
                 "clone303",
-
-                // TODO(https://fxbug.dev/377877724)
-                "getsockopt01",
-                "mlock05",
-                "mmap09",
-                "swapon03",
-                "unlink09",
             ],
         },
     ],

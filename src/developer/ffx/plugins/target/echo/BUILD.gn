@@ -10,7 +10,7 @@ ffx_plugin("ffx_target_echo") {
   with_unit_tests = true
   args_with_unit_tests = true
   deps = [
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_fdomain",
     "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
@@ -20,6 +20,8 @@ ffx_plugin("ffx_target_echo") {
   ]
   test_deps = [
     "//src/developer/ffx/config:lib",
+    "//src/lib/fdomain/client",
+    "//src/lib/fdomain/local",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",

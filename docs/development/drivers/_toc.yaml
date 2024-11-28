@@ -72,3 +72,27 @@ toc:
   section:
   - title: "Deleting drivers"
     path: /docs/development/drivers/best_practices/deleting.md
+- title: "SDK-based driver development"
+  status: beta
+  section:
+  - title: "Overview"
+    path: /docs/development/sdk/index.md
+  - title: "Navigating a Bazel-and-Fuchsia-SDK-based development environment"
+    path: /docs/development/sdk/navigating-a-bazel-and-fuchsia-sdk-based-development-environment.md
+  - title: "Codelab: Build a driver"
+    section:
+    - include: /docs/get-started/sdk/learn/driver/_toc.yaml
+  - title: "Driver binding"
+    section:
+    - title: "Write bind rules for a driver"
+      path: /docs/development/sdk/write-bind-rules-for-driver.md
+    - title: "Create a new bind library for a driver"
+      path: /docs/development/sdk/create-new-bind-library-for-driver.md
+    - title: "FIDL-based bind libraries tutorial"
+      path: /docs/development/sdk/fidl-bind-libraries-bazel.md
+    - title: "Debug a driver when it fails to load"
+      path: /docs/development/sdk/debug-driver-when-it-fails-to-load.md
+  - title: "Driver testing"
+    section:
+    - title: "Driver unit testing quick start"
+      path: /docs/development/sdk/driver-testing/driver-unit-testing-quick-start.md

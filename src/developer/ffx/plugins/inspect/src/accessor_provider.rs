@@ -6,9 +6,7 @@ use anyhow::anyhow;
 use diagnostics_data::Data;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::ClientSelectorConfiguration::{SelectAll, Selectors};
-use fidl_fuchsia_diagnostics::{
-    Format, Selector, SelectorArgument, StreamParameters, StringSelector, TreeSelector,
-};
+use fidl_fuchsia_diagnostics::{Format, Selector, SelectorArgument, StreamParameters};
 use fidl_fuchsia_diagnostics_host::{ArchiveAccessorMarker, ArchiveAccessorProxy};
 use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_sys2 as fsys2;
@@ -35,43 +33,18 @@ fn add_host_before_last_dot(input: &str) -> Result<String, Error> {
     Ok(format!("{}.host.{}", rest, last))
 }
 
-struct MonikerAndProtocol {
-    protocol: String,
-    moniker: String,
+struct MonikerAndProtocol<'a> {
+    protocol: &'a str,
+    moniker: &'a str,
 }
 
-impl TryFrom<Selector> for MonikerAndProtocol {
+impl<'a> TryFrom<&'a str> for MonikerAndProtocol<'a> {
     type Error = Error;
 
-    fn try_from(selector: Selector) -> Result<Self, Self::Error> {
-        Ok(MonikerAndProtocol {
-            moniker: selector
-                .component_selector
-                .map(|selector| selector.moniker_segments)
-                .flatten()
-                .into_iter()
-                .flatten()
-                .map(|value| match value {
-                    StringSelector::ExactMatch(value) => Ok(value),
-                    _ => Err(Error::MustBeExactMoniker),
-                })
-                .collect::<Result<Vec<_>, Error>>()?
-                .join("/"),
-            protocol: selector
-                .tree_selector
-                .map(|value| match value {
-                    TreeSelector::PropertySelector(value) => Ok(value.target_properties),
-                    _ => Err(Error::MustUsePropertySelector),
-                })
-                .into_iter()
-                .flatten()
-                .map(|value| match value {
-                    StringSelector::ExactMatch(value) => Ok(value),
-                    _ => Err(Error::MustBeExactProtocol),
-                })
-                .next()
-                .ok_or(Error::MustBeExactProtocol)??,
-        })
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        s.rsplit_once(":")
+            .map(|(moniker, protocol)| MonikerAndProtocol { moniker, protocol })
+            .ok_or_else(|| Error::invalid_accessor(s))
     }
 }
 
@@ -82,7 +55,7 @@ impl HostArchiveReader {
 
     pub async fn snapshot_diagnostics_data<D>(
         &self,
-        accessor: &Option<String>,
+        accessor: Option<&str>,
         selectors: impl IntoIterator<Item = Selector>,
     ) -> Result<Vec<Data<D>>, Error>
     where
@@ -95,25 +68,21 @@ impl HostArchiveReader {
             Selectors(selectors.map(|s| SelectorArgument::StructuredSelector(s)).collect())
         };
 
-        let accessor = match accessor {
-            Some(ref s) => {
+        let accessor = match accessor.as_deref() {
+            Some(s) => {
                 let s = add_host_before_last_dot(s)?;
-                let selector = selectors::parse_verbose(&s).map_err(|e| {
-                    Error::ParseSelector("unable to parse selector".to_owned(), anyhow!("{:?}", e))
-                })?;
-                let moniker_and_protocol = MonikerAndProtocol::try_from(selector)?;
-
+                let moniker_and_protocol = MonikerAndProtocol::try_from(s.as_str())?;
                 let (client, server) = fidl::endpoints::create_endpoints::<ArchiveAccessorMarker>();
                 self.rcs_proxy
-                    .open_capability(
-                        &format!("/{}", moniker_and_protocol.moniker),
+                    .deprecated_open_capability(
+                        &format!("{}", moniker_and_protocol.moniker),
                         fsys2::OpenDirType::ExposedDir,
                         &moniker_and_protocol.protocol,
                         server.into_channel(),
                         OpenFlags::empty(),
                     )
                     .await??;
-                Cow::Owned(client.into_proxy()?)
+                Cow::Owned(client.into_proxy())
             }
             None => Cow::Borrowed(&self.diagnostics_proxy),
         };
@@ -156,7 +125,7 @@ impl HostArchiveReader {
 impl DiagnosticsProvider for HostArchiveReader {
     async fn snapshot<D>(
         &self,
-        accessor_path: &Option<String>,
+        accessor_path: Option<&str>,
         selectors: impl IntoIterator<Item = Selector>,
     ) -> Result<Vec<Data<D>>, Error>
     where

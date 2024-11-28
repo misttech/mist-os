@@ -228,7 +228,7 @@ impl ExecutionScopeParams {
                 #[cfg(target_os = "fuchsia")]
                 scope: self
                     .async_executor
-                    .map_or_else(|| OnceLock::new(), |e| e.root_scope().new_child().into()),
+                    .map_or_else(|| OnceLock::new(), |e| e.global_scope().new_child().into()),
                 #[cfg(not(target_os = "fuchsia"))]
                 scope: OnceLock::new(),
             }),
@@ -241,7 +241,12 @@ impl Executor {
         // We lazily initialize the executor rather than at construction time as there are currently
         // a few tests that create the ExecutionScope before the async executor has been initialized
         // (which means we cannot call EHandle::local()).
-        self.scope.get_or_init(|| Scope::new())
+        self.scope.get_or_init(|| {
+            #[cfg(target_os = "fuchsia")]
+            return Scope::global().new_child();
+            #[cfg(not(target_os = "fuchsia"))]
+            return Scope::new();
+        })
     }
 
     fn shutdown(&self) {

@@ -41,7 +41,7 @@ async fn wait_for_test_peer(
 
     // Start discovery and let bt-host process the fake LE peer.
     let host = harness.aux().host.clone();
-    let (_discovery_proxy, token) = fidl::endpoints::create_proxy().unwrap();
+    let (_discovery_proxy, token) = fidl::endpoints::create_proxy();
     host.start_discovery(HostStartDiscoveryRequest { token: Some(token), ..Default::default() })
         .unwrap();
 
@@ -73,11 +73,8 @@ async fn test_lifecycle(_: ()) {
         emulator.publish_and_wait_for_device_path(Emulator::default_settings()).await.unwrap();
 
     // Create bt-host component in HostRealm after device is published
-    let host = HostRealm::create_bt_host_in_collection(&realm, &device_path)
-        .await
-        .unwrap()
-        .into_proxy()
-        .unwrap();
+    let host =
+        HostRealm::create_bt_host_in_collection(&realm, &device_path).await.unwrap().into_proxy();
     let info: HostInfo = host
         .watch_state()
         .await
@@ -189,7 +186,7 @@ async fn test_discovery(harness: HostHarness) {
     let proxy = harness.aux().host.clone();
 
     // Start discovery. "discovering" should get set to true.
-    let (discovery_proxy, token) = fidl::endpoints::create_proxy().unwrap();
+    let (discovery_proxy, token) = fidl::endpoints::create_proxy();
     proxy
         .start_discovery(HostStartDiscoveryRequest { token: Some(token), ..Default::default() })
         .unwrap();
@@ -222,7 +219,7 @@ async fn test_discovery(harness: HostHarness) {
 async fn test_close(harness: HostHarness) {
     // Enable all procedures.
     let proxy = harness.aux().host.clone();
-    let (_discovery_proxy, token) = fidl::endpoints::create_proxy().unwrap();
+    let (_discovery_proxy, token) = fidl::endpoints::create_proxy();
     proxy
         .start_discovery(HostStartDiscoveryRequest { token: Some(token), ..Default::default() })
         .unwrap();
@@ -276,7 +273,7 @@ async fn test_watch_peers(harness: HostHarness) {
 
     // Wait for all fake devices to be discovered.
     let proxy = harness.aux().host.clone();
-    let (_discovery_proxy, token) = fidl::endpoints::create_proxy().unwrap();
+    let (_discovery_proxy, token) = fidl::endpoints::create_proxy();
     proxy
         .start_discovery(HostStartDiscoveryRequest { token: Some(token), ..Default::default() })
         .unwrap();
@@ -310,7 +307,7 @@ async fn test_connect(harness: HostHarness) {
     let proxy = harness.aux().host.clone();
 
     // Start discovery and let bt-host process the fake devices.
-    let (_discovery_proxy, token) = fidl::endpoints::create_proxy().unwrap();
+    let (_discovery_proxy, token) = fidl::endpoints::create_proxy();
     proxy
         .start_discovery(HostStartDiscoveryRequest { token: Some(token), ..Default::default() })
         .unwrap();

@@ -50,12 +50,12 @@ pub async fn handle_request_stream(
             }
             TreeRequest::ListChildNames { tree_iterator, .. } => {
                 let values = inspector.tree_names().await?;
-                let request_stream = tree_iterator.into_stream()?;
+                let request_stream = tree_iterator.into_stream();
                 spawn_tree_name_iterator_server(values, request_stream)
             }
             TreeRequest::OpenChild { child_name, tree, .. } => {
                 if let Ok(inspector) = inspector.read_tree(&child_name).await {
-                    spawn_tree_server_with_stream(inspector, settings.clone(), tree.into_stream()?)
+                    spawn_tree_server_with_stream(inspector, settings.clone(), tree.into_stream())
                         .detach()
                 }
             }
@@ -92,7 +92,7 @@ pub fn spawn_tree_server(
     settings: TreeServerSendPreference,
 ) -> Result<(fasync::Task<()>, fidl::endpoints::ClientEnd<TreeMarker>), Error> {
     let (tree, server_end) = fidl::endpoints::create_endpoints::<TreeMarker>();
-    let task = spawn_tree_server_with_stream(inspector, settings, server_end.into_stream()?);
+    let task = spawn_tree_server_with_stream(inspector, settings, server_end.into_stream());
     Ok((task, tree))
 }
 
@@ -155,8 +155,7 @@ mod tests {
         inspector: Inspector,
         settings: TreeServerSendPreference,
     ) -> Result<(fasync::Task<()>, TreeProxy), Error> {
-        spawn_tree_server(inspector, settings)
-            .map(|(t, p)| (t, p.into_proxy().expect("ClientEnd is convertible to TreeProxy")))
+        spawn_tree_server(inspector, settings).map(|(t, p)| (t, p.into_proxy()))
     }
 
     #[fuchsia::test]
@@ -175,8 +174,7 @@ mod tests {
     async fn list_child_names() -> Result<(), Error> {
         let (_server, tree) =
             spawn_server_proxy(test_inspector(), TreeServerSendPreference::default())?;
-        let (name_iterator, server_end) =
-            fidl::endpoints::create_proxy::<TreeNameIteratorMarker>()?;
+        let (name_iterator, server_end) = fidl::endpoints::create_proxy::<TreeNameIteratorMarker>();
         tree.list_child_names(server_end)?;
         verify_iterator(name_iterator, vec!["lazy-0".to_string()]).await?;
         Ok(())
@@ -186,27 +184,25 @@ mod tests {
     async fn open_children() -> Result<(), Error> {
         let (_server, tree) =
             spawn_server_proxy(test_inspector(), TreeServerSendPreference::default())?;
-        let (child_tree, server_end) = fidl::endpoints::create_proxy::<TreeMarker>()?;
+        let (child_tree, server_end) = fidl::endpoints::create_proxy::<TreeMarker>();
         tree.open_child("lazy-0", server_end)?;
         let tree_content = child_tree.get_content().await?;
         let hierarchy = parse_content(tree_content)?;
         assert_data_tree!(hierarchy, root: {
             b: 2u64,
         });
-        let (name_iterator, server_end) =
-            fidl::endpoints::create_proxy::<TreeNameIteratorMarker>()?;
+        let (name_iterator, server_end) = fidl::endpoints::create_proxy::<TreeNameIteratorMarker>();
         child_tree.list_child_names(server_end)?;
         verify_iterator(name_iterator, vec!["lazy-vals-0".to_string()]).await?;
 
-        let (child_tree_2, server_end) = fidl::endpoints::create_proxy::<TreeMarker>()?;
+        let (child_tree_2, server_end) = fidl::endpoints::create_proxy::<TreeMarker>();
         child_tree.open_child("lazy-vals-0", server_end)?;
         let tree_content = child_tree_2.get_content().await?;
         let hierarchy = parse_content(tree_content)?;
         assert_data_tree!(hierarchy, root: {
             c: 3.0,
         });
-        let (name_iterator, server_end) =
-            fidl::endpoints::create_proxy::<TreeNameIteratorMarker>()?;
+        let (name_iterator, server_end) = fidl::endpoints::create_proxy::<TreeNameIteratorMarker>();
         child_tree_2.list_child_names(server_end)?;
         verify_iterator(name_iterator, vec![]).await?;
 

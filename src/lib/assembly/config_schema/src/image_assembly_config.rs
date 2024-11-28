@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_constants::FileEntry;
 use assembly_images_config::{FilesystemImageMode, ImagesConfig};
-use assembly_util::FileEntry;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 

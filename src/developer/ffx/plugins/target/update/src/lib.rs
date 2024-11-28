@@ -161,7 +161,7 @@ impl UpdateTool {
         // until the update is completed.
         let (monitor_client, monitor_server) = if do_monitor {
             let (client_end, request_stream) =
-                fidl::endpoints::create_request_stream::<MonitorMarker>().map_err(|e| bug!(e))?;
+                fidl::endpoints::create_request_stream::<MonitorMarker>();
             (Some(client_end), Some(request_stream))
         } else {
             (None, None)
@@ -268,8 +268,7 @@ impl UpdateTool {
         };
 
         let (reboot_controller, reboot_controller_server_end) =
-            fidl::endpoints::create_proxy::<finstaller::RebootControllerMarker>()
-                .bug_context("creating reboot controller")?;
+            fidl::endpoints::create_proxy::<finstaller::RebootControllerMarker>();
 
         let mut update_attempt = installer::start_update(
             &pkg_url,
@@ -396,7 +395,7 @@ for more detail on the progress of update-related downloads.\n"
                 if let Some(product_path) =
                     context.get::<Option<PathBuf>, _>("product.path").map_err(|e| bug!(e))?
                 {
-                    product_path.clone()
+                    product_path
                 } else {
                     return_user_error!("No product bundle path specified nor configured")
                 }
@@ -540,8 +539,7 @@ mod tests {
         O: Fn(String),
     {
         let (proxy, mut stream) =
-            create_proxy_and_stream::<fidl_fuchsia_update_channelcontrol::ChannelControlMarker>()
-                .unwrap();
+            create_proxy_and_stream::<fidl_fuchsia_update_channelcontrol::ChannelControlMarker>();
         let mut buf = Vec::new();
         let fut = async {
             assert_matches!(handle_channel_control_cmd(&argument, proxy, &mut buf).await, Ok(()));

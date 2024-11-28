@@ -298,7 +298,7 @@ impl ArtifactBridgeInternal for LogBridge {
         let mut artifact_receiver = self.artifact_receiver.borrow_mut();
         if let Some(client_end) = artifact_receiver.next().await {
             let mut artifact = self.artifact.borrow_mut();
-            *artifact = client_end.into_proxy().ok();
+            *artifact = Some(client_end.into_proxy());
         }
     }
 

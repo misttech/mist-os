@@ -171,14 +171,12 @@ mod tests {
 
     impl Connector {
         fn opt_out(&self) -> OptOutProxy {
-            let (proxy, stream) =
-                fidl::endpoints::create_proxy_and_stream::<OptOutMarker>().unwrap();
+            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<OptOutMarker>();
             self.0.unbounded_send(IncomingService::OptOut(stream)).unwrap();
             proxy
         }
         fn opt_out_admin(&self) -> OptOutAdminProxy {
-            let (proxy, stream) =
-                fidl::endpoints::create_proxy_and_stream::<OptOutAdminMarker>().unwrap();
+            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<OptOutAdminMarker>();
             self.0.unbounded_send(IncomingService::OptOutAdmin(stream)).unwrap();
             proxy
         }

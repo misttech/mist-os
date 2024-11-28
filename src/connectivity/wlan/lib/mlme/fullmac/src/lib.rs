@@ -48,6 +48,8 @@ pub enum FullmacMlmeError {
     InvalidDataPlaneType(fidl_common::DataPlaneType),
     #[error("Failed to query vendor driver: {0:?}")]
     FailedToQueryVendorDriver(anyhow::Error),
+    #[error("Failed to convert query from vendor driver: {0:?}")]
+    FailedToConvertVendorDriverQuery(anyhow::Error),
     #[error("Failed to create persistence proxy: {0}")]
     FailedToCreatePersistenceProxy(fidl::Error),
     #[error("Failed to create sme: {0}")]
@@ -154,7 +156,6 @@ where
     let driver_event_sender_clone = driver_event_sender.clone();
     let inspector =
         Inspector::new(fuchsia_inspect::InspectorConfig::default().size(INSPECT_VMO_SIZE_BYTES));
-    let inspect_usme_node = inspector.root().create_child("usme");
 
     let (startup_sender, startup_receiver) = oneshot::channel();
     let mlme_loop_join_handle = std::thread::spawn(move || {
@@ -169,7 +170,6 @@ where
             driver_event_sender_clone,
             driver_event_stream,
             inspector,
-            inspect_usme_node,
             startup_sender,
         );
         let result = executor.run(future);
@@ -220,13 +220,10 @@ async fn start_and_serve<D: DeviceOps + Send + 'static>(
     driver_event_sender: mpsc::UnboundedSender<FullmacDriverEvent>,
     driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
     inspector: Inspector,
-    inspect_usme_node: fuchsia_inspect::Node,
     startup_sender: oneshot::Sender<Result<(), FullmacMlmeError>>,
 ) -> Result<(), zx::Status> {
     let StartedDriver { mlme_main_loop_fut, sme_fut } =
-        match start(device, driver_event_stream, driver_event_sender, inspector, inspect_usme_node)
-            .await
-        {
+        match start(device, driver_event_stream, driver_event_sender, inspector).await {
             Ok(initialized_mlme) => {
                 startup_sender.send(Ok(())).unwrap();
                 initialized_mlme
@@ -263,21 +260,18 @@ async fn start<D: DeviceOps + Send + 'static>(
     driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
     driver_event_sender: mpsc::UnboundedSender<FullmacDriverEvent>,
     inspector: Inspector,
-    inspect_usme_node: fuchsia_inspect::Node,
 ) -> Result<StartedDriver, FullmacMlmeError> {
     let (fullmac_ifc_client_end, fullmac_ifc_request_stream) =
-        fidl::endpoints::create_request_stream()
-            .map_err(FullmacMlmeError::FailedToCreateIfcRequestStream)?;
+        fidl::endpoints::create_request_stream();
 
     let usme_bootstrap_protocol_channel =
-        device.start(fullmac_ifc_client_end).map_err(FullmacMlmeError::DeviceStartFailed)?;
+        device.init(fullmac_ifc_client_end).map_err(FullmacMlmeError::DeviceStartFailed)?;
 
     let server = fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(
         usme_bootstrap_protocol_channel,
     );
 
-    let mut usme_bootstrap_stream =
-        server.into_stream().map_err(FullmacMlmeError::FailedToGetUsmeBootstrapStream)?;
+    let mut usme_bootstrap_stream = server.into_stream();
 
     let fidl_sme::UsmeBootstrapRequest::Start {
         generic_sme_server,
@@ -295,8 +289,7 @@ async fn start<D: DeviceOps + Send + 'static>(
 
     responder.send(inspect_vmo).map_err(FullmacMlmeError::FailedToRespondToUsmeBootstrapRequest)?;
 
-    let generic_sme_stream =
-        generic_sme_server.into_stream().map_err(FullmacMlmeError::FailedToGetGenericSmeStream)?;
+    let generic_sme_stream = generic_sme_server.into_stream();
 
     // Create SME
     let cfg = wlan_sme::Config {
@@ -307,9 +300,10 @@ async fn start<D: DeviceOps + Send + 'static>(
     let (mlme_event_sender, mlme_event_receiver) = mpsc::unbounded();
     let mlme_event_sink = UnboundedSink::new(mlme_event_sender);
 
-    let device_info = fullmac_to_mlme::convert_device_info(
-        device.query_device_info().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?,
-    );
+    let device_info =
+        device.query_device_info().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
+    let device_info = fullmac_to_mlme::convert_device_info(device_info)
+        .map_err(FullmacMlmeError::FailedToConvertVendorDriverQuery)?;
 
     let mac_sublayer_support =
         device.query_mac_sublayer_support().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
@@ -340,8 +334,7 @@ async fn start<D: DeviceOps + Send + 'static>(
     // TODO(https://fxbug.dev/42064968): Get persistence working by adding the appropriate configs
     //                         in *.cml files
     let (persistence_proxy, _persistence_server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_diagnostics_persist::DataPersistenceMarker>()
-            .map_err(FullmacMlmeError::FailedToCreatePersistenceProxy)?;
+        fidl::endpoints::create_proxy::<fidl_fuchsia_diagnostics_persist::DataPersistenceMarker>();
 
     let (persistence_req_sender, _persistence_req_forwarder_fut) =
         auto_persist::create_persistence_req_sender(persistence_proxy);
@@ -353,7 +346,7 @@ async fn start<D: DeviceOps + Send + 'static>(
         mac_sublayer_support,
         security_support,
         spectrum_management_support,
-        inspect_usme_node,
+        inspector,
         persistence_req_sender,
         generic_sme_stream,
     )
@@ -393,8 +386,7 @@ mod tests {
         assert_variant!(startup_result, Ok(()));
 
         let (client_sme_proxy, client_sme_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::ClientSmeMarker>()
-                .expect("creating ClientSme proxy should succeed");
+            fidl::endpoints::create_proxy::<fidl_sme::ClientSmeMarker>();
 
         let mut client_sme_response_fut =
             h.generic_sme_proxy.as_ref().unwrap().get_client_sme(client_sme_server);
@@ -555,6 +547,20 @@ mod tests {
     }
 
     #[test]
+    fn test_mlme_startup_fails_due_to_failure_to_convert_query_device_info() {
+        let (mut h, mut test_fut) = TestHelper::set_up();
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = None;
+        assert_variant!(
+            h.exec.run_until_stalled(&mut test_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
+
+        let startup_result =
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Err(FullmacMlmeError::FailedToConvertVendorDriverQuery(_)));
+    }
+
+    #[test]
     fn test_mlme_startup_exits_due_to_sme_channel_closure() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
@@ -603,16 +609,11 @@ mod tests {
             let exec = fasync::TestExecutor::new();
 
             let (mut fake_device, _driver_calls) = FakeFullmacDevice::new();
-            let usme_bootstrap_proxy = fake_device
-                .usme_bootstrap_client_end
-                .take()
-                .unwrap()
-                .into_proxy()
-                .expect("converting into UsmeBootstrapProxy should succeed");
+            let usme_bootstrap_proxy =
+                fake_device.usme_bootstrap_client_end.take().unwrap().into_proxy();
 
             let (generic_sme_proxy, generic_sme_server_end) =
-                fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>()
-                    .expect("creating GenericSmeProxy should succeed");
+                fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>();
             let usme_bootstrap_result = if bootstrap {
                 Some(usme_bootstrap_proxy.start(
                     generic_sme_server_end,
@@ -624,7 +625,6 @@ mod tests {
 
             let (driver_event_sender, driver_event_stream) = mpsc::unbounded();
             let inspector = Inspector::default();
-            let inspect_usme_node = inspector.root().create_child("usme");
             let (startup_sender, startup_receiver) = oneshot::channel();
 
             let mocks = fake_device.mocks.clone();
@@ -634,7 +634,6 @@ mod tests {
                 driver_event_sender.clone(),
                 driver_event_stream,
                 inspector,
-                inspect_usme_node,
                 startup_sender,
             ));
 

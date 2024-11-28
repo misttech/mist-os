@@ -1408,8 +1408,7 @@ mod tests {
 
         let mut output = Vec::new();
         let (filter, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_filter::StateMarker>()
-                .expect("failed to create proxy and request stream for filter server");
+            fidl::endpoints::create_proxy_and_stream::<fnet_filter::StateMarker>();
 
         let connector = TestConnector { filter: Some(filter), ..Default::default() };
         let op = do_filter(
@@ -1426,7 +1425,7 @@ mod tests {
             let (_options, server_end, _state_control_handle) =
                 req.into_get_watcher().expect("request should be of type GetWatcher");
 
-            let mut watcher_request_stream = server_end.into_stream().expect("watcher FIDL error");
+            let mut watcher_request_stream = server_end.into_stream();
 
             let events = [
                 // controller a, namespace a

@@ -127,7 +127,7 @@ impl Buffer for CoreReceiveBuffer {
         match self {
             Self::Zero => 0,
             Self::Ready { buffer, new_buffer_sender: _, empty: _, pending_capacity } => {
-                pending_capacity.as_ref().copied().unwrap_or(buffer.capacity().into())
+                pending_capacity.as_ref().copied().unwrap_or_else(|| buffer.capacity().into())
             }
         }
     }

@@ -46,7 +46,7 @@ impl FfxMain for EchoTool {
 }
 
 async fn echo_impl(echo_proxy: EchoProxy, cmd: EchoCommand) -> Result<String> {
-    let echo_text = cmd.text.unwrap_or("Ffx".to_string());
+    let echo_text = cmd.text.unwrap_or_else(|| "Ffx".to_string());
     match echo_proxy.echo_string(&echo_text).await {
         Ok(r) => Ok(format!("SUCCESS: received {r:?}")),
         Err(e) => return_bug!("ERROR: {e:?}"),
@@ -62,8 +62,7 @@ mod test {
     use serde_json::json;
 
     fn setup_fake_echo_proxy() -> ffx::EchoProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<ffx::EchoMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<ffx::EchoMarker>();
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {

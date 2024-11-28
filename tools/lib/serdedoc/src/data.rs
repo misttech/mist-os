@@ -123,13 +123,17 @@ impl DataType {
     /// Construct a DataType from a root schema object.
     fn from_root_schema(root_schema: &RootSchema) -> Result<Self> {
         let schema = root_schema.schema.clone();
-        let metadata =
-            root_schema.schema.metadata.as_ref().ok_or(anyhow!("missing metadata from root"))?;
-        let rust_type = metadata.title.as_ref().ok_or(anyhow!("missing title from root"))?.clone();
+        let metadata = root_schema
+            .schema
+            .metadata
+            .as_ref()
+            .ok_or_else(|| anyhow!("missing metadata from root"))?;
+        let rust_type =
+            metadata.title.as_ref().ok_or_else(|| anyhow!("missing title from root"))?.clone();
         let description = metadata
             .description
             .as_ref()
-            .ok_or(anyhow!("missing description from {}", &rust_type))?
+            .ok_or_else(|| anyhow!("missing description from {}", &rust_type))?
             .clone();
         Self::from_schema_object(rust_type, description, schema)
     }
@@ -141,7 +145,7 @@ impl DataType {
             metadata
                 .description
                 .as_ref()
-                .ok_or(anyhow!("missing description from {}", &rust_type))?
+                .ok_or_else(|| anyhow!("missing description from {}", &rust_type))?
                 .clone()
         } else {
             "no description".to_string()
@@ -191,7 +195,7 @@ impl DataType {
                         let subschemas = object
                             .subschemas
                             .as_ref()
-                            .ok_or(anyhow!("Missing subschemas for {}", &rust_type))?;
+                            .ok_or_else(|| anyhow!("Missing subschemas for {}", &rust_type))?;
                         let mut subobjects = Vec::<SchemaObject>::new();
                         if let Some(subs) = &subschemas.all_of {
                             for sub in subs {
@@ -205,15 +209,15 @@ impl DataType {
                         }
                         let subobject = subobjects
                             .first()
-                            .ok_or(anyhow!("Missing subobject for {}", &rust_type))?
+                            .ok_or_else(|| anyhow!("Missing subobject for {}", &rust_type))?
                             .clone();
-                        let reference = subobject
-                            .reference
-                            .ok_or(anyhow!("Missing reference for field in {}", &rust_type))?;
-                        StructFieldType::Custom { data_type: reference.clone() }
+                        let reference = subobject.reference.ok_or_else(|| {
+                            anyhow!("Missing reference for field in {}", &rust_type)
+                        })?;
+                        StructFieldType::Custom { data_type: reference }
                     };
                     let metadata = object.metadata();
-                    let description = metadata.description.clone().unwrap_or("".into());
+                    let description = metadata.description.clone().unwrap_or_else(|| "".into());
                     let default = metadata.default.clone();
                     Ok(StructFieldData { field_name, data_type, description, default })
                 })
@@ -240,7 +244,7 @@ fn single_or_vec_to_string(single_or_vec: &SingleOrVec<InstanceType>) -> Result<
     match single_or_vec {
         SingleOrVec::Single(t) => Ok(format!("{}", instance_type_to_string(&t)?)),
         SingleOrVec::Vec(v) => {
-            let t = v.first().ok_or(anyhow!("Missing instance type"))?;
+            let t = v.first().ok_or_else(|| anyhow!("Missing instance type"))?;
             Ok(format!("[{}]", instance_type_to_string(&t)?))
         }
     }

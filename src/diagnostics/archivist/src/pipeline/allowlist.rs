@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::error::Error;
+use anyhow::anyhow;
 use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::{Selector, TreeNames};
 use moniker::ExtendedMoniker;
@@ -127,7 +128,11 @@ fn bucketize_selectors_by_name<'a>(
             Some(TreeNames::All(_)) => {
                 selectors_against_all.push(s);
             }
-            Some(TreeNames::__SourceBreaking { .. }) => unreachable!("source breaking"),
+            Some(TreeNames::__SourceBreaking { unknown_ordinal }) => {
+                return Err(Error::Selectors(anyhow!(
+                    "unknown TreeNames variant {unknown_ordinal} in {s:?}"
+                )));
+            }
         }
     }
 

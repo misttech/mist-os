@@ -80,9 +80,12 @@ if (current_toolchain == default_toolchain) {
     ]
   }
 
+  group("efi_config_executable_deps") {
+    deps = [ ":main" ]
+  }
+
   group("efi_config_deps") {
     deps = [
-      ":main",
       "//zircon/kernel/phys:ubsan-runtime",
 
       # In instrumented builds, every TU has a reference that needs to be

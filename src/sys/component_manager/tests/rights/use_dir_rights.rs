@@ -12,24 +12,20 @@ use {fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fuchsia_async a
 /// rights.
 struct RightsTestCase {
     path: &'static str,
-    rights: fio::OpenFlags,
+    rights: fio::Flags,
 }
 
 impl RightsTestCase {
     /// Constructs a new rights test case.
-    fn new(path: &'static str, rights: fio::OpenFlags) -> RightsTestCase {
+    fn new(path: &'static str, rights: fio::Flags) -> RightsTestCase {
         RightsTestCase { path: path, rights: rights }
     }
 
     /// Returns every right not available for this path.
-    fn unavailable_rights(&self) -> Vec<fio::OpenFlags> {
-        let all_rights = [
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::OpenFlags::RIGHT_WRITABLE,
-            fio::OpenFlags::RIGHT_EXECUTABLE,
-        ];
+    fn unavailable_rights(&self) -> Vec<fio::Flags> {
+        let all_rights = [fio::PERM_READABLE, fio::PERM_WRITABLE, fio::PERM_EXECUTABLE];
 
-        let mut unavailable_rights: Vec<fio::OpenFlags> = vec![];
+        let mut unavailable_rights: Vec<fio::Flags> = vec![];
         for right_to_check in all_rights.iter() {
             if *right_to_check | self.rights != self.rights {
                 unavailable_rights.push(*right_to_check);
@@ -40,9 +36,9 @@ impl RightsTestCase {
 
     /// Verifies that the rights are correctly implemented for the type.
     fn verify(&self) -> io::Result<()> {
-        fdio::open_fd_deprecated(self.path, self.rights)?;
+        fdio::open_fd(self.path, self.rights)?;
         for invalid_right in self.unavailable_rights() {
-            if let Ok(_) = fdio::open_fd_deprecated(self.path, invalid_right) {
+            if let Ok(_) = fdio::open_fd(self.path, invalid_right) {
                 return Err(io::Error::new(
                     io::ErrorKind::Other,
                     format!(
@@ -79,24 +75,12 @@ async fn run_trigger_service(mut stream: ftest::TriggerRequestStream) -> Result<
 async fn handle_trigger(event: ftest::TriggerRequest) {
     let ftest::TriggerRequest::Run { responder } = event;
     let tests = [
-        RightsTestCase::new("/read_only", fio::OpenFlags::RIGHT_READABLE),
-        RightsTestCase::new(
-            "/read_write",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        ),
-        RightsTestCase::new(
-            "/read_write_dup",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        ),
-        RightsTestCase::new(
-            "/read_exec",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        ),
-        RightsTestCase::new(
-            "/nested/read_exec",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        ),
-        RightsTestCase::new("/read_only_after_scoped", fio::OpenFlags::RIGHT_READABLE),
+        RightsTestCase::new("/read_only", fio::PERM_READABLE),
+        RightsTestCase::new("/read_write", fio::PERM_READABLE | fio::PERM_WRITABLE),
+        RightsTestCase::new("/read_write_dup", fio::PERM_READABLE | fio::PERM_WRITABLE),
+        RightsTestCase::new("/read_exec", fio::PERM_READABLE | fio::PERM_EXECUTABLE),
+        RightsTestCase::new("/nested/read_exec", fio::PERM_READABLE | fio::PERM_EXECUTABLE),
+        RightsTestCase::new("/read_only_after_scoped", fio::PERM_READABLE),
     ];
     let mut responses = vec![];
     for test_case in tests.iter() {

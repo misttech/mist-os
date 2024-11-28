@@ -20,7 +20,10 @@ TEST_F(SummaryUnitTest, Single) {
   TestUtils::CreateCapture(&c, {
                                    .vmos =
                                        {
-                                           {.koid = 1, .name = "v1", .committed_bytes = 100},
+                                           {.koid = 1,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
                                        },
                                    .processes =
                                        {
@@ -36,15 +39,15 @@ TEST_F(SummaryUnitTest, Single) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   EXPECT_EQ(1U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, TwoVmos) {
@@ -53,8 +56,14 @@ TEST_F(SummaryUnitTest, TwoVmos) {
   TestUtils::CreateCapture(&c, {
                                    .vmos =
                                        {
-                                           {.koid = 1, .name = "v1", .committed_bytes = 100},
-                                           {.koid = 2, .name = "v1", .committed_bytes = 100},
+                                           {.koid = 1,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 2,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
                                        },
                                    .processes =
                                        {
@@ -70,15 +79,15 @@ TEST_F(SummaryUnitTest, TwoVmos) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(200U, sizes.private_bytes);
-  EXPECT_EQ(200U, sizes.scaled_bytes);
-  EXPECT_EQ(200U, sizes.total_bytes);
+  EXPECT_EQ(200U, sizes.private_bytes.integral);
+  EXPECT_EQ(200U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(200U, sizes.total_bytes.integral);
 
   EXPECT_EQ(1U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(200U, sizes.private_bytes);
-  EXPECT_EQ(200U, sizes.scaled_bytes);
-  EXPECT_EQ(200U, sizes.total_bytes);
+  EXPECT_EQ(200U, sizes.private_bytes.integral);
+  EXPECT_EQ(200U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(200U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, TwoVmoNames) {
@@ -87,8 +96,14 @@ TEST_F(SummaryUnitTest, TwoVmoNames) {
   TestUtils::CreateCapture(&c, {
                                    .vmos =
                                        {
-                                           {.koid = 1, .name = "v1", .committed_bytes = 100},
-                                           {.koid = 2, .name = "v2", .committed_bytes = 100},
+                                           {.koid = 1,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 2,
+                                            .name = "v2",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
                                        },
                                    .processes = {{.koid = 2, .name = "p1", .vmos = {1, 2}}},
                                });
@@ -101,33 +116,39 @@ TEST_F(SummaryUnitTest, TwoVmoNames) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(200U, sizes.private_bytes);
-  EXPECT_EQ(200U, sizes.scaled_bytes);
-  EXPECT_EQ(200U, sizes.total_bytes);
+  EXPECT_EQ(200U, sizes.private_bytes.integral);
+  EXPECT_EQ(200U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(200U, sizes.total_bytes.integral);
 
   EXPECT_EQ(2U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
   sizes = ps.GetSizes("v2");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, Parent) {
   // One process, two vmos with different names, one is child.
   Capture c;
-  TestUtils::CreateCapture(
-      &c, {
-              .vmos =
-                  {
-                      {.koid = 1, .name = "v1", .committed_bytes = 100},
-                      {.koid = 2, .name = "v2", .parent_koid = 1, .committed_bytes = 100},
-                  },
-              .processes = {{.koid = 2, .name = "p1", .vmos = {2}}},
-          });
+  TestUtils::CreateCapture(&c, {
+                                   .vmos =
+                                       {
+                                           {.koid = 1,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 2,
+                                            .name = "v2",
+                                            .parent_koid = 1,
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                       },
+                                   .processes = {{.koid = 2, .name = "p1", .vmos = {2}}},
+                               });
   Summary s(c);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(2U, process_summaries.size());
@@ -137,19 +158,19 @@ TEST_F(SummaryUnitTest, Parent) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(200U, sizes.private_bytes);
-  EXPECT_EQ(200U, sizes.scaled_bytes);
-  EXPECT_EQ(200U, sizes.total_bytes);
+  EXPECT_EQ(200U, sizes.private_bytes.integral);
+  EXPECT_EQ(200U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(200U, sizes.total_bytes.integral);
 
   EXPECT_EQ(2U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
   sizes = ps.GetSizes("v2");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, TwoProcesses) {
@@ -157,8 +178,14 @@ TEST_F(SummaryUnitTest, TwoProcesses) {
   Capture c;
   TestUtils::CreateCapture(&c, {.vmos =
                                     {
-                                        {.koid = 1, .name = "v1", .committed_bytes = 100},
-                                        {.koid = 2, .name = "v2", .committed_bytes = 100},
+                                        {.koid = 1,
+                                         .name = "v1",
+                                         .committed_bytes = 100,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
+                                        {.koid = 2,
+                                         .name = "v2",
+                                         .committed_bytes = 100,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
                                     },
                                 .processes = {
                                     {.koid = 2, .name = "p1", .vmos = {1}},
@@ -173,29 +200,29 @@ TEST_F(SummaryUnitTest, TwoProcesses) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   EXPECT_EQ(1U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   ps = process_summaries.at(2);
   EXPECT_EQ(3U, ps.koid());
   EXPECT_STREQ("p2", ps.name().c_str());
   sizes = ps.sizes();
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   EXPECT_EQ(1U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v2");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, TwoProcessesShared) {
@@ -203,7 +230,10 @@ TEST_F(SummaryUnitTest, TwoProcessesShared) {
   Capture c;
   TestUtils::CreateCapture(&c, {.vmos =
                                     {
-                                        {.koid = 1, .name = "v1", .committed_bytes = 100},
+                                        {.koid = 1,
+                                         .name = "v1",
+                                         .committed_bytes = 100,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
                                     },
                                 .processes = {
                                     {.koid = 2, .name = "p1", .vmos = {1}},
@@ -218,44 +248,50 @@ TEST_F(SummaryUnitTest, TwoProcessesShared) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(50U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   EXPECT_EQ(1U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(50U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   ps = process_summaries.at(2);
   EXPECT_EQ(3U, ps.koid());
   EXPECT_STREQ("p2", ps.name().c_str());
   sizes = ps.sizes();
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(50U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   EXPECT_EQ(1U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(50U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, TwoProcessesChild) {
   // Two processes, with one vmo shared through parantage.
   Capture c;
-  TestUtils::CreateCapture(
-      &c, {.vmos =
-               {
-                   {.koid = 1, .name = "v1", .committed_bytes = 100},
-                   {.koid = 2, .name = "v2", .parent_koid = 1, .committed_bytes = 100},
-               },
-           .processes = {
-               {.koid = 2, .name = "p1", .vmos = {1}},
-               {.koid = 3, .name = "p2", .vmos = {2}},
-           }});
+  TestUtils::CreateCapture(&c, {.vmos =
+                                    {
+                                        {.koid = 1,
+                                         .name = "v1",
+                                         .committed_bytes = 100,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
+                                        {.koid = 2,
+                                         .name = "v2",
+                                         .parent_koid = 1,
+                                         .committed_bytes = 100,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
+                                    },
+                                .processes = {
+                                    {.koid = 2, .name = "p1", .vmos = {1}},
+                                    {.koid = 3, .name = "p2", .vmos = {2}},
+                                }});
   Summary s(c);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(3U, process_summaries.size());
@@ -265,46 +301,49 @@ TEST_F(SummaryUnitTest, TwoProcessesChild) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(50U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   EXPECT_EQ(1U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(50U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   ps = process_summaries.at(2);
   EXPECT_EQ(3U, ps.koid());
   EXPECT_STREQ("p2", ps.name().c_str());
   sizes = ps.sizes();
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(150U, sizes.scaled_bytes);
-  EXPECT_EQ(200U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(150U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(200U, sizes.total_bytes.integral);
 
   EXPECT_EQ(2U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(50U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
   sizes = ps.GetSizes("v2");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, MissingParent) {
   // Child VMO with parent koid that's not found.
   Capture c;
-  TestUtils::CreateCapture(
-      &c, {.vmos =
-               {
-                   {.koid = 2, .name = "v2", .parent_koid = 1, .committed_bytes = 100},
-               },
-           .processes = {
-               {.koid = 2, .name = "p1", .vmos = {2}},
-           }});
+  TestUtils::CreateCapture(&c, {.vmos =
+                                    {
+                                        {.koid = 2,
+                                         .name = "v2",
+                                         .parent_koid = 1,
+                                         .committed_bytes = 100,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
+                                    },
+                                .processes = {
+                                    {.koid = 2, .name = "p1", .vmos = {2}},
+                                }});
   Summary s(c);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(2U, process_summaries.size());
@@ -312,13 +351,13 @@ TEST_F(SummaryUnitTest, MissingParent) {
   EXPECT_STREQ("p1", ps.name().c_str());
   EXPECT_EQ(2U, ps.koid());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
   sizes = ps.GetSizes("v2");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, Kernel) {
@@ -342,36 +381,36 @@ TEST_F(SummaryUnitTest, Kernel) {
   EXPECT_EQ(ProcessSummary::kKernelKoid, ps.koid());
   EXPECT_STREQ("kernel", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(210U, sizes.private_bytes);
-  EXPECT_EQ(210U, sizes.scaled_bytes);
-  EXPECT_EQ(210U, sizes.total_bytes);
+  EXPECT_EQ(210U, sizes.private_bytes.integral);
+  EXPECT_EQ(210U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(210U, sizes.total_bytes.integral);
 
   EXPECT_EQ(6U, ps.name_to_sizes().size());
 
   sizes = ps.GetSizes("wired");
-  EXPECT_EQ(10U, sizes.private_bytes);
-  EXPECT_EQ(10U, sizes.scaled_bytes);
-  EXPECT_EQ(10U, sizes.total_bytes);
+  EXPECT_EQ(10U, sizes.private_bytes.integral);
+  EXPECT_EQ(10U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(10U, sizes.total_bytes.integral);
   sizes = ps.GetSizes("heap");
-  EXPECT_EQ(20U, sizes.private_bytes);
-  EXPECT_EQ(20U, sizes.scaled_bytes);
-  EXPECT_EQ(20U, sizes.total_bytes);
+  EXPECT_EQ(20U, sizes.private_bytes.integral);
+  EXPECT_EQ(20U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(20U, sizes.total_bytes.integral);
   sizes = ps.GetSizes("mmu");
-  EXPECT_EQ(30U, sizes.private_bytes);
-  EXPECT_EQ(30U, sizes.scaled_bytes);
-  EXPECT_EQ(30U, sizes.total_bytes);
+  EXPECT_EQ(30U, sizes.private_bytes.integral);
+  EXPECT_EQ(30U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(30U, sizes.total_bytes.integral);
   sizes = ps.GetSizes("ipc");
-  EXPECT_EQ(40U, sizes.private_bytes);
-  EXPECT_EQ(40U, sizes.scaled_bytes);
-  EXPECT_EQ(40U, sizes.total_bytes);
+  EXPECT_EQ(40U, sizes.private_bytes.integral);
+  EXPECT_EQ(40U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(40U, sizes.total_bytes.integral);
   sizes = ps.GetSizes("other");
-  EXPECT_EQ(50U, sizes.private_bytes);
-  EXPECT_EQ(50U, sizes.scaled_bytes);
-  EXPECT_EQ(50U, sizes.total_bytes);
+  EXPECT_EQ(50U, sizes.private_bytes.integral);
+  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(50U, sizes.total_bytes.integral);
   sizes = ps.GetSizes("vmo");
-  EXPECT_EQ(60U, sizes.private_bytes);
-  EXPECT_EQ(60U, sizes.scaled_bytes);
-  EXPECT_EQ(60U, sizes.total_bytes);
+  EXPECT_EQ(60U, sizes.private_bytes.integral);
+  EXPECT_EQ(60U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(60U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, KernelVmo) {
@@ -385,7 +424,10 @@ TEST_F(SummaryUnitTest, KernelVmo) {
                                        },
                                    .vmos =
                                        {
-                                           {.koid = 1, .name = "v1", .committed_bytes = 100},
+                                           {.koid = 1,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
                                        },
                                    .processes =
                                        {
@@ -399,14 +441,14 @@ TEST_F(SummaryUnitTest, KernelVmo) {
   EXPECT_EQ(ProcessSummary::kKernelKoid, ps.koid());
   EXPECT_STREQ("kernel", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(10U, sizes.private_bytes);
-  EXPECT_EQ(10U, sizes.scaled_bytes);
-  EXPECT_EQ(10U, sizes.total_bytes);
+  EXPECT_EQ(10U, sizes.private_bytes.integral);
+  EXPECT_EQ(10U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(10U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("vmo");
-  EXPECT_EQ(10U, sizes.private_bytes);
-  EXPECT_EQ(10U, sizes.scaled_bytes);
-  EXPECT_EQ(10U, sizes.total_bytes);
+  EXPECT_EQ(10U, sizes.private_bytes.integral);
+  EXPECT_EQ(10U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(10U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, NameMatch) {
@@ -416,22 +458,70 @@ TEST_F(SummaryUnitTest, NameMatch) {
       &c, {
               .vmos =
                   {
-                      {.koid = 1, .name = "blob-12a", .committed_bytes = 100},
-                      {.koid = 2, .name = "ld.so.1-internal-heap", .committed_bytes = 100},
-                      {.koid = 3, .name = "blob-de", .committed_bytes = 100},
-                      {.koid = 4, .name = "pthread_t:0x59853000/TLS=0x548", .committed_bytes = 100},
-                      {.koid = 5, .name = "thrd_t:0x59853000/TLS=0x548", .committed_bytes = 100},
-                      {.koid = 6, .name = "data:libfoo.so", .committed_bytes = 100},
-                      {.koid = 7, .name = "", .committed_bytes = 100},
-                      {.koid = 8, .name = "scudo:primary", .committed_bytes = 100},
-                      {.koid = 9, .name = "scudo:secondary", .committed_bytes = 100},
-                      {.koid = 10, .name = "foo", .committed_bytes = 100},
-                      {.koid = 11, .name = "initial-thread", .committed_bytes = 100},
-                      {.koid = 12, .name = "libfoo.so.1", .committed_bytes = 100},
-                      {.koid = 13, .name = "stack: msg of 123", .committed_bytes = 100},
-                      {.koid = 14, .name = "inactive-blob-123", .committed_bytes = 100},
-                      {.koid = 15, .name = "bss456:foobar", .committed_bytes = 100},
-                      {.koid = 16, .name = "relro:foobar", .committed_bytes = 100},
+                      {.koid = 1,
+                       .name = "blob-12a",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 2,
+                       .name = "ld.so.1-internal-heap",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 3,
+                       .name = "blob-de",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 4,
+                       .name = "pthread_t:0x59853000/TLS=0x548",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 5,
+                       .name = "thrd_t:0x59853000/TLS=0x548",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 6,
+                       .name = "data:libfoo.so",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 7,
+                       .name = "",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 8,
+                       .name = "scudo:primary",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 9,
+                       .name = "scudo:secondary",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 10,
+                       .name = "foo",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 11,
+                       .name = "initial-thread",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 12,
+                       .name = "libfoo.so.1",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 13,
+                       .name = "stack: msg of 123",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 14,
+                       .name = "inactive-blob-123",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 15,
+                       .name = "bss456:foobar",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
+                      {.koid = 16,
+                       .name = "relro:foobar",
+                       .committed_bytes = 100,
+                       .committed_fractional_scaled_bytes = UINT64_MAX},
                   },
               .processes =
                   {
@@ -449,20 +539,20 @@ TEST_F(SummaryUnitTest, NameMatch) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(1600U, sizes.private_bytes);
+  EXPECT_EQ(1600U, sizes.private_bytes.integral);
 
   EXPECT_EQ(11U, ps.name_to_sizes().size());
-  EXPECT_EQ(200U, ps.GetSizes("[blobs]").private_bytes);
-  EXPECT_EQ(200U, ps.GetSizes("[process-bootstrap]").private_bytes);
-  EXPECT_EQ(300U, ps.GetSizes("[stacks]").private_bytes);
-  EXPECT_EQ(100U, ps.GetSizes("[data]").private_bytes);
-  EXPECT_EQ(100U, ps.GetSizes("[bss]").private_bytes);
-  EXPECT_EQ(100U, ps.GetSizes("[relro]").private_bytes);
-  EXPECT_EQ(100U, ps.GetSizes("[unnamed]").private_bytes);
-  EXPECT_EQ(200U, ps.GetSizes("[scudo]").private_bytes);
-  EXPECT_EQ(100U, ps.GetSizes("foo").private_bytes);
-  EXPECT_EQ(100U, ps.GetSizes("[bootfs-libraries]").private_bytes);
-  EXPECT_EQ(100U, ps.GetSizes("[inactive blobs]").private_bytes);
+  EXPECT_EQ(200U, ps.GetSizes("[blobs]").private_bytes.integral);
+  EXPECT_EQ(200U, ps.GetSizes("[process-bootstrap]").private_bytes.integral);
+  EXPECT_EQ(300U, ps.GetSizes("[stacks]").private_bytes.integral);
+  EXPECT_EQ(100U, ps.GetSizes("[data]").private_bytes.integral);
+  EXPECT_EQ(100U, ps.GetSizes("[bss]").private_bytes.integral);
+  EXPECT_EQ(100U, ps.GetSizes("[relro]").private_bytes.integral);
+  EXPECT_EQ(100U, ps.GetSizes("[unnamed]").private_bytes.integral);
+  EXPECT_EQ(200U, ps.GetSizes("[scudo]").private_bytes.integral);
+  EXPECT_EQ(100U, ps.GetSizes("foo").private_bytes.integral);
+  EXPECT_EQ(100U, ps.GetSizes("[bootfs-libraries]").private_bytes.integral);
+  EXPECT_EQ(100U, ps.GetSizes("[inactive blobs]").private_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, AllUndigested) {
@@ -471,8 +561,14 @@ TEST_F(SummaryUnitTest, AllUndigested) {
   TestUtils::CreateCapture(&c, {
                                    .vmos =
                                        {
-                                           {.koid = 1, .name = "v1", .committed_bytes = 100},
-                                           {.koid = 2, .name = "v2", .committed_bytes = 100},
+                                           {.koid = 1,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 2,
+                                            .name = "v2",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
                                        },
                                    .processes = {{.koid = 2, .name = "p1", .vmos = {1, 2}}},
                                });
@@ -486,19 +582,19 @@ TEST_F(SummaryUnitTest, AllUndigested) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(200U, sizes.private_bytes);
-  EXPECT_EQ(200U, sizes.scaled_bytes);
-  EXPECT_EQ(200U, sizes.total_bytes);
+  EXPECT_EQ(200U, sizes.private_bytes.integral);
+  EXPECT_EQ(200U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(200U, sizes.total_bytes.integral);
 
   EXPECT_EQ(2U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
   sizes = ps.GetSizes("v2");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, OneUndigested) {
@@ -507,8 +603,14 @@ TEST_F(SummaryUnitTest, OneUndigested) {
   TestUtils::CreateCapture(&c, {
                                    .vmos =
                                        {
-                                           {.koid = 1, .name = "v1", .committed_bytes = 100},
-                                           {.koid = 2, .name = "v2", .committed_bytes = 100},
+                                           {.koid = 1,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 2,
+                                            .name = "v2",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
                                        },
                                    .processes = {{.koid = 2, .name = "p1", .vmos = {1, 2}}},
                                });
@@ -523,15 +625,15 @@ TEST_F(SummaryUnitTest, OneUndigested) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   EXPECT_EQ(1U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, TwoProcessesOneUndigested) {
@@ -539,8 +641,14 @@ TEST_F(SummaryUnitTest, TwoProcessesOneUndigested) {
   Capture c;
   TestUtils::CreateCapture(&c, {.vmos =
                                     {
-                                        {.koid = 1, .name = "v1", .committed_bytes = 100},
-                                        {.koid = 2, .name = "v2", .committed_bytes = 100},
+                                        {.koid = 1,
+                                         .name = "v1",
+                                         .committed_bytes = 100,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
+                                        {.koid = 2,
+                                         .name = "v2",
+                                         .committed_bytes = 100,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
                                     },
                                 .processes = {
                                     {.koid = 2, .name = "p1", .vmos = {1}},
@@ -556,38 +664,59 @@ TEST_F(SummaryUnitTest, TwoProcessesOneUndigested) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   EXPECT_EQ(1U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, Pools) {
   // One process, two vmos with same name.
   Capture c;
-  TestUtils::CreateCapture(
-      &c, {.vmos =
-               {
-                   {.koid = 1, .name = "SysmemContiguousPool", .committed_bytes = 400},
-                   {.koid = 2, .name = "ContiguousChild", .size_bytes = 300, .parent_koid = 1},
-                   {.koid = 3, .name = "ContiguousGrandchild", .size_bytes = 100, .parent_koid = 2},
-                   {.koid = 4, .name = "ContiguousGrandchild", .size_bytes = 50, .parent_koid = 2},
-                   {.koid = 5, .name = "Sysmem-core", .committed_bytes = 50},
-                   {.koid = 6, .name = "CoreChild", .size_bytes = 50, .parent_koid = 5},
-               },
-           .processes =
-               {
-                   {.koid = 10, .name = "p1", .vmos = {1, 2, 5}},
-                   {.koid = 20, .name = "p2", .vmos = {3}},
-                   {.koid = 30, .name = "p3", .vmos = {4}},
-                   {.koid = 40, .name = "p4", .vmos = {6}},
-               },
-           .rooted_vmo_names = Capture::kDefaultRootedVmoNames});
+  TestUtils::CreateCapture(&c, {.vmos =
+                                    {
+                                        {.koid = 1,
+                                         .name = "SysmemContiguousPool",
+                                         .committed_bytes = 400,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
+                                        {.koid = 2,
+                                         .name = "ContiguousChild",
+                                         .size_bytes = 300,
+                                         .parent_koid = 1,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
+                                        {.koid = 3,
+                                         .name = "ContiguousGrandchild",
+                                         .size_bytes = 100,
+                                         .parent_koid = 2,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
+                                        {.koid = 4,
+                                         .name = "ContiguousGrandchild",
+                                         .size_bytes = 50,
+                                         .parent_koid = 2,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
+                                        {.koid = 5,
+                                         .name = "Sysmem-core",
+                                         .committed_bytes = 50,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
+                                        {.koid = 6,
+                                         .name = "CoreChild",
+                                         .size_bytes = 50,
+                                         .parent_koid = 5,
+                                         .committed_fractional_scaled_bytes = UINT64_MAX},
+                                    },
+                                .processes =
+                                    {
+                                        {.koid = 10, .name = "p1", .vmos = {1, 2, 5}},
+                                        {.koid = 20, .name = "p2", .vmos = {3}},
+                                        {.koid = 30, .name = "p3", .vmos = {4}},
+                                        {.koid = 40, .name = "p4", .vmos = {6}},
+                                    },
+                                .rooted_vmo_names = Capture::kDefaultRootedVmoNames});
   Summary s(c, Summary::kNameMatches);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(5U, process_summaries.size());
@@ -600,75 +729,75 @@ TEST_F(SummaryUnitTest, Pools) {
   ProcessSummary ps = process_summaries.at(1);
   EXPECT_EQ(10U, ps.koid());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(250U / 3, sizes.scaled_bytes);
-  EXPECT_EQ(250U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(250U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(250U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("SysmemContiguousPool");
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(100U / 3, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("ContiguousChild");
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(150U / 3, sizes.scaled_bytes);
-  EXPECT_EQ(150U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(150U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(150U, sizes.total_bytes.integral);
 
   ps = process_summaries.at(2);
   EXPECT_EQ(20U, ps.koid());
   sizes = ps.sizes();
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U + 250U / 3, sizes.scaled_bytes);
-  EXPECT_EQ(100U + 250U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U + 250U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U + 250U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("SysmemContiguousPool");
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(100U / 3, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("ContiguousChild");
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(150U / 3, sizes.scaled_bytes);
-  EXPECT_EQ(150U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(150U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(150U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("ContiguousGrandchild");
-  EXPECT_EQ(100U, sizes.private_bytes);
-  EXPECT_EQ(100U, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   ps = process_summaries.at(3);
   EXPECT_EQ(30U, ps.koid());
   sizes = ps.sizes();
-  EXPECT_EQ(50U, sizes.private_bytes);
-  EXPECT_EQ(50U + 250U / 3, sizes.scaled_bytes);
-  EXPECT_EQ(50U + 250U, sizes.total_bytes);
+  EXPECT_EQ(50U, sizes.private_bytes.integral);
+  EXPECT_EQ(50U + 250U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(50U + 250U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("SysmemContiguousPool");
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(100U / 3, sizes.scaled_bytes);
-  EXPECT_EQ(100U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("ContiguousChild");
-  EXPECT_EQ(0U, sizes.private_bytes);
-  EXPECT_EQ(150U / 3, sizes.scaled_bytes);
-  EXPECT_EQ(150U, sizes.total_bytes);
+  EXPECT_EQ(0U, sizes.private_bytes.integral);
+  EXPECT_EQ(150U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(150U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("ContiguousGrandchild");
-  EXPECT_EQ(50U, sizes.private_bytes);
-  EXPECT_EQ(50U, sizes.scaled_bytes);
-  EXPECT_EQ(50U, sizes.total_bytes);
+  EXPECT_EQ(50U, sizes.private_bytes.integral);
+  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(50U, sizes.total_bytes.integral);
 
   ps = process_summaries.at(4);
   EXPECT_EQ(40U, ps.koid());
   sizes = ps.sizes();
-  EXPECT_EQ(50U, sizes.private_bytes);
-  EXPECT_EQ(50U, sizes.scaled_bytes);
-  EXPECT_EQ(50U, sizes.total_bytes);
+  EXPECT_EQ(50U, sizes.private_bytes.integral);
+  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(50U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("CoreChild");
-  EXPECT_EQ(50U, sizes.private_bytes);
-  EXPECT_EQ(50U, sizes.scaled_bytes);
-  EXPECT_EQ(50U, sizes.total_bytes);
+  EXPECT_EQ(50U, sizes.private_bytes.integral);
+  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(50U, sizes.total_bytes.integral);
 }
 
 }  // namespace test

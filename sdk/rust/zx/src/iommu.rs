@@ -14,28 +14,11 @@ use crate::{ok, sys, AsHandleRef, Handle, HandleBased, HandleRef, Resource, Stat
 pub struct Iommu(Handle);
 impl_handle_based!(Iommu);
 
+// ABI-compatible with zx_iommu_desc_dummy_t.
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
 pub struct IommuDescDummy {
-    reserved: u8,
-}
-
-impl Default for IommuDescDummy {
-    fn default() -> IommuDescDummy {
-        Self::from(sys::zx_iommu_desc_dummy_t::default())
-    }
-}
-
-impl From<sys::zx_iommu_desc_dummy_t> for IommuDescDummy {
-    fn from(desc: sys::zx_iommu_desc_dummy_t) -> IommuDescDummy {
-        IommuDescDummy { reserved: desc.reserved }
-    }
-}
-
-impl From<IommuDescDummy> for sys::zx_iommu_desc_dummy_t {
-    fn from(desc: IommuDescDummy) -> sys::zx_iommu_desc_dummy_t {
-        sys::zx_iommu_desc_dummy_t { reserved: desc.reserved }
-    }
+    padding1: u8,
 }
 
 impl Iommu {
@@ -45,16 +28,15 @@ impl Iommu {
     // [`zx_iommu_create`](https://fuchsia.dev/fuchsia-src/reference/syscalls/iommu_create) system call to create an iommu with type `ZX_IOMMU_TYPE_DUMMY`
     pub fn create_dummy(resource: &Resource, desc: IommuDescDummy) -> Result<Iommu, Status> {
         let mut iommu_handle = sys::zx_handle_t::default();
-        let desc_dummy = sys::zx_iommu_desc_dummy_t::from(desc);
         let status = unsafe {
             // SAFETY:
-            //  * desc parameter is a valid pointer (desc_dummy).
+            //  * desc parameter is a valid pointer (desc).
             //  * desc_size parameter is the size of desc.
             sys::zx_iommu_create(
                 resource.raw_handle(),
                 sys::ZX_IOMMU_TYPE_DUMMY,
-                std::ptr::from_ref(&desc_dummy).cast::<u8>(),
-                std::mem::size_of_val(&desc_dummy),
+                std::ptr::from_ref(&desc).cast::<u8>(),
+                std::mem::size_of_val(&desc),
                 &mut iommu_handle,
             )
         };

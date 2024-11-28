@@ -197,7 +197,7 @@ pub fn condition_value(input: NomSpan) -> IResult<NomSpan, Value, BindParserErro
     let identifer = map(ws(compound_identifier), Value::Identifier);
 
     alt((string, number, boolean, identifer))(input)
-        .or(Err(nom::Err::Error(BindParserError::ConditionValue(input.to_string()))))
+        .or_else(|_| Err(nom::Err::Error(BindParserError::ConditionValue(input.to_string()))))
 }
 
 pub fn using(input: NomSpan) -> IResult<NomSpan, Include, BindParserError> {

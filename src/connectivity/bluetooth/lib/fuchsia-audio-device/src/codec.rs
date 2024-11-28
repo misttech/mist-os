@@ -181,8 +181,7 @@ impl SoftCodec {
         formats: fidl_fuchsia_hardware_audio::DaiSupportedFormats,
         initially_plugged: bool,
     ) -> (Self, ClientEnd<CodecMarker>) {
-        let (client, codec_requests) =
-            fidl::endpoints::create_request_stream::<CodecMarker>().unwrap();
+        let (client, codec_requests) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let is_input = match direction {
             CodecDirection::Input => Some(true),
             CodecDirection::Output => Some(false),
@@ -455,7 +454,7 @@ pub(crate) mod tests {
             },
             true,
         );
-        test(exec, client.into_proxy().expect("channel should be available"), codec)
+        test(exec, client.into_proxy(), codec)
     }
 
     #[fixture(with_soft_codec)]
@@ -629,7 +628,7 @@ pub(crate) mod tests {
             },
             true,
         );
-        let proxy = client.into_proxy().unwrap();
+        let proxy = client.into_proxy();
 
         let set_format_fut = proxy.set_dai_format(&fidl_fuchsia_hardware_audio::DaiFormat {
             number_of_channels: 2,

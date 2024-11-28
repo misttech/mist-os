@@ -841,15 +841,15 @@ def _offset_symbols_and_breakpoints(kernel_relocated_base=None):
         gdb.execute("set confirm on", to_string=True)
 
     # Verify it works as expected
-    code_start = _read_symbol_address("__code_start")
+    executable_start = _read_symbol_address("__executable_start")
     if not kernel_relocated_base:
         return False
 
     expected = relocated + (load_start - base_address)
-    if code_start != expected:
+    if executable_start != expected:
         print(
-            "Error: Incorrect relocation for __code_start 0x%x vs 0x%x"
-            % (expected, code_start)
+            "Error: Incorrect relocation for __executable_start 0x%x vs 0x%x"
+            % (expected, executable_start)
         )
         return False
 

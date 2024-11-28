@@ -64,9 +64,9 @@ TEST(PbusBtiTest, BtiIsSameAfterCrash) {
     ASSERT_OK(
         fdio_fd_create(endpoints->client.TakeChannel().release(), dev_fd.reset_and_get_address()));
     ASSERT_OK(RecursiveWaitForFile(dev_fd.get(), kParentPath));
-    ASSERT_OK(fdio_open_fd_at(dev_fd.get(), kParentPath,
-                              static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory),
-                              parent_dir.reset_and_get_address()));
+    ASSERT_OK(fdio_open3_fd_at(dev_fd.get(), kParentPath,
+                               static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
+                               parent_dir.reset_and_get_address()));
   }
 
   uint64_t koid1;

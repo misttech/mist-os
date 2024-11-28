@@ -103,7 +103,8 @@ impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
         let enable_client_state_connector = data.config.enable_client_state_connector;
 
         // Use `thermal_config_path` if it was provided, otherwise default to `THERMAL_CONFIG_PATH`
-        let config_path = thermal_config_path.unwrap_or(Self::THERMAL_CONFIG_PATH.to_string());
+        let config_path =
+            thermal_config_path.unwrap_or_else(|| Self::THERMAL_CONFIG_PATH.to_string());
 
         // Read the thermal config file from `config_path`
         // TODO(b/320705983): Update the thermal config file to identify a more general
@@ -132,7 +133,7 @@ impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
         // override for tests.
         let inspect = self
             .inspect_root
-            .unwrap_or(inspect::component::inspector().root())
+            .unwrap_or_else(|| inspect::component::inspector().root())
             .create_child(self.node_name);
 
         let metrics_tracker =
@@ -554,7 +555,7 @@ impl ThermalStateHandler {
                             ..
                         } => self
                             .client_states
-                            .connect_stream_for_client(&client_type, watcher.into_stream()?)?,
+                            .connect_stream_for_client(&client_type, watcher.into_stream())?,
                     }
                 }
                 Ok(())
@@ -770,7 +771,7 @@ mod tests {
                 .unwrap();
 
             let (watcher_proxy, watcher_server_end) =
-                fidl::endpoints::create_proxy::<fthermal::ClientStateWatcherMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fthermal::ClientStateWatcherMarker>();
 
             // Pass the `watcher_server_end` to the node, so it will be associated with thermal
             // state changes of `client_type`

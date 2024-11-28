@@ -156,6 +156,7 @@ impl PackageManifestWatcher {
         // Canonicalize the paths, since that's what notify returns.
         let manifest_path = manifest_path.canonicalize_utf8()?;
 
+        #[allow(clippy::set_contains_or_insert)] // TODO(https://fxbug.dev/379733655): Remove this
         if !self.watched_manifest_paths.contains(&manifest_path) {
             self.file_watcher.update_package_manifest(&manifest_path)?;
             self.file_watcher.watch_path(&manifest_path)?;

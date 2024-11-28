@@ -70,7 +70,7 @@ async fn suite_connection_handler(mut stream: ftest::SuiteRequestStream) {
                 info!("{} Starting GetTests", rid);
                 task_tx
                     .send(fasync::Task::spawn(async move {
-                        let mut stream = iterator.into_stream().expect("convert to stream");
+                        let mut stream = iterator.into_stream();
                         let resp = match get_test_cases(rid).await {
                             Ok(v) => v,
                             Err(e) => {
@@ -102,7 +102,7 @@ async fn suite_connection_handler(mut stream: ftest::SuiteRequestStream) {
             }
             ftest::SuiteRequest::Run { tests, listener, .. } => {
                 info!("{} Starting Run", rid);
-                let proxy = listener.into_proxy().expect("into proxy");
+                let proxy = listener.into_proxy();
                 task_tx
                     .send(fasync::Task::spawn(async move {
                         if let Err(e) = handle_run(rid, tests, proxy).await {
@@ -132,8 +132,7 @@ async fn handle_run(
 
         let (stdout_tx, stdout_rx) = zx::Socket::create_stream();
         let (stderr_tx, stderr_rx) = zx::Socket::create_stream();
-        let (case_proxy, server_end) =
-            fidl::endpoints::create_proxy::<ftest::CaseListenerMarker>().expect("create proxy");
+        let (case_proxy, server_end) = fidl::endpoints::create_proxy::<ftest::CaseListenerMarker>();
         listener
             .on_test_case_started(
                 &test,
@@ -225,7 +224,7 @@ async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Erro
     );
 
     for _ in 0..NUM_TRIALS {
-        let (iterator, result_stream) = fidl::endpoints::create_proxy::<BatchIteratorMarker>()?;
+        let (iterator, result_stream) = fidl::endpoints::create_proxy::<BatchIteratorMarker>();
         let time_start = Instant::now();
 
         proxy.stream_diagnostics(

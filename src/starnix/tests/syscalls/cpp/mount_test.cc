@@ -448,7 +448,7 @@ TEST_F(ProcMountsTest, Basic) {
   }
   EXPECT_THAT(read_mounts(), IsSupersetOf({
                                  "data/system / remote_bundle rw,nosuid,nodev 0 0",
-                                 "none /dev tmpfs rw,nosuid 0 0",
+                                 "none /dev devtmpfs rw,nosuid 0 0",
                                  ". /tmp tmpfs rw 0 0",
                              }));
 }

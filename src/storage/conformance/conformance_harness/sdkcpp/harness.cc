@@ -52,31 +52,23 @@ class SdkCppHarness : public fidl::Server<fio_test::TestHarness> {
     config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
                                 fio::NodeAttributesQuery::kStorageSize);
 
-    // TODO(https://fxbug.dev/324112857): Support append when finalizing Open3 support.
-
     completer.Reply(std::move(config));
   }
 
-  void GetDirectory(GetDirectoryRequest& request, GetDirectoryCompleter::Sync& completer) final {
+  void CreateDirectory(CreateDirectoryRequest& request,
+                       CreateDirectoryCompleter::Sync& completer) final {
     auto dir = std::make_unique<vfs::PseudoDir>();
-
-    for (auto& entry : request.root().entries()) {
+    for (auto& entry : request.contents()) {
       AddEntry(std::move(*entry), *dir);
     }
-
-    // TODO(https://fxbug.dev/324112857): Convert this to use the new Serve signature when the
-    // GetDirectory method is compatible with fuchsia.io/Flags and remove the suppression.
-    fuchsia::io::OpenFlags deprecated_flags =
-        static_cast<fuchsia::io::OpenFlags>(static_cast<uint32_t>(request.flags()));
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    ZX_ASSERT_MSG(dir->Serve(deprecated_flags, request.directory_request().TakeChannel()) == ZX_OK,
-                  "Failed to serve directory!");
-#pragma clang diagnostic pop
+    zx_status_t status = dir->Serve(request.flags(), std::move(request.object_request()));
+    ZX_ASSERT_MSG(status == ZX_OK, "Failed to serve directory: %s", zx_status_get_string(status));
+    // In the SDK VFS, the lifetime of nodes controls connection lifetimes. This means that we must
+    // keep the pseudo directory alive until the end of the test.
     directories_.push_back(std::move(dir));
   }
 
-  void GetServiceDir(GetServiceDirCompleter::Sync& completer) final {
+  void OpenServiceDirectory(OpenServiceDirectoryCompleter::Sync& completer) final {
     // Create a directory with a fuchsia.test.placeholders/Echo server at the discoverable name.
     auto svc_dir = std::make_unique<vfs::PseudoDir>();
     auto handler = [](fidl::ServerEnd<test_placeholders::Echo> server_end) {

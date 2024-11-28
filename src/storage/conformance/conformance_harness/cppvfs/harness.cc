@@ -66,28 +66,22 @@ class TestHarness : public fidl::Server<fio_test::TestHarness> {
     config.supports_services(true);
     config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
                                 fio::NodeAttributesQuery::kStorageSize);
-    // TODO(https://fxbug.dev/324112857): Support append mode when adding open3 support.
 
     completer.Reply(config);
   }
 
-  void GetDirectory(GetDirectoryRequest& request, GetDirectoryCompleter::Sync& completer) final {
+  void CreateDirectory(CreateDirectoryRequest& request,
+                       CreateDirectoryCompleter::Sync& completer) final {
     fbl::RefPtr<fs::PseudoDir> dir{fbl::MakeRefCounted<fs::PseudoDir>()};
-
-    for (auto& entry : request.root().entries()) {
+    for (auto& entry : request.contents()) {
       AddEntry(std::move(*entry), *dir);
     }
-    zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(request.flags());
-    ZX_ASSERT_MSG(options.is_ok(), "Failed to validate flags: %s", options.status_string());
     zx_status_t status =
-        vfs_->ServeDeprecated(std::move(dir), request.directory_request().TakeChannel(), *options);
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "Serving directory failed: " << zx_status_get_string(status);
-      return;
-    }
+        vfs_->Serve(std::move(dir), request.object_request().TakeChannel(), request.flags());
+    ZX_ASSERT_MSG(status == ZX_OK, "Serving directory failed: %s", zx_status_get_string(status));
   }
 
-  void GetServiceDir(GetServiceDirCompleter::Sync& completer) final {
+  void OpenServiceDirectory(OpenServiceDirectoryCompleter::Sync& completer) final {
     // Create a directory with a fuchsia.test.placeholders/Echo server at the discoverable name.
     fbl::RefPtr svc_dir = fbl::MakeRefCounted<fs::PseudoDir>();
     auto handler = [this](fidl::ServerEnd<test_placeholders::Echo> server_end) {

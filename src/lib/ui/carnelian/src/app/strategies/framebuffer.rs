@@ -138,9 +138,9 @@ impl DisplayCoordinator {
         let provider =
             fuchsia_component::client::connect_to_protocol_at_path::<ProviderMarker>(path)
                 .context("while opening device file")?;
-        let (coordinator, coordinator_server) = endpoints::create_proxy::<CoordinatorMarker>()?;
+        let (coordinator, coordinator_server) = endpoints::create_proxy::<CoordinatorMarker>();
         let (listener_client, mut listener_requests) =
-            endpoints::create_request_stream::<CoordinatorListenerMarker>()?;
+            endpoints::create_request_stream::<CoordinatorListenerMarker>();
         let () = if virtcon_mode.is_some() {
             provider
                 .open_coordinator_with_listener_for_virtcon(

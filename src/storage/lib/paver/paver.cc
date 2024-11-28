@@ -362,7 +362,7 @@ zx::result<> PartitionPave(const DevicePartitioner& partitioner, zx::vmo payload
             status.status_string());
       return status.take_error();
     }
-    ERROR("Could not find \"%s\" Partition on device.  The device may need to be re-initalized.\n",
+    ERROR("Could not find \"%s\" Partition on device.  The device may need to be re-initialized.\n",
           spec.ToString().c_str());
     return status.take_error();
   }
@@ -431,17 +431,19 @@ WriteFirmwareResult CreateWriteFirmwareResult(std::variant<zx_status_t, bool>* v
 
 }  // namespace
 
-zx::result<std::unique_ptr<Paver>> Paver::Create(fbl::unique_fd devfs_root,
-                                                 fbl::unique_fd partitions_root) {
-  zx::result devices = BlockDevices::Create(std::move(devfs_root), std::move(partitions_root));
+zx::result<std::unique_ptr<Paver>> Paver::Create(fbl::unique_fd devfs_root) {
+  zx::result devices = BlockDevices::CreateDevfs(std::move(devfs_root));
   if (devices.is_error()) {
     return devices.take_error();
   }
-  zx::result svc_root = component::Connect<fuchsia_io::Directory>("/svc");
-  if (svc_root.is_error()) {
-    return {};
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  if (zx_status_t status =
+          fdio_open3("/svc", static_cast<uint64_t>(fuchsia_io::wire::kPermReadable),
+                     server.TakeChannel().release());
+      status != ZX_OK) {
+    return zx::error(status);
   }
-  return zx::ok(std::make_unique<Paver>(std::move(*devices), std::move(*svc_root)));
+  return zx::ok(std::make_unique<Paver>(std::move(*devices), std::move(client)));
 }
 
 void Paver::FindDataSink(FindDataSinkRequestView request, FindDataSinkCompleter::Sync& _completer) {
@@ -449,20 +451,10 @@ void Paver::FindDataSink(FindDataSinkRequestView request, FindDataSinkCompleter:
                  std::move(request->data_sink), context_);
 }
 
-void Paver::UseBlockDevice(UseBlockDeviceRequestView request,
-                           UseBlockDeviceCompleter::Sync& _completer) {
-  UseBlockDevice(
-      BlockAndController{
-          .device = std::move(request->block_device),
-          .controller = std::move(request->block_controller),
-      },
-      std::move(request->data_sink));
-}
-
-void Paver::UseBlockDevice(BlockAndController block_device,
-                           fidl::ServerEnd<fuchsia_paver::DynamicDataSink> dynamic_data_sink) {
+void Paver::FindPartitionTableManager(FindPartitionTableManagerRequestView request,
+                                      FindPartitionTableManagerCompleter::Sync& _completer) {
   DynamicDataSink::Bind(dispatcher_, devices_.Duplicate(), svc_root_.borrow(),
-                        std::move(block_device), std::move(dynamic_data_sink), context_);
+                        std::move(request->data_sink), context_);
 }
 
 void Paver::FindBootManager(FindBootManagerRequestView request,
@@ -635,11 +627,10 @@ void DataSink::Bind(async_dispatcher_t* dispatcher, BlockDevices devices,
 
 void DynamicDataSink::Bind(async_dispatcher_t* dispatcher, BlockDevices devices,
                            fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-                           BlockAndController block_device,
                            fidl::ServerEnd<fuchsia_paver::DynamicDataSink> server,
-                           std::shared_ptr<Context> context) {
-  zx::result partitioner = DevicePartitionerFactory::Create(
-      devices, svc_root, GetCurrentArch(), std::move(context), std::move(block_device));
+                           std::shared_ptr<Context> context, BlockAndController block) {
+  zx::result partitioner = DevicePartitionerFactory::Create(devices, svc_root, GetCurrentArch(),
+                                                            std::move(context), std::move(block));
   if (partitioner.is_error()) {
     ERROR("Unable to initialize a partitioner: %s.\n", partitioner.status_string());
     fidl_epitaph_write(server.channel().get(), ZX_ERR_BAD_STATE);
@@ -689,21 +680,38 @@ void BootManager::Bind(async_dispatcher_t* dispatcher, BlockDevices devices,
                        fidl::ClientEnd<fuchsia_io::Directory> svc_root,
                        std::shared_ptr<Context> context,
                        fidl::ServerEnd<fuchsia_paver::BootManager> server) {
-  auto status = abr::ClientFactory::Create(devices, svc_root.borrow(), std::move(context));
-  if (status.is_error()) {
-    ERROR("Failed to get ABR client: %s\n", status.status_string());
-    fidl_epitaph_write(server.channel().get(), status.error_value());
+  zx::result supports_abr = abr::SupportsVerifiedBoot(devices, svc_root);
+  if (supports_abr.is_error()) {
+    ERROR("Failed to check if system supports verified boot: %s\n", supports_abr.status_string());
+    fidl_epitaph_write(server.channel().get(), supports_abr.error_value());
+    return;
+  } else if (!*supports_abr) {
+    LOG("System doesn't support verified boot; not creating BootManager\n");
+    fidl_epitaph_write(server.channel().get(), ZX_ERR_NOT_SUPPORTED);
     return;
   }
-  auto& abr_client = status.value();
 
-  auto boot_manager =
-      std::make_unique<BootManager>(std::move(abr_client), std::move(devices), std::move(svc_root));
+  zx::result partitioner =
+      DevicePartitionerFactory::Create(devices, svc_root, GetCurrentArch(), std::move(context));
+  if (partitioner.is_error()) {
+    ERROR("Unable to initialize a partitioner: %s.\n", partitioner.status_string());
+    fidl_epitaph_write(server.channel().get(), partitioner.error_value());
+    return;
+  }
+  zx::result abr = partitioner->CreateAbrClient();
+  if (abr.is_error()) {
+    ERROR("Failed to get ABR client: %s\n", abr.status_string());
+    fidl_epitaph_write(server.channel().get(), abr.error_value());
+    return;
+  }
+
+  auto boot_manager = std::make_unique<BootManager>(std::move(*partitioner), std::move(*abr));
   fidl::BindServer(dispatcher, std::move(server), std::move(boot_manager));
 }
 
 void BootManager::QueryCurrentConfiguration(QueryCurrentConfigurationCompleter::Sync& completer) {
-  zx::result<Configuration> status = abr::QueryBootConfig(devices_, svc_root_);
+  zx::result<Configuration> status =
+      abr::QueryBootConfig(partitioner_->Devices(), partitioner_->SvcRoot());
   if (status.is_error()) {
     completer.ReplyError(status.status_value());
     return;
@@ -763,7 +771,8 @@ bool BootManager::IsFinalBootAttempt(const AbrSlotInfo& slot_info, Configuration
   }
 
   // If the slot in question is our current boot slot, we're on our last attempt.
-  zx::result<Configuration> current_configuration = abr::QueryBootConfig(devices_, svc_root_);
+  zx::result<Configuration> current_configuration =
+      abr::QueryBootConfig(partitioner_->Devices(), partitioner_->SvcRoot());
   return current_configuration.is_ok() && *current_configuration == configuration;
 }
 

@@ -50,7 +50,7 @@ async fn read_info() -> Result<DetectResult, Error> {
     let (_coordinator, listener_requests) = {
         let (dc_proxy, dc_server) = endpoints::create_sync_proxy::<CoordinatorMarker>();
         let (listener_client, listener_requests) =
-            endpoints::create_request_stream::<CoordinatorListenerMarker>()?;
+            endpoints::create_request_stream::<CoordinatorListenerMarker>();
         let payload =
             fidl_fuchsia_hardware_display::ProviderOpenCoordinatorWithListenerForPrimaryRequest {
                 coordinator: Some(dc_server),

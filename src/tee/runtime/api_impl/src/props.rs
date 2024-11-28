@@ -432,7 +432,7 @@ impl PropSets {
             panic!("Invalid enumerator handle provided");
         };
 
-        prop_enumerator.start(prop_set.clone());
+        prop_enumerator.start(prop_set);
     }
 
     fn reset_property_enumerator(&mut self, handle: PropSetHandle) {

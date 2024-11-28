@@ -137,8 +137,7 @@ impl ListTool {
     }
 
     async fn list_from_device(&self) -> fho::Result<Vec<RepositoryInfo>> {
-        let (repo_iterator, repo_iterator_server) =
-            fidl::endpoints::create_proxy().map_err(|e| bug!(e))?;
+        let (repo_iterator, repo_iterator_server) = fidl::endpoints::create_proxy();
         self.repo_proxy.list(repo_iterator_server).map_err(|e| bug!(e))?;
         let mut ret: Vec<RepositoryInfo> = vec![];
         loop {
@@ -149,8 +148,7 @@ impl ListTool {
             ret.extend(repos.into_iter().map(|r| r.try_into().unwrap()))
         }
 
-        let (rule_iterator, rule_iterator_server) =
-            fidl::endpoints::create_proxy().map_err(|e| bug!(e))?;
+        let (rule_iterator, rule_iterator_server) = fidl::endpoints::create_proxy();
         self.engine_proxy.list(rule_iterator_server).map_err(|e| bug!("{e}"))?;
 
         let mut rewrite_rules: Vec<Rule> = vec![];
@@ -183,7 +181,7 @@ impl ListTool {
         self.repos
             .list_registered_targets(server)
             .map_err(|e| bug!("error communicating with daemon: {e}"))?;
-        let registered_targets = client.into_proxy().map_err(|e| bug!("{e}"))?;
+        let registered_targets = client.into_proxy();
 
         let mut items: HashMap<String, RepositoryInfo> = HashMap::new();
 
@@ -194,7 +192,7 @@ impl ListTool {
             .map_err(|e| bug!(e))?
         {
             for registered_target in registered_targets {
-                let repo = registered_target.repo_name.unwrap_or("<unknown>".to_owned());
+                let repo = registered_target.repo_name.unwrap_or_else(|| "<unknown>".to_owned());
                 let mut aliases = registered_target.aliases.unwrap_or_else(Vec::new);
                 aliases.sort();
 
@@ -275,7 +273,7 @@ mod test {
             fasync::Task::spawn(async move {
                 match req {
                     RepositoryRegistryRequest::ListRegisteredTargets { iterator, .. } => {
-                        let mut iterator = iterator.into_stream().unwrap();
+                        let mut iterator = iterator.into_stream();
                         while let Some(Ok(req)) = iterator.next().await {
                             match req {
                                 RepositoryTargetsIteratorRequest::Next { responder } => {
@@ -297,7 +295,7 @@ mod test {
                 let mut sent = false;
                 match req {
                     RepositoryRegistryRequest::ListRegisteredTargets { iterator, .. } => {
-                        let mut iterator = iterator.into_stream().unwrap();
+                        let mut iterator = iterator.into_stream();
                         while let Some(Ok(req)) = iterator.next().await {
                             match req {
                                 RepositoryTargetsIteratorRequest::Next { responder } => {
@@ -350,7 +348,7 @@ mod test {
             }
             RepositoryManagerRequest::List { iterator, .. } => {
                 fuchsia_async::Task::local(async move {
-                    let mut stream = iterator.into_stream().unwrap();
+                    let mut stream = iterator.into_stream();
                     while let Some(req) = stream.try_next().await.unwrap() {
                         let fidl_fuchsia_pkg::RepositoryIteratorRequest::Next { responder } = req;
                         responder.send(&[]).unwrap();
@@ -367,13 +365,13 @@ mod test {
         let repos = fho::testing::fake_proxy(move |req| match req {
             EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
                 fuchsia_async::Task::local(async move {
-                    let mut tx_stream = transaction.into_stream().unwrap();
+                    let mut tx_stream = transaction.into_stream();
 
                     while let Some(req) = tx_stream.try_next().await.unwrap() {
                         match req {
                             EditTransactionRequest::ResetAll { control_handle: _ } => (),
                             EditTransactionRequest::ListDynamic { iterator, control_handle: _ } => {
-                                let mut stream = iterator.into_stream().unwrap();
+                                let mut stream = iterator.into_stream();
 
                                 while let Some(req) = stream.try_next().await.unwrap() {
                                     let RuleIteratorRequest::Next { responder } = req;
@@ -393,7 +391,7 @@ mod test {
             }
             EngineRequest::List { iterator, .. } => {
                 fuchsia_async::Task::local(async move {
-                    let mut stream = iterator.into_stream().unwrap();
+                    let mut stream = iterator.into_stream();
                     while let Some(req) = stream.try_next().await.unwrap() {
                         let RuleIteratorRequest::Next { responder } = req;
                         responder.send(&[]).unwrap();

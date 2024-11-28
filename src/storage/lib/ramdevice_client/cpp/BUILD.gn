@@ -73,15 +73,15 @@ shared_library("ramdevice-client-test-lib") {
     # <ramdevice-client/ramnand.h> has #include <fidl/fuchsia.hardware.nand/cpp/wire.h>
     "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//src/devices/testing/driver-integration-test-shim",
+    "//zircon/system/ulib/fbl",
   ]
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
     "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp",
     "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_cpp",
+    "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
-    "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/ddk",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",

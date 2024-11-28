@@ -10,6 +10,8 @@ TEST(CrasherTest, ShouldPass) { ASSERT_TRUE(true); }
 
 TEST(CrasherTest, ShouldFail) { ASSERT_TRUE(false); }
 
+TEST(CrasherTest, ShouldCrash) { abort(); }
+
 TEST(CrasherTest, WaitAndFail) {
   sleep(10);
   ASSERT_TRUE(false);

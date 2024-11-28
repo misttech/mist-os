@@ -64,7 +64,7 @@ impl RouteEventsResult {
         route: Vec<ComponentEventRoute>,
     ) {
         let event_state =
-            self.mapping.entry(source_name).or_insert(RequestedEventState::new(route));
+            self.mapping.entry(source_name).or_insert_with(|| RequestedEventState::new(route));
         if !event_state.scopes.contains(&scope) {
             event_state.scopes.push(scope);
         }

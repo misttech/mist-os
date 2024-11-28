@@ -1359,7 +1359,7 @@ void VmPageSpliceList::FreeAllPages() {
     if (page.IsPage()) {
       pmm_free_page(page.ReleasePage());
     } else if (page.IsReference()) {
-      auto compression = pmm_page_compression();
+      auto compression = Pmm::Node().GetPageCompression();
       DEBUG_ASSERT(compression);
       compression->Free(page.ReleaseReference());
     }
@@ -1407,7 +1407,7 @@ zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
           DEBUG_ASSERT(!list_in_list(&page->queue_node));
           pmm_free_page(page);
         } else if (content.IsReference()) {
-          VmCompression* compression = pmm_page_compression();
+          VmCompression* compression = Pmm::Node().GetPageCompression();
           DEBUG_ASSERT(compression);
           compression->Free(content.ReleaseReference());
         }

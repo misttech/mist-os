@@ -143,10 +143,18 @@ class GnLabelTest(unittest.TestCase):
         self.assertEqual(path, Path("rebase/dir/path/to/foo"))
 
     def test_code_search_url(self) -> None:
-        url = GnLabel.from_str("//path/to/foo:bar").code_search_url()
+        url = GnLabel.from_str("//path/to/foo:bar").url()
         self.assertEqual(
             url,
             "https://cs.opensource.google/fuchsia/fuchsia/+/main:path/to/foo",
+        )
+
+    def test_custom_url(self) -> None:
+        input_url = "https://fuchsia.dev/whats-new/release-notes"
+        url = GnLabel.from_str("//path/to/foo:bar", url=input_url).url()
+        self.assertEqual(
+            url,
+            input_url,
         )
 
     def test_is_host_target(self) -> None:

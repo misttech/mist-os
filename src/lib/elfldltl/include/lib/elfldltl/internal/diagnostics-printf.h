@@ -11,6 +11,7 @@
 #include <tuple>
 #include <type_traits>
 
+#include "../constants.h"
 #include "const-string.h"
 
 namespace elfldltl {
@@ -198,6 +199,16 @@ struct PrintfType<FileAddress<T>> {
     return " at relative address"s + PrintfHexFormatStringForType<T>();
   }
   static constexpr auto Arguments(FileAddress<T> arg) { return std::make_tuple(*arg); }
+};
+
+template <>
+struct PrintfType<ElfMachine> {
+  static consteval std::string Format() { return "%.*s (%#" PRIx16 ")"; }
+  static constexpr auto Arguments(ElfMachine machine) {
+    std::string_view name = ElfMachineName(machine);
+    return std::make_tuple(static_cast<int>(name.size()), name.data(),
+                           static_cast<uint16_t>(machine));
+  }
 };
 
 // This concatenates them all together in a mandatory constexpr context so the

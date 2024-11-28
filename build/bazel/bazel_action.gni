@@ -860,7 +860,7 @@ template("bazel_action") {
     }
 
     # Forward GN C/C++ compiler optimization configuration to Bazel
-    if (optimize == "none" || optimize == "default" ||
+    if (optimize == "none" || optimize == "moderate" ||
         optimize == "sanitizer" || optimize == "coverage" ||
         optimize == "minimal") {
       args += [ "--compilation_mode=fastbuild" ]

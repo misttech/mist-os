@@ -25,14 +25,14 @@ pub async fn create_cmd<W: std::io::Write>(
 ) -> Result<()> {
     let parent = moniker
         .parent()
-        .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
+        .ok_or_else(|| format_err!("Error: {} does not reference a dynamic instance", moniker))?;
     let leaf = moniker
         .leaf()
-        .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
+        .ok_or_else(|| format_err!("Error: {} does not reference a dynamic instance", moniker))?;
     let child_name = leaf.name();
     let collection = leaf
         .collection()
-        .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
+        .ok_or_else(|| format_err!("Error: {} does not reference a dynamic instance", moniker))?;
 
     writeln!(writer, "URL: {}", url)?;
     writeln!(writer, "Moniker: {}", moniker)?;
@@ -67,7 +67,7 @@ mod test {
         expected_url: &'static str,
     ) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {

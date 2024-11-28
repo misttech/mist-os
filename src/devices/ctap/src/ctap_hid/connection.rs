@@ -131,8 +131,7 @@ pub mod fidl {
         where
             F: (Fn(SecurityKeyDeviceRequest, u32) -> ()) + Send + 'static,
         {
-            let (device_proxy, mut stream) = create_proxy_and_stream::<SecurityKeyDeviceMarker>()
-                .expect("Failed to create proxy and stream");
+            let (device_proxy, mut stream) = create_proxy_and_stream::<SecurityKeyDeviceMarker>();
             fasync::Task::spawn(async move {
                 let mut req_num = 0u32;
                 while let Some(req) = stream.try_next().await.expect("Failed to read req") {

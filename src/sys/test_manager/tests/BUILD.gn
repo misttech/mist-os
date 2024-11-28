@@ -17,11 +17,11 @@ rustc_test("test_manager_test_bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/test_diagnostics/rust:test_diagnostics",
     "//src/sys/test_manager:test_lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:pretty_assertions",
+    "//third_party/rust_crates:test-case",
   ]
 
   sources = [ "src/tests.rs" ]
@@ -39,7 +39,6 @@ rustc_test("test_manager_stress_test_bin") {
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/test_diagnostics/rust:test_diagnostics",
     "//src/sys/test_manager:test_lib",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:pretty_assertions",
@@ -61,11 +60,11 @@ rustc_test("test_manager_specified_realm_bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/test_diagnostics/rust:test_diagnostics",
     "//src/sys/test_manager:test_lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:pretty_assertions",
+    "//third_party/rust_crates:test-case",
   ]
 
   sources = [ "src/specified_realm_test.rs" ]

@@ -28,6 +28,7 @@ impl FilesystemConfig for F2fs {
         FsManagementFilesystemInstance::new(
             fs_management::F2fs::default(),
             block_device,
+            None,
             /*as_blob=*/ false,
         )
         .await

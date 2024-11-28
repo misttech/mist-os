@@ -34,6 +34,7 @@ use starnix_modules_input::{
 };
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_magma::magma_device_init;
+use starnix_modules_nanohub::nanohub_device_init;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_perfetto_consumer::start_perfetto_consumer_thread;
 #[cfg(not(feature = "starnix_lite"))]
@@ -100,12 +101,17 @@ pub struct Features {
     pub rootfs_rw: bool,
 
     pub network_manager: bool,
+
+    pub nanohub: bool,
 }
 
 /// Parses all the featurse in `entries`.
 ///
 /// Returns an error if parsing fails, or if an unsupported feature is present in `features`.
-pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
+pub fn parse_features(
+    entries: &Vec<String>,
+    structured_config: &starnix_kernel_structured_config::Config,
+) -> Result<Features, Error> {
     let mut features = Features::default();
     for entry in entries {
         let (raw_flag, raw_args) =
@@ -142,6 +148,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("gralloc", _) => features.gralloc = true,
             #[cfg(not(feature = "starnix_lite"))]
             ("magma", _) => features.magma = true,
+            ("nanohub", _) => features.nanohub = true,
             ("network_manager", _) => features.network_manager = true,
             #[cfg(not(feature = "starnix_lite"))]
             ("gfxstream", _) => features.gfxstream = true,
@@ -150,6 +157,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("enable_suid", _) => features.kernel.enable_suid = true,
             #[cfg(not(feature = "starnix_lite"))]
             ("io_uring", _) => features.kernel.io_uring = true,
+            ("error_on_failed_reboot", _) => features.kernel.error_on_failed_reboot = true,
             #[cfg(not(feature = "starnix_lite"))]
             ("perfetto", Some(socket_path)) => {
                 features.perfetto = Some(socket_path.into());
@@ -166,6 +174,10 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
                 return Err(anyhow!("Unsupported feature: {}", f));
             }
         };
+    }
+
+    if structured_config.ui_visual_debugging_level > 0 {
+        features.kernel.enable_visual_debugging = true;
     }
 
     Ok(features)
@@ -236,7 +248,7 @@ pub fn run_container_features(
         );
 
         let input_events_relay = InputEventsRelay::new();
-        input_events_relay.clone().start_relays(
+        input_events_relay.start_relays(
             &kernel,
             EventProxyMode::WakeContainer,
             touch_source_client,
@@ -307,6 +319,9 @@ pub fn run_container_features(
         if let Err(e) = kernel.network_manager.init(kernel) {
             log_error!("Network manager initialization failed: ({e:?})");
         }
+    }
+    if features.nanohub {
+        nanohub_device_init(locked, system_task);
     }
 
     Ok(())

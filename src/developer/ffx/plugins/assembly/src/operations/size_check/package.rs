@@ -347,11 +347,13 @@ fn compute_budget_results(
                 )
             })?;
             let package_result =
-                package_breakdown.entry(blob.package_path.clone()).or_insert(PackageSizeInfo {
-                    name: blob.package_name.clone(),
-                    proportional_size: 0,
-                    used_space_in_blobfs: 0,
-                    blobs: vec![],
+                package_breakdown.entry(blob.package_path.clone()).or_insert_with(|| {
+                    PackageSizeInfo {
+                        name: blob.package_name.clone(),
+                        proportional_size: 0,
+                        used_space_in_blobfs: 0,
+                        blobs: vec![],
+                    }
                 });
             package_result.proportional_size += count.size / count.share_count;
             package_result.used_space_in_blobfs += count.size;

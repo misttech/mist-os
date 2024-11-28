@@ -52,7 +52,7 @@ async fn test_read_write<'a>(
 fn make_con() -> Result<(fasync::Socket, ConnectionProxy, ConnectionTransport), anyhow::Error> {
     let (data_stream, server_socket) = make_socket_pair()?;
     let (client_end, server_end) = endpoints::create_endpoints::<ConnectionMarker>();
-    let client_end = client_end.into_proxy().unwrap();
+    let client_end = client_end.into_proxy();
     let con = ConnectionTransport { data: server_socket, con: server_end };
     Ok((data_stream, client_end, con))
 }
@@ -68,9 +68,9 @@ async fn main() -> Result<(), Error> {
     vsock.listen(8002, acceptor_client2).await?.map_err(zx::Status::from_raw)?;
     let (acceptor_client3, acceptor3) = endpoints::create_endpoints::<AcceptorMarker>();
     vsock.listen(8003, acceptor_client3).await?.map_err(zx::Status::from_raw)?;
-    let mut acceptor = acceptor.into_stream()?;
-    let mut acceptor2 = acceptor2.into_stream()?;
-    let mut acceptor3 = acceptor3.into_stream()?;
+    let mut acceptor = acceptor.into_stream();
+    let mut acceptor2 = acceptor2.into_stream();
+    let mut acceptor3 = acceptor3.into_stream();
 
     let (mut data_stream, client_end, con) = make_con()?;
     let _port = vsock.connect(2, 8000, con).await?.map_err(zx::Status::from_raw)?;
@@ -83,7 +83,7 @@ async fn main() -> Result<(), Error> {
 
     // Wait for a connection
     let AcceptorRequest::Accept { addr: _, responder } =
-        acceptor.next().await.ok_or(format_err!("Failed to get incoming connection"))??;
+        acceptor.next().await.ok_or_else(|| format_err!("Failed to get incoming connection"))??;
     let (mut data_stream, client_end, con) = make_con()?;
     responder.send(Some(con))?;
 
@@ -94,8 +94,10 @@ async fn main() -> Result<(), Error> {
         .wait(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE)?;
 
     // Get next connection
-    let AcceptorRequest::Accept { addr: _, responder } =
-        acceptor2.next().await.ok_or(format_err!("Failed to get incoming connection"))??;
+    let AcceptorRequest::Accept { addr: _, responder } = acceptor2
+        .next()
+        .await
+        .ok_or_else(|| format_err!("Failed to get incoming connection"))??;
     let (mut data_stream, _client_end, con) = make_con()?;
     responder.send(Some(con))?;
     // Send data until the peer closes
@@ -112,8 +114,10 @@ async fn main() -> Result<(), Error> {
 
     // Get next connection
     {
-        let AcceptorRequest::Accept { addr: _, responder } =
-            acceptor3.next().await.ok_or(format_err!("Failed to get incoming connection"))??;
+        let AcceptorRequest::Accept { addr: _, responder } = acceptor3
+            .next()
+            .await
+            .ok_or_else(|| format_err!("Failed to get incoming connection"))??;
         let (mut data_stream, _client_end, con) = make_con()?;
         responder.send(Some(con))?;
         // Read some data then suddenly close the connection.

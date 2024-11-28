@@ -74,9 +74,9 @@ class UsbCdc : public UsbCdcType,
   zx_status_t UsbFunctionInterfaceSetConfigured(bool configured, usb_speed_t speed);
   zx_status_t UsbFunctionInterfaceSetInterface(uint8_t interface, uint8_t alt_setting);
 
-  zx_status_t insert_usb_request(usb::FidlRequest&& req, usb_endpoint::UsbEndpoint<UsbCdc>& ep);
+  zx_status_t insert_usb_request(usb::FidlRequest&& req, usb::EndpointClient<UsbCdc>& ep);
 
-  void usb_request_queue(usb::FidlRequest&& req, usb_endpoint::UsbEndpoint<UsbCdc>& ep);
+  void usb_request_queue(usb::FidlRequest&& req, usb::EndpointClient<UsbCdc>& ep);
 
   zx_status_t cdc_generate_mac_address();
   zx_status_t cdc_send_locked(ethernet_netbuf_t* netbuf) __TA_REQUIRES(tx_mutex_);
@@ -90,16 +90,16 @@ class UsbCdc : public UsbCdcType,
   fdf::SynchronizedDispatcher dispatcher_;
 
   // In-direction (TX to host).
-  usb_endpoint::UsbEndpoint<UsbCdc> intr_ep_{usb::EndpointType::INTERRUPT, this,
-                                             std::mem_fn(&UsbCdc::cdc_intr_complete)};
+  usb::EndpointClient<UsbCdc> intr_ep_{usb::EndpointType::INTERRUPT, this,
+                                       std::mem_fn(&UsbCdc::cdc_intr_complete)};
 
   // Out-direction (RX from host).
-  usb_endpoint::UsbEndpoint<UsbCdc> bulk_out_ep_{usb::EndpointType::BULK, this,
-                                                 std::mem_fn(&UsbCdc::cdc_rx_complete)};
+  usb::EndpointClient<UsbCdc> bulk_out_ep_{usb::EndpointType::BULK, this,
+                                           std::mem_fn(&UsbCdc::cdc_rx_complete)};
 
   // In-direction (TX to host).
-  usb_endpoint::UsbEndpoint<UsbCdc> bulk_in_ep_{usb::EndpointType::BULK, this,
-                                                std::mem_fn(&UsbCdc::cdc_tx_complete)};
+  usb::EndpointClient<UsbCdc> bulk_in_ep_{usb::EndpointType::BULK, this,
+                                          std::mem_fn(&UsbCdc::cdc_tx_complete)};
 
   list_node_t tx_pending_infos_ __TA_GUARDED(tx_mutex_) = {};  // list of ethernet_netbuf_t
 

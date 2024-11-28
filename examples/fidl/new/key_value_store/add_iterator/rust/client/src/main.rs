@@ -44,7 +44,7 @@ async fn main() -> Result<(), Error> {
         // This helper creates a channel, and returns two protocol ends: the `client_end` is already
         // conveniently bound to the correct FIDL protocol, `Iterator`, while the `server_end` is
         // unbound and ready to be sent over the wire.
-        let (iterator, server_end) = create_proxy::<IteratorMarker>()?;
+        let (iterator, server_end) = create_proxy::<IteratorMarker>();
 
         // There is no need to wait for the iterator to connect before sending the first `Get()`
         // request - since we already hold the `client_end` of the connection, we can start queuing

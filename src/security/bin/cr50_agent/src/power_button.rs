@@ -102,8 +102,7 @@ mod tests {
         }
 
         pub fn serve(self: Arc<Self>) -> MonitorProxy {
-            let (proxy, mut stream) =
-                fidl::endpoints::create_proxy_and_stream::<MonitorMarker>().unwrap();
+            let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<MonitorMarker>();
 
             Task::spawn(async move {
                 while let Some(req) = stream.try_next().await.unwrap() {

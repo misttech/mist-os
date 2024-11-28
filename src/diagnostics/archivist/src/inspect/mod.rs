@@ -422,15 +422,13 @@ mod tests {
                     service::spawn_tree_server(inspector_dup, TreeServerSendPreference::default())
                         .unwrap();
                 servers.push(server);
-                clients
-                    .entry(component_name.clone())
-                    .or_default()
-                    .push(client.into_proxy().unwrap());
+                clients.entry(component_name.clone()).or_default().push(client.into_proxy());
             }
         }
 
         let pipeline = Arc::new(Pipeline::for_test(None));
-        let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
+        let inspect_repo =
+            Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], fasync::Scope::new()));
 
         for (component, handles) in clients {
             let moniker = ExtendedMoniker::parse_str(&component).unwrap();
@@ -495,7 +493,8 @@ mod tests {
         let static_selectors_opt = Some(vec![child_1_1_selector, child_2_selector]);
 
         let pipeline = Arc::new(Pipeline::for_test(static_selectors_opt));
-        let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
+        let inspect_repo =
+            Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], fasync::Scope::new()));
 
         // The moniker here is made up since the selector is a glob
         // selector, so any path would match.
@@ -570,12 +569,14 @@ mod tests {
 
         let identity = Arc::new(ComponentIdentity::new(component_id, TEST_URL));
 
-        let (proxy, request_stream) = create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+        let (proxy, request_stream) = create_proxy_and_stream::<InspectSinkMarker>();
         proxy
             .publish(InspectSinkPublishRequest { tree: Some(tree_client), ..Default::default() })
             .unwrap();
 
-        let inspect_sink_server = Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo)));
+        let scope = fasync::Scope::new();
+        let inspect_sink_server =
+            Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo), scope.new_child()));
         Arc::clone(&inspect_sink_server).handle(Event {
             timestamp: zx::BootInstant::get(),
             payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
@@ -586,8 +587,7 @@ mod tests {
 
         drop(proxy);
 
-        inspect_sink_server.stop();
-        inspect_sink_server.wait_for_servers_to_complete().await;
+        scope.close().await;
 
         let expected_get_next_result_errors = match mode {
             VerifyMode::ExpectComponentFailure => 1u64,
@@ -780,8 +780,7 @@ mod tests {
             Arc::clone(&stats),
             trace_id,
         );
-        let (consumer, batch_iterator_requests) =
-            create_proxy_and_stream::<BatchIteratorMarker>().unwrap();
+        let (consumer, batch_iterator_requests) = create_proxy_and_stream::<BatchIteratorMarker>();
         (
             consumer,
             Task::spawn(async {

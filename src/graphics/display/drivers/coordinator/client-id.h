@@ -9,7 +9,7 @@
 
 #include <fbl/strong_int.h>
 
-namespace display {
+namespace display_coordinator {
 
 // Typesafe unique identifier for an active Coordinator client connection.
 //
@@ -21,6 +21,6 @@ DEFINE_STRONG_INT(ClientId, uint64_t);
 // Sentinel value that will never be associated with a client connection.
 constexpr ClientId kInvalidClientId(0);
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CLIENT_ID_H_

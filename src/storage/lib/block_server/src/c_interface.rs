@@ -33,6 +33,7 @@ impl SessionManager {
         {
             // We must drop references to sessions whilst we're not holding the lock for
             // `open_sessions` because `Session::drop` needs to take that same lock.
+            #[allow(clippy::collection_is_never_read)]
             let mut terminated_sessions = Vec::new();
             for (_, session) in &*self.open_sessions.lock().unwrap() {
                 if let Some(session) = session.upgrade() {
@@ -499,7 +500,7 @@ pub unsafe extern "C" fn block_server_serve(block_server: *const BlockServer, ha
     let block_server = &*block_server;
     let ehandle = &block_server.ehandle;
     let handle = zx::Handle::from_raw(handle);
-    ehandle.root_scope().spawn(async move {
+    ehandle.global_scope().spawn(async move {
         let _ = block_server
             .server
             .handle_requests(fvolume::VolumeRequestStream::from_channel(

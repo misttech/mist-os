@@ -13,10 +13,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
 use assembly_config_schema::{BoardInformation, BuildType, ICUConfig};
-use assembly_named_file_map::NamedFileMap;
-use assembly_util::{
-    BootfsDestination, CompiledPackageDestination, FileEntry, NamedMap, PackageSetDestination,
+use assembly_constants::{
+    BootfsDestination, CompiledPackageDestination, FileEntry, KernelArg, PackageSetDestination,
 };
+use assembly_named_file_map::NamedFileMap;
+use assembly_util::NamedMap;
 
 /// The platform's base service level.
 ///
@@ -247,7 +248,7 @@ pub(crate) trait ConfigurationBuilder {
 
     /// Add a kernel command line arg that should be included in the
     /// assembled platform.
-    fn kernel_arg(&mut self, arg: String);
+    fn kernel_arg(&mut self, arg: KernelArg);
 
     /// Packages compiled by subsystems to include in the assembled product.
     /// Example: the trusted apps package which is configured by the product
@@ -582,7 +583,7 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
     }
 
     fn add_domain_config(&mut self, name: PackageSetDestination) -> &mut dyn DomainConfigBuilder {
-        self.domain_configs.entry(name.clone()).or_insert_with_key(|name| DomainConfig {
+        self.domain_configs.entry(name).or_insert_with_key(|name| DomainConfig {
             directories: NamedMap::new("directories"),
             name: name.clone(),
             expose_directories: true,
@@ -613,8 +614,8 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
         self.configuration_capabilities.try_insert_unique(name.to_string(), config)
     }
 
-    fn kernel_arg(&mut self, arg: String) {
-        self.kernel_args.insert(arg);
+    fn kernel_arg(&mut self, arg: KernelArg) {
+        self.kernel_args.insert(arg.to_string());
     }
 
     fn compiled_package(

@@ -346,9 +346,9 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
 
   // initialization routines need to construct the singleton kernel address space
   // at a particular points in the bootup process
-  static void KernelAspaceInitPreHeap();
+  static void KernelAspaceInit();
   static VmAspace* kernel_aspace_;
-  friend void vm_init_preheap();
+  friend void vm_init();
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_ASPACE_H_

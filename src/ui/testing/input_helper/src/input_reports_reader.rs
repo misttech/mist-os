@@ -89,8 +89,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn serves_single_report() -> Result<(), Error> {
             let (proxy, request_stream) =
-                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader proxy and stream")?;
+                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>();
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
@@ -115,8 +114,7 @@ mod tests {
             let max_reports = usize::try_from(MAX_DEVICE_REPORT_COUNT)
                 .context("internal error converting MAX_DEVICE_REPORT_COUNT to usize")?;
             let (proxy, request_stream) =
-                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader proxy and stream")?;
+                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>();
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
@@ -144,8 +142,7 @@ mod tests {
             let max_reports = usize::try_from(MAX_DEVICE_REPORT_COUNT)
                 .context("internal error converting MAX_DEVICE_REPORT_COUNT to usize")?;
             let (proxy, request_stream) =
-                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader proxy and stream")?;
+                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>();
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
@@ -198,8 +195,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn resolves_to_ok_when_all_reports_are_written() -> Result<(), Error> {
             let (proxy, request_stream) =
-                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader proxy and stream")?;
+                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>();
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
@@ -216,8 +212,7 @@ mod tests {
         async fn resolves_to_err_when_request_stream_is_terminated_before_reports_are_written(
         ) -> Result<(), Error> {
             let (proxy, request_stream) =
-                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader proxy and stream")?;
+                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>();
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
@@ -232,8 +227,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn resolves_to_err_if_request_stream_yields_error() -> Result<(), Error> {
             let (client_end, request_stream) =
-                endpoints::create_request_stream::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader client_end and stream")?;
+                endpoints::create_request_stream::<InputReportsReaderMarker>();
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
@@ -253,8 +247,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn resolves_to_err_if_send_fails() -> Result<(), Error> {
             let (proxy, request_stream) =
-                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader proxy and stream")?;
+                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>();
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
@@ -271,8 +264,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn immediately_resolves_to_ok_when_reports_is_initially_empty() -> Result<(), Error> {
             let (_proxy, request_stream) =
-                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader proxy and stream")?;
+                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>();
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
@@ -292,8 +284,7 @@ mod tests {
         fn closes_channel_after_reports_are_consumed() -> Result<(), Error> {
             let mut executor = fasync::TestExecutor::new();
             let (proxy, request_stream) =
-                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader proxy and stream")?;
+                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>();
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
@@ -321,8 +312,7 @@ mod tests {
             let max_reports = usize::try_from(MAX_DEVICE_REPORT_COUNT)
                 .context("internal error converting MAX_DEVICE_REPORT_COUNT to usize")?;
             let (proxy, request_stream) =
-                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader proxy and stream")?;
+                endpoints::create_proxy_and_stream::<InputReportsReaderMarker>();
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
@@ -355,8 +345,7 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn preserves_report_order() -> Result<(), Error> {
         let (proxy, request_stream) =
-            endpoints::create_proxy_and_stream::<InputReportsReaderMarker>()
-                .context("creating InputReportsReader proxy and stream")?;
+            endpoints::create_proxy_and_stream::<InputReportsReaderMarker>();
         let (report_sender, report_receiver) = futures::channel::mpsc::unbounded::<InputReport>();
         let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();
         report_sender

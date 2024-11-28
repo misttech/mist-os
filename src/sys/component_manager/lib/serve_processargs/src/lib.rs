@@ -188,6 +188,7 @@ mod test_util {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
     use vfs::remote::RemoteLike;
+    use vfs::ObjectRequestRef;
 
     pub fn multishot() -> (Connector, Receiver) {
         let (receiver, sender) = Connector::new();
@@ -222,6 +223,20 @@ mod test_util {
                 scope.spawn(async move {
                     self.0.send((relative_path, server_end.into_channel())).await.unwrap();
                 });
+            }
+
+            fn open3(
+                self: Arc<Self>,
+                scope: ExecutionScope,
+                relative_path: Path,
+                _flags: fio::Flags,
+                object_request: ObjectRequestRef<'_>,
+            ) -> Result<(), zx::Status> {
+                let object_request = object_request.take();
+                scope.spawn(async move {
+                    self.0.send((relative_path, object_request.into_channel())).await.unwrap();
+                });
+                Ok(())
             }
 
             fn lazy(&self, path: &Path) -> bool {
@@ -511,7 +526,7 @@ mod tests {
         assert_eq!(entry.path.to_str().unwrap(), "/svc");
 
         // Check that there are the expected two protocols inside the svc directory.
-        let dir = entry.directory.into_proxy().unwrap();
+        let dir = entry.directory.into_proxy();
         let mut entries = fuchsia_fs::directory::readdir(&dir).await.unwrap();
         let mut expectation = vec![
             DirEntry { name: "fuchsia.Normal".to_string(), kind: fio::DirentType::Service },
@@ -568,7 +583,7 @@ mod tests {
         let entry = processargs.namespace_entries.pop().unwrap();
         assert_eq!(entry.path.to_str().unwrap(), "/svc");
 
-        let dir = entry.directory.into_proxy().unwrap();
+        let dir = entry.directory.into_proxy();
         let dir = dir.into_channel().unwrap().into_zx_channel();
 
         // Connect to the protocol using namespace functionality.
@@ -637,13 +652,13 @@ mod tests {
         // No request yet. Not until we write to the client endpoint.
         assert_matches!(exec.run_until_stalled(&mut receiver.recv()), Poll::Pending);
 
-        let dir = entry.directory.into_proxy().unwrap();
+        let dir = entry.directory.into_proxy();
         let dir = dir.into_channel().unwrap().into_zx_channel();
         let (client_end, server_end) = zx::Channel::create();
 
         // Test that the flags are passed correctly.
-        let flags_for_abc = fio::OpenFlags::DIRECTORY | fio::OpenFlags::DESCRIBE;
-        fdio::open_at_deprecated(&dir, "abc", flags_for_abc, server_end).unwrap();
+        let flags_for_abc = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION;
+        fdio::open_at(&dir, "abc", flags_for_abc, server_end).unwrap();
 
         // Capability is opened with "." and a `server_end`.
         let (relative_path, server_end) = exec.run_singlethreaded(&mut receiver.recv()).unwrap();
@@ -651,11 +666,11 @@ mod tests {
 
         // Verify there is an open message for "abc" with `flags_for_abc` on `server_end`.
         let server_end: ServerEnd<fio::DirectoryMarker> = server_end.into();
-        let mut stream = server_end.into_stream().unwrap();
+        let mut stream = server_end.into_stream();
         let request = exec.run_singlethreaded(&mut stream.try_next()).unwrap().unwrap();
         assert_matches!(
             &request,
-            fio::DirectoryRequest::Open { flags, path, .. }
+            fio::DirectoryRequest::Open3 { path, flags, .. }
             if path == "abc" && *flags == flags_for_abc
         );
 

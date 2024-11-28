@@ -35,7 +35,7 @@ use netstack3_ip::nud::{
     DelegateNudContext, NudConfigContext, NudContext, NudIcmpContext, NudSenderContext, NudState,
     NudUserConfig, UseDelegateNudContext,
 };
-use netstack3_ip::{self as ip};
+use netstack3_ip::IpDeviceEgressStateContext;
 use packet::{Buf, BufferMut, InnerPacketBuilder as _, Serializer};
 use packet_formats::ethernet::EtherType;
 use packet_formats::icmp::ndp::options::NdpOptionBuilder;
@@ -187,7 +187,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>
             Some(_) => lookup_addr,
             None => lookup_addr.to_solicited_node_address().into_specified(),
         };
-        let src_ip = ip::IpDeviceStateContext::<Ipv6>::get_local_addr_for_remote(
+        let src_ip = IpDeviceEgressStateContext::<Ipv6>::get_local_addr_for_remote(
             self,
             &device_id.clone().into(),
             Some(dst_ip),

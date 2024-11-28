@@ -101,7 +101,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_shutdown() {
         // Create and serve the mock service
-        let (dir, outgoing_dir) = fidl::endpoints::create_proxy::<DirectoryMarker>().unwrap();
+        let (dir, outgoing_dir) = fidl::endpoints::create_proxy::<DirectoryMarker>();
         let mock = MockSystemControllerService::new();
         let _task = fasync::Task::local(mock.clone().run_inner(outgoing_dir));
 

@@ -68,8 +68,8 @@ alias bazel=tools/bazel
 [concepts-driver-framework]: /docs/concepts/drivers/driver_framework.md
 [concepts-drivers]: /docs/concepts/drivers/README.md
 [driver-get-started]: https://fuchsia.googlesource.com/sdk-samples/drivers
-[driver-product-bundle]: /docs/development/sdk/ffx/start-the-fuchsia-emulator.md
-[guide-fuchsia-emulator]: /docs/development/sdk/ffx/start-the-fuchsia-emulator.md
+[driver-product-bundle]: /docs/development/tools/ffx/workflows/start-the-fuchsia-emulator.md
+[guide-fuchsia-emulator]: /docs/development/tools/ffx/workflows/start-the-fuchsia-emulator.md
 [guide-fundamentals]: /docs/get-started/sdk/learn/README.md
 [qemu]: https://www.qemu.org/
 [sdk-bug]: https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=Bazel

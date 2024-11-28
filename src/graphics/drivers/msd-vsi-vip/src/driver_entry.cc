@@ -1,19 +1,17 @@
-// Copyright 2017 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
-#include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fit/thread_safety.h>
 #include <lib/magma/platform/platform_handle.h>
-#include <lib/magma/platform/platform_logger.h>
+#include <lib/magma/platform/zircon/zircon_platform_device_dfv2.h>
+#include <lib/magma/platform/zircon/zircon_platform_logger_dfv2.h>
 #include <lib/magma/platform/zircon/zircon_platform_status.h>
 #include <lib/magma/util/short_macros.h>
-#include <lib/magma_service/sys_driver/dfv1/magma_device_impl.h>
+#include <lib/magma_service/sys_driver/magma_driver_base.h>
 #include <lib/magma_service/sys_driver/magma_system_device.h>
 #include <zircon/process.h>
 #include <zircon/time.h>
@@ -21,108 +19,46 @@
 
 #include <memory>
 
-#include <ddktl/device.h>
-#include <ddktl/fidl.h>
-#include <ddktl/protocol/empty-protocol.h>
-
-#include "lib/ddk/binding_driver.h"
+#include "parent_device_dfv2.h"
 
 #if MAGMA_TEST_DRIVER
-zx_status_t magma_indriver_test(zx_device_t* device);
+using MagmaDriverBaseType = msd::MagmaTestDriverBase;
+
+zx_status_t magma_indriver_test(ParentDeviceDfv2* device);
+
+#else
+using MagmaDriverBaseType = msd::MagmaProductionDriverBase;
 #endif
 
-namespace {
-
-class GpuDevice;
-
-using DdkDeviceType =
-    ddk::Device<GpuDevice, msd::MagmaDeviceImpl, ddk::Unbindable, ddk::Initializable>;
-
-msd::DeviceHandle* ZxDeviceToDeviceHandle(zx_device_t* device) {
-  return reinterpret_cast<msd::DeviceHandle*>(device);
-}
-
-class GpuDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_GPU> {
+class NpuDevice : public MagmaDriverBaseType {
  public:
-  explicit GpuDevice(zx_device_t* parent_device) : DdkDeviceType(parent_device) {}
+  NpuDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : MagmaDriverBaseType("vsi-vip", std::move(start_args), std::move(driver_dispatcher)),
+        parent_{.incoming_ = incoming()} {}
 
-  void DdkInit(ddk::InitTxn txn);
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
-
-  zx_status_t Init();
+  zx::result<> MagmaStart() override;
 
  private:
-  zx_status_t MagmaStart() FIT_REQUIRES(magma_mutex());
+  ParentDeviceDfv2 parent_;
 };
 
-zx_status_t GpuDevice::MagmaStart() {
-  set_magma_system_device(msd::MagmaSystemDevice::Create(
-      magma_driver(), magma_driver()->CreateDevice(ZxDeviceToDeviceHandle(parent()))));
-  if (!magma_system_device())
-    return DRET_MSG(ZX_ERR_NO_RESOURCES, "Failed to create device");
-  InitSystemDevice();
-  return ZX_OK;
-}
-
-void GpuDevice::DdkInit(ddk::InitTxn txn) {
-  set_zx_device(zxdev());
-  txn.Reply(InitChildDevices());
-}
-
-void GpuDevice::DdkUnbind(ddk::UnbindTxn txn) {
-  // This will tear down client connections and cause them to return errors.
-  MagmaStop();
-  txn.Reply();
-}
-
-void GpuDevice::DdkRelease() {
-  MAGMA_LOG(INFO, "Starting device_release");
-
-  delete this;
-  MAGMA_LOG(INFO, "Finished device_release");
-}
-
-zx_status_t GpuDevice::Init() {
-  std::lock_guard<std::mutex> lock(magma_mutex());
+zx::result<> NpuDevice::MagmaStart() {
+  std::lock_guard lock(magma_mutex());
   set_magma_driver(msd::Driver::Create());
-#if MAGMA_TEST_DRIVER
-  DLOG("running magma indriver test");
-  set_unit_test_status(magma_indriver_test(parent()));
-#endif
-
-  zx_status_t status = MagmaStart();
-  if (status != ZX_OK)
-    return status;
-
-  status = DdkAdd(ddk::DeviceAddArgs("magma_gpu").set_flags(DEVICE_ADD_NON_BINDABLE));
-  if (status != ZX_OK)
-    return DRET_MSG(status, "device_add failed");
-  return ZX_OK;
-}
-
-static zx_status_t driver_bind(void* context, zx_device_t* parent) {
-  MAGMA_LOG(INFO, "driver_bind: binding\n");
-  auto gpu = std::make_unique<GpuDevice>(parent);
-  if (!gpu)
-    return ZX_ERR_NO_MEMORY;
-
-  zx_status_t status = gpu->Init();
-  if (status != ZX_OK) {
-    return status;
+  if (!magma_driver()) {
+    DMESSAGE("Failed to create MagmaDriver");
+    return zx::error(ZX_ERR_INTERNAL);
   }
-  // DdkAdd in Init took ownership of device.
-  [[maybe_unused]] GpuDevice* ptr = gpu.release();
-  return ZX_OK;
+
+  set_magma_system_device(msd::MagmaSystemDevice::Create(
+      magma_driver(),
+      magma_driver()->CreateDevice(reinterpret_cast<msd::DeviceHandle*>(&parent_))));
+  if (!magma_system_device()) {
+    MAGMA_LOG(ERROR, "Failed to create device");
+    return zx::error(ZX_ERR_NO_RESOURCES);
+  }
+
+  return zx::ok();
 }
 
-}  // namespace
-
-zx_driver_ops_t msd_driver_ops = []() constexpr {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = driver_bind;
-  return ops;
-}();
-
-ZIRCON_DRIVER(magma_pdev_gpu, msd_driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(NpuDevice);

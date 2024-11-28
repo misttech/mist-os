@@ -5,7 +5,7 @@
 #[cfg(test)]
 pub mod test {
     use crate::{
-        new_bpf_type_identifier, BpfValue, DataWidth, EbpfHelper, EbpfProgramBuilder,
+        new_bpf_type_identifier, BpfValue, DataWidth, EbpfHelperImpl, EbpfProgramBuilder,
         EmptyPacketAccessor, FunctionSignature, MemoryParameterSize, NullVerifierLogger,
         PacketAccessor, Type, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC,
         BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H,
@@ -18,8 +18,8 @@ pub mod test {
     use pest::iterators::Pair;
     use pest::Parser;
     use pest_derive::Parser;
+    use std::collections::HashMap;
     use std::str::FromStr;
-    use std::sync::Arc;
     use test_case::test_case;
     use zerocopy::{FromBytes, IntoBytes};
 
@@ -887,162 +887,139 @@ pub mod test {
         }
 
         let malloc_id = new_bpf_type_identifier();
+        let mut helpers = HashMap::<u32, FunctionSignature>::new();
+        let mut helper_impls = HashMap::<u32, EbpfHelperImpl<()>>::new();
+        let mut add_helper = |id, signature, impl_| {
+            helpers.insert(id, signature);
+            helper_impls.insert(id, EbpfHelperImpl(impl_));
+        };
 
-        builder
-            .register(&EbpfHelper {
-                index: 0,
-                name: "gather_bytes",
-                function_pointer: Arc::new(gather_bytes),
-                signature: FunctionSignature {
-                    args: vec![
-                        Type::ScalarValueParameter,
-                        Type::ScalarValueParameter,
-                        Type::ScalarValueParameter,
-                        Type::ScalarValueParameter,
-                        Type::ScalarValueParameter,
-                    ],
-                    return_value: Type::unknown_written_scalar_value(),
-                    invalidate_array_bounds: false,
-                },
-            })
-            .expect("register");
-        builder
-            .register(&EbpfHelper {
-                index: 1,
-                name: "memfrob",
-                function_pointer: Arc::new(memfrob),
-                signature: FunctionSignature {
-                    args: vec![
-                        Type::MemoryParameter {
-                            size: MemoryParameterSize::Reference { index: 1 },
-                            input: true,
-                            output: true,
-                        },
-                        Type::ScalarValueParameter,
-                    ],
-                    return_value: Type::AliasParameter { parameter_index: 0 },
-                    invalidate_array_bounds: false,
-                },
-            })
-            .expect("register");
-        builder
-            .register(&EbpfHelper {
-                index: 2,
-                name: "trash_registers",
-                function_pointer: Arc::new(trash_registers),
-                signature: FunctionSignature {
-                    args: vec![],
-                    return_value: Type::unknown_written_scalar_value(),
-                    invalidate_array_bounds: false,
-                },
-            })
-            .expect("register");
-        builder
-            .register(&EbpfHelper {
-                index: 3,
-                name: "sqrti",
-                function_pointer: Arc::new(sqrti),
-                signature: FunctionSignature {
-                    args: vec![Type::ScalarValueParameter],
-                    return_value: Type::unknown_written_scalar_value(),
-                    invalidate_array_bounds: false,
-                },
-            })
-            .expect("register");
-        builder
-            .register(&EbpfHelper {
-                index: 4,
-                name: "strcmp_ext",
-                function_pointer: Arc::new(strcmp_ext),
-                signature: FunctionSignature {
-                    // Args cannot be correctly verified as the verifier cannot check the string
-                    // are correctly 0 terminated.
-                    args: vec![],
-                    return_value: Type::unknown_written_scalar_value(),
-                    invalidate_array_bounds: false,
-                },
-            })
-            .expect("register");
-        builder
-            .register(&EbpfHelper {
-                index: 100,
-                name: "null_or",
-                function_pointer: Arc::new(null_or),
-                signature: FunctionSignature {
-                    args: vec![Type::ScalarValueParameter],
-                    return_value: Type::NullOrParameter(Box::new(
-                        Type::unknown_written_scalar_value(),
-                    )),
-                    invalidate_array_bounds: false,
-                },
-            })
-            .expect("register");
-        builder
-            .register(&EbpfHelper {
-                index: 101,
-                name: "read_only",
-                function_pointer: Arc::new(read_only),
-                signature: FunctionSignature {
-                    args: vec![Type::MemoryParameter {
-                        size: MemoryParameterSize::Value(8),
+        add_helper(
+            0,
+            FunctionSignature {
+                args: vec![
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+            gather_bytes,
+        );
+        add_helper(
+            1,
+            FunctionSignature {
+                args: vec![
+                    Type::MemoryParameter {
+                        size: MemoryParameterSize::Reference { index: 1 },
                         input: true,
-                        output: false,
-                    }],
-                    return_value: Type::unknown_written_scalar_value(),
-                    invalidate_array_bounds: false,
-                },
-            })
-            .expect("register");
-        builder
-            .register(&EbpfHelper {
-                index: 102,
-                name: "write_only",
-                function_pointer: Arc::new(write_only),
-                signature: FunctionSignature {
-                    args: vec![
-                        Type::MemoryParameter {
-                            size: MemoryParameterSize::Value(8),
-                            input: false,
-                            output: true,
-                        },
-                        Type::ScalarValueParameter,
-                    ],
-                    return_value: Type::unknown_written_scalar_value(),
-                    invalidate_array_bounds: false,
-                },
-            })
-            .expect("register");
-        builder
-            .register(&EbpfHelper {
-                index: 103,
-                name: "malloc",
-                function_pointer: Arc::new(malloc),
-                signature: FunctionSignature {
-                    args: vec![Type::ScalarValueParameter],
-                    return_value: Type::NullOrParameter(Box::new(Type::ReleasableParameter {
-                        id: malloc_id.clone(),
-                        inner: Box::new(Type::MemoryParameter {
-                            size: MemoryParameterSize::Reference { index: 0 },
-                            input: true,
-                            output: true,
-                        }),
-                    })),
-                    invalidate_array_bounds: false,
-                },
-            })
-            .expect("register");
-        builder
-            .register(&EbpfHelper {
-                index: 104,
-                name: "free",
-                function_pointer: Arc::new(free),
-                signature: FunctionSignature {
-                    args: vec![Type::ReleaseParameter { id: malloc_id.clone() }],
-                    return_value: Type::unknown_written_scalar_value(),
-                    invalidate_array_bounds: false,
-                },
-            })
-            .expect("register");
+                        output: true,
+                    },
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::AliasParameter { parameter_index: 0 },
+                invalidate_array_bounds: false,
+            },
+            memfrob,
+        );
+        add_helper(
+            2,
+            FunctionSignature {
+                args: vec![],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+            trash_registers,
+        );
+        add_helper(
+            3,
+            FunctionSignature {
+                args: vec![Type::ScalarValueParameter],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+            sqrti,
+        );
+        add_helper(
+            4,
+            FunctionSignature {
+                // Args cannot be correctly verified as the verifier cannot check the string
+                // are correctly 0 terminated.
+                args: vec![],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+            strcmp_ext,
+        );
+        add_helper(
+            100,
+            FunctionSignature {
+                args: vec![Type::ScalarValueParameter],
+                return_value: Type::NullOrParameter(Box::new(Type::unknown_written_scalar_value())),
+                invalidate_array_bounds: false,
+            },
+            null_or,
+        );
+        add_helper(
+            101,
+            FunctionSignature {
+                args: vec![Type::MemoryParameter {
+                    size: MemoryParameterSize::Value(8),
+                    input: true,
+                    output: false,
+                }],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+            read_only,
+        );
+        add_helper(
+            102,
+            FunctionSignature {
+                args: vec![
+                    Type::MemoryParameter {
+                        size: MemoryParameterSize::Value(8),
+                        input: false,
+                        output: true,
+                    },
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+            write_only,
+        );
+        add_helper(
+            103,
+            FunctionSignature {
+                args: vec![Type::ScalarValueParameter],
+                return_value: Type::NullOrParameter(Box::new(Type::ReleasableParameter {
+                    id: malloc_id.clone(),
+                    inner: Box::new(Type::MemoryParameter {
+                        size: MemoryParameterSize::Reference { index: 0 },
+                        input: true,
+                        output: true,
+                    }),
+                })),
+                invalidate_array_bounds: false,
+            },
+            malloc,
+        );
+        add_helper(
+            104,
+            FunctionSignature {
+                args: vec![Type::ReleaseParameter { id: malloc_id.clone() }],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+            free,
+        );
+
+        builder.set_helpers(helpers);
+        builder.set_helper_impls(helper_impls);
 
         let program = builder.load(test_case.code, &mut NullVerifierLogger);
         if let Some(value) = test_case.result {

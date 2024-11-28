@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Context;
-use cm_rust::{FidlIntoNative, NativeIntoFidl, OfferDeclCommon};
+use cm_rust::{CapabilityTypeName, FidlIntoNative, NativeIntoFidl, OfferDeclCommon};
 use cm_types::{LongName, RelativePath};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd};
 use fidl_fuchsia_inspect::InspectSinkMarker;
@@ -13,12 +13,11 @@ use fuchsia_component::server as fserver;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::{join, FutureExt, StreamExt, TryStreamExt};
-use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use thiserror::Error;
 use tracing::*;
 use url::Url;
@@ -33,24 +32,57 @@ mod builtin;
 mod resolver;
 mod runner;
 
-lazy_static! {
-    pub static ref BINDER_EXPOSE_DECL: cm_rust::ExposeDecl =
-        cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-            source: cm_rust::ExposeSource::Framework,
-            source_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
-            #[cfg(fuchsia_api_level_at_least = "25")]
-            source_dictionary: Default::default(),
-            target: cm_rust::ExposeTarget::Parent,
-            target_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
-            // TODO(https://fxbug.dev/42058594): Support optional exposes.
-            availability: cm_rust::Availability::Required,
-        },);
+#[cfg(fuchsia_api_level_at_least = "25")]
+const DIAGNOSTICS_DICT_NAME: &str = "diagnostics";
 
-    static ref PROTOCOLS_ROUTED_TO_ALL: [cm_types::Name; 2] = [
-        cm_types::Name::from_str(LogSinkMarker::PROTOCOL_NAME).unwrap(),
-        cm_types::Name::from_str(InspectSinkMarker::PROTOCOL_NAME).unwrap(),
-    ];
-}
+static BINDER_EXPOSE_DECL: LazyLock<cm_rust::ExposeDecl> = LazyLock::new(|| {
+    cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
+        source: cm_rust::ExposeSource::Framework,
+        source_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
+        #[cfg(fuchsia_api_level_at_least = "25")]
+        source_dictionary: Default::default(),
+        target: cm_rust::ExposeTarget::Parent,
+        target_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
+        // TODO(https://fxbug.dev/42058594): Support optional exposes.
+        availability: cm_rust::Availability::Required,
+    })
+});
+
+#[cfg(fuchsia_api_level_at_least = "25")]
+static CAPABILITIES_ROUTED_TO_ALL: LazyLock<[(CapabilityTypeName, cm_types::Name); 3]> =
+    LazyLock::new(|| {
+        [
+            (
+                CapabilityTypeName::Dictionary,
+                cm_types::Name::from_str(DIAGNOSTICS_DICT_NAME).unwrap(),
+            ),
+            // TODO(https://fxbug.dev/345827642): remove the explicit routing of LogSink and InspectSink.
+            // Components should instead use these protocols from the diagnostics dictionary.
+            (
+                CapabilityTypeName::Protocol,
+                cm_types::Name::from_str(LogSinkMarker::PROTOCOL_NAME).unwrap(),
+            ),
+            (
+                CapabilityTypeName::Protocol,
+                cm_types::Name::from_str(InspectSinkMarker::PROTOCOL_NAME).unwrap(),
+            ),
+        ]
+    });
+
+#[cfg(fuchsia_api_level_less_than = "25")]
+static CAPABILITIES_ROUTED_TO_ALL: LazyLock<[(CapabilityTypeName, cm_types::Name); 2]> =
+    LazyLock::new(|| {
+        [
+            (
+                CapabilityTypeName::Protocol,
+                cm_types::Name::from_str(LogSinkMarker::PROTOCOL_NAME).unwrap(),
+            ),
+            (
+                CapabilityTypeName::Protocol,
+                cm_types::Name::from_str(InspectSinkMarker::PROTOCOL_NAME).unwrap(),
+            ),
+        ]
+    });
 
 #[fuchsia::main]
 async fn main() {
@@ -164,16 +196,7 @@ impl RealmBuilderFactory {
                         responder.send(Err(ftest::RealmBuilderError::UrlIsNotRelative))?;
                         continue;
                     }
-                    let pkg_dir = match pkg_dir_handle
-                        .into_proxy()
-                        .context("Failed to convert `pkg_dir` ClientEnd to proxy.")
-                    {
-                        Ok(pkg_dir) => pkg_dir,
-                        Err(err) => {
-                            responder.send(Err(ftest::RealmBuilderError::InvalidPkgDirHandle))?;
-                            return Err(err);
-                        }
-                    };
+                    let pkg_dir = pkg_dir_handle.into_proxy();
                     if let Err(e) = pkg_dir.query().await.context(
                         "Invoking `fuchsia.unknown/Queryable.query` on provided `pkg_dir` failed.",
                     ) {
@@ -207,9 +230,7 @@ impl RealmBuilderFactory {
                     builder_server_end,
                     responder,
                 } => {
-                    let pkg_dir = pkg_dir_handle
-                        .into_proxy()
-                        .context("Failed to convert `pkg_dir` ClientEnd to proxy.")?;
+                    let pkg_dir = pkg_dir_handle.into_proxy();
                     if let Err(err) = pkg_dir.query().await.context(
                         "Invoking `fuchsia.unknown/Queryable.query` on provided `pkg_dir` failed.",
                     ) {
@@ -241,9 +262,7 @@ impl RealmBuilderFactory {
         let runner_proxy_placeholder = Arc::new(Mutex::new(None));
         let realm_contents = Arc::new(Mutex::new(ManagedRealmContents::default()));
 
-        let realm_stream = realm_server_end
-            .into_stream()
-            .context("Failed to convert `realm_server_end` to stream.")?;
+        let realm_stream = realm_server_end.into_stream();
 
         let realm_has_been_built = Arc::new(AtomicBool::new(false));
 
@@ -265,16 +284,14 @@ impl RealmBuilderFactory {
             }
         });
 
-        let builder_stream = builder_server_end
-            .into_stream()
-            .context("Failed to convert `builder_server_end` to stream.")?;
+        let builder_stream = builder_server_end.into_stream();
 
         let builder = Builder {
             pkg_dir: Clone::clone(&pkg_dir),
             realm_node,
             registry: self.registry.clone(),
             runner: self.runner.clone(),
-            runner_proxy_placeholder: runner_proxy_placeholder.clone(),
+            runner_proxy_placeholder: runner_proxy_placeholder,
             realm_has_been_built: realm_has_been_built,
             realm_contents,
         };
@@ -334,9 +351,7 @@ impl Builder {
                         continue;
                     }
 
-                    let runner_proxy = runner
-                        .into_proxy()
-                        .context("failed to convert runner ClientEnd into proxy")?;
+                    let runner_proxy = runner.into_proxy();
                     *self.runner_proxy_placeholder.lock().await = Some(Clone::clone(&runner_proxy));
                     let res = self
                         .realm_node
@@ -672,7 +687,7 @@ impl Realm {
         let child_realm_node = RealmNode2::new_from_decl(
             new_decl_with_program_entries(vec![
                 (runner::LOCAL_COMPONENT_ID_KEY.to_string(), local_component_id.into()),
-                (ftest::LOCAL_COMPONENT_NAME_KEY.to_string(), child_path.join("/").to_string()),
+                (ftest::LOCAL_COMPONENT_NAME_KEY.to_string(), child_path.join("/")),
             ]),
             true,
         );
@@ -710,9 +725,7 @@ impl Realm {
 
         async move {
             let name: LongName = name.parse().map_err(|_| RealmBuilderError::ChildNameInvalid)?;
-            let child_realm_stream = child_realm_server_end
-                .into_stream()
-                .map_err(|e| RealmBuilderError::InvalidChildRealmHandle(name.to_string(), e))?;
+            let child_realm_stream = child_realm_server_end.into_stream();
             self_realm_node.add_child(name, options, child_realm_node).await?;
 
             self_execution_scope.spawn(async move {
@@ -818,9 +831,6 @@ impl Realm {
         let string_id: String = local_component_id.clone().into();
         let child_name: LongName =
             format!("read-only-directory-{}", string_id).parse().expect("should be valid name");
-
-        let mut child_path = self.realm_path.clone();
-        child_path.push(child_name.to_string());
 
         let child_realm_node = RealmNode2::new_from_decl(
             new_decl_with_program_entries(vec![(
@@ -943,9 +953,9 @@ impl RealmNodeState {
     /// Protocols are matched via their `target_name`.
     fn route_common_protocols_from_parent(&mut self) {
         for child in &self.decl.children {
-            for protocol in &*PROTOCOLS_ROUTED_TO_ALL {
+            for (type_name, capability_name) in &*CAPABILITIES_ROUTED_TO_ALL {
                 if self.decl.offers.iter().any(|offer| {
-                    offer.target_name() == protocol
+                    offer.target_name() == capability_name
                         && match offer.target() {
                             cm_rust::OfferTarget::Child(child_ref) => child_ref.name == child.name,
                             cm_rust::OfferTarget::Collection(_) => true,
@@ -954,20 +964,43 @@ impl RealmNodeState {
                 }) {
                     continue;
                 }
-
-                self.decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                    source: cm_rust::OfferSource::Parent,
-                    target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: child.name.clone(),
-                        collection: None,
-                    }),
-                    source_name: protocol.clone(),
+                let decl = match type_name {
+                    CapabilityTypeName::Protocol => {
+                        cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
+                            source: cm_rust::OfferSource::Parent,
+                            target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                                name: child.name.clone(),
+                                collection: None,
+                            }),
+                            source_name: capability_name.clone(),
+                            #[cfg(fuchsia_api_level_at_least = "25")]
+                            source_dictionary: Default::default(),
+                            target_name: capability_name.clone(),
+                            dependency_type: cm_rust::DependencyType::Strong,
+                            availability: cm_rust::Availability::Required,
+                        })
+                    }
                     #[cfg(fuchsia_api_level_at_least = "25")]
-                    source_dictionary: Default::default(),
-                    target_name: protocol.clone(),
-                    dependency_type: cm_rust::DependencyType::Strong,
-                    availability: cm_rust::Availability::Required,
-                }));
+                    CapabilityTypeName::Dictionary => {
+                        cm_rust::OfferDecl::Dictionary(cm_rust::OfferDictionaryDecl {
+                            source: cm_rust::OfferSource::Parent,
+                            target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                                name: child.name.clone(),
+                                collection: None,
+                            }),
+                            source_name: capability_name.clone(),
+                            source_dictionary: Default::default(),
+                            target_name: capability_name.clone(),
+                            dependency_type: cm_rust::DependencyType::Strong,
+                            availability: cm_rust::Availability::Required,
+                        })
+                    }
+                    _ => {
+                        unreachable!("we don't route other kinds of capabilities to all components")
+                    }
+                };
+
+                self.decl.offers.push(decl);
             }
         }
     }
@@ -1280,7 +1313,7 @@ impl RealmNode2 {
                     }
                 }
 
-                if is_parent_ref(target) {
+                if matches!(target, fcdecl::Ref::Parent(_)) {
                     match &capability {
                         ftest::Capability::Protocol(ftest::Protocol { availability, .. })
                         | ftest::Capability::Directory(ftest::Directory { availability, .. })
@@ -1313,6 +1346,9 @@ impl RealmNode2 {
                     let decl =
                         create_expose_decl(capability.clone(), from.clone(), ExposingIn::Realm)?;
                     push_if_not_present(&mut state_guard.decl.exposes, decl);
+                } else if matches!(target, fcdecl::Ref::Self_(_)) {
+                    let decl = create_use_decl(capability.clone(), from.clone())?;
+                    push_if_not_present(&mut state_guard.decl.uses, decl);
                 } else {
                     let decl = create_offer_decl(capability.clone(), from.clone(), target.clone())?;
                     push_if_not_present(&mut state_guard.decl.offers, decl);
@@ -1420,7 +1456,10 @@ async fn add_use_decl_if_needed(
     if let fcdecl::Ref::Child(child) = ref_ {
         if let Some(child) = realm.get_updateable_children().get(&FlyStr::new(&child.name)) {
             let mut decl = child.get_decl().await;
-            push_if_not_present(&mut decl.uses, create_use_decl(capability)?);
+            push_if_not_present(
+                &mut decl.uses,
+                create_use_decl(capability, fcdecl::Ref::Parent(fcdecl::ParentRef {}))?,
+            );
             let () = child.replace_decl(decl).await?;
         }
     }
@@ -1609,7 +1648,7 @@ fn create_capability_decl(
         _ => {
             return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
                 "Encountered unsupported capability variant: {:?}.",
-                capability.clone()
+                capability
             )));
         }
     })
@@ -1783,7 +1822,7 @@ fn create_offer_decl(
         _ => {
             return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
                 "Encountered unsupported capability variant: {:?}.",
-                capability.clone()
+                capability
             )));
         }
     })
@@ -1816,7 +1855,7 @@ fn create_expose_decl(
                 ExposingIn::Realm => try_into_target_name(&protocol.name, &protocol.as_)?,
             };
             cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-                source: source.clone(),
+                source: source,
                 source_name,
                 #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary,
@@ -1906,7 +1945,7 @@ fn create_expose_decl(
                 ExposingIn::Realm => try_into_target_name(&resolver.name, &resolver.as_)?,
             };
             cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
-                source: source.clone(),
+                source: source,
                 source_name,
                 #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary,
@@ -1924,7 +1963,7 @@ fn create_expose_decl(
                 ExposingIn::Realm => try_into_target_name(&runner.name, &runner.as_)?,
             };
             cm_rust::ExposeDecl::Runner(cm_rust::ExposeRunnerDecl {
-                source: source.clone(),
+                source: source,
                 source_name,
                 #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary,
@@ -1935,7 +1974,7 @@ fn create_expose_decl(
         _ => {
             return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
                 "Encountered unsupported capability variant: {:?}.",
-                capability.clone()
+                capability
             )));
         }
     })
@@ -1955,7 +1994,11 @@ fn check_and_unwrap_use_availability(
     }
 }
 
-fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, RealmBuilderError> {
+fn create_use_decl(
+    capability: ftest::Capability,
+    source: fcdecl::Ref,
+) -> Result<cm_rust::UseDecl, RealmBuilderError> {
+    let source: cm_rust::UseSource = source.fidl_into_native();
     Ok(match capability {
         ftest::Capability::Protocol(protocol) => {
             // If the capability was renamed in the parent's offer declaration, we want to use the
@@ -1972,7 +2015,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
                 .map(FidlIntoNative::fidl_into_native)
                 .unwrap_or(cm_rust::DependencyType::Strong);
             cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-                source: cm_rust::UseSource::Parent,
+                source,
                 source_name,
                 #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary,
@@ -1998,7 +2041,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
                 .map(FidlIntoNative::fidl_into_native)
                 .unwrap_or(cm_rust::DependencyType::Strong);
             cm_rust::UseDecl::Directory(cm_rust::UseDirectoryDecl {
-                source: cm_rust::UseSource::Parent,
+                source,
                 source_name,
                 #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary,
@@ -2013,6 +2056,9 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             })
         }
         ftest::Capability::Storage(storage) => {
+            if source != cm_rust::UseSource::Parent {
+                unreachable!("storage use source must be parent");
+            }
             // If the capability was renamed in the parent's offer declaration, we want to use the
             // post-rename version of it here.
             let source_name = try_into_target_name(&storage.name, &storage.as_)?;
@@ -2034,7 +2080,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
                 &service.path,
             )?;
             cm_rust::UseDecl::Service(cm_rust::UseServiceDecl {
-                source: cm_rust::UseSource::Parent,
+                source,
                 source_name,
                 #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary,
@@ -2050,8 +2096,8 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             let filter = event.filter.as_ref().cloned().map(FidlIntoNative::fidl_into_native);
             let target_path = try_into_capability_path(&event.path)?;
             cm_rust::UseDecl::EventStream(cm_rust::UseEventStreamDecl {
-                source: cm_rust::UseSource::Parent,
-                source_name: source_name.clone(),
+                source,
+                source_name,
                 target_path,
                 filter,
                 scope: event.scope.as_ref().cloned().map(FidlIntoNative::fidl_into_native),
@@ -2066,7 +2112,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             let source_dictionary = parse_relative_path(runner.from_dictionary)?;
 
             cm_rust::UseDecl::Runner(cm_rust::UseRunnerDecl {
-                source: cm_rust::UseSource::Parent,
+                source,
                 source_name,
                 source_dictionary,
             })
@@ -2074,7 +2120,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
         _ => {
             return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
                 "Encountered unsupported capability variant: {:?}.",
-                capability.clone()
+                capability
             )));
         }
     })
@@ -2090,13 +2136,6 @@ fn contains_child(realm: &RealmNodeState, ref_: &fcdecl::Ref) -> bool {
             .chain(realm.mutable_children.keys())
             .any(|name| child.name.as_str() == name.as_str()),
         _ => true,
-    }
-}
-
-fn is_parent_ref(ref_: &fcdecl::Ref) -> bool {
-    match ref_ {
-        fcdecl::Ref::Parent(_) => true,
-        _ => false,
     }
 }
 
@@ -2410,23 +2449,39 @@ mod tests {
         }
 
         fn add_recursive_automatic_decls(&mut self) {
-            let create_offer_decl = |child_name: &str, protocol: cm_types::Name| {
-                OfferBuilder::protocol()
-                    .name(protocol.as_str())
-                    .source(cm_rust::OfferSource::Parent)
-                    .target_static_child(child_name)
-                    .build()
-            };
+            let create_offer_decl =
+                |kind: CapabilityTypeName, child_name: &str, name: cm_types::Name| match kind {
+                    CapabilityTypeName::Protocol => OfferBuilder::protocol()
+                        .name(name.as_str())
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child(child_name)
+                        .build(),
+                    #[cfg(fuchsia_api_level_at_least = "25")]
+                    CapabilityTypeName::Dictionary => OfferBuilder::dictionary()
+                        .name(name.as_str())
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child(child_name)
+                        .build(),
+                    _ => unreachable!("we only call this with protocols and dictionaries"),
+                };
 
             for child in &self.decl.children {
-                for protocol in &*PROTOCOLS_ROUTED_TO_ALL {
-                    self.decl.offers.push(create_offer_decl(child.name.as_ref(), protocol.clone()));
+                for (kind, capability) in &*CAPABILITIES_ROUTED_TO_ALL {
+                    self.decl.offers.push(create_offer_decl(
+                        *kind,
+                        child.name.as_ref(),
+                        capability.clone(),
+                    ));
                 }
             }
 
             for (child_name, _, _) in &self.children {
-                for protocol in &*PROTOCOLS_ROUTED_TO_ALL {
-                    self.decl.offers.push(create_offer_decl(child_name.as_ref(), protocol.clone()));
+                for (kind, capability) in &*CAPABILITIES_ROUTED_TO_ALL {
+                    self.decl.offers.push(create_offer_decl(
+                        *kind,
+                        child_name.as_ref(),
+                        capability.clone(),
+                    ));
                 }
             }
 
@@ -2489,8 +2544,7 @@ mod tests {
             realm_contents,
         };
 
-        let (builder_proxy, builder_stream) =
-            create_proxy_and_stream::<ftest::BuilderMarker>().unwrap();
+        let (builder_proxy, builder_stream) = create_proxy_and_stream::<ftest::BuilderMarker>();
 
         let builder_stream_task = fasync::Task::local(async move {
             builder.handle_stream(builder_stream).await.expect("failed to handle builder stream");
@@ -2546,8 +2600,7 @@ mod tests {
 
     impl RealmAndBuilderTask {
         fn new() -> Self {
-            let (realm_proxy, realm_stream) =
-                create_proxy_and_stream::<ftest::RealmMarker>().unwrap();
+            let (realm_proxy, realm_stream) = create_proxy_and_stream::<ftest::RealmMarker>();
             let pkg_dir = fuchsia_fs::directory::open_in_namespace(
                 "/pkg",
                 fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_EXECUTABLE,
@@ -2588,7 +2641,7 @@ mod tests {
                 builder_task.await;
             });
             let (runner_client_end, runner_stream) =
-                create_request_stream::<fcrunner::ComponentRunnerMarker>().unwrap();
+                create_request_stream::<fcrunner::ComponentRunnerMarker>();
             Self {
                 realm_proxy,
                 builder_proxy,
@@ -2700,6 +2753,12 @@ mod tests {
         let mut expected_output_tree = ComponentTree {
             decl: ComponentDeclBuilder::new()
                 .offer(
+                    OfferBuilder::dictionary()
+                        .name(DIAGNOSTICS_DICT_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a"),
+                )
+                .offer(
                     OfferBuilder::protocol()
                         .name(LogSinkMarker::PROTOCOL_NAME)
                         .source(cm_rust::OfferSource::Parent)
@@ -2710,6 +2769,12 @@ mod tests {
                         .name(InspectSinkMarker::PROTOCOL_NAME)
                         .source(cm_rust::OfferSource::Parent)
                         .target_static_child("a"),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name(DIAGNOSTICS_DICT_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("b"),
                 )
                 .offer(
                     OfferBuilder::protocol()
@@ -2731,6 +2796,12 @@ mod tests {
                 ComponentTree {
                     decl: ComponentDeclBuilder::new()
                         .offer(
+                            OfferBuilder::dictionary()
+                                .name(DIAGNOSTICS_DICT_NAME)
+                                .source(cm_rust::OfferSource::Parent)
+                                .target_static_child("b_child_static"),
+                        )
+                        .offer(
                             OfferBuilder::protocol()
                                 .name(LogSinkMarker::PROTOCOL_NAME)
                                 .source(cm_rust::OfferSource::Parent)
@@ -2741,6 +2812,12 @@ mod tests {
                                 .name(InspectSinkMarker::PROTOCOL_NAME)
                                 .source(cm_rust::OfferSource::Parent)
                                 .target_static_child("b_child_static"),
+                        )
+                        .offer(
+                            OfferBuilder::dictionary()
+                                .name(DIAGNOSTICS_DICT_NAME)
+                                .source(cm_rust::OfferSource::Parent)
+                                .target_static_child("b_child_dynamic"),
                         )
                         .offer(
                             OfferBuilder::protocol()
@@ -3202,6 +3279,12 @@ mod tests {
 
         let mut expected_tree = ComponentTree {
             decl: ComponentDeclBuilder::new_empty_component()
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name(DIAGNOSTICS_DICT_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("realm_with_child"),
+                )
                 .offer(
                     OfferBuilder::protocol()
                         .name(LogSinkMarker::PROTOCOL_NAME)
@@ -4257,8 +4340,7 @@ mod tests {
     #[fuchsia::test]
     async fn add_child_to_child_realm() {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
-        let (child_realm_proxy, child_realm_server_end) =
-            create_proxy::<ftest::RealmMarker>().unwrap();
+        let (child_realm_proxy, child_realm_server_end) = create_proxy::<ftest::RealmMarker>();
         realm_and_builder_task
             .realm_proxy
             .add_child_realm("a", &ftest::ChildOptions::default(), child_realm_server_end)
@@ -4460,8 +4542,7 @@ mod tests {
     #[fuchsia::test]
     async fn add_local_child_to_child_realm() {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
-        let (child_realm_proxy, child_realm_server_end) =
-            create_proxy::<ftest::RealmMarker>().unwrap();
+        let (child_realm_proxy, child_realm_server_end) = create_proxy::<ftest::RealmMarker>();
         realm_and_builder_task
             .realm_proxy
             .add_child_realm("a", &ftest::ChildOptions::default(), child_realm_server_end)
@@ -4616,8 +4697,7 @@ mod tests {
     #[fuchsia::test]
     async fn all_functions_error_after_build() {
         let mut rabt = RealmAndBuilderTask::new();
-        let (child_realm_proxy, child_realm_server_end) =
-            create_proxy::<ftest::RealmMarker>().unwrap();
+        let (child_realm_proxy, child_realm_server_end) = create_proxy::<ftest::RealmMarker>();
         rabt.realm_proxy
             .add_child_realm("a", &ftest::ChildOptions::default(), child_realm_server_end)
             .await
@@ -4644,7 +4724,7 @@ mod tests {
         assert_err(rabt.realm_proxy.add_child("a", "test:///a", &empty_opts())).await;
         assert_err(rabt.realm_proxy.add_child_from_decl("a", &empty_decl(), &empty_opts())).await;
         assert_err(rabt.realm_proxy.add_local_child("a", &empty_opts())).await;
-        let (_child_realm_proxy, server_end) = create_proxy::<ftest::RealmMarker>().unwrap();
+        let (_child_realm_proxy, server_end) = create_proxy::<ftest::RealmMarker>();
         assert_err(rabt.realm_proxy.add_child_realm("a", &empty_opts(), server_end)).await;
         assert_err(rabt.realm_proxy.get_component_decl("b")).await;
         assert_err(rabt.realm_proxy.replace_component_decl("b", &empty_decl())).await;
@@ -4655,7 +4735,7 @@ mod tests {
         assert_err(child_realm_proxy.add_child("a", "test:///a", &empty_opts())).await;
         assert_err(child_realm_proxy.add_child_from_decl("a", &empty_decl(), &empty_opts())).await;
         assert_err(child_realm_proxy.add_local_child("a", &empty_opts())).await;
-        let (_child_realm_proxy, server_end) = create_proxy::<ftest::RealmMarker>().unwrap();
+        let (_child_realm_proxy, server_end) = create_proxy::<ftest::RealmMarker>();
         assert_err(child_realm_proxy.add_child_realm("a", &empty_opts(), server_end)).await;
         assert_err(child_realm_proxy.get_component_decl("b")).await;
         assert_err(child_realm_proxy.replace_component_decl("b", &empty_decl())).await;

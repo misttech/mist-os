@@ -39,7 +39,7 @@ struct Gt6853InputReport {
 
   void ToFidlInputReport(
       fidl::WireTableBuilder<fuchsia_input_report::wire::InputReport>& input_report,
-      fidl::AnyArena& allocator);
+      fidl::AnyArena& allocator) const;
 };
 
 class Gt6853Device;

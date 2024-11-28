@@ -64,11 +64,6 @@ where
         async move {
             while let Some(req) = stream.next().await {
                 match req.unwrap() {
-                    fio::DirectoryRequest::Clone { flags, object, control_handle: _ } => {
-                        let stream = object.into_stream().unwrap().cast_stream();
-                        mock_filesystem::describe_dir(flags, &stream);
-                        fasync::Task::spawn(Arc::clone(&self).handle_stream(stream)).detach();
-                    }
                     fio::DirectoryRequest::Open {
                         flags,
                         mode: _,
@@ -99,8 +94,7 @@ where
                             )
                         });
                     }
-                    fio::DirectoryRequest::Close { .. } => (),
-                    req => panic!("DirectoryStreamHandler unhandled request {:?}", req),
+                    request => panic!("Unhandled fuchsia.io/Directory request: {request:?}"),
                 }
             }
         }
@@ -147,7 +141,7 @@ impl OpenRequestHandler for OpenFailOrTempFs {
     ) {
         if self.should_fail() {
             if path == "." {
-                let stream = object.into_stream().unwrap().cast_stream();
+                let stream = object.into_stream().cast_stream();
                 mock_filesystem::describe_dir(flags, &stream);
                 fasync::Task::spawn(parent.handle_stream(stream)).detach();
             } else {
@@ -155,12 +149,10 @@ impl OpenRequestHandler for OpenFailOrTempFs {
             }
         } else {
             let (tempdir_proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            fdio::open_deprecated(
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            fdio::open(
                 self.tempdir.path().to_str().unwrap(),
-                fio::OpenFlags::DIRECTORY
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE,
                 server_end.into_channel(),
             )
             .unwrap();
@@ -196,8 +188,7 @@ impl OpenRequestHandler for OpenFailOrTempFs {
             Ok(())
         } else {
             let (tempdir_proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .map_err(|_e| Status::INTERNAL)?;
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             fuchsia_fs::directory::open_channel_in_namespace(
                 self.tempdir.path().to_str().unwrap(),
                 fio::PERM_READABLE | fio::PERM_WRITABLE,
@@ -232,14 +223,11 @@ impl WriteFailOrTempFs {
     fn new_failing(files_to_fail_writes: Vec<String>) -> Arc<Self> {
         let tempdir = tempfile::tempdir().expect("/tmp to exist");
 
-        let (tempdir_proxy, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (tempdir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
-        fdio::open_deprecated(
+        fdio::open(
             tempdir.path().to_str().unwrap(),
-            fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE,
             server_end.into_channel(),
         )
         .expect("open temp directory");
@@ -275,7 +263,7 @@ impl OpenRequestHandler for WriteFailOrTempFs {
         parent: Arc<DirectoryStreamHandler<Self>>,
     ) {
         if path == "." && self.should_fail() {
-            let stream = object.into_stream().unwrap().cast_stream();
+            let stream = object.into_stream().cast_stream();
             mock_filesystem::describe_dir(flags, &stream);
             fasync::Task::spawn(parent.handle_stream(stream)).detach();
             return;
@@ -293,12 +281,11 @@ impl OpenRequestHandler for WriteFailOrTempFs {
 
         let (file_requests, file_control_handle) =
             ServerEnd::<fio::FileMarker>::new(object.into_channel())
-                .into_stream_and_control_handle()
-                .expect("split file server end");
+                .into_stream_and_control_handle();
 
         // Create a proxy to the actual file we'll open to proxy to.
         let (backing_node_proxy, backing_node_server_end) =
-            fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
         self.tempdir_proxy
             .open(flags, fio::ModeType::empty(), &path, backing_node_server_end)
@@ -357,12 +344,11 @@ impl OpenRequestHandler for WriteFailOrTempFs {
         // to the backing file instead to our FailingWriteFileStreamHandler.
         let (file_requests, file_control_handle) =
             ServerEnd::<fio::FileMarker>::new(object_request.take().into_channel())
-                .into_stream_and_control_handle()
-                .map_err(|_| Status::INTERNAL)?;
+                .into_stream_and_control_handle();
 
         // Create a proxy to the actual file we'll open to proxy to.
         let (backing_node_proxy, backing_node_server_end) =
-            fidl::endpoints::create_proxy::<fio::NodeMarker>().map_err(|_| Status::INTERNAL)?;
+            fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
         self.tempdir_proxy
             .open3(&path, flags, &object_request.options(), backing_node_server_end.into_channel())
@@ -525,13 +511,10 @@ impl OpenRequestHandler for RenameFailOrTempFs {
         parent: Arc<DirectoryStreamHandler<Self>>,
     ) {
         // Set up proxy to tmpdir and delegate to it on success.
-        let (tempdir_proxy, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        fdio::open_deprecated(
+        let (tempdir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        fdio::open(
             self.tempdir.path().to_str().unwrap(),
-            fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE,
             server_end.into_channel(),
         )
         .unwrap();
@@ -543,7 +526,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
         // Prepare to handle the directory requests. We must call describe_dir, which sends an
         // OnOpen if OPEN_FLAG_DESCRIBE is set. Otherwise, the code will hang when reading from
         // the stream.
-        let mut stream = object.into_stream().unwrap().cast_stream();
+        let mut stream = object.into_stream().cast_stream();
         mock_filesystem::describe_dir(flags, &stream);
         let fail_count = Arc::clone(&self.fail_count);
         let files_to_fail_renames = Clone::clone(&self.files_to_fail_renames);
@@ -621,8 +604,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
         parent: Arc<DirectoryStreamHandler<Self>>,
     ) -> Result<(), Status> {
         // Set up proxy to tmpdir and delegate to it on success.
-        let (tempdir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .map_err(|_e| Status::INTERNAL)?;
+        let (tempdir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         fuchsia_fs::directory::open_channel_in_namespace(
             self.tempdir.path().to_str().unwrap(),
             fio::PERM_READABLE | fio::PERM_WRITABLE,
@@ -720,8 +702,7 @@ async fn create_testenv_serves_repo<H: OpenRequestHandler + Send + Sync + 'stati
 ) -> (TestEnv, RepositoryConfig, Package, ServedRepository) {
     // Create testenv with failing isolated-persistent-storage
     let directory_handler = Arc::new(DirectoryStreamHandler::new(open_handler));
-    let (proxy, stream) =
-        fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+    let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
     fasync::Task::spawn(directory_handler.handle_stream(stream)).detach();
     let env = TestEnvBuilder::new()
         .mounts(
@@ -812,7 +793,7 @@ async fn verify_pkg_resolution_succeeds_during_minfs_repo_config_and_rewrite_rul
 
     // Add repo config and rewrite rules
     let () = env.proxies.repo_manager.add(&config.clone().into()).await.unwrap().unwrap();
-    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
+    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
     let rule = Rule::new("should-be-rewritten", "example.com", "/", "/").unwrap();
     let () = edit_transaction.add(&rule.clone().into()).await.unwrap().unwrap();
@@ -833,7 +814,7 @@ async fn verify_pkg_resolution_succeeds_during_minfs_repo_config_and_rewrite_rul
     // the failure count doesn't change.
     make_succeed_fn();
     let () = env.proxies.repo_manager.add(&config.clone().into()).await.unwrap().unwrap();
-    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
+    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
     let () = edit_transaction.add(&rule.clone().into()).await.unwrap().unwrap();
     let () = edit_transaction.commit().await.unwrap().unwrap();

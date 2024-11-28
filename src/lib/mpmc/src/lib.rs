@@ -100,7 +100,7 @@ impl<T: Clone> Clone for Receiver<T> {
     fn clone(&self) -> Self {
         if let Some(sender_set) = self.sources.upgrade() {
             let (sender, receiver) = mpsc::channel(self.buffer_size);
-            let sources = sender_set.clone();
+            let sources = sender_set;
             sources.push(sender);
             Self {
                 sources: Arc::downgrade(&sources),

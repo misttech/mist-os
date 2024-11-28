@@ -24,7 +24,7 @@ async fn get_driver_info(
     driver_filter: &[String],
 ) -> Result<Vec<fdf::DriverInfo>> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>();
 
     service
         .get_driver_info(driver_filter, iterator_server)

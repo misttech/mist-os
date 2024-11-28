@@ -406,7 +406,7 @@ pub(super) async fn serve_view(
         .try_fold(sink, |mut sink, request| async move {
             match request {
                 ViewRequest::OpenEntryIterator { it, options, control_handle: _ } => sink
-                    .send(NewWatcher { stream: it.into_stream()?, options })
+                    .send(NewWatcher { stream: it.into_stream(), options })
                     .await
                     .map_err(|_: mpsc::SendError| Error::Send(WorkerClosedError))?,
             }

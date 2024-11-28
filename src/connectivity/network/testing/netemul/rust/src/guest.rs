@@ -55,10 +55,7 @@ impl Controller {
             .map_err(|err| {
                 anyhow::anyhow!(format!("create guest error for guest {}: {:?}", name, err))
             })?;
-        Ok(Controller {
-            guest: Some(guest.into_proxy().context("failed to convert guest to proxy")?),
-            name,
-        })
+        Ok(Controller { guest: Some(guest.into_proxy()), name })
     }
 
     fn proxy(&self) -> &fnetemul_guest::GuestProxy {
@@ -70,12 +67,8 @@ impl Controller {
     pub async fn put_file(&self, local_path: &str, remote_path: &str) -> Result {
         let (file_client_end, file_server_end) =
             fidl::endpoints::create_endpoints::<fio::FileMarker>();
-        fdio::open_deprecated(
-            &local_path,
-            fio::OpenFlags::RIGHT_READABLE,
-            file_server_end.into_channel(),
-        )
-        .with_context(|| format!("failed to open file '{}'", local_path))?;
+        fdio::open(&local_path, fio::PERM_READABLE, file_server_end.into_channel())
+            .with_context(|| format!("failed to open file '{}'", local_path))?;
         let status = self
             .proxy()
             .put_file(file_client_end, remote_path)
@@ -94,9 +87,9 @@ impl Controller {
     pub async fn get_file(&self, local_path: &str, remote_path: &str) -> Result {
         let (file_client_end, file_server_end) =
             fidl::endpoints::create_endpoints::<fio::FileMarker>();
-        fdio::open_deprecated(
+        fdio::open(
             &local_path,
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+            fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE,
             file_server_end.into_channel(),
         )
         .with_context(|| format!("failed to open file '{}'", local_path))?;
@@ -156,8 +149,7 @@ impl Controller {
         let (stderr_local, stderr_remote) = zx::Socket::create_stream();
 
         let (command_listener_client, command_listener_server) =
-            fidl::endpoints::create_proxy::<fguest_interaction::CommandListenerMarker>()
-                .context("failed to create CommandListener proxy")?;
+            fidl::endpoints::create_proxy::<fguest_interaction::CommandListenerMarker>();
         let (stdin_local, stdin_remote) = match input {
             Some(input) => {
                 let (stdin_local, stdin_remote) = zx::Socket::create_stream();

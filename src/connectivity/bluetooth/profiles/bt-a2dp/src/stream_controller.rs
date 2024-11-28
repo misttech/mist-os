@@ -18,7 +18,7 @@ use futures::stream::{SelectAll, Stream};
 use futures::{select, StreamExt};
 use std::cell::RefCell;
 use std::sync::{Arc, Weak};
-use tracing::{info, trace, warn};
+use tracing::{info, trace};
 
 /// An interface for managing the state of streaming connections with remote peers.
 pub trait StreamController {
@@ -108,16 +108,7 @@ fn handle_suspend_request<SC: StreamController>(
     info!("Received a2dp.Controller FIDL request to suspend for peer {:?}", peer_id);
 
     let id = peer_id.map(|id| (*id).into());
-    let stream = match token.into_stream() {
-        Ok(st) => st,
-        Err(e) => {
-            if !e.is_closed() {
-                warn!("StreamSuspender channel closed with unexpected error: {:?}", e);
-            }
-            let _ = responder.send();
-            return None;
-        }
-    };
+    let stream = token.into_stream();
 
     // Request to suspend the stream via the `controller`. The lifetime of the returned Token
     // will be tied to that of the FIDL client's suspend `stream`.
@@ -253,7 +244,7 @@ mod tests {
     fn setup_server_and_mock_controller(
         should_error: bool,
     ) -> (fasync::Task<()>, ControllerProxy, mpsc::Receiver<Event>) {
-        let (c, s) = create_proxy_and_stream::<ControllerMarker>().unwrap();
+        let (c, s) = create_proxy_and_stream::<ControllerMarker>();
         let (controller, test_events) = MockStreamController::new(should_error);
 
         let _server_task =
@@ -287,7 +278,7 @@ mod tests {
         controller_svc: &ControllerProxy,
         id: Option<PeerId>,
     ) -> (QueryResponseFut<()>, StreamSuspenderProxy) {
-        let (c, s) = create_proxy::<StreamSuspenderMarker>().unwrap();
+        let (c, s) = create_proxy::<StreamSuspenderMarker>();
         let peer_id: Option<fidl_fuchsia_bluetooth::PeerId> = id.map(|id| id.into());
         let fidl_req = controller_svc
             .suspend(peer_id.as_ref(), s)
@@ -451,7 +442,7 @@ mod tests {
 
         // Client wants to suspend stream for some peer but closes token before sending the request.
         let remote_id = PeerId(11);
-        let (c, s) = create_proxy::<StreamSuspenderMarker>().unwrap();
+        let (c, s) = create_proxy::<StreamSuspenderMarker>();
         drop(c);
         let fidl_request = controller_svc
             .suspend(Some(remote_id.into()).as_ref(), s)

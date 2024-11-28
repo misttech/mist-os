@@ -138,7 +138,7 @@ TEST_F(BeaconLostTest, BeaconTooFarDisassocTest) {
   // A deauth should have occurred due to moving away from the AP
   ASSERT_EQ(client_ifc_.stats_.deauth_indications.size(), 1U);
   auto deauth_ind = *client_ifc_.stats_.deauth_indications.begin();
-  EXPECT_TRUE(deauth_ind.locally_initiated);
+  EXPECT_TRUE(deauth_ind.locally_initiated());
 }
 
 // Verify that losing a beacon from an unassociated ap does not cause any disassociation

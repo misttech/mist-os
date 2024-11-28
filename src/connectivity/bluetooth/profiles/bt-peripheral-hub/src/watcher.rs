@@ -55,7 +55,7 @@ mod tests {
     ) -> (impl Future<Output = Result<(), Error>>, WatcherProxy, Arc<PeripheralState>) {
         let shared_state = Arc::new(PeripheralState::new());
         let server = Watcher::new(shared_state.clone());
-        let (c, s) = fidl::endpoints::create_proxy_and_stream::<WatcherMarker>().unwrap();
+        let (c, s) = fidl::endpoints::create_proxy_and_stream::<WatcherMarker>();
         let server_task = server.run(s);
 
         (server_task, c, shared_state)

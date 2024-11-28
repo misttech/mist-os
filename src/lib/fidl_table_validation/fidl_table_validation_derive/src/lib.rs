@@ -136,7 +136,7 @@ fn fidl_table_validator(span: Span, attrs: &[Attribute]) -> Result<Option<Ident>
             Meta::Path(fidl_table_validator) => fidl_table_validator
                 .get_ident()
                 .cloned()
-                .ok_or(Error::new(fidl_table_validator.span(), "Invalid Identifier")),
+                .ok_or_else(|| Error::new(fidl_table_validator.span(), "Invalid Identifier")),
             _ => Err(Error::new(
                 span,
                 concat!(

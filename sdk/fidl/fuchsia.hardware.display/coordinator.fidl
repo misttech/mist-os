@@ -302,7 +302,7 @@ closed protocol Coordinator {
         val float32;
     });
 
-    /// Configures the layer as a color layer with the given color.
+    /// Configures the layer as a solid color fill layer.
     ///
     /// It is illegal to call this on an invalid layer.
     strict SetLayerColorConfig(struct {
@@ -314,9 +314,6 @@ closed protocol Coordinator {
     ///
     /// If wait_event_id corresponds to an imported event, the driver will
     /// wait for ZX_EVENT_SIGNALED on the object before presenting the image.
-    ///
-    /// If signal_event_id is valid, then the driver will signal the event with
-    /// ZX_EVENT_SIGNALED when the image is no longer being presented.
     ///
     /// A layer's active image is the most recently applied image which either has
     /// no wait event or whose wait event has been signaled. Whenever a new image
@@ -334,8 +331,8 @@ closed protocol Coordinator {
     /// An image cannot be used for multiple layers simultaneously, nor can an
     /// image be given back to the display coordinator while it is still in use.
     /// An image is considered in use when it is part of a pending configuration
-    /// or from when its configuration is applied until its signal_event_id is
-    /// signaled.
+    /// or from when its configuration is applied until it is replaced by a
+    /// subsequent configuration that is *displayed* (not merely applied).
     ///
     /// It is illegal to call this with an invalid layer or image id, to
     /// call it on a color layer, or to call it with an image and layer whose
@@ -343,11 +340,10 @@ closed protocol Coordinator {
     /// with an image layer that has no image (note that is is not illegal to
     /// validate such a configuration). It is illegal to reuse a wait event which
     /// another layer that has not been presented is waiting on.
-    strict SetLayerImage(struct {
+    strict SetLayerImage2(struct {
         layer_id LayerId;
         image_id ImageId;
         wait_event_id EventId;
-        signal_event_id EventId;
     });
 
     /// Attempts to validate the current configuration.
@@ -358,7 +354,7 @@ closed protocol Coordinator {
     ///
     /// Most SetX operations require revalidating the configuration. The
     /// following operations do not require revalidation.
-    /// * SetLayerImage()
+    /// * SetLayerImage2()
     ///
     /// If discard is true, the pending changes will be discarded after validation.
     strict CheckConfig(struct {

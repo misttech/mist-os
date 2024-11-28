@@ -220,7 +220,7 @@ async fn create_zxcrypt_key() -> Result<([u8; 16], Vec<u8>, Vec<u8>), zx::Status
 async fn with_crypt_service<R, Fut: Future<Output = Result<R, Error>>>(
     f: impl FnOnce(ClientEnd<fidl_fuchsia_fxfs::CryptMarker>) -> Fut,
 ) -> Result<R, Error> {
-    let (crypt, mut stream) = create_request_stream::<fidl_fuchsia_fxfs::CryptMarker>()?;
+    let (crypt, mut stream) = create_request_stream::<fidl_fuchsia_fxfs::CryptMarker>();
 
     // Run a crypt service to unwrap the zxcrypt keys.
     let mut crypt_service = pin!(async {
@@ -286,7 +286,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_keys() {
         with_crypt_service(|crypt| async {
-            let crypt = crypt.into_proxy().unwrap();
+            let crypt = crypt.into_proxy();
             let (_, key, unwrapped_key) = crypt
                 .create_key(0, fidl_fuchsia_fxfs::KeyPurpose::Data)
                 .await

@@ -309,7 +309,7 @@ impl CtapDevice for Device<FidlConnection, OsRng> {
     async fn device(dir_proxy: &fio::DirectoryProxy, entry_path: &PathBuf) -> Result<Self, Error> {
         let device_path =
             entry_path.to_str().context(format_err!("Failed to get entry path as a string."))?;
-        let (device_proxy, server) = fidl::endpoints::create_proxy::<SecurityKeyDeviceMarker>()?;
+        let (device_proxy, server) = fidl::endpoints::create_proxy::<SecurityKeyDeviceMarker>();
         fdio::service_connect_at(
             dir_proxy.as_channel().as_ref(),
             &device_path,

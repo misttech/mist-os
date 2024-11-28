@@ -16,6 +16,8 @@
 
 namespace dl::testing {
 
+extern const ld::abi::Abi<>& gStartupLdAbi;
+
 // The Base class provides testing facilities and logic specific to the platform
 // the test is running on. DlImplTests invokes Base methods when functions
 // need to operate differently depending on the OS.
@@ -30,14 +32,18 @@ class DlImplTests : public Base {
   static constexpr bool kSupportsNoLoadMode = false;
   // TODO(https://fxbug.dev/342480690): Support TLS
   static constexpr bool kSupportsTls = false;
-  // TODO(https://fxbug.dev/324136831): Support startup modules
-  static constexpr bool kSupportsStartupModules = false;
+
+  void SetUp() override {
+    fbl::AllocChecker ac;
+    dynamic_linker_ = RuntimeDynamicLinker::Create(gStartupLdAbi, ac);
+    ASSERT_TRUE(ac.check());
+  }
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were
     // satisfied and then clear the expectation set.
     auto verify_expectations = fit::defer([&]() { Base::VerifyAndClearNeeded(); });
-    auto result = dynamic_linker_.Open<typename Base::Loader>(
+    auto result = dynamic_linker_->Open<typename Base::Loader>(
         file, mode, std::bind_front(&Base::RetrieveFile, this));
     if (result.is_ok()) {
       Base::TrackModule(result.value(), std::string{file});
@@ -50,7 +56,7 @@ class DlImplTests : public Base {
     auto untrack_file = fit::defer([&]() { Base::UntrackModule(module); });
     // At minimum check that a valid handle was passed and present in the
     // dynamic linker's list of modules.
-    for (auto& m : dynamic_linker_.modules()) {
+    for (auto& m : dynamic_linker_->modules()) {
       if (&m == module) {
         return fit::ok();
       }
@@ -60,15 +66,15 @@ class DlImplTests : public Base {
 
   fit::result<Error, void*> DlSym(void* module, const char* ref) {
     const RuntimeModule* root = static_cast<RuntimeModule*>(module);
-    return dynamic_linker_.LookupSymbol(*root, ref);
+    return dynamic_linker_->LookupSymbol(*root, ref);
   }
 
-  // The `dynamic_linker_` dtor will also destroy and unmap modules remaining in
+  // The `dynamic_linker_-> dtor will also destroy and unmap modules remaining in
   // its modules list, so there is no need to do any extra clean up operation.
   void CleanUpOpenedFile(void* ptr) override {}
 
  private:
-  RuntimeDynamicLinker dynamic_linker_;
+  std::unique_ptr<RuntimeDynamicLinker> dynamic_linker_;
 };
 
 using DlImplLoadPosixTests = DlImplTests<DlLoadTestsBase>;

@@ -643,7 +643,6 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 
         server_end
             .into_stream()
-            .unwrap()
             .map(|result| result.context("failed fbinder::ContainerPowerControllerRequest request"))
             .try_for_each_concurrent(None, |event| {
                 handle_request(event, &proxy_event, &kernel, service_name)
@@ -1271,15 +1270,14 @@ mod tests {
                 x => panic!("Expected a start request, got: {x:?}"),
             };
 
-        let lutex_controller = lutex_controller_client_end.into_proxy().expect("into_proxy");
+        let lutex_controller = lutex_controller_client_end.into_proxy();
 
         let (process_accessor_client_end, process_accessor_server_end) =
             create_endpoints::<fbinder::ProcessAccessorMarker>();
         let process_accessor_task =
             fasync::Task::local(run_process_accessor(process_accessor_server_end));
 
-        let (binder, binder_server_end) =
-            create_proxy::<fbinder::BinderMarker>().expect("create_proxy");
+        let (binder, binder_server_end) = create_proxy::<fbinder::BinderMarker>();
 
         let process =
             fuchsia_runtime::process_self().duplicate(zx::Rights::SAME_RIGHTS).expect("process");
@@ -1414,8 +1412,7 @@ mod tests {
     async fn container_power_controller() {
         let (kernel, _init_task) = create_kernel_and_task();
 
-        let (power_controller, power_controller_server_end) =
-            fidl::endpoints::create_proxy().unwrap();
+        let (power_controller, power_controller_server_end) = fidl::endpoints::create_proxy();
         let (event, event_remote) = zx::EventPair::create();
         let _server_task = fasync::Task::local(async move {
             let result = RemoteBinderHandle::<TestRemoteControllerConnector>::serve_container_power_controller(power_controller_server_end, event_remote, kernel, "test").await;
@@ -1439,8 +1436,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (kernel, _init_task) = create_kernel_and_task();
 
-        let (power_controller, power_controller_server_end) =
-            fidl::endpoints::create_proxy().unwrap();
+        let (power_controller, power_controller_server_end) = fidl::endpoints::create_proxy();
         let (event, event_remote) = zx::EventPair::create();
         let kernel_clone = kernel.clone();
         let _server_task = fasync::Task::local(async move {

@@ -17,6 +17,15 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
+namespace fdio_internal {
+// Helper from the reference documentation for std::visit<> to allow visit-by-overload of
+// std::variant<>.
+template <class... Ts>
+struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+}  // namespace fdio_internal
+
 using fdio_ptr = fbl::RefPtr<fdio>;
 
 // FDIO provides POSIX I/O functionality over various transports
@@ -200,16 +209,6 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
     // Custom deleter to keep the destructor buried.
     std::unique_ptr<fdio_t, void (*)(fdio_t*)> ptr_;
   };
-
-  // Helpers from the reference documentation for std::visit<>, to allow
-  // visit-by-overload of the std::variant<> returned by GetLastReference():
-  template <class... Ts>
-  struct overloaded : Ts... {
-    using Ts::operator()...;
-  };
-  // explicit deduction guide (not needed as of C++20)
-  template <class... Ts>
-  overloaded(Ts...) -> overloaded<Ts...>;
 
  protected:
   friend class fbl::internal::MakeRefCountedHelper<fdio>;

@@ -167,8 +167,7 @@ pub(crate) async fn unregister_pb_repo_server(
     retry = true;
 
     loop {
-        let (repo_iterator, repo_iterator_server) =
-            fidl::endpoints::create_proxy().map_err(|e| bug!(e))?;
+        let (repo_iterator, repo_iterator_server) = fidl::endpoints::create_proxy();
         match repo_manager_proxy.list(repo_iterator_server) {
             Ok(_) => {
                 loop {
@@ -222,8 +221,7 @@ async fn is_server_registered(
 ) -> Result<bool> {
     let repo_manager_proxy = get_repo_manager_proxy(rcs_proxy_connector, time_to_wait).await?;
 
-    let (repo_iterator, repo_iterator_server) =
-        fidl::endpoints::create_proxy().map_err(|e| bug!(e))?;
+    let (repo_iterator, repo_iterator_server) = fidl::endpoints::create_proxy();
     repo_manager_proxy.list(repo_iterator_server).map_err(|e| bug!(e))?;
     loop {
         let repos = repo_iterator.next().await.map_err(|e| bug!(e))?;
@@ -341,10 +339,9 @@ async fn get_rewrite_proxy(
     let rcs_proxy = try_rcs_proxy_connection(rcs_proxy_connector, time_to_wait).await?;
 
     let (rewrite_proxy, rewrite_server) =
-        fidl::endpoints::create_proxy::<<EngineProxy as fidl::endpoints::Proxy>::Protocol>()
-            .map_err(|e| bug!(e))?;
+        fidl::endpoints::create_proxy::<<EngineProxy as fidl::endpoints::Proxy>::Protocol>();
     rcs_proxy
-        .open_capability(
+        .deprecated_open_capability(
             &REPOSITORY_MANAGER_MONIKER,
             OpenDirType::ExposedDir,
             fidl_fuchsia_pkg_rewrite::EngineMarker::PROTOCOL_NAME,
@@ -369,10 +366,9 @@ async fn get_repo_manager_proxy(
     let rcs_proxy = try_rcs_proxy_connection(rcs_proxy_connector, time_to_wait).await?;
     let (repo_manager_proxy, repo_manager_server) = fidl::endpoints::create_proxy::<
         <RepositoryManagerProxy as fidl::endpoints::Proxy>::Protocol,
-    >()
-    .map_err(|e| bug!(e))?;
+    >();
     rcs_proxy
-        .open_capability(
+        .deprecated_open_capability(
             &REPOSITORY_MANAGER_MONIKER,
             OpenDirType::ExposedDir,
             fidl_fuchsia_pkg::RepositoryManagerMarker::PROTOCOL_NAME,
@@ -507,8 +503,7 @@ mod tests {
                             iterator,
                             control_handle: _control_handle,
                         } => {
-                            let mut stream =
-                                iterator.into_stream().expect("list iterator into_stream");
+                            let mut stream = iterator.into_stream();
                             let mut sent = false;
                             while let Some(RepositoryIteratorRequest::Next { responder }) =
                                 stream.try_next().await.expect("next try_next")
@@ -559,7 +554,7 @@ mod tests {
                             let rules = Arc::clone(&rules);
 
                             Task::local(async move {
-                                let mut stream = transaction.into_stream().unwrap();
+                                let mut stream = transaction.into_stream();
                                 while let Some(request) = stream.next().await {
                                     let request = request.unwrap();
                                     match request {
@@ -568,7 +563,7 @@ mod tests {
                                             iterator,
                                             control_handle: _,
                                         } => {
-                                            let mut stream = iterator.into_stream().unwrap();
+                                            let mut stream = iterator.into_stream();
 
                                             let mut rules =
                                                 rules.lock().unwrap().clone().into_iter();
@@ -608,7 +603,7 @@ mod tests {
         let (repo_manager, _) = FakeRepositoryManager::new();
         let (engine, _) = FakeEngine::new();
         match req {
-            RemoteControlRequest::OpenCapability {
+            RemoteControlRequest::DeprecatedOpenCapability {
                 capability_name,
                 server_channel,
                 responder,
@@ -620,16 +615,14 @@ mod tests {
                             fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
                                 server_channel,
                             )
-                            .into_stream()
-                            .unwrap(),
+                            .into_stream(),
                         );
                         responder.send(Ok(())).expect("Could not send response")
                     }
                     EngineMarker::PROTOCOL_NAME => {
                         engine.spawn(
                             fidl::endpoints::ServerEnd::<EngineMarker>::new(server_channel)
-                                .into_stream()
-                                .unwrap(),
+                                .into_stream(),
                         );
                         responder.send(Ok(())).expect("Could not send response")
                     }

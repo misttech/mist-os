@@ -33,6 +33,7 @@
                         ],
                         "override_condition_to": "allowed-condition",
                         "bug": "https://fxbug.dev/42073939",
+                        "email_subject_line": "",
                         "comment": [
                             "Test override rule"
                         ],
@@ -86,6 +87,7 @@
                         ],
                         "override_condition_to": "allowed-condition",
                         "bug": "https://fxbug.dev/42073939",
+                        "email_subject_line": "",
                         "comment": [
                             "Test override rule"
                         ],
@@ -157,6 +159,7 @@
                         ],
                         "override_condition_to": "allowed-condition",
                         "bug": "https://fxbug.dev/42073939",
+                        "email_subject_line": "",
                         "comment": [
                             "Test override rule"
                         ],
@@ -200,6 +203,7 @@
                 "suggested_override_rule": {
                     "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
                     "bug": "<INSERT TICKET URL>",
+                    "email_subject_line": "<INSERT EMAIL SUBJECT LINE FOR COUNSEL APPROVAL, IF APPLICABLE>",
                     "comment": [
                         "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
                     ],
@@ -266,6 +270,7 @@
                         ],
                         "override_condition_to": "allowed-condition",
                         "bug": "https://fxbug.dev/42073939",
+                        "email_subject_line": "",
                         "comment": [
                             "Test override rule"
                         ],
@@ -309,6 +314,7 @@
                 "suggested_override_rule": {
                     "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
                     "bug": "<INSERT TICKET URL>",
+                    "email_subject_line": "<INSERT EMAIL SUBJECT LINE FOR COUNSEL APPROVAL, IF APPLICABLE>",
                     "comment": [
                         "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
                     ],
@@ -364,6 +370,7 @@
                 "suggested_override_rule": {
                     "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
                     "bug": "<INSERT TICKET URL>",
+                    "email_subject_line": "<INSERT EMAIL SUBJECT LINE FOR COUNSEL APPROVAL, IF APPLICABLE>",
                     "comment": [
                         "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
                     ],
@@ -419,6 +426,7 @@
                 "suggested_override_rule": {
                     "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
                     "bug": "<INSERT TICKET URL>",
+                    "email_subject_line": "<INSERT EMAIL SUBJECT LINE FOR COUNSEL APPROVAL, IF APPLICABLE>",
                     "comment": [
                         "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
                     ],
@@ -475,6 +483,7 @@
                 "suggested_override_rule": {
                     "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
                     "bug": "<INSERT TICKET URL>",
+                    "email_subject_line": "<INSERT EMAIL SUBJECT LINE FOR COUNSEL APPROVAL, IF APPLICABLE>",
                     "comment": [
                         "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
                     ],
@@ -541,6 +550,7 @@
                         "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
                         "override_condition_to": "allowed-condition",
                         "bug": "https://fxbug.dev/42073939",
+                        "email_subject_line": "",
                         "comment": [
                             "Test override rule"
                         ],
@@ -606,6 +616,7 @@
                         "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
                         "override_condition_to": "allowed-condition",
                         "bug": "https://fxbug.dev/42073939",
+                        "email_subject_line": "",
                         "comment": [
                             "Test override rule"
                         ],
@@ -631,6 +642,7 @@
                 "suggested_override_rule": {
                     "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
                     "bug": "<INSERT TICKET URL>",
+                    "email_subject_line": "<INSERT EMAIL SUBJECT LINE FOR COUNSEL APPROVAL, IF APPLICABLE>",
                     "comment": [
                         "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
                     ],

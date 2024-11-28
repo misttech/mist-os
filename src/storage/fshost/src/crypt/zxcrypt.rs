@@ -165,7 +165,8 @@ impl Device for ZxcryptDevice {
                 .await
                 .context("Transport error on get_volume_info")?;
             zx::Status::ok(status).context("get_volume_info failed")?;
-            let manager = volume_manager_info.ok_or(anyhow!("Expected volume manager info"))?;
+            let manager =
+                volume_manager_info.ok_or_else(|| anyhow!("Expected volume manager info"))?;
             manager.slice_size
         } else {
             0

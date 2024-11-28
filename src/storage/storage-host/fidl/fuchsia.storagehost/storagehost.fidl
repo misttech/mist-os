@@ -22,6 +22,12 @@ closed protocol Partition {
 
 @discoverable
 closed protocol PartitionsManager {
+    /// Returns the dimensions of the block device the partition manager resides in.
+    strict GetBlockInfo() -> (struct {
+        block_count uint64;
+        block_size uint32;
+    }) error zx.Status;
+
     /// Starts a new transaction to modify the partition table.  The transaction will only be
     /// applied when `CommitTransaction` is called.  Only one transaction may be active at any given
     /// time.  Closing all handles to the returned event will cancel the transaction.
@@ -70,7 +76,8 @@ closed protocol PartitionsAdmin {
     }) -> () error zx.Status;
 };
 
-/// Each partition exposes this service.
+/// Each partition exposes this service.  The instance names are unique for each partition but
+/// otherwise have no special meaning.  In practice they correspond to the index in the GPT.
 service PartitionService {
     volume client_end:fuchsia.hardware.block.volume.Volume;
     partition client_end:Partition;

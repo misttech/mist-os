@@ -76,16 +76,7 @@ tool, do the following:
 1.  On your target device, run:
 
     ```posix-terminal
-    lsblk
-    ```
-
-    Take note of the HDD or SSD's device path from the output of `lsblk`. An
-    example path looks like `/dev/sys/platform/pci/00:17.0/ahci/sata0/block`.
-
-1.  On your target device, run:
-
-    ```posix-terminal
-    install-disk-image init-partition-tables --block-device <BLOCK_DEVICE_PATH>
+    install-disk-image init-partition-tables
     ```
 
 1.  From your host, start the bootserver:

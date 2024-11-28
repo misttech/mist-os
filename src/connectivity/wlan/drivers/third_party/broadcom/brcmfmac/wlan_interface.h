@@ -81,7 +81,7 @@ class WlanInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacI
   static zx_status_t ClearCountry(brcmf_pub* drvr);
 
   // WlanFullmacImpl implementations, dispatching FIDL requests from higher layers.
-  void Start(StartRequestView request, StartCompleter::Sync& completer) override;
+  void Init(InitRequestView request, InitCompleter::Sync& completer) override;
   void Query(QueryCompleter::Sync& completer) override;
   void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override;
   void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override;
@@ -95,16 +95,12 @@ class WlanInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacI
   void Deauth(DeauthRequestView request, DeauthCompleter::Sync& completer) override;
   void AssocResp(AssocRespRequestView request, AssocRespCompleter::Sync& completer) override;
   void Disassoc(DisassocRequestView request, DisassocCompleter::Sync& completer) override;
-  void Reset(ResetRequestView request, ResetCompleter::Sync& completer) override;
   void StartBss(StartBssRequestView request, StartBssCompleter::Sync& completer) override;
   void StopBss(StopBssRequestView request, StopBssCompleter ::Sync& completer) override;
   void SetKeys(SetKeysRequestView request, SetKeysCompleter::Sync& completer) override;
-  void DelKeys(DelKeysRequestView request, DelKeysCompleter::Sync& completer) override;
   void EapolTx(EapolTxRequestView request, EapolTxCompleter::Sync& completer) override;
   void GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) override;
   void GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) override;
-  void SetMulticastPromisc(SetMulticastPromiscRequestView request,
-                           SetMulticastPromiscCompleter::Sync& completer) override;
   void SaeHandshakeResp(SaeHandshakeRespRequestView request,
                         SaeHandshakeRespCompleter::Sync& completer) override;
   void SaeFrameTx(SaeFrameTxRequestView request, SaeFrameTxCompleter::Sync& completer) override;

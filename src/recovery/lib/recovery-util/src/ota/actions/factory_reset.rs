@@ -65,7 +65,7 @@ mod test {
     ) -> Result<(FactoryResetProxy, mpsc::Receiver<i32>), Error> {
         let (mut sender, receiver) = mpsc::channel(1);
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<FactoryResetMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<FactoryResetMarker>();
 
         fasync::Task::local(async move {
             while let Some(request) =

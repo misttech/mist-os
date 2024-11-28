@@ -193,7 +193,8 @@ impl Channel {
                 }
                 _ => {}
             };
-            let proxy = proxy.ok_or(Error::profile("l2cap parameter changing not supported"))?;
+            let proxy =
+                proxy.ok_or_else(|| Error::profile("l2cap parameter changing not supported"))?;
             let parameters = fidl_bt::ChannelParameters {
                 flush_timeout: duration.clone().map(zx::MonotonicDuration::into_nanos),
                 ..Default::default()
@@ -267,8 +268,8 @@ impl TryFrom<fidl_fuchsia_bluetooth_bredr::Channel> for Channel {
             flush_timeout: Arc::new(Mutex::new(
                 fidl.flush_timeout.map(zx::MonotonicDuration::from_nanos),
             )),
-            audio_direction_ext: fidl.ext_direction.and_then(|e| e.into_proxy().ok()),
-            l2cap_parameters_ext: fidl.ext_l2cap.and_then(|e| e.into_proxy().ok()),
+            audio_direction_ext: fidl.ext_direction.map(|e| e.into_proxy()),
+            l2cap_parameters_ext: fidl.ext_l2cap.map(|e| e.into_proxy()),
             terminated: false,
         })
     }
@@ -457,7 +458,7 @@ mod tests {
 
         let (remote, _local) = zx::Socket::create_datagram();
         let (client_end, mut direction_request_stream) =
-            create_request_stream::<bredr::AudioDirectionExtMarker>().unwrap();
+            create_request_stream::<bredr::AudioDirectionExtMarker>();
         let ext = bredr::Channel {
             socket: Some(remote),
             channel_mode: Some(fidl_bt::ChannelMode::Basic),
@@ -548,7 +549,7 @@ mod tests {
 
         let (remote, _local) = zx::Socket::create_datagram();
         let (client_end, mut l2cap_request_stream) =
-            create_request_stream::<bredr::L2capParametersExtMarker>().unwrap();
+            create_request_stream::<bredr::L2capParametersExtMarker>();
         let ext = bredr::Channel {
             socket: Some(remote),
             channel_mode: Some(fidl_bt::ChannelMode::Basic),

@@ -26,67 +26,16 @@ bool ParentDeviceDFv2::SetThreadRole(const char* role_name) {
 }
 
 zx::bti ParentDeviceDFv2::GetBusTransactionInitiator() {
-  auto res = pdev_->GetBtiById(0);
-  if (!res.ok()) {
-    DMESSAGE("failed to get bus transaction initiator: %s", res.status_string());
-    return zx::bti();
-  }
-  if (!res->is_ok()) {
-    DMESSAGE("failed to get bus transaction initiator: %d", res->error_value());
-    return zx::bti();
-  }
-  return std::move(res.value()->bti);
+  return zx::bti(pdev_.GetBusTransactionInitiator()->release_handle());
 }
 
 std::unique_ptr<magma::PlatformMmio> ParentDeviceDFv2::CpuMapMmio(
     unsigned int index, magma::PlatformMmio::CachePolicy cache_policy) {
-  auto res = pdev_->GetMmioById(index);
-  if (!res.ok()) {
-    DMESSAGE("failed to get mmio: %s", res.status_string());
-    return nullptr;
-  }
-  if (!res->is_ok()) {
-    DMESSAGE("failed to get mmio: %d", res->error_value());
-    return nullptr;
-  }
-
-  size_t offset = 0;
-  size_t size = 0;
-  zx::vmo vmo;
-  if (res->value()->has_offset()) {
-    offset = res->value()->offset();
-  }
-  if (res->value()->has_size()) {
-    size = res->value()->size();
-  }
-  if (res->value()->has_vmo()) {
-    vmo = std::move(res->value()->vmo());
-  }
-
-  auto mmio_buffer =
-      fdf::MmioBuffer::Create(offset, size, std::move(vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
-  if (!mmio_buffer.is_ok()) {
-    DMESSAGE("Failed to make mmio buffer %s", mmio_buffer.status_string());
-    return nullptr;
-  }
-
-  std::unique_ptr<magma::ZirconPlatformMmio> mmio(
-      new magma::ZirconPlatformMmio(std::move(mmio_buffer.value())));
-  return mmio;
+  return pdev_.CpuMapMmio(index, cache_policy);
 }
 
 std::unique_ptr<magma::PlatformInterrupt> ParentDeviceDFv2::RegisterInterrupt(unsigned int index) {
-  auto res = pdev_->GetInterruptById(index, 0);
-  if (!res.ok()) {
-    DMESSAGE("failed to register interrupt: %s", res.status_string());
-    return nullptr;
-  }
-  if (!res->is_ok()) {
-    DMESSAGE("failed to register interrupt: %d", res->error_value());
-    return nullptr;
-  }
-
-  return std::make_unique<magma::ZirconPlatformInterrupt>(zx::handle(std::move(res->value()->irq)));
+  return pdev_.RegisterInterrupt(index);
 }
 
 zx::result<fdf::ClientEnd<fuchsia_hardware_gpu_mali::ArmMali>>
@@ -102,7 +51,7 @@ zx::result<std::vector<fdf_power::PowerElementConfiguration>>
 ParentDeviceDFv2::GetPowerConfiguration() {
   // TODO(b/358361345): Use //sdk/lib/driver/platform-device/cpp to retrieve power configuration
   // once it supports it.
-  fidl::WireResult result = pdev_->GetPowerConfiguration();
+  fidl::WireResult result = pdev_.fidl()->GetPowerConfiguration();
   if (!result.ok()) {
     DMESSAGE("Failed to send GetPowerConfiguration request: %s", result.status_string());
     return zx::error(result.status());

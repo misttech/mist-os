@@ -217,7 +217,12 @@ class ThreadRuntimeStats {
     return ret;
   }
 
-  mutable DECLARE_SEQLOCK_EXPLICIT_SYNC(ThreadRuntimeStats, kRuntimeStatsSyncType) seq_lock_;
+  // This lock is acquired in the scheduler. Disable reporting to prevent
+  // interacting with the debug log and interfering with the last result, which
+  // can cause lockdep failures.
+  mutable DECLARE_SEQLOCK_EXPLICIT_SYNC(ThreadRuntimeStats, kRuntimeStatsSyncType,
+                                        LockFlagsReportingDisabled) seq_lock_;
+
   SeqLockPayload<ThreadStats, decltype(seq_lock_)> published_stats_ TA_GUARDED(seq_lock_){};
   RelaxedAtomic<zx_ticks_t> page_fault_ticks_{0};
   RelaxedAtomic<zx_ticks_t> lock_contention_ticks_{0};

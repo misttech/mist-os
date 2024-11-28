@@ -41,7 +41,7 @@ impl MockVerifierService {
     /// Spawns an `fasync::Task` which serves fuchsia.update.verify/BlobfsVerifier.
     pub fn spawn_blobfs_verifier_service(self: Arc<Self>) -> (fidl::BlobfsVerifierProxy, Task<()>) {
         let (proxy, stream) =
-            ::fidl::endpoints::create_proxy_and_stream::<fidl::BlobfsVerifierMarker>().unwrap();
+            ::fidl::endpoints::create_proxy_and_stream::<fidl::BlobfsVerifierMarker>();
 
         let task = Task::spawn(self.run_blobfs_verifier_service(stream));
 
@@ -53,7 +53,7 @@ impl MockVerifierService {
         self: Arc<Self>,
     ) -> (fidl::NetstackVerifierProxy, Task<()>) {
         let (proxy, stream) =
-            ::fidl::endpoints::create_proxy_and_stream::<fidl::NetstackVerifierMarker>().unwrap();
+            ::fidl::endpoints::create_proxy_and_stream::<fidl::NetstackVerifierMarker>();
 
         let task = Task::spawn(self.run_netstack_verifier_service(stream));
 
@@ -92,8 +92,7 @@ impl MockVerifierService {
 
     /// Spawns an `fasync::Task` which serves fuchsia.update.verify service.
     pub fn spawn_healthcheck_service(self: Arc<Self>) -> (fidl::VerifierProxy, Task<()>) {
-        let (proxy, stream) =
-            ::fidl::endpoints::create_proxy_and_stream::<fidl::VerifierMarker>().unwrap();
+        let (proxy, stream) = ::fidl::endpoints::create_proxy_and_stream::<fidl::VerifierMarker>();
 
         let task = Task::spawn(self.run_healthcheck_service(stream));
 

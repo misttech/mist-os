@@ -137,7 +137,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   static zx::result<std::shared_ptr<Node>> CreateCompositeNode(
       std::string_view node_name, std::vector<std::weak_ptr<Node>> parents,
       std::vector<std::string> parents_names,
-      const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties,
+      const std::vector<fuchsia_driver_framework::NodePropertyEntry2>& parent_properties,
       NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index = 0);
 
   // This is called when |node_ref_| is unbound from the dispatcher.
@@ -206,7 +206,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Set properties to non-composite node properties containing a clone of `properties` and
   // "DRIVER_FRAMEWORK_VERSION == 2".
   void SetNonCompositeProperties(
-      cpp20::span<const fuchsia_driver_framework::NodeProperty> properties);
+      cpp20::span<const fuchsia_driver_framework::NodeProperty2> properties);
 
   // Evaluates the given rematch_flags against the node. Returns true if rematch should take place,
   // false otherwise. Rematching is done based on the node type and url both matching:
@@ -280,12 +280,12 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // TODO(https://fxbug.dev/42160282): Remove const_cast once VectorView supports const.
   fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols() const {
     return fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol>::FromExternal(
-        const_cast<decltype(symbols_)&>(symbols_));
+        const_cast<decltype(symbols_) &>(symbols_));
   }
 
   // Returns the node properties of the node and its parents if the node is a composite node.
   // See `properties_` property for more info.
-  const fuchsia_driver_framework::wire::NodePropertyDictionary& properties() const {
+  const fuchsia_driver_framework::wire::NodePropertyDictionary2& properties() const {
     return properties_;
   }
 
@@ -293,7 +293,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Returns std::nullopt if the node is a non-composite and `parent_name` is not "default".
   // Returns std::nullopt if the parent node cannot be found.
   // See `properties_` property for more info.
-  std::optional<cpp20::span<const fuchsia_driver_framework::wire::NodeProperty>> GetNodeProperties(
+  std::optional<cpp20::span<const fuchsia_driver_framework::wire::NodeProperty2>> GetNodeProperties(
+      std::string_view parent_name = "default") const;
+
+  std::optional<std::vector<fuchsia_driver_framework::NodeProperty>> GetDeprecatedNodeProperties(
       std::string_view parent_name = "default") const;
 
   const Collection& collection() const { return collection_; }
@@ -436,7 +439,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Set properties to composite node properties containing a clone of the node properties of
   // `parents_`.
   void SetCompositeParentProperties(
-      const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties);
+      const std::vector<fuchsia_driver_framework::NodePropertyEntry2>& parent_properties);
 
   // Update `properties_dict_` to identify the contents of `properties_`.
   void SynchronizePropertiesDict();
@@ -473,10 +476,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // non-composite. "default" entry refers to the primary parent node's properties if the node is a
   // composite. All referenced data is owned by `arena_`. Make sure to call
   // `Node::SynchronizePropertiesDict()` when modified.
-  fuchsia_driver_framework::wire::NodePropertyDictionary properties_;
+  fuchsia_driver_framework::wire::NodePropertyDictionary2 properties_;
 
   // Maps the node properties of the entries of `properties_` by their name.
-  std::unordered_map<std::string, cpp20::span<const fuchsia_driver_framework::wire::NodeProperty>>
+  std::unordered_map<std::string, cpp20::span<const fuchsia_driver_framework::wire::NodeProperty2>>
       properties_dict_;
 
   Collection collection_ = Collection::kNone;

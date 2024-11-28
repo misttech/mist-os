@@ -79,7 +79,7 @@ impl Actor {
     /// typically be run in a non-blocking task group of the component.
     pub fn new(scope: &TaskGroup, starter: impl Start + Send + Sync + 'static) -> Actor {
         let (sender, receiver) = mpsc::unbounded();
-        let (client, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = create_proxy::<fio::DirectoryMarker>();
         let escrow = EscrowedState { outgoing_dir: server, escrowed_dictionary: None };
         let outgoing_dir = Arc::new(Mutex::new(client));
         let actor = ActorImpl {
@@ -268,7 +268,7 @@ impl ActorImpl {
         } else {
             // No outgoing directory server endpoint was escrowed. Mint a new pair and
             // update our client counterpart.
-            let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             *self.outgoing_dir.lock().unwrap() = client;
             server
         };
@@ -396,7 +396,7 @@ mod tests {
         let (reason, escrow) = start_rx.next().await.unwrap();
         assert_eq!(reason, StartReason::OutgoingDirectory);
 
-        let mut outgoing = escrow.outgoing_dir.into_stream().unwrap();
+        let mut outgoing = escrow.outgoing_dir.into_stream();
         let dir_entry = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
         assert_eq!(dir_entry.2, "foo");
 
@@ -430,7 +430,7 @@ mod tests {
         let mut next_start = start_rx.next();
         assert_matches!(TestExecutor::poll_until_stalled(&mut next_start).await, Poll::Pending);
 
-        let mut outgoing = escrow.unwrap().outgoing_dir.into_stream().unwrap();
+        let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
         let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
         assert_eq!(open.2, "foo");
 
@@ -545,7 +545,7 @@ mod tests {
             )),
             Ok(())
         );
-        let mut outgoing = escrow.unwrap().outgoing_dir.into_stream().unwrap();
+        let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
         let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
         assert_eq!(open.2, "bar");
 
@@ -640,7 +640,7 @@ mod tests {
             }))
             .unwrap();
 
-        let mut outgoing = escrow.unwrap().outgoing_dir.into_stream().unwrap();
+        let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
         let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
         assert_eq!(open.2, "foo");
 

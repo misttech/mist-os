@@ -43,11 +43,6 @@ int TestBoard::Thread() {
     zxlogf(ERROR, "%s: SpiInit failed: %d", __func__, status);
   }
 
-  status = ClockInit();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: ClockInit failed: %d", __func__, status);
-  }
-
   status = TestInit();
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: TestInit failed: %d", __func__, status);

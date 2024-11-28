@@ -16,7 +16,7 @@ where
     P: fidl::endpoints::ProtocolMarker,
     F: Fn(fidl::endpoints::Request<P>) + Send,
 {
-    let mut stream = server_end.into_stream().unwrap();
+    let mut stream = server_end.into_stream();
     fasync::Task::spawn(async move {
         while let Some(request) = stream.try_next().await.unwrap() {
             handler(request);

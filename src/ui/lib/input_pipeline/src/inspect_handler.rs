@@ -456,8 +456,7 @@ mod tests {
             pressed_buttons_vec.push(*button as u64);
         });
 
-        let (light_sensor_proxy, _) =
-            create_proxy_and_stream::<InputDeviceMarker>().expect("proxy created");
+        let (light_sensor_proxy, _) = create_proxy_and_stream::<InputDeviceMarker>();
 
         let recent_events = vec![
             create_keyboard_event(

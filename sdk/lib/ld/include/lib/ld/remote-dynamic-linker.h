@@ -424,8 +424,9 @@ class RemoteDynamicLinker {
   // initial module's place in the load order.  The modules() list is complete,
   // remote_abi() has been initialized, and abi_stub_module() can be used.
   template <class Diagnostics, typename GetDep>
-  std::optional<InitResult> Init(Diagnostics& diag, InitModuleList initial_modules,
-                                 GetDep&& get_dep) {
+  std::optional<InitResult> Init(
+      Diagnostics& diag, InitModuleList initial_modules, GetDep&& get_dep,
+      std::optional<elfldltl::ElfMachine> machine = elfldltl::ElfMachine::kNative) {
     static_assert(std::is_invocable_r_v<GetDepResult, GetDep, Soname>);
 
     assert(abi_stub_);
@@ -438,12 +439,21 @@ class RemoteDynamicLinker {
 
     auto next_modid = [this]() -> uint32_t { return static_cast<uint32_t>(modules_.size()); };
 
+    auto check_machine = [machine, &diag](const DecodedModule& decoded) {
+      return !machine || decoded.machine() == *machine ||
+             // TODO(mcgrathr): module-prefixed diagnostics here?
+             diag.FormatError("wrong e_machine for architecture: ", decoded.machine());
+    };
+
     // Start the list with the root modules.  The first one is the main
     // executable if there is such a thing.  It gets symbolizer module ID 0.
     std::vector<uint32_t> initial_modules_modid(initial_modules.size(), static_cast<uint32_t>(-1));
     size_t implicit_module_count = 1;  // The stub counts specially.
     for (size_t i = 0; i < initial_modules.size(); ++i) {
       InitModule& init_module = initial_modules[i];
+      if (!check_machine(*init_module.decoded_module)) [[unlikely]] {
+        return std::nullopt;
+      }
       if (init_module.visible_name) {
         initial_modules_modid[i] = next_modid();
         EmplaceModule(*init_module.visible_name, std::nullopt,
@@ -522,9 +532,12 @@ class RemoteDynamicLinker {
             // The get_dep function failed, but said to keep going anyway.
             continue;
           }
+          if (!check_machine(**result)) [[unlikely]] {
+            return std::nullopt;
+          }
           mod.set_decoded(std::move(*result), modid, true, max_tls_modid_);
         } else {
-          return {};
+          return std::nullopt;
         }
       }
 
@@ -632,9 +645,9 @@ class RemoteDynamicLinker {
   }
 
   // Shorthand for the two-argument Relocate method below.
-  template <class Diagnostics>
+  template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, class Diagnostics>
   bool Relocate(Diagnostics& diag) {
-    return Relocate(diag, tls_desc_resolver());
+    return Relocate<Machine>(diag, tls_desc_resolver());
   }
 
   // Perform relocations on all modules.  The modules() list gives the set and
@@ -656,22 +669,23 @@ class RemoteDynamicLinker {
   // missing dependency modules is an obvious recipe for undefined symbol
   // errors that aren't going to be more enlightening to the user.  But this
   // class supports any policy.
-  template <class Diagnostics, typename TlsDescResolverType>
+  template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, class Diagnostics,
+            typename TlsDescResolverType>
   bool Relocate(Diagnostics& diag, TlsDescResolverType&& tls_desc_resolver) {
     // If any module wasn't decoded successfully, just skip it.
     auto valid_modules = ValidModules();
     auto relocate = [&](auto& module) -> bool {
-      // Resolve against the successfully decoded modules, ignoring the others.
-      return module.Relocate(diag, valid_modules, tls_desc_resolver);
+      return module.template Relocate<Machine>(
+          // Resolve against successfully decoded modules, ignoring the others.
+          diag, valid_modules, tls_desc_resolver);
     };
 
     // After the segments are complete, make sure all the VMO handles are
     // read-only so they don't accidentally get mutated.  This isn't necessary
     // in non-zygote mode since the object won't usually be saved long anyway.
     auto protect_segments = [&diag](auto& module) -> bool {
-      return module.load_info().VisitSegments([&diag](auto& segment) -> bool {
-        using SegmentType = std::decay_t<decltype(segment)>;
-        if constexpr (elfldltl::kSegmentHasFilesz<SegmentType>) {
+      auto protect_segment = [&diag]<class Segment>(Segment& segment) -> bool {
+        if constexpr (elfldltl::kSegmentHasFilesz<Segment>) {
           zx::result<> result = segment.MakeImmutable();
           if (result.is_error()) [[unlikely]] {
             return diag.SystemError(  //
@@ -680,7 +694,8 @@ class RemoteDynamicLinker {
           }
         }
         return true;
-      });
+      };
+      return module.load_info().VisitSegments(protect_segment);
     };
 
     return std::ranges::all_of(valid_modules, relocate) && FinishAbi(diag) &&

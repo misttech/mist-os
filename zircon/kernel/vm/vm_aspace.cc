@@ -108,7 +108,7 @@ uint arch_aspace_flags_from_type(VmAspace::Type type) {
 // Called once at boot to initialize the singleton kernel address
 // space. Thread safety analysis is disabled since we don't need to
 // lock yet.
-void VmAspace::KernelAspaceInitPreHeap() TA_NO_THREAD_SAFETY_ANALYSIS {
+void VmAspace::KernelAspaceInit() TA_NO_THREAD_SAFETY_ANALYSIS {
   g_kernel_aspace.Initialize(KERNEL_ASPACE_BASE, KERNEL_ASPACE_SIZE, VmAspace::Type::Kernel,
                              CreateAslrConfig(VmAspace::Type::Kernel), "kernel");
 

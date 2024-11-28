@@ -551,7 +551,7 @@ mod tests {
         #[allow(clippy::arc_with_non_send_sync)]
         fn new(real_dir: fio::DirectoryProxy) -> (Arc<Self>, fio::DirectoryProxy) {
             let (proxy, requests) =
-                fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
             let this = Arc::new(Self {
                 real_dir,
                 inner: std::sync::Mutex::new(DirectoryInterceptorInner {
@@ -594,8 +594,7 @@ mod tests {
                             flags.intersects(fio::OpenFlags::CREATE),
                         ) {
                             Some(status) => {
-                                let (_, control_handle) =
-                                    object.into_stream_and_control_handle().unwrap();
+                                let (_, control_handle) = object.into_stream_and_control_handle();
                                 control_handle
                                     .send_on_open_(status.into_raw(), None)
                                     .expect("failed to send OnOpen event");

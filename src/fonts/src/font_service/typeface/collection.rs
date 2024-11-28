@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 fn unwrap_query<'a>(query: &'a Option<TypefaceQuery>) -> Result<&'a TypefaceQuery, Error> {
-    query.as_ref().ok_or(format_err!("Missing query"))
+    query.as_ref().ok_or_else(|| format_err!("Missing query"))
 }
 
 /// Ordered collection of `Typeface`s. Construct using [`TypefaceCollectionBuilder`].

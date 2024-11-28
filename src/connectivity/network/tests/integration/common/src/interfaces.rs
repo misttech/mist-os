@@ -30,11 +30,13 @@ pub async fn wait_for_non_loopback_interface_up<
     exclude_ids: Option<&HashSet<u64>>,
     timeout: zx::MonotonicDuration,
 ) -> Result<(u64, String)> {
-    let mut if_map = HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new();
+    let mut if_map =
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>>::new();
     let mut wait_for_interface = pin!(fidl_fuchsia_net_interfaces_ext::wait_interface(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            interface_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(
+            interface_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )?,
         &mut if_map,
         |if_map| {
@@ -82,8 +84,7 @@ pub async fn add_address_wait_assigned(
 > {
     let (address_state_provider, server) = fidl::endpoints::create_proxy::<
         fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-    >()
-    .expect("create proxy");
+    >();
     let () = control
         .add_address(&address, &address_parameters, server)
         .expect("Control.AddAddress FIDL error");
@@ -211,13 +212,17 @@ pub async fn wait_for_addresses<T, F>(
     mut predicate: F,
 ) -> Result<T>
 where
-    F: FnMut(&[fidl_fuchsia_net_interfaces_ext::Address]) -> Option<T>,
+    F: FnMut(
+        &[fidl_fuchsia_net_interfaces_ext::Address<fidl_fuchsia_net_interfaces_ext::AllInterest>],
+    ) -> Option<T>,
 {
-    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(u64::from(id));
+    let mut state =
+        fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(u64::from(id));
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interfaces_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::AllInterest,
+        >(
+            &interfaces_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
         )
         .context("get interface event stream")?,
         &mut state,
@@ -233,11 +238,13 @@ pub async fn wait_for_online(
     id: u64,
     want_online: bool,
 ) -> Result<()> {
-    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(u64::from(id));
+    let mut state =
+        fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(u64::from(id));
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interfaces_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(
+            &interfaces_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
         )
         .context("get interface event stream")?,
         &mut state,

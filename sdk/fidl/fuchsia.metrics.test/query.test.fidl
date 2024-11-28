@@ -1,9 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-// TODO(https://fxbug.dev/365558387): Either remove the dependency from CTF
-// tests and uncomment this line or make this library stable.
-// @available(added=HEAD)
+@available(added=HEAD)
 library fuchsia.metrics.test;
 
 using fuchsia.metrics as metrics;

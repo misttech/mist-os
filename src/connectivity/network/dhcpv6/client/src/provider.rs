@@ -85,10 +85,8 @@ mod tests {
         F: Fn(NewClientParams, ServerEnd<ClientMarker>) -> Fut,
     {
         let (client_end, server_end) = create_endpoints::<ClientProviderMarker>();
-        let client_provider_proxy =
-            client_end.into_proxy().expect("failed to create test client proxy");
-        let client_provider_stream =
-            server_end.into_stream().expect("failed to create test request stream");
+        let client_provider_proxy = client_end.into_proxy();
+        let client_provider_stream = server_end.into_stream();
 
         let test_fut = async {
             for interface_id in 0..10 {

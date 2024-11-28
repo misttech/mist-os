@@ -27,10 +27,10 @@ if (is_host && target_cpu == "x64") {
       "//src/developer/ffx/lib/isolate:lib",
       "//src/lib/fuchsia-async",
       "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:async-io",
       "//third_party/rust_crates:futures",
       "//third_party/rust_crates:once_cell",
       "//third_party/rust_crates:tempfile",
+      "//third_party/rust_crates:tokio",
       "//tools/make-fuchsia-vol:lib",
     ]
 

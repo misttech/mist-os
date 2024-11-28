@@ -82,7 +82,7 @@ fn fizzbuzz(n: u32) -> String {
             (0, 0) => "FizzBuzz".to_string(),
             (0, _) => "Fizz".to_string(),
             (_, 0) => "Buzz".to_string(),
-            (_, _) => format!("{}", i).to_string(),
+            (_, _) => format!("{}", i),
         })
         .collect::<Vec<_>>()
         .join(" ")

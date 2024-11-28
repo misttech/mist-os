@@ -40,7 +40,7 @@
       "optionality": "optional",
       "long": "--accessor",
       "short": null,
-      "description": "A selector specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to. The selector will be in the form of: <moniker>:<directory>:fuchsia.diagnostics.ArchiveAccessorName Typically this is the output of `iquery list-accessors`. For example: `bootstrap/archivist:expose:fuchsia.diagnostics.FeedbackArchiveAccessor` means that the command will connect to the `FeedbackArchiveAccecssor` exposed by `bootstrap/archivist`.",
+      "description": "A selector specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to. The selector will be in the form of: <moniker>:fuchsia.diagnostics.ArchiveAccessorName Typically this is the output of `iquery list-accessors`. For example: `bootstrap/archivist:fuchsia.diagnostics.FeedbackArchiveAccessor` means that the command will connect to the `FeedbackArchiveAccecssor` exposed by `bootstrap/archivist`.",
       "hidden": false
     }
   ],

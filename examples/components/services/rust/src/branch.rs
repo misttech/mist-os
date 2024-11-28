@@ -80,8 +80,7 @@ async fn start_provider(
         .expect("failed to create_child");
 
     let (exposed_dir, exposed_dir_server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("failed to create endpoints");
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     info!(%name, %url, "open exposed dir of BankAccount provider");
     realm
         .open_exposed_dir(

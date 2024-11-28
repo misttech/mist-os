@@ -167,7 +167,7 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
     async fn execute_any(&self, args: FuzzShellCommand) -> Result<NextAction> {
         match args.command {
             FuzzShellSubcommand::List(ListSubcommand { json_file, pattern }) => {
-                let tests_json = json_file.or(self.tests_json.clone());
+                let tests_json = json_file.or_else(|| self.tests_json.clone());
                 let mut urls =
                     get_fuzzer_urls(&tests_json).context("failed to get URLs to list")?;
                 if urls.is_empty() {
@@ -278,7 +278,7 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
                 self.writer.println(format!("Detached."));
             }
             FuzzShellSubcommand::Stop(StopSubcommand { url, .. }) => {
-                let url = url.unwrap_or(fuzzer.url().to_string());
+                let url = url.unwrap_or_else(|| fuzzer.url().to_string());
                 self.stop(&url).await.context("failed to stop fuzzer")?;
             }
             FuzzShellSubcommand::Exit(ExitShellSubcommand {}) => {
@@ -616,11 +616,10 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
     }
 
     async fn connect_to_manager(&self) -> Result<Manager> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fuzz::ManagerMarker>()
-            .context("failed to create proxy for fuchsia.fuzzer.Manager")?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fuzz::ManagerMarker>();
         let result = self
             .remote_control
-            .open_capability(
+            .deprecated_open_capability(
                 "/core/fuzz-manager",
                 fsys::OpenDirType::ExposedDir,
                 fuzz::ManagerMarker::PROTOCOL_NAME,
@@ -694,7 +693,7 @@ mod test_fixtures {
                 .create_tests_json(urls.iter())
                 .context("failed to write URLs for shell script")?;
             let tests_json = Some(tests_json.to_string_lossy().to_string());
-            let (proxy, server_end) = create_proxy::<rcs::RemoteControlMarker>()?;
+            let (proxy, server_end) = create_proxy::<rcs::RemoteControlMarker>();
             let rcs_task = create_task(serve_rcs(server_end, test.clone()), test.writer());
             let reader = ScriptReader::new();
             let shell = Shell::new(tests_json, proxy, reader, test.writer());
@@ -808,11 +807,11 @@ mod test_fixtures {
     }
 
     async fn serve_rcs(server_end: ServerEnd<rcs::RemoteControlMarker>, test: Test) -> Result<()> {
-        let mut stream = server_end.into_stream()?;
+        let mut stream = server_end.into_stream();
         let mut task = None;
         while let Some(request) = stream.next().await {
             match request {
-                Ok(rcs::RemoteControlRequest::OpenCapability {
+                Ok(rcs::RemoteControlRequest::DeprecatedOpenCapability {
                     moniker,
                     capability_set,
                     capability_name,

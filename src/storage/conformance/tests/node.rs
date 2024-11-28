@@ -10,10 +10,9 @@ use io_conformance_util::*;
 #[fuchsia::test]
 async fn test_open_node_on_directory() {
     let harness = TestHarness::new().await;
-    let root = root_directory(vec![]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
-    let (_proxy, on_representation) = test_dir
+    let (_proxy, on_representation) = dir
         .open3_node_repr::<fio::NodeMarker>(
             ".",
             fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_NODE,
@@ -24,7 +23,7 @@ async fn test_open_node_on_directory() {
     assert_matches!(on_representation, fio::Representation::Connector(fio::ConnectorInfo { .. }));
 
     // If other protocol types are specified, the target must match at least one.
-    let error: zx::Status = test_dir
+    let error: zx::Status = dir
         .open3_node::<fio::NodeMarker>(
             ".",
             fio::Flags::PROTOCOL_NODE | fio::Flags::PROTOCOL_FILE,
@@ -39,10 +38,10 @@ async fn test_open_node_on_directory() {
 async fn test_open_node_on_file() {
     let harness = TestHarness::new().await;
 
-    let root = root_directory(vec![file("file", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let entries = vec![file("file", vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    let (_proxy, representation) = test_dir
+    let (_proxy, representation) = dir
         .open3_node_repr::<fio::NodeMarker>(
             "file",
             fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_NODE,
@@ -53,7 +52,7 @@ async fn test_open_node_on_file() {
     assert_matches!(representation, fio::Representation::Connector(fio::ConnectorInfo { .. }));
 
     // If other protocol types are specified, the target must match at least one.
-    let error: zx::Status = test_dir
+    let error: zx::Status = dir
         .open3_node::<fio::NodeMarker>(
             "file",
             fio::Flags::PROTOCOL_NODE | fio::Flags::PROTOCOL_DIRECTORY,
@@ -63,7 +62,7 @@ async fn test_open_node_on_file() {
         .unwrap_err();
     assert_eq!(error, zx::Status::NOT_DIR);
 
-    let error: zx::Status = test_dir
+    let error: zx::Status = dir
         .open3_node::<fio::NodeMarker>(
             "file",
             fio::Flags::PROTOCOL_NODE | fio::Flags::PROTOCOL_SYMLINK,
@@ -77,13 +76,11 @@ async fn test_open_node_on_file() {
 #[fuchsia::test]
 async fn test_set_attr_and_set_flags_on_node() {
     let harness = TestHarness::new().await;
-    let root = root_directory(vec![file("file", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let entries = vec![file("file", vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    let proxy = test_dir
-        .open3_node::<fio::NodeMarker>("file", fio::Flags::PROTOCOL_NODE, None)
-        .await
-        .unwrap();
+    let proxy =
+        dir.open3_node::<fio::NodeMarker>("file", fio::Flags::PROTOCOL_NODE, None).await.unwrap();
 
     assert_eq!(
         zx::Status::ok(
@@ -114,10 +111,10 @@ async fn test_set_attr_and_set_flags_on_node() {
 #[fuchsia::test]
 async fn test_node_clone() {
     let harness = TestHarness::new().await;
-    let root = root_directory(vec![file("file", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let entries = vec![file("file", vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    let proxy = test_dir
+    let proxy = dir
         .open3_node::<fio::NodeMarker>(
             "file",
             fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
@@ -126,7 +123,7 @@ async fn test_node_clone() {
         .await
         .unwrap();
 
-    let (cloned, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    let (cloned, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
     proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server).expect("clone failed");
 
     assert_matches!(
@@ -138,10 +135,9 @@ async fn test_node_clone() {
 #[fuchsia::test]
 async fn test_open_node_with_attributes() {
     let harness = TestHarness::new().await;
-    let root = root_directory(vec![]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
-    let (_proxy, representation) = test_dir
+    let (_proxy, representation) = dir
         .open3_node_repr::<fio::NodeMarker>(
             ".",
             fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_NODE,

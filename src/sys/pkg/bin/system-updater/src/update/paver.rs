@@ -176,10 +176,10 @@ pub fn connect_in_namespace() -> anyhow::Result<(fpaver::DataSinkProxy, fpaver::
     let paver = fuchsia_component::client::connect_to_protocol::<fpaver::PaverMarker>()
         .context("connect to fuchsia.paver.Paver")?;
 
-    let (data_sink, server_end) = fidl::endpoints::create_proxy::<fpaver::DataSinkMarker>()?;
+    let (data_sink, server_end) = fidl::endpoints::create_proxy::<fpaver::DataSinkMarker>();
     let () = paver.find_data_sink(server_end).context("connect to fuchsia.paver.DataSink")?;
 
-    let (boot_manager, server_end) = fidl::endpoints::create_proxy::<fpaver::BootManagerMarker>()?;
+    let (boot_manager, server_end) = fidl::endpoints::create_proxy::<fpaver::BootManagerMarker>();
     let () = paver.find_boot_manager(server_end).context("connect to fuchsia.paver.BootManager")?;
 
     Ok((data_sink, boot_manager))

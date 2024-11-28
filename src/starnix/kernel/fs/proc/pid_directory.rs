@@ -293,7 +293,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
         dir.entry(
             current_task,
             "prev",
-            AttrNode::new(task.clone(), security::ProcAttr::Previous),
+            AttrNode::new(task, security::ProcAttr::Previous),
             mode!(IFREG, 0o444),
         );
     });
@@ -313,6 +313,10 @@ fn static_directory_builder_with_common_task_entries<'a>(
         OomScoreAdjFile::new_node(task.into()),
         mode!(IFREG, 0o744),
     );
+    // TODO(https://fxbug.dev/378715232): For now, we return '0' to allow tools that
+    // attempt to dump process information to read this value, but later work should
+    // return a proper 'wchan'.
+    dir.entry(current_task, "wchan", BytesFile::new_node(b"0".to_vec()), mode!(IFREG, 0o444));
     // proc(5): "The files inside each /proc/pid directory are normally owned by
     // the effective user and effective group ID of the process."
     dir.dir_creds(task.creds().euid_as_fscred());

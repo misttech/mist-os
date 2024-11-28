@@ -323,8 +323,8 @@ func genArgs(
 		imports = append(imports, staticSpec.Board)
 	}
 
-	if staticSpec.MainProductLabel != "" {
-		vars["main_product_label"] = staticSpec.MainProductLabel
+	if staticSpec.MainPbLabel != "" {
+		vars["main_pb_label"] = staticSpec.MainPbLabel
 	}
 
 	if contextSpec.SdkId != "" {

@@ -288,16 +288,7 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
 {
     fasync::Task::local(async move {
         let mut previous_report: Option<InputReport> = None;
-        let (report_reader, server_end) = match fidl::endpoints::create_proxy() {
-            Ok(res) => res,
-            Err(e) => {
-                metrics_logger.log_error(
-                    InputPipelineErrorMetricDimensionEvent::InputDeviceCreateInputReportProxyFailed,
-                    std::format!("error creating InputReport proxy: {:?}", &e),
-                );
-                return; // TODO(https://fxbug.dev/42131965): signal error
-            }
-        };
+        let (report_reader, server_end) = fidl::endpoints::create_proxy();
         let result = device_proxy.get_input_reports_reader(server_end);
         if result.is_err() {
             metrics_logger.log_error(
@@ -459,7 +450,7 @@ pub fn get_device_from_dir_entry_path(
         return Err(format_err!("Failed to get entry path as a string."));
     }
 
-    let (input_device, server) = fidl::endpoints::create_proxy::<InputDeviceMarker>()?;
+    let (input_device, server) = fidl::endpoints::create_proxy::<InputDeviceMarker>();
     fdio::service_connect_at(
         dir_proxy.as_channel().as_ref(),
         input_device_path.unwrap(),
@@ -684,8 +675,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             is_device_type(
@@ -730,8 +720,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             is_device_type(
@@ -765,8 +754,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             !is_device_type(
@@ -809,8 +797,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             is_device_type(
@@ -844,8 +831,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             !is_device_type(
@@ -886,8 +872,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             is_device_type(
@@ -921,8 +906,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             !is_device_type(
@@ -992,8 +976,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         let device_descriptor =
             &input_device_proxy.get_descriptor().await.expect("Failed to get device descriptor");

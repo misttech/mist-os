@@ -55,7 +55,7 @@ impl Service for InputDeviceRegistryService {
 
         let mut manager_stream =
             ServerEnd::<fidl_fuchsia_ui_policy::DeviceListenerRegistryMarker>::new(channel)
-                .into_stream()?;
+                .into_stream();
 
         let listeners_handle = self.listeners.clone();
         let last_event = self.last_sent_event.clone();
@@ -71,16 +71,15 @@ impl Service for InputDeviceRegistryService {
                     responder,
                 } = req
                 {
-                    if let Ok(proxy) = listener.into_proxy() {
-                        // Save the listener.
-                        listeners_handle.write().push(proxy.clone());
-                        // Acknowledge the registration.
-                        responder.send().expect("failed to ack RegisterListener call");
-                        // Send the last event if there was one.
-                        let last_event = last_event.read().clone();
-                        if let Some(event) = last_event {
-                            let _ = proxy.on_event(&event).await;
-                        }
+                    let proxy = listener.into_proxy();
+                    // Save the listener.
+                    listeners_handle.write().push(proxy.clone());
+                    // Acknowledge the registration.
+                    responder.send().expect("failed to ack RegisterListener call");
+                    // Send the last event if there was one.
+                    let last_event = last_event.read().clone();
+                    if let Some(event) = last_event {
+                        let _ = proxy.on_event(&event).await;
                     }
                 }
             }

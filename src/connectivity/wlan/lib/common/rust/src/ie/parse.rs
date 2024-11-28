@@ -89,12 +89,12 @@ pub fn parse_tim<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<TimView<B>>
 
 pub fn parse_country<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<CountryView<B>> {
     let mut reader = BufferReader::new(raw_body);
-    let country_code = reader
-        .read::<[u8; 2]>()
-        .ok_or(FrameParseError(format!("Element body is too short to include a country code")))?;
-    let environment = reader.read_byte().ok_or(FrameParseError(format!(
-        "Element body is too short to include the whole country string"
-    )))?;
+    let country_code = reader.read::<[u8; 2]>().ok_or_else(|| {
+        FrameParseError(format!("Element body is too short to include a country code"))
+    })?;
+    let environment = reader.read_byte().ok_or_else(|| {
+        FrameParseError(format!("Element body is too short to include the whole country string"))
+    })?;
     Ok(CountryView {
         country_code: *country_code,
         environment: CountryEnvironment(environment),
@@ -127,7 +127,7 @@ pub fn parse_transmit_power_envelope<B: SplitByteSlice>(
     let mut reader = BufferReader::new(raw_body);
     let transmit_power_info = reader
         .read::<TransmitPowerInfo>()
-        .ok_or(FrameParseError(format!("Transmit Power Envelope element too short")))?;
+        .ok_or_else(|| FrameParseError(format!("Transmit Power Envelope element too short")))?;
     if transmit_power_info.max_transmit_power_count() > 3 {
         return FrameParseResult::Err(FrameParseError(format!(
             "Invalid transmit power count for Transmit Power Envelope element"
@@ -191,7 +191,9 @@ pub fn parse_channel_switch_wrapper<B: SplitByteSlice>(
 
 pub fn parse_vendor_ie<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<VendorIe<B>> {
     let mut reader = BufferReader::new(raw_body);
-    let oui = *reader.read::<Oui>().ok_or(FrameParseError(format!("Failed to read vendor OUI")))?;
+    let oui = *reader
+        .read::<Oui>()
+        .ok_or_else(|| FrameParseError(format!("Failed to read vendor OUI")))?;
     let vendor_ie = match oui {
         Oui::MSFT => {
             let ie_type = reader.peek_byte();

@@ -73,6 +73,7 @@ def _write_summary_csv(
                 "overriden_conditions",
                 "link",
                 "tracking_issues",
+                "email_subject_lines",
                 "comments",
                 "public_source_mirrors",
                 "is_project_shipped",
@@ -99,6 +100,7 @@ def _write_summary_csv(
             detailed_identifications = []
             detailed_overrides = []
             tracking_issues = []
+            email_subject_lines = []
             comments = []
             public_source_mirrors = []
 
@@ -146,6 +148,8 @@ def _write_summary_csv(
                                 f"{i.identified_as} ({conditions_str}) at {i.start_line}-{i.end_line} overriden to ({r.override_condition_to}) by {r.rule_file_path}"
                             )
                             tracking_issues.append(r.bug)
+                            if r.email_subject_line:
+                                email_subject_lines.append(r.email_subject_line)
                             comment = "{matched_identifications} ({matched_conditions}) -> ({overriden_condition})\n{comment_text}".format(
                                 matched_identifications=",".join(
                                     r.match_identifications.all_expressions
@@ -172,6 +176,9 @@ def _write_summary_csv(
                 ),
                 "overriden_conditions": ",".join(_dedup(final_conditions)),
                 "tracking_issues": "\n".join(_dedup(tracking_issues)),
+                "email_subject_lines": "\n==============\n".join(
+                    _dedup(email_subject_lines)
+                ),
                 "comments": "\n==============\n".join(_dedup(comments)),
                 "public_source_mirrors": "\n".join(
                     _dedup(public_source_mirrors)
@@ -214,6 +221,7 @@ def _write_detailed_csv(
                 "overriden_conditions",
                 "overriding_rules",
                 "tracking_issues",
+                "email_subject_lines",
                 "comments",
                 "public_source_mirrors",
                 "snippet_checksum",
@@ -259,6 +267,15 @@ def _write_detailed_csv(
                                 r.rule_file_path
                                 for r in identification.overriding_rules
                             ]
+                        )
+                        row["email_subject_lines"] = "\n=======\\n".join(
+                            _dedup(
+                                [
+                                    "\n".join(r.email_subject_line)
+                                    for r in identification.overriding_rules
+                                    if r.email_subject_line
+                                ]
+                            )
                         )
                         row["comments"] = "\n=======\\n".join(
                             _dedup(

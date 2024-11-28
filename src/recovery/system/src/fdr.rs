@@ -182,7 +182,7 @@ fn get_other_slot_config(config: Configuration) -> Configuration {
 /// Requires fuchsia.paver.Paver protocol capability.
 pub async fn reset_active_slot() -> Result<(), Error> {
     let paver_proxy = connect_to_protocol::<PaverMarker>().context("failed to connect to paver")?;
-    let (boot_manager, server) = fidl::endpoints::create_proxy::<BootManagerMarker>()?;
+    let (boot_manager, server) = fidl::endpoints::create_proxy::<BootManagerMarker>();
 
     paver_proxy.find_boot_manager(server).context("failed to find boot manager")?;
 
@@ -254,7 +254,7 @@ mod tests {
         let (mut query_last_active_sender, query_last_active_receiver) = mpsc::channel(10);
         let (mut set_active_sender, set_active_receiver) = mpsc::channel(10);
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<BootManagerMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<BootManagerMarker>();
 
         fasync::Task::local(async move {
             while let Some(request) =

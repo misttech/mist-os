@@ -85,6 +85,7 @@ class TestHarness : public fidl::Server<fio_test::TestHarness> {
     config.supports_get_backing_memory(true);
     config.supports_get_token(true);
     config.supports_append(true);
+    config.supports_truncate(true);
     config.supports_modify_directory(true);
     config.supports_mutable_file(true);
     config.supported_attributes(
@@ -97,7 +98,8 @@ class TestHarness : public fidl::Server<fio_test::TestHarness> {
     completer.Reply(config);
   }
 
-  void GetDirectory(GetDirectoryRequest& request, GetDirectoryCompleter::Sync& completer) final {
+  void CreateDirectory(CreateDirectoryRequest& request,
+                       CreateDirectoryCompleter::Sync& completer) final {
     uint64_t test_id = test_counter_.fetch_add(1);
     std::string directory_name = fxl::StringPrintf("test.%ld", test_id);
 
@@ -105,18 +107,18 @@ class TestHarness : public fidl::Server<fio_test::TestHarness> {
     ZX_ASSERT_MSG(test_root.is_ok(), "Failed to create test root: %s", test_root.status_string());
     auto root_dir = fbl::RefPtr<memfs::VnodeDir>::Downcast(*std::move(test_root));
 
-    for (auto& entry : request.root().entries()) {
+    for (auto& entry : request.contents()) {
       AddEntry(*entry, *root_dir);
     }
 
-    zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(request.flags());
-    ZX_ASSERT_MSG(options.is_ok(), "Failed to validate flags: %s", options.status_string());
     zx_status_t status =
-        memfs_->ServeDeprecated(root_dir, request.directory_request().TakeChannel(), *options);
+        memfs_->Serve(root_dir, request.object_request().TakeChannel(), request.flags());
     ZX_ASSERT_MSG(status == ZX_OK, "Failed to serve directory: %s", zx_status_get_string(status));
   }
 
-  void GetServiceDir(GetServiceDirCompleter::Sync& completer) final { ZX_PANIC("Not supported."); }
+  void OpenServiceDirectory(OpenServiceDirectoryCompleter::Sync& completer) final {
+    ZX_PANIC("Not supported.");
+  }
 
  private:
   std::unique_ptr<memfs::Memfs> memfs_;

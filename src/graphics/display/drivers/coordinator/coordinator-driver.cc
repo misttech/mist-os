@@ -14,7 +14,7 @@
 
 #include "src/graphics/display/drivers/coordinator/controller.h"
 
-namespace display {
+namespace display_coordinator {
 
 CoordinatorDriver::CoordinatorDriver(fdf::DriverStartArgs start_args,
                                      fdf::UnownedSynchronizedDispatcher driver_dispatcher)
@@ -96,6 +96,6 @@ void CoordinatorDriver::ConnectProvider(
                                 fidl::kIgnoreBindingClosure);
 }
 
-}  // namespace display
+}  // namespace display_coordinator
 
-FUCHSIA_DRIVER_EXPORT(display::CoordinatorDriver);
+FUCHSIA_DRIVER_EXPORT(display_coordinator::CoordinatorDriver);

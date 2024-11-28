@@ -35,7 +35,7 @@ impl BatterySimulationStateObserver for BatteryManager {
     }
     fn update_simulated_battery_info(&self, battery_info: fpower::BatteryInfo) {
         let mut simulated_battery_info = self.simulated_battery_info.write().unwrap();
-        *simulated_battery_info = battery_info.clone();
+        *simulated_battery_info = battery_info;
         drop(simulated_battery_info);
         self.update_watchers();
     }
@@ -111,7 +111,7 @@ impl BatteryManager {
                 let info = self.get_battery_info_copy();
                 let watchers = self.watchers.clone();
                 debug!("::manager:: run watchers {:?} with info {:?}", &watchers, &info);
-                BatteryManager::run_watchers(watchers.clone(), info.clone());
+                BatteryManager::run_watchers(watchers, info);
             }
             Ok(StatusUpdateResult::DoNotNotify) => {
                 debug!("::manager:: update status unchanged - skipping NOTIFY");
@@ -299,7 +299,7 @@ impl BatteryManager {
     fn update_watchers(&self) {
         let info = self.get_battery_info_copy();
         let watchers = self.watchers.clone();
-        BatteryManager::run_watchers(watchers.clone(), info.clone());
+        BatteryManager::run_watchers(watchers, info);
     }
 
     pub fn is_simulating(&self) -> bool {
@@ -323,7 +323,7 @@ impl BatteryManager {
                             responder.send(&info)?;
                         }
                         fpower::BatteryManagerRequest::Watch { watcher, .. } => {
-                            let watcher = watcher.into_proxy()?;
+                            let watcher = watcher.into_proxy();
                             debug!("::battery_manager_request:: handle Watch request");
                             self.add_watcher(watcher.clone()).await;
 
@@ -413,8 +413,8 @@ mod tests {
         battery_info.level_percent = Some(50.0);
 
         let (watcher_client_end, mut stream) =
-            create_request_stream::<fpower::BatteryInfoWatcherMarker>().unwrap();
-        let watcher = watcher_client_end.into_proxy().unwrap();
+            create_request_stream::<fpower::BatteryInfoWatcherMarker>();
+        let watcher = watcher_client_end.into_proxy();
 
         let watchers = Arc::new(Mutex::new(vec![watcher]));
 
@@ -446,12 +446,12 @@ mod tests {
         battery_info.level_percent = Some(50.0);
 
         let (watcher1_client_end, mut stream1) =
-            create_request_stream::<fpower::BatteryInfoWatcherMarker>().unwrap();
-        let watcher1 = watcher1_client_end.into_proxy().unwrap();
+            create_request_stream::<fpower::BatteryInfoWatcherMarker>();
+        let watcher1 = watcher1_client_end.into_proxy();
 
         let (watcher2_client_end, mut stream2) =
-            create_request_stream::<fpower::BatteryInfoWatcherMarker>().unwrap();
-        let watcher2 = watcher2_client_end.into_proxy().unwrap();
+            create_request_stream::<fpower::BatteryInfoWatcherMarker>();
+        let watcher2 = watcher2_client_end.into_proxy();
 
         let watchers = Arc::new(Mutex::new(vec![watcher1, watcher2]));
 

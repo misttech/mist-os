@@ -32,9 +32,9 @@ async fn run_virtio_vsock(
     let (start_info, guest_cid, listeners, responder) = virtio_vsock_fidl
         .try_next()
         .await?
-        .ok_or(anyhow!("Unexpected end of stream"))?
+        .ok_or_else(|| anyhow!("Unexpected end of stream"))?
         .into_start()
-        .ok_or(anyhow!("Expected Start message"))?;
+        .ok_or_else(|| anyhow!("Expected Start message"))?;
 
     // Prepare the device builder from the start info. The device builder has been initialized
     // with any provided traps and notification sources.
@@ -48,10 +48,7 @@ async fn run_virtio_vsock(
     // Attempt to register any initial listeners before the device starts. Listeners passed this
     // way are guaranteed to be available for even the earliest guest initiated connection.
     let result = listeners.into_iter().try_for_each(|listener| {
-        vsock_device.listen(
-            listener.port,
-            listener.acceptor.into_proxy().map_err(|_| zx::Status::BAD_HANDLE)?,
-        )
+        vsock_device.listen(listener.port, listener.acceptor.into_proxy())
     });
     if result.is_err() {
         responder.send(result.map_err(|status| status.into_raw()))?;
@@ -99,7 +96,7 @@ async fn handle_host_vsock_endpoint(
         .try_for_each_concurrent(None, |request| async {
             match request {
                 HostVsockEndpointRequest::Listen { port, acceptor, responder } => responder.send(
-                    vsock_device.listen(port, acceptor.into_proxy()?).map_err(|err| err.into_raw()),
+                    vsock_device.listen(port, acceptor.into_proxy()).map_err(|err| err.into_raw()),
                 ),
                 HostVsockEndpointRequest::Connect { guest_port, responder } => {
                     vsock_device.client_initiated_connect(guest_port, responder).await

@@ -37,7 +37,7 @@ async fn main() -> Result<(), Error> {
             Ok(response) => {
                 let client = AccessorClient::new(
                     response.peer_id.unwrap(),
-                    response.accessor.unwrap().into_proxy().unwrap(),
+                    response.accessor.unwrap().into_proxy(),
                 );
                 let accessor_loop = start_accessor_loop(client.clone()).fuse();
                 pin_mut!(accessor_loop);

@@ -11,19 +11,15 @@ use core::num::NonZeroU8;
 use core::ops::{Deref as _, DerefMut as _};
 use core::sync::atomic::AtomicU16;
 
-use ip::device::RsTimerId;
 use lock_order::lock::{LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor};
 use lock_order::relation::LockBefore;
 use log::debug;
-use net_types::ip::{
-    AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
-};
+use net_types::ip::{AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
 use net_types::{LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::sync::WeakRc;
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext, ExistsError,
-    InstantBindingsTypes, IpDeviceAddr, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError,
-    RemoveResourceResultWithContext,
+    IpDeviceAddr, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError, RemoveResourceResultWithContext,
 };
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_filter::FilterImpl;
@@ -40,17 +36,17 @@ use netstack3_ip::device::{
     Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState,
     Ipv6DeviceConfiguration, Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
     Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext,
-    RsState, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig,
-    SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
+    RsState, RsTimerId, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
+    SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
 };
 use netstack3_ip::gmp::{
-    GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext,
-    MldContext, MldGroupState, MldStateContext, MulticastGroupSet,
+    GmpGroupState, GmpStateRef, IgmpContext, IgmpSendContext, IgmpState, IgmpStateContext,
+    MldContext, MldSendContext, MldStateContext, MulticastGroupSet,
 };
 use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
-use netstack3_ip::socket::SasCandidate;
 use netstack3_ip::{
-    self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt,
+    self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpDeviceContext,
+    IpDeviceEgressStateContext, IpDeviceIngressStateContext, IpLayerIpExt, IpSasHandler,
     IpSendFrameError, Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
 };
 use packet::{EmptyBuf, InnerPacketBuilder, Serializer};
@@ -219,10 +215,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     IgmpStateContext<BC> for CoreCtx<'_, BC, L>
 {
-    fn with_igmp_state<
-        O,
-        F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<BC::Instant>>) -> O,
-    >(
+    fn with_igmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<BC>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -237,10 +230,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
     MldStateContext<BC> for CoreCtx<'_, BC, L>
 {
-    fn with_mld_state<
-        O,
-        F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<BC::Instant>>) -> O,
-    >(
+    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<BC>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -300,7 +290,7 @@ impl<
         BT: IpDeviceStateBindingsTypes,
         I: Ip + IpLayerIpExt + IpDeviceIpExt,
         Devices: Iterator<Item = Accessor::DeviceId>,
-        Accessor: IpDeviceStateContext<I, BT> + GmpQueryHandler<I, BT>,
+        Accessor: IpDeviceStateContext<I, BT>,
     > Iterator for FilterPresentWithDevices<I, Devices, Accessor, BT>
 where
     <I as IpDeviceIpExt>::State<BT>: 's,
@@ -318,7 +308,7 @@ where
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    ip::IpDeviceStateContext<Ipv4> for CoreCtx<'_, BC, L>
+    IpDeviceEgressStateContext<Ipv4> for CoreCtx<'_, BC, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateNextPacketId>())
@@ -327,19 +317,19 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     fn get_local_addr_for_remote(
         &mut self,
         device_id: &Self::DeviceId,
-        _remote: Option<SpecifiedAddr<Ipv4Addr>>,
+        remote: Option<SpecifiedAddr<Ipv4Addr>>,
     ) -> Option<IpDeviceAddr<Ipv4Addr>> {
-        device::IpDeviceStateContext::<Ipv4, _>::with_address_ids(
-            self,
-            device_id,
-            |mut addrs, _core_ctx| addrs.next().as_ref().map(IpAddressId::addr),
-        )
+        IpSasHandler::<Ipv4, _>::get_local_addr_for_remote(self, device_id, remote)
     }
 
     fn get_hop_limit(&mut self, _device_id: &Self::DeviceId) -> NonZeroU8 {
         DEFAULT_TTL
     }
+}
 
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
+    IpDeviceIngressStateContext<Ipv4> for CoreCtx<'_, BC, L>
+{
     fn address_status_for_device(
         &mut self,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
@@ -350,7 +340,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>>
-    ip::IpDeviceContext<Ipv4> for CoreCtx<'_, BC, L>
+    IpDeviceContext<Ipv4> for CoreCtx<'_, BC, L>
 {
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
         is_ip_device_enabled::<Ipv4, _, _>(self, device_id)
@@ -388,34 +378,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     }
 }
 
-fn get_ipv6_sas_candidate<
-    BT: InstantBindingsTypes,
-    CC: device::IpDeviceAddressContext<Ipv6, BT>,
->(
-    core_ctx: &mut CC,
-    device_id: &CC::DeviceId,
-    addr_id: &CC::AddressId,
-) -> SasCandidate<CC::DeviceId> {
-    core_ctx.with_ip_address_state(
-        device_id,
-        &addr_id,
-        |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config }| {
-            SasCandidate {
-                addr_sub: addr_id.addr_sub(),
-                assigned: *assigned,
-                // Assume an address is deprecated if config
-                // is not available. That means the address
-                // is going away, so we should not prefer
-                // it.
-                deprecated: config.map(|c| c.is_deprecated()).unwrap_or(true),
-                device: device_id.clone(),
-            }
-        },
-    )
-}
-
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    ip::IpDeviceStateContext<Ipv6> for CoreCtx<'_, BC, L>
+    IpDeviceEgressStateContext<Ipv6> for CoreCtx<'_, BC, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&()) -> O>(&self, cb: F) -> O {
         cb(&())
@@ -426,23 +390,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         device_id: &Self::DeviceId,
         remote: Option<SpecifiedAddr<Ipv6Addr>>,
     ) -> Option<IpDeviceAddr<Ipv6Addr>> {
-        device::IpDeviceStateContext::<Ipv6, BC>::with_address_ids(
-            self,
-            device_id,
-            |addrs, core_ctx| {
-                IpDeviceAddr::new_from_ipv6_source(ip::socket::select_ipv6_source_address(
-                    remote,
-                    device_id,
-                    addrs.map(|addr_id| get_ipv6_sas_candidate(core_ctx, device_id, &addr_id)),
-                ))
-            },
-        )
+        ip::IpSasHandler::<Ipv6, _>::get_local_addr_for_remote(self, device_id, remote)
     }
 
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8 {
         get_ipv6_hop_limit(self, device_id)
     }
+}
 
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
+    IpDeviceIngressStateContext<Ipv6> for CoreCtx<'_, BC, L>
+{
     fn address_status_for_device(
         &mut self,
         addr: SpecifiedAddr<Ipv6Addr>,
@@ -514,8 +472,11 @@ impl<
     }
 }
 
-impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>
-    ip::IpDeviceMtuContext<I> for CoreCtx<'_, BC, L>
+impl<
+        I: IpExt,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
+    > ip::IpDeviceMtuContext<I> for CoreCtx<'_, BC, L>
 {
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
         crate::device::integration::get_mtu(self, device_id)
@@ -569,7 +530,15 @@ impl<'a, I: gmp::IpExt + IpDeviceIpExt, BC: BindingsContext>
         BC,
     >
 {
-    type IpDeviceStateCtx<'s> = CoreCtxWithIpDeviceConfiguration<'s, &'s <I as IpDeviceIpExt>::Configuration, WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<I>>, BC> where Self: 's;
+    type IpDeviceStateCtx<'s>
+        = CoreCtxWithIpDeviceConfiguration<
+        's,
+        &'s <I as IpDeviceIpExt>::Configuration,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<I>>,
+        BC,
+    >
+    where
+        Self: 's;
 
     fn ip_device_configuration_and_ctx(
         &mut self,
@@ -602,7 +571,15 @@ impl<'a, BC: BindingsContext> device::WithIpv6DeviceConfigurationMutInner<BC>
         BC,
     >
 {
-    type Ipv6DeviceStateCtx<'s> = CoreCtxWithIpDeviceConfiguration<'s, &'s Ipv6DeviceConfiguration, WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>, BC> where Self: 's;
+    type Ipv6DeviceStateCtx<'s>
+        = CoreCtxWithIpDeviceConfiguration<
+        's,
+        &'s Ipv6DeviceConfiguration,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
+        BC,
+    >
+    where
+        Self: 's;
 
     fn ipv6_device_configuration_and_ctx(
         &mut self,
@@ -686,7 +663,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
     }
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
     DadAddressContext<BC>
     for CoreCtxWithIpDeviceConfiguration<'_, &'_ Ipv6DeviceConfiguration, L, BC>
 {
@@ -873,22 +850,14 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
         body: F,
     ) -> Result<(), IpSendFrameError<S>> {
         let Self { config: _, core_ctx } = self;
+
         let dst_ip = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS.into_specified();
-        let src_ip = device::IpDeviceStateContext::<Ipv6, BC>::with_address_ids(
+        let src_ip = ip::IpSasHandler::<Ipv6, _>::get_local_addr_for_remote(
             core_ctx,
             device_id,
-            |addrs, core_ctx| {
-                ip::socket::select_ipv6_source_address(
-                    Some(dst_ip),
-                    device_id,
-                    addrs.map(|addr_id| get_ipv6_sas_candidate(core_ctx, device_id, &addr_id)),
-                )
-            },
-        );
-        let src_ip = match src_ip {
-            Ipv6SourceAddr::Unicast(addr) => Some(*addr),
-            Ipv6SourceAddr::Unspecified => None,
-        };
+            Some(dst_ip),
+        )
+        .and_then(|addr| UnicastAddr::new(addr.addr()));
         ip::icmp::send_ndp_packet(
             core_ctx,
             bindings_ctx,
@@ -906,7 +875,7 @@ impl<
         I: IpExt,
         Config,
         BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::DeviceLayerState>,
+        L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
     > ip::IpDeviceMtuContext<I> for CoreCtxWithIpDeviceConfiguration<'_, Config, L, BC>
 {
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
@@ -1193,11 +1162,17 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
         BC,
     >
 {
+    type SendContext<'b> = CoreCtx<'b, BC, WrapLockLevel<crate::lock_ordering::IpDeviceGmp<Ipv4>>>;
+
     /// Calls the function with a mutable reference to the device's IGMP state
     /// and whether or not IGMP is enabled for the `device`.
     fn with_igmp_state_mut<
         O,
-        F: FnOnce(GmpStateRef<'_, Ipv4, Self, BC>, &mut IgmpState<BC>) -> O,
+        F: for<'b> FnOnce(
+            Self::SendContext<'b>,
+            GmpStateRef<'b, Ipv4, Self, BC>,
+            &'b mut IgmpState<BC>,
+        ) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -1207,25 +1182,35 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
         let Ipv4DeviceConfiguration { ip_config: IpDeviceConfiguration { gmp_enabled, .. } } =
             Borrow::borrow(&*config);
 
-        let mut state = crate::device::integration::ip_device_state(core_ctx, device);
+        let mut state = crate::device::integration::ip_device_state_and_core_ctx(core_ctx, device);
         // Note that changes to `ip_enabled` is not possible in this context
         // since IP enabled changes are only performed while the IP device
         // configuration lock is held exclusively. Since we have access to
         // the IP device configuration here (`config`), we know changes to
         // IP enabled are not possible.
-        let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv4>>().ip_enabled;
-        let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
-        let IpDeviceMulticastGroups { groups, gmp, gmp_proto } = &mut *state;
+        let ip_enabled = state
+            .lock_with::<crate::lock_ordering::IpDeviceFlags<Ipv4>, _>(|x| x.right())
+            .ip_enabled;
+        let (mut state, mut locked) =
+            state.write_lock_with_and::<crate::lock_ordering::IpDeviceGmp<Ipv4>, _>(|x| x.right());
+        let IpDeviceMulticastGroups { groups, gmp, gmp_proto, gmp_config } = &mut *state;
         let enabled = ip_enabled && *gmp_enabled;
-        cb(GmpStateRef { enabled, groups, gmp }, gmp_proto)
+        cb(
+            locked.cast_core_ctx(),
+            GmpStateRef { enabled, groups, gmp, config: gmp_config },
+            gmp_proto,
+        )
     }
+}
 
+impl<'a, BC: BindingsContext> IgmpSendContext<BC>
+    for CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
+{
     fn get_ip_addr_subnet(
         &mut self,
         device: &Self::DeviceId,
     ) -> Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>> {
-        let Self { config: _, core_ctx } = self;
-        ip::device::get_ipv4_addr_subnet(core_ctx, device)
+        ip::device::get_ipv4_addr_subnet(self, device)
     }
 }
 
@@ -1233,10 +1218,15 @@ impl<
         'a,
         Config: Borrow<Ipv6DeviceConfiguration>,
         BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>,
+        L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>,
     > MldContext<BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
-    fn with_mld_state_mut<O, F: FnOnce(GmpStateRef<'_, Ipv6, Self, BC>) -> O>(
+    type SendContext<'b> = CoreCtx<'b, BC, WrapLockLevel<crate::lock_ordering::IpDeviceGmp<Ipv6>>>;
+
+    fn with_mld_state_mut<
+        O,
+        F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, Self, BC>) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -1249,21 +1239,27 @@ impl<
             ip_config: IpDeviceConfiguration { gmp_enabled, .. },
         } = Borrow::borrow(&*config);
 
-        let mut state = crate::device::integration::ip_device_state(core_ctx, device);
-        let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv6>>().ip_enabled;
-        let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
-        let IpDeviceMulticastGroups { groups, gmp, .. } = &mut *state;
+        let mut state = crate::device::integration::ip_device_state_and_core_ctx(core_ctx, device);
+        let ip_enabled = state
+            .lock_with::<crate::lock_ordering::IpDeviceFlags<Ipv6>, _>(|x| x.right())
+            .ip_enabled;
+        let (mut state, mut locked) =
+            state.write_lock_with_and::<crate::lock_ordering::IpDeviceGmp<Ipv6>, _>(|x| x.right());
+        let IpDeviceMulticastGroups { groups, gmp, gmp_config, gmp_proto: _ } = &mut *state;
         let enabled = ip_enabled && *gmp_enabled;
-        cb(GmpStateRef { enabled, groups, gmp })
+        cb(locked.cast_core_ctx(), GmpStateRef { enabled, groups, gmp, config: gmp_config })
     }
+}
 
+impl<'a, BC: BindingsContext> MldSendContext<BC>
+    for CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
+{
     fn get_ipv6_link_local_addr(
         &mut self,
         device: &Self::DeviceId,
     ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
-        let Self { config: _, core_ctx } = self;
         device::IpDeviceStateContext::<Ipv6, BC>::with_address_ids(
-            core_ctx,
+            self,
             device,
             |mut addrs, core_ctx| {
                 addrs.find_map(|addr_id| {
@@ -1341,7 +1337,10 @@ impl<
         L: LockBefore<crate::lock_ordering::FilterState<I>>,
     > FilterHandlerProvider<I, BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
-    type Handler<'b> = FilterImpl<'b, CoreCtx<'a, BC, L>> where Self: 'b;
+    type Handler<'b>
+        = FilterImpl<'b, CoreCtx<'a, BC, L>>
+    where
+        Self: 'b;
 
     fn filter_handler(&mut self) -> Self::Handler<'_> {
         let Self { config: _, core_ctx } = self;
@@ -1355,15 +1354,15 @@ impl<
         I: IpLayerIpExt,
         Config,
         BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::IpState<I>>,
-    > ip::IpDeviceStateContext<I> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+        L: LockBefore<crate::lock_ordering::IpDeviceGmp<I>>,
+    > IpDeviceEgressStateContext<I> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
     fn with_next_packet_id<O, F: FnOnce(&<I as IpLayerIpExt>::PacketIdState) -> O>(
         &self,
         cb: F,
     ) -> O {
         let Self { config: _, core_ctx } = self;
-        ip::IpDeviceStateContext::<I>::with_next_packet_id(core_ctx, cb)
+        IpDeviceEgressStateContext::<I>::with_next_packet_id(core_ctx, cb)
     }
 
     fn get_local_addr_for_remote(
@@ -1372,21 +1371,31 @@ impl<
         remote: Option<SpecifiedAddr<<I as Ip>::Addr>>,
     ) -> Option<IpDeviceAddr<<I as Ip>::Addr>> {
         let Self { config: _, core_ctx } = self;
-        ip::IpDeviceStateContext::<I>::get_local_addr_for_remote(core_ctx, device_id, remote)
+        IpDeviceEgressStateContext::<I>::get_local_addr_for_remote(core_ctx, device_id, remote)
     }
 
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8 {
         let Self { config: _, core_ctx } = self;
-        ip::IpDeviceStateContext::<I>::get_hop_limit(core_ctx, device_id)
+        IpDeviceEgressStateContext::<I>::get_hop_limit(core_ctx, device_id)
     }
+}
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<
+        'a,
+        I: IpLayerIpExt,
+        Config,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::IpDeviceGmp<I>>,
+    > IpDeviceIngressStateContext<I> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+{
     fn address_status_for_device(
         &mut self,
         dst_ip: SpecifiedAddr<<I as Ip>::Addr>,
         device_id: &Self::DeviceId,
     ) -> AddressStatus<<I as IpLayerIpExt>::AddressStatus> {
         let Self { config: _, core_ctx } = self;
-        ip::IpDeviceStateContext::<I>::address_status_for_device(core_ctx, dst_ip, device_id)
+        IpDeviceIngressStateContext::<I>::address_status_for_device(core_ctx, dst_ip, device_id)
     }
 }
 
@@ -1394,7 +1403,10 @@ impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::NudCounter
     for StackState<BC>
 {
     type Data = NudCounters<I>;
-    type Guard<'l> = &'l NudCounters<I> where Self: 'l;
+    type Guard<'l>
+        = &'l NudCounters<I>
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         self.nud_counters()
@@ -1529,7 +1541,10 @@ impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv6AddressEntry<BT>>
 
 impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::SlaacCounters> for StackState<BT> {
     type Data = SlaacCounters;
-    type Guard<'l> = &'l SlaacCounters where Self: 'l;
+    type Guard<'l>
+        = &'l SlaacCounters
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.ipv6.slaac_counters

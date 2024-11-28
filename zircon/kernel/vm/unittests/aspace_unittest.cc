@@ -1261,17 +1261,13 @@ static bool vmaspace_nested_attribution_test() {
   ASSERT_EQ(ZX_OK, status);
 
   // Verify that the two pages are counted for the parent vmar chain.
-  VmObject::AttributionCounts counts = mapping->GetAttributedMemory();
-  ASSERT_EQ(2ul * PAGE_SIZE, counts.uncompressed_bytes);
-
-  counts = subvmar2->GetAttributedMemory();
-  ASSERT_EQ(2ul * PAGE_SIZE, counts.uncompressed_bytes);
-
-  counts = subvmar1->GetAttributedMemory();
-  ASSERT_EQ(2ul * PAGE_SIZE, counts.uncompressed_bytes);
-
-  counts = vmar->GetAttributedMemory();
-  ASSERT_EQ(2ul * PAGE_SIZE, counts.uncompressed_bytes);
+  ASSERT_TRUE(make_private_attribution_counts(2ul * PAGE_SIZE, 0) ==
+              mapping->GetAttributedMemory());
+  ASSERT_TRUE(make_private_attribution_counts(2ul * PAGE_SIZE, 0) ==
+              subvmar2->GetAttributedMemory());
+  ASSERT_TRUE(make_private_attribution_counts(2ul * PAGE_SIZE, 0) ==
+              subvmar1->GetAttributedMemory());
+  ASSERT_TRUE(make_private_attribution_counts(2ul * PAGE_SIZE, 0) == vmar->GetAttributedMemory());
 
   END_TEST;
 }
@@ -1315,12 +1311,12 @@ static bool vm_mapping_attribution_commit_decommit_test() {
   status = vmo->CommitRange(4 * PAGE_SIZE, 8 * PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   expected_vmo_gen_count += 8;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 8ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_vmo_gen_count,
+                                             make_private_attribution_counts(8ul * PAGE_SIZE, 0)));
   EXPECT_EQ(true, verify_mapping_memory_attribution(
                       mapping.get(), expected_mapping_gen_count, expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 4ul * PAGE_SIZE}));
+                      make_private_attribution_counts(4ul * PAGE_SIZE, 0)));
 
   // Decommit the pages committed above, returning the VMO to zero committed pages.
   // Should increment the vmo generation count, but not the mapping generation count.
@@ -1337,21 +1333,21 @@ static bool vm_mapping_attribution_commit_decommit_test() {
   status = vmo->CommitRange(0, 10 * PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   expected_vmo_gen_count += 10;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 10ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_vmo_gen_count,
+                                             make_private_attribution_counts(10ul * PAGE_SIZE, 0)));
   EXPECT_EQ(true, verify_mapping_memory_attribution(
                       mapping.get(), expected_mapping_gen_count, expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 8ul * PAGE_SIZE}));
+                      make_private_attribution_counts(8ul * PAGE_SIZE, 0)));
 
   // Decommit pages in the vmo via the mapping.
   // Should increment the vmo generation count, not the mapping generation count.
   status = mapping->DecommitRange(0, mapping->size_locking());
   ASSERT_EQ(ZX_OK, status);
   ++expected_vmo_gen_count;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_vmo_gen_count,
+                                             make_private_attribution_counts(2ul * PAGE_SIZE, 0)));
   EXPECT_EQ(true, verify_mapping_memory_attribution(mapping.get(), expected_mapping_gen_count,
                                                     expected_vmo_gen_count, AttributionCounts{}));
 
@@ -1361,15 +1357,16 @@ static bool vm_mapping_attribution_commit_decommit_test() {
   ASSERT_EQ(ZX_OK, status);
   EXPECT_EQ(0ul, mapping->size_locking());
   ++expected_mapping_gen_count;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_vmo_gen_count,
+                                             make_private_attribution_counts(2ul * PAGE_SIZE, 0)));
   EXPECT_EQ(expected_mapping_gen_count, mapping->GetMappingGenerationCount());
-  EXPECT_EQ(0ul, mapping->GetAttributedMemory().uncompressed_bytes);
+
+  EXPECT_TRUE((vm::AttributionCounts{}) == mapping->GetAttributedMemory());
   VmMapping::CachedMemoryAttribution attr = mapping->GetCachedMemoryAttribution();
   EXPECT_EQ(0ul, attr.mapping_generation_count);
   EXPECT_EQ(0ul, attr.vmo_generation_count);
-  EXPECT_EQ(0ul, attr.attribution_counts.uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == attr.attribution_counts);
 
   // Free the test address space.
   status = aspace->Destroy();
@@ -1417,12 +1414,12 @@ static bool vm_mapping_attribution_map_unmap_test() {
   status = mapping->MapRange(0, mapping->size_locking(), true);
   ASSERT_EQ(ZX_OK, status);
   expected_vmo_gen_count += 8;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 8ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_vmo_gen_count,
+                                             make_private_attribution_counts(8ul * PAGE_SIZE, 0)));
   EXPECT_EQ(true, verify_mapping_memory_attribution(
                       mapping.get(), expected_mapping_gen_count, expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 8ul * PAGE_SIZE}));
+                      make_private_attribution_counts(8ul * PAGE_SIZE, 0)));
 
   // Unmap from the right end of the mapping.
   // Should increment the mapping generation count.
@@ -1432,12 +1429,12 @@ static bool vm_mapping_attribution_map_unmap_test() {
   EXPECT_EQ(old_base, mapping->base_locking());
   EXPECT_EQ(7ul * PAGE_SIZE, mapping->size_locking());
   ++expected_mapping_gen_count;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 8ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_vmo_gen_count,
+                                             make_private_attribution_counts(8ul * PAGE_SIZE, 0)));
   EXPECT_EQ(true, verify_mapping_memory_attribution(
                       mapping.get(), expected_mapping_gen_count, expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 7ul * PAGE_SIZE}));
+                      make_private_attribution_counts(7ul * PAGE_SIZE, 0)));
 
   // Unmap from the center of the mapping.
   // Should increment the mapping generation count.
@@ -1446,12 +1443,12 @@ static bool vm_mapping_attribution_map_unmap_test() {
   EXPECT_EQ(old_base, mapping->base_locking());
   EXPECT_EQ(4ul * PAGE_SIZE, mapping->size_locking());
   ++expected_mapping_gen_count;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 8ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_vmo_gen_count,
+                                             make_private_attribution_counts(8ul * PAGE_SIZE, 0)));
   EXPECT_EQ(true, verify_mapping_memory_attribution(
                       mapping.get(), expected_mapping_gen_count, expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 4ul * PAGE_SIZE}));
+                      make_private_attribution_counts(4ul * PAGE_SIZE, 0)));
 
   // Unmap from the left end of the mapping.
   // Should increment the mapping generation count.
@@ -1460,12 +1457,12 @@ static bool vm_mapping_attribution_map_unmap_test() {
   EXPECT_NE(old_base, mapping->base_locking());
   EXPECT_EQ(3ul * PAGE_SIZE, mapping->size_locking());
   ++expected_mapping_gen_count;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 8ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_vmo_gen_count,
+                                             make_private_attribution_counts(8ul * PAGE_SIZE, 0)));
   EXPECT_EQ(true, verify_mapping_memory_attribution(
                       mapping.get(), expected_mapping_gen_count, expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 3ul * PAGE_SIZE}));
+                      make_private_attribution_counts(3ul * PAGE_SIZE, 0)));
 
   // Free the test address space.
   status = aspace->Destroy();
@@ -1526,10 +1523,10 @@ static bool vm_mapping_attribution_merge_test() {
   ASSERT_EQ(ZX_OK, status);
   expected_vmo_gen_count += 16;
   for (int i = 0; i < 4; i++) {
-    mappings[i].expected_attribution_counts.uncompressed_bytes += 4ul * PAGE_SIZE;
+    mappings[i].expected_attribution_counts = make_private_attribution_counts(4ul * PAGE_SIZE, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(
                         vmo.get(), expected_vmo_gen_count,
-                        AttributionCounts{.uncompressed_bytes = 16ul * PAGE_SIZE}));
+                        make_private_attribution_counts(16ul * PAGE_SIZE, 0)));
     EXPECT_EQ(true, verify_mapping_memory_attribution(
                         mappings[i].ptr, mappings[i].expected_gen_count, expected_vmo_gen_count,
                         mappings[i].expected_attribution_counts));
@@ -1542,7 +1539,7 @@ static bool vm_mapping_attribution_merge_test() {
   for (int i = 0; i < 4; i++) {
     EXPECT_EQ(true, verify_object_memory_attribution(
                         vmo.get(), expected_vmo_gen_count,
-                        AttributionCounts{.uncompressed_bytes = 16ul * PAGE_SIZE}));
+                        make_private_attribution_counts(16ul * PAGE_SIZE, 0)));
     EXPECT_EQ(true, verify_mapping_memory_attribution(
                         mappings[i].ptr, mappings[i].expected_gen_count, expected_vmo_gen_count,
                         mappings[i].expected_attribution_counts));
@@ -1556,7 +1553,7 @@ static bool vm_mapping_attribution_merge_test() {
   for (int i = 0; i < 3; i++) {
     EXPECT_EQ(true, verify_object_memory_attribution(
                         vmo.get(), expected_vmo_gen_count,
-                        AttributionCounts{.uncompressed_bytes = 16ul * PAGE_SIZE}));
+                        make_private_attribution_counts(16ul * PAGE_SIZE, 0)));
     EXPECT_EQ(true, verify_mapping_memory_attribution(
                         mappings[i].ptr, mappings[i].expected_gen_count, expected_vmo_gen_count,
                         mappings[i].expected_attribution_counts));
@@ -1569,9 +1566,9 @@ static bool vm_mapping_attribution_merge_test() {
   ++mappings[0].expected_gen_count;
   mappings[0].expected_attribution_counts += mappings[1].expected_attribution_counts;
   mappings[0].expected_attribution_counts += mappings[2].expected_attribution_counts;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_vmo_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 16ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_vmo_gen_count,
+                                             make_private_attribution_counts(16ul * PAGE_SIZE, 0)));
   EXPECT_EQ(true, verify_mapping_memory_attribution(mappings[0].ptr, mappings[0].expected_gen_count,
                                                     expected_vmo_gen_count,
                                                     mappings[0].expected_attribution_counts));
@@ -1997,9 +1994,9 @@ static bool arch_vm_aspace_protect_split_pages_out_of_memory() {
   END_TEST;
 }
 
-// Test to make sure all the vm kernel regions (code, rodata, data, bss, etc.) is correctly mapped
-// in vm and has the correct arch_mmu_flags. This test also check that all gaps are contained within
-// a VMAR.
+// Test to make sure all the vm kernel regions (code, rodata, data, bss, etc.) are correctly mapped
+// in vm and have the correct arch_mmu_flags. This test also check that all gaps are contained
+// within a VMAR.
 static bool vm_kernel_region_test() {
   BEGIN_TEST;
 
@@ -2008,7 +2005,7 @@ static bool vm_kernel_region_test() {
           reinterpret_cast<vaddr_t>(__executable_start));
   EXPECT_NE(kernel_vmar.get(), nullptr);
   EXPECT_FALSE(kernel_vmar->is_mapping());
-  for (vaddr_t base = reinterpret_cast<vaddr_t>(__code_start);
+  for (vaddr_t base = reinterpret_cast<vaddr_t>(__executable_start);
        base < reinterpret_cast<vaddr_t>(_end); base += PAGE_SIZE) {
     bool within_region = false;
     for (const auto& kernel_region : kernel_regions) {

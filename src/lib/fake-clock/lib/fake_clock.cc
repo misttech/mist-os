@@ -239,7 +239,7 @@ __EXPORT zx_status_t zx_timer_create(uint32_t options, zx_clock_t clock_id, zx_h
   // ZX_EVENTPAIR_SIGNALED and ZX_TIMER_SIGNAL collide, this assertion protects that assumption more
   // strongly.
   static_assert(ZX_EVENTPAIR_SIGNALED == ZX_TIMER_SIGNALED);
-  if (clock_id != ZX_CLOCK_MONOTONIC) {
+  if (clock_id != ZX_CLOCK_MONOTONIC && clock_id != ZX_CLOCK_BOOT) {
     // NOTE: _zx_timer_create will just fail according to the docs.
     return _zx_timer_create(options, clock_id, out);
   }

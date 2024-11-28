@@ -15,10 +15,7 @@ driver_bind_rules("goldfish-display-bind") {
 
 fuchsia_cc_driver("goldfish-display-driver") {
   output_name = "goldfish-display"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+  configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
 
   deps = [
     ":common",
@@ -44,7 +41,6 @@ fuchsia_driver_package("goldfish_display") {
 
 source_set("common") {
   visibility = [ ":*" ]
-  configs += [ "//build/config:all_source" ]
   sources = [
     "display-driver.cc",
     "display-driver.h",
@@ -72,7 +68,7 @@ source_set("common") {
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
     "//src/devices/lib/goldfish/pipe_headers",
     "//src/devices/lib/goldfish/pipe_io",
-    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/api-types/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/image-format",
@@ -84,7 +80,6 @@ source_set("common") {
 }
 
 test("goldfish-unittests") {
-  configs += [ "//build/config:all_source" ]
   sources = [ "display-engine-test.cc" ]
 
   deps = [

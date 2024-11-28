@@ -85,17 +85,10 @@ pub fn send_on_open_with_error(
         return;
     }
 
-    match server_end.into_stream_and_control_handle() {
-        Ok((_, control_handle)) => {
-            // Same as above, ignore the error.
-            let _ = control_handle.send_on_open_(status.into_raw(), None);
-            control_handle.shutdown_with_epitaph(status);
-        }
-        Err(_) => {
-            // Same as above, ignore the error.
-            return;
-        }
-    }
+    let (_, control_handle) = server_end.into_stream_and_control_handle();
+    // Same as above, ignore the error.
+    let _ = control_handle.send_on_open_(status.into_raw(), None);
+    control_handle.shutdown_with_epitaph(status);
 }
 
 /// Trait to be used as a supertrait when an object should allow dynamic casting to an Any.
@@ -128,16 +121,7 @@ pub async fn extended_attributes_sender(
     iterator: ServerEnd<fio::ExtendedAttributeIteratorMarker>,
     attributes: Vec<Vec<u8>>,
 ) {
-    let mut stream = match iterator.into_stream() {
-        Ok(stream) => stream,
-        Err(error) => {
-            tracing::error!(
-                ?error,
-                "failed to turn extended attributes iterator request into a stream!"
-            );
-            return;
-        }
-    };
+    let mut stream = iterator.into_stream();
 
     let mut chunks = attributes.chunks(fio::MAX_LIST_ATTRIBUTES_CHUNK as usize).peekable();
 

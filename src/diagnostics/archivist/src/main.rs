@@ -26,15 +26,12 @@ const INSPECTOR_SIZE: usize = 2 * 1024 * 1024 /* 2MB */;
 
 fn main() -> Result<(), Error> {
     let config = Config::take_from_startup_handle();
-    let num_threads = config.num_threads;
-    debug!("Running executor with {} threads.", num_threads);
-    if num_threads == 1 {
-        let mut executor = fasync::LocalExecutor::new();
-        executor.run_singlethreaded(async_main(config)).context("async main")?;
-    } else {
-        let mut executor = fasync::SendExecutor::new(num_threads as usize - 1);
-        executor.run(async_main(config)).context("async main")?;
-    }
+    // The executor will spin up an extra thread which is only for monitoring, so we ignore that.
+    // Non-legacy sockets are serviced from a dedicated thread (which isn't counted here).  We
+    // *must* always use a multi-threaded executor because we use `fasync::EHandle::poll_tasks`
+    // which requires it.
+    let mut executor = fasync::SendExecutor::new(config.num_threads as usize);
+    executor.run(async_main(config)).context("async main")?;
     debug!("Exiting.");
     Ok(())
 }
@@ -46,8 +43,7 @@ async fn async_main(config: Config) -> Result<(), Error> {
         .record_child("config", |config_node| config.record_inspect(config_node));
 
     let is_embedded = !config.log_to_debuglog;
-    let mut archivist = Archivist::new(config).await;
-    archivist.set_lifecycle_request_stream(component_lifecycle::take_lifecycle_request_stream());
+    let archivist = Archivist::new(config).await;
     debug!("Archivist initialized from configuration.");
 
     let startup_handle =
@@ -56,7 +52,8 @@ async fn async_main(config: Config) -> Result<(), Error> {
 
     let mut fs = ServiceFs::new();
     fs.serve_connection(fidl::endpoints::ServerEnd::new(zx::Channel::from(startup_handle)))?;
-    archivist.run(fs, is_embedded).await?;
+    let lifecycle_requests = component_lifecycle::take_lifecycle_request_stream();
+    archivist.run(fs, is_embedded, lifecycle_requests).await?;
 
     Ok(())
 }

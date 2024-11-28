@@ -4,6 +4,8 @@
 
 mod log;
 mod log_settings;
+mod log_stream;
 
 pub use log::LogServer;
 pub use log_settings::LogSettingsServer;
+pub use log_stream::LogStreamServer;

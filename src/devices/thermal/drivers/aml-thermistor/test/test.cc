@@ -133,11 +133,22 @@ TEST_F(ThermistorDeviceTest, GetTemperatureCelsius) {
     EXPECT_TRUE(FloatNear(result->temp(), ntc_info[0].profile[ntc_idx].temperature_c));
   }
 
-  {  // set read value to 0, which should be out of range of the ntc table
+  {  // set read value to 0, which should be out of range of the ntc table. Cap at last index.
     adc_.SyncCall([&](std::unique_ptr<TestSarAdc>* adc) { (*adc)->set_normalized_sample(0); });
     auto result = client_->GetTemperatureCelsius();
     EXPECT_TRUE(result.is_ok());
-    EXPECT_NOT_OK(result->status());
+    EXPECT_OK(result->status());
+    EXPECT_TRUE(FloatNear(result->temp(), ntc_info[0].profile[33].temperature_c));
+  }
+
+  {  // set read value to 0.99999, which should be out of range of the ntc table. Cap at first
+     // index.
+    adc_.SyncCall(
+        [&](std::unique_ptr<TestSarAdc>* adc) { (*adc)->set_normalized_sample(0.99999f); });
+    auto result = client_->GetTemperatureCelsius();
+    EXPECT_TRUE(result.is_ok());
+    EXPECT_OK(result->status());
+    EXPECT_TRUE(FloatNear(result->temp(), ntc_info[0].profile[0].temperature_c));
   }
 
   {  // set read value to max, which should be out of range of ntc table

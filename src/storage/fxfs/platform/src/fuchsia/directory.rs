@@ -9,7 +9,7 @@ use crate::fuchsia::node::{FxNode, GetResult, OpenedNode};
 use crate::fuchsia::symlink::FxSymlink;
 use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume, RootDir};
 use anyhow::{bail, Error};
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
 use base64::engine::Engine as _;
 use either::{Left, Right};
 use fidl::endpoints::ServerEnd;
@@ -774,7 +774,7 @@ impl VfsDirectory for FxDirectory {
                         }
                         .boxed())
                     } else {
-                        FxFile::create_connection_async(node, scope, flags, object_request)
+                        FxFile::create_connection_async(node, scope, flags, object_request).await
                     }
                 } else if node.is::<FxSymlink>() {
                     let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
@@ -816,7 +816,7 @@ impl VfsDirectory for FxDirectory {
                     )
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
-                    FxFile::create_connection_async(node, scope, flags, object_request)
+                    FxFile::create_connection_async(node, scope, flags, object_request).await
                 } else if node.is::<FxSymlink>() {
                     let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
                     object_request.create_connection(
@@ -894,10 +894,11 @@ impl VfsDirectory for FxDirectory {
                 };
                 let mut name_bytes_mut = name_bytes.clone();
                 let name = if let Some(key) = &key {
-                    key.decrypt_filename(&mut name_bytes_mut).map_err(map_to_status)?;
+                    key.decrypt_filename(self.object_id(), &mut name_bytes_mut)
+                        .map_err(map_to_status)?;
                     String::from_utf8(name_bytes_mut).map_err(|_| Err(zx::Status::BAD_STATE))?
                 } else {
-                    BASE64_STANDARD.encode(name_bytes_mut)
+                    BASE64_URL_SAFE_NO_PAD.encode(name_bytes_mut)
                 };
 
                 let info = EntryInfo::new(object_id, entry_type);
@@ -1025,13 +1026,14 @@ mod tests {
         open_dir_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
     };
     use assert_matches::assert_matches;
-    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
     use base64::engine::Engine as _;
     use fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd};
     use fuchsia_fs::directory::{DirEntry, DirentKind};
     use fuchsia_fs::file;
     use futures::StreamExt;
     use fxfs::object_store::Timestamp;
+    use fxfs_crypto::FSCRYPT_PADDING;
     use fxfs_insecure_crypto::InsecureCrypt;
     use rand::Rng;
     use std::os::fd::AsRawFd;
@@ -1779,7 +1781,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::Directory)
             }
@@ -1803,7 +1805,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 assert!(entry.kind == DirentKind::Directory)
             }
         }
@@ -1895,7 +1897,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::File)
             }
@@ -2057,7 +2059,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::Directory)
             }
@@ -2072,7 +2074,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 assert!(entry.kind == DirentKind::Directory)
             }
         }
@@ -2116,7 +2118,7 @@ mod tests {
             let dir = open_dir_checked(
                 parent.as_ref(),
                 fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
-                &format!("fee_{}", i),
+                &format!("plaintext_{}", i),
             )
             .await;
             close_dir_checked(dir).await;
@@ -2151,8 +2153,8 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
-                assert!(!entry.name.contains("fee"));
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
+                assert!(!entry.name.starts_with("plaintext_"), "{entry:?} isn't encrypted!");
                 assert!(entry.kind == DirentKind::Directory)
             }
         }
@@ -2162,7 +2164,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.contains("fee"));
+                assert!(entry.name.starts_with("plaintext_"), "{entry:?} is still encrypted!");
                 assert!(entry.kind == DirentKind::Directory)
             }
         }
@@ -2249,7 +2251,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::Directory)
             }
@@ -2264,11 +2266,92 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 assert!(entry.kind == DirentKind::Directory)
             }
         }
         close_dir_checked(Arc::try_unwrap(encrypted_dir).unwrap()).await;
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_encrypted_filename_does_not_have_slashes() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+        const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        for _ in 0..100 {
+            let one_char = || CHARSET[rand::thread_rng().gen_range(0..CHARSET.len())] as char;
+            let filename: String = std::iter::repeat_with(one_char).take(100).collect();
+            let dir = open_dir_checked(
+                parent.as_ref(),
+                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
+                &filename,
+            )
+            .await;
+            close_dir_checked(dir).await;
+        }
+
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+        let readdir = |dir: Arc<fio::DirectoryProxy>| async move {
+            let status = dir.rewind().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("rewind failed");
+            let (status, buf) = dir.read_dirents(fio::MAX_BUF).await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("read_dirents failed");
+            let mut entries = vec![];
+            for res in fuchsia_fs::directory::parse_dir_entries(&buf) {
+                entries.push(res.expect("Failed to parse entry"));
+            }
+            entries
+        };
+
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+
+        let encrypted_entries = readdir(Arc::clone(&parent)).await;
+        for entry in encrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
+                assert!(!entry.name.contains("/"));
+                assert!(entry.kind == DirentKind::Directory)
+            }
+        }
+
         close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
         new_fixture.close().await;
     }
@@ -2333,7 +2416,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::File)
             }
@@ -2427,7 +2510,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::Directory)
             }
@@ -2445,7 +2528,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 assert!(entry.kind == DirentKind::Directory)
             }
             count += 1;
@@ -2525,7 +2608,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::Directory)
             }
@@ -2533,7 +2616,7 @@ mod tests {
 
         let (status, dst_token) = parent.get_token().await.expect("FIDL call failed");
         zx::Status::ok(status).expect("get_token failed");
-        let new_encrypted_name = BASE64_STANDARD.encode("new_encrypted_name");
+        let new_encrypted_name = BASE64_URL_SAFE_NO_PAD.encode("new_encrypted_name");
         parent
             .rename(&encrypted_name, zx::Event::from(dst_token.unwrap()), &new_encrypted_name)
             .await
@@ -2621,8 +2704,7 @@ mod tests {
                 .expect("FIDL call failed")
                 .expect("create_symlink failed");
 
-            let (proxy, server_end) =
-                create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+            let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
             root.open(
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
                 fio::ModeType::empty(),
@@ -2649,8 +2731,7 @@ mod tests {
                 panic!("Unexpected on_open {on_open:?}");
             }
 
-            let (proxy, server_end) =
-                create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+            let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
             root.create_symlink("symlink2", b"target2", Some(server_end))
                 .await
                 .expect("FIDL call failed")
@@ -2708,8 +2789,7 @@ mod tests {
                 .expect("create_symlink failed");
 
             async fn open_symlink(root: &fio::DirectoryProxy, path: &str) -> fio::SymlinkProxy {
-                let (proxy, server_end) =
-                    create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+                let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
                 root.open(
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
                     fio::ModeType::empty(),
@@ -2767,8 +2847,7 @@ mod tests {
                 .expect("FIDL call failed")
                 .expect("create_symlink failed");
 
-            let root = fuchsia_fs::directory::clone_no_describe(root, None)
-                .expect("clone_no_describe failed");
+            let root = fuchsia_fs::directory::clone(root).expect("clone failed");
 
             fasync::unblock(|| {
                 let root: std::os::fd::OwnedFd =
@@ -2817,8 +2896,7 @@ mod tests {
             let namespace = fdio::Namespace::installed().expect("Unable to get namespace");
             static COUNTER: AtomicU64 = AtomicU64::new(0);
             let path = format!("/test_symlink_stat.{}", COUNTER.fetch_add(1, Ordering::Relaxed));
-            let root = fuchsia_fs::directory::clone_no_describe(root, None)
-                .expect("clone_no_describe failed");
+            let root = fuchsia_fs::directory::clone(root).expect("clone failed");
             namespace
                 .bind(&path, ClientEnd::new(root.into_channel().unwrap().into_zx_channel()))
                 .expect("bind failed");
@@ -2856,7 +2934,7 @@ mod tests {
 
         {
             let (iterator_client, iterator_server) =
-                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>();
             file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
             let (chunk, last) = iterator_client
                 .get_next()
@@ -2885,7 +2963,7 @@ mod tests {
 
         {
             let (iterator_client, iterator_server) =
-                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>();
             file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
             let (chunk, last) = iterator_client
                 .get_next()
@@ -2910,7 +2988,7 @@ mod tests {
 
         {
             let (iterator_client, iterator_server) =
-                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>();
             file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
             let (chunk, last) = iterator_client
                 .get_next()
@@ -3042,7 +3120,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
-            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
             let mode = fio::MODE_TYPE_DIRECTORY
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
             let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
@@ -3090,7 +3168,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
-            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
             let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
             let options = fio::Options {
                 create_attributes: Some(fio::MutableNodeAttributes { ..Default::default() }),
@@ -3131,7 +3209,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
-            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
             let mode = fio::MODE_TYPE_DIRECTORY
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
             let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
@@ -3181,7 +3259,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
-            let (_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+            let (_proxy, server_end) = create_proxy::<fio::FileMarker>();
             let mode = fio::MODE_TYPE_FILE
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
             let uid = 1;
@@ -3241,7 +3319,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
-            let (_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+            let (_proxy, server_end) = create_proxy::<fio::FileMarker>();
 
             let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_MAYBE_CREATE;
             let options = Default::default();
@@ -3279,7 +3357,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
-            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
             let mode = fio::MODE_TYPE_FILE
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
             let uid = 1;
@@ -3386,7 +3464,7 @@ mod tests {
             attributes: Some(fio::NodeAttributesQuery::SELINUX_CONTEXT),
             ..Default::default()
         };
-        let (node, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+        let (node, server_end) = create_proxy::<fio::NodeMarker>();
         root_dir.open3(path, flags, &options, server_end.into_channel()).expect("Reopening node");
         let repr = node
             .take_event_stream()
@@ -3429,7 +3507,7 @@ mod tests {
                     }),
                     ..Default::default()
                 };
-                let (node, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+                let (node, server_end) = create_proxy::<fio::NodeMarker>();
                 root_dir
                     .open3(path, flags, &options, server_end.into_channel())
                     .expect("Creating node");
@@ -3499,7 +3577,7 @@ mod tests {
             let path = "symlink";
             let root_dir = fixture.root();
             // Create node with the context.
-            let (node, server_end) = create_proxy::<fio::SymlinkMarker>().unwrap();
+            let (node, server_end) = create_proxy::<fio::SymlinkMarker>();
             root_dir
                 .create_symlink(path, ".".as_bytes(), Some(server_end))
                 .await

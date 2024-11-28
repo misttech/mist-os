@@ -30,6 +30,7 @@ if (is_host) {
       "//src/developer/ffx/lib/target:lib",
       "//src/developer/ffx/plugins/emulator/common:ffx_emulator_common",
       "//src/developer/ffx/plugins/emulator/configuration:ffx_emulator_config",
+      "//src/lib/assembly/vbmeta",
       "//src/lib/fuchsia-async",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",
@@ -48,6 +49,8 @@ if (is_host) {
     ]
     inputs = [
       "test_data/unknown_engine_type_engine.json",
+      "test_data/testkey_atx_psk.pem",
+      "test_data/atx_metadata.bin",
 
       "templates/emulator_flags.json.template",
       "templates/efi_flags.json.template",

@@ -79,7 +79,7 @@ fn default_address() -> Address {
 }
 
 async fn add_fake_peer(proxy: &EmulatorProxy, address: &Address) -> Result<PeerProxy, Error> {
-    let (local, remote) = fidl::endpoints::create_proxy()?;
+    let (local, remote) = fidl::endpoints::create_proxy();
     let params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),
@@ -516,7 +516,7 @@ async fn test_receive_connection(harness: PeripheralHarness) {
         .unwrap();
 
     // Similarly our AdvertisingHandle should be closed by the system.
-    let handle = handle.into_proxy().unwrap();
+    let handle = handle.into_proxy();
     let _ = handle.on_closed().await.unwrap();
 }
 

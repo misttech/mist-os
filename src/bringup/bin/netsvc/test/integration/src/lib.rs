@@ -97,7 +97,7 @@ where
                                 options,
                             } => {
                                 assert_eq!(options, None);
-                                log_listener.into_proxy().expect("create proxy")
+                                log_listener.into_proxy()
                             }
                             r @ fidl_fuchsia_logger::LogRequest::ListenSafeWithSelectors {
                                 ..
@@ -189,7 +189,6 @@ where
             fidl_fuchsia_paver::PaverRequest::FindDataSink { data_sink, control_handle: _ } => {
                 data_sink
                     .into_stream()
-                    .expect("failed to get request stream")
                     .for_each(|r| async move {
                         match r.expect("data sink request error") {
                             fidl_fuchsia_paver::DataSinkRequest::WriteAsset {
@@ -213,10 +212,7 @@ where
                                 payload,
                                 responder,
                             } => {
-                                let () = process_streamed_payload(
-                                    payload.into_proxy().expect("failed to get proxy"),
-                                )
-                                .await;
+                                let () = process_streamed_payload(payload.into_proxy()).await;
                                 responder.send(zx::Status::OK.into_raw())
                             }
                             r => panic!("unexpected request {:?}", r),
@@ -231,7 +227,6 @@ where
             } => {
                 boot_manager
                     .into_stream()
-                    .expect("failed to get request stream")
                     .for_each(|r| {
                         match r.expect("boot manager request error") {
                             fidl_fuchsia_paver::BootManagerRequest::QueryActiveConfiguration {
@@ -1416,19 +1411,18 @@ async fn starts_device_in_multicast_promiscuous(name: &str) {
     // Add the device to devfs and wait for netsvc to set it to multicast
     // promiscuous.
 
-    let (client_end, connector_stream) =
-        fidl::endpoints::create_request_stream().expect("create request stream");
+    let (client_end, connector_stream) = fidl::endpoints::create_request_stream();
     let () = netsvc_realm
         .add_raw_device(netemul::devfs_device_path("ep").as_path(), client_end)
         .await
         .expect("add virtual device");
 
-    let netdevice = netdevice.into_proxy().expect("netdevice proxy");
+    let netdevice = netdevice.into_proxy();
     let netdevice = &netdevice;
     let connector_fut = connector_stream.for_each_concurrent(None, |r| async move {
         match r.expect("connector error") {
             fnetemul_network::DeviceProxy_Request::ServeDevice { req, control_handle: _ } => {
-                let rs = req.into_stream().expect("into request stream");
+                let rs = req.into_stream();
                 rs.for_each(|req| async move {
                     match req.expect("request error") {
                         fidl_fuchsia_hardware_network::DeviceInstanceRequest::GetDevice {
@@ -1440,7 +1434,7 @@ async fn starts_device_in_multicast_promiscuous(name: &str) {
                 .await
             }
             fnetemul_network::DeviceProxy_Request::ServeController { req, control_handle: _ } => {
-                let rs = req.into_stream().expect("into request stream");
+                let rs = req.into_stream();
                 rs.for_each(|req| async move {
                     match req.expect("request error") {
                         fidl_fuchsia_device::ControllerRequest::GetTopologicalPath {

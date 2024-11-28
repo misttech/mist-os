@@ -401,7 +401,7 @@ mod tests {
             let event = match event_type {
                 EventType::LogSinkRequested => {
                     let (_, request_stream) =
-                        fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
+                        fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>();
                     Event {
                         timestamp: zx::BootInstant::from_nanos(FAKE_TIMESTAMP),
                         payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
@@ -412,7 +412,7 @@ mod tests {
                 }
                 EventType::InspectSinkRequested => {
                     let (_, request_stream) =
-                        fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+                        fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>();
                     Event {
                         timestamp: zx::BootInstant::from_nanos(FAKE_TIMESTAMP),
                         payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
@@ -520,7 +520,7 @@ mod tests {
         let _router_task = fasync::Task::spawn(fut);
 
         // Emit an event
-        let (_, server_end) = fidl::endpoints::create_proxy::<LogSinkMarker>().unwrap();
+        let (_, server_end) = fidl::endpoints::create_proxy::<LogSinkMarker>();
         let request_stream_koid = server_end.as_handle_ref().get_koid().unwrap();
         let request_stream = LogSinkRequestStream::from_channel(fidl::AsyncChannel::from_channel(
             server_end.into_channel(),
@@ -583,8 +583,7 @@ mod tests {
         let _router_task = fasync::Task::spawn(fut);
 
         // Emit an event
-        let (_, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+        let (_, request_stream) = fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>();
         producer
             .dispatcher
             .emit(Event {
@@ -603,8 +602,7 @@ mod tests {
         assert!(third_receiver.next().now_or_never().unwrap().is_none());
 
         // We see additional events in the second receiver which remains alive.
-        let (_, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+        let (_, request_stream) = fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>();
         producer
             .dispatcher
             .emit(Event {
@@ -774,7 +772,7 @@ mod tests {
 
     fn inspect_sink_requested(identity: Arc<ComponentIdentity>) -> Event {
         let (_proxy, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>();
         Event {
             timestamp: zx::BootInstant::from_nanos(FAKE_TIMESTAMP),
             payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {

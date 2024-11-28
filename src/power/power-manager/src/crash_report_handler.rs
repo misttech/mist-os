@@ -176,8 +176,7 @@ mod tests {
 
         // Set up the CrashReportHandler node
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>();
         let crash_report_handler = CrashReportHandlerBuilder::new()
             .with_proxy_fn(Box::new(move || Ok(proxy.clone())))
             .build()
@@ -215,8 +214,7 @@ mod tests {
         // Set up the proxy/stream and node outside of the large future used below. This way we can
         // still poll the stream after the future completes.
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>();
         let crash_report_handler = CrashReportHandlerBuilder::new()
             .with_proxy_fn(Box::new(move || Ok(proxy.clone())))
             .with_max_pending_crash_reports(1)
@@ -302,8 +300,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_crash_report_channel_closure() {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>();
         let crash_report_handler = CrashReportHandlerBuilder::new()
             .with_proxy_fn(Box::new(move || Ok(proxy.clone())))
             .build()

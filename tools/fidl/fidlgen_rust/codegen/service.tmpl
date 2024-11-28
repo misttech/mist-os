@@ -83,7 +83,7 @@ impl {{ .Name }}Proxy {
     ///{{ . }}
     {{- end }}
     pub fn connect_to_{{ .SnakeName }}(&self) -> Result<{{ .ProtocolType }}Proxy, fidl::Error> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<{{ .ProtocolType }}Marker>()?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<{{ .ProtocolType }}Marker>();
         self.connect_channel_to_{{ .SnakeName }}(server_end)?;
         Ok(proxy)
     }

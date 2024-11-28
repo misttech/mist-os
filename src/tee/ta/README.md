@@ -17,6 +17,9 @@ TAs are linked as shared libraries against the interface definition
 in //src/tee/tee_internal_api/libtee_internal.ifs which enumerates the symbols that
 are (intentionally) exported from the runtime.
 
+The symbols exported by the TA itself are further verified to consist of the
+official entrypoints (see //src/tee/ta/abi.ifs).
+
 ## Packaging
 
 TAs are included in a Fuchsia package as a regular shared library. The file

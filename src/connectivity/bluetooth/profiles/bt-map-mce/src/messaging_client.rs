@@ -103,7 +103,7 @@ impl Stream for MessagingClient {
             return Poll::Pending;
         };
         let (accessor_client, accessor_request_stream): (ClientEnd<AccessorMarker>, _) =
-            fidl::endpoints::create_request_stream().unwrap();
+            fidl::endpoints::create_request_stream();
         let watch_responder = self.accessor_request.take().unwrap();
         let _ = watch_responder.send(Ok(MessagingClientWatchAccessorResponse {
             peer_id: Some(accessor.peer_id.into()),
@@ -497,8 +497,7 @@ mod tests {
     fn test_messaging_client(
         exec: &mut fasync::TestExecutor,
     ) -> (ProfileRequestStream, MessagingClient, Channel, MessagingClientProxy) {
-        let (profile_proxy, mut profile_requests) =
-            create_proxy_and_stream::<ProfileMarker>().unwrap();
+        let (profile_proxy, mut profile_requests) = create_proxy_and_stream::<ProfileMarker>();
 
         let mut messaging_client = MessagingClient::new(profile_proxy);
 
@@ -540,7 +539,7 @@ mod tests {
         }
 
         let (msg_client_proxy, msg_client_request_stream) =
-            create_proxy_and_stream::<MessagingClientMarker>().unwrap();
+            create_proxy_and_stream::<MessagingClientMarker>();
 
         messaging_client.set_fidl_stream(msg_client_request_stream).expect("should succeed");
         (profile_requests, messaging_client, remote, msg_client_proxy)
@@ -677,7 +676,7 @@ mod tests {
             .expect("should be ok")
             .expect("should have response");
 
-        let accessor_proxy = response.accessor.expect("should exist").into_proxy().unwrap();
+        let accessor_proxy = response.accessor.expect("should exist").into_proxy();
         let accessor_fut = pin!(accessor_fut);
 
         // Incoming FIDL request for listing all MAS instances.
@@ -712,7 +711,7 @@ mod tests {
             .expect("should be ok")
             .expect("should have response");
 
-        let accessor_proxy = response.accessor.expect("should exist").into_proxy().unwrap();
+        let accessor_proxy = response.accessor.expect("should exist").into_proxy();
         let accessor_fut = pin!(accessor_fut);
 
         // Drop the connection to the MAS instance.
@@ -741,12 +740,12 @@ mod tests {
             .expect("should be ok")
             .expect("should have response");
 
-        let accessor_proxy = response.accessor.expect("should exist").into_proxy().unwrap();
+        let accessor_proxy = response.accessor.expect("should exist").into_proxy();
         let mut accessor_fut = pin!(accessor_fut);
 
         // Case 1: SetNotificationRegistration with mas_instance_ids.
         let (relayer_client, _relayer_request_stream) =
-            create_request_stream::<NotificationRegistrationMarker>().unwrap();
+            create_request_stream::<NotificationRegistrationMarker>();
 
         let request_fut = accessor_proxy.set_notification_registration(
             AccessorSetNotificationRegistrationRequest {
@@ -823,7 +822,7 @@ mod tests {
 
         // Case 2: SetNotificationRegistration without mas_instance_ids.
         let (relayer_client, _relayer_request_stream) =
-            create_request_stream::<NotificationRegistrationMarker>().unwrap();
+            create_request_stream::<NotificationRegistrationMarker>();
 
         let request_fut = accessor_proxy.set_notification_registration(
             AccessorSetNotificationRegistrationRequest {

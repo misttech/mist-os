@@ -69,7 +69,7 @@ END_DATA(fixup_code_size)
 #define FIXUP_LOCATION(addr) (addr - KERNEL_BASE)(%rdi)
 
 // This code must be purely position-independent and have no relocs.
-// This is called with the runtime address of __code_start in %rdi.
+// This is called with the runtime address of __executable_start in %rdi.
 FUNCTION(apply_fixups)
     mov %rdi, %rax
     sub $KERNEL_BASE, %rax

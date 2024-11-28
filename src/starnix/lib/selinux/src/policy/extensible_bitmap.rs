@@ -143,7 +143,8 @@ impl<PS: ParseStrategy> Iterator for ExtensibleBitmapSpansIterator<'_, PS> {
     fn next(&mut self) -> Option<Self::Item> {
         let low = self.next_bit_with_value(true)?;
         // End the span at the bit preceding either the next false bit, or the end of the bitmap.
-        let high = self.next_bit_with_value(false).unwrap_or(self.bitmap.num_elements()) - 1;
+        let high =
+            self.next_bit_with_value(false).unwrap_or_else(|| self.bitmap.num_elements()) - 1;
         Some(Self::Item { low, high })
     }
 }

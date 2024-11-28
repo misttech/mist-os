@@ -41,30 +41,6 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
  public:
   DISALLOW_COPY_ASSIGN_AND_MOVE(LocalVnode);
 
-  // Initializes a new vnode with a remote node_type, and attaches a reference to it
-  // inside an (optional) parent.
-  template <class T, class... Args>
-  static zx::result<fbl::RefPtr<LocalVnode>> Create(fbl::RefPtr<LocalVnode> parent,
-                                                    fbl::String name,
-                                                    std::in_place_type_t<T> in_place,
-                                                    Args&&... args) {
-    fbl::RefPtr vn = fbl::AdoptRef(
-        new LocalVnode(std::move(parent), std::move(name), in_place, std::forward<Args>(args)...));
-
-    if (vn->parent_ != nullptr) {
-      zx_status_t status = vn->parent_->AddChild(vn);
-      if (status != ZX_OK) {
-        return zx::error(status);
-      }
-    }
-
-    return zx::ok(vn);
-  }
-
-  // Recursively unlinks this Vnode's children, and detaches this node from
-  // its parent.
-  void Unlink();
-
   // Detaches this vnode from its parent. The Vnode's own children are not unlinked.
   void UnlinkFromParent();
 
@@ -72,14 +48,12 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
   // |last_seen| is the ID of the last returned vnode. At the same time,
   // |last_seen| is updated to reflect the current ID.
   //
-  // If the end of iteration is reached, |out_vnode| is set to nullptr.
-  zx_status_t Readdir(uint64_t* last_seen, fbl::RefPtr<LocalVnode>* out_vnode) const;
+  // If the end of iteration is reached, |ZX_ERR_NOT_FOUND| is returned.
+  zx::result<std::string_view> Readdir(uint64_t* last_seen) const;
 
   // Invoke |func| on the (path, channel) pairs for all remote nodes found in the
   // node hierarchy rooted at `this`.
   zx_status_t EnumerateRemotes(const EnumerateCallback& func) const;
-
-  const fbl::String& Name() const { return name_; }
 
   struct IdTreeTag {};
   struct NameTreeTag {};
@@ -89,16 +63,18 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
                                                    fbl::NodeOptions::AllowMultiContainerUptr>,
                     fbl::TaggedWAVLTreeContainable<Entry*, NameTreeTag>> {
    public:
-    Entry(uint64_t id, fbl::RefPtr<LocalVnode> node) : id_(id), node_(std::move(node)) {}
+    Entry(uint64_t id, fbl::String name, fbl::RefPtr<LocalVnode> node)
+        : id_(id), name_(std::move(name)), node_(std::move(node)) {}
     ~Entry() = default;
 
     uint64_t id() const { return id_; }
-    const fbl::String& name() const { return node_->name_; }
+    const fbl::String& name() const { return name_; }
     const fbl::RefPtr<LocalVnode>& node() const { return node_; }
 
    private:
-    uint64_t const id_;
-    fbl::RefPtr<LocalVnode> node_;
+    const uint64_t id_;
+    const fbl::String name_;
+    const fbl::RefPtr<LocalVnode> node_;
   };
 
   struct KeyByIdTraits {
@@ -108,7 +84,7 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
   };
 
   struct KeyByNameTraits {
-    static fbl::String GetKey(const Entry& entry) { return entry.name(); }
+    static const fbl::String& GetKey(const Entry& entry) { return entry.name(); }
     static bool LessThan(const fbl::String& key1, const fbl::String& key2) { return key1 < key2; }
     static bool EqualTo(const fbl::String& key1, const fbl::String& key2) { return key1 == key2; }
   };
@@ -117,18 +93,27 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
       fbl::TaggedWAVLTree<uint64_t, std::unique_ptr<Entry>, IdTreeTag, KeyByIdTraits>;
   using EntryByNameMap = fbl::TaggedWAVLTree<fbl::String, Entry*, NameTreeTag, KeyByNameTraits>;
 
+  class Intermediate;
+
+  using ParentAndId = std::tuple<std::reference_wrapper<Intermediate>, uint64_t>;
+
   class Intermediate {
    public:
-    bool has_children() const { return !entries_by_id_.is_empty(); }
-    void AddEntry(fbl::RefPtr<LocalVnode> vn);
-    void RemoveEntry(LocalVnode* vn);
-    void UnlinkEntries();
+    ~Intermediate();
 
-    const EntryByIdMap& GetEntriesById() const { return entries_by_id_; }
+    size_t num_children() const;
+    // Returns (child, false) if a child with |name| exists, otherwise creates a new child with
+    // |name| using |builder| and returns (child, true). Returns the error if |builder| fails.
+    zx::result<std::tuple<fbl::RefPtr<LocalVnode>, bool>> LookupOrInsert(
+        fbl::String name, fit::function<zx::result<fbl::RefPtr<LocalVnode>>(ParentAndId)> builder);
+    void RemoveEntry(LocalVnode* vn, uint64_t id);
+
+    // See |LocalVnode::Readdir|.
+    zx::result<std::string_view> Readdir(uint64_t* last_seen) const;
 
     // Returns a child if it has the name |name|.
     // Otherwise, returns nullptr.
-    fbl::RefPtr<LocalVnode> Lookup(std::string_view name) const;
+    fbl::RefPtr<LocalVnode> Lookup(const fbl::String& name) const;
 
     // Invoke |Fn()| on all entries in this Intermediate node_type.
     // May be used as a const visitor-pattern for all entries.
@@ -148,12 +133,10 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
    public:
     Local(fdio_open_local_func_t on_open, void* context);
     zx::result<fdio_ptr> Open();
-    void Unlink();
 
    private:
-    fbl::Mutex lock_;
-    fdio_open_local_func_t on_open_ __TA_GUARDED(lock_);
-    void* context_ __TA_GUARDED(lock_);
+    const fdio_open_local_func_t on_open_;
+    void* const context_;
   };
 
   class Remote {
@@ -168,24 +151,21 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
   std::variant<Local, Intermediate, Remote>& NodeType() { return node_type_; }
 
  private:
+  friend class fbl::internal::MakeRefCountedHelper<LocalVnode>;
   friend class fbl::RefPtr<LocalVnode>;
 
-  zx_status_t AddChild(fbl::RefPtr<LocalVnode> child);
-  zx_status_t RemoveChild(LocalVnode* child);
+  zx_status_t EnumerateInternal(PathBuffer* path, std::string_view name,
+                                const EnumerateCallback& func) const;
 
-  zx_status_t EnumerateInternal(PathBuffer* path, const EnumerateCallback& func) const;
-
+  // The parent must outlive the child.
   template <class T, class... Args>
-  LocalVnode(fbl::RefPtr<LocalVnode> parent, fbl::String name, std::in_place_type_t<T> in_place,
+  LocalVnode(std::optional<ParentAndId> parent_and_id, std::in_place_type_t<T> in_place,
              Args&&... args)
-      : node_type_(in_place, std::forward<Args>(args)...),
-        parent_(std::move(parent)),
-        name_(std::move(name)) {}
+      : node_type_(in_place, std::forward<Args>(args)...), parent_and_id_(parent_and_id) {}
   ~LocalVnode();
 
   std::variant<Local, Intermediate, Remote> node_type_;
-  fbl::RefPtr<LocalVnode> parent_;
-  const fbl::String name_;
+  std::optional<ParentAndId> parent_and_id_;
 };
 
 }  // namespace fdio_internal

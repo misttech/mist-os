@@ -480,14 +480,8 @@ impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
         index: u32,
     ) -> Result<(), String> {
         let helper = &self.program.helpers[&index];
-        let result = (helper.function_pointer)(
-            context,
-            self.reg(1),
-            self.reg(2),
-            self.reg(3),
-            self.reg(4),
-            self.reg(5),
-        );
+        let result =
+            helper.0(context, self.reg(1), self.reg(2), self.reg(3), self.reg(4), self.reg(5));
         self.next();
         self.set_reg(0, result);
         Ok(())
@@ -871,6 +865,18 @@ impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
         self.jump_with_offset(jump_offset);
         self.set_reg(dst, value.into());
         Ok(())
+    }
+
+    fn load_map_ptr<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        _dst: Register,
+        _map_index: u32,
+        _jump_offset: i16,
+    ) -> Result<(), String> {
+        // ldimm64 instructions with src=BPF_PSEUDO_MAP_IDX should be replaced when the program is
+        // linked.
+        panic!("executing program with BPF_PSEUDO_MAP_IDX")
     }
 
     fn load_from_packet<'a>(

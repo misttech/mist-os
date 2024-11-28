@@ -228,89 +228,22 @@ type RectU = struct {
     height uint32;
 };
 
-type PrimaryLayer = struct {
-    /// The result of a successful ImportImage() call.
+/// Equivalent to the ['fuchsia.hardware.display.types/Color'] FIDL type.
+type Color = struct {
+    format FuchsiaImages2PixelFormatEnumValue;
+    bytes array<uint8, 8>;
+};
+
+/// Equivalent to the ['fuchsia.hardware.display.types/Layer'] FIDL type.
+type Layer = struct {
+    display_destination RectU;
+    image_source RectU;
     image_handle uint64;
-
-    /// Must match the ImportImage() argument for `image_handle`.
     image_metadata ImageMetadata;
-
-    /// An ALPHA_* constant.
-    ///
-    /// If |alpha_mode| == `ALPHA_DISABLED`, the layer is opaque and alpha_layer_val is ignored.
-    ///
-    /// If |alpha_mode| == `PREMULTIPLIED` or `HW_MULTIPLY` and |alpha_layer_val| is NaN, the alpha
-    /// used when blending is determined by the per-pixel alpha channel.
-    ///
-    /// If |alpha_mode| == `PREMULTIPLIED` or `HW_MULTIPLY` and |alpha_layer_val| is not NaN, the
-    /// alpha used when blending is the product of alpha_layer_val and any per-pixel alpha.
-    /// Additionally, if alpha_mode == PREMULTIPLIED, then the hardware must premultiply the color
-    /// channel with alpha_layer_val before blending.
-    ///
-    /// If alpha_layer_val is not NaN, it will be in the range [0, 1].
+    fallback_color Color;
     alpha_mode Alpha;
     alpha_layer_val float32;
-
-    /// Applied to the input image pixels specified by `image_source`.
-    ///
-    /// `display_destination` must account for image dimensions changes caused
-    /// by rotations. For example, rotating a 600x300 pixel image by 90 degrees
-    /// would specify 300x600 pixel dimensions in `display_destination`.
     image_source_transformation CoordinateTransformation;
-
-    /// The associated image region whose pixels are drawn by the layer.
-    ///
-    /// The rectangle uses the Vulkan coordinate space. The origin is at the
-    /// image's top-left corner. The X axis points to the right, and the Y axis
-    /// points downwards.
-    ///
-    /// A valid layer definition requires a valid non-empty image source
-    /// rectangle that is entirely contained within the image.
-    ///
-    /// Hardware image cropping is requested implicitly, when the source
-    /// region's dimensions differ from the image's dimensions. Some display
-    /// hardware may not support cropping.
-    image_source RectU;
-
-    /// The display image (composited output) region occupied by the layer.
-    ///
-    /// The rectangle uses the Vulkan coordinate space. The origin is at the
-    /// display's top-left corner. The X axis points to the right, and the Y axis
-    /// points downwards.
-    ///
-    /// A valid layer definition requires a valid non-empty display destination
-    /// rectangle that is entirely contained within the display.
-    ///
-    /// Hardware image scaling is requested implicitly, when the output region's
-    /// dimensions differ from the dimensions of `image_source`. Some display
-    /// hardware may not support scaling. All display hardware has limitations
-    /// in scaling support.
-    display_destination RectU;
-};
-
-type ColorLayer = struct {
-    /// The format of `color` bytes.
-    format FuchsiaImages2PixelFormatEnumValue;
-
-    /// The color to use for the layer. The color is little-endian, and is
-    /// guaranteed to be of the exact size of one pixel in `format`.
-    color vector<uint8>:MAX;
-};
-
-/// Types of layers.
-type LayerType = strict enum : uint32 {
-    PRIMARY = 0;
-    COLOR = 1;
-};
-
-type LayerConfig = strict union {
-    1: primary PrimaryLayer;
-    2: color ColorLayer;
-};
-
-type Layer = struct {
-    type LayerType;
-    cfg LayerConfig;
 };
 
 /// constants for display_config's mode_flags field
@@ -387,8 +320,8 @@ type ConfigCheckResult = strict enum : uint32 {
 /// Individual bit positions map to the values of the FIDL enum
 /// [`fuchsia.hardware.display.types/ClientCompositionOpcode`].
 type ClientCompositionOpcode = strict bits : uint32 {
-    /// The client should convert the corresponding layer to a primary layer.
-    USE_PRIMARY = 0x1;
+    /// The client should configure the layer to use a source image.
+    USE_IMAGE = 0x1;
     /// The client should compose all layers with MERGE_BASE and MERGE_SRC into a new,
     /// single primary layer at the MERGE_BASE layer's z-order. The driver must accept
     /// a fullscreen layer with the default pixel format, but may accept other layer

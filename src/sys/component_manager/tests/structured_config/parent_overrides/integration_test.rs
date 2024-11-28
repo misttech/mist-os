@@ -85,7 +85,7 @@ async fn realm_api_refuses_to_override_immutable_config() {
     // open the child's exposed directory to start resolving it
     let child_ref = ChildRef { name: child_name, collection: Some(collection_name) };
     let (_exposed_dir, exposed_dir_server) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     assert_matches!(
         realm
             .open_exposed_dir(&child_ref, exposed_dir_server)

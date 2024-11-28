@@ -36,42 +36,6 @@ constexpr uint32_t kMemoryDomain = 3;
 
 namespace aml_nna {
 
-zx_status_t AmlNnaDevice::PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio) {
-  return pdev_.GetMmio(index, out_mmio);
-}
-
-zx_status_t AmlNnaDevice::PDevGetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq) {
-  return pdev_.GetInterrupt(index, flags, out_irq);
-}
-
-zx_status_t AmlNnaDevice::PDevGetBti(uint32_t index, zx::bti* out_handle) {
-  return pdev_.GetBti(index, out_handle);
-}
-
-zx_status_t AmlNnaDevice::PDevGetSmc(uint32_t index, zx::resource* out_resource) {
-  return pdev_.GetSmc(index, out_resource);
-}
-
-zx_status_t AmlNnaDevice::PDevGetDeviceInfo(pdev_device_info_t* out_info) {
-  return pdev_.GetDeviceInfo(out_info);
-}
-
-zx_status_t AmlNnaDevice::PDevGetBoardInfo(pdev_board_info_t* out_info) {
-  return pdev_.GetBoardInfo(out_info);
-}
-// This is to be compatible with magma::ZirconPlatformDevice.
-zx_status_t AmlNnaDevice::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
-  auto* proto = static_cast<ddk::AnyProtocol*>(out_protocol);
-  switch (proto_id) {
-    case ZX_PROTOCOL_PDEV:
-      proto->ops = &pdev_protocol_ops_;
-      proto->ctx = this;
-      return ZX_OK;
-    default:
-      return ZX_ERR_NOT_SUPPORTED;
-  }
-}
-
 zx_status_t AmlNnaDevice::Init() {
   if (nna_block_.nna_power_version == kNnaPowerDomain) {
     zx_status_t status = PowerDomainControl(true);
@@ -255,6 +219,32 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
+  auto result = device->outgoing_.AddService<fuchsia_hardware_platform_device::Service>(
+      fuchsia_hardware_platform_device::Service::InstanceHandler({
+          .device =
+              [device = device.get()](
+                  fidl::ServerEnd<fuchsia_hardware_platform_device::Device> server_end) {
+                device_connect_fragment_fidl_protocol(
+                    device->parent_, "pdev",
+                    fuchsia_hardware_platform_device::Service::Device::ServiceName,
+                    fuchsia_hardware_platform_device::Service::Device::Name,
+                    server_end.TakeChannel().release());
+              },
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add PlatformDevice protocol: %s", result.status_string());
+    return result.status_value();
+  }
+
+  auto [directory_client, directory_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  {
+    auto result = device->outgoing_.Serve(std::move(directory_server));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to service the outgoing directory");
+      return result.status_value();
+    }
+  }
+
   zx_device_str_prop_t props[] = {
       ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
       ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
@@ -265,8 +255,15 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
                            bind_fuchsia_verisilicon_platform::BIND_PLATFORM_DEV_DID_MAGMA_VIP),
   };
 
-  status = device->DdkAdd(
-      ddk::DeviceAddArgs("aml-nna").set_str_props(props).forward_metadata(parent, 0));
+  std::array fidl_offers = {
+      fuchsia_hardware_platform_device::Service::Name,
+  };
+
+  status = device->DdkAdd(ddk::DeviceAddArgs("aml-nna")
+                              .set_str_props(props)
+                              .forward_metadata(parent, 0)
+                              .set_outgoing_dir(directory_client.TakeChannel())
+                              .set_fidl_service_offers(fidl_offers));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not create aml nna device: %d\n", status);
     return status;

@@ -880,13 +880,13 @@ mod tests {
         {
           "test_component": {
             "label": "//some/label/for/test:a",
-            "moniker": "/core/testing:system-tests"
+            "moniker": "/core/testing/system-tests"
           }
         },
         {
           "test_component": {
             "label": "//some/label/for/test:b",
-            "moniker": "/core/testing:devices-tests"
+            "moniker": "/core/testing/devices-tests"
           }
         }
         ]);
@@ -896,11 +896,11 @@ mod tests {
 
         assert_eq!(
             lookup_map.get("//some/label/for/test:a"),
-            Some("/core/testing:system-tests".into()).as_ref()
+            Some("/core/testing/system-tests".into()).as_ref()
         );
         assert_eq!(
             lookup_map.get("//some/label/for/test:b"),
-            Some("/core/testing:devices-tests".into()).as_ref()
+            Some("/core/testing/devices-tests".into()).as_ref()
         );
     }
 
@@ -910,13 +910,13 @@ mod tests {
         {
           "test_component": {
             "label": "//some/label/for/test:a",
-            "moniker": "/core/testing:system-tests"
+            "moniker": "/core/testing/system-tests"
           }
         },
         {
           "test_component": {
             "label": "//some/label/for/test:a",
-            "moniker": "/core/testing:devices-tests"
+            "moniker": "/core/testing/devices-tests"
           }
         }
         ]);

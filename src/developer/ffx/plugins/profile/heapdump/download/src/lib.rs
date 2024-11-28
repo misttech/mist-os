@@ -33,7 +33,7 @@ impl FfxMain for DownloadTool {
 }
 
 async fn download(remote_control: RemoteControlProxy, cmd: DownloadCommand) -> Result<()> {
-    let (receiver_client, receiver_stream) = create_request_stream()?;
+    let (receiver_client, receiver_stream) = create_request_stream();
     let request = fheapdump_client::CollectorDownloadStoredSnapshotRequest {
         snapshot_id: Some(cmd.snapshot_id),
         receiver: Some(receiver_client),

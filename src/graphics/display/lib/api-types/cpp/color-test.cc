@@ -1,0 +1,200 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include "src/graphics/display/lib/api-types/cpp/color.h"
+
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <lib/image-format/image_format.h>
+
+#include <initializer_list>
+
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+namespace display {
+
+namespace {
+
+constexpr Color kRgbaGreyish({
+    .format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+    .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0},
+});
+
+constexpr Color kRgbaGreyish2({
+    .format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+    .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0},
+});
+
+constexpr Color kBgraGreyish2({
+    .format = fuchsia_images2::wire::PixelFormat::kB8G8R8A8,
+    .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0},
+});
+
+TEST(ColorTest, EqualityIsReflexive) {
+  EXPECT_EQ(kRgbaGreyish, kRgbaGreyish);
+  EXPECT_EQ(kRgbaGreyish2, kRgbaGreyish2);
+  EXPECT_EQ(kBgraGreyish2, kBgraGreyish2);
+}
+
+TEST(ColorTest, EqualityIsSymmetric) {
+  EXPECT_EQ(kRgbaGreyish, kRgbaGreyish2);
+  EXPECT_EQ(kRgbaGreyish2, kRgbaGreyish);
+}
+
+TEST(ColorTest, EqualityForDifferentContents) {
+  static constexpr Color kRgbaFuchsia({
+      .format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+      .bytes = std::initializer_list<uint8_t>{0xff, 0x00, 0xff, 0xff, 0, 0, 0, 0},
+  });
+
+  EXPECT_NE(kRgbaGreyish, kRgbaFuchsia);
+  EXPECT_NE(kRgbaFuchsia, kRgbaGreyish);
+}
+
+TEST(ColorTest, EqualityForDifferentFormats) {
+  static constexpr Color kBgraGreyish({
+      .format = fuchsia_images2::wire::PixelFormat::kB8G8R8A8,
+      .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0},
+  });
+  EXPECT_NE(kRgbaGreyish, kBgraGreyish);
+  EXPECT_NE(kBgraGreyish, kRgbaGreyish);
+}
+
+TEST(ColorTest, FromDesignatedInitializer) {
+  static constexpr Color color({
+      .format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+      .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0},
+  });
+  EXPECT_EQ(fuchsia_images2::wire::PixelFormat::kR8G8B8A8, color.format());
+  EXPECT_THAT(color.bytes(), testing::ElementsAreArray(std::initializer_list<uint8_t>{
+                                 0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}));
+}
+
+TEST(ColorTest, FromFidlColor) {
+  static constexpr fuchsia_hardware_display_types::wire::Color fidl_color = {
+      .format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+      .bytes = {0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0},
+  };
+
+  static constexpr Color color = Color::From(fidl_color);
+  EXPECT_EQ(fuchsia_images2::wire::PixelFormat::kR8G8B8A8, color.format());
+  EXPECT_THAT(color.bytes(), testing::ElementsAreArray(std::initializer_list<uint8_t>{
+                                 0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}));
+}
+
+TEST(ColorTest, FromBanjoColor) {
+  static constexpr color_t banjo_color = {
+      .format = static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+      .bytes = {0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0},
+  };
+
+  static constexpr Color color = Color::From(banjo_color);
+  EXPECT_EQ(fuchsia_images2::wire::PixelFormat::kR8G8B8A8, color.format());
+  EXPECT_THAT(color.bytes(), testing::ElementsAreArray(std::initializer_list<uint8_t>{
+                                 0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}));
+}
+
+TEST(ColorTest, ToFidlColor) {
+  static constexpr Color color({
+      .format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+      .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0},
+  });
+
+  static constexpr fuchsia_hardware_display_types::wire::Color fidl_color = color.ToFidl();
+  EXPECT_EQ(fuchsia_images2::wire::PixelFormat::kR8G8B8A8, fidl_color.format);
+  EXPECT_THAT(fidl_color.bytes, testing::ElementsAreArray(std::initializer_list<uint8_t>{
+                                    0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}));
+}
+
+TEST(ColorTest, ToBanjoColor) {
+  static constexpr Color color({
+      .format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+      .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0},
+  });
+
+  static constexpr color_t banjo_color = color.ToBanjo();
+  EXPECT_EQ(static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+            banjo_color.format);
+  EXPECT_THAT(banjo_color.bytes, testing::ElementsAreArray(std::initializer_list<uint8_t>{
+                                     0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}));
+}
+
+TEST(ColorTest, IsValidFidlRgbaGreyish) {
+  EXPECT_TRUE(Color::IsValid(fuchsia_hardware_display_types::wire::Color{
+      .format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+      .bytes = {0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0},
+  }));
+}
+
+TEST(ColorTest, IsValidBanjoRgbaGreyish) {
+  EXPECT_TRUE(Color::IsValid(color_t{
+      .format = static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+      .bytes = {0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0},
+  }));
+}
+
+TEST(ColorTest, SupportsFormatRgbaFormats) {
+  EXPECT_TRUE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kB8G8R8A8));
+  EXPECT_TRUE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kR8G8B8A8));
+  EXPECT_TRUE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kB8G8R8A8));
+  EXPECT_TRUE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kA2B10G10R10));
+  EXPECT_TRUE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kA2R10G10B10));
+}
+
+TEST(ColorTest, SupportsFormatRgbFormats) {
+  EXPECT_TRUE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kB8G8R8));
+  EXPECT_TRUE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kR5G6B5));
+  EXPECT_TRUE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kR3G3B2));
+  EXPECT_TRUE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kR8G8B8));
+}
+
+TEST(ColorTest, SupportsFormatImplicitColorChannels) {
+  EXPECT_TRUE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kL8));
+  EXPECT_TRUE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kR8));
+}
+
+TEST(ColorTest, SupportsFormatUnspecifiedAlpha) {
+  EXPECT_FALSE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kB8G8R8X8));
+  EXPECT_FALSE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kR8G8B8X8));
+  EXPECT_FALSE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kR2G2B2X2));
+}
+
+TEST(ColorTest, SupportsFormatMultiPlanar) {
+  EXPECT_FALSE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kI420));
+  EXPECT_FALSE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kM420));
+  EXPECT_FALSE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kNv12));
+  EXPECT_FALSE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kYuy2));
+  EXPECT_FALSE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kYv12));
+  EXPECT_FALSE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kP010));
+}
+
+TEST(ColorTest, SupportsFormatInvalid) {
+  EXPECT_FALSE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kInvalid));
+  EXPECT_FALSE(Color::SupportsFormat(fuchsia_images2::wire::PixelFormat::kMjpeg));
+}
+
+TEST(ColorTest, EncodingSizeMatchesImageFormat) {
+  static constexpr std::array kSupportedFormats = {
+      fuchsia_images2::PixelFormat::kR8G8B8A8,    fuchsia_images2::PixelFormat::kB8G8R8A8,
+      fuchsia_images2::PixelFormat::kB8G8R8,      fuchsia_images2::PixelFormat::kR5G6B5,
+      fuchsia_images2::PixelFormat::kR3G3B2,      fuchsia_images2::PixelFormat::kL8,
+      fuchsia_images2::PixelFormat::kR8,          fuchsia_images2::PixelFormat::kA2R10G10B10,
+      fuchsia_images2::PixelFormat::kA2B10G10R10, fuchsia_images2::PixelFormat::kR8G8B8,
+  };
+
+  for (fuchsia_images2::PixelFormat format : kSupportedFormats) {
+    SCOPED_TRACE(::testing::Message() << "Format code: " << static_cast<uint32_t>(format));
+    ASSERT_TRUE(Color::SupportsFormat(format));
+    const PixelFormatAndModifier sysmem_format(format,
+                                               fuchsia_images2::wire::PixelFormatModifier::kLinear);
+    EXPECT_EQ(ImageFormatBitsPerPixel(sysmem_format),
+              static_cast<uint32_t>(Color::EncodingSize(format) * 8));
+  }
+}
+
+}  // namespace
+
+}  // namespace display

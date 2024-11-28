@@ -57,4 +57,50 @@ void RuntimeDynamicLinker::MakeGlobal(const ModuleTree& module_tree) {
   }
 }
 
+void RuntimeDynamicLinker::PopulateStartupModules(fbl::AllocChecker& func_ac,
+                                                  const ld::abi::Abi<>& abi) {
+  // Arm the function-level AllocChecker with the result of the function.
+  auto set_result = [&func_ac](bool v) { func_ac.arm(sizeof(RuntimeModule), v); };
+
+  for (const AbiModule& abi_module : ld::AbiLoadedModules(abi)) {
+    fbl::AllocChecker ac;
+    std::unique_ptr<RuntimeModule> module =
+        RuntimeModule::Create(ac, Soname{abi_module.link_map.name.get()});
+    if (!ac.check()) [[unlikely]] {
+      set_result(false);
+      return;
+    }
+    module->SetStartupModule(abi_module, abi);
+    // TODO(https://fxbug.dev/379766260): Fill out the direct_deps of
+    // startup modules.
+    modules_.push_back(std::move(module));
+  }
+
+  set_result(true);
+}
+
+std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi::Abi<>& abi,
+                                                                   fbl::AllocChecker& ac) {
+  assert(abi.loaded_modules);
+  assert(abi.static_tls_modules.size() == abi.static_tls_offsets.size());
+
+  // Arm the caller's AllocChecker with the return value of this function.
+  auto result = [&ac](std::unique_ptr<RuntimeDynamicLinker> v) {
+    ac.arm(sizeof(RuntimeDynamicLinker), static_cast<bool>(v));
+    return v;
+  };
+
+  fbl::AllocChecker linker_ac;
+  std::unique_ptr<RuntimeDynamicLinker> dynamic_linker{new (linker_ac) RuntimeDynamicLinker};
+  if (linker_ac.check()) [[likely]] {
+    fbl::AllocChecker populate_ac;
+    dynamic_linker->PopulateStartupModules(populate_ac, abi);
+    if (!populate_ac.check()) [[unlikely]] {
+      return result(nullptr);
+    }
+  }
+
+  return result(std::move(dynamic_linker));
+}
+
 }  // namespace dl

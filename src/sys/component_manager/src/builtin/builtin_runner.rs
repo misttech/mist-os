@@ -22,7 +22,6 @@ use routing::capability_source::{BuiltinSource, CapabilitySource};
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{Controllable, Controller, StopInfo};
 use sandbox::{Capability, Dict, DirEntry, RemotableCapability};
-use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::{error, warn};
@@ -43,16 +42,15 @@ use crate::model::token::{InstanceRegistry, InstanceToken};
 use crate::sandbox_util;
 use crate::sandbox_util::LaunchTaskOnReceive;
 
-const TYPE: &str = "type";
 const SVC: &str = "svc";
 
-type BuiltinProgramGen = Box<dyn Fn() -> BuiltinProgramFn + Send + Sync + 'static>;
+pub type BuiltinProgramGen = Box<dyn Fn() -> BuiltinProgramFn + Send + Sync + 'static>;
 
-/// The builtin runner runs components implemented inside component_manager.
+/// The builtin runner runs a component implemented inside component_manager.
 ///
-/// Builtin components are still defined by a declaration. When a component uses
-/// the builtin runner, the `type` field in the program block will identify which
-/// builtin component to run (e.g `type: "elf_runner"`).
+/// Builtin components are still defined by a declaration. Each builtin runner can
+/// run only a single program. For example, the "builtin_elf_runner" runs the elf
+/// runner component.
 ///
 /// When bootstrapping the system, builtin components may be resolved by the builtin URL
 /// scheme, e.g. fuchsia-builtin://#elf_runner.cm. However, it's entirely possible to resolve
@@ -61,7 +59,7 @@ type BuiltinProgramGen = Box<dyn Fn() -> BuiltinProgramFn + Send + Sync + 'stati
 pub struct BuiltinRunner {
     root_job: zx::Unowned<'static, zx::Job>,
     task_group: TaskGroup,
-    builtin_programs: HashMap<&'static str, BuiltinProgramGen>,
+    program: BuiltinProgramGen,
 }
 
 /// Pure data type holding some resources needed by the ELF runner.
@@ -87,17 +85,11 @@ enum BuiltinRunnerError {
     #[error("namespace error: {0}")]
     NamespaceError(#[from] NamespaceError),
 
-    #[error("\"program.type\" must be specified")]
-    MissingProgramType,
-
     #[error("\"program\" has an illegal field or value")]
     IllegalProgram,
 
     #[error("cannot create job: {}", _0)]
     JobCreation(zx_status::Status),
-
-    #[error("unsupported \"program.type\": {}", _0)]
-    UnsupportedProgramType(String),
 }
 
 impl From<BuiltinRunnerError> for zx::Status {
@@ -106,9 +98,7 @@ impl From<BuiltinRunnerError> for zx::Status {
             BuiltinRunnerError::MissingOutgoingDir
             | BuiltinRunnerError::MissingNamespace
             | BuiltinRunnerError::NamespaceError(_)
-            | BuiltinRunnerError::MissingProgramType
-            | BuiltinRunnerError::IllegalProgram
-            | BuiltinRunnerError::UnsupportedProgramType(_) => {
+            | BuiltinRunnerError::IllegalProgram => {
                 zx::Status::from_raw(fcomponent::Error::InvalidArguments.into_primitive() as i32)
             }
             BuiltinRunnerError::JobCreation(status) => status,
@@ -119,12 +109,14 @@ impl From<BuiltinRunnerError> for zx::Status {
 impl BuiltinRunner {
     /// Creates a builtin runner with its required resources.
     /// - `task_group`: The tasks associated with the builtin runner.
+    /// - `program': The program that this builtin runner can run.
+    ///   Each builtin runner can only run a single program.
     pub fn new(
         root_job: zx::Unowned<'static, zx::Job>,
         task_group: TaskGroup,
-        builtin_programs: HashMap<&'static str, BuiltinProgramGen>,
+        program: BuiltinProgramGen,
     ) -> Self {
-        Self { root_job, task_group, builtin_programs }
+        Self { root_job, task_group, program }
     }
 
     /// Starts a builtin component.
@@ -136,9 +128,6 @@ impl BuiltinRunner {
             start_info.outgoing_dir.take().ok_or(BuiltinRunnerError::MissingOutgoingDir)?;
         let namespace: Namespace =
             start_info.ns.take().ok_or(BuiltinRunnerError::MissingNamespace)?.try_into()?;
-        let program_type = runner::get_program_string(&start_info, TYPE)
-            .ok_or(BuiltinRunnerError::MissingProgramType)?
-            .to_string();
         let main_process_critical =
             runner::get_program_string(&start_info, "main_process_critical").unwrap_or("false");
         let root_job_critical = match main_process_critical {
@@ -151,12 +140,8 @@ impl BuiltinRunner {
         let job = self.root_job.create_child_job().map_err(BuiltinRunnerError::JobCreation)?;
         let job2 = job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
         let (lifecycle_client, lifecycle_server) =
-            endpoints::create_proxy::<fprocess_lifecycle::LifecycleMarker>().unwrap();
-        let body: BuiltinProgramFn = self
-            .builtin_programs
-            .get(program_type.as_str())
-            .map(|f| f())
-            .ok_or_else(|| BuiltinRunnerError::UnsupportedProgramType(program_type))?;
+            endpoints::create_proxy::<fprocess_lifecycle::LifecycleMarker>();
+        let body: BuiltinProgramFn = (self.program)();
         let program = BuiltinProgram::new(
             body,
             job,
@@ -170,17 +155,8 @@ impl BuiltinRunner {
         Ok((program, Box::pin(wait_for_job_termination(job2))))
     }
 
-    /// Gets the list of builtin programs available in production. If you wish to add a new
-    /// builtin component, you should update this function.
-    ///
-    /// Normally, component manager uses this set of builtin components, but tests may replace
-    /// this with their own components.
-    pub fn get_builtin_programs(
-        elf_runner_resources: Arc<ElfRunnerResources>,
-    ) -> HashMap<&'static str, BuiltinProgramGen> {
-        let mut out = HashMap::new();
-
-        let f: BuiltinProgramGen = Box::new(move || {
+    pub fn get_elf_program(elf_runner_resources: Arc<ElfRunnerResources>) -> BuiltinProgramGen {
+        Box::new(move || {
             let elf_runner_resources = elf_runner_resources.clone();
             Box::new(
                 move |job: zx::Job,
@@ -196,10 +172,11 @@ impl BuiltinRunner {
                     .boxed()
                 },
             )
-        });
-        out.insert("elf_runner", f);
+        })
+    }
 
-        let f: BuiltinProgramGen = Box::new(|| {
+    pub fn get_devfs_program() -> BuiltinProgramGen {
+        Box::new(|| {
             Box::new(
                 move |_job: zx::Job,
                       namespace: Namespace,
@@ -216,10 +193,11 @@ impl BuiltinRunner {
                     .boxed()
                 },
             )
-        });
-        out.insert("devfs", f);
+        })
+    }
 
-        let f: BuiltinProgramGen = Box::new(|| {
+    pub fn get_shutdown_shim_program() -> BuiltinProgramGen {
+        Box::new(|| {
             Box::new(
                 move |_job: zx::Job,
                       namespace: Namespace,
@@ -231,7 +209,7 @@ impl BuiltinRunner {
                         let ns_entries: Vec<fprocess::NameInfo> = namespace.into();
                         let Some(svc) = ns_entries.into_iter().find_map(|e| {
                             if e.path == "/svc" {
-                                Some(e.directory.into_proxy().unwrap())
+                                Some(e.directory.into_proxy())
                             } else {
                                 None
                             }
@@ -247,10 +225,11 @@ impl BuiltinRunner {
                     .boxed()
                 },
             )
-        });
-        out.insert("shutdown-shim", f);
+        })
+    }
 
-        let f: BuiltinProgramGen = Box::new(|| {
+    pub fn get_service_broker_program() -> BuiltinProgramGen {
+        Box::new(|| {
             Box::new(
                 move |_job: zx::Job,
                       namespace: Namespace,
@@ -273,10 +252,7 @@ impl BuiltinRunner {
                     .boxed()
                 },
             )
-        });
-        out.insert("service-broker", f);
-
-        out
+        })
     }
 }
 
@@ -326,8 +302,7 @@ impl BuiltinRunnerFactory for BuiltinRunner {
                             start_info, controller, ..
                         } => match runner.clone().start(start_info) {
                             Ok((program, on_exit)) => {
-                                let (stream, control) =
-                                    controller.into_stream_and_control_handle().unwrap();
+                                let (stream, control) = controller.into_stream_and_control_handle();
                                 let controller = Controller::new(program, stream, control);
                                 runner.task_group.spawn(controller.serve(on_exit));
                             }
@@ -482,7 +457,7 @@ impl ElfRunnerProgram {
     ///   child of the provided job.
     fn new(job: zx::Job, namespace: Namespace, resources: Arc<ElfRunnerResources>) -> Self {
         let namespace = Arc::new(namespace);
-        let connector = NamespaceConnector { namespace: namespace.clone() };
+        let connector = NamespaceConnector { namespace: namespace };
         let elf_runner = elf_runner::ElfRunner::new(
             job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
             Box::new(connector),
@@ -511,7 +486,7 @@ impl ElfRunnerProgram {
             }),
         ));
 
-        let inner_clone = inner.clone();
+        let inner_clone = inner;
         let snapshot_provider = Arc::new(LaunchTaskOnReceive::new(
             CapabilitySource::Builtin(BuiltinSource {
                 capability: InternalCapability::Protocol(
@@ -563,7 +538,7 @@ impl ElfRunnerProgram {
     }
 
     async fn wait_for_shutdown(self, lifecycle: ServerEnd<fprocess_lifecycle::LifecycleMarker>) {
-        let mut stream = lifecycle.into_stream().unwrap();
+        let mut stream = lifecycle.into_stream();
         #[allow(clippy::never_loop)]
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
@@ -683,27 +658,20 @@ mod tests {
 
     fn make_builtin_runner(
         root_job: zx::Unowned<'static, zx::Job>,
-        programs: HashMap<&'static str, BuiltinProgramGen>,
+        program: BuiltinProgramGen,
     ) -> Arc<BuiltinRunner> {
         let task_group = TaskGroup::new();
-        Arc::new(BuiltinRunner::new(root_job, task_group, programs))
+        Arc::new(BuiltinRunner::new(root_job, task_group, program))
     }
 
     fn make_start_info(
-        program_type: &str,
         svc_dir: ClientEnd<fio::DirectoryMarker>,
         main_process_critical: bool,
     ) -> (ComponentStartInfo, DirectoryProxy) {
-        let (outgoing_dir, outgoing_server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (outgoing_dir, outgoing_server_end) = fidl::endpoints::create_proxy();
         let mut start_info = ComponentStartInfo {
             resolved_url: Some("fuchsia-builtin://elf_runner.cm".to_string()),
-            program: Some(Dictionary {
-                entries: Some(vec![DictionaryEntry {
-                    key: "type".to_string(),
-                    value: Some(Box::new(DictionaryValue::Str(program_type.to_string()))),
-                }]),
-                ..Default::default()
-            }),
+            program: Some(Dictionary { entries: Some(vec![]), ..Default::default() }),
             ns: Some(vec![ComponentNamespaceEntry {
                 path: Some("/svc".to_string()),
                 directory: Some(svc_dir),
@@ -725,9 +693,8 @@ mod tests {
         (start_info, outgoing_dir)
     }
 
-    fn make_test_builtin_programs() -> HashMap<&'static str, BuiltinProgramGen> {
-        let mut out = HashMap::new();
-        let f: BuiltinProgramGen = Box::new(|| {
+    fn make_test_exit_immediately() -> BuiltinProgramGen {
+        Box::new(|| {
             Box::new(
                 move |_job: zx::Job,
                       _namespace: Namespace,
@@ -740,10 +707,11 @@ mod tests {
                     .boxed()
                 },
             )
-        });
-        out.insert("test-exit-immediately", f);
+        })
+    }
 
-        let f: BuiltinProgramGen = Box::new(|| {
+    fn make_test_watch_lifecycle() -> BuiltinProgramGen {
+        Box::new(|| {
             Box::new(
                 move |_job: zx::Job,
                       _namespace: Namespace,
@@ -751,7 +719,7 @@ mod tests {
                       lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
                       _program: Option<Dictionary>| {
                     async move {
-                        let mut stream = lifecycle_server.into_stream().unwrap();
+                        let mut stream = lifecycle_server.into_stream();
                         #[allow(clippy::never_loop)]
                         while let Ok(Some(request)) = stream.try_next().await {
                             match request {
@@ -768,10 +736,11 @@ mod tests {
                     .boxed()
                 },
             )
-        });
-        out.insert("test-watch-lifecycle", f);
+        })
+    }
 
-        let f: BuiltinProgramGen = Box::new(|| {
+    fn make_test_hang() -> BuiltinProgramGen {
+        Box::new(|| {
             Box::new(
                 move |_job: zx::Job,
                       _namespace: Namespace,
@@ -785,10 +754,7 @@ mod tests {
                     .boxed()
                 },
             )
-        });
-        out.insert("test-hang", f);
-
-        out
+        })
     }
 
     #[test_case(false; "non-critical")]
@@ -799,10 +765,9 @@ mod tests {
             LazyLock::new(|| fuchsia_runtime::job_default().create_child_job().unwrap());
         let root_job_handle = ROOT_JOB.as_handle_ref().cast();
 
-        let programs = make_test_builtin_programs();
-        let builtin_runner = make_builtin_runner(root_job_handle, programs);
+        let builtin_runner = make_builtin_runner(root_job_handle, make_test_exit_immediately());
         let (client, server_end) =
-            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         builtin_runner
@@ -817,13 +782,12 @@ mod tests {
                 ),
             )
             .unwrap();
-        let (component_controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (component_controller, server_end) = fidl::endpoints::create_proxy();
 
         // Start the "test" component.
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
         open_channel_in_namespace("/svc", fio::PERM_READABLE, svc_server_end).unwrap();
-        let (start_info, _outgoing_dir) =
-            make_start_info("test-exit-immediately", svc, main_process_critical);
+        let (start_info, _outgoing_dir) = make_start_info(svc, main_process_critical);
         client.start(start_info, server_end).unwrap();
 
         // The test component exits immediately, so we should observe a stop event on the
@@ -865,10 +829,9 @@ mod tests {
             LazyLock::new(|| fuchsia_runtime::job_default().create_child_job().unwrap());
         let root_job_handle = ROOT_JOB.as_handle_ref().cast();
 
-        let programs = make_test_builtin_programs();
-        let builtin_runner = make_builtin_runner(root_job_handle, programs);
+        let builtin_runner = make_builtin_runner(root_job_handle, make_test_watch_lifecycle());
         let (client, server_end) =
-            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         builtin_runner
@@ -883,13 +846,12 @@ mod tests {
                 ),
             )
             .unwrap();
-        let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (controller, server_end) = fidl::endpoints::create_proxy();
 
         // Start the "test" component.
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
         open_channel_in_namespace("/svc", fio::PERM_READABLE, svc_server_end).unwrap();
-        let (start_info, _outgoing_dir) =
-            make_start_info("test-watch-lifecycle", svc, main_process_critical);
+        let (start_info, _outgoing_dir) = make_start_info(svc, main_process_critical);
         client.start(start_info, server_end).unwrap();
 
         let controller2 = controller.clone();
@@ -942,10 +904,9 @@ mod tests {
             LazyLock::new(|| fuchsia_runtime::job_default().create_child_job().unwrap());
         let root_job_handle = ROOT_JOB.as_handle_ref().cast();
 
-        let programs = make_test_builtin_programs();
-        let builtin_runner = make_builtin_runner(root_job_handle, programs);
+        let builtin_runner = make_builtin_runner(root_job_handle, make_test_hang());
         let (client, server_end) =
-            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         builtin_runner
@@ -960,12 +921,12 @@ mod tests {
                 ),
             )
             .unwrap();
-        let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (controller, server_end) = fidl::endpoints::create_proxy();
 
         // Start the "test" component.
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
         open_channel_in_namespace("/svc", fio::PERM_READABLE, svc_server_end).unwrap();
-        let (start_info, _outgoing_dir) = make_start_info("test-hang", svc, main_process_critical);
+        let (start_info, _outgoing_dir) = make_start_info(svc, main_process_critical);
         client.start(start_info, server_end).unwrap();
 
         let controller2 = controller.clone();
@@ -1017,10 +978,10 @@ mod tests {
     #[fuchsia::test]
     async fn elf_runner_start_stop() {
         let elf_runner_resources = make_elf_runner_resources();
-        let programs = BuiltinRunner::get_builtin_programs(elf_runner_resources.clone());
-        let builtin_runner = make_builtin_runner(fuchsia_runtime::job_default(), programs);
+        let program = BuiltinRunner::get_elf_program(elf_runner_resources.clone());
+        let builtin_runner = make_builtin_runner(fuchsia_runtime::job_default(), program);
         let (client, server_end) =
-            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         builtin_runner
@@ -1035,12 +996,12 @@ mod tests {
                 ),
             )
             .unwrap();
-        let (elf_runner_controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (elf_runner_controller, server_end) = fidl::endpoints::create_proxy();
 
         // Start the ELF runner.
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
         open_channel_in_namespace("/svc", fio::PERM_READABLE, svc_server_end).unwrap();
-        let (start_info, outgoing_dir) = make_start_info("elf_runner", svc, false);
+        let (start_info, outgoing_dir) = make_start_info(svc, false);
         client.start(start_info, server_end).unwrap();
 
         // Use the ComponentRunner FIDL in the outgoing directory of the ELF runner to run
@@ -1131,40 +1092,5 @@ mod tests {
         let instance_died =
             zx::Status::from_raw(fcomponent::Error::InstanceDied.into_primitive() as i32);
         assert_eq!(result.termination_status, instance_died);
-    }
-
-    /// Test that the builtin runner reports errors when starting unknown types.
-    #[fuchsia::test]
-    async fn start_error_unknown_type() {
-        let programs = make_test_builtin_programs();
-        let builtin_runner = make_builtin_runner(fuchsia_runtime::job_default(), programs);
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
-        let scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
-        builtin_runner
-            .get_scoped_runner(
-                make_scoped_policy_checker(),
-                OpenRequest::new(
-                    scope.clone(),
-                    fio::OpenFlags::empty(),
-                    VfsPath::dot(),
-                    &mut object_request,
-                ),
-            )
-            .unwrap();
-        let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
-        let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
-        open_channel_in_namespace("/svc", fio::PERM_READABLE, svc_server_end).unwrap();
-        let (start_info, _outgoing_dir) = make_start_info("foobar", svc, false);
-        client.start(start_info, server_end).unwrap();
-        let event = controller.take_event_stream().try_next().await;
-        let invalid_arguments =
-            zx::Status::from_raw(fcomponent::Error::InvalidArguments.into_primitive() as i32);
-        assert_matches!(
-            event,
-            Err(fidl::Error::ClientChannelClosed { status, .. })
-            if status == invalid_arguments
-        );
     }
 }

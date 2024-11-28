@@ -111,7 +111,7 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
       outgoing_ptr = &test_env->incoming_directory();
     });
     device_server.SyncCall([outgoing_ptr](compat::DeviceServer* device_server) {
-      device_server->Init(component::kDefaultInstance);
+      device_server->Initialize(component::kDefaultInstance);
       EXPECT_EQ(ZX_OK, device_server->Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                             outgoing_ptr));
     });
@@ -135,9 +135,9 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     // [START set_up_outgoing_directory_channel]
-    zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
-                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      server_end.TakeChannel().release());
+    zx_status_t status = fdio_open3_at(driver_outgoing_.handle()->get(), "/svc",
+                                       static_cast<uint64_t>(fuchsia_io::Flags::kProtocolDirectory),
+                                       server_end.TakeChannel().release());
     // [END set_up_outgoing_directory_channel]
     EXPECT_EQ(ZX_OK, status);
     return std::move(client_end);

@@ -33,16 +33,9 @@ class PlatformDevice {
 
   virtual void* GetDeviceHandle() = 0;
 
-  // Get a driver-specific protocol implementation. |proto_id| identifies which
-  // protocol to retrieve.
-  virtual bool GetProtocol(uint32_t proto_id, void* proto_out) = 0;
-
   virtual uint32_t GetMmioCount() const = 0;
 
   virtual std::unique_ptr<PlatformHandle> GetBusTransactionInitiator() const = 0;
-
-  virtual Status LoadFirmware(const char* filename, std::unique_ptr<PlatformBuffer>* firmware_out,
-                              uint64_t* size_out) const = 0;
 
   // Map an MMIO listed at |index| in the MDI for this device.
   virtual std::unique_ptr<PlatformMmio> CpuMapMmio(unsigned int index,

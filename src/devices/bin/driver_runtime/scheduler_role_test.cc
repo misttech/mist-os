@@ -11,8 +11,8 @@
 #include <lib/zx/interrupt.h>
 
 #include "src/devices/bin/driver_runtime/dispatcher.h"
-#include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/runtime_test_case.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 
 namespace driver_runtime {
 extern DispatcherCoordinator& GetDispatcherCoordinator();
@@ -68,7 +68,7 @@ TEST_F(ThreadPoolTest, NoSchedulerRole) {
 
   libsync::Completion task_completion;
   ASSERT_OK(async::PostTask(dispatcher_.async_dispatcher(), [&] {
-    auto role_profile_status = driver_context::GetRoleProfileStatus();
+    auto role_profile_status = thread_context::GetRoleProfileStatus();
     ASSERT_FALSE(role_profile_status.has_value());
 
     task_completion.Signal();
@@ -82,7 +82,7 @@ TEST_F(ThreadPoolTest, WithSchedulerRole) {
 
   libsync::Completion task_completion;
   ASSERT_OK(async::PostTask(dispatcher_.async_dispatcher(), [&] {
-    auto role_profile_status = driver_context::GetRoleProfileStatus();
+    auto role_profile_status = thread_context::GetRoleProfileStatus();
     ASSERT_TRUE(role_profile_status.has_value());
     ASSERT_OK(role_profile_status.value());
 
@@ -97,7 +97,7 @@ TEST_F(ThreadPoolTest, BadSchedulerRole) {
 
   libsync::Completion task_completion;
   ASSERT_OK(async::PostTask(dispatcher_.async_dispatcher(), [&] {
-    auto role_profile_status = driver_context::GetRoleProfileStatus();
+    auto role_profile_status = thread_context::GetRoleProfileStatus();
     ASSERT_TRUE(role_profile_status.has_value());
     ASSERT_NE(ZX_OK, *role_profile_status);
 
@@ -113,7 +113,7 @@ TEST_F(ThreadPoolTest, AllowSyncCalls) {
 
   libsync::Completion task_completion;
   ASSERT_OK(async::PostTask(dispatcher_.async_dispatcher(), [&] {
-    auto role_profile_status = driver_context::GetRoleProfileStatus();
+    auto role_profile_status = thread_context::GetRoleProfileStatus();
     ASSERT_TRUE(role_profile_status.has_value());
     ASSERT_OK(role_profile_status.value());
 
@@ -135,7 +135,7 @@ TEST_F(ThreadPoolTest, Shutdown) {
   auto fake_driver = CreateFakeDriver();
   libsync::Completion shutdown_completion;
   auto shutdown_handler = [&](fdf_dispatcher_t* dispatcher) {
-    auto role_profile_status = driver_context::GetRoleProfileStatus();
+    auto role_profile_status = thread_context::GetRoleProfileStatus();
     ASSERT_TRUE(role_profile_status.has_value());
     ASSERT_OK(role_profile_status.value());
 
@@ -226,7 +226,7 @@ TEST_F(MultipleDispatchersThreadPoolTest, ManyDispatchers) {
 
     libsync::Completion task_completion;
     ASSERT_OK(async::PostTask(dispatcher->async_dispatcher(), [&] {
-      auto role_profile_status = driver_context::GetRoleProfileStatus();
+      auto role_profile_status = thread_context::GetRoleProfileStatus();
       ASSERT_TRUE(role_profile_status.has_value());
       ASSERT_OK(role_profile_status.value());
 

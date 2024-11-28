@@ -202,14 +202,14 @@ impl RegisterTool {
                     "Error while registering repository {repo_name} with {target}: {err}\n\
                                     Ensure that a target is running and connected with:\n\
                                     $ ffx target list",
-                    target = target_spec.clone().unwrap_or("None".to_string())
+                    target = target_spec.clone().unwrap_or_else(|| "None".to_string())
                 )
             }
             Err(RepositoryError::ServerNotRunning) => {
                 return_bug!(
                     "Failed to register repository {repo_name} with {target} {reason:#}",
                     reason = pkg::config::determine_why_repository_server_is_not_running().await,
-                    target = target_spec.clone().unwrap_or("None".to_string())
+                    target = target_spec.clone().unwrap_or_else(|| "None".to_string())
                 )
             }
             Err(err @ RepositoryError::ConflictingRegistration) => {
@@ -223,7 +223,7 @@ impl RegisterTool {
             }
             Err(err) => {
                 return_bug!("Unexpected error. Failed to register repository {repo_name} with {target}: {err}",
-                target=target_spec.clone().unwrap_or("None".to_string()))
+                target=target_spec.clone().unwrap_or_else(|| "None".to_string()))
             }
         }
     }
@@ -350,13 +350,13 @@ mod test {
             EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
                 let expected_rule = expected_rule.clone();
                 fuchsia_async::Task::local(async move {
-                    let mut tx_stream = transaction.into_stream().unwrap();
+                    let mut tx_stream = transaction.into_stream();
 
                     while let Some(req) = tx_stream.try_next().await.unwrap() {
                         match req {
                             EditTransactionRequest::ResetAll { control_handle: _ } => (),
                             EditTransactionRequest::ListDynamic { iterator, control_handle: _ } => {
-                                let mut stream = iterator.into_stream().unwrap();
+                                let mut stream = iterator.into_stream();
 
                                 while let Some(req) = stream.try_next().await.unwrap() {
                                     let RuleIteratorRequest::Next { responder } = req;

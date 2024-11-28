@@ -23,7 +23,7 @@ async fn client_integration_test() {
         .unwrap()
         .unwrap();
 
-    let (_exposed_dir_proxy, exposed_dir_server) = fidl::endpoints::create_proxy().unwrap();
+    let (_exposed_dir_proxy, exposed_dir_server) = fidl::endpoints::create_proxy();
 
     // Trying to open the component's dir will fail because we've given it a bad CVF file.
     assert_eq!(

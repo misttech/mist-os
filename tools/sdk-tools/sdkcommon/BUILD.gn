@@ -24,8 +24,5 @@ go_test("sdkcommon-test") {
 }
 
 group("host-tool-deps") {
-  deps = [
-    "//src/developer/ffx:bin_sdk($host_toolchain)",
-    "//src/sys/pkg/bin/pm:host",
-  ]
+  deps = [ "//src/developer/ffx:bin_sdk($host_toolchain)" ]
 }

@@ -46,12 +46,12 @@ pub fn next_match_one_of<'a, Rule: RuleType>(
 ) -> ParseResult<Pair<'a, Rule>, Rule> {
     let pair_result = pairs.next();
     let pair = pair_result
-        .ok_or(ParseError::NextRuleMissing { expected_rules: expected_rules.clone() })?;
+        .ok_or_else(|| ParseError::NextRuleMissing { expected_rules: expected_rules.clone() })?;
 
     let pair_rule = pair.as_rule();
     if !expected_rules.contains(&pair_rule) {
         return Err(ParseError::NextRuleUnexpected {
-            expected_rules: expected_rules.clone(),
+            expected_rules: expected_rules,
             actual_rule: pair_rule,
         });
     }

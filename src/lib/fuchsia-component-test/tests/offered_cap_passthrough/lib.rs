@@ -31,13 +31,8 @@ async fn offered_capability_passed_through_nested_component_manager() {
         )
         .await
         .unwrap();
-    let cm_instance = builder
-        .build_in_nested_component_manager_with_passthrough_offers(
-            "#meta/component_manager.cm",
-            vec![cm_types::BoundedName::new("fidl.examples.routing.echo.Echo").unwrap()],
-        )
-        .await
-        .unwrap();
+    let cm_instance =
+        builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
     assert!(
         receive_echo_client_results.next().await.is_some(),
         "failed to observe the mock client report success",

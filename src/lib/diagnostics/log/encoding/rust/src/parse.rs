@@ -5,36 +5,65 @@
 //! Parse diagnostic records from streams, returning FIDL-generated structs that match expected
 //! diagnostic service APIs.
 
-use crate::{ArgType, Argument, Header, RawSeverity, Record, Value};
-use nom::bytes::complete::take;
-use nom::multi::many0;
-use nom::number::complete::{le_f64, le_i64, le_u64};
-use nom::{Err, IResult};
+use crate::{constants, ArgType, Argument, Header, RawSeverity, Record, Value};
 use std::borrow::Cow;
-use std::cell::RefCell;
-use std::rc::Rc;
 use thiserror::Error;
-
-pub(crate) type ParseResult<'a, T> = IResult<&'a [u8], T, ParseError>;
+use zerocopy::FromBytes;
 
 /// Extracts the basic information of a log message: timestamp and severity.
-pub fn basic_info(buf: &[u8]) -> Result<(zx::BootInstant, RawSeverity), nom::Err<ParseError>> {
-    let (after_header, header) = parse_header(buf)?;
+pub fn basic_info(buf: &[u8]) -> Result<(zx::BootInstant, RawSeverity), ParseError> {
+    let (header, after_header) =
+        Header::read_from_prefix(buf).map_err(|_| ParseError::InvalidHeader)?;
     if header.raw_type() != crate::TRACING_FORMAT_LOG_RECORD_TYPE {
-        return Err(nom::Err::Failure(ParseError::ValueOutOfValidRange));
+        return Err(ParseError::InvalidRecordType);
     }
-    let (_, timestamp) = le_i64(after_header)?;
+    let (timestamp, _) =
+        i64::read_from_prefix(after_header).map_err(|_| ParseError::InvalidTimestamp)?;
     Ok((zx::BootInstant::from_nanos(timestamp), header.severity()))
 }
 
 /// Attempt to parse a diagnostic record from the head of this buffer, returning the record and any
 /// unused portion of the buffer if successful.
 pub fn parse_record(buf: &[u8]) -> Result<(Record<'_>, &[u8]), ParseError> {
-    match try_parse_record(buf) {
-        Ok((remainder, record)) => Ok((record, remainder)),
-        Err(Err::Incomplete(n)) => Err(ParseError::Incomplete(n)),
-        Err(Err::Error(e)) | Err(Err::Failure(e)) => Err(e),
+    let (header, after_header) =
+        Header::read_from_prefix(buf).map_err(|_| ParseError::InvalidHeader)?;
+
+    if header.raw_type() != crate::TRACING_FORMAT_LOG_RECORD_TYPE {
+        return Err(ParseError::ValueOutOfValidRange);
     }
+
+    let (timestamp, remaining_buffer) =
+        i64::read_from_prefix(after_header).map_err(|_| ParseError::InvalidTimestamp)?;
+
+    let arguments_length = if header.size_words() >= 2 {
+        // Remove two word lengths for header and timestamp.
+        (header.size_words() - 2) as usize * 8
+    } else {
+        return Err(ParseError::ValueOutOfValidRange);
+    };
+
+    let Some((mut arguments_buffer, remaining)) =
+        remaining_buffer.split_at_checked(arguments_length)
+    else {
+        return Err(ParseError::ValueOutOfValidRange);
+    };
+
+    let mut arguments = vec![];
+    let mut state = ParseState::Initial;
+    while !arguments_buffer.is_empty() {
+        let (argument, rem) = parse_argument_internal(arguments_buffer, &mut state)?;
+        arguments_buffer = rem;
+        arguments.push(argument);
+    }
+
+    Ok((
+        Record {
+            timestamp: zx::BootInstant::from_nanos(timestamp),
+            severity: header.severity(),
+            arguments,
+        },
+        remaining,
+    ))
 }
 
 /// Internal parser state.
@@ -48,114 +77,81 @@ enum ParseState {
     InArguments,
 }
 
-pub(crate) fn try_parse_record(buf: &[u8]) -> ParseResult<'_, Record<'_>> {
-    let (after_header, header) = parse_header(buf)?;
-
-    if header.raw_type() != crate::TRACING_FORMAT_LOG_RECORD_TYPE {
-        return Err(nom::Err::Failure(ParseError::ValueOutOfValidRange));
-    }
-
-    let (var_len, timestamp) = le_i64(after_header)?;
-
-    // Remove two word lengths for header and timestamp.
-    let remaining_record_len = if header.size_words() >= 2 {
-        (header.size_words() - 2) as usize * 8
-    } else {
-        return Err(nom::Err::Failure(ParseError::ValueOutOfValidRange));
-    };
-    let severity = header.severity();
-
-    let (after_record, args_buf) = take(remaining_record_len)(var_len)?;
-    let state = Rc::new(RefCell::new(ParseState::Initial));
-    let (_, arguments) =
-        many0(|input| parse_argument_internal(input, &mut state.borrow_mut()))(args_buf)?;
-
-    let timestamp = zx::BootInstant::from_nanos(timestamp);
-    Ok((after_record, Record { timestamp, severity, arguments }))
-}
-
-fn parse_header(buf: &[u8]) -> ParseResult<'_, Header> {
-    let (after, header) = le_u64(buf)?;
-    let header = Header(header);
-
-    Ok((after, header))
-}
-
 /// Parses an argument
-pub fn parse_argument(buf: &[u8]) -> ParseResult<'_, Argument<'_>> {
-    let mut state = ParseState::Initial;
-    parse_argument_internal(buf, &mut state)
+pub fn parse_argument<'a>(buf: &'a [u8]) -> Result<(Argument<'a>, &'a [u8]), ParseError> {
+    parse_argument_internal(buf, &mut ParseState::Initial)
 }
 
 fn parse_argument_internal<'a>(
     buf: &'a [u8],
     state: &mut ParseState,
-) -> ParseResult<'a, Argument<'a>> {
-    let (after_header, header) = parse_header(buf)?;
-    let arg_ty = ArgType::try_from(header.raw_type()).map_err(nom::Err::Failure)?;
+) -> Result<(Argument<'a>, &'a [u8]), ParseError> {
+    let (header, after_header) =
+        Header::read_from_prefix(buf).map_err(|_| ParseError::InvalidArgumentHeader)?;
+    let arg_ty = ArgType::try_from(header.raw_type())?;
 
-    let (after_name, name) = string_ref(header.name_ref(), after_header, false)?;
-    if matches!(state, ParseState::Initial) && matches!(&name, Cow::Borrowed("message")) {
+    let (name, after_name) = string_ref(header.name_ref(), after_header, false)?;
+    if matches!(state, ParseState::Initial) && name == Cow::Borrowed(constants::MESSAGE) {
         *state = ParseState::InMessage;
     }
     let (value, after_value) = match arg_ty {
         ArgType::Null => (Value::UnsignedInt(1), after_name),
         ArgType::I64 => {
-            let (rem, n) = le_i64(after_name)?;
+            let (n, rem) =
+                i64::read_from_prefix(after_name).map_err(|_| ParseError::InvalidArgument)?;
             (Value::SignedInt(n), rem)
         }
         ArgType::U64 => {
-            let (rem, n) = le_u64(after_name)?;
+            let (n, rem) =
+                u64::read_from_prefix(after_name).map_err(|_| ParseError::InvalidArgument)?;
             (Value::UnsignedInt(n), rem)
         }
         ArgType::F64 => {
-            let (rem, n) = le_f64(after_name)?;
+            let (n, rem) =
+                f64::read_from_prefix(after_name).map_err(|_| ParseError::InvalidArgument)?;
             (Value::Floating(n), rem)
         }
         ArgType::String => {
-            let (rem, s) =
+            let (s, rem) =
                 string_ref(header.value_ref(), after_name, matches!(state, ParseState::InMessage))?;
             (Value::Text(s), rem)
         }
         ArgType::Bool => (Value::Boolean(header.bool_val()), after_name),
         ArgType::Pointer | ArgType::Koid | ArgType::I32 | ArgType::U32 => {
-            return Err(Err::Failure(ParseError::Unsupported))
+            return Err(ParseError::Unsupported)
         }
     };
     if matches!(state, ParseState::InMessage) {
         *state = ParseState::InArguments;
     }
 
-    Ok((after_value, Argument::new(name, value)))
+    Ok((Argument::new(name, value), after_value))
 }
 
 fn string_ref(
     ref_mask: u16,
     buf: &[u8],
     support_invalid_utf8: bool,
-) -> ParseResult<'_, Cow<'_, str>> {
-    Ok(if ref_mask == 0 {
-        (buf, "".into())
-    } else if (ref_mask & 1 << 15) == 0 {
-        return Err(Err::Failure(ParseError::Unsupported));
+) -> Result<(Cow<'_, str>, &[u8]), ParseError> {
+    if ref_mask == 0 {
+        return Ok((Cow::Borrowed(""), buf));
+    }
+    if (ref_mask & 1 << 15) == 0 {
+        return Err(ParseError::Unsupported);
+    }
+    // zero out the top bit
+    let name_len = (ref_mask & !(1 << 15)) as usize;
+    let Some((name, after_name)) = buf.split_at_checked(name_len) else {
+        return Err(ParseError::ValueOutOfValidRange);
+    };
+    let parsed = if support_invalid_utf8 {
+        String::from_utf8_lossy(name)
     } else {
-        // zero out the top bit
-        let name_len = (ref_mask & !(1 << 15)) as usize;
-        let (after_name, name) = take(name_len)(buf)?;
-        let parsed = if support_invalid_utf8 {
-            match std::str::from_utf8(name) {
-                Ok(valid) => Cow::Borrowed(valid),
-                Err(_) => String::from_utf8_lossy(name),
-            }
-        } else {
-            Cow::Borrowed(
-                std::str::from_utf8(name).map_err(|e| nom::Err::Error(ParseError::from(e)))?,
-            )
-        };
-        let (_padding, after_padding) = after_name.split_at(after_name.len() % 8);
-
-        (after_padding, parsed)
-    })
+        let name = std::str::from_utf8(name)?;
+        Cow::Borrowed(name)
+    };
+    let (_padding, after_padding) = after_name.split_at(after_name.len() % 8);
+    Ok((parsed, after_padding))
 }
 
 /// Errors which occur when interacting with streams of diagnostic records.
@@ -170,29 +166,34 @@ pub enum ParseError {
     #[error("unsupported value type")]
     Unsupported,
 
-    /// We encountered a generic `nom` error while parsing.
-    #[error("nom parsing error: {0:?}")]
-    Nom(nom::error::ErrorKind),
+    /// We failed to parse a record header.
+    #[error("found invalid header")]
+    InvalidHeader,
+
+    /// We failed to parse a record header.
+    #[error("found invalid header in an argument")]
+    InvalidArgumentHeader,
+
+    /// We failed to parse a record timestamp.
+    #[error("found invalid timestamp after header")]
+    InvalidTimestamp,
+
+    /// We failed to parse a record argument.
+    #[error("found invalid argument")]
+    InvalidArgument,
+
+    /// The record type wasn't the one we expected: LOGS
+    #[error("found invalid record type")]
+    InvalidRecordType,
 
     /// We failed to parse a complete item.
-    #[error("parsing terminated early, needed {0:?}")]
-    Incomplete(nom::Needed),
+    #[error("parsing terminated early, remaining bytes: {0:?}")]
+    Incomplete(usize),
 }
 
 impl From<std::str::Utf8Error> for ParseError {
     fn from(_: std::str::Utf8Error) -> Self {
         ParseError::ValueOutOfValidRange
-    }
-}
-
-impl nom::error::ParseError<&[u8]> for ParseError {
-    fn from_error_kind(_input: &[u8], kind: nom::error::ErrorKind) -> Self {
-        ParseError::Nom(kind)
-    }
-
-    fn append(_input: &[u8], kind: nom::error::ErrorKind, _prev: Self) -> Self {
-        // TODO(https://fxbug.dev/42133514) support chaining these
-        ParseError::Nom(kind)
     }
 }
 
@@ -219,5 +220,25 @@ mod tests {
         let (timestamp, severity) = basic_info(encoded).unwrap();
         assert_eq!(timestamp, expected_timestamp);
         assert_eq!(severity, Severity::Error.into_primitive());
+    }
+
+    #[fuchsia::test]
+    fn parse_record_with_zeros() {
+        let expected_timestamp = zx::BootInstant::from_nanos(72);
+        let record = Record {
+            timestamp: expected_timestamp,
+            severity: Severity::Error as u8,
+            arguments: vec![],
+        };
+        let mut buffer = Cursor::new(vec![0u8; 1000]);
+        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
+        encoder.write_record(record.clone()).unwrap();
+
+        // Ensure that some additional padding is ok to parse the record.
+        let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize + 3];
+
+        let (result_record, rem) = parse_record(encoded).unwrap();
+        assert_eq!(rem.len(), 3);
+        assert_eq!(record, result_record);
     }
 }

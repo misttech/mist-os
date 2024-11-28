@@ -273,8 +273,7 @@ impl GattService {
     ) -> Result<LocalServiceRequestStream, Error> {
         // Build the GATT service.
         let info = Self::service_info();
-        let (service_client, service_stream) = create_request_stream::<LocalServiceMarker>()
-            .context("Can't create LocalService endpoints")?;
+        let (service_client, service_stream) = create_request_stream::<LocalServiceMarker>();
 
         if let Err(e) = server_svc.publish_service(&info, service_client).await? {
             warn!("Couldn't set up Fast Pair GATT Service: {:?}", e);
@@ -447,7 +446,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (gatt_client, mut gatt_server) =
-            fidl::endpoints::create_proxy_and_stream::<Server_Marker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<Server_Marker>();
         let gatt_server_fut = gatt_server.next();
         let mut gatt_server_fut = pin!(gatt_server_fut);
         let _ = exec.run_until_stalled(&mut gatt_server_fut).expect_pending("Upstream still ok");
@@ -476,7 +475,7 @@ pub(crate) mod tests {
     /// Returns the `GattService` and the connection to the published local service.
     pub(crate) async fn setup_gatt_service() -> (GattService, LocalServiceProxy) {
         let (gatt_server_client, mut gatt_server) =
-            fidl::endpoints::create_proxy_and_stream::<Server_Marker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<Server_Marker>();
 
         let publish_fut = GattService::from_proxy(gatt_server_client, Config::example_config());
         let gatt_server_fut = gatt_server.select_next_some();
@@ -494,7 +493,7 @@ pub(crate) mod tests {
                 let _ = responder.send(Ok(()));
                 // Publish service request should resolve.
                 let gatt_service = publish_fut.await.expect("should resolve ok");
-                (gatt_service, local_service_client.into_proxy().unwrap())
+                (gatt_service, local_service_client.into_proxy())
             }
         }
     }

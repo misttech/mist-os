@@ -236,7 +236,8 @@ impl<'a> CpuControlHandlerBuilder<'a> {
         let logical_cpu_numbers = ok_or_default_err!(self.logical_cpu_numbers)?;
 
         // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
         let inspect =
             InspectData::new(inspect_root, format!("CpuControlHandler (perf_rank: {})", perf_rank));
 
@@ -743,7 +744,7 @@ pub mod tests {
     // Returns a proxy to a fake CpuCtrl driver pre-baked to return the given set of CPU opps.
     pub fn fake_cpu_ctrl_driver_with_opps(opps: Vec<OperatingPoint>) -> fcpuctrl::DeviceProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fcpuctrl::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcpuctrl::DeviceMarker>();
 
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {

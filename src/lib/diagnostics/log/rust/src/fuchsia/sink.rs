@@ -164,7 +164,7 @@ mod tests {
     const TARGET: &str = "diagnostics_log_lib_test::fuchsia::sink::tests";
 
     async fn init_sink(config: SinkConfig) -> fidl::Socket {
-        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
+        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>();
         let sink = Sink::new(&proxy, config).unwrap();
         tracing::subscriber::set_global_default(Registry::default().with(sink)).unwrap();
 
@@ -183,7 +183,7 @@ mod tests {
         // 160 writes so we write 5 MB given that we write 32K each write. Without enabling
         // retrying, this would lead to dropped logs.
         const TOTAL_WRITES: usize = 32 * 5;
-        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
+        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>();
         // Writes a megabyte of data to the Sink.
         std::thread::spawn(move || {
             let sink = Sink::new(

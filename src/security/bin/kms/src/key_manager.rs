@@ -166,10 +166,7 @@ impl KeyManager {
         key_to_bind: Arc<Mutex<dyn KmsKey>>,
         key: ServerEnd<AsymmetricPrivateKeyMarker>,
     ) -> Result<(), Error> {
-        let mut request_stream = key.into_stream().map_err(debug_err_fn!(
-            Error::InternalError,
-            "Error creating AsymmetricKey request stream {:?}"
-        ))?;
+        let mut request_stream = key.into_stream();
         // Need to clone the key_name to be move into the async function.
         let key_name = String::from(key_name);
         // Copy the key map into the async function.

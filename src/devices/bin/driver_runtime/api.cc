@@ -14,8 +14,8 @@
 #include "src/devices/bin/driver_runtime/arena.h"
 #include "src/devices/bin/driver_runtime/channel.h"
 #include "src/devices/bin/driver_runtime/dispatcher.h"
-#include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/handle.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 #include "src/devices/lib/log/log.h"
 
 // fdf_arena_t interface
@@ -164,7 +164,7 @@ __EXPORT void fdf_dispatcher_shutdown_async(fdf_dispatcher_t* dispatcher) {
 __EXPORT void fdf_dispatcher_destroy(fdf_dispatcher_t* dispatcher) { return dispatcher->Destroy(); }
 
 __EXPORT fdf_dispatcher_t* fdf_dispatcher_get_current_dispatcher() {
-  return static_cast<fdf_dispatcher_t*>(driver_context::GetCurrentDispatcher());
+  return static_cast<fdf_dispatcher_t*>(thread_context::GetCurrentDispatcher());
 }
 
 __EXPORT zx_status_t fdf_dispatcher_seal(fdf_dispatcher_t* dispatcher, uint32_t option) {
@@ -185,17 +185,17 @@ __EXPORT zx_status_t fdf_env_start() { return driver_runtime::DispatcherCoordina
 __EXPORT void fdf_env_reset() { return driver_runtime::DispatcherCoordinator::EnvReset(); }
 
 __EXPORT void fdf_env_register_driver_entry(const void* driver) {
-  driver_context::PushDriver(driver);
+  thread_context::PushDriver(driver);
 }
 
-__EXPORT void fdf_env_register_driver_exit() { driver_context::PopDriver(); }
+__EXPORT void fdf_env_register_driver_exit() { thread_context::PopDriver(); }
 
 __EXPORT zx_status_t fdf_env_dispatcher_create_with_owner(
     const void* driver, uint32_t options, const char* name, size_t name_len,
     const char* scheduler_role, size_t scheduler_role_len,
     fdf_dispatcher_shutdown_observer_t* observer, fdf_dispatcher_t** out_dispatcher) {
-  driver_context::PushDriver(driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   driver_runtime::Dispatcher* dispatcher;
   auto status = driver_runtime::Dispatcher::Create(
@@ -231,7 +231,7 @@ __EXPORT void fdf_env_dispatcher_get_dump_deprecated(fdf_dispatcher_t* dispatche
   *out_dump = buf;
 }
 
-__EXPORT const void* fdf_env_get_current_driver() { return driver_context::GetCurrentDriver(); }
+__EXPORT const void* fdf_env_get_current_driver() { return thread_context::GetCurrentDriver(); }
 
 __EXPORT zx_status_t fdf_env_shutdown_dispatchers_async(
     const void* driver, fdf_env_driver_shutdown_observer_t* observer) {
@@ -257,8 +257,8 @@ __EXPORT void fdf_internal_wait_until_all_dispatchers_destroyed() {
 __EXPORT zx_status_t fdf_testing_create_unmanaged_dispatcher(
     const void* driver, uint32_t options, const char* name, size_t name_len,
     fdf_dispatcher_shutdown_observer_t* observer, fdf_dispatcher_t** out_dispatcher) {
-  driver_context::PushDriver(driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   driver_runtime::Dispatcher* dispatcher;
   auto status = driver_runtime::Dispatcher::CreateUnmanagedDispatcher(
@@ -271,11 +271,11 @@ __EXPORT zx_status_t fdf_testing_create_unmanaged_dispatcher(
 }
 
 __EXPORT zx_status_t fdf_testing_set_default_dispatcher(fdf_dispatcher_t* dispatcher) {
-  if (!driver_context::IsCallStackEmpty()) {
+  if (!thread_context::IsCallStackEmpty()) {
     return ZX_ERR_BAD_STATE;
   }
 
-  driver_context::SetDefaultTestingDispatcher(static_cast<driver_runtime::Dispatcher*>(dispatcher));
+  thread_context::SetDefaultTestingDispatcher(static_cast<driver_runtime::Dispatcher*>(dispatcher));
   return ZX_OK;
 }
 

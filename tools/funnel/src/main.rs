@@ -293,7 +293,7 @@ async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     tracing::info!("result from do_ssh: {:?}", do_ssh_res);
     match do_ssh_res {
         Ok(_) => {}
-        e @ Err(ssh::TunnelError::TunnelAlreadyRunning { remote_host: _ }) => {
+        e @ Err(ssh::TunnelError::PortForwardingFailed { remote_host: _ }) => {
             // If this returned an error due to our signal just log and return
             let was_requested = term_requested.lock().unwrap();
             if !*was_requested {
@@ -322,7 +322,7 @@ fn write_target_event<W: Write>(mut writer: W, event: TargetEvent) -> Result<()>
         TargetEvent::Removed(handle) => handle,
     };
 
-    let node_name = handle.node_name.unwrap_or("<unknown>".to_string());
+    let node_name = handle.node_name.unwrap_or_else(|| "<unknown>".to_string());
 
     write!(writer, "({symbol})\t{node_name}\t")?;
     write_target_state(&mut writer, handle.state)?;

@@ -5,6 +5,8 @@
 // N.B. The offline symbolizer (scripts/symbolize) reads our output,
 // don't break it.
 
+#include "zircon/system/ulib/inspector/backtrace.h"
+
 #include <elf-search.h>
 #include <inttypes.h>
 #include <stddef.h>
@@ -17,7 +19,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <iterator>
 #include <vector>
 
 #include <fbl/alloc_checker.h>
@@ -29,25 +30,22 @@
 #include "src/lib/unwinder/fuchsia.h"
 #include "src/lib/unwinder/unwind.h"
 
-__EXPORT void inspector_print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t thread) {
-  static constexpr int kBacktraceFrameLimit = 200;
+namespace {
 
-  // Setup memory and modules.
-  unwinder::FuchsiaMemory memory(process);
-  std::vector<uint64_t> modules;
-  elf_search::ForEachModule(
-      *zx::unowned_process{process},
-      [&modules](const elf_search::ModuleInfo& info) { modules.push_back(info.vaddr); });
+constexpr int kBacktraceFrameLimit = 200;
 
-  // Setup registers.
-  zx_thread_state_general_regs_t regs;
-  if (inspector_read_general_regs(thread, &regs) != ZX_OK) {
-    return;
-  }
-  auto registers = unwinder::FromFuchsiaRegisters(regs);
+bool ModuleContainsFrameAddress(const elf_search::ModuleInfo& info, const uint64_t pc) {
+  auto contains_frame_address = [pc, &info](const Elf64_Phdr& phdr) {
+    uintptr_t start = phdr.p_vaddr;
+    uintptr_t end = phdr.p_vaddr + phdr.p_memsz;
 
-  auto frames = unwinder::Unwind(&memory, modules, registers, kBacktraceFrameLimit);
+    return pc >= info.vaddr + start && pc < info.vaddr + end;
+  };
 
+  return std::any_of(info.phdrs.begin(), info.phdrs.end(), contains_frame_address);
+}
+
+void print_backtrace_markup(FILE* f, const std::vector<unwinder::Frame>& frames) {
   // Print frames.
   int n = 0;
   for (auto& frame : frames) {
@@ -87,10 +85,39 @@ __EXPORT void inspector_print_backtrace_markup(FILE* f, zx_handle_t process, zx_
   }
 }
 
-__EXPORT void inspector_print_markup_context(FILE* f, zx_handle_t process) {
-  // We should dump all modules instead of only used ones. See https://fxbug.dev/42076491.
+}  // namespace
+
+std::vector<unwinder::Frame> inspector::get_frames(FILE* f, zx_handle_t process,
+                                                   zx_handle_t thread) {
+  // Setup memory and modules.
+  unwinder::FuchsiaMemory memory(process);
+  std::vector<uint64_t> modules;
   elf_search::ForEachModule(
-      *zx::unowned_process{process}, [f, count = 0u](const elf_search::ModuleInfo& info) mutable {
+      *zx::unowned_process{process},
+      [&modules](const elf_search::ModuleInfo& info) { modules.push_back(info.vaddr); });
+
+  // Setup registers.
+  zx_thread_state_general_regs_t regs;
+  if (inspector_read_general_regs(thread, &regs) != ZX_OK) {
+    return {};
+  }
+  auto registers = unwinder::FromFuchsiaRegisters(regs);
+
+  return unwinder::Unwind(&memory, modules, registers, kBacktraceFrameLimit);
+}
+
+void inspector::print_markup_context(FILE* f, zx_handle_t process, std::vector<uint64_t> pcs) {
+  elf_search::ForEachModule(
+      *zx::unowned_process{process},
+      [f, &pcs, count = 0u](const elf_search::ModuleInfo& info) mutable {
+        auto is_frame_from_module = [&info](const uint64_t pc) {
+          return ModuleContainsFrameAddress(info, pc);
+        };
+
+        if (!pcs.empty() && std::none_of(pcs.begin(), pcs.end(), is_frame_from_module)) {
+          return;
+        }
+
         const size_t kPageSize = zx_system_get_page_size();
         unsigned int module_id = count++;
         // Print out the module first.
@@ -120,4 +147,14 @@ __EXPORT void inspector_print_markup_context(FILE* f, zx_handle_t process) {
           fprintf(f, ":%#" PRIxPTR "}}}\n", start);
         }
       });
+}
+
+__EXPORT void inspector_print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t thread) {
+  const std::vector<unwinder::Frame> frames = inspector::get_frames(f, process, thread);
+  print_backtrace_markup(f, frames);
+}
+
+__EXPORT void inspector_print_markup_context(FILE* f, zx_handle_t process) {
+  // Print all modules.
+  inspector::print_markup_context(f, process, /*pcs=*/{});
 }

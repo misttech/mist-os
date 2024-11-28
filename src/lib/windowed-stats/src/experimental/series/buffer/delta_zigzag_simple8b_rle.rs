@@ -103,8 +103,8 @@ impl BaseDeltaZigzagSimple8bRleRingBuffer {
         let metadata = self.buffer.metadata();
         // Add one count for the base value
         let num_blocks =
-            metadata.num_blocks.checked_add(if self.base.is_some() { 1 } else { 0 }).ok_or(
-                io::Error::new(io::ErrorKind::InvalidData, "Metadata num_blocks overflow"),
+            metadata.num_blocks.checked_add(if self.base.is_some() { 1 } else { 0 }).ok_or_else(
+                || io::Error::new(io::ErrorKind::InvalidData, "Metadata num_blocks overflow"),
             )?;
         buffer.write_u16::<LittleEndian>(num_blocks)?;
         buffer.write_u16::<LittleEndian>(metadata.selectors_head_index)?;

@@ -141,7 +141,7 @@ if (current_toolchain == default_toolchain) {
     testonly = true
     component_name = "component_manager"
     manifest = "meta/component_manager.cml"
-    deps = [ "//src/sys/component_manager:bin" ]
+    deps = [ "//src/sys/component_manager:bin_eng" ]
   }
 
   group("tests") {

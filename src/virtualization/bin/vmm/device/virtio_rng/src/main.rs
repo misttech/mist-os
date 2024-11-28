@@ -16,9 +16,9 @@ async fn run_virtio_rng(mut con: VirtioRngRequestStream) -> Result<(), anyhow::E
     let (start_info, responder) = con
         .try_next()
         .await?
-        .ok_or(anyhow!("Unexpected end of stream"))?
+        .ok_or_else(|| anyhow!("Unexpected end of stream"))?
         .into_start()
-        .ok_or(anyhow!("Expected Start message"))?;
+        .ok_or_else(|| anyhow!("Expected Start message"))?;
 
     // Prepare the device builder
     let mut con = con.cast_stream();
@@ -40,7 +40,7 @@ async fn run_virtio_rng(mut con: VirtioRngRequestStream) -> Result<(), anyhow::E
         while let Some(mem) = iter.next().transpose()? {
             unsafe {
                 zx::sys::zx_cprng_draw(
-                    mem.try_mut_ptr().ok_or(anyhow!("Invalid descriptor address"))?,
+                    mem.try_mut_ptr().ok_or_else(|| anyhow!("Invalid descriptor address"))?,
                     mem.len(),
                 );
             }

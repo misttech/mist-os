@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_bluetooth as fidl;
+#[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_contrib::log::WriteInspect;
 use std::fmt;
 
@@ -142,6 +143,7 @@ impl fmt::Display for Address {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl WriteInspect for Address {
     fn write_inspect(
         &self,

@@ -140,9 +140,11 @@ pub async fn multi_stream(
             .map(move |x| {
                 let stream_errors_out = stream_errors_out.clone();
                 async move {
-                    if let Err(x) = x.await.unwrap_or(Err(Error::ConnectionClosed(Some(
-                        "Stream handler hung up without returning a status".to_owned(),
-                    )))) {
+                    if let Err(x) = x.await.unwrap_or_else(|_| {
+                        Err(Error::ConnectionClosed(Some(
+                            "Stream handler hung up without returning a status".to_owned(),
+                        )))
+                    }) {
                         let _ = stream_errors_out.unbounded_send(x);
                     }
                 }

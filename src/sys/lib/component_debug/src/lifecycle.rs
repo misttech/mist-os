@@ -158,7 +158,7 @@ pub async fn start_instance(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
     moniker: &Moniker,
 ) -> Result<StopFuture, StartError> {
-    let (client, server) = fidl::endpoints::create_proxy::<fcomponent::BinderMarker>().unwrap();
+    let (client, server) = fidl::endpoints::create_proxy::<fcomponent::BinderMarker>();
     lifecycle_controller
         .start_instance(&moniker.to_string(), server)
         .await
@@ -193,7 +193,7 @@ pub async fn start_instance_with_args(
     moniker: &Moniker,
     arguments: fcomponent::StartChildArgs,
 ) -> Result<StopFuture, StartError> {
-    let (client, server) = fidl::endpoints::create_proxy::<fcomponent::BinderMarker>().unwrap();
+    let (client, server) = fidl::endpoints::create_proxy::<fcomponent::BinderMarker>();
     lifecycle_controller
         .start_instance_with_args(&moniker.to_string(), server, arguments)
         .await
@@ -295,7 +295,7 @@ mod test {
         expected_numbered_handle_count: usize,
     ) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
@@ -333,7 +333,7 @@ mod test {
         expected_name: &'static str,
     ) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
@@ -360,7 +360,7 @@ mod test {
 
     fn lifecycle_start(expected_moniker: &'static str) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
@@ -381,7 +381,7 @@ mod test {
 
     fn lifecycle_stop(expected_moniker: &'static str) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
@@ -398,7 +398,7 @@ mod test {
 
     fn lifecycle_resolve(expected_moniker: &'static str) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
@@ -417,7 +417,7 @@ mod test {
 
     fn lifecycle_unresolve(expected_moniker: &'static str) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
@@ -436,7 +436,7 @@ mod test {
 
     fn lifecycle_create_fail(error: fsys::CreateError) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
@@ -452,7 +452,7 @@ mod test {
 
     fn lifecycle_start_fail(error: fsys::StartError) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fpromise/single_threaded_executor.h>
+
 #include <fbl/unaligned.h>
 
 #include "src/devices/block/drivers/ufs/device_manager.h"
@@ -73,46 +75,48 @@ TEST_F(InitTest, UnitAttentionClear) {
 
 TEST_F(InitTest, Inspect) {
   ASSERT_NO_FATAL_FAILURE(StartDriver());
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(dut_->GetInspector().inspector().DuplicateVmo()));
 
-  const auto* ufs = hierarchy().GetByPath({"ufs"});
-  ASSERT_NOT_NULL(ufs);
+  fpromise::result<inspect::Hierarchy> hierarchy =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(dut_->inspect()));
+  ASSERT_TRUE(hierarchy.is_ok());
+  const auto* ufs = hierarchy.value().GetByPath({"ufs"});
+  ASSERT_NE(ufs, nullptr);
 
   const auto* version = ufs->GetByPath({"version"});
-  ASSERT_NOT_NULL(version);
+  ASSERT_NE(version, nullptr);
   auto major_version =
       version->node().get_property<inspect::UintPropertyValue>("major_version_number");
-  ASSERT_NOT_NULL(major_version);
+  ASSERT_NE(major_version, nullptr);
   EXPECT_EQ(major_version->value(), kMajorVersion);
   auto minor_version =
       version->node().get_property<inspect::UintPropertyValue>("minor_version_number");
-  ASSERT_NOT_NULL(minor_version);
+  ASSERT_NE(minor_version, nullptr);
   EXPECT_EQ(minor_version->value(), kMinorVersion);
   auto version_suffix = version->node().get_property<inspect::UintPropertyValue>("version_suffix");
-  ASSERT_NOT_NULL(version_suffix);
+  ASSERT_NE(version_suffix, nullptr);
   EXPECT_EQ(version_suffix->value(), kVersionSuffix);
 
   const auto* controller = ufs->GetByPath({"controller"});
-  ASSERT_NOT_NULL(controller);
+  ASSERT_NE(controller, nullptr);
   auto logical_unit_count =
       controller->node().get_property<inspect::UintPropertyValue>("logical_unit_count");
-  ASSERT_NOT_NULL(logical_unit_count);
-  EXPECT_EQ(logical_unit_count->value(), 1);
+  ASSERT_NE(logical_unit_count, nullptr);
+  EXPECT_EQ(logical_unit_count->value(), 1U);
   auto reference_clock =
       controller->node().get_property<inspect::StringPropertyValue>("reference_clock");
-  ASSERT_NOT_NULL(reference_clock);
+  ASSERT_NE(reference_clock, nullptr);
   EXPECT_EQ(reference_clock->value(), "19.2 MHz");
 
   const auto* attributes = controller->GetByPath({"attributes"});
-  ASSERT_NOT_NULL(attributes);
+  ASSERT_NE(attributes, nullptr);
   auto boot_lun_enabled = attributes->node().get_property<inspect::UintPropertyValue>("bBootLunEn");
-  ASSERT_NOT_NULL(boot_lun_enabled);
-  EXPECT_EQ(boot_lun_enabled->value(), 0x01);
+  ASSERT_NE(boot_lun_enabled, nullptr);
+  EXPECT_EQ(boot_lun_enabled->value(), 0x01U);
 
   const auto* unipro = controller->GetByPath({"unipro"});
-  ASSERT_NOT_NULL(unipro);
+  ASSERT_NE(unipro, nullptr);
   auto local_version = unipro->node().get_property<inspect::UintPropertyValue>("local_version");
-  ASSERT_NOT_NULL(local_version);
+  ASSERT_NE(local_version, nullptr);
   EXPECT_EQ(local_version->value(), kUniproVersion);
 }
 
@@ -157,6 +161,35 @@ TEST_F(InitTest, WriteBoosterBufferLifeTime) {
   mock_device_.SetAttribute(Attributes::bWBBufferLifeTimeEst, kExceededWriteBoosterBufferLifeTime);
   ASSERT_NO_FATAL_FAILURE(StartDriver());
   ASSERT_FALSE(dut_->GetDeviceManager().IsWriteBoosterEnabled());
+}
+
+TEST_F(InitTest, PowerOnWriteProtectEnable) {
+  mock_device_.SetFlag(Flags::fPowerOnWPEn, true);
+  ASSERT_NO_FATAL_FAILURE(StartDriver());
+  ASSERT_TRUE(dut_->GetDeviceManager().IsPowerOnWritePotectEnabled());
+}
+
+TEST_F(InitTest, PowerOnWriteProtectDisable) {
+  mock_device_.SetFlag(Flags::fPowerOnWPEn, false);
+  ASSERT_NO_FATAL_FAILURE(StartDriver());
+  ASSERT_FALSE(dut_->GetDeviceManager().IsPowerOnWritePotectEnabled());
+}
+
+TEST_F(InitTest, LogicalLunPowerOnWriteProtectEnable) {
+  uint8_t lun = 0;
+  mock_device_.SetFlag(Flags::fPowerOnWPEn, true);
+  mock_device_.GetLogicalUnit(lun).GetUnitDesc().bLUWriteProtect =
+      LUWriteProtect::kPowerOnWriteProtect;
+  ASSERT_NO_FATAL_FAILURE(StartDriver());
+  ASSERT_TRUE(dut_->GetDeviceManager().IsLogicalLunPowerOnWriteProtect());
+}
+
+TEST_F(InitTest, LogicalLunPowerOnWriteProtectDisable) {
+  uint8_t lun = 0;
+  mock_device_.SetFlag(Flags::fPowerOnWPEn, true);
+  mock_device_.GetLogicalUnit(lun).GetUnitDesc().bLUWriteProtect = LUWriteProtect::kNoWriteProtect;
+  ASSERT_NO_FATAL_FAILURE(StartDriver());
+  ASSERT_FALSE(dut_->GetDeviceManager().IsLogicalLunPowerOnWriteProtect());
 }
 
 }  // namespace ufs

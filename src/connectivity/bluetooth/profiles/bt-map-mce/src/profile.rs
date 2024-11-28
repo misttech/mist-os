@@ -162,7 +162,7 @@ impl MasConfig {
                 match &a.element {
                     DataElement::Str(bytes) => String::from_utf8(bytes.to_vec())
                         .ok()
-                        .or(Some(FALLBACK_MAS_SERVICE_NAME.to_string())),
+                        .or_else(|| Some(FALLBACK_MAS_SERVICE_NAME.to_string())),
                     _ => Some(FALLBACK_MAS_SERVICE_NAME.to_string()),
                 }
             })
@@ -178,10 +178,8 @@ impl MasConfig {
                 let DataElement::Uint8(raw_val) = a.element else {
                     return None;
                 };
-                let supported: Vec<Result<MessageType, MapError>> =
-                    MessageType::from_bits(raw_val).collect();
                 let supported: HashSet<MessageType> =
-                    supported.into_iter().filter_map(|r| r.ok()).collect();
+                    MessageType::from_bits(raw_val).filter_map(|r| r.ok()).collect();
                 Some(supported)
             })
             .ok_or(MapError::InvalidSdp(ServiceRecordItem::SupportedMessageTypes))?;
@@ -301,7 +299,7 @@ pub fn connect_and_advertise(profile_svc: bredr::ProfileProxy) -> Result<Profile
 
     // MCE device advertises the MNS on it and and searches for MAS on remote peers.
     let mut profile_client =
-        ProfileClient::advertise(profile_svc.clone(), service_defs, channel_parameters)
+        ProfileClient::advertise(profile_svc, service_defs, channel_parameters)
             .map_err(MapError::other)?;
 
     profile_client

@@ -277,8 +277,6 @@ void FileConnection::AdvisoryLock(fidl::WireServer<fio::File>::AdvisoryLockReque
   advisory_lock(koid_, vnode(), true, request->request, std::move(callback));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(24)
 void FileConnection::handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_io::File>,
                                            fidl::UnknownMethodCompleter::Sync&) {}
-#endif
 }  // namespace fs::internal

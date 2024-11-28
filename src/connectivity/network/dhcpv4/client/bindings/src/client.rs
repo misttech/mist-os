@@ -196,7 +196,7 @@ impl Client {
             return Err(Error::Exit(ClientExitReason::InvalidParams));
         }
         let ConfigurationToRequest { routers, dns_servers, .. } =
-            configuration_to_request.unwrap_or(ConfigurationToRequest::default());
+            configuration_to_request.unwrap_or_else(ConfigurationToRequest::default);
 
         let config = dhcp_client_core::client::ClientConfig {
             client_hardware_address: mac,
@@ -282,10 +282,8 @@ impl Client {
             )
             .get();
 
-        let (asp_proxy, asp_server_end) = endpoints::create_proxy::<
-            fnet_interfaces_admin::AddressStateProviderMarker,
-        >()
-        .expect("should never get FIDL error while creating AddressStateProvider endpoints");
+        let (asp_proxy, asp_server_end) =
+            endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
 
         let previous_lease = current_lease.replace(Lease {
             event_stream: asp_proxy.take_event_stream(),
@@ -412,6 +410,7 @@ impl Client {
             Ok(reason) => match reason {
                 fnet_interfaces_admin::AddressRemovalReason::UserRemoved => (),
                 reason @ (fnet_interfaces_admin::AddressRemovalReason::Invalid
+                | fnet_interfaces_admin::AddressRemovalReason::InvalidProperties
                 | fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned
                 | fnet_interfaces_admin::AddressRemovalReason::DadFailed
                 | fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved) => {
@@ -450,6 +449,9 @@ impl Client {
                         Some(reason) => match reason {
                             fnet_interfaces_admin::AddressRemovalReason::Invalid => {
                                 panic!("yielded invalid address")
+                            }
+                            fnet_interfaces_admin::AddressRemovalReason::InvalidProperties => {
+                                panic!("used invalid properties")
                             }
                             fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved => {
                                 tracing::warn!("{debug_log_prefix} interface removed; stopping");

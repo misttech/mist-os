@@ -41,7 +41,7 @@ async fn connect_into_realm<T>(
 where
     T: endpoints::ProtocolMarker,
 {
-    let (proxy, server_end) = endpoints::create_proxy::<T>().expect("infallible");
+    let (proxy, server_end) = endpoints::create_proxy::<T>();
     let _result = realm_proxy
         .connect_to_named_protocol(
             <T as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
@@ -86,15 +86,14 @@ where
         })?;
 
     // realm_proxy must live as long as you need your test realm to live.
-    let (realm_proxy, realm_server_end) =
-        endpoints::create_proxy::<ffth::RealmProxy_Marker>().expect("infallible");
+    let (realm_proxy, realm_server_end) = endpoints::create_proxy::<ffth::RealmProxy_Marker>();
 
     let (push_source_puppet, _opts, cobalt_metric_client) = test_realm_proxy
         .create_realm(fttr::RealmOptions { ..Default::default() }, utc_clock_copy, realm_server_end)
         .await
         .expect("FIDL protocol error")
         .expect("Error value returned from the call");
-    let cobalt = cobalt_metric_client.into_proxy().expect("infallible");
+    let cobalt = cobalt_metric_client.into_proxy();
 
     // Fake clock controller for the tests that need that.
     let fake_clock_proxy = connect_into_realm::<ffte::FakeClockMarker>(&realm_proxy).await;
@@ -103,7 +102,7 @@ where
     let fake_clock_controller =
         FakeClockController::new(fake_clock_control_proxy, fake_clock_proxy);
 
-    let push_source_puppet = push_source_puppet.into_proxy().expect("infallible");
+    let push_source_puppet = push_source_puppet.into_proxy();
     let push_source_controller = RemotePushSourcePuppet::new(push_source_puppet);
     tracing::debug!("faketime_test: about to run test_fn");
     let result = test_fn(utc_clock, push_source_controller, cobalt, fake_clock_controller).await;

@@ -1237,8 +1237,7 @@ mod tests {
             };
             assert!(!data_has_persisted().await);
 
-            let (watcher_proxy, watcher_server) =
-                fidl::endpoints::create_proxy().expect("Failed to create FIDL endpoints");
+            let (watcher_proxy, watcher_server) = fidl::endpoints::create_proxy();
             let mem_pressure = MemoryPressureMonitor::try_from(watcher_server)
                 .expect("Failed to create MemoryPressureMonitor");
 
@@ -1351,8 +1350,7 @@ mod tests {
             };
             assert!(!data_has_persisted().await);
 
-            let (watcher_proxy, watcher_server) =
-                fidl::endpoints::create_proxy().expect("Failed to create FIDL endpoints");
+            let (watcher_proxy, watcher_server) = fidl::endpoints::create_proxy();
             let mem_pressure = MemoryPressureMonitor::try_from(watcher_server)
                 .expect("Failed to create MemoryPressureMonitor");
 
@@ -1436,8 +1434,7 @@ mod tests {
                 .expect("create unencrypted volume failed");
             volume_store_id = volume_and_root.volume().store().store_object_id();
 
-            let (volume_proxy, volume_server_end) =
-                fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -1446,8 +1443,7 @@ mod tests {
             );
 
             let (volume_dir_proxy, dir_server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create dir proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             volumes_directory
                 .serve_volume(&volume_and_root, dir_server_end, false)
                 .expect("serve_volume failed");
@@ -1476,8 +1472,7 @@ mod tests {
 
             let file_proxy = {
                 let (root_proxy, root_server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("Create dir proxy to succeed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
                     .open(
                         fio::OpenFlags::RIGHT_READABLE
@@ -1560,8 +1555,7 @@ mod tests {
                 .mount_volume(VOLUME_NAME, None, false)
                 .await
                 .expect("mount unencrypted volume failed");
-            let (volume_proxy, volume_server_end) =
-                fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -1571,8 +1565,7 @@ mod tests {
 
             let project_proxy = {
                 let (volume_dir_proxy, dir_server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("Create dir proxy to succeed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volumes_directory
                     .serve_volume(&volume_and_root, dir_server_end, false)
                     .expect("serve_volume failed");
@@ -1629,8 +1622,7 @@ mod tests {
             .await
             .expect("mount unencrypted volume failed");
         let (volume_dir_proxy, dir_server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                .expect("Create dir proxy to succeed");
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         volumes_directory
             .serve_volume(&volume_and_root, dir_server_end, false)
             .expect("serve_volume failed");
@@ -1672,8 +1664,7 @@ mod tests {
                 .expect("create unencrypted volume failed");
             volume_store_id = volume_and_root.volume().store().store_object_id();
 
-            let (volume_proxy, volume_server_end) =
-                fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -1682,8 +1673,7 @@ mod tests {
             );
 
             let (volume_dir_proxy, dir_server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create dir proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             volumes_directory
                 .serve_volume(&volume_and_root, dir_server_end, false)
                 .expect("serve_volume failed");
@@ -1706,8 +1696,7 @@ mod tests {
 
             let file_proxy = {
                 let (root_proxy, root_server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("Create dir proxy to succeed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
                     .open(
                         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -1805,8 +1794,7 @@ mod tests {
                 .mount_volume(VOLUME_NAME, Some(Arc::new(InsecureCrypt::new())), false)
                 .await
                 .expect("mount unencrypted volume failed");
-            let (volume_proxy, volume_server_end) =
-                fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -1816,15 +1804,13 @@ mod tests {
 
             let (root_proxy, project_proxy) = {
                 let (volume_dir_proxy, dir_server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("Create dir proxy to succeed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volumes_directory
                     .serve_volume(&volume_and_root, dir_server_end, false)
                     .expect("serve_volume failed");
 
                 let (root_proxy, root_server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("Create dir proxy to succeed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
                     .open(
                         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -1978,8 +1964,7 @@ mod tests {
                 .expect("create unencrypted volume failed");
             volume_store_id = volume_and_root.volume().store().store_object_id();
 
-            let (volume_proxy, volume_server_end) =
-                fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -1988,8 +1973,7 @@ mod tests {
             );
 
             let (volume_dir_proxy, dir_server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create dir proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             volumes_directory
                 .serve_volume(&volume_and_root, dir_server_end, false)
                 .expect("serve_volume failed");
@@ -2006,8 +1990,7 @@ mod tests {
 
             let dir_proxy = {
                 let (root_proxy, root_server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("Create dir proxy to succeed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
                     .open(
                         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -2117,8 +2100,7 @@ mod tests {
                 .await
                 .expect("create unencrypted volume failed");
             volume_store_id = volume_and_root.volume().store().store_object_id();
-            let (volume_proxy, volume_server_end) =
-                fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -2126,8 +2108,7 @@ mod tests {
                 volume_server_end.into_channel().into(),
             );
             let (volume_dir_proxy, dir_server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create dir proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             volumes_directory
                 .serve_volume(&volume_and_root, dir_server_end, false)
                 .expect("serve_volume failed");
@@ -2146,8 +2127,7 @@ mod tests {
             // iterator will progress passed it with no effect.
             let file_proxy = {
                 let (root_proxy, root_server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("Create dir proxy to succeed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
                     .open(
                         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,

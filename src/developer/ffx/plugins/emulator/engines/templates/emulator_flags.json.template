@@ -27,7 +27,11 @@
         "-smp",
         {{! These should probably be predicated on the host CPU. }}
         {{#if (eq device.cpu.architecture "x64")}}
-            "{{device.cpu.count}},threads=2",
+	    {{#if (eq device.cpu.count 1)}}
+	        "{{device.cpu.count}}",
+	    {{else}}
+                "{{device.cpu.count}},threads=2",
+	    {{/if}}
         {{else}}
           "{{device.cpu.count}}",
         {{/if}}

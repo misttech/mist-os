@@ -51,7 +51,7 @@ the view on a connected display.
             ..Default::default()
         };
 
-        let (view_controller_proxy, server_end) = create_proxy::<ViewControllerMarker>()?;
+        let (view_controller_proxy, server_end) = create_proxy::<ViewControllerMarker>();
         graphical_presenter.present_view(view_spec, Some(server_end))?;
 
         Ok(view_controller_proxy)

@@ -54,8 +54,7 @@ impl ActorInstance {
                 format_err!("Realm.CreateChild failed to create {} with error: {:?}", name, e)
             })?;
 
-        let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>()
-            .context("Could not create endpoints for exposed dir")?;
+        let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
         let child_ref =
             ChildRef { name: name.clone(), collection: Some(ACTOR_COLLECTION_NAME.to_string()) };
         realm_proxy
@@ -110,7 +109,7 @@ impl ActorInstance {
 
     async fn get_actions(&self) -> Result<Vec<String>> {
         let action_iterator = self.actor_proxy.get_actions().await?;
-        let action_iterator = action_iterator.into_proxy()?;
+        let action_iterator = action_iterator.into_proxy();
         let mut actions = vec![];
 
         loop {
@@ -157,7 +156,7 @@ fn connect_to_realm_proxy(ns: Vec<ComponentNamespaceEntry>) -> Result<RealmProxy
             if path == "/svc" {
                 let dir =
                     entry.directory.ok_or(format_err!("No directory for 'svc' namespace entry"))?;
-                let dir = dir.into_proxy()?;
+                let dir = dir.into_proxy();
                 return connect_to_protocol_at_dir_root::<RealmMarker>(&dir);
             }
         }

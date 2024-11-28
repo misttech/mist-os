@@ -354,13 +354,13 @@ mod tests {
         status_callback: Option<&'a dyn StatusCallback>,
     ) -> Result<(PayloadStreamProxy, impl Future<Output = Result<(), Error>> + 'a), Error> {
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<PayloadStreamMarker>();
-        let stream = server_end.into_stream()?;
+        let stream = server_end.into_stream();
 
         // Do not await as we return this Future so that the caller can run the client and server
         // concurrently.
         let server = streamer.service_payload_stream_requests(stream, status_callback);
 
-        return Ok((client_end.into_proxy()?, server));
+        return Ok((client_end.into_proxy(), server));
     }
 
     async fn create_ramdisk(src: Vec<u8>) -> Result<RamdiskClient, Error> {
@@ -463,7 +463,7 @@ mod tests {
             let ramdisk_controller = ramdisk_client
                 .as_controller()
                 .ok_or_else(|| anyhow!("invalid ramdisk controller"))?;
-            let (ramdisk_block, server) = fidl::endpoints::create_proxy::<BlockMarker>()?;
+            let (ramdisk_block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
             let () = ramdisk_controller.connect_to_device_fidl(server.into_channel())?;
             let payload_streamer = BlockDevicePayloadStreamer::new(ramdisk_block).await?;
             Box::new(payload_streamer)
@@ -555,7 +555,7 @@ mod tests {
         // channel, use open() to acquire the BlockProxy here.
         let ramdisk_controller =
             ramdisk_client.as_controller().ok_or_else(|| anyhow!("invalid ramdisk controller"))?;
-        let (ramdisk_block, server) = fidl::endpoints::create_proxy::<BlockMarker>()?;
+        let (ramdisk_block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
         let () = ramdisk_controller.connect_to_device_fidl(server.into_channel())?;
         let streamer: Box<dyn PayloadStreamer> =
             Box::new(BlockDevicePayloadStreamer::new(ramdisk_block).await?);

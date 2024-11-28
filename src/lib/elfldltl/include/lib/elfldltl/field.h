@@ -6,6 +6,7 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_FIELD_H_
 
 #include <bit>
+#include <cstddef>
 #include <cstdint>
 #include <type_traits>
 #include <utility>

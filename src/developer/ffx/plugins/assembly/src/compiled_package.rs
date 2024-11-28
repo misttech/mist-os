@@ -8,8 +8,9 @@ use assembly_config_schema::assembly_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_config_schema::PackageSet;
+use assembly_constants::FileEntry;
 use assembly_tool::Tool;
-use assembly_util::{DuplicateKeyError, FileEntry, InsertUniqueExt, MapEntry};
+use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use serde::Serialize;
@@ -203,10 +204,10 @@ impl CompiledPackageBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assembly_constants::CompiledPackageDestination;
+    use assembly_constants::TestCompiledPackageDestination::ForTest;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolProvider;
-    use assembly_util::CompiledPackageDestination;
-    use assembly_util::TestCompiledPackageDestination::ForTest;
     use fuchsia_archive::Utf8Reader;
     use fuchsia_pkg::PackageManifest;
     use std::fs::File;

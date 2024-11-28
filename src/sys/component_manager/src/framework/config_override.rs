@@ -76,7 +76,7 @@ impl FrameworkCapability for ConfigOverride {
     ) -> Box<dyn CapabilityProvider> {
         Box::new(ConfigOverrideCapabilityProvider {
             config_override: self.clone(),
-            scope_moniker: scope.moniker.clone(),
+            scope_moniker: scope.moniker,
         })
     }
 }
@@ -95,7 +95,7 @@ struct ConfigOverrideCapabilityProvider {
 impl InternalCapabilityProvider for ConfigOverrideCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fsys::ConfigOverrideMarker>::new(server_end);
-        self.config_override.serve(self.scope_moniker, server_end.into_stream().unwrap()).await;
+        self.config_override.serve(self.scope_moniker, server_end.into_stream()).await;
     }
 }
 

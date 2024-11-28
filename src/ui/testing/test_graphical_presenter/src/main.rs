@@ -64,12 +64,10 @@ impl TestGraphicalPresenter {
         let flatland = client::connect_to_protocol::<FlatlandMarker>()
             .context("error connecting to Flatland")?;
         let (parent_viewport_watcher, parent_viewport_request) =
-            fidl::endpoints::create_proxy::<ParentViewportWatcherMarker>()
-                .context("error creating viewport watcher")?;
+            fidl::endpoints::create_proxy::<ParentViewportWatcherMarker>();
         let flatland_events = flatland.take_event_stream();
 
-        let (view_focuser, view_focuser_request) = fidl::endpoints::create_proxy::<FocuserMarker>()
-            .expect("Failed to create Focuser channel");
+        let (view_focuser, view_focuser_request) = fidl::endpoints::create_proxy::<FocuserMarker>();
         Ok(Self {
             flatland,
             flatland_events,
@@ -101,8 +99,7 @@ impl TestGraphicalPresenter {
                                 let viewref_pair = fuchsia_scenic::ViewRefPair::new()?;
                                 let  view_identity =
                                                     fidl_fuchsia_ui_views::ViewIdentityOnCreation::from(viewref_pair);
-                                let (view_focused_proxy, view_focused) = fidl::endpoints::create_proxy::<ViewRefFocusedMarker>()
-                                    .expect("Failed to create ViewRefFocused channel");
+                                let (view_focused_proxy, view_focused) = fidl::endpoints::create_proxy::<ViewRefFocusedMarker>();
                                 let view_bound_protocols = ViewBoundProtocols {
                                     view_focuser: self.view_focuser_request.take(),
                                     view_ref_focused: Some(view_focused),
@@ -246,7 +243,7 @@ impl TestGraphicalPresenter {
                 responder.send(Ok(()))?;
 
                 let view_controller_request_stream =
-                    view_controller_request.map(|s| s.into_stream().ok()).flatten();
+                    view_controller_request.map(|s| s.into_stream());
 
                 // If we have a view already, first detach and destroy the viewport.
                 if let Some(_) = self.child_view.take() {
@@ -311,8 +308,7 @@ impl TestGraphicalPresenter {
 
         // Now set the content and present the new viewport.
         let (child_view_watcher, child_view_watcher_request) =
-            fidl::endpoints::create_proxy::<ChildViewWatcherMarker>()
-                .context("error creating viewport watcher")?;
+            fidl::endpoints::create_proxy::<ChildViewWatcherMarker>();
         self.flatland
             .create_viewport(
                 &VIEWPORT_CONTENT_ID,

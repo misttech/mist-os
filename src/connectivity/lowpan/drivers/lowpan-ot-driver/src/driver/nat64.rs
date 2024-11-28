@@ -145,7 +145,7 @@ impl Nat64 {
         // Don't handle the error here. If failed, control_proxy conversion will fail.
         let _ = masquerade_proxy.create(&config, server_end).now_or_never();
 
-        let control_proxy = client_end.into_proxy().context("failed to convert ctrl proxy")?;
+        let control_proxy = client_end.into_proxy();
 
         control_proxy.set_enabled(true).now_or_never();
 

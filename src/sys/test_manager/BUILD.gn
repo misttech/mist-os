@@ -73,6 +73,7 @@ rustc_library("lib") {
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-sync",
     "//src/lib/fuchsia-url",
+    "//src/lib/test_diagnostics/rust:test_diagnostics",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
     "//src/sys/lib/mem_util",
@@ -88,12 +89,14 @@ rustc_library("lib") {
     "//third_party/rust_crates:tracing",
   ]
   test_deps = [
+    ":test_lib",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/test_diagnostics/rust:test_diagnostics",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:maplit",
+    "//third_party/rust_crates:test-case",
   ]
 
   sources = [
@@ -123,6 +126,8 @@ rustc_binary("bin") {
   name = "test_manager"
   with_unit_tests = true
   edition = "2021"
+
+  configs += [ "//build/config/rust:bootfs" ]
 
   deps = [
     ":lib",
@@ -232,12 +237,20 @@ fuchsia_package("pkg") {
 fuchsia_package("pkg_for_bootstrap") {
   testonly = true
   package_name = "test_manager"
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//bundles/assembly:*",
+  ]
   deps = [
     ":test_manager_for_bootstrap_cmp",
     "debug_data_processor",
     "//src/diagnostics/archivist:archivist-for-embedding-bundle",
+    "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_component",
     "//src/storage/memfs:memfs_component",
+    "//src/sys/test_runners/elf:elf-test-runner-component",
+    "//src/sys/test_runners/gtest:gtest-runner-component",
+    "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache_cmp",
+    "//src/sys/testing:bootstrap_test_realm",
   ]
 }
 

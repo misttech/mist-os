@@ -794,10 +794,9 @@ impl<K: Key, V: LayerValue> Layer<K, V> for PersistentLayer<K, V> {
     }
 
     fn record_inspect_data(self: Arc<Self>, node: &fuchsia_inspect::Node) {
-        let this = self.clone();
         node.record_bool("persistent", true);
         node.record_uint("size", self.object_handle.get_size());
-        if let Some(stats) = this.bloom_filter_stats.as_ref() {
+        if let Some(stats) = self.bloom_filter_stats.as_ref() {
             node.record_child("bloom_filter", move |node| {
                 node.record_uint("size", stats.size as u64);
                 node.record_uint("num_nonces", stats.num_nonces as u64);

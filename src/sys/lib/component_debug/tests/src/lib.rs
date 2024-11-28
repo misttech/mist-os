@@ -51,6 +51,8 @@ async fn show() {
 
     assert!(resolved.config.is_none());
 
+    assert_eq!(resolved.runner.unwrap(), "rust_test_runner");
+
     // The expected incoming capabilities are:
     // fidl.examples.routing.echo.Echo
     // fuchsia.logger.LogSink

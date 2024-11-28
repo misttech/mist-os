@@ -398,8 +398,7 @@ impl ArchiveReader {
 
         let archive = archive.as_ref().unwrap();
 
-        let (iterator, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>()
-            .map_err(Error::CreateIteratorProxy)?;
+        let (iterator, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>();
 
         let stream_parameters = StreamParameters {
             stream_mode: Some(mode),
@@ -864,8 +863,7 @@ mod tests {
 
     fn spawn_fake_archive(data_to_send: serde_json::Value) -> fdiagnostics::ArchiveAccessorProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdiagnostics::ArchiveAccessorMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fdiagnostics::ArchiveAccessorMarker>();
         fasync::Task::spawn(async move {
             while let Some(request) = stream.try_next().await.expect("stream request") {
                 match request {
@@ -876,7 +874,7 @@ mod tests {
                         let data = data_to_send.clone();
                         fasync::Task::spawn(async move {
                             let mut called = false;
-                            let mut stream = result_stream.into_stream().expect("into stream");
+                            let mut stream = result_stream.into_stream();
                             while let Some(req) = stream.try_next().await.expect("stream request") {
                                 match req {
                                     fdiagnostics::BatchIteratorRequest::WaitForReady {

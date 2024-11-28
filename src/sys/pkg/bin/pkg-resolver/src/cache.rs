@@ -441,6 +441,7 @@ pub async fn merkle_for_url(
     mut cobalt_sender: ProtocolSender<MetricEvent>,
 ) -> Result<BlobId, MerkleForError> {
     // TODO(https://fxbug.dev/338012491): Stop adding variants to package URLs.
+    #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379717246)
     let target_path = TargetPath::new(format!(
         "{}/{}",
         url.name(),

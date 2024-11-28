@@ -33,6 +33,7 @@ pub struct BuiltinRunner {
     name: Name,
     factory: Arc<dyn BuiltinRunnerFactory>,
     security_policy: Arc<SecurityPolicy>,
+    add_to_env: bool,
 }
 
 impl BuiltinRunner {
@@ -40,8 +41,9 @@ impl BuiltinRunner {
         name: Name,
         factory: Arc<dyn BuiltinRunnerFactory>,
         security_policy: Arc<SecurityPolicy>,
+        add_to_env: bool,
     ) -> Self {
-        Self { name, factory, security_policy }
+        Self { name, factory, security_policy, add_to_env }
     }
 
     pub fn name(&self) -> &Name {
@@ -51,6 +53,10 @@ impl BuiltinRunner {
     pub fn factory(&self) -> &Arc<dyn BuiltinRunnerFactory> {
         &self.factory
     }
+
+    pub fn add_to_env(&self) -> bool {
+        self.add_to_env
+    }
 }
 
 impl BuiltinCapability for BuiltinRunner {
@@ -59,8 +65,7 @@ impl BuiltinCapability for BuiltinRunner {
     }
 
     fn new_provider(&self, target: WeakComponentInstance) -> Box<dyn CapabilityProvider> {
-        let checker =
-            ScopedPolicyChecker::new(self.security_policy.clone(), target.moniker.clone());
+        let checker = ScopedPolicyChecker::new(self.security_policy.clone(), target.moniker);
         let runner = self.factory.clone();
         Box::new(RunnerCapabilityProvider::new(runner, checker))
     }
@@ -135,7 +140,7 @@ mod tests {
         let provider = Box::new(RunnerCapabilityProvider { factory: mock_runner, checker });
 
         // Open a connection to the provider.
-        let (client, server) = fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>()?;
+        let (client, server) = fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let server = server.into_channel();
         let task_group = TaskGroup::new();
         let scope = ExecutionScope::new();
@@ -161,7 +166,7 @@ mod tests {
                 fidl::endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
             client.start(sample_start_info("xxx://failing"), server_controller)?;
             let actual = client_controller
-                .into_proxy()?
+                .into_proxy()
                 .take_event_stream()
                 .next()
                 .await

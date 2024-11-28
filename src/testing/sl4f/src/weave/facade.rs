@@ -39,7 +39,7 @@ impl WeaveFacade {
 
     /// Returns the PairingStateWatcher proxy provided on instantiation.
     fn pairing_state_watcher(&self) -> Result<PairingStateWatcherProxy, Error> {
-        let (pairing_proxy, pairing_server_end) = create_proxy::<PairingStateWatcherMarker>()?;
+        let (pairing_proxy, pairing_server_end) = create_proxy::<PairingStateWatcherMarker>();
         self.stack()?.get_pairing_state_watcher(pairing_server_end)?;
         Ok(pairing_proxy)
     }
@@ -187,7 +187,7 @@ mod tests {
         }
 
         fn build_stack(self) -> (WeaveFacade, impl Future<Output = ()>) {
-            let (proxy, mut stream) = create_proxy_and_stream::<StackMarker>().unwrap();
+            let (proxy, mut stream) = create_proxy_and_stream::<StackMarker>();
             let fut = async move {
                 let _ = &self;
                 for expected in self.expected_stack {
@@ -200,7 +200,7 @@ mod tests {
             (facade, fut)
         }
         fn build_stack_and_pairing_state_watcher(self) -> (WeaveFacade, impl Future<Output = ()>) {
-            let (proxy, mut stream) = create_proxy_and_stream::<StackMarker>().unwrap();
+            let (proxy, mut stream) = create_proxy_and_stream::<StackMarker>();
             let stream_fut = async move {
                 let _ = &self;
                 match stream.next().await {
@@ -208,7 +208,7 @@ mod tests {
                         watcher,
                         control_handle: _,
                     })) => {
-                        let mut into_stream = watcher.into_stream().unwrap();
+                        let mut into_stream = watcher.into_stream();
                         for expected in self.expected_pair {
                             expected(into_stream.next().await.unwrap().unwrap());
                         }
@@ -251,7 +251,7 @@ mod tests {
 
         fn build(self) -> (WeaveFacade, impl Future<Output = ()>) {
             let (proxy, mut stream) =
-                fidl::endpoints::create_proxy_and_stream::<FactoryDataManagerMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<FactoryDataManagerMarker>();
             let fut = async move {
                 for expected in self.expected {
                     expected(stream.next().await.unwrap().unwrap());

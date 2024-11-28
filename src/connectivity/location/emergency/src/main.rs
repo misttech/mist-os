@@ -58,8 +58,7 @@ impl ConnectedProtocol for CobaltConnectedService {
         &'a mut self,
     ) -> future::BoxFuture<'a, Result<MetricEventLoggerProxy, Error>> {
         async {
-            let (logger_proxy, server_end) =
-                fidl::endpoints::create_proxy().context("failed to create proxy endpoints")?;
+            let (logger_proxy, server_end) = fidl::endpoints::create_proxy();
             let metric_event_logger_factory =
                 connect_to_protocol::<MetricEventLoggerFactoryMarker>()
                     .context("Failed to connect to fuchsia::metrics::MetricEventLoggerFactory")?;
@@ -184,15 +183,7 @@ async fn process_bss_updates<C: BssCache>(
                 stations,
                 control_handle: _,
             }) => {
-                let update_result = bss_cache
-                    .lock()
-                    .await
-                    .update(
-                        stations
-                            .into_proxy()
-                            .context("failed to get proxy for scan result iterator")?,
-                    )
-                    .await;
+                let update_result = bss_cache.lock().await.update(stations.into_proxy()).await;
                 report_bss_update_metrics(update_result, &mut cobalt_api);
                 update_result.context("failed to apply base station update")?
             }
@@ -282,8 +273,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn propagates_stations_downward() {
             let (cobalt_sender, _cobalt_receiver) = make_fake_cobalt_connection();
-            let (proxy, stream) = create_proxy_and_stream::<WlanBaseStationWatcherMarker>()
-                .expect("internal error: failed to create base station watcher");
+            let (proxy, stream) = create_proxy_and_stream::<WlanBaseStationWatcherMarker>();
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
@@ -292,8 +282,7 @@ mod tests {
                 cobalt_sender,
             );
             let (scan_result_reader, _scan_result_generator) =
-                create_request_stream::<ScanResultIteratorMarker>()
-                    .expect("internal error: failed to create scan result iterator");
+                create_request_stream::<ScanResultIteratorMarker>();
             proxy
                 .report_current_stations(scan_result_reader)
                 .expect("internal error: proxy failed to send request");
@@ -305,8 +294,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn update_error_does_not_panic() {
             let (cobalt_sender, _cobalt_receiver) = make_fake_cobalt_connection();
-            let (proxy, stream) = create_proxy_and_stream::<WlanBaseStationWatcherMarker>()
-                .expect("internal error: failed to create base station watcher");
+            let (proxy, stream) = create_proxy_and_stream::<WlanBaseStationWatcherMarker>();
             let bss_cache = Mutex::new(FakeBssCache::new(Err(UpdateError::NoBssIds)));
             let server_fut = handle_client_requests(
                 &bss_cache,
@@ -315,8 +303,7 @@ mod tests {
                 cobalt_sender,
             );
             let (scan_result_reader, _scan_result_generator) =
-                create_request_stream::<ScanResultIteratorMarker>()
-                    .expect("internal error: failed to create scan result iterator");
+                create_request_stream::<ScanResultIteratorMarker>();
             proxy
                 .report_current_stations(scan_result_reader)
                 .expect("internal error: proxy failed to send request");
@@ -349,8 +336,7 @@ mod tests {
         ) {
             let test_fut = async {
                 let (cobalt_sender, cobalt_receiver) = make_fake_cobalt_connection();
-                let (proxy, stream) = create_proxy_and_stream::<WlanBaseStationWatcherMarker>()
-                    .expect("internal error: failed to create emergency provider");
+                let (proxy, stream) = create_proxy_and_stream::<WlanBaseStationWatcherMarker>();
                 let bss_cache = Mutex::new(FakeBssCache::new(update_result));
                 let server_fut = handle_client_requests(
                     &bss_cache,
@@ -359,8 +345,7 @@ mod tests {
                     cobalt_sender,
                 );
                 let (scan_result_reader, _scan_result_generator) =
-                    create_request_stream::<ScanResultIteratorMarker>()
-                        .expect("internal error: failed to create scan result iterator");
+                    create_request_stream::<ScanResultIteratorMarker>();
                 proxy
                     .report_current_stations(scan_result_reader)
                     .expect("internal error: proxy failed to send request");
@@ -389,8 +374,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn does_not_report_extra_metrics() {
             let (cobalt_sender, cobalt_receiver) = make_fake_cobalt_connection();
-            let (proxy, stream) = create_proxy_and_stream::<WlanBaseStationWatcherMarker>()
-                .expect("internal error: failed to create emergency provider");
+            let (proxy, stream) = create_proxy_and_stream::<WlanBaseStationWatcherMarker>();
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
@@ -399,8 +383,7 @@ mod tests {
                 cobalt_sender,
             );
             let (scan_result_reader, _scan_result_generator) =
-                create_request_stream::<ScanResultIteratorMarker>()
-                    .expect("internal error: failed to create scan result iterator");
+                create_request_stream::<ScanResultIteratorMarker>();
             proxy
                 .report_current_stations(scan_result_reader)
                 .expect("internal error: proxy failed to send request");
@@ -454,8 +437,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn propagates_success_to_client() {
             let (cobalt_sender, _cobalt_receiver) = make_fake_cobalt_connection();
-            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>()
-                .expect("internal error: failed to create emergency provider");
+            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>();
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
@@ -473,8 +455,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn propagates_error_to_client() {
             let (cobalt_sender, _cobalt_receiver) = make_fake_cobalt_connection();
-            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>()
-                .expect("internal error: failed to create emergency provider");
+            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>();
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
@@ -492,8 +473,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn reports_success_to_cobalt() {
             let (cobalt_sender, cobalt_receiver) = make_fake_cobalt_connection();
-            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>()
-                .expect("internal error: failed to create emergency provider");
+            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>();
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
@@ -519,8 +499,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn reports_failure_to_cobalt() {
             let (cobalt_sender, cobalt_receiver) = make_fake_cobalt_connection();
-            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>()
-                .expect("internal error: failed to create emergency provider");
+            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>();
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
@@ -546,8 +525,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn propagates_reported_accuracy_to_cobalt() {
             let (cobalt_sender, cobalt_receiver) = make_fake_cobalt_connection();
-            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>()
-                .expect("internal error: failed to create emergency provider");
+            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>();
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
@@ -575,8 +553,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn reports_worst_accuracy_if_accuracy_is_unknown() {
             let (cobalt_sender, cobalt_receiver) = make_fake_cobalt_connection();
-            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>()
-                .expect("internal error: failed to create emergency provider");
+            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>();
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
@@ -602,8 +579,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn reports_elapsed_time_to_cobalt_on_success() {
             let (cobalt_sender, cobalt_receiver) = make_fake_cobalt_connection();
-            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>()
-                .expect("internal error: failed to create emergency provider");
+            let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>();
             let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
             let server_fut = handle_client_requests(
                 &bss_cache,
@@ -639,8 +615,7 @@ mod tests {
         ) {
             let test_fut = async {
                 let (cobalt_sender, cobalt_receiver) = make_fake_cobalt_connection();
-                let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>()
-                    .expect("internal error: failed to create emergency provider");
+                let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>();
                 let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
                 let resolver = StubBssResolver { resolve: || Err(resolver_error) };
                 let server_fut = handle_client_requests(
@@ -684,8 +659,7 @@ mod tests {
         fn does_not_report_extra_metrics(result: Result<(), ()>, expected_metric_ids: &[u32]) {
             let test_fut = async {
                 let (cobalt_sender, cobalt_receiver) = make_fake_cobalt_connection();
-                let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>()
-                    .expect("internal error: failed to create emergency provider");
+                let (proxy, stream) = create_proxy_and_stream::<EmergencyProviderMarker>();
                 let bss_cache = Mutex::new(FakeBssCache::new(Ok(())));
                 let resolver = StubBssResolver {
                     resolve: || match &result {

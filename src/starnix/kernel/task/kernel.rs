@@ -81,6 +81,14 @@ pub struct KernelFeatures {
     ///
     /// TODO(https://fxbug.dev/297431387): Enabled by default once the feature is completed.
     pub io_uring: bool,
+
+    /// Whether the kernel should return an error to userspace, rather than panicking, if `reboot()`
+    /// is requested but cannot be enacted because the kernel lacks the relevant capabilities.
+    pub error_on_failed_reboot: bool,
+
+    /// This controls whether or not the default framebuffer background is black or colorful, to
+    /// aid debugging.
+    pub enable_visual_debugging: bool,
 }
 
 /// Contains an fscrypt wrapping key id.
@@ -350,7 +358,8 @@ impl Kernel {
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
         #[cfg(not(feature = "starnix_lite"))]
         let framebuffer =
-            Framebuffer::new(framebuffer_aspect_ratio).expect("Failed to create framebuffer");
+            Framebuffer::new(framebuffer_aspect_ratio, features.enable_visual_debugging)
+                .expect("Failed to create framebuffer");
 
         let crash_reporter = CrashReporter::new(&inspect_node, crash_reporter_proxy);
         let network_manager = NetworkManagerHandle::new_with_inspect(&inspect_node);

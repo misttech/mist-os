@@ -139,8 +139,9 @@ impl TryFrom<Uuid> for fidlbredr::ServiceClassProfileIdentifier {
 
     fn try_from(value: Uuid) -> Result<Self, Self::Error> {
         let short: u16 = value.try_into()?;
-        Self::from_primitive(short)
-            .ok_or(Error::conversion(format!("unknown ServiceClassProfileIdentifier: {short}")))
+        Self::from_primitive(short).ok_or_else(|| {
+            Error::conversion(format!("unknown ServiceClassProfileIdentifier: {short}"))
+        })
     }
 }
 

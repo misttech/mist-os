@@ -25,7 +25,7 @@
 #include "src/graphics/display/drivers/intel-display/power.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-dpll.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
 
 namespace intel_display {
 

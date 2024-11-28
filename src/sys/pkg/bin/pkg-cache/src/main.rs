@@ -62,8 +62,7 @@ impl ConnectedProtocol for CobaltConnectedService {
 
     fn get_protocol(&mut self) -> future::BoxFuture<'_, Result<MetricEventLoggerProxy, Error>> {
         async {
-            let (logger_proxy, server_end) =
-                fidl::endpoints::create_proxy().context("failed to create proxy endpoints")?;
+            let (logger_proxy, server_end) = fidl::endpoints::create_proxy();
             let metric_event_logger_factory =
                 connect_to_protocol::<MetricEventLoggerFactoryMarker>()
                     .context("Failed to connect to fuchsia::metrics::MetricEventLoggerFactory")?;
@@ -416,8 +415,7 @@ async fn serve_base_package_if_present(
     open_packages: &RootDirCache,
     scope: package_directory::ExecutionScope,
 ) -> anyhow::Result<fio::DirectoryProxy> {
-    let (proxy, server) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().context("create proxy")?;
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     match base_resolver::package::resolve_package(
         &url,
         server,

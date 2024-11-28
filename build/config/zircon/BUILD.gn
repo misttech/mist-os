@@ -331,7 +331,7 @@ config("static-libc++") {
       # NOTE: the path below was relative to toolchain.tool_dir in the Zircon build
       # but the Fuchsia one doesn't support GCC-based host builds at all, so this
       # is assuming Clang is always used instead.
-      "${rebased_clang_prefix}/../lib/libc++.a",
+      "${rebased_clang_dir}/lib/libc++.a",
     ]
   } else {
     ldflags = [ "-static-libstdc++" ]

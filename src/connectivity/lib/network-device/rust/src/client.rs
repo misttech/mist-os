@@ -32,7 +32,7 @@ pub fn new_port_status_stream(
     buffer: Option<u32>,
 ) -> Result<impl Stream<Item = Result<PortStatus>> + Unpin> {
     let (watcher_proxy, watcher_server) =
-        fidl::endpoints::create_proxy::<netdev::StatusWatcherMarker>()?;
+        fidl::endpoints::create_proxy::<netdev::StatusWatcherMarker>();
     let () = port_proxy
         .get_status_watcher(watcher_server, buffer.unwrap_or(DEFAULT_PORT_STREAM_BUFFER_SIZE))?;
     Ok(HangingGetStream::new(watcher_proxy, netdev::StatusWatcherProxy::watch_status)
@@ -48,7 +48,7 @@ impl Client {
 
     /// Connects to the specified `port`.
     pub fn connect_port(&self, port: Port) -> Result<netdev::PortProxy> {
-        let (port_proxy, port_server) = fidl::endpoints::create_proxy::<netdev::PortMarker>()?;
+        let (port_proxy, port_server) = fidl::endpoints::create_proxy::<netdev::PortMarker>();
         self.connect_port_server_end(port, port_server).map(move |()| port_proxy)
     }
 
@@ -104,7 +104,7 @@ impl Client {
     pub fn device_port_event_stream(
         &self,
     ) -> Result<impl Stream<Item = Result<DevicePortEvent>> + Unpin> {
-        let (proxy, server) = fidl::endpoints::create_proxy::<netdev::PortWatcherMarker>()?;
+        let (proxy, server) = fidl::endpoints::create_proxy::<netdev::PortWatcherMarker>();
         let () = self.device.get_port_watcher(server)?;
         Ok(HangingGetStream::new(proxy, netdev::PortWatcherProxy::watch).err_into())
     }

@@ -58,7 +58,7 @@ class MetadataGetterDfv2Test : public testing::Test {
     ASSERT_TRUE(test_environment_init_result.is_ok());
 
     incoming_.SyncCall([&](IncomingNamespace* incoming) {
-      incoming->compat_server.Init(component::kDefaultInstance, "root");
+      incoming->compat_server.Initialize(component::kDefaultInstance);
 
       zx_status_t add_metadata_status = incoming->compat_server.AddMetadata(
           kTestMetadataType, &kTestMetadata, sizeof(TestMetadata));

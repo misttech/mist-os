@@ -25,8 +25,7 @@ async fn run_trigger_service(mut stream: ftest::TriggerRequestStream) {
         for id in &["a", "b", "c"] {
             let child_ref = fdecl::ChildRef { name: format!("child_{}", id), collection: None };
 
-            let (exposed_dir, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             realm
                 .open_exposed_dir(&child_ref, server_end)
                 .await

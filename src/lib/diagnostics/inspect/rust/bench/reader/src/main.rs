@@ -112,8 +112,7 @@ fn uncontended_snapshot_tree_bench(b: &mut criterion::Bencher, size: usize) {
     let mut executor = fuchsia_async::LocalExecutor::new();
 
     let inspector = Inspector::new(InspectorConfig::default().size(size));
-    let (proxy, tree_server_fut) =
-        fuchsia_inspect_bench_utils::spawn_server(inspector.clone()).unwrap();
+    let (proxy, tree_server_fut) = fuchsia_inspect_bench_utils::spawn_server(inspector).unwrap();
     let task = fasync::Task::local(tree_server_fut);
 
     b.iter_with_large_drop(|| loop {
@@ -136,6 +135,7 @@ fn reader_snapshot_tree_vmo_bench(b: &mut criterion::Bencher, size: usize, fille
         fuchsia_inspect_bench_utils::spawn_server(inspector.clone()).unwrap();
     let task = fasync::Task::local(tree_server_fut);
 
+    #[allow(clippy::collection_is_never_read)]
     let mut nodes = vec![];
     if filled_size > 0 {
         let ints_for_filling: i64 = filled_size / 16 - 1;

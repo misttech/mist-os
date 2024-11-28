@@ -161,7 +161,7 @@ impl InputEventsRelay {
                     )
                 }
                 EventProxyMode::None => (
-                    touch_source_client_end.into_proxy().expect("Failed to create proxy"),
+                    touch_source_client_end.into_proxy(),
                     None,
                 ),
             };
@@ -275,8 +275,7 @@ impl InputEventsRelay {
                     open_files: default_keyboard_device_opened_files,
                 };
                 let (keyboard_listener, mut event_stream) =
-                    fidl::endpoints::create_request_stream::<KeyboardListenerMarker>()
-                        .expect("Failed to create keyboard proxy and stream");
+                    fidl::endpoints::create_request_stream::<KeyboardListenerMarker>();
                 if keyboard
                     .add_listener(view_ref, keyboard_listener, zx::MonotonicInstant::INFINITE)
                     .is_err()
@@ -353,9 +352,7 @@ impl InputEventsRelay {
                             );
                         (local_listener_stream, Some(local_resume_event))
                     }
-                    EventProxyMode::None => {
-                        (remote_server.into_stream().expect("Failed to create event stream"), None)
-                    }
+                    EventProxyMode::None => (remote_server.into_stream(), None),
                 };
                 slf.button_relay_loop(
                     local_listener_stream,
@@ -546,17 +543,15 @@ mod test {
             keyboard_device.open_test(locked, current_task).expect("Failed to create input file");
 
         let (touch_source_client_end, touch_source_stream) =
-            fidl::endpoints::create_request_stream::<TouchSourceMarker>()
-                .expect("failed to create TouchSource channel");
+            fidl::endpoints::create_request_stream::<TouchSourceMarker>();
 
         let (keyboard_proxy, keyboard_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>()
-                .expect("failed to create Keyboard channel");
+            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
             fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
         let (device_registry_proxy, device_listener_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
-                .expect("Failed to create DeviceListenerRegistry proxy and stream.");
+            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>(
+            );
 
         let relay = InputEventsRelay::new();
         relay.start_relays(
@@ -867,7 +862,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");
@@ -943,7 +938,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");
@@ -1081,7 +1076,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");
@@ -1143,7 +1138,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");

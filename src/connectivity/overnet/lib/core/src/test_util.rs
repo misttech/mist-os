@@ -42,7 +42,7 @@ impl NodeIdGenerator {
     /// Create a new router with a unique (within this test run) node id.
     pub fn new_router(&mut self) -> Result<Arc<crate::router::Router>, Error> {
         crate::router::Router::with_node_id(
-            self.next().ok_or(anyhow::format_err!("No more node ids available"))?,
+            self.next().ok_or_else(|| anyhow::format_err!("No more node ids available"))?,
             None,
         )
     }
@@ -50,7 +50,7 @@ impl NodeIdGenerator {
     /// Like [`new_router`] but enables circuit route forwarding.
     pub fn new_router_circuit_router(&mut self) -> Result<Arc<crate::router::Router>, Error> {
         crate::router::Router::with_node_id(
-            self.next().ok_or(anyhow::format_err!("No more node ids available"))?,
+            self.next().ok_or_else(|| anyhow::format_err!("No more node ids available"))?,
             Some(TEST_ROUTER_INTERVAL),
         )
     }

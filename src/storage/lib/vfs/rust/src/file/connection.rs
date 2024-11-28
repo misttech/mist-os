@@ -820,7 +820,6 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 .trace(trace::trace_future_args!(c"storage", c"File::Allocate"))
                 .await?;
             }
-            #[cfg(fuchsia_api_level_at_least = "24")]
             fio::FileRequest::_UnknownMethod { .. } => (),
         }
         Ok(ConnectionState::Alive)
@@ -857,9 +856,8 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
         };
         self.scope.spawn(async move {
-            if let Ok(requests) = server_end.into_stream() {
-                connection.handle_requests(requests).await;
-            }
+            let requests = server_end.into_stream();
+            connection.handle_requests(requests).await;
         });
     }
 
@@ -1282,8 +1280,7 @@ mod tests {
 
     fn init_mock_file(callback: MockCallbackType, flags: fio::OpenFlags) -> TestEnv {
         let file = MockFile::new(callback);
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy::<fio::FileMarker>().expect("Create proxy to succeed");
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
         let scope = ExecutionScope::new();
 
@@ -1326,7 +1323,7 @@ mod tests {
         );
         // Read from original proxy.
         let _: Vec<u8> = env.proxy.read(6).await.unwrap().map_err(Status::from_raw).unwrap();
-        let (clone_proxy, remote) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let (clone_proxy, remote) = fidl::endpoints::create_proxy::<fio::FileMarker>();
         env.proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, remote.into_channel().into()).unwrap();
         // Seek and read from clone_proxy.
         let _: u64 = clone_proxy
@@ -1915,8 +1912,7 @@ mod tests {
 
         fn init_mock_stream_file(vmo: zx::Vmo, flags: fio::OpenFlags) -> TestEnv {
             let file = MockFile::new_with_vmo(Box::new(always_succeed_callback), vmo);
-            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>()
-                .expect("Create proxy to succeed");
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
             let scope = ExecutionScope::new();
 

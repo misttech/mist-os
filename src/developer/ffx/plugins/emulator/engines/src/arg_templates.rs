@@ -106,8 +106,9 @@ impl HelperDef for UnitAbbreviationHelper {
         out: &mut dyn Output,
     ) -> HelperResult {
         // Convert the serde_json::Value into a DataUnits.
-        let param =
-            h.param(0).ok_or(RenderError::new(format!("Parameter 0 is missing in {:?}", h)))?;
+        let param = h
+            .param(0)
+            .ok_or_else(|| RenderError::new(format!("Parameter 0 is missing in {:?}", h)))?;
 
         match serde_json::from_value::<DataUnits>(param.value().clone()) {
             Ok(units) => out.write(units.abbreviate())?,
@@ -139,12 +140,14 @@ impl HelperDef for DiskImageHelper {
         out: &mut dyn Output,
     ) -> HelperResult {
         // Convert the serde_json::Value into a DiskImage.
-        let param =
-            h.param(0).ok_or(RenderError::new(format!("Parameter 0 is missing in {:?}", h)))?;
+        let param = h
+            .param(0)
+            .ok_or_else(|| RenderError::new(format!("Parameter 0 is missing in {:?}", h)))?;
 
         match serde_json::from_value::<DiskImage>(param.value().clone()) {
             Ok(path) => out.write(
-                path.to_str().ok_or(RenderError::new(format!("Invalid path {:?}", path)))?,
+                path.to_str()
+                    .ok_or_else(|| RenderError::new(format!("Invalid path {:?}", path)))?,
             )?,
             Err(_) => out.write(param.value().render().as_ref())?,
         };
@@ -190,8 +193,9 @@ impl HelperDef for EnvironmentHelper {
         out: &mut dyn Output,
     ) -> HelperResult {
         // Get the key specified in param(0) and retrieve the value from std::env.
-        let param =
-            h.param(0).ok_or(RenderError::new(format!("Parameter 0 is missing in {:?}", h)))?;
+        let param = h
+            .param(0)
+            .ok_or_else(|| RenderError::new(format!("Parameter 0 is missing in {:?}", h)))?;
         if let Some(key) = param.value().as_str() {
             match std::env::var(key) {
                 Ok(val) => out.write(&val)?,

@@ -20,7 +20,7 @@ pub struct PairingMock {
 
 impl PairingMock {
     pub fn new(timeout: MonotonicDuration) -> Result<(PairingProxy, PairingMock), Error> {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PairingMarker>()?;
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PairingMarker>();
         Ok((proxy, PairingMock { stream, timeout }))
     }
 
@@ -33,7 +33,7 @@ impl PairingMock {
             PairingRequest::SetPairingDelegate { input, output, delegate, control_handle: _ }
                 if input == expected_input_cap && output == expected_output_cap =>
             {
-                Ok(Status::Satisfied(delegate.into_proxy()?))
+                Ok(Status::Satisfied(delegate.into_proxy()))
             }
             _ => Ok(Status::Pending),
         })
@@ -49,7 +49,7 @@ pub struct AccessMock {
 
 impl AccessMock {
     pub fn new(timeout: MonotonicDuration) -> Result<(AccessProxy, AccessMock), Error> {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<AccessMarker>()?;
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<AccessMarker>();
         Ok((proxy, AccessMock { stream, timeout }))
     }
 

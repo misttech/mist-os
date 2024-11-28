@@ -166,7 +166,7 @@ async fn setup_realm(mock_runner: Arc<MockRunner>) -> Fixture {
                     "fuchsia.component.runner.ComponentRunner",
                 ))
                 .from(&mock_runner)
-                .to(Ref::child("component_manager")),
+                .to(Ref::self_()),
         )
         .await
         .unwrap();
@@ -184,7 +184,7 @@ async fn setup_realm(mock_runner: Arc<MockRunner>) -> Fixture {
         instance.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
 
     let (introspector, server_end) =
-        fidl::endpoints::create_proxy::<fcomponent::IntrospectorMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fcomponent::IntrospectorMarker>();
     realm_query
         .open(
             ".",
@@ -198,7 +198,7 @@ async fn setup_realm(mock_runner: Arc<MockRunner>) -> Fixture {
         .unwrap()
         .unwrap();
 
-    let (realm, server_end) = fidl::endpoints::create_proxy::<fcomponent::RealmMarker>().unwrap();
+    let (realm, server_end) = fidl::endpoints::create_proxy::<fcomponent::RealmMarker>();
     realm_query
         .open(
             ".",

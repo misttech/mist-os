@@ -17,7 +17,7 @@ use pkg::{PkgServerInstanceInfo, PkgServerInstances, ServerMode};
 // map from the start command to the serve command.
 pub(crate) fn to_serve_command(cmd: &StartCommand) -> ServeCommand {
     ServeCommand {
-        address: cmd.address.unwrap_or(ffx_repository_serve_args::default_address()),
+        address: cmd.address.unwrap_or_else(ffx_repository_serve_args::default_address),
         alias: cmd.alias.clone(),
         alias_conflict_mode: cmd.alias_conflict_mode,
         port_path: cmd.port_path.clone(),

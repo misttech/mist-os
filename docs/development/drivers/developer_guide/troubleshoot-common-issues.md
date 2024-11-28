@@ -655,4 +655,4 @@ void handle_unknown_method(
 [compat-device-server]: /docs/development/drivers/migration/set-up-compat-device-server.md#set-up-the-compat-device-server
 [offer-compat-device-server]: /docs/development/drivers/migration/set-up-compat-device-server.md#offer-the-compat-device-server-to-the-target-child-node
 [driver-export-macro]: /docs/development/drivers/developer_guide/write-a-minimal-dfv2-driver.md#add-the-driver-export-macro
-[view-driver-information]: /docs/development/sdk/ffx/view-driver-information.md
+[view-driver-information]: /docs/development/tools/ffx/workflows/view-driver-information.md

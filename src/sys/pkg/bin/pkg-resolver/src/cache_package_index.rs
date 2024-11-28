@@ -21,8 +21,7 @@ pub async fn from_proxy(
 async fn from_proxy_impl(
     pkg_cache: &fidl_fuchsia_pkg::PackageCacheProxy,
 ) -> Result<system_image::CachePackages, anyhow::Error> {
-    let (pkg_iterator, server_end) =
-        fidl::endpoints::create_proxy::<PackageIndexIteratorMarker>().context("creating proxy")?;
+    let (pkg_iterator, server_end) = fidl::endpoints::create_proxy::<PackageIndexIteratorMarker>();
     let () =
         pkg_cache.cache_package_index(server_end).context("calling cache_package_index fidl")?;
 
@@ -75,7 +74,7 @@ mod tests {
             while let Some(req) = stream.try_next().await.unwrap() {
                 match req {
                     PackageCacheRequest::CachePackageIndex { iterator, control_handle: _ } => {
-                        let iterator = iterator.into_stream().unwrap();
+                        let iterator = iterator.into_stream();
                         self.serve_package_iterator(iterator);
                     }
                     _ => panic!("unexpected PackageCache request: {req:?}"),
@@ -107,7 +106,7 @@ mod tests {
     async fn spawn_pkg_cache(
         cache_package_index: Vec<(UnpinnedAbsolutePackageUrl, BlobId)>,
     ) -> fidl_fuchsia_pkg::PackageCacheProxy {
-        let (client, request_stream) = create_proxy_and_stream::<PackageCacheMarker>().unwrap();
+        let (client, request_stream) = create_proxy_and_stream::<PackageCacheMarker>();
         let cache = MockPackageCacheService::new_with_cache_packages(Arc::new(cache_package_index));
         fasync::Task::spawn(cache.run_service(request_stream)).detach();
         client
@@ -115,7 +114,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn error_yields_empty() {
-        let (client, _) = fidl::endpoints::create_proxy::<PackageCacheMarker>().unwrap();
+        let (client, _) = fidl::endpoints::create_proxy::<PackageCacheMarker>();
         let cache_packages = from_proxy(&client).await;
         assert_eq!(cache_packages, system_image::CachePackages::from_entries(vec![]));
     }

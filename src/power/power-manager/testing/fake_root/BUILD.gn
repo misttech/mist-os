@@ -24,6 +24,7 @@ fuchsia_cc_driver("root_driver") {
     "../fuchsia.powermanager.driver.bind:powermanager_bindlib_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/lib/driver:driver_runtime",
   ]
 }

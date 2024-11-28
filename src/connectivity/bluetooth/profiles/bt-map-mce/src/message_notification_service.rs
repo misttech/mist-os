@@ -89,7 +89,7 @@ impl Session {
         if mas_instances.len() == 0 {
             return Err(Error::InvalidParameters);
         }
-        let relayer_proxy = relayer_client.into_proxy().map_err(|e| Error::Other(e.into()))?;
+        let relayer_proxy = relayer_client.into_proxy();
         *lock = State::Requested {
             mas_instances,
             relayer_proxy: Some(relayer_proxy),
@@ -322,10 +322,12 @@ impl ObexServerHandler for ServerHandler {
             ));
         };
         let app_params =
-            headers.get(&HeaderIdentifier::ApplicationParameters).ok_or(new_operation_error(
-                OperationResponseCode::NotAcceptable,
-                "Application Parameters header missing",
-            ))?;
+            headers.get(&HeaderIdentifier::ApplicationParameters).ok_or_else(|| {
+                new_operation_error(
+                    OperationResponseCode::NotAcceptable,
+                    "Application Parameters header missing",
+                )
+            })?;
         let Header::ApplicationParameters(params) = app_params else { unreachable!() };
 
         // Parse MAS instance ID.
@@ -422,10 +424,9 @@ pub(crate) mod tests {
         impl Future<Output = Result<(), Error>>,
     ) {
         // Set up fake client request for notifications.
-        let (accessor_proxy, mut accessor_requests) =
-            create_proxy_and_stream::<AccessorMarker>().unwrap();
+        let (accessor_proxy, mut accessor_requests) = create_proxy_and_stream::<AccessorMarker>();
         let (relayer_client, relayer_request_stream) =
-            create_request_stream::<NotificationRegistrationMarker>().unwrap();
+            create_request_stream::<NotificationRegistrationMarker>();
         let register_fut = accessor_proxy.set_notification_registration(
             AccessorSetNotificationRegistrationRequest {
                 mas_instance_ids: Some(vec![TEST_MAS_ID_1, TEST_MAS_ID_2]),

@@ -35,6 +35,7 @@ fuchsia_cc_driver("aml-nna-driver") {
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver:driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",

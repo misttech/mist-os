@@ -115,7 +115,7 @@ TEST_F(LifecycleTest, DestroyIfaceWithoutIfaceIdFails) {
   }
 }
 
-TEST_F(LifecycleTest, FullmacStartMultipleCallsFails) {
+TEST_F(LifecycleTest, FullmacInitMultipleCallsFails) {
   uint16_t iface_id = 0;
   {
     // First call to create iface with client role should succeed
@@ -139,18 +139,22 @@ TEST_F(LifecycleTest, FullmacStartMultipleCallsFails) {
         std::move(driver_connect_result.value()));
 
     {
-      // first call to start succeeds
+      // first call to init succeeds
       auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
-      auto result = fullmac_client.buffer(test_arena_)->Start(std::move(endpoints->client));
+      auto req = fuchsia_wlan_fullmac::wire::WlanFullmacImplInitRequest::Builder(test_arena_)
+                     .ifc(std::move(endpoints->client))
+                     .Build();
+      auto result = fullmac_client.buffer(test_arena_)->Init(req);
       ASSERT_TRUE(result.ok() && !result->is_error());
     }
 
     {
-      // second call to start fails
+      // second call to init fails
       auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
-      auto result = fullmac_client->Start(std::move(endpoints->client));
-      ASSERT_TRUE(result.ok());
-      ASSERT_TRUE(result->is_error());
+      auto req = fuchsia_wlan_fullmac::wire::WlanFullmacImplInitRequest::Builder(test_arena_)
+                     .ifc(std::move(endpoints->client))
+                     .Build();
+      auto result = fullmac_client.buffer(test_arena_)->Init(req);
       ASSERT_EQ(result->error_value(), ZX_ERR_ALREADY_BOUND);
     }
   }

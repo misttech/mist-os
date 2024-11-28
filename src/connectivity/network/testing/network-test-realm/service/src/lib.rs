@@ -66,7 +66,7 @@ async fn has_running_child(
     expected_child_ref: &fdecl::ChildRef,
     realm_proxy: &fcomponent::RealmProxy,
 ) -> Result<bool> {
-    let (iterator_proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (iterator_proxy, server_end) = fidl::endpoints::create_proxy();
     let list_children_result = realm_proxy
         .list_children(&collection_ref, server_end)
         .await
@@ -129,14 +129,15 @@ pub async fn get_interface_id<'a>(
     interface_name: &'a str,
     state_proxy: &'a fnet_interfaces::StateProxy,
 ) -> Result<Option<u64>> {
-    let stream = fnet_interfaces_ext::event_stream_from_state(
-        &state_proxy,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
-    .context("failed to get interface stream")?;
+    let stream =
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
+            &state_proxy,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .context("failed to get interface stream")?;
     let interfaces = fnet_interfaces_ext::existing(
         stream,
-        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>>::new(),
     )
     .await
     .context("failed to get existing interfaces")?;

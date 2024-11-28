@@ -202,7 +202,7 @@ impl EventAttribute {
                 let timestamp_nanos = datetime
                     .and_utc()
                     .timestamp_nanos_opt()
-                    .ok_or(Error::invalid_data(datetime))?;
+                    .ok_or_else(|| Error::invalid_data(datetime))?;
                 notification.timestamp = Some(timestamp_nanos);
             }
             EventAttribute::Subject(value) => notification.subject = Some(value.to_string()),
@@ -321,7 +321,7 @@ impl EventReport {
             .attrs
             .iter()
             .find_map(|a| if let EventAttribute::Type(t) = a { Some(t) } else { None })
-            .ok_or(Error::missing_data(TYPE_ATTR))?;
+            .ok_or_else(|| Error::missing_data(TYPE_ATTR))?;
 
         // Old folder attribute is only allowed if event type is message shift.
         if type_ != &Type::MessageShift
@@ -364,7 +364,7 @@ impl EventReport {
         let version_attr = &attributes
             .iter()
             .find(|a| a.name.local_name == VERSION_ATTR)
-            .ok_or(Error::MissingData(VERSION_ATTR.to_string()))?
+            .ok_or_else(|| Error::MissingData(VERSION_ATTR.to_string()))?
             .value;
         str::parse(version_attr.as_str())
     }

@@ -57,12 +57,12 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
     size_t roam_attempts = 0;
     size_t roam_successes = 0;
     std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcConnectConfRequest> connect_results;
-    std::list<wlan_fullmac_wire::WlanFullmacAssocInd> assoc_indications;
-    std::list<wlan_fullmac_wire::WlanFullmacAuthInd> auth_indications;
-    std::list<wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest> deauth_results;
-    std::list<wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest> disassoc_results;
-    std::list<wlan_fullmac_wire::WlanFullmacDeauthIndication> deauth_indications;
-    std::list<wlan_fullmac_wire::WlanFullmacDisassocIndication> disassoc_indications;
+    std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcAssocIndRequest> assoc_indications;
+    std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcAuthIndRequest> auth_indications;
+    std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcDeauthConfRequest> deauth_results;
+    std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest> disassoc_results;
+    std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcDeauthIndRequest> deauth_indications;
+    std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest> disassoc_indications;
     std::list<wlan_fullmac_wire::WlanFullmacChannelSwitchInfo> csa_indications;
     std::list<wlan_fullmac_wire::WlanFullmacStartConfirm> start_confirmations;
     std::list<wlan_fullmac_wire::WlanFullmacStopConfirm> stop_confirmations;
@@ -129,7 +129,7 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
                        OnWmmStatusRespCompleter::Sync& completer) override;
 
   // Query an interface
-  void Query(wlan_fullmac_wire::WlanFullmacQueryInfo* out_info);
+  void Query(wlan_fullmac_wire::WlanFullmacImplQueryResponse* out_info);
 
   // Query for MAC sublayer feature support on an interface
   void QueryMacSublayerSupport(wlan_common::MacSublayerSupport* out_resp);

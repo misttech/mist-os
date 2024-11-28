@@ -152,7 +152,10 @@ pub async fn do_root<C: NetCliDepsConnector>(
 
 fn shortlist_interfaces(
     name_pattern: &str,
-    interfaces: &mut HashMap<u64, finterfaces_ext::PropertiesAndState<()>>,
+    interfaces: &mut HashMap<
+        u64,
+        finterfaces_ext::PropertiesAndState<(), finterfaces_ext::AllInterest>,
+    >,
 ) {
     interfaces.retain(|_: &u64, properties_and_state| {
         properties_and_state.properties.name.contains(name_pattern)
@@ -369,13 +372,13 @@ async fn do_if<C: NetCliDepsConnector>(
                 connect_with_context::<froot::InterfacesMarker, _>(connector).await?;
             let interface_state =
                 connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
-            let stream = finterfaces_ext::event_stream_from_state(
+            let stream = finterfaces_ext::event_stream_from_state::<finterfaces_ext::AllInterest>(
                 &interface_state,
                 finterfaces_ext::IncludedAddresses::OnlyAssigned,
             )?;
             let mut response = finterfaces_ext::existing(
                 stream,
-                HashMap::<u64, finterfaces_ext::PropertiesAndState<()>>::new(),
+                HashMap::<u64, finterfaces_ext::PropertiesAndState<(), _>>::new(),
             )
             .await?;
             if let Some(name_pattern) = name_pattern {
@@ -415,13 +418,13 @@ async fn do_if<C: NetCliDepsConnector>(
                 connect_with_context::<froot::InterfacesMarker, _>(connector).await?;
             let interface_state =
                 connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
-            let stream = finterfaces_ext::event_stream_from_state(
+            let stream = finterfaces_ext::event_stream_from_state::<finterfaces_ext::AllInterest>(
                 &interface_state,
                 finterfaces_ext::IncludedAddresses::OnlyAssigned,
             )?;
             let response = finterfaces_ext::existing(
                 stream,
-                finterfaces_ext::InterfaceState::<()>::Unknown(id),
+                finterfaces_ext::InterfaceState::<(), _>::Unknown(id),
             )
             .await?;
             match response {
@@ -643,8 +646,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 let subnet = fnet_ext::Subnet { addr, prefix_len: prefix };
                 let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
                     finterfaces_admin::AddressStateProviderMarker,
-                >()
-                .context("create proxy")?;
+                >();
                 let () = control
                     .add_address(
                         &subnet.into(),
@@ -720,10 +722,10 @@ async fn do_if<C: NetCliDepsConnector>(
                 let id = interface.find_nicid(connector).await?;
                 let interfaces_state =
                     connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
-                let mut state = finterfaces_ext::InterfaceState::<()>::Unknown(id);
+                let mut state = finterfaces_ext::InterfaceState::<(), _>::Unknown(id);
 
                 let assigned_addr = finterfaces_ext::wait_interface_with_id(
-                    finterfaces_ext::event_stream_from_state(
+                    finterfaces_ext::event_stream_from_state::<finterfaces_ext::AllInterest>(
                         &interfaces_state,
                         finterfaces_ext::IncludedAddresses::OnlyAssigned,
                     )?,
@@ -768,9 +770,10 @@ async fn do_if<C: NetCliDepsConnector>(
             let build_name_to_id_map = || async {
                 let interface_state =
                     connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
-                let stream = finterfaces_ext::event_stream_from_state(
-                    &interface_state,
-                    finterfaces_ext::IncludedAddresses::OnlyAssigned,
+                let stream = finterfaces_ext::event_stream_from_state::<
+                    finterfaces_ext::AllInterest,
+                >(
+                    &interface_state, finterfaces_ext::IncludedAddresses::OnlyAssigned
                 )?;
                 let response = finterfaces_ext::existing(stream, HashMap::new()).await?;
                 Ok::<HashMap<String, u64>, Error>(
@@ -825,7 +828,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     )
                     .await?;
 
-            let (bridge, server_end) = fidl::endpoints::create_proxy().context("create proxy")?;
+            let (bridge, server_end) = fidl::endpoints::create_proxy();
             stack.bridge_interfaces(&ids, server_end).context("bridge interfaces")?;
             let bridge_id = bridge.get_id().await.context("get bridge id")?;
             // Detach the channel so it won't cause bridge destruction on exit.
@@ -870,7 +873,6 @@ async fn do_if_config_set(
             "if config set expects property value pairs and thus an even number of arguments"
         )));
     }
-    let mut temporary_address_enabled = None;
     let config = options.iter().tuples().try_fold(
         finterfaces_admin::Configuration::default(),
         |mut config, (property, value)| {
@@ -887,7 +889,6 @@ async fn do_if_config_set(
                         .slaac
                         .get_or_insert(Default::default())
                         .temporary_address = Some(enabled);
-                    temporary_address_enabled = Some(enabled);
                 }
                 unknown_property => {
                     return Err(user_facing_error(format!(
@@ -1530,7 +1531,7 @@ async fn print_neigh_entries(
 ) -> Result<(), Error> {
     let (it_client, it_server) =
         fidl::endpoints::create_endpoints::<fneighbor::EntryIteratorMarker>();
-    let it = it_client.into_proxy().context("error creating proxy to entry iterator")?;
+    let it = it_client.into_proxy();
 
     let () = view
         .open_entry_iterator(it_server, &fneighbor::EntryIteratorOptions::default())
@@ -2002,7 +2003,7 @@ mod tests {
         name: &'static str,
         port_class: finterfaces_ext::PortClass,
         octets: Option<[u8; 6]>,
-    ) -> (finterfaces_ext::Properties, Option<fnet::MacAddress>) {
+    ) -> (finterfaces_ext::Properties<finterfaces_ext::AllInterest>, Option<fnet::MacAddress>) {
         (
             finterfaces_ext::Properties {
                 id: id.try_into().unwrap(),
@@ -2089,7 +2090,7 @@ mod tests {
     async fn if_ip_forward(ip_version: fnet::IpVersion, enable: bool) {
         let interface1 = TestInterface { nicid: 1, name: "interface1" };
         let (root_interfaces, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>();
         let connector =
             TestConnector { root_interfaces: Some(root_interfaces), ..Default::default() };
 
@@ -2164,8 +2165,7 @@ mod tests {
             .expect("get admin request");
         assert_eq!(id, expected_nicid);
 
-        let mut control: finterfaces_admin::ControlRequestStream =
-            control.into_stream().expect("control request stream");
+        let mut control: finterfaces_admin::ControlRequestStream = control.into_stream();
         let (configuration, responder) = control
             .next()
             .await
@@ -2193,8 +2193,7 @@ mod tests {
             .expect("get admin request");
         assert_eq!(id, expected_nicid);
 
-        let mut control: finterfaces_admin::ControlRequestStream =
-            control.into_stream().expect("control request stream");
+        let mut control: finterfaces_admin::ControlRequestStream = control.into_stream();
         let responder = control
             .next()
             .await
@@ -2212,7 +2211,7 @@ mod tests {
     async fn if_igmp(igmp_version: finterfaces_admin::IgmpVersion) {
         let interface1 = TestInterface { nicid: 1, name: "interface1" };
         let (root_interfaces, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>();
         let connector =
             TestConnector { root_interfaces: Some(root_interfaces), ..Default::default() };
 
@@ -2283,7 +2282,7 @@ mod tests {
     async fn if_mld(mld_version: finterfaces_admin::MldVersion) {
         let interface1 = TestInterface { nicid: 1, name: "interface1" };
         let (root_interfaces, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>();
         let connector =
             TestConnector { root_interfaces: Some(root_interfaces), ..Default::default() };
 
@@ -2363,7 +2362,7 @@ mod tests {
                     ) = request.into_get_watcher().expect("request type should be GetWatcher");
 
                     let mut watcher_request_stream: finterfaces::WatcherRequestStream =
-                        server_end.into_stream().expect("watcher FIDL error");
+                        server_end.into_stream();
 
                     for event in interfaces
                         .into_iter()
@@ -2420,7 +2419,7 @@ mod tests {
 
         let interface1 = TestInterface { nicid: 1, name: "interface1" };
         let (root_interfaces, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>();
 
         let connector =
             TestConnector { root_interfaces: Some(root_interfaces), ..Default::default() };
@@ -2450,8 +2449,7 @@ mod tests {
                 .expect("get admin request");
             assert_eq!(id, interface1.nicid);
 
-            let mut control: finterfaces_admin::ControlRequestStream =
-                control.into_stream().expect("control request stream");
+            let mut control: finterfaces_admin::ControlRequestStream = control.into_stream();
             let (
                 addr,
                 addr_params,
@@ -2473,9 +2471,8 @@ mod tests {
                 }
             );
 
-            let mut address_state_provider_request_stream = address_state_provider_server_end
-                .into_stream()
-                .expect("address state provider FIDL error");
+            let mut address_state_provider_request_stream =
+                address_state_provider_server_end.into_stream();
             async fn next_request(
                 stream: &mut finterfaces_admin::AddressStateProviderRequestStream,
             ) -> finterfaces_admin::AddressStateProviderRequest {
@@ -2524,9 +2521,9 @@ mod tests {
         let interface2 = TestInterface { nicid: 2, name: "interface2" };
 
         let (root_interfaces, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>();
         let (interfaces_state, interfaces_requests) =
-            fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>();
 
         let (interface1_properties, _mac) = get_fake_interface(
             interface1.nicid,
@@ -2570,7 +2567,7 @@ mod tests {
                 .into_get_admin()
                 .expect("get admin request");
             assert_eq!(id, interface1.nicid);
-            let mut control = control.into_stream().expect("control request stream");
+            let mut control = control.into_stream();
             let (addr, responder) = control
                 .next()
                 .await
@@ -2622,7 +2619,7 @@ mod tests {
                     .into_get_admin()
                     .expect("get admin request");
                 assert_eq!(id, interface2.nicid);
-                let mut control = control.into_stream().expect("control request stream");
+                let mut control = control.into_stream();
                 let (addr, responder) = control
                     .next()
                     .await
@@ -2655,7 +2652,9 @@ mod tests {
             online: true,
             addresses: addrs
                 .into_iter()
-                .map(|(addr, assignment_state)| finterfaces_ext::Address {
+                .map(|(addr, assignment_state)| finterfaces_ext::Address::<
+                    finterfaces_ext::AllInterest,
+                > {
                     addr,
                     assignment_state,
                     valid_until: finterfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
@@ -2711,7 +2710,7 @@ mod tests {
         let interface = TestInterface { nicid: INTERFACE_ID, name: INTERFACE_NAME };
 
         let (interfaces_state, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>();
 
         let interfaces_handler = async move {
             let (finterfaces::WatcherOptions { include_non_assigned_addresses, .. }, server_end, _) =
@@ -2723,8 +2722,7 @@ mod tests {
                     .into_get_watcher()
                     .expect("request should be GetWatcher");
             assert_eq!(include_non_assigned_addresses, Some(false));
-            let mut request_stream: finterfaces::WatcherRequestStream =
-                server_end.into_stream().expect("server end into request stream");
+            let mut request_stream: finterfaces::WatcherRequestStream = server_end.into_stream();
             for event in events {
                 request_stream
                     .next()
@@ -2894,9 +2892,9 @@ mac               -
     #[fasync::run_singlethreaded(test)]
     async fn if_list(json: bool, wanted_output: String) {
         let (root_interfaces, root_interfaces_stream) =
-            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>();
         let (interfaces_state, interfaces_state_stream) =
-            fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>();
 
         let buffers = ffx_writer::TestBuffers::default();
         let mut output = if json {
@@ -2922,7 +2920,7 @@ mac               -
                     options: _,
                     watcher,
                     control_handle: _,
-                } => futures::future::ready(watcher.into_stream()),
+                } => futures::future::ready(Ok(watcher.into_stream())),
             })
             .try_flatten()
             .map(|res| res.expect("watcher stream error"));
@@ -3054,7 +3052,7 @@ mac               -
 
     async fn test_do_dhcp(cmd: opts::DhcpEnum) {
         let (stack, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>();
         let connector = TestConnector { stack: Some(stack), ..Default::default() };
         let op = do_dhcp(cmd.clone(), &connector);
         let op_succeeds = async move {
@@ -3103,7 +3101,7 @@ mac               -
         };
 
         let (stack, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>();
         let connector = TestConnector { stack: Some(stack), ..Default::default() };
         let buffers = ffx_writer::TestBuffers::default();
         let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
@@ -3213,9 +3211,9 @@ mac               -
     #[fasync::run_singlethreaded(test)]
     async fn route_list(json: bool, wanted_output: String) {
         let (routes_v4_controller, mut routes_v4_state_stream) =
-            fidl::endpoints::create_proxy_and_stream::<froutes::StateV4Marker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<froutes::StateV4Marker>();
         let (routes_v6_controller, mut routes_v6_state_stream) =
-            fidl::endpoints::create_proxy_and_stream::<froutes::StateV6Marker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<froutes::StateV6Marker>();
         let connector = TestConnector {
             routes_v4: Some(routes_v4_controller),
             routes_v6: Some(routes_v6_controller),
@@ -3341,9 +3339,9 @@ mac               -
     #[fasync::run_singlethreaded(test)]
     async fn bridge(use_ifname: bool) {
         let (stack, mut stack_requests) =
-            fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>();
         let (interfaces_state, interfaces_state_requests) =
-            fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>();
         let connector = TestConnector {
             interfaces_state: Some(interfaces_state),
             stack: Some(stack),
@@ -3398,7 +3396,7 @@ mac               -
                 requested_ifs,
                 bridge_ifs.iter().map(|interface| interface.nicid).collect::<Vec<_>>()
             );
-            let mut bridge_requests = bridge_server_end.into_stream().expect("bridge stream");
+            let mut bridge_requests = bridge_server_end.into_stream();
             let responder = bridge_requests
                 .try_next()
                 .await
@@ -3430,7 +3428,7 @@ mac               -
         want: String,
     ) {
         let (it, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fneighbor::EntryIteratorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fneighbor::EntryIteratorMarker>();
 
         let server = async {
             for items in batches {
@@ -3678,7 +3676,7 @@ mac               -
     #[fasync::run_singlethreaded(test)]
     async fn neigh_add() {
         let (controller, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fneighbor::ControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fneighbor::ControllerMarker>();
         let neigh = do_neigh_add(INTERFACE_ID, IF_ADDR_V4.addr, MAC_1, controller);
         let neigh_succeeds = async {
             let (got_interface_id, got_ip_address, got_mac, responder) = requests
@@ -3702,7 +3700,7 @@ mac               -
     #[fasync::run_singlethreaded(test)]
     async fn neigh_clear() {
         let (controller, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fneighbor::ControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fneighbor::ControllerMarker>();
         let neigh = do_neigh_clear(INTERFACE_ID, IP_VERSION, controller);
         let neigh_succeeds = async {
             let (got_interface_id, got_ip_version, responder) = requests
@@ -3725,7 +3723,7 @@ mac               -
     #[fasync::run_singlethreaded(test)]
     async fn neigh_del() {
         let (controller, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fneighbor::ControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fneighbor::ControllerMarker>();
         let neigh = do_neigh_del(INTERFACE_ID, IF_ADDR_V4.addr, controller);
         let neigh_succeeds = async {
             let (got_interface_id, got_ip_address, responder) = requests
@@ -3787,8 +3785,7 @@ mac               -
     #[fasync::run_singlethreaded(test)]
     async fn test_do_dhcpd(cmd: opts::dhcpd::DhcpdEnum) {
         let (dhcpd, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fdhcp::Server_Marker>()
-                .expect("failed to create proxy and request stream for dhcp server");
+            fidl::endpoints::create_proxy_and_stream::<fdhcp::Server_Marker>();
 
         let connector = TestConnector { dhcpd: Some(dhcpd), ..Default::default() };
         let op = do_dhcpd(cmd.clone(), &connector);
@@ -3912,7 +3909,7 @@ mac               -
     #[fasync::run_singlethreaded(test)]
     async fn dns_lookup() {
         let (lookup, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>();
         let connector = TestConnector { name_lookup: Some(lookup), ..Default::default() };
 
         let cmd = opts::dns::DnsEnum::Lookup(opts::dns::Lookup {

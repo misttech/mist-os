@@ -91,7 +91,7 @@ pub async fn open_node_status<T: ProtocolMarker>(
     path: &str,
 ) -> Result<T::Proxy, zx::Status> {
     let flags = flags | fio::OpenFlags::DESCRIBE;
-    let (node_proxy, node_server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy");
+    let (node_proxy, node_server) = create_proxy::<fio::NodeMarker>();
     dir.open(flags, fio::ModeType::empty(), path, node_server).expect("Cannot open node");
     let status = get_open_status(&node_proxy).await;
 
@@ -150,7 +150,7 @@ pub async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Vec<u8> {
 
 /// Attempts to open the given file, and checks the status is `NOT_FOUND`.
 pub async fn assert_file_not_found(dir: &fio::DirectoryProxy, path: &str) {
-    let (file_proxy, file_server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy");
+    let (file_proxy, file_server) = create_proxy::<fio::NodeMarker>();
     dir.open(
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DESCRIBE,
         fio::ModeType::empty(),
@@ -209,18 +209,12 @@ pub fn validate_vmo_rights(vmo: &zx::Vmo, expected_vmo_rights: fio::VmoFlags) {
 pub async fn create_file_and_get_backing_memory(
     dir_entry: io_test::DirectoryEntry,
     test_harness: &test_harness::TestHarness,
-    file_flags: fio::OpenFlags,
+    file_flags: fio::Flags,
     vmo_flags: fio::VmoFlags,
 ) -> Result<(zx::Vmo, (fio::DirectoryProxy, fio::FileProxy)), zx::Status> {
     let file_path = get_directory_entry_name(&dir_entry);
-    let root = root_directory(vec![dir_entry]);
-    let dir_proxy = test_harness.get_directory(root, file_flags);
-    let file_proxy = open_node_status::<fio::FileMarker>(
-        &dir_proxy,
-        file_flags | fio::OpenFlags::NOT_DIRECTORY,
-        &file_path,
-    )
-    .await?;
+    let dir_proxy = test_harness.get_directory(vec![dir_entry], file_flags);
+    let file_proxy = dir_proxy.open3_node::<fio::FileMarker>(&file_path, file_flags, None).await?;
     let vmo = file_proxy
         .get_backing_memory(vmo_flags)
         .await
@@ -229,19 +223,11 @@ pub async fn create_file_and_get_backing_memory(
     Ok((vmo, (dir_proxy, file_proxy)))
 }
 
-/// Constructs a directory from a set of directory entries.
-pub fn root_directory(entries: Vec<io_test::DirectoryEntry>) -> io_test::Directory {
-    // Convert the simple vector of entries into the convoluted FIDL field type.
+/// Makes a directory with a name and set of entries.
+pub fn directory(name: &str, entries: Vec<io_test::DirectoryEntry>) -> io_test::DirectoryEntry {
     let entries: Vec<Option<Box<io_test::DirectoryEntry>>> =
         entries.into_iter().map(|e| Some(Box::new(e))).collect();
-    io_test::Directory { name: "/".to_string(), entries }
-}
-
-/// Makes a subdirectory with a name and a set of entries.
-pub fn directory(name: &str, entries: Vec<io_test::DirectoryEntry>) -> io_test::DirectoryEntry {
-    let mut dir = root_directory(entries);
-    dir.name = name.to_string();
-    io_test::DirectoryEntry::Directory(dir)
+    io_test::DirectoryEntry::Directory(io_test::Directory { name: name.to_string(), entries })
 }
 
 /// Makes a remote directory with a name, which forwards the requests to the given directory proxy.
@@ -325,7 +311,7 @@ async fn open3_node_impl<T: ProtocolMarker>(
     flags: fio::Flags,
     options: Option<fio::Options>,
 ) -> Result<(T::Proxy, Option<fio::Representation>), zx::Status> {
-    let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy");
+    let (proxy, server) = create_proxy::<fio::NodeMarker>();
     dir.open3(path, flags, &options.unwrap_or_default(), server.into_channel())
         .expect("Failed to call open3");
     let representation = if flags.contains(fio::Flags::FLAG_SEND_REPRESENTATION) {

@@ -52,7 +52,7 @@ impl PreSigningController {
             return Err(anyhow!("Cannot perform validations involving static packages: StaticPkgCollector reported errors {:?}", static_pkgs.errors));
         }
 
-        let static_pkgs_map = static_pkgs.static_pkgs.clone().unwrap_or(HashMap::new());
+        let static_pkgs_map = static_pkgs.static_pkgs.clone().unwrap_or_else(HashMap::new);
 
         // Remove variant from package name and convert hash to string.
         // Build checks validation expects a map of package names to merkle hash strings.

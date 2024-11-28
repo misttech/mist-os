@@ -17,6 +17,10 @@ use assembly_config_schema::product_config::{
     ProductConfigData, ProductPackageDetails, ProductPackagesConfig,
 };
 use assembly_config_schema::{BoardInformation, DriverDetails, PackageDetails, PackageSet};
+use assembly_constants::{
+    BootfsDestination, BootfsPackageDestination, FileEntry, PackageDestination,
+    PackageSetDestination,
+};
 use assembly_domain_config::DomainConfigPackage;
 use assembly_driver_manifest::{DriverManifestBuilder, DriverPackageType};
 use assembly_file_relative_path::SupportsFileRelativePaths;
@@ -31,10 +35,7 @@ use assembly_shell_commands::ShellCommandsBuilder;
 use assembly_structured_config::Repackager;
 use assembly_tool::ToolProvider;
 use assembly_util as util;
-use assembly_util::{
-    BootfsDestination, BootfsPackageDestination, FileEntry, InsertAllUniqueExt, InsertUniqueExt,
-    NamedMap, PackageDestination, PackageSetDestination,
-};
+use assembly_util::{InsertAllUniqueExt, InsertUniqueExt, NamedMap};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
 use itertools::Itertools;
@@ -298,7 +299,7 @@ impl ImageAssemblyConfigBuilder {
         }
 
         let memory_buckets: Vec<Utf8PathBuf> =
-            memory_buckets.clone().into_iter().map(|b| b.to_utf8_pathbuf()).collect();
+            memory_buckets.into_iter().map(|b| b.to_utf8_pathbuf()).collect();
         self.add_memory_buckets(&memory_buckets)?;
 
         assembly_util::set_option_once_or(
@@ -1201,6 +1202,8 @@ mod tests {
     use super::*;
     use assembly_config_schema::assembly_config::CompiledComponentDefinition;
     use assembly_config_schema::image_assembly_config::PartialKernelConfig;
+    use assembly_constants::CompiledPackageDestination;
+    use assembly_constants::TestCompiledPackageDestination::ForTest;
     use assembly_file_relative_path::FileRelativePathBuf;
     use assembly_named_file_map::SourceMerklePair;
     use assembly_package_utils::PackageManifestPathBuf;
@@ -1208,8 +1211,6 @@ mod tests {
     use assembly_test_util::generate_test_manifest;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolCommandLog;
-    use assembly_util::CompiledPackageDestination;
-    use assembly_util::TestCompiledPackageDestination::ForTest;
     use fuchsia_pkg::{BlobInfo, MetaPackage, PackageBuilder, PackageManifestBuilder};
     use serde_json::json;
     use std::fs::File;

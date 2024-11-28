@@ -99,10 +99,13 @@ impl<T> Task<T> {
 impl Task<()> {
     /// Detach this task so that it can run independently in the background.
     ///
-    /// *Note*: this is usually not what you want. This API severs the control flow from the
-    /// caller, making it impossible to return values (including errors). If your goal is to run
-    /// multiple futures concurrently, consider using [`TaskGroup`] or other futures combinators
-    /// such as:
+    /// *Note*: This is usually not what you want. This API severs the control flow from the
+    /// caller. This can result in flaky tests and makes it impossible to return values
+    /// (including errors).
+    ///
+    /// If your goal is to run multiple tasks concurrently, use [`Scope`][crate::Scope].
+    ///
+    /// You can also use other futures combinators such as:
     ///
     /// * [`futures::future::join`]
     /// * [`futures::future::select`]
@@ -128,7 +131,7 @@ impl Task<()> {
 }
 
 impl<T: Send + 'static> Task<T> {
-    /// Spawn a new task on the root scope of the current executor.
+    /// Spawn a new task on the global scope of the current executor.
     ///
     /// The task may be executed on any thread(s) owned by the current executor.
     /// See [`Task::local`] for an equivalent that ensures locality.
@@ -137,20 +140,23 @@ impl<T: Send + 'static> Task<T> {
     /// (b) the returned [`Task`] is dropped while the executor is running, or
     /// (c) the executor is destroyed; whichever comes first.
     ///
+    /// Code that uses scopes is encouraged to spawn on a shorter lived scope or
+    /// explicitly call [`Scope::global()`][crate::Scope::global] for spawning.
+    ///
     /// # Panics
     ///
-    /// `spawn` may panic if not called in the context of an executor (e.g.
-    /// within a call to `run` or `run_singlethreaded`).
+    /// May panic if not called in the context of an executor (e.g. within a
+    /// call to [`run`][crate::SendExecutor::run]).
     pub fn spawn(future: impl Future<Output = T> + Send + 'static) -> Task<T> {
         let executor = EHandle::local();
-        let scope = executor.root_scope();
+        let scope = executor.global_scope();
         let task_id = executor.spawn(scope, future);
         Task(JoinHandle::new(scope.clone(), task_id))
     }
 }
 
 impl<T: 'static> Task<T> {
-    /// Spawn a new task on the root scope of the thread local executor.
+    /// Spawn a new task on the global scope of the thread local executor.
     ///
     /// The passed future will live until either (a) the future completes,
     /// (b) the returned [`Task`] is dropped while the executor is running, or
@@ -159,13 +165,16 @@ impl<T: 'static> Task<T> {
     /// NOTE: This is not supported with a [`SendExecutor`] and will cause a
     /// runtime panic. Use [`Task::spawn`] instead.
     ///
+    /// Code that uses scopes is encouraged to spawn on a shorter lived scope or
+    /// explicitly call [`Scope::global()`][crate::Scope::global] for spawning.
+    ///
     /// # Panics
     ///
-    /// `local` may panic if not called in the context of a local executor (e.g.
-    /// within a call to `run` or `run_singlethreaded`).
+    /// May panic if not called in the context of an executor (e.g. within a
+    /// call to [`run`][crate::SendExecutor::run]).
     pub fn local(future: impl Future<Output = T> + 'static) -> Task<T> {
         let executor = EHandle::local();
-        let scope = executor.root_scope();
+        let scope = executor.global_scope();
         let task_id = executor.spawn_local(scope, future);
         Task(JoinHandle::new(scope.clone(), task_id))
     }

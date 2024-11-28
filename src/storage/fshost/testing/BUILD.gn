@@ -9,6 +9,7 @@ fshost_component_and_config("test-fshost") {
   testonly = true
   options = {
     data_filesystem_format = "minfs"
+    gpt_all = true
   }
 }
 
@@ -17,6 +18,7 @@ fshost_component_and_config("test-fshost-no-watcher") {
   options = {
     data_filesystem_format = "minfs"
     disable_block_watcher = true
+    gpt_all = true
   }
 }
 
@@ -25,6 +27,7 @@ fshost_component_and_config("test-fshost-storage-host") {
   options = {
     data_filesystem_format = "fxfs"
     storage_host = true
+    gpt_all = true
   }
 }
 
@@ -34,6 +37,7 @@ fshost_component_and_config("test-fshost-storage-host-netboot") {
     data_filesystem_format = "fxfs"
     storage_host = true
     netboot = true
+    gpt_all = true
   }
 }
 

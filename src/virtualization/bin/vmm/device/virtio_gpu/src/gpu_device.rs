@@ -752,7 +752,7 @@ mod tests {
             .unwrap();
 
         // Process the chain.
-        let (_proxy, stream) = create_proxy_and_stream::<VirtioGpuMarker>().unwrap();
+        let (_proxy, stream) = create_proxy_and_stream::<VirtioGpuMarker>();
         let mut device = GpuDevice::new(&mem, stream.control_handle());
 
         // Process the request.
@@ -787,7 +787,7 @@ mod tests {
     impl<'a> TestFixture<'a> {
         pub fn new(mem: &'a IdentityDriverMem) -> Self {
             let state = TestQueue::new(32, mem);
-            let (proxy, stream) = create_proxy_and_stream::<VirtioGpuMarker>().unwrap();
+            let (proxy, stream) = create_proxy_and_stream::<VirtioGpuMarker>();
             let device = GpuDevice::new(mem, stream.control_handle());
             Self { mem, state, device, _proxy: proxy }
         }

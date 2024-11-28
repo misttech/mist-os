@@ -200,7 +200,7 @@ fn find_matching(token: &Option<String>, mut candidates: Vec<String>) -> Vec<Pai
     }
     candidates
         .into_iter()
-        .map(|command| Pair { display: command.clone(), replacement: command.clone() })
+        .map(|command| Pair { display: command.clone(), replacement: command })
         .collect()
 }
 

@@ -9,9 +9,10 @@ import("//sdk/ctf/build/ctf.gni")
 import("//sdk/ctf/build/ctf_api_level.gni")
 import("//sdk/ctf/build/ctf_output_directory.gni")
 
-# Generates a manifest of CTF release artifacts to upload to remote storage.
-build_api_module("ctf_artifacts") {
+generated_file("ctf_artifacts_source_list") {
   testonly = true
+  outputs = [ "$root_out_dir/ctf_artifacts_source_list.json" ]
+  output_conversion = "json"
   data_keys = [ "ctf_artifacts" ]
   walk_keys = [ "ctf_barrier" ]
   deps = [
@@ -19,12 +20,59 @@ build_api_module("ctf_artifacts") {
     ":host_test_manifest",
     "tests:e2e_tests",
   ]
+
+  metadata = {
+    # Used by the //:ctf_artifacts_path build API module
+    ctf_artifacts_path =
+        [ rebase_path("$root_out_dir/ctf_release/ctf_artifacts.json",
+                      root_build_dir) ]
+  }
+}
+
+# A file that contains the path to the ctf_artifacts manifest, used
+# by infra scripts to locate the latter.
+build_api_module("ctf_artifacts_path") {
+  testonly = true
+  data_keys = [ "ctf_artifacts_path" ]
+  deps = [ ":ctf_artifacts" ]
+}
+
+# Generates a manifest of CTF release artifacts to upload to remote storage.
+action("ctf_artifacts") {
+  testonly = true
+  _output_json = "$root_out_dir/ctf_release/ctf_artifacts.json"
+  outputs = [ _output_json ]
+  deps = [ ":ctf_artifacts_source_list" ]
+  script = "copy_ctf_artifacts.py"
+  _dep_outputs = get_target_outputs(deps[0])
+  sources = _dep_outputs
+  depfile = "$target_out_dir/ctf_artifacts.json.d"
+  args = [
+    "--artifacts_json",
+    rebase_path(_dep_outputs[0], root_out_dir),
+    "--output_manifest",
+    rebase_path(outputs[0], root_out_dir),
+    "--depfile",
+    rebase_path(depfile, root_out_dir),
+  ]
+
+  metadata = {
+    # Used to populate the api.json file that is uploaded by
+    # artifactory (see tools/artifactory/modules.go)
+    build_api_modules = [ "ctf_artifacts" ]
+
+    # This information will be used exclusively by build/api/client.py
+    # The script expects a series of lines such as: <name>=<file_path>
+    build_api_client_info =
+        [ "ctf_artifacts=" + rebase_path(outputs[0], root_build_dir) ]
+  }
 }
 
 group("ctf") {
   testonly = true
   deps = [
     ":check_test_templates",
+    ":ctf_artifacts",
     ":golden_files",
     ":manifests",
     ":tests",

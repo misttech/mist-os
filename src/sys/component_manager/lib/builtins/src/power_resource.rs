@@ -54,7 +54,7 @@ mod tests {
         let power_resource = get_power_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::PowerResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::PowerResourceMarker>();
         fasync::Task::local(
             PowerResource::new(power_resource)
                 .unwrap_or_else(|e| panic!("Error while creating power resource service: {}", e))

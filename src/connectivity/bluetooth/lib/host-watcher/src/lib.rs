@@ -210,7 +210,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>();
         let mut watcher = HostWatcher::new(proxy);
 
         let _ = exec.run_until_stalled(&mut watcher.next()).expect_pending("No updates");
@@ -229,7 +229,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>();
         let mut watcher = HostWatcher::new(proxy);
 
         let _ = exec.run_until_stalled(&mut watcher.next()).expect_pending("No updates");
@@ -260,7 +260,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>();
         let host = example_host(HostId(1), /* active= */ true, /* discoverable= */ false);
         // HostWatcher starts off with a tracked active, non-discoverable host.
         let mut watcher = HostWatcher::new_with_state(proxy, host.try_into().ok());
@@ -285,7 +285,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>();
         // HostWatcher starts off with a tracked active, non-discoverable host.
         let mut host1 =
             example_host(HostId(1), /* active= */ true, /* discoverable= */ false);
@@ -316,7 +316,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>();
         let mut host1 =
             example_host(HostId(1), /* active= */ true, /* discoverable= */ false);
         // HostWatcher starts off with a tracked active, non-discoverable host.
@@ -337,7 +337,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>();
         let host1 =
             example_host(HostId(1), /* active= */ true, /* discoverable= */ false);
         // HostWatcher starts off with a tracked active, non-discoverable host.
@@ -368,7 +368,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>();
         let mut watcher = HostWatcher::new(proxy);
         let _ = exec.run_until_stalled(&mut watcher.next()).expect_pending("No updates");
         assert!(!watcher.is_terminated());
@@ -389,7 +389,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>();
         let mut watcher = HostWatcher::new(proxy);
         let _ = exec.run_until_stalled(&mut watcher.next()).expect_pending("No updates");
         assert!(!watcher.is_terminated());

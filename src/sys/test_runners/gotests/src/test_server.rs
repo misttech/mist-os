@@ -18,8 +18,8 @@ use std::num::NonZeroUsize;
 use std::sync::{Arc, Weak};
 use test_runners_lib::cases::TestCaseInfo;
 use test_runners_lib::elf::{
-    Component, ComponentError, EnumeratedTestCases, FidlError, KernelError,
-    MemoizedFutureContainer, PinnedFuture, SuiteServer,
+    Component, ComponentError, EnumeratedTestCases, KernelError, MemoizedFutureContainer,
+    PinnedFuture, SuiteServer,
 };
 use test_runners_lib::errors::*;
 use test_runners_lib::launch;
@@ -202,9 +202,7 @@ impl TestServer {
         let (test_stderr, stderr_client) = zx::Socket::create_stream();
 
         let (case_listener_proxy, listener) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>()
-                .map_err(FidlError::CreateProxy)
-                .unwrap();
+            fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>();
 
         run_listener
             .on_test_case_started(
@@ -553,14 +551,11 @@ mod tests {
         let server = TestServer::new();
 
         let (run_listener_client, run_listener) =
-            fidl::endpoints::create_request_stream::<RunListenerMarker>()
-                .context("Failed to create run_listener")?;
+            fidl::endpoints::create_request_stream::<RunListenerMarker>();
         let (test_suite_client, test_suite) =
-            fidl::endpoints::create_request_stream::<SuiteMarker>()
-                .context("failed to create suite")?;
+            fidl::endpoints::create_request_stream::<SuiteMarker>();
 
-        let suite_proxy =
-            test_suite_client.into_proxy().context("can't convert suite into proxy")?;
+        let suite_proxy = test_suite_client.into_proxy();
         fasync::Task::spawn(async move {
             server
                 .serve_test_suite(test_suite, weak_component)

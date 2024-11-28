@@ -286,7 +286,7 @@ impl UpdatePackageBuilder {
         let mut builder = self.make_subpackage_builder("images_fuchsia")?;
         if let Some(slot) = &self.slot_primary {
             let (zbi, vbmeta) =
-                slot.zbi_and_vbmeta().ok_or(anyhow!("primary slot missing a zbi image"))?;
+                slot.zbi_and_vbmeta().ok_or_else(|| anyhow!("primary slot missing a zbi image"))?;
 
             builder.package.add_file_as_blob(&zbi.destination, zbi.source.to_string())?;
 
@@ -308,8 +308,9 @@ impl UpdatePackageBuilder {
         // Generate the update_images_recovery package.
         let mut builder = self.make_subpackage_builder("images_recovery")?;
         if let Some(slot) = &self.slot_recovery {
-            let (zbi, vbmeta) =
-                slot.zbi_and_vbmeta().ok_or(anyhow!("recovery slot missing a zbi image"))?;
+            let (zbi, vbmeta) = slot
+                .zbi_and_vbmeta()
+                .ok_or_else(|| anyhow!("recovery slot missing a zbi image"))?;
 
             builder.package.add_file_as_blob(&zbi.destination, zbi.source.to_string())?;
 

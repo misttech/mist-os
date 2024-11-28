@@ -65,7 +65,7 @@ pub async fn create_iface(
     zx::Status::ok(response.0)
         .map_err(|e| return anyhow::anyhow!("Create iface returned non-OK status: {}", e))?;
 
-    match response.1.clone() {
+    match response.1 {
         Some(resp) => {
             let iface_id = resp.iface_id;
             tracing::info!("Created iface {:?}", iface_id);
@@ -118,8 +118,8 @@ mod tests {
     pub(crate) fn setup_fake_service<M: fidl::endpoints::ProtocolMarker>(
     ) -> (fuchsia_async::TestExecutor, M::Proxy, M::RequestStream) {
         let exec = fuchsia_async::TestExecutor::new();
-        let (proxy, server) = fidl::endpoints::create_proxy::<M>().expect("creating proxy");
-        (exec, proxy, server.into_stream().expect("creating stream"))
+        let (proxy, server) = fidl::endpoints::create_proxy::<M>();
+        (exec, proxy, server.into_stream())
     }
 
     fn fake_iface_query_response(

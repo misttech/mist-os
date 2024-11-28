@@ -14,7 +14,7 @@ import("config.gni")
 declare_args() {
   # Label pointing to the main product bundle to work with if the default product in a multi-product
   # build is not desired.
-  main_product_label = ""
+  main_pb_label = ""
 }
 
 group("ffx") {
@@ -66,14 +66,13 @@ if (current_toolchain == default_toolchain) {
     output_conversion = "json"
   }
 
-  if (main_product_label == "") {
+  if (main_pb_label == "") {
     if (defined(files) && defined(files.product_bundle_dir)) {
       _product_path = files.product_bundle_dir
     }
   } else {
-    _product_path =
-        get_label_info(main_product_label, "target_out_dir") + "/" +
-        get_label_info(main_product_label, "name") + "/product_bundle"
+    _product_path = get_label_info(main_pb_label, "target_out_dir") + "/" +
+                    get_label_info(main_pb_label, "name") + "/product_bundle"
   }
 
   group("default_ffx_config") {

@@ -44,7 +44,6 @@ go_library("bundler") {
     "cloud_sink_test.go",
   ]
   deps = [
-    "//src/sys/pkg/bin/pm/build",
     "//third_party/golibs:cloud.google.com/go/storage",
     "//third_party/golibs:google.golang.org/api/iterator",
     "//tools/build",

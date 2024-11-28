@@ -30,7 +30,7 @@ async fn main() {
     let mut receiver_tasks = fasync::TaskGroup::new();
     for i in 1..=3 {
         let (receiver, receiver_stream) =
-            endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+            endpoints::create_request_stream::<fsandbox::ReceiverMarker>();
         let connector_id = id_gen.next();
         store.connector_create(connector_id, receiver).await.unwrap().unwrap();
         store
@@ -98,7 +98,7 @@ async fn handle_echo_receiver(index: u64, mut receiver_stream: fsandbox::Receive
             fsandbox::ReceiverRequest::Receive { channel, control_handle: _ } => {
                 task_group.spawn(async move {
                     let server_end = endpoints::ServerEnd::<EchoMarker>::new(channel.into());
-                    run_echo_server(index, server_end.into_stream().unwrap()).await;
+                    run_echo_server(index, server_end.into_stream()).await;
                 });
             }
             fsandbox::ReceiverRequest::_UnknownMethod { ordinal, .. } => {

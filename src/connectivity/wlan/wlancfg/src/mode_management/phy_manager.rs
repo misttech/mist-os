@@ -945,8 +945,7 @@ async fn query_security_support(
     proxy: &fidl_service::DeviceMonitorProxy,
     iface_id: u16,
 ) -> Result<fidl_common::SecuritySupport, PhyManagerError> {
-    let (feature_support_proxy, feature_support_server) =
-        fidl::endpoints::create_proxy().map_err(|_| PhyManagerError::IfaceQueryFailure)?;
+    let (feature_support_proxy, feature_support_server) = fidl::endpoints::create_proxy();
     proxy
         .get_feature_support(iface_id, feature_support_server)
         .await
@@ -1007,7 +1006,7 @@ async fn disconnect(
     dev_monitor_proxy: &fidl_service::DeviceMonitorProxy,
     iface_id: u16,
 ) -> Result<(), Error> {
-    let (sme_proxy, remote) = create_proxy()?;
+    let (sme_proxy, remote) = create_proxy();
     dev_monitor_proxy.get_client_sme(iface_id, remote).await?.map_err(zx::Status::from_raw)?;
 
     sme_proxy
@@ -1020,7 +1019,7 @@ async fn stop_ap(
     dev_monitor_proxy: &fidl_service::DeviceMonitorProxy,
     iface_id: u16,
 ) -> Result<(), Error> {
-    let (sme_proxy, remote) = create_proxy()?;
+    let (sme_proxy, remote) = create_proxy();
     dev_monitor_proxy.get_ap_sme(iface_id, remote).await?.map_err(zx::Status::from_raw)?;
 
     match sme_proxy.stop().await {
@@ -1068,9 +1067,8 @@ mod tests {
     /// Create a TestValues for a unit test.
     fn test_setup() -> TestValues {
         let (monitor_proxy, monitor_requests) =
-            endpoints::create_proxy::<fidl_service::DeviceMonitorMarker>()
-                .expect("failed to create DeviceMonitor proxy");
-        let monitor_stream = monitor_requests.into_stream().expect("failed to create stream");
+            endpoints::create_proxy::<fidl_service::DeviceMonitorMarker>();
+        let monitor_stream = monitor_requests.into_stream();
 
         let inspector = inspect::Inspector::default();
         let node = inspector.root().create_child("phy_manager");
@@ -1150,7 +1148,7 @@ mod tests {
                 feature_support_server
             }
         );
-        feature_support_server.into_stream().expect("extracting feature support request stream")
+        feature_support_server.into_stream()
     }
 
     /// Serve the given security support for unit testing.
@@ -4398,7 +4396,7 @@ mod tests {
 
         // Next, the disconnect will be requested.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        let mut sme_stream = sme_server.into_stream().into_future();
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Disconnect{
@@ -4481,7 +4479,7 @@ mod tests {
 
         // Expect the stop AP request.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        let mut sme_stream = sme_server.into_stream().into_future();
         assert_variant!(
             poll_ap_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ApSmeRequest::Stop{
@@ -4519,7 +4517,7 @@ mod tests {
 
         // Expect the stop AP request.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        let mut sme_stream = sme_server.into_stream().into_future();
         assert_variant!(
             poll_ap_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ApSmeRequest::Stop{
@@ -4827,7 +4825,7 @@ mod tests {
 
         // Next, the disconnect will be requested.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        let mut sme_stream = sme_server.into_stream().into_future();
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Disconnect{
@@ -4880,7 +4878,7 @@ mod tests {
 
         // Expect the stop AP request.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        let mut sme_stream = sme_server.into_stream().into_future();
         assert_variant!(
             poll_ap_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ApSmeRequest::Stop{

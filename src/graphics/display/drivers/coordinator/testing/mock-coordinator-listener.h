@@ -8,22 +8,22 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 
-namespace display {
+namespace display_coordinator {
 
 class MockCoordinatorListener
     : public fidl::WireServer<fuchsia_hardware_display::CoordinatorListener> {
  public:
   using OnDisplaysChangedCallback =
       fit::function<void(std::vector<fuchsia_hardware_display::wire::Info> added_displays,
-                         std::vector<DisplayId> removed_display_ids)>;
+                         std::vector<display::DisplayId> removed_display_ids)>;
   using OnClientOwnershipChangeCallback = fit::function<void(bool has_ownership)>;
-  using OnVsyncCallback =
-      fit::function<void(DisplayId display_id, zx::time timestamp, ConfigStamp applied_config_stamp,
-                         VsyncAckCookie cookie)>;
+  using OnVsyncCallback = fit::function<void(display::DisplayId display_id, zx::time timestamp,
+                                             display::ConfigStamp applied_config_stamp,
+                                             display::VsyncAckCookie cookie)>;
 
   MockCoordinatorListener(OnDisplaysChangedCallback on_displays_changed_callback,
                           OnVsyncCallback on_vsync_callback,
@@ -64,6 +64,6 @@ class MockCoordinatorListener
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::CoordinatorListener>> binding_;
 };
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_MOCK_COORDINATOR_LISTENER_H_

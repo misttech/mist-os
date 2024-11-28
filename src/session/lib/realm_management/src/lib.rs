@@ -123,8 +123,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
 
         assert!(create_child_component(
             child_name,
@@ -153,8 +152,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
 
         assert!(create_child_component("", "", "", Default::default(), &realm_proxy).await.is_ok());
     }
@@ -175,8 +173,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
 
         assert!(create_child_component("", "", "", Default::default(), &realm_proxy)
             .await
@@ -199,8 +196,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
 
         let (_exposed_dir, exposed_dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
         assert!(open_child_component_exposed_dir(
@@ -228,8 +224,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
 
         let (_exposed_dir, exposed_dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
         assert!(open_child_component_exposed_dir("", "", &realm_proxy, exposed_dir_server_end)
@@ -262,8 +257,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
 
         let (exposed_dir, exposed_dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
         open_child_component_exposed_dir("", "", &realm_proxy, exposed_dir_server_end)
@@ -272,7 +266,7 @@ mod tests {
 
         // Create a proxy of any FIDL protocol, with any `await`-able method.
         // (`fio::DirectoryMarker` here is arbitrary.)
-        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
 
         // Connect should succeed, but it is still an asynchronous operation.
         // The `directory_request_handler` is not called yet.
@@ -309,8 +303,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
 
         let (_exposed_dir, exposed_dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
         assert!(open_child_component_exposed_dir("", "", &realm_proxy, exposed_dir_server_end)
@@ -334,8 +327,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
 
         assert!(destroy_child_component(child_name, child_collection, &realm_proxy).await.is_ok());
     }

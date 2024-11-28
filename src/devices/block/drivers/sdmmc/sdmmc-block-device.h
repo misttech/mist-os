@@ -294,6 +294,8 @@ class SdmmcBlockDevice : public block_server::Interface {
     inspect::UintProperty max_lifetime_used_;            // Set once by the init thread.
     inspect::UintProperty cache_size_bits_;              // Set once by the init thread.
     inspect::BoolProperty cache_enabled_;                // Set once by the init thread.
+    inspect::BoolProperty cache_flush_fifo_;             // Set once by the init thread.
+    inspect::BoolProperty barrier_supported_;            // Set once by the init thread.
     inspect::BoolProperty trim_enabled_;                 // Set once by the init thread.
     inspect::UintProperty max_packed_reads_;             // Set once by the init thread.
     inspect::UintProperty max_packed_writes_;            // Set once by the init thread.

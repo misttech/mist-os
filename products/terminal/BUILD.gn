@@ -6,125 +6,43 @@ import("//build/assembly/product_assembly_configuration.gni")
 import("//build/assembly/sshd_config.gni")
 import("//build/bazel/assembly/bazel_product_bundle.gni")
 import("//build/info/info.gni")
-import("//products/terminal/cache_packages.gni")
 
 assert(
     is_fuchsia,
     "Product definitions and assemblies should only be defined in the fuchsia toolchain")
 
-# This is the base product configuration used by all terminal products
+bazel_inputs = [
+  "//src/fonts/asset_providers:open-fonts-collection-bazel",
+  "//build/images/flash:esp.bazel_input",
+  "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+  "//build/images/zedboot:zedboot.bazel_legacy_aib",
 
-terminal_base = {
-  testonly = true
-  platform = {
-    build_type = "eng"
-
-    bluetooth = {
-      type = "standard"
-      snoop = "lazy"
-    }
-
-    development_support = {
-      include_sl4f = true
-
-      # If the 'authorized_ssh_keys_path' GN arg has been set, then pass that path
-      # as part of the platform configuration.
-      if (authorized_ssh_keys_path != false) {
-        authorized_ssh_keys_path =
-            rebase_path(authorized_ssh_keys_path, root_build_dir)
-      }
-
-      tools = {
-        connectivity = {
-          enable_networking = true
-          enable_wlan = true
-          enable_thread = true
-        }
-      }
-    }
-
-    ui = {
-      enabled = true
-      supported_input_devices = [
-        "button",
-        "touchscreen",
-      ]
-      with_synthetic_device_support = true
-    }
-
-    media = {
-      audio = {
-        full_stack = {
-        }
-      }
-      enable_codecs = true
-      enable_sessions = true
-    }
-
-    fonts = {
-      # See base_packages below.
-      font_collection = "open-fonts-collection"
-    }
-
-    session = {
-      enabled = true
-
-      # avoid impacting existing terminal users like chromium tests
-      autolaunch = false
-    }
-
-    storage = {
-      mutable_storage_garbage_collection = true
-    }
-  }
-
-  product = {
-    session = {
-      url = "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
-    }
-    build_info = default_product_build_info
-  }
-  deps = [ "//build/info:build_info_files" ]
-
-  base_packages = [
-    {
-      # Provides font assets for `platform.fonts.font_collection` above.
-      package_target = "//src/fonts/asset_providers:open-fonts-collection.asset-provider.package"
-    },
-  ]
-
-  cache_packages = []
-  foreach(pkg, terminal_cache_packages) {
-    cache_packages += [
-      {
-        package_target = pkg
-      },
-    ]
-  }
-}
-
-product_assembly_configuration("terminal") {
-  forward_variables_from(terminal_base, "*")
-}
-
-# TODO(https://fxbug.dev/370543906): Remove this product once it's no longer
-# needed.
-product_assembly_configuration("terminal_with_netstack2") {
-  forward_variables_from(terminal_base, "*")
-
-  platform.connectivity = {
-    network = {
-      netstack_version = "netstack2"
-    }
-  }
-}
-
-bazel_inputs = terminal_cache_package_bazel_inputs + [
-                 "//src/fonts/asset_providers:open-fonts-collection-bazel",
-                 "//build/images/flash:esp.bazel_input",
-                 "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-                 "//build/images/zedboot:zedboot.bazel_legacy_aib",
-               ]
+  # Cache packages.
+  "//src/ui/bin/terminal:terminal.bazel_input",
+  "//src/ui/bin/tiles-session:tiles-session.bazel_input",
+  "//src/graphics/display/testing/fake-coordinator-connector:fake-coordinator-connector.bazel_input",
+  "//src/diagnostics/validator/inspect:validator.bazel_input",
+  "//src/tests/fidl/dynsuite/client_suite/harness:harness.bazel_input",
+  "//src/tests/fidl/dynsuite/server_suite/harness:harness.bazel_input",
+  "//src/developer/build_info/testing:fake-build-info.bazel_input",
+  "//src/diagnostics/archivist:archivist-for-embedding.bazel_input",
+  "//src/testing/fidl/intl_property_manager:intl_property_manager.bazel_input",
+  "//src/fonts:fonts_hermetic_for_test.bazel_input",
+  "//src/fonts:fonts_configurable_for_test.bazel_input",
+  "//src/ui/testing/test_ui_stack:flatland-scene-manager-test-ui-stack.bazel_input",
+  "//src/ui/testing/test_ui_stack:test-ui-stack.bazel_input",
+  "//src/tests/fidl/compatibility:fidl-compatibility-array-harness_pkg.bazel_input",
+  "//src/tests/fidl/compatibility:fidl-compatibility-minimal-harness_pkg.bazel_input",
+  "//src/tests/fidl/compatibility:fidl-compatibility-struct-harness_pkg.bazel_input",
+  "//src/tests/fidl/compatibility:fidl-compatibility-table-harness_pkg.bazel_input",
+  "//src/tests/fidl/compatibility:fidl-compatibility-union-harness_pkg.bazel_input",
+  "//src/tests/fidl/compatibility:fidl-compatibility-vector-harness_pkg.bazel_input",
+  "//src/tests/fidl/compatibility/cpp:cpp.bazel_input",
+  "//src/tests/fidl/compatibility/hlcpp:hlcpp.bazel_input",
+  "//src/tests/fidl/compatibility/llcpp:llcpp.bazel_input",
+  "//src/tests/fidl/compatibility/go:go.bazel_input",
+  "//src/tests/fidl/compatibility/rust:rust.bazel_input",
+]
 if (board_configuration_label != false) {
   bazel_inputs += [ get_label_info(board_configuration_label,
                                    "label_no_toolchain") + ".bazel_input" ]
@@ -186,6 +104,16 @@ if (target_cpu == "arm64") {
     bazel_product_image_target = ":image.arm64"
     bazel_recovery_image_target = "//products/zedboot:arm64"
     bazel_elf_sizes_target = ":elf_sizes.arm64"
+    bazel_inputs_from_gn = bazel_inputs
+  }
+
+  bazel_product_bundle("product_bundle.qemu-arm64") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.qemu-arm64"
+    bazel_product_image_target = ":image.qemu-arm64"
+    bazel_recovery_image_target = "//products/zedboot:qemu-arm64"
+    bazel_elf_sizes_target = ":elf_sizes.qemu-arm64"
     bazel_inputs_from_gn = bazel_inputs
   }
 

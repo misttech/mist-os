@@ -118,13 +118,13 @@ pub(crate) async fn serve(
                     )?;
                 }
                 PackageCacheRequest::BasePackageIndex { iterator, control_handle: _ } => {
-                    let stream = iterator.into_stream()?;
+                    let stream = iterator.into_stream();
                     let () =
                         serve_package_index(base_packages.root_package_urls_and_hashes(), stream)
                             .await;
                 }
                 PackageCacheRequest::CachePackageIndex { iterator, control_handle: _ } => {
-                    let stream = iterator.into_stream()?;
+                    let stream = iterator.into_stream();
                     let () =
                         serve_package_index(cache_packages.root_package_urls_and_hashes(), stream)
                             .await;
@@ -288,7 +288,7 @@ async fn get_impl(
     let () = node.record_uint("meta-far-length", meta_far_blob.length);
     let () = node.record_string("gc-protection", format!("{gc_protection:?}"));
 
-    let needed_blobs = needed_blobs.into_stream().map_err(|_| Status::INTERNAL)?;
+    let needed_blobs = needed_blobs.into_stream();
     let pkg: Hash = meta_far_blob.blob_id.into();
 
     let root_dir = match gc_protection {
@@ -587,7 +587,7 @@ async fn handle_get_missing_blobs(
         None => Err(ServeNeededBlobsError::UnexpectedClose("handle_get_missing_blobs")),
     }?;
 
-    let iter_stream = iterator.into_stream().map_err(ServeNeededBlobsError::ReceiveRequest)?;
+    let iter_stream = iterator.into_stream();
 
     // Start serving the iterator in the background and internally move on to the next state. If
     // this foreground task decides to bail out, this spawned task will be dropped which will abort
@@ -873,7 +873,7 @@ mod serve_needed_blobs_tests {
     #[test_case(fpkg::GcProtection::Retained; "retained")]
     #[fuchsia::test]
     async fn start_stop(gc_protection: fpkg::GcProtection) {
-        let (_, stream) = fidl::endpoints::create_proxy_and_stream::<NeededBlobsMarker>().unwrap();
+        let (_, stream) = fidl::endpoints::create_proxy_and_stream::<NeededBlobsMarker>();
 
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
 
@@ -900,8 +900,7 @@ mod serve_needed_blobs_tests {
         meta_blob_info: BlobInfo,
         gc_protection: fpkg::GcProtection,
     ) -> (Task<Result<(), ServeNeededBlobsError>>, NeededBlobsProxy, blobfs::Mock) {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<NeededBlobsMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<NeededBlobsMarker>();
 
         let (blobfs, blobfs_mock) = blobfs::Client::new_mock();
         let inspector = finspect::Inspector::default();
@@ -966,7 +965,7 @@ mod serve_needed_blobs_tests {
     impl BlobWriterExt for Box<fpkg::BlobWriter> {
         fn unwrap_file(self) -> fio::FileProxy {
             match *self {
-                fpkg::BlobWriter::File(file) => file.into_proxy().unwrap(),
+                fpkg::BlobWriter::File(file) => file.into_proxy(),
                 fpkg::BlobWriter::Writer(_) => panic!("should be file"),
             }
         }
@@ -996,8 +995,7 @@ mod serve_needed_blobs_tests {
         let (task, proxy, blobfs) =
             spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
-        let (iter, iter_server_end) =
-            fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>().unwrap();
+        let (iter, iter_server_end) = fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>();
         proxy.get_missing_blobs(iter_server_end).unwrap();
         assert_matches!(
             iter.next().await,
@@ -1504,7 +1502,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let (missing_blobs_iter, missing_blobs_iter_server_end) =
-                    fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>().unwrap();
+                    fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>();
 
                 assert_matches!(proxy.get_missing_blobs(missing_blobs_iter_server_end), Ok(()));
 
@@ -1540,7 +1538,7 @@ mod serve_needed_blobs_tests {
         let serve_meta_task = write_meta_blob(&proxy, &mut blobfs, meta_blob_info, vec![]).await;
 
         let (missing_blobs_iter, missing_blobs_iter_server_end) =
-            fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>().unwrap();
+            fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>();
         assert_matches!(proxy.get_missing_blobs(missing_blobs_iter_server_end), Ok(()));
         let missing_blobs = collect_blob_info_iterator(missing_blobs_iter).await;
         assert_eq!(missing_blobs, vec![]);
@@ -1621,7 +1619,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let (missing_blobs_iter, missing_blobs_iter_server_end) =
-                    fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>().unwrap();
+                    fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>();
 
                 assert_matches!(proxy.get_missing_blobs(missing_blobs_iter_server_end), Ok(()));
 
@@ -1664,7 +1662,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let (missing_blobs_iter, missing_blobs_iter_server_end) =
-                    fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>().unwrap();
+                    fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>();
 
                 assert_matches!(proxy.get_missing_blobs(missing_blobs_iter_server_end), Ok(()));
 
@@ -1675,7 +1673,7 @@ mod serve_needed_blobs_tests {
 
         // Trying to enumerate the missing blobs again is a protocol violation.
         let (_missing_blobs_iter, missing_blobs_iter_server_end) =
-            fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>().unwrap();
+            fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>();
         assert_matches!(proxy.get_missing_blobs(missing_blobs_iter_server_end), Ok(()));
 
         assert_matches!(
@@ -1709,7 +1707,7 @@ mod serve_needed_blobs_tests {
             },
             async {
                 let (missing_blobs_iter, missing_blobs_iter_server_end) =
-                    fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>().unwrap();
+                    fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>();
 
                 assert_matches!(proxy.get_missing_blobs(missing_blobs_iter_server_end), Ok(()));
 
@@ -2291,7 +2289,7 @@ mod get_handler_tests {
 
     #[fuchsia::test]
     async fn everything_closed() {
-        let (_, stream) = fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+        let (_, stream) = fidl::endpoints::create_proxy::<NeededBlobsMarker>();
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (blobfs, _) = blobfs::Client::new_test();
         let inspector = fuchsia_inspect::Inspector::default();
@@ -2354,7 +2352,7 @@ mod serve_package_index_tests {
         ];
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PackageIndexIteratorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PackageIndexIteratorMarker>();
         let task = Task::local(async move {
             serve_package_index(cache_packages.iter().map(|(url, hash)| (url, hash)), stream).await
         });

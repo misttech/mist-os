@@ -16,10 +16,7 @@ namespace {
 
 class ExtentCacheTest : public F2fsFakeDevTestFixture {
  public:
-  ExtentCacheTest()
-      : F2fsFakeDevTestFixture(TestOptions{
-            .block_count = uint64_t{8} * 1024 * 1024 * 1024 / kDefaultSectorSize,
-        }) {}
+  ExtentCacheTest() : F2fsFakeDevTestFixture() {}
 
   void SetUp() override {
     F2fsFakeDevTestFixture::SetUp();

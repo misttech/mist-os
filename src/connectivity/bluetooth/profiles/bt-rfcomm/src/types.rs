@@ -283,8 +283,7 @@ pub(crate) mod tests {
     }
 
     fn build_service_group() -> (ServiceGroup, bredr::ConnectionReceiverRequestStream) {
-        let (client, server) =
-            create_proxy_and_stream::<bredr::ConnectionReceiverMarker>().unwrap();
+        let (client, server) = create_proxy_and_stream::<bredr::ConnectionReceiverMarker>();
         let params = Default::default();
 
         (ServiceGroup::new(client, params), server)

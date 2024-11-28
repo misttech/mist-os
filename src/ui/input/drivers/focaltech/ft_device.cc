@@ -71,7 +71,7 @@ enum FtTouchEventType : uint8_t {
 
 void FtDevice::FtInputReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-    fidl::AnyArena& allocator) {
+    fidl::AnyArena& allocator) const {
   fidl::VectorView<fuchsia_input_report::wire::ContactInputReport> contact_rpt(allocator,
                                                                                contact_count);
   for (size_t i = 0; i < contact_count; i++) {

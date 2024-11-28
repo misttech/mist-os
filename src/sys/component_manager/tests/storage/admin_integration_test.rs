@@ -61,8 +61,7 @@ async fn collect_storage_user_monikers<T: AsRef<str>>(
     admin: &fsys::StorageAdminProxy,
     realm_moniker: T,
 ) -> HashSet<String> {
-    let (it_proxy, it_server) =
-        create_proxy::<fsys::StorageIteratorMarker>().expect("create iterator");
+    let (it_proxy, it_server) = create_proxy::<fsys::StorageIteratorMarker>();
     admin
         .list_storage_in_realm(realm_moniker.as_ref(), it_server)
         .await
@@ -114,7 +113,7 @@ async fn single_storage_user() {
 
     let (node_client_end, node_server) = create_endpoints::<fio::NodeMarker>();
     let directory = ClientEnd::<fio::DirectoryMarker>::new(node_client_end.into_channel());
-    let dir_proxy = directory.into_proxy().unwrap();
+    let dir_proxy = directory.into_proxy();
     let storage_user_moniker_with_instances = storage_users.into_iter().next().unwrap();
     storage_admin
         .open_storage(&storage_user_moniker_with_instances, node_server)

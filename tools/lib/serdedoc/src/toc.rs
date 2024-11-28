@@ -54,7 +54,7 @@ impl<'a> TableOfContents<'a> {
                 .data
                 .data_types
                 .get(&rust_type)
-                .ok_or(anyhow!("node missing: {}", &rust_type))?;
+                .ok_or_else(|| anyhow!("node missing: {}", &rust_type))?;
             let mut has_children = false;
             if let DataTypeInner::Struct(data) = &node.inner {
                 for field in &data.fields {

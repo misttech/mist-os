@@ -127,13 +127,11 @@ mod tests {
         QueryResponseFut<Result<(), i32>>,
     ) {
         let (c, mut s) =
-            fidl::endpoints::create_proxy_and_stream::<di::DeviceIdentificationMarker>()
-                .expect("valid endpoints");
+            fidl::endpoints::create_proxy_and_stream::<di::DeviceIdentificationMarker>();
 
         let records = &[minimal_record(false)];
         let (token_client, token_server) =
-            fidl::endpoints::create_proxy::<di::DeviceIdentificationHandleMarker>()
-                .expect("valid endpoints");
+            fidl::endpoints::create_proxy::<di::DeviceIdentificationHandleMarker>();
         let request_fut =
             c.set_device_identification(records, token_server).check().expect("valid fidl request");
 
@@ -156,7 +154,7 @@ mod tests {
             .expect("should parse record");
         // A BR/EDR advertise request.
         let (connect_client, connect_stream) =
-            fidl::endpoints::create_proxy_and_stream::<ConnectionReceiverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ConnectionReceiverMarker>();
         let advertisement = BrEdrProfileAdvertisement { connect_stream };
         let token = DeviceIdRequestToken::new(svc, advertisement, request_server, responder);
 
@@ -172,7 +170,7 @@ mod tests {
             request.into_set_device_identification().expect("set device id request");
         let mut client_fut = pin!(client_fut);
 
-        let (token, _connect_client) = make_token(responder, request_server.into_stream().unwrap());
+        let (token, _connect_client) = make_token(responder, request_server.into_stream());
 
         // The client request should still be alive since the `token` is alive.
         exec.run_until_stalled(&mut client_fut).expect_pending("Token is still alive");
@@ -194,7 +192,7 @@ mod tests {
             request.into_set_device_identification().expect("set device id request");
         let mut client_fut = pin!(client_fut);
 
-        let (token, connect_client) = make_token(responder, request_server.into_stream().unwrap());
+        let (token, connect_client) = make_token(responder, request_server.into_stream());
         let mut token = pin!(token);
 
         // The client request should still be alive since the `token` is alive.
@@ -222,7 +220,7 @@ mod tests {
             request.into_set_device_identification().expect("set device id request");
         let mut client_fut = pin!(client_fut);
 
-        let (token, connect_client) = make_token(responder, request_server.into_stream().unwrap());
+        let (token, connect_client) = make_token(responder, request_server.into_stream());
         let mut token = pin!(token);
 
         assert!(!token.is_terminated());

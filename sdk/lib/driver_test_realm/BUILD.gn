@@ -54,21 +54,35 @@ group("tests") {
   ]
 }
 
+source_set("internal_server_cpp") {
+  sources = [
+    "src/internal_server.cc",
+    "src/internal_server.h",
+  ]
+  deps = [ "//sdk/lib/component/incoming/cpp" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
+  ]
+}
+
 executable("bin") {
   output_name = "driver_test_realm"
-  sources = [ "driver_test_realm.cc" ]
+  sources = [
+    "driver_test_realm.cc",
+    "src/boot_items.cc",
+    "src/boot_items.h",
+    "src/root_job.cc",
+    "src/root_job.h",
+    "src/system_state.h",
+  ]
   deps = [
     ":driver_test_realm_config",
+    ":internal_server_cpp",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
-    "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
-    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
-    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
-    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_cpp",
-    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_cpp",
     "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
@@ -78,8 +92,6 @@ executable("bin") {
     "//sdk/lib/zbi-format",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
-    "//src/lib/files",
-    "//third_party/rapidjson",
   ]
 }
 
@@ -116,11 +128,14 @@ executable("fake_resolver_bin") {
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
+    "//src/lib/files",
+    "//third_party/rapidjson",
   ]
 }
 

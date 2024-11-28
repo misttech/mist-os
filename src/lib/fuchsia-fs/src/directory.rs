@@ -43,7 +43,7 @@ mod fuchsia {
         path: &str,
         flags: fio::Flags,
     ) -> Result<fio::DirectoryProxy, OpenError> {
-        let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
+        let (node, request) = fidl::endpoints::create_proxy();
         open_channel_in_namespace(path, flags, request)?;
         Ok(node)
     }
@@ -141,8 +141,7 @@ pub fn open_directory_async(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let (dir, server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(OpenError::CreateProxy)?;
+    let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;
 
@@ -160,8 +159,7 @@ pub async fn open_directory(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let (dir, server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(OpenError::CreateProxy)?;
+    let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     let flags = flags | fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION;
 
@@ -179,8 +177,7 @@ pub async fn create_directory(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let (dir, server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(OpenError::CreateProxy)?;
+    let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     let flags = flags
         | fio::Flags::FLAG_MAYBE_CREATE
@@ -223,8 +220,7 @@ pub fn open_file_async(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::FileProxy, OpenError> {
-    let (file, server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().map_err(OpenError::CreateProxy)?;
+    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
     let flags = flags | fio::Flags::PROTOCOL_FILE;
 
@@ -242,8 +238,7 @@ pub async fn open_file(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::FileProxy, OpenError> {
-    let (file, server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().map_err(OpenError::CreateProxy)?;
+    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
     let flags = flags | fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_SEND_REPRESENTATION;
 
@@ -262,8 +257,7 @@ pub async fn open_node(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::NodeProxy, OpenError> {
-    let (file, server_end) =
-        fidl::endpoints::create_proxy::<fio::NodeMarker>().map_err(OpenError::CreateProxy)?;
+    let (file, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
     let flags = flags | fio::Flags::FLAG_SEND_REPRESENTATION;
 
@@ -288,31 +282,23 @@ pub fn open_async<P: fidl::endpoints::ProtocolMarker>(
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
 
-    ClientEnd::<P>::new(client.into_channel()).into_proxy().map_err(OpenError::CreateProxy)
+    Ok(ClientEnd::<P>::new(client.into_channel()).into_proxy())
 }
 
-/// Opens a new connection to the given directory using `flags` if provided, or
-/// `fidl_fuchsia_io::OpenFlags::CLONE_SAME_RIGHTS` otherwise.
-pub fn clone_no_describe(
-    dir: &fio::DirectoryProxy,
-    flags: Option<fio::OpenFlags>,
-) -> Result<fio::DirectoryProxy, CloneError> {
-    let (clone, server_end) = fidl::endpoints::create_proxy().map_err(CloneError::CreateProxy)?;
-    clone_onto_no_describe(dir, flags, server_end)?;
-    Ok(clone)
+/// Opens a new connection to the given `directory`. The cloned connection has the same permissions.
+pub fn clone(dir: &fio::DirectoryProxy) -> Result<fio::DirectoryProxy, CloneError> {
+    let (client_end, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    dir.clone2(ServerEnd::new(server_end.into_channel())).map_err(CloneError::SendCloneRequest)?;
+    Ok(client_end)
 }
 
-/// Opens a new connection to the given directory onto the given server end using `flags` if
-/// provided, or `fidl_fuchsia_io::OpenFlags::SAME_RIGHTS` otherwise.
-pub fn clone_onto_no_describe(
-    dir: &fio::DirectoryProxy,
-    flags: Option<fio::OpenFlags>,
+/// Opens a new connection to the given `directory` using `request`. The cloned connection has the
+/// same permissions as `directory`.
+pub fn clone_onto(
+    directory: &fio::DirectoryProxy,
     request: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), CloneError> {
-    let node_request = ServerEnd::new(request.into_channel());
-    let flags = flags.unwrap_or(fio::OpenFlags::CLONE_SAME_RIGHTS);
-
-    dir.clone(flags, node_request).map_err(CloneError::SendCloneRequest)
+    directory.clone2(ServerEnd::new(request.into_channel())).map_err(CloneError::SendCloneRequest)
 }
 
 /// Gracefully closes the directory proxy from the remote end.
@@ -664,8 +650,7 @@ pub async fn remove_dir_recursive(
     root_dir: &fio::DirectoryProxy,
     name: &str,
 ) -> Result<(), EnumerateError> {
-    let (dir, dir_server) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
+    let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     root_dir
         .open3(name, DIR_FLAGS, &fio::Options::default(), dir_server.into_channel())
         .map_err(|e| EnumerateError::Fidl("open", e))?;
@@ -690,8 +675,7 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
             match dirent.kind {
                 DirentKind::Directory => {
                     let (subdir, subdir_server) =
-                        fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                            .expect("failed to create proxy");
+                        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                     dir.open3(
                         &dirent.name,
                         DIR_FLAGS,
@@ -947,7 +931,7 @@ mod tests {
             "rw" => remote_dir(dir)
         };
         let (example_dir_proxy, example_dir_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let example_dir_flags =
             fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
@@ -1038,36 +1022,6 @@ mod tests {
         let pkg = open_pkg();
         // The open error should be detected immediately.
         assert_matches!(open_node(&pkg, "fake", fio::PERM_READABLE).await, Err(_));
-    }
-
-    // clone_no_describe
-
-    #[fasync::run_singlethreaded(test)]
-    async fn clone_no_describe_no_flags_same_rights() {
-        let (dir, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
-
-        clone_no_describe(&dir, None).unwrap();
-
-        assert_matches!(
-            stream.next().await,
-            Some(Ok(fio::DirectoryRequest::Clone { flags: fio::OpenFlags::CLONE_SAME_RIGHTS, .. }))
-        );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn clone_no_describe_flags_passed_through() {
-        let (dir, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
-
-        const FLAGS: fio::OpenFlags = fio::OpenFlags::DIRECTORY;
-
-        clone_no_describe(&dir, Some(FLAGS)).unwrap();
-
-        assert_matches!(
-            stream.next().await,
-            Some(Ok(fio::DirectoryRequest::Clone { flags: FLAGS, .. }))
-        );
     }
 
     // create_randomly_named_file
@@ -1242,11 +1196,11 @@ mod tests {
     }
 
     // readdir
+    // TODO(https://fxbug.dev/324111518): Transition test to open3.
 
     #[fasync::run_singlethreaded(test)]
     async fn test_readdir() {
-        let (dir_client, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_client, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let dir = pseudo_directory! {
             "afile" => read_only(""),
             "zzz" => read_only(""),
@@ -1278,10 +1232,10 @@ mod tests {
 
     // dir_contains
 
+    // TODO(https://fxbug.dev/324111518): Transition test to open3.
     #[fasync::run_singlethreaded(test)]
     async fn test_dir_contains() {
-        let (dir_client, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_client, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let dir = pseudo_directory! {
             "afile" => read_only(""),
             "zzz" => read_only(""),
@@ -1329,7 +1283,7 @@ mod tests {
         // run twice to check that seek offset is properly reset before reading the directory
         for _ in 0..2 {
             let (tx, rx) = oneshot::channel();
-            let clone_dir = clone_no_describe(&dir, None).expect("clone dir");
+            let clone_dir = clone(&dir).expect("clone dir");
             fasync::Task::spawn(async move {
                 let entries = readdir_recursive(&clone_dir, None)
                     .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
@@ -1360,8 +1314,7 @@ mod tests {
         // This test must use a forever-pending server in order to ensure that the timeout
         // triggers before the function under test finishes, even if the timeout is
         // in the past.
-        let (dir, _server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("could not create proxy");
+        let (dir, _server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let result = readdir_recursive(&dir, Some(zx::MonotonicDuration::from_nanos(0)))
             .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
             .await

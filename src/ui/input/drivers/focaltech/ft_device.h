@@ -142,7 +142,7 @@ class FtDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTR
 
     void ToFidlInputReport(
         fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-        fidl::AnyArena& allocator);
+        fidl::AnyArena& allocator) const;
   };
 
   static uint8_t CalculateEcc(const uint8_t* buffer, size_t size, uint8_t initial = 0);

@@ -23,6 +23,89 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.driver.framework/BusInfo.address",
+        "ordinal": "2",
+        "type": "fuchsia.driver.framework/DeviceAddress"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/BusInfo.address_stability",
+        "ordinal": "3",
+        "type": "fuchsia.driver.framework/DeviceAddressStability"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/BusInfo.bus",
+        "ordinal": "1",
+        "type": "fuchsia.driver.framework/BusType"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.driver.framework/BusInfo"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/BusType.ACPI",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/BusType.DEVICE_TREE",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/BusType.GPIO",
+        "value": "6"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/BusType.I2C",
+        "value": "7"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/BusType.PCI",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/BusType.PLATFORM",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/BusType.SDIO",
+        "value": "9"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/BusType.SPI",
+        "value": "8"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/BusType.SPMI",
+        "value": "11"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/BusType.UART",
+        "value": "10"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/BusType.USB",
+        "value": "5"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.driver.framework/BusType",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.driver.framework/CompositeDriverInfo.composite_name",
         "ordinal": "1",
         "type": "string"
@@ -200,6 +283,67 @@
         "resourceness": "resource"
     },
     {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/DeviceAddress.array_char_int_value",
+        "ordinal": "4",
+        "type": "vector<string:4>:10"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/DeviceAddress.array_int_value",
+        "ordinal": "2",
+        "type": "vector<uint8>:10"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/DeviceAddress.char_int_value",
+        "ordinal": "3",
+        "type": "string:4"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/DeviceAddress.int_value",
+        "ordinal": "1",
+        "type": "uint8"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/DeviceAddress.string_value",
+        "ordinal": "5",
+        "type": "string:32"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.driver.framework/DeviceAddress",
+        "strictness": "flexible"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/DeviceAddressStability.STABLE",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/DeviceAddressStability.UNSTABLE_BETWEEN_BOOT",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/DeviceAddressStability.UNSTABLE_BETWEEN_DRIVER_RESTART",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/DeviceAddressStability.UNSTABLE_BETWEEN_SOFTWARE_UPDATE",
+        "value": "2"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.driver.framework/DeviceAddressStability",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.driver.framework/DeviceCategory.category",
         "ordinal": "1",
@@ -360,6 +504,18 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverStartArgs.node_properties_2",
+        "ordinal": "12",
+        "type": "vector<fuchsia.driver.framework/NodePropertyEntry2>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverStartArgs.node_token",
+        "ordinal": "11",
+        "type": "zx/Handle:EVENT"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.driver.framework/DriverStartArgs.outgoing_dir",
         "ordinal": "6",
         "type": "server_end:fuchsia.io/Directory"
@@ -397,6 +553,18 @@
         "kind": "struct",
         "name": "fuchsia.driver.framework/DriverStartRequest",
         "resourceness": "resource"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.driver.framework/MAX_DEVICE_ADDRESS_ARRAY_LEN",
+        "type": "uint32",
+        "value": "10"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.driver.framework/MAX_DEVICE_ADDRESS_STR_LEN",
+        "type": "uint32",
+        "value": "32"
     },
     {
         "kind": "const",
@@ -455,6 +623,12 @@
         "name": "fuchsia.driver.framework/Node",
         "openness": "open",
         "transport": "channel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeAddArgs.bus_info",
+        "ordinal": "7",
+        "type": "fuchsia.driver.framework/BusInfo"
     },
     {
         "kind": "table/member",
@@ -616,6 +790,11 @@
         "value": "11"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.UNSUPPORTED_ARGS",
+        "value": "12"
+    },
+    {
         "kind": "enum",
         "name": "fuchsia.driver.framework/NodeError",
         "strictness": "flexible",
@@ -639,6 +818,22 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodeProperty2.key",
+        "ordinal": "1",
+        "type": "string:256"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodeProperty2.value",
+        "ordinal": "2",
+        "type": "fuchsia.driver.framework/NodePropertyValue"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/NodeProperty2"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.driver.framework/NodePropertyEntry.name",
         "ordinal": "1",
         "type": "string:128"
@@ -652,6 +847,22 @@
     {
         "kind": "struct",
         "name": "fuchsia.driver.framework/NodePropertyEntry"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodePropertyEntry2.name",
+        "ordinal": "1",
+        "type": "string:128"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodePropertyEntry2.properties",
+        "ordinal": "2",
+        "type": "vector<fuchsia.driver.framework/NodeProperty2>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/NodePropertyEntry2"
     },
     {
         "kind": "union/member",

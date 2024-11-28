@@ -88,7 +88,7 @@ async fn handle_runner_request(
         };
         let url = start_info.resolved_url.clone().unwrap_or_else(|| "unknown url".to_string());
         info!("Colocated runner is going to start component {url}");
-        let (stream, control) = controller.into_stream_and_control_handle().unwrap();
+        let (stream, control) = controller.into_stream_and_control_handle();
         match start(start_info, resource_tracker.clone(), memory_server_handle.new_publisher()) {
             Ok((program, on_exit)) => {
                 let controller = Controller::new(program, stream, control);
@@ -230,7 +230,7 @@ mod tests {
         let resource_tracker =
             Arc::new(ResourceTracker { resources: Mutex::new(Default::default()) });
         let (runner, runner_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentRunnerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentRunnerMarker>();
         let memory_server = get_memory_server(resource_tracker.clone());
         let server = fasync::Task::spawn(handle_runner_request(
             runner_stream,
@@ -268,7 +268,7 @@ mod tests {
         assert!(!colocated_component_vmos.is_empty());
 
         // Stop the component.
-        let controller = controller.into_proxy().unwrap();
+        let controller = controller.into_proxy();
         controller.stop().unwrap();
         controller.on_closed().await.unwrap();
 

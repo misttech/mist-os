@@ -30,7 +30,7 @@ async fn main() {
 
     // Dynamically add trigger-d to the dictionary
     let (trigger_receiver_client, trigger_receiver_stream) =
-        endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+        endpoints::create_request_stream::<fsandbox::ReceiverMarker>();
     let connector_id = 100;
     store.connector_create(connector_id, trigger_receiver_client).await.unwrap().unwrap();
     store
@@ -105,7 +105,7 @@ async fn handle_receiver(mut receiver_stream: fsandbox::ReceiverRequestStream) {
                 task_group.spawn(async move {
                     let server_end =
                         endpoints::ServerEnd::<ftest::TriggerMarker>::new(channel.into());
-                    run_trigger_service("Triggered d", server_end.into_stream().unwrap()).await;
+                    run_trigger_service("Triggered d", server_end.into_stream()).await;
                 });
             }
             fsandbox::ReceiverRequest::_UnknownMethod { .. } => {

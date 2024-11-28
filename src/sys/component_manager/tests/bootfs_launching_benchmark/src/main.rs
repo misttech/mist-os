@@ -139,7 +139,7 @@ async fn build_echo_dictionary() -> (fsandbox::DictionaryRef, fsandbox::Receiver
     store.dictionary_create(svc_dict_id).await.unwrap().unwrap();
 
     let (echo_receiver_client, echo_receiver_stream) =
-        endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+        endpoints::create_request_stream::<fsandbox::ReceiverMarker>();
     let connector_id = 100;
     store.connector_create(connector_id, echo_receiver_client).await.unwrap().unwrap();
     store
@@ -202,7 +202,7 @@ async fn handle_receiver(
         match request {
             fsandbox::ReceiverRequest::Receive { channel, control_handle: _ } => {
                 let server_end = endpoints::ServerEnd::<fecho::EchoMarker>::new(channel.into());
-                let stream = server_end.into_stream().unwrap();
+                let stream = server_end.into_stream();
                 futures.push(fasync::Task::spawn(run_echo_service(stream)));
             }
             fsandbox::ReceiverRequest::_UnknownMethod { .. } => unimplemented!(),

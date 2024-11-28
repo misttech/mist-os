@@ -565,16 +565,16 @@ TEST_F(DebugAgentTests, RecursiveFilterAppliesImplicitFilter) {
   debug_ipc::UpdateFilterReply reply;
   remote_api->OnUpdateFilter(request, &reply);
 
-  harness.debug_agent()->OnComponentDiscovered(kRootComponentMoniker, kRootComponentUrl);
+  harness.debug_agent()->OnComponentStarted(kRootComponentMoniker, kRootComponentUrl);
 
   // There should now be TWO filters, one of which the frontend doesn't know about.
 
   // Now we start the child component, which contains a program.
   harness.debug_agent()->OnComponentStarted(kSubpackageMoniker, kSubpackageUrl);
 
-  EXPECT_EQ(harness.stream_backend()->component_starts().size(), 1u);
-  EXPECT_EQ(harness.stream_backend()->component_starts()[0].component.url, kSubpackageUrl);
-  EXPECT_EQ(harness.stream_backend()->component_starts()[0].component.moniker, kSubpackageMoniker);
+  EXPECT_EQ(harness.stream_backend()->component_starts().size(), 2u);
+  EXPECT_EQ(harness.stream_backend()->component_starts()[1].component.url, kSubpackageUrl);
+  EXPECT_EQ(harness.stream_backend()->component_starts()[1].component.moniker, kSubpackageMoniker);
 }
 
 TEST_F(DebugAgentTests, AttachToExistingJob) {

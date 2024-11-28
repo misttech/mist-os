@@ -130,7 +130,7 @@ impl RiveViewAssistant {
         let background = Color { r: background.r, g: background.g, b: background.b, a: 255 };
 
         RiveViewAssistant {
-            app_sender: app_sender.clone(),
+            app_sender: app_sender,
             view_key,
             file,
             playback_speed,

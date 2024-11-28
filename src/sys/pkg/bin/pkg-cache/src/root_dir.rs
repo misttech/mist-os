@@ -178,7 +178,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn bootfs_then_blobfs_treats_erroring_bootfs_as_empty() {
-        let bootfs = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0;
+        let bootfs = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().0;
         let bootfs_then_blobfs =
             BootfsThenBlobfs::new(bootfs, blobfs::Client::new_test().0).await.unwrap();
         assert_eq!(bootfs_then_blobfs.0.bootfs_contents, HashSet::new());

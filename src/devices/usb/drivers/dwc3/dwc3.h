@@ -98,7 +98,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     size_t actual;
     zx_status_t status;
     UserEndpoint* uep;
-    usb_endpoint::RequestVariant req;
+    usb::RequestVariant req;
   };
 
   // Like a usb::RequestQueue for usb::FidlRequests.
@@ -200,10 +200,10 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     dwc3_trb_t* last{nullptr};     // last TRB in the fifo (link TRB)
   };
 
-  class EpServer : public usb_endpoint::UsbEndpoint {
+  class EpServer : public usb::EndpointServer {
    public:
     EpServer(const zx::bti& bti, Dwc3* dwc3, UserEndpoint* uep)
-        : usb_endpoint::UsbEndpoint{bti, uep->ep.ep_num}, dwc3_{dwc3}, uep_{uep} {
+        : usb::EndpointServer{bti, uep->ep.ep_num}, dwc3_{dwc3}, uep_{uep} {
       auto result =
           fdf::SynchronizedDispatcher::Create({}, "ep-dispatcher", [&](fdf_dispatcher_t*) {});
       if (result.is_error()) {

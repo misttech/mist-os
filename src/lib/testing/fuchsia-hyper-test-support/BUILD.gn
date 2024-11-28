@@ -27,7 +27,7 @@ rustc_library("fuchsia-hyper-test-support") {
   if (is_fuchsia) {
     deps += [ "//third_party/rust_crates:pin-project" ]
   } else {
-    deps += [ "//third_party/rust_crates:async-net" ]
+    deps += [ "//src/developer/ffx/lib/netext:lib" ]
   }
 
   sources = [

@@ -102,9 +102,8 @@ impl Program {
         diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
     ) -> Result<Program, StartError> {
         let (controller, server_end) =
-            endpoints::create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
-        let (runtime_dir, runtime_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            endpoints::create_proxy::<fcrunner::ComponentControllerMarker>();
+        let (runtime_dir, runtime_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let start_info = start_info.into_fidl(escrowed_state, runtime_server)?;
 
@@ -226,9 +225,9 @@ impl Program {
     pub fn mock_from_controller(
         controller: endpoints::ClientEnd<fcrunner::ComponentControllerMarker>,
     ) -> Program {
-        let controller = ComponentController::new(controller.into_proxy().unwrap(), None);
+        let controller = ComponentController::new(controller.into_proxy(), None);
         let (runtime_dir, _runtime_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         Program { controller, runtime_dir }
     }
 }
@@ -821,7 +820,7 @@ pub mod tests {
     #[fuchsia::test]
     async fn finalize_program() {
         let (program, server) = mocks::mock_program();
-        let (stream, control) = server.into_stream_and_control_handle().unwrap();
+        let (stream, control) = server.into_stream_and_control_handle();
         let (outgoing_dir_client, outgoing_dir_server) = fidl::endpoints::create_endpoints();
 
         control

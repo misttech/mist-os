@@ -74,8 +74,7 @@ mod tests {
         dir.add_service_at("B", FidlService::from(I2cDeviceRequestStream::I2cDeviceB));
 
         // Create a directory proxy to access the I2C devices.
-        let (dev, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .context("Failed to create FIDL proxy")?;
+        let (dev, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         service_fs.serve_connection(server_end).context("Failed to serve connection")?;
 
         // Run the command and mock I2C device servers.

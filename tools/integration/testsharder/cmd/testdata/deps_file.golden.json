@@ -1,0 +1,105 @@
+[
+    {
+        "name": "AEMU",
+        "tests": [
+            {
+                "name": "fuchsia-pkg://fuchsia.com/bar#meta/bar.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/bar#meta/bar.cm",
+                "path": "",
+                "label": "//src/something:bar(//build/toolchain/fuchsia:x64)",
+                "os": "fuchsia",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1,
+                "tags": [
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "0"
+                    }
+                ]
+            },
+            {
+                "name": "fuchsia-pkg://fuchsia.com/baz#meta/baz.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/baz#meta/baz.cm",
+                "path": "",
+                "label": "//src/something:baz(//build/toolchain/fuchsia:x64)",
+                "os": "fuchsia",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1,
+                "tags": [
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "0"
+                    }
+                ]
+            },
+            {
+                "name": "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm",
+                "path": "",
+                "label": "//src/something:foo(//build/toolchain/fuchsia:x64)",
+                "os": "fuchsia",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1,
+                "tags": [
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "0"
+                    }
+                ]
+            }
+        ],
+        "environment": {
+            "dimensions": {
+                "cpu": "x64",
+                "device_type": "AEMU"
+            },
+            "virtual_device_spec": {
+                "name": ""
+            }
+        },
+        "deps": [
+            "host_x64/bootserver_new",
+            "host_x64/botanist",
+            "host_x64/ffx",
+            "host_x64/fvm",
+            "host_x64/llvm-profdata",
+            "host_x64/llvm-symbolizer",
+            "host_x64/ssh",
+            "host_x64/zbi",
+            "images.json",
+            "product_bundle/zbi",
+            "product_bundles.json",
+            "sdk/manifest/core"
+        ],
+        "timeout_secs": 0,
+        "summary": {
+            "tests": null
+        },
+        "product_bundle": "core.x64",
+        "expects_ssh": true,
+        "cipd_packages": [
+            {
+                "name": "fuchsia/third_party/android/aemu/release/${platform}",
+                "version": "aemu_version",
+                "subdir": "aemu/bin"
+            },
+            {
+                "name": "fuchsia/third_party/edk2",
+                "version": "edk2_version",
+                "subdir": "edk2"
+            }
+        ],
+        "build_metadata": {
+            "board": "x64",
+            "optimize": "debug",
+            "product": "core",
+            "target_arch": "x64",
+            "variants": [
+                "coverage"
+            ]
+        }
+    }
+]

@@ -5,7 +5,7 @@
 use crate::diagnostics::TRACE_CATEGORY;
 use crate::identity::ComponentIdentity;
 use crate::logs::multiplex::PinStream;
-use crate::logs::shared_buffer::{ContainerBuffer, LazyItem};
+use crate::logs::shared_buffer::{self, ContainerBuffer, LazyItem};
 use crate::logs::socket::{Encoding, LogMessageSocket};
 use crate::logs::stats::LogStreamStats;
 use crate::logs::stored_message::StoredMessage;
@@ -21,8 +21,9 @@ use fidl_fuchsia_logger::{
 };
 use fuchsia_async::Task;
 use fuchsia_sync::Mutex;
-use futures::channel::{mpsc, oneshot};
+use futures::channel::oneshot;
 use futures::prelude::*;
+use futures::stream::StreamExt;
 use selectors::SelectorExt;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -74,8 +75,9 @@ type InterestSender = oneshot::Sender<Result<FidlInterest, InterestChangeError>>
 
 #[derive(Debug)]
 struct ContainerState {
-    /// Number of sockets currently being drained for this component.
-    num_active_sockets: u64,
+    /// Number of legacy sockets currently being drained for this component.  Sockets that use
+    /// structured messages use the buffer's socket handling.
+    num_active_legacy_sockets: u64,
 
     /// Number of LogSink channels currently being listened to for this component.
     num_active_channels: u64,
@@ -87,6 +89,27 @@ struct ContainerState {
     hanging_gets: BTreeMap<usize, Arc<Mutex<Option<InterestSender>>>>,
 
     is_initializing: bool,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CursorItem {
+    pub rolled_out: u64,
+    pub message: Arc<StoredMessage>,
+    pub identity: Arc<ComponentIdentity>,
+}
+
+impl Eq for CursorItem {}
+
+impl Ord for CursorItem {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.message.timestamp().cmp(&other.message.timestamp())
+    }
+}
+
+impl PartialOrd for CursorItem {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.message.timestamp().cmp(&other.message.timestamp()))
+    }
 }
 
 impl LogsArtifactsContainer {
@@ -107,7 +130,7 @@ impl LogsArtifactsContainer {
             buffer,
             state: Arc::new(Mutex::new(ContainerState {
                 num_active_channels: 0,
-                num_active_sockets: 0,
+                num_active_legacy_sockets: 0,
                 interests,
                 hanging_gets: BTreeMap::new(),
                 is_initializing: true,
@@ -128,6 +151,49 @@ impl LogsArtifactsContainer {
         self.next_hanging_get_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     }
 
+    fn create_raw_cursor(
+        &self,
+        buffer_cursor: shared_buffer::Cursor,
+    ) -> impl Stream<Item = CursorItem> {
+        let identity = Arc::clone(&self.identity);
+        buffer_cursor
+            .enumerate()
+            .scan((zx::BootInstant::ZERO, 0u64), move |(last_timestamp, rolled_out), (i, item)| {
+                futures::future::ready(match item {
+                    LazyItem::Next(message) => {
+                        *last_timestamp = message.timestamp();
+                        Some(Some(CursorItem {
+                            message,
+                            identity: Arc::clone(&identity),
+                            rolled_out: *rolled_out,
+                        }))
+                    }
+                    LazyItem::ItemsRolledOut(rolled_out_count, timestamp) => {
+                        if i > 0 {
+                            *rolled_out += rolled_out_count;
+                        }
+                        *last_timestamp = timestamp;
+                        Some(None)
+                    }
+                })
+            })
+            .filter_map(future::ready)
+    }
+
+    /// Returns a stream of this component's log messages. These are the raw messages in FXT format.
+    ///
+    /// # Rolled out logs
+    ///
+    /// When messages are evicted from our internal buffers before a client can read them, they
+    /// are counted as rolled out messages which gets appended to the metadata of the next message.
+    /// If there is no next message, there is no way to know how many messages were rolled out.
+    pub fn cursor_raw(&self, mode: StreamMode) -> PinStream<CursorItem> {
+        let Some(buffer_cursor) = self.buffer.cursor(mode) else {
+            return Box::pin(futures::stream::empty());
+        };
+        Box::pin(self.create_raw_cursor(buffer_cursor))
+    }
+
     /// Returns a stream of this component's log messages.
     ///
     /// # Rolled out logs
@@ -143,64 +209,41 @@ impl LogsArtifactsContainer {
         let Some(buffer_cursor) = self.buffer.cursor(mode) else {
             return Box::pin(futures::stream::empty());
         };
-
-        let identity = Arc::clone(&self.identity);
-        Box::pin(
-            buffer_cursor
-                .enumerate()
-                .scan(
-                    (zx::BootInstant::ZERO, 0u64),
-                    move |(last_timestamp, rolled_out_messages), (i, item)| {
-                        futures::future::ready(match item {
-                            LazyItem::Next(m) => {
-                                let trace_id = ftrace::Id::random();
-                                let _trace_guard = ftrace::async_enter!(
-                                    trace_id,
-                                    TRACE_CATEGORY,
-                                    c"LogContainer::cursor.parse_message",
-                                    // An async duration cannot have multiple concurrent child async durations
-                                    // so we include the nonce as metadata to manually determine relationship.
-                                    "parent_trace_id" => u64::from(parent_trace_id),
-                                    "trace_id" => u64::from(trace_id)
-                                );
-                                *last_timestamp = m.timestamp();
-                                match m.parse(&identity) {
-                                    Ok(m) => Some(Some(Arc::new(maybe_add_rolled_out_error(
-                                        rolled_out_messages,
-                                        m,
-                                    )))),
-                                    Err(err) => {
-                                        let data = maybe_add_rolled_out_error(
-                                            rolled_out_messages,
-                                            LogsDataBuilder::new(BuilderArgs {
-                                                moniker: identity.moniker.clone(),
-                                                timestamp: *last_timestamp,
-                                                component_url: Some(identity.url.clone()),
-                                                severity: diagnostics_data::Severity::Warn,
-                                            })
-                                            .add_error(
-                                                diagnostics_data::LogError::FailedToParseRecord(
-                                                    format!("{err:?}"),
-                                                ),
-                                            )
-                                            .build(),
-                                        );
-                                        Some(Some(Arc::new(data)))
-                                    }
-                                }
-                            }
-                            LazyItem::ItemsRolledOut(rolled_out_count, timestamp) => {
-                                if i > 0 {
-                                    *rolled_out_messages += rolled_out_count;
-                                }
-                                *last_timestamp = timestamp;
-                                Some(None)
-                            }
-                        })
-                    },
-                )
-                .filter_map(future::ready),
-        )
+        let mut rolled_out_count = 0;
+        Box::pin(self.create_raw_cursor(buffer_cursor).map(
+            move |CursorItem { message, identity, rolled_out }| {
+                rolled_out_count += rolled_out;
+                let trace_id = ftrace::Id::random();
+                let _trace_guard = ftrace::async_enter!(
+                    trace_id,
+                    TRACE_CATEGORY,
+                    c"LogContainer::cursor.parse_message",
+                    // An async duration cannot have multiple concurrent child async durations
+                    // so we include the nonce as metadata to manually determine relationship.
+                    "parent_trace_id" => u64::from(parent_trace_id),
+                    "trace_id" => u64::from(trace_id)
+                );
+                match message.parse(&identity) {
+                    Ok(m) => Arc::new(maybe_add_rolled_out_error(&mut rolled_out_count, m)),
+                    Err(err) => {
+                        let data = maybe_add_rolled_out_error(
+                            &mut rolled_out_count,
+                            LogsDataBuilder::new(BuilderArgs {
+                                moniker: identity.moniker.clone(),
+                                timestamp: message.timestamp(),
+                                component_url: Some(identity.url.clone()),
+                                severity: diagnostics_data::Severity::Warn,
+                            })
+                            .add_error(diagnostics_data::LogError::FailedToParseRecord(format!(
+                                "{err:?}"
+                            )))
+                            .build(),
+                        );
+                        Arc::new(data)
+                    }
+                }
+            },
+        ))
     }
 
     /// Handle `LogSink` protocol on `stream`. Each socket received from the `LogSink` client is
@@ -209,22 +252,21 @@ impl LogsArtifactsContainer {
     pub fn handle_log_sink(
         self: &Arc<Self>,
         stream: LogSinkRequestStream,
-        sender: mpsc::UnboundedSender<Task<()>>,
+        scope: fasync::ScopeHandle,
     ) {
         {
             let mut guard = self.state.lock();
             guard.num_active_channels += 1;
             guard.is_initializing = false;
         }
-        let task = Task::spawn(Arc::clone(self).actually_handle_log_sink(stream, sender.clone()));
-        sender.unbounded_send(task).expect("channel is live for whole program");
+        scope.spawn(Arc::clone(self).actually_handle_log_sink(stream, scope.clone()));
     }
 
     /// This function does not return until the channel is closed.
     async fn actually_handle_log_sink(
         self: Arc<Self>,
         mut stream: LogSinkRequestStream,
-        sender: mpsc::UnboundedSender<Task<()>>,
+        scope: fasync::ScopeHandle,
     ) {
         let hanging_get_sender = Arc::new(Mutex::new(None));
 
@@ -232,23 +274,18 @@ impl LogsArtifactsContainer {
         let previous_interest_sent = Arc::new(Mutex::new(None));
         debug!(%self.identity, "Draining LogSink channel.");
 
-        macro_rules! handle_socket {
-            ($ctor:ident($socket:ident)) => {{
-                let socket = fasync::Socket::from_socket($socket);
-                let log_stream = LogMessageSocket::$ctor(socket, self.stats.clone());
-                self.state.lock().num_active_sockets += 1;
-                let task = Task::spawn(self.clone().drain_messages(log_stream));
-                sender.unbounded_send(task).expect("channel alive for whole program");
-            }};
-        }
-
         while let Some(next) = stream.next().await {
             match next {
                 Ok(LogSinkRequest::Connect { socket, .. }) => {
-                    handle_socket! {new(socket)};
+                    // TODO(https://fxbug.dev/378977533): Add support for ingesting
+                    // the legacy log format directly to the shared buffer.
+                    let socket = fasync::Socket::from_socket(socket);
+                    let log_stream = LogMessageSocket::new(socket, Arc::clone(&self.stats));
+                    self.state.lock().num_active_legacy_sockets += 1;
+                    scope.spawn(Arc::clone(&self).drain_messages(log_stream));
                 }
                 Ok(LogSinkRequest::ConnectStructured { socket, .. }) => {
-                    handle_socket! {new_structured(socket)};
+                    self.buffer.add_socket(socket);
                 }
                 Ok(LogSinkRequest::WaitForInterestChange { responder }) => {
                     // Check if we sent latest data to the client
@@ -370,7 +407,7 @@ impl LogsArtifactsContainer {
             }
         }
         debug!(%self.identity, "Socket closed.");
-        self.state.lock().num_active_sockets -= 1;
+        self.state.lock().num_active_legacy_sockets -= 1;
         self.check_inactive();
     }
 
@@ -473,9 +510,9 @@ impl LogsArtifactsContainer {
     pub fn is_active(&self) -> bool {
         let state = self.state.lock();
         state.is_initializing
-            || state.num_active_sockets > 0
+            || state.num_active_legacy_sockets > 0
             || state.num_active_channels > 0
-            || !self.buffer.is_empty()
+            || self.buffer.is_active()
     }
 
     /// Called whenever there's a transition that means the component might no longer be active.
@@ -623,12 +660,12 @@ mod tests {
     use fuchsia_async::MonotonicDuration;
     use fuchsia_inspect as inspect;
     use fuchsia_inspect_derive::WithInspect;
-    use futures::channel::mpsc::UnboundedReceiver;
     use moniker::ExtendedMoniker;
 
     fn initialize_container(
         severity: Option<Severity>,
-    ) -> (Arc<LogsArtifactsContainer>, LogSinkProxy, UnboundedReceiver<Task<()>>) {
+        scope: fasync::ScopeHandle,
+    ) -> (Arc<LogsArtifactsContainer>, LogSinkProxy) {
         let identity = Arc::new(ComponentIdentity::new(
             ExtendedMoniker::parse_str("/foo/bar").unwrap(),
             "fuchsia-pkg://test",
@@ -638,7 +675,7 @@ mod tests {
                 .with_inspect(inspect::component::inspector().root(), identity.moniker.to_string())
                 .expect("failed to attach component log stats"),
         );
-        let buffer = Arc::new(SharedBuffer::new(1024 * 1024, Box::new(|_| {})));
+        let buffer = SharedBuffer::new(1024 * 1024, Box::new(|_| {}));
         let container = Arc::new(LogsArtifactsContainer::new(
             identity,
             std::iter::empty(),
@@ -648,17 +685,16 @@ mod tests {
             None,
         ));
         // Connect out LogSink under test and take its events channel.
-        let (sender, _recv) = mpsc::unbounded();
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().expect("create log sink");
-        container.handle_log_sink(stream, sender);
-        (container, proxy, _recv)
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>();
+        container.handle_log_sink(stream, scope);
+        (container, proxy)
     }
 
     #[fuchsia::test]
     async fn update_interest() {
         // Sync path test (initial interest)
-        let (container, log_sink, _sender) = initialize_container(None);
+        let scope = fasync::Scope::new();
+        let (container, log_sink) = initialize_container(None, scope.to_handle());
         // Get initial interest
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         {
@@ -715,14 +751,16 @@ mod tests {
 
     #[fuchsia::test]
     async fn initial_interest() {
-        let (_container, log_sink, _sender) = initialize_container(Some(Severity::Info));
+        let scope = fasync::Scope::new();
+        let (_container, log_sink) = initialize_container(Some(Severity::Info), scope.to_handle());
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         assert_eq!(initial_interest.min_severity, Some(Severity::Info));
     }
 
     #[fuchsia::test]
     async fn interest_serverity_semantics() {
-        let (container, log_sink, _sender) = initialize_container(None);
+        let scope = fasync::Scope::new();
+        let (container, log_sink) = initialize_container(None, scope.to_handle());
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         assert_eq!(initial_interest.min_severity, None);
         // Set some interest.

@@ -13,7 +13,6 @@
 #include <zircon/processargs.h>
 #include <zircon/status.h>
 
-#include "src/storage/lib/paver/abr-client.h"
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/pave-logging.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
@@ -88,46 +87,30 @@ int main(int argc, char** argv) {
 #if defined(LEGACY_PAVER)
   // NOTE: Ordering matters!
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::AstroAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::NelsonAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::KolaPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::KolaAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AndroidPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::AndroidAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
 #elif defined(astro)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::AstroAbrClientFactory>());
 #elif defined(nelson)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::NelsonAbrClientFactory>());
 #elif defined(sherlock)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
 #elif defined(kola)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::KolaPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::KolaAbrClientFactory>());
 #elif defined(luis)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
 #elif defined(vim3)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
 #elif defined(x64)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
 #elif defined(android)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AndroidPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::AndroidAbrClientFactory>());
 #else
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
 #endif

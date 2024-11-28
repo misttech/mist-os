@@ -92,7 +92,7 @@ pub fn create_test_config_entry(
         label: entry.test.label.clone(),
         host_test_binary: "path/to/bin".to_string(), // TODO: Fix this path when we have a common binary
         resources: None,
-        tags: test_tags.clone(),
+        tags: test_tags,
         requested_features: RequestedFeatures {
             sdk_tools_path: true,
             requires_target: true,

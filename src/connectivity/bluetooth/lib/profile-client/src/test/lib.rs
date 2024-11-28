@@ -58,8 +58,7 @@ impl TestProfileServer {
         service_definition: Option<bredr::ServiceDefinition>,
         service_class_profile_id: Option<bredr::ServiceClassProfileIdentifier>,
     ) -> TestProfileServerEndpoints {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Create new profile connection");
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>();
 
         let mut client = match service_definition {
             None => ProfileClient::new(proxy.clone()),
@@ -83,7 +82,7 @@ impl TestProfileServer {
         let request = self.profile_request_stream.next().await;
         match request {
             Some(Ok(bredr::ProfileRequest::Search { payload, .. })) => {
-                self.search_results_proxy = Some(payload.results.unwrap().into_proxy().unwrap());
+                self.search_results_proxy = Some(payload.results.unwrap().into_proxy());
             }
             _ => panic!(
                 "unexpected result on profile request stream while waiting for search: {:?}",
@@ -96,8 +95,7 @@ impl TestProfileServer {
         let request = self.profile_request_stream.next().await;
         match request {
             Some(Ok(bredr::ProfileRequest::Advertise { payload, responder, .. })) => {
-                self.connection_receiver_proxy =
-                    Some(payload.receiver.unwrap().into_proxy().unwrap());
+                self.connection_receiver_proxy = Some(payload.receiver.unwrap().into_proxy());
                 if let Some(_old_responder) = self.advertise_responder.replace(responder) {
                     panic!("Got new advertise request before old request is complete.");
                 }

@@ -573,8 +573,7 @@ mod test {
     #[fuchsia::test]
     async fn running_suite_events_simple() {
         let (suite_proxy, mut suite_request_stream) =
-            create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>()
-                .expect("create proxy");
+            create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let suite_server_task = fasync::Task::spawn(async move {
             respond_to_get_events(&mut suite_request_stream, vec![create_empty_event(0)]).await;
             respond_to_get_events(&mut suite_request_stream, vec![]).await;
@@ -597,8 +596,7 @@ mod test {
     #[fuchsia::test]
     async fn running_suite_events_multiple_events() {
         let (suite_proxy, mut suite_request_stream) =
-            create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>()
-                .expect("create proxy");
+            create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let suite_server_task = fasync::Task::spawn(async move {
             respond_to_get_events(
                 &mut suite_request_stream,
@@ -631,8 +629,7 @@ mod test {
     #[fuchsia::test]
     async fn running_suite_events_peer_closed() {
         let (suite_proxy, mut suite_request_stream) =
-            create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>()
-                .expect("create proxy");
+            create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let suite_server_task = fasync::Task::spawn(async move {
             respond_to_get_events(&mut suite_request_stream, vec![create_empty_event(1)]).await;
             drop(suite_request_stream);
@@ -759,8 +756,7 @@ mod test {
             suite_stopped_event(500, ftest_manager::SuiteStatus::Passed),
         ];
 
-        let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>()
-            .expect("create stream");
+        let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let test_fut = async move {
             let reporter = output::InMemoryReporter::new();
             let run_reporter = output::RunReporter::new(reporter.clone());
@@ -823,8 +819,7 @@ mod test {
             suite_stopped_event(500, ftest_manager::SuiteStatus::Passed),
         ];
 
-        let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>()
-            .expect("create stream");
+        let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let stdio_write_fut = async move {
             let mut async_stdout = fasync::Socket::from_socket(stdout_write);
             async_stdout.write_all(STDOUT_CONTENT.as_bytes()).await.expect("write to socket");
@@ -906,8 +901,7 @@ mod test {
             suite_stopped_event(500, ftest_manager::SuiteStatus::Passed),
         ];
 
-        let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>()
-            .expect("create stream");
+        let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let serve_fut = async move {
             // server side will send all events, then write to (and close) sockets.
             serve_all_events(stream, all_events).await;
@@ -990,8 +984,7 @@ mod test {
             suite_stopped_event(500, ftest_manager::SuiteStatus::Passed),
         ];
 
-        let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>()
-            .expect("create stream");
+        let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let stdio_write_fut = async move {
             let mut async_stdout = fasync::Socket::from_socket(stdout_write);
             async_stdout.write_all(STDOUT_CONTENT.as_bytes()).await.expect("write to socket");
@@ -1068,8 +1061,7 @@ mod test {
             case_stderr_event(300, 0, stderr_read),
         ];
 
-        let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>()
-            .expect("create stream");
+        let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let test_fut = async move {
             let reporter = output::InMemoryReporter::new();
             let run_reporter = output::RunReporter::new(reporter.clone());

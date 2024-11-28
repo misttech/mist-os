@@ -10,8 +10,9 @@ rustc_library("lib") {
   edition = "2021"
 
   deps = [
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/lib/versioning/version-history/rust/data",
+    "//third_party/rust_crates:schemars",
+    "//third_party/rust_crates:serde",
   ]
 
   sources = [ "src/lib.rs" ]

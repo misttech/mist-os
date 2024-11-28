@@ -87,7 +87,7 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
 
     let golden_packages = GoldenFile::from_files(&cmd.golden_packages)
         .context("Failed to open the golden packages lists")?;
-    match golden_packages.compare(bootfs_package_names.clone()) {
+    match golden_packages.compare(bootfs_package_names) {
         CompareResult::Matches => Ok(()),
         CompareResult::Mismatch { errors } => {
             println!("Bootfs package index mismatch \n");

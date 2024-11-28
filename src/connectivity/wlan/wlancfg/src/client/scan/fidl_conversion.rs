@@ -98,7 +98,7 @@ pub async fn send_scan_results_over_fidl(
     mut scan_results: &[fidl_policy::ScanResult],
 ) -> Result<(), Error> {
     // Wait to get a request for a chunk of scan results
-    let (mut stream, ctrl) = output_iterator.into_stream_and_control_handle()?;
+    let (mut stream, ctrl) = output_iterator.into_stream_and_control_handle();
     let mut sent_some_results = false;
 
     // Verify consumer is expecting results before each batch
@@ -149,7 +149,7 @@ pub async fn send_scan_error_over_fidl(
     error_code: types::ScanError,
 ) -> Result<(), fidl::Error> {
     // Wait to get a request for a chunk of scan results
-    let (mut stream, ctrl) = output_iterator.into_stream_and_control_handle()?;
+    let (mut stream, ctrl) = output_iterator.into_stream_and_control_handle();
     if let Some(req) = stream.try_next().await? {
         let fidl_policy::ScanResultIteratorRequest::GetNext { responder } = req;
         responder.send(Err(error_code))?;
@@ -405,8 +405,7 @@ mod tests {
         let scan_results = generate_test_fidl_data();
 
         // Create an iterator and send scan results
-        let (iter, iter_server) =
-            fidl::endpoints::create_proxy().expect("failed to create iterator");
+        let (iter, iter_server) = fidl::endpoints::create_proxy();
         let send_fut = send_scan_results_over_fidl(iter_server, &scan_results);
         let mut send_fut = pin!(send_fut);
 
@@ -440,8 +439,7 @@ mod tests {
         let scan_results = generate_test_fidl_data();
 
         // Create an iterator and send scan results
-        let (iter, iter_server) =
-            fidl::endpoints::create_proxy().expect("failed to create iterator");
+        let (iter, iter_server) = fidl::endpoints::create_proxy();
         let send_fut = send_scan_results_over_fidl(iter_server, &scan_results);
         let mut send_fut = pin!(send_fut);
 
@@ -455,8 +453,7 @@ mod tests {
     #[fuchsia::test]
     fn scan_result_sends_max_message_size() {
         let mut exec = fasync::TestExecutor::new();
-        let (iter, iter_server) =
-            fidl::endpoints::create_proxy().expect("failed to create iterator");
+        let (iter, iter_server) = fidl::endpoints::create_proxy();
 
         // Create a single scan result at the max allowed size to send in single
         // FIDL message.
@@ -481,8 +478,7 @@ mod tests {
     #[fuchsia::test]
     fn scan_result_exceeding_max_size_throws_error() {
         let mut exec = fasync::TestExecutor::new();
-        let (iter, iter_server) =
-            fidl::endpoints::create_proxy().expect("failed to create iterator");
+        let (iter, iter_server) = fidl::endpoints::create_proxy();
 
         // Create a single scan result exceeding the  max allowed size to send in single
         // FIDL message.
@@ -505,8 +501,7 @@ mod tests {
     #[fuchsia::test]
     fn scan_result_sends_single_batch() {
         let mut exec = fasync::TestExecutor::new();
-        let (iter, iter_server) =
-            fidl::endpoints::create_proxy().expect("failed to create iterator");
+        let (iter, iter_server) = fidl::endpoints::create_proxy();
 
         // Create a set of scan results that does not exceed the the max message
         // size, so it should be sent in a single batch.
@@ -532,8 +527,7 @@ mod tests {
     #[fuchsia::test]
     fn scan_result_sends_multiple_batches() {
         let mut exec = fasync::TestExecutor::new();
-        let (iter, iter_server) =
-            fidl::endpoints::create_proxy().expect("failed to create iterator");
+        let (iter, iter_server) = fidl::endpoints::create_proxy();
 
         // Create a set of scan results that exceed the max FIDL message size, so
         // they should be split into batches.

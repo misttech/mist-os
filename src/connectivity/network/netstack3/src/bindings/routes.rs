@@ -479,10 +479,8 @@ where
                             responder: _,
                         } => None,
                     };
-                    // No new requests will be accepted. Also remove all the rules that reference
-                    // this table.
+                    // Remove all the rules that reference this table.
                     if let Some(table_id) = removing {
-                        rest.close();
                         let removed = rules.handle_table_removed(table_id);
                         Self::install_rules_and_notify_watchers(
                             &mut ctx,
@@ -498,6 +496,23 @@ where
                         route_update_dispatcher,
                         route_work_item);
                     if let Some(table_id) = removing {
+                        let Table { core_id, inner, .. } = tables.remove(&table_id)
+                            .expect("invalid table ID");
+                        let core_id = assert_matches!(core_id,
+                            CoreId::User(core_id) => core_id, "cannot remove main table");
+                        let weak = core_id.downgrade();
+                        ctx.api().routes()
+                            .remove_table(core_id)
+                            .map_deferred(|d| d.into_future("table id", &weak))
+                            .into_future()
+                            .await;
+                        // Make sure all the strong references to the route set is gone before
+                        // we respond to any of the pending requests. Because among all the
+                        // pending requests, there maybe a `RemoveSet` request. Once we respond,
+                        // the requesting task will proceed to unwrap the primary ID for the
+                        // route set. This will cause panic if there are still strong references.
+                        drop(inner);
+                        rest.close();
                         rest.filter_map(|RouteWorkItem {
                             change: _,
                             responder,
@@ -507,16 +522,6 @@ where
                                 error!("failed to respond to the change request: {err:?}");
                             })
                         )).await;
-                        let Table { core_id, .. } = tables.remove(&table_id)
-                            .expect("invalid table ID");
-                        let core_id = assert_matches!(core_id,
-                            CoreId::User(core_id) => core_id, "cannot remove main table");
-                        let weak = core_id.downgrade();
-                        ctx.api().routes()
-                            .remove_table(core_id)
-                            .map_deferred(|d| d.into_future("table id", &weak))
-                            .into_future()
-                            .await
                     } else {
                         route_work_receivers.push(rest.into_future());
                     }

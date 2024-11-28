@@ -609,7 +609,7 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
                         .await?
                         .expect("failed to create child");
                     let (exposed_dir_proxy, exposed_dir_server_end) =
-                        fidl::endpoints::create_proxy()?;
+                        fidl::endpoints::create_proxy();
                     realm_proxy
                         .open_exposed_dir(
                             &fcdecl::ChildRef {

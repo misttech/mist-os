@@ -168,9 +168,7 @@ async fn run_ccd(proxy: Cr50Proxy, cmd: CcdCommand) -> Result<(), Error> {
 
             match rc {
                 Cr50Rc::Cr50(Cr50Status::Success) | Cr50Rc::Cr50(Cr50Status::InProgress) => {
-                    handle_pp(client.unwrap().into_proxy().context("Making proxy")?)
-                        .await
-                        .context("Handling PP")?;
+                    handle_pp(client.unwrap().into_proxy()).await.context("Handling PP")?;
                 }
                 err => println!("Failed to open: {:?}", err),
             }
@@ -185,9 +183,7 @@ async fn run_ccd(proxy: Cr50Proxy, cmd: CcdCommand) -> Result<(), Error> {
 
             match rc {
                 Cr50Rc::Cr50(Cr50Status::Success) | Cr50Rc::Cr50(Cr50Status::InProgress) => {
-                    handle_pp(client.unwrap().into_proxy().context("Making proxy")?)
-                        .await
-                        .context("Handling PP")?
+                    handle_pp(client.unwrap().into_proxy()).await.context("Handling PP")?
                 }
                 err => println!("Failed to unlock: {:?}", err),
             }

@@ -48,7 +48,7 @@ async fn run_test_suite(mut stream: ftest::SuiteRequestStream) -> Result<(), Err
     while let Some(event) = stream.try_next().await? {
         match event {
             ftest::SuiteRequest::GetTests { iterator, control_handle: _ } => {
-                let mut stream = iterator.into_stream()?;
+                let mut stream = iterator.into_stream();
                 fasync::Task::spawn(
                     async move {
                         let case = ftest::Case {
@@ -73,13 +73,12 @@ async fn run_test_suite(mut stream: ftest::SuiteRequestStream) -> Result<(), Err
                 assert_eq!(tests.len(), 1);
                 assert_eq!(tests[0].name, Some("EchoTest".to_string()));
 
-                let proxy = listener.into_proxy().expect("Can't convert listener channel to proxy");
+                let proxy = listener.into_proxy();
                 let mut result =
                     ftest::Result_ { status: Some(ftest::Status::Passed), ..Default::default() };
 
                 let (case_listener_proxy, case_listener) =
-                    fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>()
-                        .expect("cannot create proxy");
+                    fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>();
                 proxy
                     .on_test_case_started(
                         &tests.pop().unwrap(),

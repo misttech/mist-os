@@ -29,12 +29,6 @@ group("dart_allowlist") {
   # We will ignore variance in targets added/deleted from //third_part/dart-pkg and //src/tests/end_to_end/perf.
   visibility = []
 
-  # Remaining host tools which still use Dart.
-  visibility += [
-    "//scripts/fxtest:*",
-    "//scripts/fxutils:*",
-  ]
-
   # SL4F dart client library and tests which use it.
   visibility += [
     "//sdk/testing/gcloud_lib:gcloud_lib",

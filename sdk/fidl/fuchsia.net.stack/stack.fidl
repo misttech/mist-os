@@ -62,15 +62,6 @@ closed protocol Stack {
         entry ForwardingEntry;
     }) -> () error Error;
 
-    /// Sets the IP forwarding state for an interface.
-    // TODO(https://fxbug.dev/42176374): Remove this.
-    @deprecated("Use fuchsia.net.interfaces.admin/Control.SetConfiguration")
-    strict SetInterfaceIpForwardingDeprecated(struct {
-        id fuchsia.net.InterfaceId;
-        ip_version fuchsia.net.IpVersion;
-        enabled bool;
-    }) -> () error Error;
-
     /// Enables or disables the DHCP client on an interface.
     /// TODO(https://fxbug.dev/42162065): Remove this once the DHCP client is moved
     /// out of the netstack.

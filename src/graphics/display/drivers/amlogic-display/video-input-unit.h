@@ -17,7 +17,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 
 namespace amlogic_display {
 

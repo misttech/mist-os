@@ -270,6 +270,14 @@
             as: "dev",
             to: [ "#devfs-with-pkg" ],
         },
+        {
+            runner: "builtin_devfs",
+            from: "parent",
+            to: [
+                "#devfs",
+                "#devfs-with-pkg",
+            ],
+        },
 
         // These protocols are not actually used but exist to increase the lifetime
         // of components. The capabilities are named after their place in the topology.
@@ -371,6 +379,12 @@
             from: "#power-broker",
             to: "#boot-drivers",
             source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.driver.test.DriverLists",
+            from: "void",
+            to: "#driver_index",
+            availability: "optional",
         },
     ],
     expose: [

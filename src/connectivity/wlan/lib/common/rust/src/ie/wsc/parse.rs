@@ -59,18 +59,18 @@ pub fn parse_probe_resp_wsc(raw_body: &[u8]) -> Result<ProbeRespWsc, anyhow::Err
         }
     }
 
-    let version = version.ok_or(format_err!("Missing version"))?;
-    let wps_state = wps_state.ok_or(format_err!("Missing WSC state"))?;
-    let response_type = response_type.ok_or(format_err!("Missing response type"))?;
-    let uuid_e = uuid_e.ok_or(format_err!("Missing UUID-E"))?;
-    let manufacturer = manufacturer.ok_or(format_err!("Missing manufacturer"))?;
-    let model_name = model_name.ok_or(format_err!("Missing model name"))?;
-    let model_number = model_number.ok_or(format_err!("Missing model number"))?;
-    let serial_number = serial_number.ok_or(format_err!("Missing serial number"))?;
+    let version = version.ok_or_else(|| format_err!("Missing version"))?;
+    let wps_state = wps_state.ok_or_else(|| format_err!("Missing WSC state"))?;
+    let response_type = response_type.ok_or_else(|| format_err!("Missing response type"))?;
+    let uuid_e = uuid_e.ok_or_else(|| format_err!("Missing UUID-E"))?;
+    let manufacturer = manufacturer.ok_or_else(|| format_err!("Missing manufacturer"))?;
+    let model_name = model_name.ok_or_else(|| format_err!("Missing model name"))?;
+    let model_number = model_number.ok_or_else(|| format_err!("Missing model number"))?;
+    let serial_number = serial_number.ok_or_else(|| format_err!("Missing serial number"))?;
     let primary_device_type =
-        primary_device_type.ok_or(format_err!("Missing primary device type"))?;
-    let device_name = device_name.ok_or(format_err!("Missing device name"))?;
-    let config_methods = config_methods.ok_or(format_err!("Missing config methods"))?;
+        primary_device_type.ok_or_else(|| format_err!("Missing primary device type"))?;
+    let device_name = device_name.ok_or_else(|| format_err!("Missing device name"))?;
+    let config_methods = config_methods.ok_or_else(|| format_err!("Missing config methods"))?;
 
     Ok(ProbeRespWsc {
         version,

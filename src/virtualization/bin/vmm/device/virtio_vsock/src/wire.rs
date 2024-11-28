@@ -76,7 +76,7 @@ impl TryFrom<u16> for VsockType {
 
     fn try_from(n: u16) -> Result<Self, Self::Error> {
         <Self as num_traits::FromPrimitive>::from_u16(n)
-            .ok_or(anyhow!("Unrecognized VsockType: {}", n))
+            .ok_or_else(|| anyhow!("Unrecognized VsockType: {}", n))
     }
 }
 
@@ -104,6 +104,6 @@ impl TryFrom<u16> for OpType {
 
     fn try_from(n: u16) -> Result<Self, Self::Error> {
         <Self as num_traits::FromPrimitive>::from_u16(n)
-            .ok_or(anyhow!("Unrecognized OpType: {}", n))
+            .ok_or_else(|| anyhow!("Unrecognized OpType: {}", n))
     }
 }

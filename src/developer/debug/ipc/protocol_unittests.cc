@@ -705,7 +705,7 @@ TEST(Protocol, AspaceReply) {
   EXPECT_EQ(initial.map[3].size, second.map[3].size);
   EXPECT_EQ(initial.map[3].depth, second.map[3].depth);
   EXPECT_EQ(initial.map[3].vmo_offset, second.map[3].vmo_offset);
-  EXPECT_EQ(initial.map[3].committed_pages, second.map[3].committed_pages);
+  EXPECT_EQ(initial.map[3].committed_bytes, second.map[3].committed_bytes);
   EXPECT_EQ(initial.map[3].read, second.map[3].read);
   EXPECT_EQ(initial.map[3].write, second.map[3].write);
   EXPECT_EQ(initial.map[3].execute, second.map[3].execute);

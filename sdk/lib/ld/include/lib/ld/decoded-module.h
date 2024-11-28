@@ -86,6 +86,10 @@ class DecodedModule : public DecodedModuleBase {
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
+  // This is the return value that the <lib/elfldltl/resolve.h> Module API
+  // requires for the Lookup method.
+  using LookupResult = fit::result<bool, const Sym*>;
+
   static_assert(std::is_move_constructible_v<LoadInfo> || std::is_copy_constructible_v<LoadInfo>);
 
   static constexpr bool kModuleInline = InlineModule == AbiModuleInline::kYes;
@@ -122,6 +126,10 @@ class DecodedModule : public DecodedModuleBase {
   // HasModule() returns true, i.e. after EmplaceModule / NewModule.
 
   constexpr const auto& symbol_info() const { return module().symbols; }
+
+  constexpr LookupResult Lookup(auto& diag, elfldltl::SymbolName& name) const {
+    return fit::ok(name.Lookup(symbol_info()));
+  }
 
   // This is the DT_SONAME in the file or empty if there was none (or if
   // decoding was incomplete).  This often matches the name by which the

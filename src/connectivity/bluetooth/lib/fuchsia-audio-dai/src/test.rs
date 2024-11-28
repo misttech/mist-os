@@ -128,6 +128,7 @@ async fn test_handle_dai_requests(
         ..Default::default()
     };
 
+    #[allow(clippy::collection_is_never_read)]
     let mut _rb_task = None;
     while let Some(req) = requests.next().await {
         if let Err(e) = req {
@@ -172,7 +173,7 @@ async fn test_handle_dai_requests(
                     continue;
                 }
                 handle.set_configured(dai_format, pcm_format);
-                let requests = ring_buffer.into_stream().expect("stream from server end");
+                let requests = ring_buffer.into_stream();
                 _rb_task = Some(fasync::Task::spawn(handle_ring_buffer(requests, handle.clone())));
             }
             x => unimplemented!("DAI request not implemented: {:?}", x),
@@ -227,8 +228,7 @@ fn mock_dai_device(
 /// Builds and returns a DigitalAudioInterface for testing scenarios. Returns the
 /// `TestHandle` associated with this device which can be used to validate behavior.
 pub fn test_digital_audio_interface(as_input: bool) -> (DigitalAudioInterface, TestHandle) {
-    let (proxy, requests) =
-        fidl::endpoints::create_proxy_and_stream::<DaiMarker>().expect("proxy creation");
+    let (proxy, requests) = fidl::endpoints::create_proxy_and_stream::<DaiMarker>();
 
     let (handler, handle) = mock_dai_device(as_input, requests);
     fasync::Task::spawn(handler).detach();
@@ -239,8 +239,7 @@ pub fn test_digital_audio_interface(as_input: bool) -> (DigitalAudioInterface, T
 async fn handle_dai_connect_requests(as_input: bool, mut stream: DaiConnectorRequestStream) {
     while let Some(request) = stream.next().await {
         if let Ok(DaiConnectorRequest::Connect { dai_protocol, .. }) = request {
-            let (handler, _test_handle) =
-                mock_dai_device(as_input, dai_protocol.into_stream().unwrap());
+            let (handler, _test_handle) = mock_dai_device(as_input, dai_protocol.into_stream());
             fasync::Task::spawn(handler).detach();
         }
     }

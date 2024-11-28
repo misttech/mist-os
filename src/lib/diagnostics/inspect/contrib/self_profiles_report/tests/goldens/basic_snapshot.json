@@ -34,7 +34,7 @@
               "page_fault_time": 0,
               "wall_time": 35901459,
               "lock_contention_time": 0,
-              "LeafDuration": {
+              "Red.LeafDuration": {
                 "count": 100,
                 "lock_contention_time": 0,
                 "cpu_time": 35749752,
@@ -52,7 +52,7 @@
               "lock_contention_time": 0,
               "wall_time": 359149337,
               "queue_time": 8749,
-              "LeafDuration": {
+              "Fuchsia.LeafDuration": {
                 "queue_time": 8749,
                 "page_fault_time": 0,
                 "location": "../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5",
@@ -70,7 +70,7 @@
               "cpu_time": 71685041,
               "lock_contention_time": 0,
               "wall_time": 71725336,
-              "LeafDuration": {
+              "Green.LeafDuration": {
                 "location": "../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5",
                 "count": 200,
                 "queue_time": 0,
@@ -88,7 +88,7 @@
               "lock_contention_time": 0,
               "location": "../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:45:25",
               "cpu_time": 107521250,
-              "LeafDuration": {
+              "Blue.LeafDuration": {
                 "count": 300,
                 "wall_time": 107405957,
                 "queue_time": 8125,

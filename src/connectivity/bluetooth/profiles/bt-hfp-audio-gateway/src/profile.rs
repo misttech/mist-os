@@ -47,8 +47,7 @@ pub(crate) mod test_server {
     /// Register a new Profile object, and create an associated test server.
     pub(crate) fn setup_profile_and_test_server(
     ) -> (ProfileClient, bredr::ProfileProxy, LocalProfileTestServer) {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Create new profile connection");
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>();
 
         let profile = register(proxy.clone(), Default::default()).expect("register profile");
         (profile, proxy, stream.into())
@@ -85,7 +84,7 @@ pub(crate) mod test_server {
                         if self.is_registration_complete() {
                             panic!("unexpected second advertise request");
                         }
-                        self.receiver = Some(payload.receiver.unwrap().into_proxy().unwrap());
+                        self.receiver = Some(payload.receiver.unwrap().into_proxy());
                         let _ = responder.send(Ok(&bredr::ProfileAdvertiseResponse {
                             services: payload.services.clone(),
                             ..Default::default()
@@ -98,7 +97,7 @@ pub(crate) mod test_server {
                         if self.is_registration_complete() {
                             panic!("unexpected second search request");
                         }
-                        self.results = Some(payload.results.unwrap().into_proxy().unwrap());
+                        self.results = Some(payload.results.unwrap().into_proxy());
                         if self.is_registration_complete() {
                             break;
                         }

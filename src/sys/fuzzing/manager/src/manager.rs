@@ -90,10 +90,8 @@ impl<T: FidlEndpoint<RunBuilderMarker>> Manager<T> {
             .run_builder
             .create_proxy()
             .context("failed to connect to fuchsia.test_manager.RunBuilder")?;
-        let (run_proxy, run_controller) = create_proxy::<RunControllerMarker>()
-            .context("failed to create fuchsia.test_manager.RunController")?;
-        let (suite_proxy, suite_controller) = create_proxy::<SuiteControllerMarker>()
-            .context("failed to create fuchsia.test_manager.SuiteController")?;
+        let (run_proxy, run_controller) = create_proxy::<RunControllerMarker>();
+        let (suite_proxy, suite_controller) = create_proxy::<SuiteControllerMarker>();
         let run_options =
             RunOptions { arguments: Some(vec![fuzz::FUZZ_MODE.to_string()]), ..Default::default() };
         run_builder
@@ -246,8 +244,7 @@ mod tests {
         let fuzz_manager =
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         let test_fut = || async move {
-            let (client, server) = create_proxy::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (client, server) = create_proxy::<fuzz::ControllerMarker>();
             let result = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
@@ -394,8 +391,7 @@ mod tests {
         let fuzz_manager2 =
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         let test_fut = || async move {
-            let (client1, server) = create_proxy::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (client1, server) = create_proxy::<fuzz::ControllerMarker>();
             let result = fuzz_manager1
                 .connect(FOO_URL, server)
                 .await
@@ -404,8 +400,7 @@ mod tests {
             assert!(!client1.is_closed());
 
             // Reconnecting should disconnect previous client.
-            let (client2, server) = create_proxy::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (client2, server) = create_proxy::<fuzz::ControllerMarker>();
             let result = fuzz_manager2
                 .connect(FOO_URL, server)
                 .await
@@ -456,8 +451,7 @@ mod tests {
         let fuzz_manager =
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         let test_fut = || async move {
-            let (_, server) = create_proxy::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (_, server) = create_proxy::<fuzz::ControllerMarker>();
             let result = fuzz_manager
                 .connect(FOO_URL, server)
                 .await

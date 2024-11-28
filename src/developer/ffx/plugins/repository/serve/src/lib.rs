@@ -180,7 +180,7 @@ pub fn get_repo_base_name(
             .get::<Option<String>, _>(CONFIG_KEY_DEFAULT_REPOSITORY)
             .map_err(|e| bug!("{e}"))?
         {
-            return Ok(repo_name.to_string());
+            return Ok(repo_name);
         }
     }
     Ok(DEFAULT_REPO_NAME.to_string())
@@ -690,7 +690,7 @@ mod test {
         fn new(repo_manager: FakeRepositoryManager, engine: FakeEngine) -> RemoteControlProxy {
             let fake_rcs_proxy: RemoteControlProxy =
                 fho::testing::fake_proxy(move |req| match req {
-                    frcs::RemoteControlRequest::OpenCapability {
+                    frcs::RemoteControlRequest::DeprecatedOpenCapability {
                         moniker: _,
                         capability_set: _,
                         capability_name,
@@ -703,13 +703,11 @@ mod test {
                                 fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
                                     server_channel,
                                 )
-                                .into_stream()
-                                .unwrap(),
+                                .into_stream(),
                             ),
                             EngineMarker::PROTOCOL_NAME => engine.spawn(
                                 fidl::endpoints::ServerEnd::<EngineMarker>::new(server_channel)
-                                    .into_stream()
-                                    .unwrap(),
+                                    .into_stream(),
                             ),
                             _ => {
                                 unreachable!();
@@ -753,12 +751,12 @@ mod test {
                     .detach();
                 }
                 TargetRequest::OpenRemoteControl { remote_control, responder } => {
-                    let mut s = remote_control.into_stream().unwrap();
+                    let mut s = remote_control.into_stream();
                     let knock_skip = knock_skip.clone();
                     fasync::Task::local(async move {
                         if let Ok(Some(req)) = s.try_next().await {
                             match req {
-                                frcs::RemoteControlRequest::OpenCapability {
+                                frcs::RemoteControlRequest::DeprecatedOpenCapability {
                                     moniker: _,
                                     capability_set: _,
                                     capability_name,
@@ -781,8 +779,7 @@ mod test {
                                                 >::new(
                                                     server_channel
                                                 )
-                                                .into_stream()
-                                                .unwrap();
+                                                .into_stream();
                                                 fasync::Task::local(async move {
                                                     while let Some(Ok(_)) = stream.next().await {
                                                         // Do nada, just await the request, this is required for target knocking
@@ -911,7 +908,7 @@ mod test {
                             let events_closure = Arc::clone(&events_closure);
 
                             fasync::Task::local(async move {
-                                let mut stream = transaction.into_stream().unwrap();
+                                let mut stream = transaction.into_stream();
                                 while let Some(request) = stream.next().await {
                                     let request = request.unwrap();
                                     match request {
@@ -929,7 +926,7 @@ mod test {
                                                 .lock()
                                                 .unwrap()
                                                 .push(RewriteEngineEvent::ListDynamic);
-                                            let mut stream = iterator.into_stream().unwrap();
+                                            let mut stream = iterator.into_stream();
 
                                             let mut rules =
                                                 rules.lock().unwrap().clone().into_iter();

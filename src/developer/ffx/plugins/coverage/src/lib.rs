@@ -47,9 +47,12 @@ pub async fn coverage(cmd: CoverageCommand) -> Result<()> {
     llvm_profdata_bin
         .exists()
         .then_some(())
-        .ok_or(anyhow!("{:?} does not exist", llvm_profdata_bin))?;
+        .ok_or_else(|| anyhow!("{:?} does not exist", llvm_profdata_bin))?;
     let llvm_cov_bin = clang_bin_dir.join("llvm-cov");
-    llvm_cov_bin.exists().then_some(()).ok_or(anyhow!("{:?} does not exist", llvm_cov_bin))?;
+    llvm_cov_bin
+        .exists()
+        .then_some(())
+        .ok_or_else(|| anyhow!("{:?} does not exist", llvm_cov_bin))?;
 
     let profraws = glob_profraws(&cmd.test_output_dir)?;
     // TODO(https://fxbug.dev/42182448): find a better place to put merged.profdata.
@@ -166,7 +169,7 @@ fn find_debug_file(symbol_index: &SymbolIndex, binary_id: &str) -> Result<PathBu
                     .join(format!("{}.debug", binary_id[2..].to_string()));
                 p.exists().then_some(p)
             })
-            .ok_or(anyhow!("no matching debug files found for binary ID {}", binary_id))
+            .ok_or_else(|| anyhow!("no matching debug files found for binary ID {}", binary_id))
     } else {
         Err(anyhow!("binary ID must have more than 2 characters, got '{}'", binary_id))
     }

@@ -39,7 +39,9 @@ impl DaiAudioDevice {
         let pcm_formats = dai.ring_buffer_formats().await?;
         Ok(Self {
             dai: Arc::new(dai),
-            is_input: props.is_input.ok_or(format_err!("DAI did not provide required is_input"))?,
+            is_input: props
+                .is_input
+                .ok_or_else(|| format_err!("DAI did not provide required is_input"))?,
             configured_formats: None,
             dai_formats,
             pcm_formats,
@@ -71,9 +73,9 @@ impl DaiAudioDevice {
             return Err(format_err!("Attempted to start a DAI that is still running"));
         }
         let (dai_format, pcm_format) =
-            self.configured_formats.clone().ok_or(format_err!("formats not configured"))?;
+            self.configured_formats.clone().ok_or_else(|| format_err!("formats not configured"))?;
         let (client, request_stream) =
-            fidl::endpoints::create_request_stream::<StreamConfigMarker>()?;
+            fidl::endpoints::create_request_stream::<StreamConfigMarker>();
         self.config_stream_task =
             futures::future::maybe_done(fasync::Task::spawn(process_audio_requests(
                 request_stream,
@@ -273,8 +275,7 @@ mod tests {
 
     async fn setup_audio_stream_proxy(dai: &mut DaiAudioDevice) -> StreamConfigProxy {
         let (proxy, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<AudioDeviceEnumeratorMarker>()
-                .expect("proxy creation to work");
+            fidl::endpoints::create_proxy_and_stream::<AudioDeviceEnumeratorMarker>();
 
         let _ = dai.config(SUPPORTED_DAI_FORMAT, SUPPORTED_PCM_FORMAT).unwrap();
 
@@ -291,7 +292,7 @@ mod tests {
             })) => {
                 assert_eq!(&device_name, TEST_DEVICE_NAME, "name should match");
                 assert_eq!(is_input, true, "should be an input device");
-                channel.into_proxy().expect("make a proxy")
+                channel.into_proxy()
             }
             x => panic!("Expected AudioDevice to be added by channel, got {:?}", x),
         }
@@ -301,8 +302,7 @@ mod tests {
     #[fuchsia::test]
     async fn start_enumerator_registration(mut dai: DaiAudioDevice) {
         let (proxy, _requests) =
-            fidl::endpoints::create_proxy_and_stream::<AudioDeviceEnumeratorMarker>()
-                .expect("proxy creation to work");
+            fidl::endpoints::create_proxy_and_stream::<AudioDeviceEnumeratorMarker>();
 
         // start without config doesn't work
         let _ = dai
@@ -376,8 +376,7 @@ mod tests {
     async fn ringbuffer_starts_dai_without_error(mut dai: DaiAudioDevice) {
         let stream_proxy = setup_audio_stream_proxy(&mut dai).await;
 
-        let (rb_proxy, server_end) =
-            fidl::endpoints::create_proxy::<RingBufferMarker>().expect("proxy creation");
+        let (rb_proxy, server_end) = fidl::endpoints::create_proxy::<RingBufferMarker>();
 
         let format = fidl_fuchsia_hardware_audio::Format {
             pcm_format: Some(SUPPORTED_PCM_FORMAT.clone()),

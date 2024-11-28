@@ -77,7 +77,7 @@ impl TcpProxyControl {
         proxy_port: u16,
         tcp_proxy_token: ServerEnd<TcpProxy_Marker>,
     ) -> Result<u16, Error> {
-        let mut tcp_proxy_stream = tcp_proxy_token.into_stream()?;
+        let mut tcp_proxy_stream = tcp_proxy_token.into_stream();
         let mut proxy_handles_lock = self.proxy_handles.lock().await;
 
         if let Some(proxy_handle) = proxy_handles_lock.get(&target_port) {
@@ -218,7 +218,7 @@ mod test {
 
     fn launch_data_proxy_control() -> TcpProxyControlProxy {
         let control = TcpProxyControl::new();
-        let (proxy, stream) = create_proxy_and_stream::<TcpProxyControlMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<TcpProxyControlMarker>();
         fasync::Task::spawn(async move {
             control.serve_requests_from_stream(stream).await.unwrap();
         })
@@ -304,8 +304,7 @@ mod test {
         assert_request(test_port).await;
 
         let (tcp_proxy, tcp_proxy_handle) = TcpProxy::new(test_port, 0).unwrap();
-        let (tcp_proxy_token, tcp_proxy_server_end) =
-            create_proxy_and_stream::<TcpProxy_Marker>().unwrap();
+        let (tcp_proxy_token, tcp_proxy_server_end) = create_proxy_and_stream::<TcpProxy_Marker>();
         let proxy_port = tcp_proxy_handle
             .register_client(tcp_proxy_server_end)
             .map_err(|_| anyhow!("Error on register client"))
@@ -329,8 +328,7 @@ mod test {
         let test_port = launch_test_server_v4();
 
         let (tcp_proxy, tcp_proxy_handle) = TcpProxy::new(test_port, 0).unwrap();
-        let (tcp_proxy_token, tcp_proxy_server_end) =
-            create_proxy_and_stream::<TcpProxy_Marker>().unwrap();
+        let (tcp_proxy_token, tcp_proxy_server_end) = create_proxy_and_stream::<TcpProxy_Marker>();
         let proxy_port = tcp_proxy_handle
             .register_client(tcp_proxy_server_end)
             .map_err(|_| anyhow!("Error on register client"))
@@ -353,8 +351,7 @@ mod test {
         assert_request(test_port).await;
 
         let (tcp_proxy, tcp_proxy_handle) = TcpProxy::new(test_port, 0).unwrap();
-        let (tcp_proxy_token, tcp_proxy_server_end) =
-            create_proxy_and_stream::<TcpProxy_Marker>().unwrap();
+        let (tcp_proxy_token, tcp_proxy_server_end) = create_proxy_and_stream::<TcpProxy_Marker>();
         let proxy_port = tcp_proxy_handle
             .register_client(tcp_proxy_server_end)
             .map_err(|_| anyhow!("Error on register client"))
@@ -364,7 +361,7 @@ mod test {
 
         // create second client
         let (tcp_proxy_token_2, tcp_proxy_server_end_2) =
-            create_proxy_and_stream::<TcpProxy_Marker>().unwrap();
+            create_proxy_and_stream::<TcpProxy_Marker>();
         tcp_proxy_handle
             .register_client(tcp_proxy_server_end_2)
             .map_err(|_| anyhow!("Error on register client"))
@@ -387,12 +384,11 @@ mod test {
         let control_proxy = launch_data_proxy_control();
         let target_port = 80;
 
-        let (_proxy_client, proxy_client_server_end) = create_proxy::<TcpProxy_Marker>().unwrap();
+        let (_proxy_client, proxy_client_server_end) = create_proxy::<TcpProxy_Marker>();
         let open_port =
             control_proxy.open_proxy_(target_port, 0, proxy_client_server_end).await.unwrap();
 
-        let (_proxy_client_2, proxy_client_server_end_2) =
-            create_proxy::<TcpProxy_Marker>().unwrap();
+        let (_proxy_client_2, proxy_client_server_end_2) = create_proxy::<TcpProxy_Marker>();
         let open_port_2 =
             control_proxy.open_proxy_(target_port, 0, proxy_client_server_end_2).await.unwrap();
 
@@ -406,7 +402,7 @@ mod test {
         let control_proxy = launch_data_proxy_control();
 
         // echo server reachable through proxy
-        let (tcp_proxy, tcp_proxy_server_end) = create_proxy().unwrap();
+        let (tcp_proxy, tcp_proxy_server_end) = create_proxy();
         let proxy_port =
             control_proxy.open_proxy_(test_port, 0, tcp_proxy_server_end).await.unwrap();
         assert_request(proxy_port).await;
@@ -417,7 +413,7 @@ mod test {
         assert_unreachable(proxy_port).await;
 
         // reachable after recreating proxy
-        let (_tcp_proxy, tcp_proxy_server_end) = create_proxy().unwrap();
+        let (_tcp_proxy, tcp_proxy_server_end) = create_proxy();
         let proxy_port =
             control_proxy.open_proxy_(test_port, 0, tcp_proxy_server_end).await.unwrap();
         assert_request(proxy_port).await;

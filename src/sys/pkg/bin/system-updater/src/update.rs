@@ -1402,8 +1402,7 @@ async fn replace_retained_packages(
     hashes: impl IntoIterator<Item = fuchsia_hash::Hash>,
     retained_packages: &fpkg::RetainedPackagesProxy,
 ) -> Result<(), anyhow::Error> {
-    let (client_end, stream) =
-        fidl::endpoints::create_request_stream().context("creating request stream")?;
+    let (client_end, stream) = fidl::endpoints::create_request_stream();
     let replace_resp = retained_packages.replace(client_end);
     let () = fidl_fuchsia_pkg_ext::serve_fidl_iterator_from_slice(
         stream,

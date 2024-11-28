@@ -44,7 +44,7 @@ pub fn map_to_raw_status(e: Error) -> zx::sys::zx_status_t {
 }
 
 pub async fn new_block_client(remote: ClientEnd<BlockMarker>) -> Result<RemoteBlockClient, Error> {
-    Ok(RemoteBlockClient::new(remote.into_proxy()?).await?)
+    Ok(RemoteBlockClient::new(remote.into_proxy()).await?)
 }
 
 /// Runs Fxfs as a component.
@@ -77,6 +77,7 @@ impl Deref for InspectedFxFilesystem {
 #[async_trait]
 impl FsInspect for InspectedFxFilesystem {
     fn get_info_data(&self) -> InfoData {
+        let earliest_version = self.0.super_block_header().earliest_version;
         InfoData {
             id: self.1,
             fs_type: fidl_fuchsia_fs::VfsType::Fxfs.into_primitive().into(),
@@ -85,8 +86,7 @@ impl FsInspect for InspectedFxFilesystem {
             version_minor: LATEST_VERSION.minor.into(),
             block_size: self.0.block_size() as u64,
             max_filename_length: fio::MAX_FILENAME,
-            // TODO(https://fxbug.dev/42175592): Determine how to report oldest on-disk version if required.
-            oldest_version: None,
+            oldest_version: Some((earliest_version.major.into(), earliest_version.minor.into())),
         }
     }
 
@@ -538,11 +538,10 @@ mod tests {
             fs.close().await.expect("close failed");
         }
 
-        let (client_end, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client_end, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let (lifecycle_client, lifecycle_server) =
-            fidl::endpoints::create_proxy::<LifecycleMarker>().unwrap();
+            fidl::endpoints::create_proxy::<LifecycleMarker>();
 
         let mut component_task = Box::pin(
             async {
@@ -632,8 +631,7 @@ mod tests {
 
             async move {
                 let (dir_proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("create_proxy failed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volumes_proxy
                     .create("test", server_end, CreateOptions::default(), MountOptions::default())
                     .await
@@ -653,8 +651,7 @@ mod tests {
 
                 // Creating another volume with the same name should fail.
                 let (_dir_proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("create_proxy failed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volumes_proxy
                     .create("test", server_end, CreateOptions::default(), MountOptions::default())
                     .await
@@ -672,8 +669,7 @@ mod tests {
 
                 // Create the same volume again and it should now succeed.
                 let (_dir_proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("create_proxy failed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volumes_proxy
                     .create("test", server_end, CreateOptions::default(), MountOptions::default())
                     .await
@@ -695,8 +691,7 @@ mod tests {
                 .expect("Unable to connect to Volumes protocol");
 
             let (volumes_dir_proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("create_proxy failed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             client
                 .open(
                     fio::OpenFlags::RIGHT_READABLE,
@@ -711,8 +706,7 @@ mod tests {
 
             async move {
                 let (_dir_proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("create_proxy failed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volumes_proxy
                     .create("test", server_end, CreateOptions::default(), MountOptions::default())
                     .await

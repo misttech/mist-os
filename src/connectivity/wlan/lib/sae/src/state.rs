@@ -139,7 +139,8 @@ fn process_commit<E>(
         None => return Ok(FrameResult::Drop),
     };
 
-    let pwe = fcg.element_from_octets(&config.pwe)?.ok_or(format_err!("Could not unwrap PWE"))?;
+    let pwe =
+        fcg.element_from_octets(&config.pwe)?.ok_or_else(|| format_err!("Could not unwrap PWE"))?;
     let element_k = fcg.scalar_op(
         rand,
         &fcg.elem_op(&fcg.scalar_op(&peer_commit.scalar, &pwe)?, &peer_commit.element)?,
@@ -211,7 +212,7 @@ impl<E> SaeNew<E> {
         };
         let pwe = fcg
             .element_from_octets(&self.config.pwe)?
-            .ok_or(format_err!("Could not unwrap PWE"))?;
+            .ok_or_else(|| format_err!("Could not unwrap PWE"))?;
         let element = fcg.inverse_op(fcg.scalar_op(&mask, &pwe)?)?;
         Ok((
             rand.to_be_vec(fcg.scalar_size()?),

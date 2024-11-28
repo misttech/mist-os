@@ -103,7 +103,7 @@ pub async fn connect_to_instance_protocol_at_path<P: ProtocolMarker>(
     path: &str,
     realm: &fsys::RealmQueryProxy,
 ) -> Result<P::Proxy, OpenError> {
-    let (proxy, server_end) = create_proxy::<P>().unwrap();
+    let (proxy, server_end) = create_proxy::<P>();
     let server_end = server_end.into_channel();
     open_in_instance_dir(
         &moniker,
@@ -134,7 +134,7 @@ pub async fn open_instance_subdir_readable(
     path: &str,
     realm: &fsys::RealmQueryProxy,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let (root_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (root_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     let server_end = server_end.into_channel();
     open_in_instance_dir(
         moniker,
@@ -215,8 +215,7 @@ mod tests {
                 }
                 _ => unreachable!(),
             };
-        })
-        .unwrap();
+        });
 
         connect_to_instance_protocol_at_path::<fsys::RealmQueryMarker>(
             &Moniker::parse_str("moniker").unwrap(),
@@ -250,8 +249,7 @@ mod tests {
                 }
                 _ => unreachable!(),
             };
-        })
-        .unwrap();
+        });
 
         open_instance_subdir_readable(
             &Moniker::parse_str("moniker").unwrap(),

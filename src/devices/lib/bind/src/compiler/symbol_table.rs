@@ -134,7 +134,9 @@ fn find_qualified_identifier(
             .find(|include| {
                 namespace == include.name || Some(namespace.to_string()) == include.alias
             })
-            .ok_or(CompilerError::UnresolvedQualification(declaration.identifier.clone()))?;
+            .ok_or_else(|| {
+                CompilerError::UnresolvedQualification(declaration.identifier.clone())
+            })?;
 
         return Ok(include.name.nest(declaration.identifier.name.clone()));
     }

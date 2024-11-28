@@ -80,8 +80,6 @@ void arch_register_mpid(uint cpu_id, uint64_t mpid);
 void arm64_init_percpu_early();
 
 extern uint arm_num_cpus;
-extern uint arm64_cpu_cluster_ids[SMP_MAX_CPUS];
-extern uint arm64_cpu_cpu_ids[SMP_MAX_CPUS];
 
 // Use the x20 register to always point at the local cpu structure for fast access.
 // x20 is the first available callee-saved register that clang will allow to be marked
@@ -206,24 +204,10 @@ inline void arch_set_num_cpus(uint cpu_count) { arm_num_cpus = cpu_count; }
 
 inline uint arch_max_num_cpus() { return arm_num_cpus; }
 
-// translate a cpu number back to the cluster ID (AFF1)
-inline uint arch_cpu_num_to_cluster_id(cpu_num_t cpu) {
-  DEBUG_ASSERT(cpu < SMP_MAX_CPUS);
-
-  return arm64_cpu_cluster_ids[cpu];
-}
-
-// translate a cpu number back to the MP cpu number within a cluster (AFF0)
-inline uint arch_cpu_num_to_cpu_id(cpu_num_t cpu) {
-  DEBUG_ASSERT(cpu < SMP_MAX_CPUS);
-
-  return arm64_cpu_cpu_ids[cpu];
-}
-
 // Translate a CPU number back to the MPIDR of the CPU.
 uint64_t arch_cpu_num_to_mpidr(cpu_num_t cpu_num);
 
-// translate mpidr to cpu number
+// Translate mpidr to cpu number.
 cpu_num_t arm64_mpidr_to_cpu_num(uint64_t mpidr);
 
 // Setup the high-level percpu struct pointer for |cpu_num|.

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::device::mem::new_null_file;
 use crate::execution::execute_task_with_prerun_result;
 use crate::fs::fuchsia::RemoteFs;
 use crate::fs::tmpfs::TmpFs;
@@ -35,9 +36,9 @@ use starnix_uapi::{statfs, MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE};
 ///
 /// Open "/pkg" and returns an FsContext rooted in that directory.
 fn create_pkgfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
-    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
+    let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
     let (server, client) = zx::Channel::create();
-    fdio::open_deprecated("/pkg", rights, server).expect("failed to open /pkg");
+    fdio::open("/pkg", rights, server).expect("failed to open /pkg");
     RemoteFs::new_fs(
         kernel,
         client,
@@ -102,6 +103,10 @@ where
     let security_server_for_callback = security_server.clone();
     spawn_kernel_and_run_internal(
         move |unlocked, current_task| {
+            security::selinuxfs_init_null(
+                current_task,
+                &new_null_file(current_task, OpenFlags::empty()),
+            );
             callback(unlocked, current_task, &security_server_for_callback)
         },
         Some(security_server),

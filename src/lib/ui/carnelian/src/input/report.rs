@@ -142,7 +142,7 @@ impl<'a> InputReportHandler<'a> {
         keymap: &'a Keymap<'a>,
     ) -> Self {
         Self {
-            device_id: device_id.clone(),
+            device_id: device_id,
             view_size: size,
             display_rotation,
             keymap,

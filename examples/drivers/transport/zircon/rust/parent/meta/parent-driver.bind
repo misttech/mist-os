@@ -1,0 +1,12 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+using fuchsia.test;
+using gizmo.example;
+
+if gizmo.example.TEST_NODE_ID == "zircon_transport_rust_parent" {
+  true;
+} else {
+  fuchsia.BIND_PROTOCOL == fuchsia.test.BIND_PROTOCOL.PARENT;
+}

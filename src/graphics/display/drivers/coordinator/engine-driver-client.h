@@ -10,14 +10,14 @@
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/zx/result.h>
 
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
-#include "src/graphics/display/lib/api-types-cpp/image-buffer-usage.h"
-#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
-namespace display {
+namespace display_coordinator {
 
 class Controller;
 
@@ -44,8 +44,8 @@ class EngineDriverClient {
 
   ~EngineDriverClient();
 
-  void ReleaseImage(DriverImageId driver_image_id);
-  zx::result<> ReleaseCapture(DriverCaptureImageId driver_capture_image_id);
+  void ReleaseImage(display::DriverImageId driver_image_id);
+  zx::result<> ReleaseCapture(display::DriverCaptureImageId driver_capture_image_id);
 
   config_check_result_t CheckConfiguration(
       const display_config_t* display_config_list, size_t display_config_count,
@@ -59,20 +59,21 @@ class EngineDriverClient {
   void RegisterDisplayEngineListener(const display_engine_listener_protocol_t& protocol);
   void DeregisterDisplayEngineListener();
 
-  zx::result<DriverImageId> ImportImage(const ImageMetadata& image_metadata,
-                                        DriverBufferCollectionId collection_id, uint32_t index);
-  zx::result<DriverCaptureImageId> ImportImageForCapture(DriverBufferCollectionId collection_id,
-                                                         uint32_t index);
+  zx::result<display::DriverImageId> ImportImage(const display::ImageMetadata& image_metadata,
+                                                 display::DriverBufferCollectionId collection_id,
+                                                 uint32_t index);
+  zx::result<display::DriverCaptureImageId> ImportImageForCapture(
+      display::DriverBufferCollectionId collection_id, uint32_t index);
   zx::result<> ImportBufferCollection(
-      DriverBufferCollectionId collection_id,
+      display::DriverBufferCollectionId collection_id,
       fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> collection_token);
-  zx::result<> ReleaseBufferCollection(DriverBufferCollectionId collection_id);
-  zx::result<> SetBufferCollectionConstraints(const ImageBufferUsage& usage,
-                                              DriverBufferCollectionId collection_id);
+  zx::result<> ReleaseBufferCollection(display::DriverBufferCollectionId collection_id);
+  zx::result<> SetBufferCollectionConstraints(const display::ImageBufferUsage& usage,
+                                              display::DriverBufferCollectionId collection_id);
 
   bool IsCaptureSupported();
-  zx::result<> StartCapture(DriverCaptureImageId driver_capture_image_id);
-  zx::result<> SetDisplayPower(DisplayId display_id, bool power_on);
+  zx::result<> StartCapture(display::DriverCaptureImageId driver_capture_image_id);
+  zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on);
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb);
 
  private:
@@ -86,6 +87,6 @@ class EngineDriverClient {
   ddk::DisplayEngineProtocolClient banjo_engine_;
 };
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_ENGINE_DRIVER_CLIENT_H_

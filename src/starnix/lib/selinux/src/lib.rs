@@ -79,6 +79,8 @@ enumerable_enum! {
         Character,
         /// The SELinux "dir" object class.
         Dir,
+        /// The SELinux "fd" object class.
+        Fd,
         /// The SELinux "fifo_file" object class.
         Fifo,
         /// The SELinux "file" object class.
@@ -105,6 +107,7 @@ impl ObjectClass {
             Self::Block => "blk_file",
             Self::Character => "chr_file",
             Self::Dir => "dir",
+            Self::Fd => "fd",
             Self::Fifo => "fifo_file",
             Self::File => "file",
             Self::FileSystem => "filesystem",
@@ -246,6 +249,8 @@ permission_enum! {
         Character(CharacterFilePermission),
         /// Permissions for the well-known SELinux "dir" file-like object class.
         Dir(DirPermission),
+        /// Permissions for the well-known SELinux "fd" object class.
+        Fd(FdPermission),
         /// Permissions for the well-known SELinux "fifo_file" file-like object class.
         Fifo(FifoFilePermission),
         /// Permissions for the well-known SELinux "file" object class.
@@ -327,10 +332,15 @@ common_permission_enum! {
         Link("link"),
         /// Permission to open a file.
         Open("open"),
+        /// Permission to read file contents. Note this applies to reading more than regular file's
+        /// data.
+        Read("read"),
         /// Permission checked against the existing label when updating a file's security label.
         RelabelFrom("relabelfrom"),
         /// Permission checked against the new label when updating a file's security label.
         RelabelTo("relabelto"),
+        /// Permission to rename a file.
+        Rename("rename"),
         /// Permission to modify attributes, including uid, gid and extended attributes.
         SetAttr("setattr"),
         /// Permission to delete a file or remove a hard link.
@@ -384,8 +394,24 @@ class_permission_enum! {
         RemoveDir("rmdir"),
         /// Permission to remove an entry from a directory.
         RemoveName("remove_name"),
+        /// Permission to change parent directory.
+        Reparent("reparent"),
         /// Search access to the directory.
         Search("search"),
+        // keep-sorted end
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "fd" class permission in SELinux policy that has a particular meaning in policy
+    /// enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    FdPermission {
+        // keep-sorted start
+        /// Permission to use file descriptors copied/retained/inherited from another security
+        /// context. This permission is generally used to control whether an `exec*()` call from a
+        /// cloned process that retained a copy of the file descriptor table should succeed.
+        Use("use"),
         // keep-sorted end
     }
 }
@@ -614,7 +640,7 @@ pub struct FileSystemLabel {
 #[derive(Clone, Debug, PartialEq)]
 pub enum FileSystemLabelingScheme {
     /// This filesystem was mounted with "context=".
-    Mountpoint,
+    Mountpoint { sid: SecurityId },
     /// This filesystem has an "fs_use_xattr", "fs_use_task", or "fs_use_trans" entry in the
     /// policy. `root_sid` identifies the context for the root of the filesystem and `def_sid`
     /// identifies the context to use for unlabeled files in the filesystem (the "default

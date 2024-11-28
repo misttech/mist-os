@@ -17,12 +17,13 @@ use core::time::Duration;
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use log::{debug, error, trace};
-use net_types::ip::{AddrSubnet, IpAddress, Ipv6Addr, Subnet};
+use net_types::ip::{AddrSubnet, IpAddress, Ipv6, Ipv6Addr, Subnet};
 use net_types::Witness as _;
 use netstack3_base::{
     AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier,
-    ExistsError, HandleableTimer, Instant, InstantBindingsTypes, InstantContext, LocalTimerHeap,
-    NotFoundError, RngContext, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
+    EventContext, ExistsError, HandleableTimer, Instant, InstantBindingsTypes, InstantContext,
+    LocalTimerHeap, NotFoundError, RngContext, TimerBindingsTypes, TimerContext,
+    WeakDeviceIdentifier,
 };
 use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
@@ -34,7 +35,7 @@ use crate::internal::device::opaque_iid::{IidSecret, OpaqueIid, OpaqueIidNonce};
 use crate::internal::device::state::{
     Lifetime, PreferredLifetime, SlaacConfig, TemporarySlaacConfig,
 };
-use crate::internal::device::{AddressRemovedReason, Ipv6DeviceAddr};
+use crate::internal::device::{AddressRemovedReason, IpDeviceEvent, Ipv6DeviceAddr};
 
 /// Minimum Valid Lifetime value to actually update an address's valid lifetime.
 ///
@@ -178,7 +179,9 @@ pub struct SlaacAddrsMutAndConfig<'a, BT: SlaacBindingsTypes, A: SlaacAddresses<
 }
 
 /// The execution context for SLAAC.
-pub trait SlaacContext<BC: SlaacBindingsContext>: DeviceIdContext<AnyDevice> {
+pub trait SlaacContext<BC: SlaacBindingsContext<Self::DeviceId>>:
+    DeviceIdContext<AnyDevice>
+{
     /// The inner [`SlaacAddresses`] impl.
     type SlaacAddrs<'a>: SlaacAddresses<BC> + CounterContext<SlaacCounters> + 'a;
 
@@ -257,8 +260,17 @@ pub trait SlaacBindingsTypes: InstantBindingsTypes + TimerBindingsTypes {}
 impl<BT> SlaacBindingsTypes for BT where BT: InstantBindingsTypes + TimerBindingsTypes {}
 
 /// The bindings execution context for SLAAC.
-pub trait SlaacBindingsContext: RngContext + TimerContext + SlaacBindingsTypes {}
-impl<BC> SlaacBindingsContext for BC where BC: RngContext + TimerContext + SlaacBindingsTypes {}
+pub trait SlaacBindingsContext<D>:
+    RngContext + TimerContext + EventContext<IpDeviceEvent<D, Ipv6, Self::Instant>> + SlaacBindingsTypes
+{
+}
+impl<D, BC> SlaacBindingsContext<D> for BC where
+    BC: RngContext
+        + TimerContext
+        + EventContext<IpDeviceEvent<D, Ipv6, Self::Instant>>
+        + SlaacBindingsTypes
+{
+}
 
 /// An implementation of SLAAC.
 pub trait SlaacHandler<BC: InstantContext>: DeviceIdContext<AnyDevice> {
@@ -296,7 +308,7 @@ pub trait SlaacHandler<BC: InstantContext>: DeviceIdContext<AnyDevice> {
     fn remove_all_slaac_addresses(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId);
 }
 
-impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> SlaacHandler<BC> for CC {
+impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<BC> for CC {
     fn apply_slaac_update(
         &mut self,
         bindings_ctx: &mut BC,
@@ -478,7 +490,7 @@ impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> SlaacHandler<BC> for CC {
     }
 }
 
-fn on_address_removed_inner<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
+fn on_address_removed_inner<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>>(
     bindings_ctx: &mut BC,
     addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     device_id: &CC::DeviceId,
@@ -503,7 +515,11 @@ fn on_address_removed_inner<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
                 );
                 temporary_config
             }
-            SlaacConfig::Static { .. } => return,
+            SlaacConfig::Static { .. } => {
+                // TODO(https://fxbug.dev/42148800): Re-generate static
+                // addresses if we're not using hardware-derived IIDs.
+                return;
+            }
         };
 
     match reason {
@@ -579,7 +595,7 @@ fn on_address_removed_inner<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
     )
 }
 
-fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
+fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext<D>>(
     address_entry: SlaacAddressEntryMut<'_, BC::Instant>,
     state: &mut SlaacState<BC>,
     subnet: Subnet<Ipv6Addr>,
@@ -766,9 +782,11 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
     // Lifetime in the received advertisement.
 
     // Update the preferred lifetime for this address.
-    match preferred_for_and_regen_at {
+    let preferred_lifetime_updated = match preferred_for_and_regen_at {
         None => {
-            if !preferred_lifetime.is_deprecated() {
+            if preferred_lifetime.is_deprecated() {
+                false
+            } else {
                 *preferred_lifetime = PreferredLifetime::Deprecated;
                 let _: Option<(BC::Instant, ())> =
                     timers.cancel(bindings_ctx, &InnerSlaacTimerId::DeprecateSlaacAddress { addr });
@@ -776,6 +794,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                     bindings_ctx,
                     &InnerSlaacTimerId::RegenerateTemporaryAddress { addr_subnet: addr_sub },
                 );
+                true
             }
         }
         Some((preferred_for, regen_at)) => {
@@ -791,14 +810,16 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                         timers.cancel(bindings_ctx, &timer_id);
                 }
             };
-            *preferred_lifetime = PreferredLifetime::Preferred(preferred_instant);
+            let new_lifetime = PreferredLifetime::Preferred(preferred_instant);
+            let updated = core::mem::replace(preferred_lifetime, new_lifetime) != new_lifetime;
             let timer_id = InnerSlaacTimerId::RegenerateTemporaryAddress { addr_subnet: addr_sub };
             let _prev_regen_at: Option<(BC::Instant, ())> = match regen_at {
                 Some(regen_at) => timers.schedule_instant(bindings_ctx, timer_id, (), regen_at),
                 None => timers.cancel(bindings_ctx, &timer_id),
             };
+            updated
         }
-    }
+    };
 
     // As per RFC 4862 section 5.5.3.e, the specific action to perform for the
     // valid lifetime of the address depends on the Valid Lifetime in the
@@ -889,10 +910,19 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
             );
         }
     }
+
+    if preferred_lifetime_updated || valid_for_to_update.is_some() {
+        bindings_ctx.on_event(IpDeviceEvent::AddressPropertiesChanged {
+            device: device_id.clone(),
+            addr: addr_sub.addr().into(),
+            valid_until: slaac_config.valid_until(),
+            preferred_lifetime: *preferred_lifetime,
+        });
+    }
     ControlFlow::Continue(slaac_type)
 }
 
-impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> HandleableTimer<CC, BC>
+impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> HandleableTimer<CC, BC>
     for SlaacTimerId<CC::WeakDeviceId>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
@@ -910,6 +940,13 @@ impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> HandleableTimer<CC, BC>
                     .for_each_addr_mut(|SlaacAddressEntryMut { addr_sub, config }| {
                         if addr_sub.addr() == addr {
                             config.preferred_lifetime = PreferredLifetime::Deprecated;
+
+                            bindings_ctx.on_event(IpDeviceEvent::AddressPropertiesChanged {
+                                device: device_id.clone(),
+                                addr: addr_sub.addr().into(),
+                                valid_until: config.inner.valid_until(),
+                                preferred_lifetime: config.preferred_lifetime,
+                            });
                         }
                     }),
                 InnerSlaacTimerId::InvalidateSlaacAddress { addr } => {
@@ -1189,7 +1226,7 @@ fn desync_factor<R: Rng>(
     })
 }
 
-fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
+fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>>(
     bindings_ctx: &mut BC,
     addrs_config: SlaacAddrsMutAndConfig<'_, BC, CC::SlaacAddrs<'_>>,
     slaac_state: &mut SlaacState<BC>,
@@ -1450,7 +1487,7 @@ fn generate_global_temporary_address(
     address
 }
 
-fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
+fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>>(
     slaac_addrs: &mut CC::SlaacAddrs<'_>,
     slaac_state: &mut SlaacState<BC>,
     bindings_ctx: &mut BC,
@@ -1497,7 +1534,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
                 SlaacConfig::Static { valid_until },
                 // Generate the global address as defined by RFC 4862 section 5.5.3.d.
                 //
-                // TODO(https://fxbug.dev/42178008): Support regenerating address.
+                // TODO(https://fxbug.dev/42148800): Support regenerating address.
                 either::Either::Left(core::iter::once(generate_global_static_address(
                     &subnet,
                     &iid[..],
@@ -1766,7 +1803,7 @@ pub(crate) mod testutil {
     where
         CC: Ipv6DeviceConfigurationContext<BC>,
         for<'a> CC::Ipv6DeviceStateCtx<'a>: SlaacContext<BC>,
-        BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId> + SlaacBindingsContext,
+        BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId> + SlaacBindingsContext<CC::DeviceId>,
     {
         core_ctx.with_ipv6_device_configuration(device_id, |_, mut core_ctx| {
             core_ctx.with_slaac_addrs_mut(device_id, |_, state| {
@@ -1812,8 +1849,12 @@ mod tests {
     }
 
     type FakeCoreCtxImpl = FakeCoreCtx<FakeSlaacContext, (), FakeDeviceId>;
-    type FakeBindingsCtxImpl =
-        FakeBindingsCtx<SlaacTimerId<FakeWeakDeviceId<FakeDeviceId>>, (), (), ()>;
+    type FakeBindingsCtxImpl = FakeBindingsCtx<
+        SlaacTimerId<FakeWeakDeviceId<FakeDeviceId>>,
+        IpDeviceEvent<FakeDeviceId, Ipv6, FakeInstant>,
+        (),
+        (),
+    >;
 
     #[derive(Default)]
     struct FakeSlaacAddrs {
@@ -1895,7 +1936,10 @@ mod tests {
     }
 
     impl SlaacContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
-        type SlaacAddrs<'a> = &'a mut FakeSlaacAddrs where FakeCoreCtxImpl: 'a;
+        type SlaacAddrs<'a>
+            = &'a mut FakeSlaacAddrs
+        where
+            FakeCoreCtxImpl: 'a;
 
         fn with_slaac_addrs_mut_and_configs<
             O,

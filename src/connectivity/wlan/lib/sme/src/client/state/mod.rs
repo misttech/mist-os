@@ -1753,7 +1753,7 @@ fn roam_handle_result(
 
             if result_fields.target_bss_authenticated {
                 Err(AfterRoamFailureState::Disconnecting(Roaming::to_disconnecting(
-                    msg.to_owned(),
+                    msg,
                     failure,
                     state.cfg,
                     state.cmd.connect_txn_sink,
@@ -1761,11 +1761,7 @@ fn roam_handle_result(
                     context,
                 )))
             } else {
-                Err(AfterRoamFailureState::Idle(state.to_idle(
-                    msg.to_owned(),
-                    failure,
-                    state_change_ctx,
-                )))
+                Err(AfterRoamFailureState::Idle(state.to_idle(msg, failure, state_change_ctx)))
             }
         }
     }
@@ -4134,7 +4130,7 @@ mod tests {
         fidl_sme::ClientSmeDisconnectResponder,
     ) {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_sme::ClientSmeMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_sme::ClientSmeMarker>();
         let mut disconnect_fut =
             proxy.disconnect(fidl_sme::UserDisconnectReason::DisconnectDetectedFromSme);
         assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Pending);
@@ -5101,6 +5097,7 @@ mod tests {
                 timer,
                 att_id: 0,
                 inspect: Arc::new(inspect::SmeTree::new(
+                    inspector.clone(),
                     inspector.root().create_child("usme"),
                     &test_utils::fake_device_info([1u8; 6].into()),
                     &fake_spectrum_management_support_empty(),

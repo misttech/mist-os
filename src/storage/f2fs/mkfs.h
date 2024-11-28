@@ -18,6 +18,27 @@ static const char* kMediaExtList[] = {"jpg", "gif", "png",  "avi", "divx", "mp4"
                                       "wmv", "wma", "mpeg", "mkv", "mov",  "asx", "asf", "wmx",
                                       "svi", "wvx", "wm",   "mpg", "mpe",  "rm",  "ogg"};
 
+struct GlobalParameters {
+  uint32_t sector_size = 0;
+  uint32_t reserved_segments = 0;
+  uint32_t op_ratio = 0;
+  uint32_t op_segments = 0;
+  uint32_t cur_seg[6];
+  uint32_t segs_per_sec = 0;
+  uint32_t secs_per_zone = 0;
+  uint32_t start_sector = 0;
+  uint64_t total_sectors = 0;
+  uint32_t sectors_per_blk = 0;
+  uint32_t blks_per_seg = 0;
+  uint8_t vol_label[kVolumeLabelLength] = {
+      0,
+  };
+  int heap = 0;
+  int32_t fd = 0;
+  char* device_name = nullptr;
+  std::vector<std::string> extension_list;
+};
+
 struct MkfsOptions {
   std::string label;
   bool heap_based_allocation = true;
@@ -37,12 +58,10 @@ class MkfsWorker {
   // Not copyable or moveable
   MkfsWorker(const MkfsWorker&) = delete;
   MkfsWorker& operator=(const MkfsWorker&) = delete;
-  MkfsWorker(const MkfsWorker&&) = delete;
-  MkfsWorker& operator=(const MkfsWorker&&) = delete;
+  MkfsWorker(MkfsWorker&&) = delete;
+  MkfsWorker& operator=(MkfsWorker&&) = delete;
 
   zx::result<std::unique_ptr<BcacheMapper>> DoMkfs();
-
-  std::unique_ptr<BcacheMapper> Destroy() { return std::move(bc_); }
 
  private:
   friend class MkfsTester;
@@ -61,7 +80,7 @@ class MkfsWorker {
 
   zx_status_t WriteToDisk(void* buf, block_t bno);
 
-  zx::result<uint32_t> GetCalculatedOp(uint32_t op) const;
+  zx::result<> SetSpace();
 
   zx_status_t PrepareSuperblock();
   zx_status_t InitSitArea();

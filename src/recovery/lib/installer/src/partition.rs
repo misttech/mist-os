@@ -254,7 +254,7 @@ impl Partition {
             }
         };
         let (client, server) =
-            fidl::endpoints::create_request_stream::<fidl_fuchsia_paver::PayloadStreamMarker>()?;
+            fidl::endpoints::create_request_stream::<fidl_fuchsia_paver::PayloadStreamMarker>();
 
         // Run the server and client ends of the PayloadStream concurrently.
         try_join(
@@ -405,7 +405,7 @@ mod tests {
         block_count: usize,
         guid: [u8; 16],
     ) -> Result<PartitionProxy, Error> {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PartitionMarker>()?;
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PartitionMarker>();
         fasync::Task::local(
             serve_partition(
                 label,

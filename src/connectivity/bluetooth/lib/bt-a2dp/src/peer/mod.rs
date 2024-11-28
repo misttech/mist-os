@@ -173,7 +173,7 @@ impl StreamPermits {
             {
                 let mut lock = peer.lock();
                 match lock.suspend_local_stream(&local_id) {
-                    Ok(remote_id) => drop(lock.peer.suspend(&[remote_id.clone()])),
+                    Ok(remote_id) => drop(lock.peer.suspend(&[remote_id])),
                     Err(e) => warn!("Couldn't stop local stream {local_id:?}: {e:?}"),
                 }
             }
@@ -957,7 +957,7 @@ impl PeerInner {
                             // Happens when we cannot start because of permits.
                             // Accept this one, then queue up for suspend.
                             // We are already reserved for a permit.
-                            immediate_suspend.push(remote_id.clone());
+                            immediate_suspend.push(remote_id);
                             return Ok(());
                         };
                         match self.start_local_stream(permit, &seid) {
@@ -1128,8 +1128,7 @@ mod tests {
     ) -> (bt_metrics::MetricsLogger, fidl_fuchsia_metrics::MetricEventLoggerRequestStream) {
         let (c, s) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_metrics::MetricEventLoggerMarker,
-        >()
-        .expect("failed to create MetricsEventLogger proxy");
+        >();
         (bt_metrics::MetricsLogger::from_proxy(c), s)
     }
 
@@ -1205,8 +1204,7 @@ mod tests {
         } else {
             (bt_metrics::MetricsLogger::default(), None)
         };
-        let (profile_proxy, requests) =
-            create_proxy_and_stream::<ProfileMarker>().expect("test proxy pair creation");
+        let (profile_proxy, requests) = create_proxy_and_stream::<ProfileMarker>();
         let peer = Peer::create(PeerId(1), avdtp, streams, permits, profile_proxy, metrics_logger);
 
         (remote, requests, cobalt_receiver, peer)
@@ -1265,8 +1263,7 @@ mod tests {
     #[fuchsia::test]
     fn disconnected() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, _stream) =
-            create_proxy_and_stream::<ProfileMarker>().expect("Profile proxy should be created");
+        let (proxy, _stream) = create_proxy_and_stream::<ProfileMarker>();
         let (remote, signaling) = Channel::create();
 
         let id = PeerId(1);

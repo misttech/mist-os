@@ -43,7 +43,6 @@ fuchsia_cc_driver("test-board-driver") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "test-board.cc",
-    "test-clock.cc",
     "test-composite-node-spec.cc",
     "test-gpio.cc",
     "test-spi.cc",
@@ -148,41 +147,6 @@ fuchsia_driver_component("test-power") {
   deps = [ ":test-power-driver" ]
   info = "meta/test-driver-info.json"
   manifest = "meta/test-power.cml"
-}
-
-driver_bind_rules("test-clock-bind") {
-  testonly = true
-  rules = "meta/test-clock.bind"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.test.platform",
-  ]
-}
-
-fuchsia_cc_driver("test-clock-driver") {
-  testonly = true
-  output_name = "test-clock"
-  configs += [ "//build/config:all_source" ]
-  sources = [ "test/clock.cc" ]
-  deps = [
-    ":test-clock-bind",
-    "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_driver_component("test-clock") {
-  testonly = true
-  component_name = "test-clock"
-  deps = [ ":test-clock-driver" ]
-  info = "meta/test-driver-info.json"
-  manifest = "meta/test-clock.cml"
 }
 
 driver_bind_rules("test-spi-bind") {
@@ -294,13 +258,11 @@ fuchsia_unittest_package("platform-bus-test") {
   deps = [
     ":platform-bus",
     ":test-board",
-    ":test-clock",
     ":test-composite-node-spec",
     ":test-gpio",
     ":test-power",
     ":test-spi",
     "//src/devices/bus/drivers/platform",
-    "//src/devices/clock/drivers/clock",
     "//src/devices/gpio/drivers/gpio",
     "//src/devices/power/drivers/power",
     "//src/devices/spi/drivers/spi",

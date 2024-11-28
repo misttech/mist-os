@@ -194,7 +194,7 @@ impl InputDeviceRegistry {
     /// `fuchsia.input.report.InputDevice` that has been registered with the
     /// `fuchsia.input.injection.InputDeviceRegistry` service.
     async fn add_device(&self, descriptor: DeviceDescriptor) -> Result<InputDevice, Error> {
-        let (client_end, request_stream) = endpoints::create_request_stream::<InputDeviceMarker>()?;
+        let (client_end, request_stream) = endpoints::create_request_stream::<InputDeviceMarker>();
         let mut device: InputDevice =
             InputDevice::new(request_stream, descriptor, self.got_input_reports_reader.clone());
 
@@ -270,8 +270,7 @@ mod tests {
         device_type: TestDeviceType,
     ) -> Result<DeviceDescriptor, Error> {
         let (registry_proxy, mut registry_request_stream) =
-            endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>()
-                .expect("failed to create proxy and stream for InputDeviceRegistry");
+            endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>();
         let mut input_device_registry = InputDeviceRegistry {
             proxy: registry_proxy,
             got_input_reports_reader: AsyncEvent::new(),
@@ -307,8 +306,7 @@ mod tests {
                     device
                 }
             }
-            .into_proxy()
-            .expect("converting client_end to proxy");
+            .into_proxy();
 
             input_device_proxy
         };
@@ -327,8 +325,7 @@ mod tests {
         // reports reader, to help debug integration test failures where no component
         // read events from the fake device.
         let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-            endpoints::create_proxy::<InputReportsReaderMarker>()
-                .expect("internal error creating InputReportsReader proxy and server end");
+            endpoints::create_proxy::<InputReportsReaderMarker>();
         let _ = input_device_proxy.get_input_reports_reader(input_reports_reader_server_end);
 
         std::mem::drop(input_device_proxy); // Terminate stream served by `input_device_server_fut`.

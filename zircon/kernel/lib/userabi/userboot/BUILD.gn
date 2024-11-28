@@ -49,7 +49,7 @@ if (current_toolchain == default_toolchain) {
       toolchain_args = {
         if (optimize == "none" || optimize == "debug") {
           # userboot doesn't stay sufficiently pure without optimization.
-          optimize = "default"
+          optimize = "moderate"
         }
 
         # No runtime to print asserts, so can't compile them in.
@@ -96,6 +96,8 @@ if (toolchain_environment == "userboot") {
   }
 
   group("userboot_config_deps") {
+  }
+  group("userboot_config_executable_deps") {
   }
 
   # This is the output of target ":gen-vdso-syms-ld", below.

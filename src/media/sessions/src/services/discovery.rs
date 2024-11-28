@@ -117,16 +117,7 @@ impl Discovery {
         session_id: SessionId,
         session_control_request: ServerEnd<SessionControlMarker>,
     ) {
-        let mut requests = match session_control_request.into_stream() {
-            Ok(requests) => requests,
-            Err(e) => {
-                warn!(
-                    tag = LOG_TAG,
-                    "Client attempted to connect to session with bad channel: {:?}", e
-                );
-                return;
-            }
-        };
+        let mut requests = session_control_request.into_stream();
 
         let session_info_stream = self.single_session_info_stream(session_id);
 
@@ -179,13 +170,7 @@ impl Discovery {
         watch_options: WatchOptions,
         session_watcher: ClientEnd<SessionsWatcherMarker>,
     ) {
-        let proxy = match session_watcher.into_proxy() {
-            Ok(proxy) => proxy,
-            Err(e) => {
-                warn!(tag = LOG_TAG, "Client tried to watch session with invalid watcher: {:?}", e);
-                return;
-            }
-        };
+        let proxy = session_watcher.into_proxy();
 
         let sink = FlowControlledProxySink::from(proxy);
         self.connect_session_watcher(watch_options, sink).await;
@@ -269,16 +254,7 @@ impl Discovery {
         session_id: SessionId,
         session_request: ServerEnd<SessionObserverMarker>,
     ) {
-        let status_request_stream = match session_request.into_stream() {
-            Ok(status_request_stream) => status_request_stream,
-            Err(e) => {
-                info!(
-                    tag = LOG_TAG,
-                    "Client tried to observe session but sent a bad handle: {:?}", e
-                );
-                return;
-            }
-        };
+        let status_request_stream = session_request.into_stream();
 
         let status_request_stream = status_request_stream
             .map(std::result::Result::ok)
@@ -376,15 +352,15 @@ mod test {
         let (_observer_request_sink, observer_request_stream) = mpsc::channel(100);
         let (player_published_sink, _player_published_receiver) = oneshot::channel();
         let dummy_control_handle =
-            create_endpoints::<DiscoveryMarker>().1.into_stream_and_control_handle()?.1;
+            create_endpoints::<DiscoveryMarker>().1.into_stream_and_control_handle().1;
 
-        let (usage_reporter_proxy, _server_end) = create_proxy::<UsageReporterMarker>()?;
+        let (usage_reporter_proxy, _server_end) = create_proxy::<UsageReporterMarker>();
         let under_test = Discovery::new(player_stream, usage_reporter_proxy);
         spawn_log_error(under_test.serve(discovery_request_stream, observer_request_stream));
 
         // Create one watcher ahead of any players, for synchronization.
         let (watcher1_client, watcher1_server) = create_endpoints::<SessionsWatcherMarker>();
-        let mut watcher1 = watcher1_server.into_stream()?;
+        let mut watcher1 = watcher1_server.into_stream();
         discovery_request_sink
             .send(DiscoveryRequest::WatchSessions {
                 watch_options: Default::default(),
@@ -407,7 +383,7 @@ mod test {
             player_published_sink,
         )?;
         player_sink.send(player).await?;
-        let mut player_requests = player_server.into_stream()?;
+        let mut player_requests = player_server.into_stream();
         let info_change_responder = player_requests
             .try_next()
             .await?
@@ -430,7 +406,7 @@ mod test {
                 control_handle: dummy_control_handle.clone(),
             })
             .await?;
-        let mut watcher2 = watcher2_server.into_stream()?;
+        let mut watcher2 = watcher2_server.into_stream();
         assert_matches!(watcher2.try_next().await?.and_then(|r| r.into_session_updated()), Some(_));
 
         Ok(())

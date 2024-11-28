@@ -115,7 +115,7 @@ impl Screens {
         let title = match operation {
             // Factory resets are currently fast operations. If they take longer progress can be added here.
             Operation::FactoryDataReset => "Resetting".to_string(),
-            Operation::Reinstall => format!("Updating {}%", percent).to_string(),
+            Operation::Reinstall => format!("Updating {}%", percent),
         };
         let content = match operation {
             Operation::FactoryDataReset => "• Resetting user data\n\
@@ -184,7 +184,7 @@ impl Screens {
                 self.view_key,
                 ScreenSplit::Even,
                 Some(text1.to_string()),
-                Some(text2.to_string()),
+                Some(text2),
                 None,
                 Some(vec![
                     ButtonInfo::new("Cancel", None, false, true, Event::Cancel),

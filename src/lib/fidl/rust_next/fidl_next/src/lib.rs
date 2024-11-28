@@ -21,6 +21,7 @@
 )]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
+pub use bitflags::bitflags;
 pub use munge::munge;
 pub use rend::{f32_le, f64_le, i16_le, i32_le, i64_le, u16_le, u32_le, u64_le};
 pub use zerocopy::{FromBytes, IntoBytes};

@@ -55,7 +55,7 @@ mod tests {
         let profile_resource = get_profile_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::ProfileResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::ProfileResourceMarker>();
         fasync::Task::local(
             ProfileResource::new(profile_resource)
                 .unwrap_or_else(|e| panic!("Error while creating profile resource service: {}", e))

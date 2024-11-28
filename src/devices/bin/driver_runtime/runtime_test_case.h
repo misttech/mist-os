@@ -31,7 +31,7 @@ class RuntimeTestCase : public zxtest::Test {
                          zx_handle_t* want_handles, uint32_t want_num_handles,
                          fdf_arena_t** out_arena = nullptr);
 
-  // Returns a fake driver pointer that can be used with driver_context APIs.
+  // Returns a fake driver pointer that can be used with thread_context APIs.
   // Do not try to access the internals of the pointer.
   const void* CreateFakeDriver() {
     // We don't actually need a real pointer.

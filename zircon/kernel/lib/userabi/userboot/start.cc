@@ -30,12 +30,10 @@
 #include <zircon/types.h>
 
 #include <array>
-#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <optional>
-#include <string>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -477,7 +475,7 @@ struct TerminationInfo {
 
   // Parse CMDLINE items to determine the set of runtime options.
   Options opts = GetOptionsFromZbi(log, vmar_self, *zbi);
-
+  bool booting_multiple_programs = !opts.boot.next.empty() && !opts.test.next.empty();
   TerminationInfo info = {
       .power = std::move(power),
   };
@@ -485,7 +483,7 @@ struct TerminationInfo {
   {
     auto borrowed_bootfs = bootfs_vmo.borrow();
     Bootfs bootfs{vmar_self.borrow(), std::move(bootfs_vmo), std::move(vmex),
-                  DuplicateOrDie(log, log)};
+                  DuplicateOrDie(log, log), booting_multiple_programs};
     auto launch_process = [&](auto& elf_entry,
                               zx::channel userboot_protocol = zx::channel()) -> ChildContext {
       ChildMessageLayout child_message = CreateChildMessage();
@@ -533,6 +531,19 @@ struct TerminationInfo {
 
     if (!opts.boot.next.empty()) {
       [[maybe_unused]] auto boot_context = launch_process(opts.boot, std::move(userboot_server));
+      // Loader service has exited, we should send the collected bootfs entries.
+      auto status = UserbootPostBootfsEntries(userboot_client, bootfs.entries());
+      if (status.status_value() != ZX_ERR_PEER_CLOSED) {
+        check(log, status.status_value(), "Failed to post bootfs entries.");
+      } else {
+        // If the client does not need any of the messages that require closing the loader service,
+        // it might exit before we post these.
+        printl(log,
+               "`userboot.next` exited before publishing all `fuchsia.boot.Userboot` messages.");
+      }
+      // Now notify the other side we are done by closing our side of userboot handle.
+      userboot_client.reset();
+
       // Tests are commonly defined with `userboot.test.next`, but there are some kind of tests,
       // which require being launched as the boot program. A boot program has a well-defined
       // protocol for communicating handles, and to properly test the protocol implementation the

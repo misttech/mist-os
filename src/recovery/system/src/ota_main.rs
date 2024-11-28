@@ -166,14 +166,14 @@ mod tests {
         );
         fasync::Task::local(async move { scope.wait().await }).detach();
 
-        Ok(client.into_proxy()?)
+        Ok(client.into_proxy())
     }
 
     #[fuchsia::test]
     async fn test_main_internal_reports_ota_success() {
         let (progress_proxy, mut progress_stream) =
-            create_proxy_and_stream::<ProgressRendererMarker>().unwrap();
-        let (_dir_proxy, dir_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            create_proxy_and_stream::<ProgressRendererMarker>();
+        let (_dir_proxy, dir_server) = create_proxy::<fio::DirectoryMarker>();
 
         fasync::Task::local(async move {
             assert_matches!(progress_stream.next().await.unwrap().unwrap(), ProgressRendererRequest::Render2 { payload, responder } => {
@@ -206,8 +206,8 @@ mod tests {
     #[fuchsia::test]
     async fn test_main_internal_sends_error_when_ota_fails() {
         let (progress_proxy, mut progress_stream) =
-            create_proxy_and_stream::<ProgressRendererMarker>().unwrap();
-        let (_dir_proxy, dir_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            create_proxy_and_stream::<ProgressRendererMarker>();
+        let (_dir_proxy, dir_server) = create_proxy::<fio::DirectoryMarker>();
 
         fasync::Task::local(async move {
             assert_matches!(progress_stream.next().await.unwrap().unwrap(), ProgressRendererRequest::Render2 { payload, responder } => {

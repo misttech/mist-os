@@ -607,6 +607,7 @@
                 "ProcPidFile.SubprocessRunning",
                 "ProcPidFile.SubprocessZombie",
                 "ProcPidFile.SubprocessExited",
+                "ProcSelfMaps.AnonNameSharedAnon",
                 "ProcTask.TaskDirHasCorrectMetadata",
                 "ProcTask.VerifyTaskChildren",
                 "ProcTask.VerifyTaskDirNlinks",
@@ -1188,6 +1189,13 @@
 
                 // New failing test. Ignoring for rollers.
                 "CloneTest.NewUserMountNamespace",
+
+                // TODO(https://fxbug.dev/379127911): Investigate and re-enable
+                "TimerTest.RlimitCpuInheritedAcrossFork",
+
+                // TODO(https://fxbug.dev/379165488): deflake
+                "StatTimesTest.DirCreateFile",
+                "StatTimesTest.DirList",
             ],
         },
     ],

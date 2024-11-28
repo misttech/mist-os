@@ -38,8 +38,9 @@ impl TryFrom<fsys::RouteReport> for RouteReport {
     type Error = anyhow::Error;
 
     fn try_from(report: fsys::RouteReport) -> Result<Self> {
-        let decl_type = report.decl_type.ok_or(format_err!("missing decl type"))?.try_into()?;
-        let capability = report.capability.ok_or(format_err!("missing capability name"))?;
+        let decl_type =
+            report.decl_type.ok_or_else(|| format_err!("missing decl type"))?.try_into()?;
+        let capability = report.capability.ok_or_else(|| format_err!("missing capability name"))?;
         let availability: Option<cm_rust::Availability> =
             report.availability.map(cm_rust::Availability::from);
         let error_summary = if let Some(error) = report.error { error.summary } else { None };
@@ -138,8 +139,7 @@ mod test {
         expected_moniker: &'static str,
         reports: Vec<fsys::RouteReport>,
     ) -> fsys::RouteValidatorProxy {
-        let (route_validator, mut stream) =
-            create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
+        let (route_validator, mut stream) = create_proxy_and_stream::<fsys::RouteValidatorMarker>();
         fuchsia_async::Task::local(async move {
             match stream.try_next().await.unwrap().unwrap() {
                 fsys::RouteValidatorRequest::Validate { moniker, responder, .. } => {

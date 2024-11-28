@@ -189,22 +189,20 @@ impl TestServer {
                             });
                             let mut done_fut = done_fut.clone();
                             fasync::Task::spawn(async move {
-                                if let Ok(mut stream) = iterator.into_stream() {
-                                    while let Ok(Some(req)) = select! {
-                                    next = stream.try_next() => next,
-                                    _ = done_fut => Ok(None)}
-                                    {
-                                        match req {
-                                            ftest::CaseIteratorRequest::GetNext {
-                                                responder,
-                                                ..
-                                            } => {
-                                                // Continually drain the |names| iterator on each
-                                                // call.
-                                                responder
-                                                    .send(&names.by_ref().collect::<Vec<_>>())
-                                                    .unwrap_or_default();
-                                            }
+                                let mut stream = iterator.into_stream();
+                                while let Ok(Some(req)) = select! {
+                                next = stream.try_next() => next,
+                                _ = done_fut => Ok(None)}
+                                {
+                                    match req {
+                                        ftest::CaseIteratorRequest::GetNext {
+                                            responder, ..
+                                        } => {
+                                            // Continually drain the |names| iterator on each
+                                            // call.
+                                            responder
+                                                .send(&names.by_ref().collect::<Vec<_>>())
+                                                .unwrap_or_default();
                                         }
                                     }
                                 }
@@ -212,9 +210,7 @@ impl TestServer {
                             .detach();
                         }
                         ftest::SuiteRequest::Run { tests, options, listener, .. } => {
-                            let proxy = listener
-                                .into_proxy()
-                                .expect("Can't convert listener channel to proxy");
+                            let proxy = listener.into_proxy();
 
                             let mut tasks = vec![];
                             let parallel = options.parallel.unwrap_or(DEFAULT_PARALLEL);
@@ -228,8 +224,7 @@ impl TestServer {
 
                                     let (case_listener_proxy, case_listener) =
                                         fidl::endpoints::create_proxy::<ftest::CaseListenerMarker>(
-                                        )
-                                        .expect("cannot create proxy");
+                                        );
 
                                     proxy
                                         .on_test_case_started(
@@ -290,19 +285,18 @@ impl TestServer {
         let (fut, abort_handle) = abortable(fs.collect::<()>());
 
         let controller_fut = async move {
-            if let Ok(mut stream) = controller.into_stream() {
-                let mut done_sender = Some(done_sender);
-                while let Ok(Some(request)) = stream.try_next().await {
-                    match request {
-                        fcrunner::ComponentControllerRequest::Stop { .. }
-                        | fcrunner::ComponentControllerRequest::Kill { .. } => {
-                            if let Some(done_sender) = done_sender.take() {
-                                done_sender.send(()).ok();
-                            }
-                            abort_handle.abort();
+            let mut stream = controller.into_stream();
+            let mut done_sender = Some(done_sender);
+            while let Ok(Some(request)) = stream.try_next().await {
+                match request {
+                    fcrunner::ComponentControllerRequest::Stop { .. }
+                    | fcrunner::ComponentControllerRequest::Kill { .. } => {
+                        if let Some(done_sender) = done_sender.take() {
+                            done_sender.send(()).ok();
                         }
-                        fcrunner::ComponentControllerRequest::_UnknownMethod { .. } => (),
+                        abort_handle.abort();
                     }
+                    fcrunner::ComponentControllerRequest::_UnknownMethod { .. } => (),
                 }
             }
         };

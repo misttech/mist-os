@@ -42,6 +42,7 @@ pub struct TestFixtureBuilder {
     netboot: bool,
     no_fuchsia_boot: bool,
     disk: Option<disk_builder::Disk>,
+    extra_disks: Vec<disk_builder::Disk>,
     fshost: fshost_builder::FshostBuilder,
     zbi_ramdisk: Option<disk_builder::DiskBuilder>,
     storage_host: bool,
@@ -53,6 +54,7 @@ impl TestFixtureBuilder {
             netboot: false,
             no_fuchsia_boot: false,
             disk: None,
+            extra_disks: vec![],
             fshost: fshost_builder::FshostBuilder::new(fshost_component_name),
             zbi_ramdisk: None,
             storage_host,
@@ -66,6 +68,16 @@ impl TestFixtureBuilder {
     pub fn with_disk(&mut self) -> &mut disk_builder::DiskBuilder {
         self.disk = Some(disk_builder::Disk::Builder(disk_builder::DiskBuilder::new()));
         self.disk.as_mut().unwrap().builder()
+    }
+
+    pub fn with_extra_disk(&mut self) -> &mut disk_builder::DiskBuilder {
+        self.extra_disks.push(disk_builder::Disk::Builder(disk_builder::DiskBuilder::new()));
+        self.extra_disks.last_mut().unwrap().builder()
+    }
+
+    pub fn with_uninitialized_disk(mut self) -> Self {
+        self.disk = Some(disk_builder::Disk::Builder(disk_builder::DiskBuilder::uninitialized()));
+        self
     }
 
     pub fn with_disk_from_vmo(mut self, vmo: zx::Vmo) -> Self {
@@ -221,6 +233,10 @@ impl TestFixtureBuilder {
             fixture.add_ramdisk(vmo).await;
             fixture.ramdisk_vmo = Some(vmo_clone);
         }
+        for disk in self.extra_disks.into_iter() {
+            let vmo = disk.get_vmo().await;
+            fixture.add_ramdisk(vmo).await;
+        }
 
         fixture
     }
@@ -274,7 +290,7 @@ impl TestFixture {
     }
 
     pub fn dir(&self, dir: &str, flags: fio::Flags) -> fio::DirectoryProxy {
-        let (dev, server) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+        let (dev, server) = create_proxy::<fio::DirectoryMarker>();
         let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;
         self.realm
             .root
@@ -302,8 +318,7 @@ impl TestFixture {
             .expect("failed to connect to the BlobReader");
             let _vmo = reader.get_vmo(&expected_blob_hash.into()).await.unwrap().unwrap();
         } else {
-            let (blob, server_end) =
-                create_proxy::<fio::FileMarker>().expect("create_proxy failed");
+            let (blob, server_end) = create_proxy::<fio::FileMarker>();
             let path = &format!("{}", expected_blob_hash);
             self.dir("blob", fio::PERM_READABLE)
                 .open3(
@@ -320,7 +335,7 @@ impl TestFixture {
     /// Check for the existence of a well-known set of test files in the data volume. These files
     /// are placed by the disk builder if it formats the filesystem beforehand.
     pub async fn check_test_data_file(&self) {
-        let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
+        let (file, server) = create_proxy::<fio::NodeMarker>();
         self.dir("data", fio::PERM_READABLE)
             .open3(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
             .expect("open failed");
@@ -348,7 +363,7 @@ impl TestFixture {
     /// Checks for the absence of the .testdata marker file, indicating the data filesystem was
     /// reformatted.
     pub async fn check_test_data_file_absent(&self) {
-        let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
+        let (file, server) = create_proxy::<fio::NodeMarker>();
         self.dir("data", fio::PERM_READABLE)
             .open3(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
             .expect("open failed");

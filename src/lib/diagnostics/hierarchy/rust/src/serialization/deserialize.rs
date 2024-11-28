@@ -50,7 +50,7 @@ where
             return Err(de::Error::invalid_length(found, &"expected a single root"));
         }
 
-        result.ok_or(de::Error::custom("expected node for root"))
+        result.ok_or_else(|| de::Error::custom("expected node for root"))
     }
 }
 

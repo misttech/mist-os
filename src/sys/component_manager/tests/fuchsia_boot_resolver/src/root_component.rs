@@ -26,7 +26,7 @@ async fn run_package_resolution_checker_service(
         fpkg::PackageResolverMarker,
     >("/svc/fuchsia.pkg.PackageResolver-boot")
     .unwrap();
-    let (proxy, server) = fidl::endpoints::create_proxy().unwrap();
+    let (proxy, server) = fidl::endpoints::create_proxy();
     let _: fpkg::ResolutionContext =
         resolver.resolve("fuchsia-boot:///root_component_pkg", server).await.unwrap().unwrap();
     let sentinel_contents = fuchsia_fs::directory::read_file_to_string(

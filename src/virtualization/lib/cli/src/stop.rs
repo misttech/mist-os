@@ -124,8 +124,7 @@ async fn graceful_stop_guest<P: PlatformServices>(
     guest: arguments::GuestType,
     manager: GuestManagerProxy,
 ) -> Result<StopResult, Error> {
-    let (guest_endpoint, guest_server_end) = create_proxy::<GuestMarker>()
-        .map_err(|err| anyhow!("failed to create guest proxy: {}", err))?;
+    let (guest_endpoint, guest_server_end) = create_proxy::<GuestMarker>();
     manager
         .connect(guest_server_end)
         .await
@@ -203,8 +202,7 @@ mod test {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::MonotonicInstant::now());
 
-        let (manager_proxy, mut manager_stream) = create_proxy_and_stream::<GuestManagerMarker>()
-            .expect("failed to create GuestManager request stream");
+        let (manager_proxy, mut manager_stream) = create_proxy_and_stream::<GuestManagerMarker>();
 
         let service = FuchsiaPlatformServices::new();
         let fut = graceful_stop_guest(&service, arguments::GuestType::Debian, manager_proxy);
@@ -221,7 +219,7 @@ mod test {
             .expect("received unexpected request on stream");
 
         responder.send(Ok(())).expect("failed to send response");
-        let mut guest_stream = guest_server_end.into_stream().unwrap();
+        let mut guest_stream = guest_server_end.into_stream();
 
         assert!(executor.run_until_stalled(&mut fut).is_pending());
 
@@ -261,8 +259,7 @@ mod test {
     #[test]
     fn force_stop_guest_calls_stop_endpoint() {
         let mut executor = fasync::TestExecutor::new();
-        let (proxy, mut stream) = create_proxy_and_stream::<GuestManagerMarker>()
-            .expect("failed to create GuestManager request stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<GuestManagerMarker>();
 
         let fut = force_stop_guest(arguments::GuestType::Debian, proxy);
         futures::pin_mut!(fut);

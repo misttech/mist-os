@@ -46,12 +46,11 @@ impl LocalComponentHandles {
         let mut namespace = HashMap::new();
         for namespace_entry in fidl_namespace {
             namespace.insert(
-                namespace_entry.path.ok_or(format_err!("namespace entry missing path"))?,
+                namespace_entry.path.ok_or_else(|| format_err!("namespace entry missing path"))?,
                 namespace_entry
                     .directory
-                    .ok_or(format_err!("namespace entry missing directory handle"))?
-                    .into_proxy()
-                    .expect("failed to convert handle to proxy"),
+                    .ok_or_else(|| format_err!("namespace entry missing directory handle"))?
+                    .into_proxy(),
             );
         }
         let numbered_handles =
@@ -105,10 +104,9 @@ impl LocalComponentHandles {
         &self,
         name: &str,
     ) -> Result<P::Proxy, Error> {
-        let svc_dir_proxy = self
-            .namespace
-            .get(&"/svc".to_string())
-            .ok_or(format_err!("the component's namespace doesn't have a /svc directory"))?;
+        let svc_dir_proxy = self.namespace.get(&"/svc".to_string()).ok_or_else(|| {
+            format_err!("the component's namespace doesn't have a /svc directory")
+        })?;
         fuchsia_component::client::connect_to_named_protocol_at_dir_root::<P>(svc_dir_proxy, name)
     }
 
@@ -120,10 +118,9 @@ impl LocalComponentHandles {
     /// Opens a FIDL service with the given name as a directory, which holds instances of the
     /// service.
     pub fn open_named_service(&self, name: &str) -> Result<fio::DirectoryProxy, Error> {
-        let svc_dir_proxy = self
-            .namespace
-            .get("/svc")
-            .ok_or(format_err!("the component's namespace doesn't have a /svc directory"))?;
+        let svc_dir_proxy = self.namespace.get("/svc").ok_or_else(|| {
+            format_err!("the component's namespace doesn't have a /svc directory")
+        })?;
         fuchsia_fs::directory::open_directory_async(&svc_dir_proxy, name, fio::Flags::empty())
             .map_err(Into::into)
     }
@@ -176,11 +173,13 @@ impl LocalComponentHandles {
     /// let assets_dir = fuchsia_fs::directory::open_directory_async(&data_dir, "assets", ...)?;
     /// ```
     pub fn clone_from_namespace(&self, directory_name: &str) -> Result<fio::DirectoryProxy, Error> {
-        let dir_proxy = self.namespace.get(&format!("/{}", directory_name)).ok_or(format_err!(
-            "the local component's namespace doesn't have a /{} directory",
-            directory_name
-        ))?;
-        fuchsia_fs::directory::clone_no_describe(&dir_proxy, None).context("clone")
+        let dir_proxy = self.namespace.get(&format!("/{}", directory_name)).ok_or_else(|| {
+            format_err!(
+                "the local component's namespace doesn't have a /{} directory",
+                directory_name
+            )
+        })?;
+        fuchsia_fs::directory::clone(&dir_proxy).context("clone")
     }
 }
 
@@ -237,8 +236,7 @@ impl LocalComponentRunnerBuilder {
             .take()
             .ok_or(ftest::RealmBuilderError::BuildAlreadyCalled)?;
         let (runner_client_end, runner_request_stream) =
-            create_request_stream::<fcrunner::ComponentRunnerMarker>()
-                .expect("failed to create channel pair");
+            create_request_stream::<fcrunner::ComponentRunnerMarker>();
         let runner = LocalComponentRunner::new(local_component_implementations);
         let runner_task = fasync::Task::spawn(async move {
             if let Err(e) = runner.handle_stream(runner_request_stream).await {
@@ -293,27 +291,30 @@ impl LocalComponentRunner {
                 fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
                     let program = start_info
                         .program
-                        .ok_or(format_err!("program is missing from start_info"))?;
-                    let namespace =
-                        start_info.ns.ok_or(format_err!("namespace is missing from start_info"))?;
+                        .ok_or_else(|| format_err!("program is missing from start_info"))?;
+                    let namespace = start_info
+                        .ns
+                        .ok_or_else(|| format_err!("namespace is missing from start_info"))?;
                     let numbered_handles = start_info.numbered_handles.unwrap_or_default();
                     let outgoing_dir = start_info
                         .outgoing_dir
-                        .ok_or(format_err!("outgoing_dir is missing from start_info"))?;
+                        .ok_or_else(|| format_err!("outgoing_dir is missing from start_info"))?;
                     let _runtime_dir_server_end: ServerEnd<fio::DirectoryMarker> = start_info
                         .runtime_dir
-                        .ok_or(format_err!("runtime_dir is missing from start_info"))?;
+                        .ok_or_else(|| format_err!("runtime_dir is missing from start_info"))?;
 
                     let local_component_name = extract_local_component_name(program)?;
                     let local_component_implementation = self
                         .local_component_implementations
                         .get(&local_component_name)
-                        .ok_or(format_err!("no such local component: {:?}", local_component_name))?
+                        .ok_or_else(|| {
+                            format_err!("no such local component: {:?}", local_component_name)
+                        })?
                         .clone();
                     let (component_handles, stop_notifier) =
                         LocalComponentHandles::new(namespace, numbered_handles, outgoing_dir)?;
 
-                    let mut controller_request_stream = controller.into_stream()?;
+                    let mut controller_request_stream = controller.into_stream();
                     self.execution_scope.spawn(async move {
                         let mut local_component_implementation_fut =
                             (*local_component_implementation)(component_handles).fuse();
@@ -384,7 +385,7 @@ impl LocalComponentRunner {
 
 fn extract_local_component_name(dict: fdata::Dictionary) -> Result<String, Error> {
     let entry_value = get_dictionary_value(&dict, ftest::LOCAL_COMPONENT_NAME_KEY)
-        .ok_or(format_err!("program section is missing component name"))?;
+        .ok_or_else(|| format_err!("program section is missing component name"))?;
     if let fdata::DictionaryValue::Str(s) = entry_value {
         return Ok(s.clone());
     } else {
@@ -421,7 +422,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (_, outgoing_dir) = create_proxy().unwrap();
+        let (_, outgoing_dir) = create_proxy();
         let handles = LocalComponentHandles {
             namespace: HashMap::new(),
             numbered_handles: HashMap::new(),
@@ -457,11 +458,11 @@ mod tests {
         component_to_start: String,
     ) -> RunnerAndHandles {
         let (component_runner_client_end, runner_task) = runner_builder.build().await.unwrap();
-        let component_runner_proxy = component_runner_client_end.into_proxy().unwrap();
+        let component_runner_proxy = component_runner_client_end.into_proxy();
 
-        let (runtime_dir_proxy, runtime_dir_server_end) = create_proxy().unwrap();
-        let (outgoing_dir_proxy, outgoing_dir_server_end) = create_proxy().unwrap();
-        let (controller_proxy, controller_server_end) = create_proxy().unwrap();
+        let (runtime_dir_proxy, runtime_dir_server_end) = create_proxy();
+        let (outgoing_dir_proxy, outgoing_dir_server_end) = create_proxy();
+        let (controller_proxy, controller_server_end) = create_proxy();
         component_runner_proxy
             .start(
                 fcrunner::ComponentStartInfo {

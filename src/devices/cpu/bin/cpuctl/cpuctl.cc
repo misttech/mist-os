@@ -120,8 +120,75 @@ zx_status_t list(const ListCb& cb) {
   return ZX_OK;
 }
 
+zx::result<CpuPerformanceDomain> PerformanceDomainFromArgument(const char* argument) {
+  // Try to open the argument as a path first and if that fails fall back on the domain ID.
+  zx::result<CpuPerformanceDomain> result = zx::error(ZX_ERR_NOT_FOUND);
+  list([&result, argument](const char* name) {
+    if (strncmp(argument, name, PATH_MAX) != 0) {
+      return;
+    }
+    char path[PATH_MAX];
+    snprintf(path, PATH_MAX, kCpuDeviceFormat, name);
+    result = CpuPerformanceDomain::CreateFromPath(path);
+  });
+
+  if (result.is_ok()) {
+    return result;
+  }
+
+  // Try interpreting the argument as a performance domain ID instead.
+  int64_t domain_id = parse_positive_long(argument);
+  if (domain_id == kBadParse) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  list([&result, domain_id](const char* name) {
+    char path[PATH_MAX];
+    snprintf(path, PATH_MAX, kCpuDeviceFormat, name);
+    auto local_result = CpuPerformanceDomain::CreateFromPath(path);
+    if (local_result.is_error()) {
+      return;
+    }
+
+    auto [status, id] = local_result->GetDomainId();
+    if (status != ZX_OK) {
+      return;
+    }
+    if (id > std::numeric_limits<int64_t>::max()) {
+      std::cerr << "Domain ID is too large to be parsed, id = " << id << std::endl;
+      return;
+    }
+    const int64_t local_id = static_cast<int64_t>(id);
+
+    if (local_id != domain_id) {
+      return;
+    }
+
+    result = std::move(local_result);
+  });
+
+  return result;
+}
+
 // Print each performance domain to stdout.
-void print_performance_domain(const char* path) { printf("Domain %s\n", path); }
+void print_performance_domain_ids(const char* domain_name) {
+  char path[PATH_MAX];
+  snprintf(path, PATH_MAX, kCpuDeviceFormat, domain_name);
+  zx::result domain = CpuPerformanceDomain::CreateFromPath(path);
+  if (domain.is_error()) {
+    std::cerr << "Failed to connect to performance domain device '" << path << "'"
+              << " st = " << domain.status_string() << std::endl;
+    return;
+  }
+
+  auto [status, domain_id] = domain->GetDomainId();
+  if (status != ZX_OK) {
+    std::cerr << "Failed to get domain id for domain at " << path << std::endl;
+    return;
+  }
+
+  printf("Domain ID = %lu | Domain Path = %s\n", domain_id, path);
+}
 
 void describe(const char* domain_name) {
   char path[PATH_MAX];
@@ -171,13 +238,10 @@ void describe(const char* domain_name) {
   }
 }
 
-void set_current_operating_point(const char* domain_name, const char* opp) {
-  char path[PATH_MAX];
-  snprintf(path, PATH_MAX, kCpuDeviceFormat, domain_name);
-
-  zx::result domain = CpuPerformanceDomain::CreateFromPath(path);
+void set_current_operating_point(const char* argument, const char* opp) {
+  zx::result domain = PerformanceDomainFromArgument(argument);
   if (domain.is_error()) {
-    std::cerr << "Failed to connect to performance domain device '" << domain_name << "'"
+    std::cerr << "Failed to connect to performance domain device '" << argument << "'"
               << " st = " << domain.status_string() << std::endl;
     return;
   }
@@ -204,7 +268,7 @@ void set_current_operating_point(const char* domain_name, const char* opp) {
     return;
   }
 
-  std::cout << "PD: " << domain_name << " set opp to " << desired_opp << std::endl;
+  std::cout << "PD: " << argument << " set opp to " << desired_opp << std::endl;
 
   const auto [st, opps] = client.GetOperatingPoints();
   if (st != ZX_OK) {
@@ -223,13 +287,10 @@ void set_current_operating_point(const char* domain_name, const char* opp) {
   }
 }
 
-void get_current_operating_point(const char* domain_name) {
-  char path[PATH_MAX];
-  snprintf(path, PATH_MAX, kCpuDeviceFormat, domain_name);
-
-  zx::result domain = CpuPerformanceDomain::CreateFromPath(path);
+void get_current_operating_point(const char* argument) {
+  zx::result domain = PerformanceDomainFromArgument(argument);
   if (domain.is_error()) {
-    std::cerr << "Failed to connect to performance domain device '" << domain_name << "'"
+    std::cerr << "Failed to connect to performance domain device '" << argument << "'"
               << " st = " << domain.status_string() << std::endl;
     return;
   }
@@ -349,7 +410,7 @@ int main(int argc, char* argv[]) {
     return 0;
   }
   if (!strncmp(subcmd, "list", 4)) {
-    return list(print_performance_domain) == ZX_OK ? 0 : -1;
+    return list(print_performance_domain_ids) == ZX_OK ? 0 : -1;
   }
   if (!strncmp(subcmd, "describe", 8)) {
     if (argc >= 3) {

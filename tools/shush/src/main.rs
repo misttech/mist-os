@@ -16,6 +16,7 @@ mod span;
 
 use anyhow::{anyhow, bail, Result};
 use argh::FromArgs;
+use rustfix::Filter;
 
 use std::env;
 use std::fs::{self, File};
@@ -130,7 +131,19 @@ enum LintAction {
 /// use rustfix to auto-fix the lints
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "fix")]
-struct Fix {}
+struct Fix {
+    /// which suggestions to apply
+    #[argh(option, default = "Filter::MachineApplicableOnly", from_str_fn(filter_from_str))]
+    suggestions: Filter,
+}
+
+fn filter_from_str(s: &str) -> Result<Filter, String> {
+    match s {
+        "everything" => Ok(Filter::Everything),
+        "machine-applicable" => Ok(Filter::MachineApplicableOnly),
+        _ => Err(format!("expected `everything` or `machine-applicable`")),
+    }
+}
 
 /// add allow attributes
 #[derive(FromArgs, Debug)]
@@ -162,7 +175,7 @@ impl Allow {
     }
 
     pub fn rollout_path(&self) -> &Path {
-        self.rollout.as_deref().unwrap_or(Path::new(DEFAULT_ROLLOUT_PATH))
+        self.rollout.as_deref().unwrap_or_else(|| Path::new(DEFAULT_ROLLOUT_PATH))
     }
 }
 
@@ -177,7 +190,7 @@ struct Rollout {
 
 impl Rollout {
     pub fn rollout_path(&self) -> &Path {
-        self.rollout.as_deref().unwrap_or(Path::new(DEFAULT_ROLLOUT_PATH))
+        self.rollout.as_deref().unwrap_or_else(|| Path::new(DEFAULT_ROLLOUT_PATH))
     }
 }
 
@@ -205,10 +218,11 @@ fn main() -> Result<()> {
                 bail!("dry runs require a mocked API");
             }
 
-            match lint_args.action {
-                LintAction::Fix(_) => fix::fix(
+            match &lint_args.action {
+                LintAction::Fix(f) => fix::fix(
                     &mut lint_args.read_lints(),
                     lint_args.try_get_filter()?,
+                    f.suggestions,
                     lint_args.dryrun,
                 ),
                 LintAction::Allow(ref allow_args) => {

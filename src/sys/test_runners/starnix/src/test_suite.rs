@@ -8,7 +8,7 @@ use crate::gtest::*;
 use crate::helpers::*;
 use crate::ltp::*;
 use crate::selinux::*;
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, Error};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_test::{self as ftest};
 use frunner::{ComponentRunnerMarker, ComponentRunnerProxy, ComponentStartInfo};
@@ -74,7 +74,7 @@ pub async fn handle_suite_requests(
         match event {
             ftest::SuiteRequest::GetTests { iterator, .. } => {
                 debug!("enumerating test cases");
-                let stream = iterator.into_stream()?;
+                let stream = iterator.into_stream();
 
                 let test_cases = match test_type {
                     TestType::Gtest | TestType::Gunit | TestType::GtestXmlOutput => {
@@ -100,8 +100,7 @@ pub async fn handle_suite_requests(
             }
             ftest::SuiteRequest::Run { tests, options, listener, .. } => {
                 debug!(?tests, "running tests");
-                let run_listener_proxy =
-                    listener.into_proxy().context("Can't convert run listener channel to proxy")?;
+                let run_listener_proxy = listener.into_proxy();
 
                 if tests.is_empty() {
                     debug!("no tests listed, returning");
@@ -211,7 +210,7 @@ async fn run_test_case(
     component_runner: &frunner::ComponentRunnerProxy,
 ) -> Result<(), Error> {
     debug!("running generic fallback test suite");
-    let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
+    let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>();
     let (numbered_handles, std_handles) = create_numbered_handles();
     start_info.numbered_handles = numbered_handles;
 
@@ -274,14 +273,13 @@ mod tests {
     fn set_up_iterator(test_name: &str) -> ftest::CaseIteratorProxy {
         let cases = vec![ftest::Case { name: Some(test_name.to_string()), ..Default::default() }];
         let (iterator_client_end, iterator_stream) =
-            create_request_stream::<ftest::CaseIteratorMarker>()
-                .expect("Couldn't create case iterator");
+            create_request_stream::<ftest::CaseIteratorMarker>();
         fasync::Task::local(async move {
             let _ = handle_case_iterator(cases, iterator_stream).await;
         })
         .detach();
 
-        iterator_client_end.into_proxy().expect("Failed to create proxy")
+        iterator_client_end.into_proxy()
     }
 
     /// Spawns a `ComponentRunnerRequestStream` server that immediately closes all incoming
@@ -298,7 +296,7 @@ mod tests {
     /// provided epitaph.
     fn spawn_runner(component_controller_epitaph: zx::Status) -> frunner::ComponentRunnerProxy {
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<frunner::ComponentRunnerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<frunner::ComponentRunnerMarker>();
         fasync::Task::local(async move {
             while let Some(event) =
                 request_stream.try_next().await.expect("Error in test runner request stream")
@@ -343,7 +341,6 @@ mod tests {
                 ..
             }) => match listener
                 .into_stream()
-                .expect("Failed to get case listener stream")
                 .try_next()
                 .await
                 .expect("Failed to get case listener stream request")
@@ -369,7 +366,7 @@ mod tests {
                     ..Default::default()
                 },
                 frunner::ComponentStartInfo { ns: Some(vec![]), ..Default::default() },
-                &run_listener.into_proxy().expect("Couldn't create proxy."),
+                &run_listener.into_proxy(),
                 &component_runner,
             )
             .await;
@@ -401,8 +398,7 @@ mod tests {
     async fn test_component_controller_epitaph_ok() {
         let component_runner = spawn_runner(zx::Status::OK);
         let (run_listener, run_listener_stream) =
-            create_request_stream::<ftest::RunListenerMarker>()
-                .expect("Couldn't create case listener");
+            create_request_stream::<ftest::RunListenerMarker>();
         spawn_run_test_cases(run_listener, component_runner);
         assert_eq!(listen_to_test_result(run_listener_stream).await, Some(ftest::Status::Passed));
     }
@@ -413,8 +409,7 @@ mod tests {
     async fn test_component_controller_epitaph_not_ok() {
         let component_runner = spawn_runner(zx::Status::INTERNAL);
         let (run_listener, run_listener_stream) =
-            create_request_stream::<ftest::RunListenerMarker>()
-                .expect("Couldn't create case listener");
+            create_request_stream::<ftest::RunListenerMarker>();
         spawn_run_test_cases(run_listener, component_runner);
         assert_eq!(listen_to_test_result(run_listener_stream).await, Some(ftest::Status::Failed));
     }

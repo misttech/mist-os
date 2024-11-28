@@ -16,19 +16,14 @@
 
 namespace component::internal {
 
-// Implementation of |component::Connect| that is independent from the actual
-// |Protocol|.
+// Implementation of |component::Connect| that delegates to |fdio_service_connect|.
 zx::result<> ConnectRaw(zx::channel server_end, std::string_view path);
 
-// Implementations of |component::ConnectAt| that is independent from the actual
-// |Protocol|.
+// Implementation of |component::ConnectAt| for a service directory.
 zx::result<> ConnectAtRaw(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
                           zx::channel server_end, std::string_view protocol_name);
 
-// Implementations of |component::Clone| that is independent from the actual
-// |Protocol|.
-zx::result<> CloneRaw(fidl::UnownedClientEnd<fuchsia_io::Node>&& node, zx::channel server_end);
-
+// Implementation of |component::Clone| for |fuchsia.unknown/Cloneable|.
 zx::result<> CloneRaw(fidl::UnownedClientEnd<fuchsia_unknown::Cloneable>&& cloneable,
                       zx::channel server_end);
 
@@ -62,19 +57,6 @@ zx::result<> DirectoryOpenFunc(zx::unowned_channel dir, fidl::StringView path,
                                fidl::internal::AnyTransport remote);
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> GetGlobalServiceDirectory();
-
-// Determines if |Protocol| contains a method named |Clone|.
-template <typename Protocol, typename = void>
-struct has_fidl_method_fuchsia_io_clone : public ::std::false_type {};
-template <typename Protocol>
-struct has_fidl_method_fuchsia_io_clone<
-    Protocol, std::void_t<decltype(fidl::WireRequest<typename Protocol::Clone>{
-                  std::declval<fuchsia_io::wire::OpenFlags>() /* flags */,
-                  std::declval<fidl::ServerEnd<fuchsia_io::Node>&&>() /* object */})>>
-    : public std::true_type {};
-template <typename Protocol>
-constexpr inline auto has_fidl_method_fuchsia_io_clone_v =
-    has_fidl_method_fuchsia_io_clone<Protocol>::value;
 
 // Determines if |Protocol| contains the |fuchsia.unknown/Cloneable.Clone2| method.
 template <typename Protocol, typename = void>

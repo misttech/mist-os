@@ -223,8 +223,8 @@ use different build systems other than Bazel.
 [fuchsia-package]: /docs/concepts/packages/package.md
 [fuchsia-components]: /docs/concepts/components/v2/README.md
 [fidl-reference]: https://fuchsia.dev/reference/fidl
-[create-a-package-repository]: /docs/development/sdk/ffx/create-a-package-repository.md
-[debug-symbols]: /docs/development/sdk/ffx/register-debug-symbols.md
+[create-a-package-repository]: /docs/development/tools/ffx/workflows/create-a-package-repository.md
+[debug-symbols]: /docs/development/tools/ffx/workflows/register-debug-symbols.md
 [fuchsia-drivers]: https://fuchsia.googlesource.com/sdk-samples/drivers
 [fuchsia-idk]: /docs/development/idk/README.md
 [download-sdk]: https://chrome-infra-packages.appspot.com/p/fuchsia/sdk/core/linux-amd64/+/latest

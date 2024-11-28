@@ -191,7 +191,7 @@ class SegmentManager {
   bool CompareValidBlocks(uint32_t blocks, uint32_t segno, bool section)
       __TA_EXCLUDES(sentry_lock_);
   uint32_t GetValidBlocks(uint32_t segno, bool section) const __TA_REQUIRES_SHARED(sentry_lock_);
-  bool HasNotEnoughFreeSecs(size_t freed = 0, size_t needed = 0);
+  bool HasNotEnoughFreeSecs(size_t freed_sections = 0, size_t needed_blocks = 0);
   uint32_t Utilization();
   uint32_t CursegSegno(int type);
   uint8_t CursegAllocType(int type);
@@ -211,8 +211,6 @@ class SegmentManager {
   block_t FreeSections() __TA_EXCLUDES(segmap_lock_);
   block_t FreeSegments() __TA_EXCLUDES(segmap_lock_);
   block_t DirtySegments() __TA_EXCLUDES(seglist_lock_);
-  block_t OverprovisionSegments();
-  block_t OverprovisionSections();
   block_t ReservedSections();
 
   bool NeedSSR();
@@ -233,7 +231,7 @@ class SegmentManager {
   void InvalidateBlocks(block_t addr) __TA_EXCLUDES(sentry_lock_);
   void AddSumEntry(CursegType type, Summary *sum, uint16_t offset);
   int NpagesForSummaryFlush();
-  void GetSumPage(uint32_t segno, LockedPage *out);
+  zx_status_t GetSumPage(uint32_t segno, LockedPage *out);
   void WriteSumPage(SummaryBlock *sum_blk, block_t blk_addr);
   zx_status_t SetSummaryBlock(CursegType type, SummaryCallback callback);
   zx_status_t GetSummaryBlock(CursegType type, SummaryCallback callback);

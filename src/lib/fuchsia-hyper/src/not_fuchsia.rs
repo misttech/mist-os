@@ -3,14 +3,15 @@
 // found in the LICENSE file.
 
 use crate::{parse_ip_addr, HyperConnectorFuture, SocketOptions, TcpOptions, TcpStream};
-use async_net as net;
 use futures::io;
 use http::uri::{Scheme, Uri};
 use hyper::service::Service;
+use netext::TokioAsyncReadExt;
 use rustls::RootCertStore;
 use std::net::ToSocketAddrs;
 use std::sync::{Arc, LazyLock};
 use std::task::{Context, Poll};
+use tokio::net;
 use tracing::warn;
 
 pub fn new_root_cert_store() -> Arc<RootCertStore> {
@@ -116,7 +117,7 @@ impl HyperConnector {
         };
         let () = self.tcp_options.apply(&stream)?;
 
-        Ok(TcpStream { stream })
+        Ok(TcpStream { stream: stream.into_multithreaded_futures_stream() })
     }
 }
 
@@ -150,7 +151,6 @@ async fn resolve_host_port(host: &str, port: u16) -> Result<net::TcpStream, io::
 mod test {
     use crate::*;
     use anyhow::{Error, Result};
-    use async_net::TcpListener;
     use futures::future::BoxFuture;
     use futures::stream::FuturesUnordered;
     use futures::{StreamExt, TryFutureExt, TryStreamExt};
@@ -161,6 +161,7 @@ mod test {
     use hyper::{Response, StatusCode};
     use std::convert::Infallible;
     use std::io::Write;
+    use tokio::net::TcpListener;
 
     trait AsyncReadWrite: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send {}
     impl<T> AsyncReadWrite for T where T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send {}
@@ -191,8 +192,13 @@ mod test {
             (listener, local_addr)
         };
 
+        #[cfg(target_os = "fuchsia")]
         let listener =
             listener.incoming().map_err(Error::from).map_ok(|conn| TcpStream { stream: conn });
+        #[cfg(not(target_os = "fuchsia"))]
+        let listener = netext::TcpListenerStream(listener).map_err(Error::from).map_ok(|conn| {
+            TcpStream { stream: netext::TokioAsyncReadExt::into_multithreaded_futures_stream(conn) }
+        });
 
         let connections = listener
             .map_ok(|conn| Pin::new(Box::new(conn)) as Pin<Box<dyn AsyncReadWrite>>)

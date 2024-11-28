@@ -15,7 +15,7 @@ struct KeyboardReport {
 
   void ToFidlInputReport(
       fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-      fidl::AnyArena& allocator);
+      fidl::AnyArena& allocator) const;
 };
 
 class HidKeyboard : public HidDevice<KeyboardReport> {

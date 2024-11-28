@@ -218,6 +218,7 @@ class UsbAdbTest : public zxtest::Test {
 
     ASSERT_OK(fdf::RunOnDispatcherSync(adb_dispatcher_->async_dispatcher(),
                                        [this]() { dev_->UnbindOp(); }));
+    parent_->GetLatestChild()->WaitUntilUnbindReplyCalled();
     mock_usb_.VerifyAndClear();
     parent_ = nullptr;
   }

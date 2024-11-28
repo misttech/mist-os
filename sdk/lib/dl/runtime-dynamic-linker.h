@@ -46,10 +46,11 @@ class RuntimeDynamicLinker {
  public:
   using Soname = elfldltl::Soname<>;
 
-  // Not copyable, not movable
-  RuntimeDynamicLinker() = default;
-  RuntimeDynamicLinker(const RuntimeDynamicLinker&) = delete;
-  RuntimeDynamicLinker(RuntimeDynamicLinker&&) = delete;
+  // Create a RuntimeDynamicLinker with the passed in passive `abi`. The caller
+  // is required to pass an AllocChecker and check it to verify the
+  // RuntimeDynamicLinker was created and initialized successfully.
+  static std::unique_ptr<RuntimeDynamicLinker> Create(const ld::abi::Abi<>& abi,
+                                                      fbl::AllocChecker& ac);
 
   constexpr const ModuleList& modules() const { return modules_; }
 
@@ -61,9 +62,8 @@ class RuntimeDynamicLinker {
   // case and include it as an example for the fit::error{Error} description.
 
   // Open `file` with the given `mode`, returning a pointer to the loaded module
-  // for the file. The `retrieve_file` argument is passed on to SessionModule.Load
-  // and is called as a
-  // `fit::result<std::optional<Error>, File>(Diagnostics&, std::string_view)`
+  // for the file. The `retrieve_file` argument is to the LinkingSession and
+  // is called as a `fit::result<std::optional<Error>, File>(Diagnostics&, std::string_view)`
   // with the following semantics:
   //   - fit::error{std::nullopt} is a not found error
   //   - fit::error{Error} is an error type that can be passed to
@@ -137,6 +137,9 @@ class RuntimeDynamicLinker {
   }
 
  private:
+  // A The RuntimeDynamicLinker can only be created with RuntimeDynamicLinker::Create...).
+  RuntimeDynamicLinker() = default;
+
   // Attempt to find the loaded module with the given name, returning a nullptr
   // if the module was not found.
   RuntimeModule* FindModule(Soname name);
@@ -147,9 +150,14 @@ class RuntimeDynamicLinker {
   // list, as if it was just loaded with RTLD_GLOBAL.
   void MakeGlobal(const ModuleTree& module_tree);
 
+  // Create RuntimeModule data structures from the passive ABI and add them to
+  // the dynamic linker's modules_ list. The caller is required to pass an
+  // AllocChecker and check it to verify the success/failure of loading the
+  // passive ABI into the RuntimeDynamicLinker.
+  void PopulateStartupModules(fbl::AllocChecker& ac, const ld::abi::Abi<>& abi);
+
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
-  // TODO(https://fxbug.dev/324136831): support startup modules
   ModuleList modules_;
 };
 

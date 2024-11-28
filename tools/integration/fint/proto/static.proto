@@ -210,5 +210,5 @@ message Static {
 
   // If set, points to the label to use as the main product bundle in a
   // multi-product build.
-  string main_product_label = 44;
+  string main_pb_label = 44;
 }

@@ -48,7 +48,7 @@ impl TryFrom<NextCall> for CallEntry {
             NextCall {
                 call: Some(c), remote: Some(n), state: Some(s), direction: Some(d), ..
             } => {
-                let proxy = c.into_proxy()?;
+                let proxy = c.into_proxy();
                 Ok(CallEntry::new(proxy, n.into(), s, d.into()))
             }
             _ => Err(Error::MissingParameter("Missing fidl in NextCall table".into())),
@@ -505,7 +505,7 @@ impl Calls {
                 let idx = self
                     .oldest_by_state(IncomingWaiting)
                     .or_else(|| self.oldest_by_state(OngoingHeld))
-                    .ok_or(CallError::None(vec![IncomingWaiting, OngoingHeld]))?
+                    .ok_or_else(|| CallError::None(vec![IncomingWaiting, OngoingHeld]))?
                     .0;
 
                 self.request_active(idx, true)?;
@@ -516,7 +516,7 @@ impl Calls {
                 let idx = self
                     .oldest_by_state(IncomingWaiting)
                     .or_else(|| self.oldest_by_state(OngoingHeld))
-                    .ok_or(CallError::None(vec![IncomingWaiting, OngoingHeld]))?
+                    .ok_or_else(|| CallError::None(vec![IncomingWaiting, OngoingHeld]))?
                     .0;
 
                 self.request_active(idx, false)?;
@@ -746,7 +746,7 @@ mod tests {
     fn call_is_active() {
         // executor must be created before fidl endpoints can be created
         let _exec = fasync::TestExecutor::new();
-        let (proxy, _) = fidl::endpoints::create_proxy::<CallMarker>().unwrap();
+        let (proxy, _) = fidl::endpoints::create_proxy::<CallMarker>();
 
         let mut call = CallEntry::new(
             proxy,
@@ -782,10 +782,9 @@ mod tests {
     /// endpoints.
     fn setup_ongoing_call() -> (Calls, PeerHandlerRequestStream, CallRequestStream, CallIdx, Number)
     {
-        let (proxy, peer_stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, peer_stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
         let mut calls = Calls::new(Some(proxy));
-        let (client_end, call_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, call_stream) = fidl::endpoints::create_request_stream();
         let num = Number::from("1");
         let mut next_call = new_next_call_fidl(client_end, num.clone());
         next_call.state = Some(CallState::IncomingRinging);
@@ -844,7 +843,7 @@ mod tests {
         assert_matches!(call_stream.next().await, Some(Ok(CallRequest::RequestHold { .. })));
 
         // Make a second call that is active
-        let (client_end, mut call_stream_2) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, mut call_stream_2) = fidl::endpoints::create_request_stream();
         let next_call = new_next_call_fidl(client_end, "2");
         let _ = calls.handle_new_call(next_call).expect("success handling new call");
 
@@ -859,7 +858,7 @@ mod tests {
         assert_matches!(call_stream.next().await, Some(Ok(CallRequest::RequestHold { .. })));
 
         // Make a third call that is active
-        let (client_end, mut call_stream_3) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, mut call_stream_3) = fidl::endpoints::create_request_stream();
         let next_call = new_next_call_fidl(client_end, "3");
         let _ = calls.handle_new_call(next_call).expect("success handling new call");
 
@@ -932,7 +931,7 @@ mod tests {
             result => panic!("Unexpected result: {:?}", result),
         };
         // Respond with a call.
-        let (client, call) = fidl::endpoints::create_request_stream::<CallMarker>().unwrap();
+        let (client, call) = fidl::endpoints::create_request_stream::<CallMarker>();
         let next_call = NextCall {
             call: Some(client),
             remote: Some(num.to_string()),
@@ -1057,7 +1056,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut peer_stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
         let mut calls = Calls::new(Some(proxy));
 
         // No active call when there are no calls.
@@ -1095,7 +1094,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut peer_stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
         let mut calls = Calls::new(Some(proxy));
 
         // No active call when there are no calls.
@@ -1139,7 +1138,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut peer_stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
         let mut calls = Calls::new(Some(proxy));
 
         // No active call when there are no calls.

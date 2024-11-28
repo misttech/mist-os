@@ -6,8 +6,8 @@ use crate::subsystems::prelude::*;
 use anyhow::Context;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::recovery_config::{RecoveryConfig, SystemRecovery};
+use assembly_constants::{FileEntry, PackageDestination, PackageSetDestination};
 use assembly_images_config::VolumeConfig;
-use assembly_util::{FileEntry, PackageDestination, PackageSetDestination};
 
 pub(crate) struct RecoverySubsystem;
 impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for RecoverySubsystem {

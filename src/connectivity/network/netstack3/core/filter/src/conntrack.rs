@@ -184,9 +184,6 @@ impl<
 
         let mut guard = self.inner.lock();
 
-        // We multiply the table size limit because each connection is inserted
-        // into the table twice, once for the original tuple and again for the
-        // reply tuple.
         if guard.num_connections >= MAXIMUM_CONNECTIONS {
             guard.table_limit_hits = guard.table_limit_hits.saturating_add(1);
             if let Some((original_tuple, reply_tuple)) = guard
@@ -315,8 +312,12 @@ impl<
                     // connection from the table, since we released the table
                     // lock while updating the connection.
                     let mut guard = self.inner.lock();
-                    let _ = guard.table.remove(&conn.inner.original_tuple);
-                    let _ = guard.table.remove(&conn.inner.reply_tuple);
+                    let original = guard.table.remove(&conn.inner.original_tuple);
+                    let reply = guard.table.remove(&conn.inner.reply_tuple);
+
+                    if original.is_some() || reply.is_some() {
+                        guard.num_connections -= 1;
+                    }
 
                     Ok(Some(Connection::Shared(conn)))
                 }
@@ -2087,12 +2088,14 @@ mod tests {
 
         assert!(!table.contains_tuple(&tuple));
         assert!(!table.contains_tuple(&reply_tuple));
+        assert_eq!(table.inner.lock().num_connections, 0);
 
         // The connection should not added back on finalization.
         assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok((false, Some(_))));
 
         assert!(!table.contains_tuple(&tuple));
         assert!(!table.contains_tuple(&reply_tuple));
+        assert_eq!(table.inner.lock().num_connections, 0);
 
         // GC should complete successfully.
         bindings_ctx.sleep(Duration::from_secs(60 * 60 * 24 * 6));

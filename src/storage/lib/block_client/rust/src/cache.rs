@@ -284,7 +284,7 @@ impl std::io::Seek for Cache {
                 }
             }
         }
-        .ok_or(std::io::Error::new(std::io::ErrorKind::InvalidInput, "bad delta"))?;
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "bad delta"))?;
         Ok(self.offset)
     }
 }

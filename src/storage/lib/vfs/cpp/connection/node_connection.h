@@ -74,10 +74,8 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   }
 #endif
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_io::Node>,
                              fidl::UnknownMethodCompleter::Sync&) final {}
-#endif
 
   std::optional<fidl::ServerBindingRef<fuchsia_io::Node>> binding_;
 };

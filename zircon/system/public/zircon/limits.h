@@ -16,7 +16,7 @@
 #define ZX_MIN_PAGE_SHIFT ((uint32_t)12u)
 #define ZX_MAX_PAGE_SHIFT ((uint32_t)21u)
 
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__arm__)
 
 #define ZX_MIN_PAGE_SHIFT ((uint32_t)12u)
 #define ZX_MAX_PAGE_SHIFT ((uint32_t)16u)

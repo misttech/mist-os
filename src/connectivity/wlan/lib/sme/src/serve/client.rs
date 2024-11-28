@@ -37,6 +37,7 @@ pub fn serve(
     new_telemetry_fidl_clients: mpsc::UnboundedReceiver<
         fidl::endpoints::ServerEnd<fidl_sme::TelemetryMarker>,
     >,
+    inspector: fuchsia_inspect::Inspector,
     inspect_node: fuchsia_inspect::Node,
     persistence_req_sender: auto_persist::PersistenceReqSender,
 ) -> (MlmeSink, MlmeStream, impl Future<Output = Result<(), anyhow::Error>>) {
@@ -47,6 +48,7 @@ pub fn serve(
     let (sme, mlme_sink, mlme_stream, time_stream) = Sme::new(
         cfg,
         device_info,
+        inspector,
         inspect_node,
         persistence_req_sender,
         mac_sublayer_support,
@@ -130,6 +132,14 @@ async fn handle_telemetry_fidl_request(
                 });
             responder.send(histogram_stats.as_ref().map_err(|e| *e))
         }
+        TelemetryRequest::CloneInspectVmo { responder } => {
+            let inspect_vmo = sme
+                .lock()
+                .unwrap()
+                .on_clone_inspect_vmo()
+                .ok_or_else(|| zx::Status::INTERNAL.into_raw());
+            responder.send(inspect_vmo)
+        }
     }
 }
 
@@ -183,7 +193,7 @@ async fn connect(
 ) -> Result<(), anyhow::Error> {
     let handle = match txn {
         None => None,
-        Some(txn) => Some(txn.into_stream()?.control_handle()),
+        Some(txn) => Some(txn.into_stream().control_handle()),
     };
     let connect_txn_stream = sme.lock().unwrap().on_connect_command(req);
     serve_connect_txn_stream(handle, connect_txn_stream).await?;
@@ -430,7 +440,7 @@ mod tests {
     fn scan_results_are_effectively_unbounded(number_of_scan_results: usize, randomize: bool) {
         let mut exec = fasync::TestExecutor::new();
         let (client_sme_proxy, mut client_sme_stream) =
-            create_proxy_and_stream::<fidl_sme::ClientSmeMarker>().expect("error creating proxy");
+            create_proxy_and_stream::<fidl_sme::ClientSmeMarker>();
 
         // Request scan
         async fn request_and_collect_result(
@@ -475,8 +485,7 @@ mod tests {
 
         let (sme_proxy, sme_connect_txn_stream) = mpsc::unbounded();
         let (fidl_client_proxy, fidl_connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create ConnectTransaction proxy and stream");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let fidl_client_fut = fidl_client_proxy.take_event_stream().into_future();
         let mut fidl_client_fut = pin!(fidl_client_fut);
         let fidl_connect_txn_handle = fidl_connect_txn_stream.control_handle();

@@ -33,6 +33,12 @@ use {
     fidl_fuchsia_update_verify::{BlobfsVerifierMarker, VerifyOptions},
 };
 
+#[cfg(feature = "storage-host")]
+use {
+    fidl::endpoints::ServiceMarker as _, fidl_fuchsia_hardware_block_partition as fpartition,
+    fidl_fuchsia_storagehost as fstoragehost, fshost_test_fixture::TestFixture,
+};
+
 pub mod config;
 
 use config::{
@@ -208,7 +214,7 @@ async fn wipe_storage_not_supported() {
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
 
-    let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
 
     let result = admin
         .wipe_storage(Some(blobfs_server), None)
@@ -334,8 +340,7 @@ async fn partition_max_size_set() {
             .expect("failed to find data partition");
 
     // Get the data instance guid.
-    let (volume_proxy, volume_server_end) =
-        fidl::endpoints::create_proxy::<VolumeMarker>().unwrap();
+    let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
     data_partition_controller.connect_to_device_fidl(volume_server_end.into_channel()).unwrap();
 
     let (status, data_instance_guid) = volume_proxy.get_instance_guid().await.unwrap();
@@ -464,7 +469,7 @@ async fn set_data_and_blob_max_bytes_zero_new_write_api() {
         .await
         .expect("transport error on BlobCreator.Create")
         .expect("failed to create blob");
-    let writer = writer_client_end.into_proxy().unwrap();
+    let writer = writer_client_end.into_proxy();
     let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
         .await
         .expect("failed to create BlobWriter");
@@ -1091,7 +1096,7 @@ async fn delivery_blob_support_fxblob() {
         .expect("transport error on create")
         .expect("failed to create blob");
 
-    let writer = blob_writer_client_end.into_proxy().unwrap();
+    let writer = blob_writer_client_end.into_proxy();
     let mut blob_writer = BlobWriter::create(writer, payload.len() as u64)
         .await
         .expect("failed to create BlobWriter");
@@ -1144,6 +1149,112 @@ async fn data_persists() {
     let file =
         fuchsia_fs::directory::open_file(&data_root, "file", fio::PERM_READABLE).await.unwrap();
     assert_eq!(&fuchsia_fs::file::read(&file).await.unwrap()[..], b"file contents!");
+
+    fixture.tear_down().await;
+}
+
+#[cfg(feature = "storage-host")]
+async fn gpt_num_partitions(fixture: &TestFixture) -> usize {
+    let partitions = fixture.dir(
+        fidl_fuchsia_storagehost::PartitionServiceMarker::SERVICE_NAME,
+        fuchsia_fs::PERM_READABLE,
+    );
+    fuchsia_fs::directory::readdir(&partitions).await.expect("Failed to read partitions").len()
+}
+
+#[cfg(feature = "storage-host")]
+#[fuchsia::test]
+async fn initialized_gpt() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
+    builder.with_extra_disk();
+    let fixture = builder.build().await;
+
+    assert_eq!(gpt_num_partitions(&fixture).await, 1);
+
+    fixture.tear_down().await;
+}
+
+#[cfg(feature = "storage-host")]
+#[fuchsia::test]
+async fn uninitialized_gpt() {
+    let mut builder = new_builder().with_uninitialized_disk();
+    builder.fshost().set_config_value("netboot", true);
+    builder.with_extra_disk();
+    let fixture = builder.build().await;
+
+    assert_eq!(gpt_num_partitions(&fixture).await, 0);
+
+    fixture.tear_down().await;
+}
+
+#[cfg(feature = "storage-host")]
+#[fuchsia::test]
+async fn reset_uninitialized_gpt() {
+    let mut builder = new_builder().with_uninitialized_disk();
+    builder.fshost().set_config_value("netboot", true);
+    builder.with_extra_disk();
+    let fixture = builder.build().await;
+
+    assert_eq!(gpt_num_partitions(&fixture).await, 0);
+
+    let recovery =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::RecoveryMarker>().unwrap();
+    recovery
+        .init_system_partition_table(&[fstoragehost::PartitionInfo {
+            name: "part".to_string(),
+            type_guid: fpartition::Guid { value: [0xabu8; 16] },
+            instance_guid: fpartition::Guid { value: [0xcdu8; 16] },
+            start_block: 4,
+            num_blocks: 1,
+            flags: 0,
+        }])
+        .await
+        .expect("FIDL error")
+        .expect("init_system_partition_table failed");
+
+    assert_eq!(gpt_num_partitions(&fixture).await, 1);
+
+    fixture.tear_down().await;
+}
+
+#[cfg(feature = "storage-host")]
+#[fuchsia::test]
+async fn reset_initialized_gpt() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
+    builder.with_extra_disk();
+    builder.fshost().set_config_value("netboot", true);
+    let fixture = builder.build().await;
+
+    assert_eq!(gpt_num_partitions(&fixture).await, 1);
+
+    let recovery =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::RecoveryMarker>().unwrap();
+    recovery
+        .init_system_partition_table(&[
+            fstoragehost::PartitionInfo {
+                name: "part".to_string(),
+                type_guid: fpartition::Guid { value: [0xabu8; 16] },
+                instance_guid: fpartition::Guid { value: [0xcdu8; 16] },
+                start_block: 4,
+                num_blocks: 1,
+                flags: 0,
+            },
+            fstoragehost::PartitionInfo {
+                name: "part2".to_string(),
+                type_guid: fpartition::Guid { value: [0x11u8; 16] },
+                instance_guid: fpartition::Guid { value: [0x22u8; 16] },
+                start_block: 5,
+                num_blocks: 1,
+                flags: 0,
+            },
+        ])
+        .await
+        .expect("FIDL error")
+        .expect("init_system_partition_table failed");
+
+    assert_eq!(gpt_num_partitions(&fixture).await, 2);
 
     fixture.tear_down().await;
 }

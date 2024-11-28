@@ -43,7 +43,7 @@ async fn handle_hfp_client_connection_result(
     while let Some(request) = stream.try_next().await.context("hfp FIDL client error")? {
         let HfpRequest::Register { manager, .. } = request;
         info!("Registering call manager");
-        let proxy = manager.into_proxy().context("hfp FIDL client error")?;
+        let proxy = manager.into_proxy();
         call_manager.send(proxy).await.context("component main loop halted")?;
     }
     Ok(())
@@ -95,7 +95,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn successful_no_op_hfp_connection() {
         let (sender, _receiver) = mpsc::channel(0);
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<HfpMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<HfpMarker>();
 
         // close the stream by dropping the proxy
         drop(proxy);
@@ -109,8 +109,7 @@ mod tests {
         let (sender, _receiver) = mpsc::channel(0);
 
         // Create a stream of an unexpected protocol type.
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>();
         // Pretend that stream is the expected protocol type.
         let stream = stream.cast_stream::<HfpRequestStream>();
         // Send a request using the wrong protocol to the server end.
@@ -129,7 +128,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn successful_call_manager_registration() {
         let (sender, _receiver) = mpsc::channel(1);
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<HfpMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<HfpMarker>();
 
         let (call_manager_client_end, _call_manager_server_end) =
             fidl::endpoints::create_endpoints::<CallManagerMarker>();

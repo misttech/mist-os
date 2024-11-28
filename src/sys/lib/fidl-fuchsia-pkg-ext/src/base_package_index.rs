@@ -20,7 +20,7 @@ impl BasePackageIndex {
     /// Creates a `BasePackageIndex` from a PackageCache proxy.
     pub async fn from_proxy(cache: &PackageCacheProxy) -> Result<Self, Error> {
         let (pkg_iterator, server_end) =
-            fidl::endpoints::create_proxy::<PackageIndexIteratorMarker>()?;
+            fidl::endpoints::create_proxy::<PackageIndexIteratorMarker>();
         cache.base_package_index(server_end)?;
 
         let mut index = HashMap::with_capacity(256);
@@ -105,7 +105,7 @@ mod tests {
             while let Some(req) = stream.try_next().await.unwrap() {
                 match req {
                     PackageCacheRequest::BasePackageIndex { iterator, control_handle: _ } => {
-                        let iterator = iterator.into_stream().unwrap();
+                        let iterator = iterator.into_stream();
                         self.serve_package_iterator(iterator);
                     }
                     _ => panic!("unexpected PackageCache request: {:?}", req),
@@ -145,7 +145,7 @@ mod tests {
     async fn spawn_pkg_cache(
         base_package_index: HashMap<UnpinnedAbsolutePackageUrl, BlobId>,
     ) -> PackageCacheProxy {
-        let (client, request_stream) = create_proxy_and_stream::<PackageCacheMarker>().unwrap();
+        let (client, request_stream) = create_proxy_and_stream::<PackageCacheMarker>();
         let cache = MockPackageCacheService::new_with_base_packages(Arc::new(base_package_index));
         fasync::Task::spawn(cache.run_service(request_stream)).detach();
         client

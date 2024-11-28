@@ -14,12 +14,11 @@ pub async fn get_client_controller(
     policy_provider: wlan_policy::ClientProviderProxy,
 ) -> Result<(wlan_policy::ClientControllerProxy, wlan_policy::ClientStateUpdatesRequestStream), Error>
 {
-    let (client_controller, server_end) =
-        create_proxy::<wlan_policy::ClientControllerMarker>().unwrap();
+    let (client_controller, server_end) = create_proxy::<wlan_policy::ClientControllerMarker>();
     let (update_client_end, update_server_end) =
         create_endpoints::<wlan_policy::ClientStateUpdatesMarker>();
     let () = policy_provider.get_controller(server_end, update_client_end)?;
-    let update_stream = update_server_end.into_stream()?;
+    let update_stream = update_server_end.into_stream();
 
     Ok((client_controller, update_stream))
 }
@@ -30,7 +29,7 @@ pub fn get_client_listener_stream(
 ) -> Result<wlan_policy::ClientStateUpdatesRequestStream, Error> {
     let (client_end, server_end) = create_endpoints::<wlan_policy::ClientStateUpdatesMarker>();
     listener.get_listener(client_end)?;
-    let server_stream = server_end.into_stream()?;
+    let server_stream = server_end.into_stream();
     Ok(server_stream)
 }
 
@@ -42,12 +41,11 @@ pub async fn get_ap_controller(
     (wlan_policy::AccessPointControllerProxy, wlan_policy::AccessPointStateUpdatesRequestStream),
     Error,
 > {
-    let (ap_controller, server_end) =
-        create_proxy::<wlan_policy::AccessPointControllerMarker>().unwrap();
+    let (ap_controller, server_end) = create_proxy::<wlan_policy::AccessPointControllerMarker>();
     let (update_client_end, update_server_end) =
         create_endpoints::<wlan_policy::AccessPointStateUpdatesMarker>();
     let () = policy_provider.get_controller(server_end, update_client_end)?;
-    let update_stream = update_server_end.into_stream()?;
+    let update_stream = update_server_end.into_stream();
 
     Ok((ap_controller, update_stream))
 }
@@ -58,6 +56,6 @@ pub fn get_ap_listener_stream(
 ) -> Result<wlan_policy::AccessPointStateUpdatesRequestStream, Error> {
     let (client_end, server_end) = create_endpoints::<wlan_policy::AccessPointStateUpdatesMarker>();
     listener.get_listener(client_end)?;
-    let server_stream = server_end.into_stream()?;
+    let server_stream = server_end.into_stream();
     Ok(server_stream)
 }

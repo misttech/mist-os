@@ -17,7 +17,6 @@
                 "fuchsia.diagnostics.DenySerialLogs",
                 "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
                 "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
-                "fuchsia.diagnostics.NumThreads",
             ],
             from: "parent",
             to: "#archivist",

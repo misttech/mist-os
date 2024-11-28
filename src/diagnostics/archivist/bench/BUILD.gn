@@ -79,6 +79,10 @@ fuchsia_component_perf_test("archivist-logging-benchmark") {
   expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.archivist.logging.txt"
 }
 
+group("build-only") {
+  deps = [ ":archivist-benchmarks" ]
+}
+
 group("bench") {
   testonly = true
   deps = [

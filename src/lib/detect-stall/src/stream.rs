@@ -183,8 +183,7 @@ mod tests {
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
-        let (_proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let (_proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
         let (stream, stalled) = until_stalled(stream, idle_duration);
         let mut stream = pin!(stream);
 
@@ -204,8 +203,7 @@ mod tests {
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
-        let (_proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let (_proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
         let (stream, mut stalled) = until_stalled(stream, idle_duration);
 
         let strong_control_handle: fio::DirectoryControlHandle =
@@ -238,8 +236,7 @@ mod tests {
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
-        let (_proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let (_proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
         let (stream, stalled) = until_stalled(stream, idle_duration);
 
         // Just getting a weak control handle should not block the connection from stalling.
@@ -264,8 +261,7 @@ mod tests {
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
         let (stream, stalled) = until_stalled(stream, idle_duration);
 
         let mut stalled = pin!(stalled);
@@ -305,8 +301,7 @@ mod tests {
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
         let (stream, mut stalled) = until_stalled(stream, idle_duration);
         let mut stream = pin!(stream.fuse());
 
@@ -348,8 +343,7 @@ mod tests {
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
         let (mut stream, stalled) = until_stalled(stream, idle_duration);
 
         let mut stalled = pin!(stalled);
@@ -385,8 +379,7 @@ mod tests {
 
         const DURATION_NANOS: i64 = 40_000_000;
         let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<ProtocolAMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ProtocolAMarker>();
         let (stream, stalled) = until_stalled(stream, idle_duration);
 
         // Launch a task that serves the stream.

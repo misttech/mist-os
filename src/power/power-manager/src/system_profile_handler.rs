@@ -451,8 +451,7 @@ mod tests {
         let mut hanging_get_broker = create_hanging_get_broker(Profile::Idle);
 
         // Set up the service handler
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fprofile::WatcherMarker>()
-            .expect("Failed to create proxy and stream");
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fprofile::WatcherMarker>();
         SystemProfileHandler::handle_new_service_connection(
             stream,
             hanging_get_broker.new_subscriber(),

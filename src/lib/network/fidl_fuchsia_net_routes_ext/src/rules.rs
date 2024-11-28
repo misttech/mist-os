@@ -799,8 +799,7 @@ pub fn new_rule_set<I: Ip + FidlRuleAdminIpExt>(
     rule_table_proxy: &<I::RuleTableMarker as ProtocolMarker>::Proxy,
     priority: RuleSetPriority,
 ) -> Result<<I::RuleSetMarker as ProtocolMarker>::Proxy, RuleSetCreationError> {
-    let (rule_set_proxy, rule_set_server_end) = fidl::endpoints::create_proxy::<I::RuleSetMarker>()
-        .map_err(RuleSetCreationError::CreateProxy)?;
+    let (rule_set_proxy, rule_set_server_end) = fidl::endpoints::create_proxy::<I::RuleSetMarker>();
 
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
@@ -930,8 +929,7 @@ pub fn get_rule_watcher<I: FidlRuleIpExt + FidlRouteIpExt>(
 ) -> Result<<I::RuleWatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy, WatcherCreationError>
 {
     let (watcher_proxy, watcher_server_end) =
-        fidl::endpoints::create_proxy::<I::RuleWatcherMarker>()
-            .map_err(WatcherCreationError::CreateProxy)?;
+        fidl::endpoints::create_proxy::<I::RuleWatcherMarker>();
 
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]

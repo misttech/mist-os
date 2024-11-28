@@ -26,7 +26,7 @@ type EapolIndication = struct {
 // This grouping is the industry's de factor standard.
 type BandCapability = struct {
     /// The values of this struct apply to the band indicated in this field.
-    band fuchsia.wlan.common.WlanBand;
+    band ieee80211.WlanBand;
 
     /// Basic rates supported in units of 500 kbit/s (as defined in
     /// IEEE Std 802.11-2016, 9.4.2.3), e.g., 0x02 represents 1 Mbps.

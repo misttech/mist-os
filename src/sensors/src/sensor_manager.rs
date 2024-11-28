@@ -376,7 +376,7 @@ impl SensorManager {
             async move {
                 match request {
                     IncomingRequest::SensorManager(stream) => {
-                        let client = Client::new(stream.control_handle().clone());
+                        let client = Client::new(stream.control_handle());
                         manager.lock().await.clients.insert(client.clone());
                         handle_sensor_manager_request_stream(
                             stream,
@@ -446,13 +446,13 @@ mod tests {
     async fn test_invalid_configure_playback() {
         // Creates an invalid playback_proxy so that ConfigurePlayback gets PEER_CLOSED when trying
         // to make a request.
-        let (playback_proxy, _) = create_proxy::<PlaybackMarker>().unwrap();
+        let (playback_proxy, _) = create_proxy::<PlaybackMarker>();
 
-        let (driver_proxy, _) = create_proxy::<DriverMarker>().unwrap();
+        let (driver_proxy, _) = create_proxy::<DriverMarker>();
         let sm = SensorManager::new(Vec::new(), Some(Playback::new(driver_proxy, playback_proxy)));
 
         let manager = Arc::new(Mutex::new(sm));
-        let (proxy, stream) = create_proxy_and_stream::<ManagerMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<ManagerMarker>();
         let client = Client::new(stream.control_handle().clone());
         let (sender, _receiver) = mpsc::unbounded::<HashMap<SensorId, Sensor>>();
         fuchsia_async::Task::spawn(async move {

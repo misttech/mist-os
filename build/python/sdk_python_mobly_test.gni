@@ -132,7 +132,11 @@ template("sdk_python_mobly_test") {
 
     file_list = _files.file_list
 
-    # Ensure FIDL-IR dependencies used in the test are supported in SDK.
+    # Ensure all FIDL dependencies are available and stable. Use the
+    # "partner_internal" SDK category and greater as an approximation of this.
+    # However, note that not everything in those categories is stable.
+    # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
+    # Also, there are exceptions for host tests - see https://fxbug.dev/326090508.
     #
     # TODO(b/330629017): Centralize this group in //sdk somewhere.
     assert_no_deps = [

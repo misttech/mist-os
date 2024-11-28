@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Context, Error};
+use anyhow::{format_err, Error};
 use bt_test_harness::access::{expectation, AccessHarness};
 use bt_test_harness::profile::ProfileHarness;
 use fidl::endpoints::create_request_stream;
@@ -62,8 +62,7 @@ pub fn a2dp_sink_service_definition() -> ServiceDefinition {
 
 fn add_service(profile: &ProfileHarness) -> Result<ConnectionReceiverRequestStream, anyhow::Error> {
     let service_defs = vec![service_definition_for_testing()];
-    let (connect_client, connect_requests) =
-        create_request_stream().context("ConnectionReceiver creation")?;
+    let (connect_client, connect_requests) = create_request_stream();
 
     let _ = profile.aux().profile.advertise(ProfileAdvertiseRequest {
         services: Some(service_defs),
@@ -74,7 +73,7 @@ fn add_service(profile: &ProfileHarness) -> Result<ConnectionReceiverRequestStre
 }
 
 async fn create_bredr_peer(proxy: &EmulatorProxy, address: Address) -> Result<PeerProxy, Error> {
-    let (peer, remote) = fidl::endpoints::create_proxy()?;
+    let (peer, remote) = fidl::endpoints::create_proxy();
     let peer_params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),
@@ -91,7 +90,7 @@ async fn create_bredr_peer(proxy: &EmulatorProxy, address: Address) -> Result<Pe
 async fn start_discovery(access: &AccessHarness) -> Result<ProcedureTokenProxy, Error> {
     // We create a capability to capture the discovery token, and pass it to the profile provider
     // Discovery will stop once we drop this token
-    let (token, token_server) = fidl::endpoints::create_proxy()?;
+    let (token, token_server) = fidl::endpoints::create_proxy();
     let fidl_response = access.aux().start_discovery(token_server);
     fidl_response
         .await?
@@ -103,8 +102,7 @@ async fn add_search(
     profile: &ProfileHarness,
     profileid: ServiceClassProfileIdentifier,
 ) -> Result<SearchResultsRequestStream, Error> {
-    let (results_client, results_stream) =
-        create_request_stream().context("SearchResults creation")?;
+    let (results_client, results_stream) = create_request_stream();
     profile.aux().profile.search(ProfileSearchRequest {
         service_uuid: Some(profileid),
         results: Some(results_client),

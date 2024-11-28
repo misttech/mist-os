@@ -48,8 +48,7 @@ impl DeviceControl for StreamConfigDevice {
         _element_id: fadevice::ElementId,
         format: Format,
     ) -> Result<Box<dyn RingBuffer>, Error> {
-        let (ring_buffer_proxy, ring_buffer_server) =
-            create_proxy::<fhaudio::RingBufferMarker>().unwrap();
+        let (ring_buffer_proxy, ring_buffer_server) = create_proxy::<fhaudio::RingBufferMarker>();
         self.proxy.create_ring_buffer(&fhaudio::Format::from(format), ring_buffer_server)?;
         let ring_buffer = HardwareRingBuffer::new(ring_buffer_proxy, format).await?;
 
@@ -99,8 +98,7 @@ impl DeviceControl for RegistryDevice {
         element_id: fadevice::ElementId,
         format: Format,
     ) -> Result<Box<dyn RingBuffer>, Error> {
-        let (ring_buffer_proxy, ring_buffer_server) =
-            create_proxy::<fadevice::RingBufferMarker>().unwrap();
+        let (ring_buffer_proxy, ring_buffer_server) = create_proxy::<fadevice::RingBufferMarker>();
 
         // Request at least 100ms worth of frames (rounding up).
         let min_frames = format.frames_per_second.div_ceil(10);
@@ -148,7 +146,7 @@ fn connect_to_devfs_device(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl
                     protocol_path.as_str(),
                 )
                 .context("Failed to connect to StreamConfigConnector")?;
-            let (proxy, server_end) = create_proxy()?;
+            let (proxy, server_end) = create_proxy();
             connector_proxy.connect(server_end).context("Failed to call Connect")?;
 
             Ok(Box::new(StreamConfigDevice { proxy }))
@@ -172,7 +170,7 @@ async fn connect_to_registry_device(
     let control_creator = connect_to_protocol::<fadevice::ControlCreatorMarker>()
         .context("Failed to connect to ControlCreator")?;
 
-    let (proxy, server_end) = create_proxy::<fadevice::ControlMarker>().unwrap();
+    let (proxy, server_end) = create_proxy::<fadevice::ControlMarker>();
 
     control_creator
         .create(fadevice::ControlCreatorCreateRequest {

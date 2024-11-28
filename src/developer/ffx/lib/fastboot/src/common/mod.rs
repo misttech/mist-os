@@ -262,7 +262,6 @@ async fn flash_partition_sparse<W: Write, F: FastbootInterface>(
     tracing::debug!("Preparing to flash {} in sparse mode", file_to_upload);
 
     let sparse_files = build_sparse_files(
-        writer,
         name,
         file_to_upload,
         std::env::temp_dir().as_path(),
@@ -410,37 +409,6 @@ pub async fn reboot_bootloader<W: Write, F: FastbootInterface>(
     let d = Utc::now().signed_duration_since(start_time);
     tracing::debug!("Reboot duration: {:.2}s", (d.num_milliseconds() / 1000));
     done_time(writer, d)?;
-    Ok(())
-}
-
-pub async fn prepare<W: Write, F: FastbootInterface>(
-    writer: &mut W,
-    fastboot_interface: &mut F,
-) -> Result<()> {
-    let (reboot_client, mut reboot_server): (Sender<RebootEvent>, Receiver<RebootEvent>) =
-        mpsc::channel(1);
-    let mut start_time = None;
-    writer.flush()?;
-
-    try_join!(fastboot_interface.prepare(reboot_client).map_err(|e| anyhow!(e)), async {
-        match reboot_server.recv().await {
-            Some(RebootEvent::OnReboot) => {
-                start_time.replace(Utc::now());
-                write!(writer, "Rebooting to bootloader... ")?;
-                writer.flush()?;
-                return Ok(());
-            }
-            None => {
-                return Ok(());
-            }
-        }
-    })?;
-
-    if let Some(s) = start_time {
-        let d = Utc::now().signed_duration_since(s);
-        tracing::debug!("Reboot duration: {:.2}s", (d.num_milliseconds() / 1000));
-        done_time(writer, d)?;
-    }
     Ok(())
 }
 

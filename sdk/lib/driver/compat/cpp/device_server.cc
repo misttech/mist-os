@@ -69,6 +69,13 @@ void DeviceServer::Init(std::string name, std::string topological_path,
   banjo_config_ = std::move(banjo_config);
 }
 
+void DeviceServer::Initialize(std::string name, std::optional<ServiceOffersV1> service_offers,
+                              std::optional<BanjoConfig> banjo_config) {
+  name_ = std::move(name);
+  service_offers_ = std::move(service_offers);
+  banjo_config_ = std::move(banjo_config);
+}
+
 zx_status_t DeviceServer::AddMetadata(uint32_t type, const void* data, size_t size) {
   // Constant taken from fuchsia.system.state/METADATA_BYTES_MAX. We cannot depend on non-SDK
   // FIDL library here so we redefined the constant instead.
@@ -384,7 +391,7 @@ zx::result<> SyncInitializedDeviceServer::CreateAndServe(
   ZX_ASSERT_MSG(device_server_ == std::nullopt,
                 "Cannot call Initialize on the SyncInitializedDeviceServer more than once.");
   device_server_.emplace();
-  device_server_->Init(std::move(child_node_name), "", std::nullopt, std::move(banjo_config));
+  device_server_->Initialize(std::move(child_node_name), std::nullopt, std::move(banjo_config));
 
   zx_status_t serve_result =
       device_server_->Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing.get());
@@ -550,8 +557,8 @@ zx::result<> AsyncInitializedDeviceServer::CreateAndServe() {
 
   ZX_ASSERT(device_server_ == std::nullopt);
   device_server_.emplace();
-  device_server_->Init(std::move(storage_->child_node_name), "", std::nullopt,
-                       std::move(storage_->banjo_config));
+  device_server_->Initialize(std::move(storage_->child_node_name), std::nullopt,
+                             std::move(storage_->banjo_config));
 
   zx_status_t serve_result = device_server_->Serve(
       fdf::Dispatcher::GetCurrent()->async_dispatcher(), storage_->outgoing.get());

@@ -65,7 +65,7 @@ impl TryFrom<ViewRef> for ui_views::ViewRef {
     type Error = Error;
 
     fn try_from(view_ref: ViewRef) -> Result<Self, Error> {
-        Ok(view_ref.clone().inner)
+        Ok(view_ref.inner)
     }
 }
 
@@ -244,7 +244,7 @@ impl KeyboardService {
             {
                 // Get the store lock to make sure all data is modified exclusively.
                 let mut store = store.lock().await;
-                store.add_new_subscriber(view_ref.clone(), listener.into_proxy()?);
+                store.add_new_subscriber(view_ref.clone(), listener.into_proxy());
                 let id = store.add_view_ref(view_ref);
                 view_ref_ids.push(id);
             }
@@ -255,12 +255,12 @@ impl KeyboardService {
         view_ref_ids
             .iter()
             .map(|i| {
-                let view_ref = store.view_refs.remove(i).ok_or(format_err!(
-                    "Unable to cleanup after client disconnecting: view_ref lost."
-                ))?;
-                store.subscribers.remove(&view_ref).ok_or(format_err!(
-                    "Unable to cleanup after client disconnecting: subscriber lost."
-                ))?;
+                let view_ref = store.view_refs.remove(i).ok_or_else(|| {
+                    format_err!("Unable to cleanup after client disconnecting: view_ref lost.")
+                })?;
+                store.subscribers.remove(&view_ref).ok_or_else(|| {
+                    format_err!("Unable to cleanup after client disconnecting: subscriber lost.")
+                })?;
                 Ok(())
             })
             .collect::<Result<(), Error>>()?;
@@ -439,8 +439,7 @@ mod tests {
         fn new() -> Self {
             let fake_now = zx::MonotonicInstant::ZERO;
             let (keyboard_proxy, keyboard_request_stream) =
-                fidl::endpoints::create_proxy_and_stream::<ui_input3::KeyboardMarker>()
-                    .expect("Failed to create KeyboardProxy and stream.");
+                fidl::endpoints::create_proxy_and_stream::<ui_input3::KeyboardMarker>();
 
             let service = KeyboardService::new();
             let service_clone = service.clone();
@@ -456,7 +455,7 @@ mod tests {
         /// Returns fake client viewref and keyboard listener.
         async fn create_fake_client(&self) -> Result<Client, Error> {
             let (listener_client_end, listener) =
-                fidl::endpoints::create_request_stream::<ui_input3::KeyboardListenerMarker>()?;
+                fidl::endpoints::create_request_stream::<ui_input3::KeyboardListenerMarker>();
             let view_ref = scenic::ViewRefPair::new()?.view_ref;
 
             self.keyboard_proxy

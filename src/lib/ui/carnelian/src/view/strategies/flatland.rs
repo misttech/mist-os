@@ -256,7 +256,7 @@ impl FlatlandViewStrategy {
             flatland,
             allocator,
             view_key: key,
-            app_sender: app_sender.clone(),
+            app_sender: app_sender,
             last_presentation_time: fasync::MonotonicInstant::now().into_nanos(),
             future_presentation_times: Vec::new(),
             custom_render_offset: None,
@@ -286,7 +286,7 @@ impl FlatlandViewStrategy {
         view_creation_token: fidl_fuchsia_ui_views::ViewCreationToken,
     ) -> Result<(), Error> {
         let (parent_viewport_watcher, server_end) =
-            create_proxy::<flatland::ParentViewportWatcherMarker>()?;
+            create_proxy::<flatland::ParentViewportWatcherMarker>();
 
         let viewref_pair = fuchsia_scenic::ViewRefPair::new()?;
         let view_ref = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
@@ -312,7 +312,7 @@ impl FlatlandViewStrategy {
                 server_end,
             )?;
 
-            let touch_proxy = touch_client.into_proxy()?;
+            let touch_proxy = touch_client.into_proxy();
             let touch_sender = app_sender.clone();
 
             fasync::Task::local(async move {
@@ -354,7 +354,7 @@ impl FlatlandViewStrategy {
             })
             .detach();
 
-            let mouse_proxy = mouse_client.into_proxy()?;
+            let mouse_proxy = mouse_client.into_proxy();
             let mouse_sender = app_sender.clone();
 
             fasync::Task::local(async move {
@@ -382,7 +382,7 @@ impl FlatlandViewStrategy {
             })
             .detach();
 
-            let view_ref_focused_proxy = view_ref_focused_client.into_proxy()?;
+            let view_ref_focused_proxy = view_ref_focused_client.into_proxy();
             let view_ref_focused_sender = app_sender.clone();
 
             fasync::Task::local(async move {
@@ -415,7 +415,7 @@ impl FlatlandViewStrategy {
             flatland.create_view(view_creation_token, server_end)?;
         }
 
-        let sender = app_sender.clone();
+        let sender = app_sender;
         fasync::Task::local(async move {
             let mut layout_info_stream = HangingGetStream::new(
                 parent_viewport_watcher,
@@ -648,7 +648,7 @@ impl FlatlandViewStrategy {
             .context("Failed to connect to Keyboard service")?;
 
         let (listener_client_end, mut listener_stream) =
-            create_request_stream::<fidl_fuchsia_ui_input3::KeyboardListenerMarker>()?;
+            create_request_stream::<fidl_fuchsia_ui_input3::KeyboardListenerMarker>();
 
         let event_sender = app_sender.clone();
 

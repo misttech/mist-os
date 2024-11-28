@@ -404,8 +404,8 @@ int main(int argc, char** argv) {
   const char* fvm_images[MAX_FVM_IMAGES] = {NULL, NULL, NULL, NULL};
   const char* fxfs_image = NULL;
   const char* kernel_fn = NULL;
-  const char* init_partition_tables_device_path = NULL;
-  const char* wipe_partition_tables_device_path = NULL;
+  bool init_partition_tables = false;
+  bool wipe_partition_tables = false;
   int once = 0;
   bool allow_zedboot_version_mismatch = false;
   int status;
@@ -659,19 +659,23 @@ int main(int argc, char** argv) {
     } else if (!strcmp(argv[1], "--init-partition-tables")) {
       argc--;
       argv++;
-      if (argc <= 1) {
-        fprintf(stderr, "'--init-partition-tables' option requires a valid board name\n");
+      if (argc >= 1) {
+        fprintf(
+            stderr,
+            "'--init-partition-tables' has changed!  Path is no longer needed.  Ignoring path.\n");
         return -1;
       }
-      init_partition_tables_device_path = argv[1];
+      init_partition_tables = true;
     } else if (!strcmp(argv[1], "--wipe-partition-tables")) {
       argc--;
       argv++;
-      if (argc <= 1) {
-        fprintf(stderr, "'--wipe-partition-tables' option requires a valid board name\n");
+      if (argc >= 1) {
+        fprintf(
+            stderr,
+            "'--wipe-partition-tables' has changed!  Path is no longer needed.  Ignoring path.\n");
         return -1;
       }
-      wipe_partition_tables_device_path = argv[1];
+      wipe_partition_tables = true;
     } else if (!strcmp(argv[1], "--reuseport")) {
       reuseport = true;
     } else if (!strcmp(argv[1], "--")) {
@@ -698,7 +702,7 @@ int main(int argc, char** argv) {
   }
   if (!kernel_fn && !bootloader_image && !num_firmware && !zircona_image && !zirconb_image &&
       !zirconr_image && !vbmetaa_image && !vbmetab_image && !fvm_images[0] && !fxfs_image &&
-      !init_partition_tables_device_path && !wipe_partition_tables_device_path) {
+      !init_partition_tables && !wipe_partition_tables) {
     usage();
   }
   if (!nodename) {
@@ -892,13 +896,11 @@ int main(int argc, char** argv) {
       status = xfer(&ra, "(cmdline)", cmdline);
     }
     // Wipe partition tables before writing anything to persistent storage.
-    if (status == 0 && wipe_partition_tables_device_path) {
+    if (status == 0 && wipe_partition_tables) {
       snprintf(block_device_path, sizeof(block_device_path), block_device_path_template, tmpdir);
       int fd = mkstemp(block_device_path);
       netboot_block_device_t info = {};
-      strncpy(info.block_device_path, wipe_partition_tables_device_path,
-              sizeof(info.block_device_path) - 1);
-      int written = write(fd, &info, sizeof(info));
+      ssize_t written = write(fd, &info, sizeof(info));
       status = written == sizeof(info) ? 0 : -1;
       if (status == 0) {
         status = xfer(&ra, block_device_path, NETBOOT_WIPE_PARTITION_TABLES_FILENAME);
@@ -907,13 +909,11 @@ int main(int argc, char** argv) {
       close(fd);
     }
     // Initialize partition tables before writing anything to persistent storage.
-    if (status == 0 && init_partition_tables_device_path) {
+    if (status == 0 && init_partition_tables) {
       snprintf(block_device_path, sizeof(block_device_path), block_device_path_template, tmpdir);
       int fd = mkstemp(block_device_path);
       netboot_block_device_t info = {};
-      strncpy(info.block_device_path, init_partition_tables_device_path,
-              sizeof(info.block_device_path) - 1);
-      int written = write(fd, &info, sizeof(info));
+      ssize_t written = write(fd, &info, sizeof(info));
       status = written == sizeof(info) ? 0 : -1;
       if (status == 0) {
         status = xfer(&ra, block_device_path, NETBOOT_INIT_PARTITION_TABLES_FILENAME);

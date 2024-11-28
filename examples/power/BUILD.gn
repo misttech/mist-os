@@ -5,15 +5,17 @@
 group("power") {
   testonly = true
   deps = [
-    "cpp",
-    "rust",
+    "suspend_config",
+    "unmanaged_element",
+    "wake_lease",
   ]
 }
 
 group("hermetic_tests") {
   testonly = true
   deps = [
-    "cpp:tests",
-    "rust:tests",
+    "suspend_config:tests",
+    "unmanaged_element:tests",
+    "wake_lease:tests",
   ]
 }

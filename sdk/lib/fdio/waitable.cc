@@ -41,7 +41,7 @@ static void fdio_waitable_wait_begin(zxio_t* io, zxio_signals_t zxio_signals,
   if (zxio_signals & ZXIO_SIGNAL_WRITABLE) {
     zx_signals |= waitable->writable;
   }
-  std::visit(fdio::overloaded{
+  std::visit(fdio_internal::overloaded{
                  [out_handle](zx::handle& handle) { *out_handle = handle.get(); },
                  [out_handle](zx::unowned_handle& handle) { *out_handle = handle->get(); },
              },

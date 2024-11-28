@@ -110,8 +110,7 @@ impl TestHelper {
                     responder,
                     ..
                 } => {
-                    let telemetry_stream =
-                        telemetry_server.into_stream().expect("Failed to create telemetry stream");
+                    let telemetry_stream = telemetry_server.into_stream();
                     responder.send(Ok(())).expect("Failed to respond to telemetry request");
                     self.telemetry_svc_stream = Some(telemetry_stream);
                     self.exec.run_until_stalled(test_fut)
@@ -226,12 +225,10 @@ pub fn setup_test() -> TestHelper {
     exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
     let (cobalt_1dot1_proxy, cobalt_1dot1_stream) =
-        create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-            .expect("failed to create MetricsEventLogger proxy");
+        create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
     let (monitor_svc_proxy, monitor_svc_stream) =
-        create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>()
-            .expect("failed to create DeviceMonitor proxy");
+        create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>();
 
     let inspector = Inspector::default();
     let inspect_node = inspector.root().create_child("test_stats");

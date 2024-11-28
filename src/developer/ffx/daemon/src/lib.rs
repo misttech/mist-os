@@ -12,6 +12,7 @@ use fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy};
 use fidl_fuchsia_overnet_protocol::NodeId;
 use fuchsia_async::{TimeoutExt, Timer};
 use futures::prelude::*;
+use netext::TokioAsyncReadExt;
 use nix::sys::signal;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -61,7 +62,7 @@ pub async fn run_single_ascendd_link(
         let safe_socket_path = ascendd::short_socket_path(&sockpath)?;
         let started = std::time::Instant::now();
         tracing::debug!("Connecting to ascendd (starting at {started:?})");
-        let conn = async_net::unix::UnixStream::connect(&safe_socket_path)
+        let conn = tokio::net::UnixStream::connect(&safe_socket_path)
             .on_timeout(Duration::from_secs(30), || {
                 Err(std::io::Error::new(
                     std::io::ErrorKind::TimedOut,
@@ -103,7 +104,7 @@ pub async fn run_single_ascendd_link(
     };
 
     tracing::debug!("Got socket connection; splitting into read/write channels");
-    let (mut rx, mut tx) = unix_socket.split();
+    let (mut rx, mut tx) = unix_socket.into_multithreaded_futures_stream().split();
 
     tracing::debug!("Running the connection with the channels");
     run_ascendd_connection(node, &mut rx, &mut tx).await
@@ -249,26 +250,20 @@ pub async fn run_daemon(context: &EnvironmentContext) -> Result<std::process::Ch
     let mut stdout = std::process::Stdio::null();
     let mut stderr = std::process::Stdio::null();
 
-    if ffx_config::logging::is_enabled(context).await {
+    if ffx_config::logging::is_enabled(context) {
         let file = PathBuf::from(DAEMON_LOG_FILENAME);
-        stdout = std::process::Stdio::from(
-            ffx_config::logging::log_file(
-                context,
-                &file,
-                ffx_config::logging::LogDirHandling::WithDirWithRotate,
-            )
-            .await?,
-        );
+        stdout = std::process::Stdio::from(ffx_config::logging::log_file(
+            context,
+            &file,
+            ffx_config::logging::LogDirHandling::WithDirWithRotate,
+        )?);
         // Third argument says not to rotate the logs.  We rotated the logs once
         // for the call above, we shouldn't do it again.
-        stderr = std::process::Stdio::from(
-            ffx_config::logging::log_file(
-                context,
-                &file,
-                ffx_config::logging::LogDirHandling::WithDirWithoutRotate,
-            )
-            .await?,
-        );
+        stderr = std::process::Stdio::from(ffx_config::logging::log_file(
+            context,
+            &file,
+            ffx_config::logging::LogDirHandling::WithDirWithoutRotate,
+        )?);
     }
 
     cmd.stdin(std::process::Stdio::null())

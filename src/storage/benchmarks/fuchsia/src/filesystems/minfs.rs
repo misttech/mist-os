@@ -24,6 +24,7 @@ impl FilesystemConfig for Minfs {
         FsManagementFilesystemInstance::new(
             fs_management::Minfs::default(),
             block_device,
+            None,
             /*as_blob=*/ false,
         )
         .await

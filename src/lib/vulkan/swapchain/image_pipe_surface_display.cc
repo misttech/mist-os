@@ -772,14 +772,11 @@ void ImagePipeSurfaceDisplay::PresentImage(
   // image_id is also used in DisplayController interface.
   const fuchsia_hardware_display::ImageId fidl_image_id = {image_id};
   {
-    OneWayResult result = display_coordinator_->SetLayerImage(
-        {{.layer_id = layer_id_,
-          .image_id = fidl_image_id,
-          .wait_event_id = wait_event_id,
-          .signal_event_id = {fuchsia_hardware_display_types::kInvalidDispId}}});
+    OneWayResult result = display_coordinator_->SetLayerImage2(
+        {{.layer_id = layer_id_, .image_id = fidl_image_id, .wait_event_id = wait_event_id}});
 
     if (result.is_error()) {
-      fprintf(stderr, "%s: SetLayerImage failed: %s\n", kTag,
+      fprintf(stderr, "%s: SetLayerImage2 failed: %s\n", kTag,
               result.error_value().FormatDescription().c_str());
       // Note: don't return on failure, because we want to release fences afterward.
     }

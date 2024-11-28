@@ -116,15 +116,17 @@ zx::result<> Manager::Walk(Visitor& visitor) {
                        const devicetree::PropertyDecoder& decoder) {
     FDF_LOG(DEBUG, "Visit node - %.*s", static_cast<int>(path.back().length()), path.back().data());
     auto node = nodes_by_path_[GetPath(path)];
-    visit_status = visitor.Visit(*node, decoder);
-    if (visit_status.is_error()) {
+    zx::result<> status = visitor.Visit(*node, decoder);
+    if (status.is_error()) {
       FDF_SLOG(ERROR, "Node visit failed.", KV("node_name", node->name()),
-               KV("status_str", visit_status.status_string()));
-      return false;
+               KV("status_str", status.status_string()));
+      visit_status = status;
     }
     return true;
   });
+
   if (visit_status.is_error()) {
+    FDF_SLOG(ERROR, "Devicetree walk failed.", KV("status_str", visit_status.status_string()));
     return visit_status;
   }
 

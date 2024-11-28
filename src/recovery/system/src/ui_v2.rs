@@ -327,7 +327,7 @@ mod tests {
         );
 
         let (progress_proxy, progress_server) =
-            fidl::endpoints::create_proxy::<ProgressRendererMarker>().unwrap();
+            fidl::endpoints::create_proxy::<ProgressRendererMarker>();
 
         recovery_app_assistant
             .handle_service_connection_request(
@@ -379,7 +379,7 @@ mod tests {
         );
 
         let (progress_proxy, progress_server) =
-            fidl::endpoints::create_proxy::<ProgressRendererMarker>().unwrap();
+            fidl::endpoints::create_proxy::<ProgressRendererMarker>();
 
         recovery_app_assistant
             .handle_service_connection_request(

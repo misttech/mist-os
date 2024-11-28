@@ -32,8 +32,7 @@ async fn setup() -> (fuzz::ManagerProxy, fuzz::ControllerProxy, fasync::Task<()>
 
 // Connects a controller to the fuzzer using the fuzz-manager.
 async fn connect(fuzz_manager: &fuzz::ManagerProxy) -> (fuzz::ControllerProxy, fasync::Task<()>) {
-    let (controller, server_end) =
-        create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
+    let (controller, server_end) = create_proxy::<fuzz::ControllerMarker>();
     let status = fuzz_manager
         .connect(FUZZER_URL, server_end)
         .await
@@ -291,7 +290,7 @@ async fn test_fuzz_until_runs() -> Result<()> {
         let response =
             controller.configure(&options).await.context(controller_name("Configure"))?;
         response.map_err(Error::msg)?;
-        let (client_end, stream) = create_request_stream::<fuzz::MonitorMarker>()?;
+        let (client_end, stream) = create_request_stream::<fuzz::MonitorMarker>();
         controller.add_monitor(client_end).await.context(controller_name("AddMonitor"))?;
         let results = join!(controller.fuzz(), subscribe_to_updates(stream));
         let response = results.0.context(controller_name("Fuzz"))?;
@@ -405,7 +404,7 @@ async fn test_merge() -> Result<()> {
         response.map_err(Error::msg)?;
 
         // Get the seed corpus.
-        let (client_end, stream) = create_request_stream::<fuzz::CorpusReaderMarker>()?;
+        let (client_end, stream) = create_request_stream::<fuzz::CorpusReaderMarker>();
         let results = join!(
             controller.read_corpus(fuzz::Corpus::Seed, client_end),
             serve_corpus_reader(stream),
@@ -415,7 +414,7 @@ async fn test_merge() -> Result<()> {
         compare(&actual_seed, seed_inputs.iter().map(|s| s.to_string()).collect())?;
 
         // Get the live corpus.
-        let (client_end, stream) = create_request_stream::<fuzz::CorpusReaderMarker>()?;
+        let (client_end, stream) = create_request_stream::<fuzz::CorpusReaderMarker>();
         let results = join!(
             controller.read_corpus(fuzz::Corpus::Live, client_end),
             serve_corpus_reader(stream),

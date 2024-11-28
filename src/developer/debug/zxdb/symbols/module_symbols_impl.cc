@@ -15,6 +15,7 @@
 #include "llvm/Object/ObjectFile.h"
 #include "src/developer/debug/shared/address_range.h"
 #include "src/developer/debug/shared/largest_less_or_equal.h"
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
 #include "src/developer/debug/zxdb/symbols/compile_unit.h"
@@ -498,6 +499,8 @@ std::vector<Location> ModuleSymbolsImpl::ResolveAddressInputLocation(
     const ResolveOptions& options) const {
   std::vector<Location> result;
   if (options.symbolize) {
+    DEBUG_LOG(ModuleSymbols) << "Resolving input location for 0x" << std::hex
+                             << input_location.address;
     result.push_back(LocationForAddress(symbol_context, input_location.address, options, nullptr));
   } else {
     result.emplace_back(Location::State::kAddress, input_location.address);
@@ -511,22 +514,30 @@ Location ModuleSymbolsImpl::LocationForAddress(const SymbolContext& symbol_conte
                                                const Function* optional_func) const {
   auto dwarf_loc =
       DwarfLocationForAddress(symbol_context, absolute_address, options, optional_func);
-  if (dwarf_loc && dwarf_loc->symbol())
+  if (dwarf_loc && dwarf_loc->symbol()) {
+    DEBUG_LOG(ModuleSymbols) << "Found DWARF location with symbol for 0x" << std::hex
+                             << absolute_address;
     return std::move(*dwarf_loc);
+  }
 
   // Fall back to use ELF symbol but keep the file/line info.
   FileLine file_line;
   int column = 0;
   if (dwarf_loc) {
+    DEBUG_LOG(ModuleSymbols) << "Found DWARF location without symbol for 0x" << std::hex
+                             << absolute_address;
     file_line = dwarf_loc->file_line();
     column = dwarf_loc->column();
   }
   if (auto elf_locs =
-          ElfLocationForAddress(symbol_context, absolute_address, options, file_line, column))
+          ElfLocationForAddress(symbol_context, absolute_address, options, file_line, column)) {
+    DEBUG_LOG(ModuleSymbols) << "Found ELF location for 0x" << std::hex << absolute_address;
     return std::move(*elf_locs);
+  }
 
   // Not symbolizable, return an "address" with no symbol information. Mark it symbolized to record
   // that we tried and failed.
+  DEBUG_LOG(ModuleSymbols) << "Couldn't get location for 0x" << std::hex << absolute_address;
   return Location(Location::State::kSymbolized, absolute_address);
 }
 
@@ -536,8 +547,10 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
     const Function* optional_func) const {
   // TODO(bug 5544) handle addresses that aren't code like global variables.
   FoundUnit found_unit = GetDwarfUnitForAddress(symbol_context, absolute_address);
-  if (!found_unit)  // No DWARF symbol.
+  if (!found_unit) {
+    DEBUG_LOG(ModuleSymbols) << "Don't have DWARF unit for 0x" << std::hex << absolute_address;
     return std::nullopt;
+  }
 
   uint64_t relative_address = symbol_context.AbsoluteToRelative(absolute_address);
   FileLine file_line;
@@ -557,6 +570,8 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
   } else {
     // Resolve the function for this address.
     if ((lazy_function = found_unit.details_unit->FunctionForRelativeAddress(relative_address))) {
+      DEBUG_LOG(ModuleSymbols) << "Got function from DWARF unit for 0x" << std::hex
+                               << absolute_address;
       // FunctionForRelativeAddress() will return the most specific inlined function for the
       // address.
       function = RefPtrTo(lazy_function.Get()->As<Function>());
@@ -580,12 +595,16 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
           file_line = calling_func->call_line();
         }
       }
+    } else {
+      DEBUG_LOG(ModuleSymbols) << "No function info in DWARF unit for 0x" << std::hex
+                               << absolute_address;
     }
   }
 
   // Get the file/line location (may fail). Don't overwrite one computed above if already set above
   // using the ambigous inline call site.
   if (!file_line.is_valid()) {
+    DEBUG_LOG(ModuleSymbols) << "Referencing line table for 0x" << std::hex << absolute_address;
     const LineTable& line_table = found_unit.main_binary_unit->GetLineTable();
 
     // Use the line table to move the address to after the function prologue. Assume if the function
@@ -618,8 +637,12 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
       // state machine and is not relevant.
       const LineTable::Row& row = found_row.get();
       std::optional<std::string> file_name;
-      if (row.Line)
+      if (row.Line) {
         file_name = line_table.GetFileNameForRow(row);  // Could still return nullopt.
+      } else {
+        DEBUG_LOG(ModuleSymbols) << "Line table's row did not have a line number for 0x" << std::hex
+                                 << absolute_address;
+      }
       if (file_name) {
         // It's important this only gets called when row.Line > 0. FileLine will assert for line 0
         // if a file name or build directory is given to ensure that all "no code" locations compare
@@ -633,10 +656,15 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
         }
       }
       column = row.Column;
+    } else {
+      DEBUG_LOG(ModuleSymbols) << "Line table did not have row for 0x" << std::hex
+                               << absolute_address;
     }
   }
 
   if (!lazy_function && !file_line.is_valid()) {
+    DEBUG_LOG(ModuleSymbols) << "File/line info is not valid for eager function 0x" << std::hex
+                             << absolute_address;
     return std::nullopt;
   }
 
@@ -646,21 +674,30 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
 std::optional<Location> ModuleSymbolsImpl::ElfLocationForAddress(
     const SymbolContext& symbol_context, uint64_t absolute_address, const ResolveOptions& options,
     FileLine file_line, int column) const {
-  if (elf_addresses_.empty())
+  if (elf_addresses_.empty()) {
+    DEBUG_LOG(ModuleSymbols) << "No ELF addresses available to symbolize 0x" << std::hex
+                             << absolute_address;
     return std::nullopt;
+  }
 
   uint64_t relative_addr = symbol_context.AbsoluteToRelative(absolute_address);
   auto found = debug::LargestLessOrEqual(
       elf_addresses_.begin(), elf_addresses_.end(), relative_addr,
       [](const ElfSymbolRecord* r, uint64_t addr) { return r->relative_address < addr; },
       [](const ElfSymbolRecord* r, uint64_t addr) { return r->relative_address == addr; });
-  if (found == elf_addresses_.end())
+  if (found == elf_addresses_.end()) {
+    DEBUG_LOG(ModuleSymbols) << "ELF addresses don't contain relative address for 0x" << std::hex
+                             << absolute_address;
     return std::nullopt;
+  }
 
   // There could theoretically be multiple matches for this address, but we return only the first.
   const ElfSymbolRecord* record = *found;
-  if (relative_addr - record->relative_address > kMaxElfOffsetForMatch)
+  if (relative_addr - record->relative_address > kMaxElfOffsetForMatch) {
+    DEBUG_LOG(ModuleSymbols) << "Found ELF record is too far away from 0x" << std::hex
+                             << absolute_address;
     return std::nullopt;  // Too far away.
+  }
   return Location(
       absolute_address, std::move(file_line), column, symbol_context,
       fxl::MakeRefCounted<ElfSymbol>(const_cast<ModuleSymbolsImpl*>(this)->GetWeakPtr(), *record));

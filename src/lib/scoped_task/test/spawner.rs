@@ -57,6 +57,7 @@ fn main() {
     // print logs and non-fatal errors directly to stdout instead.
     let mut stdout = unsafe { File::from_raw_fd(1) };
 
+    #[allow(clippy::collection_is_never_read)]
     let mut _process = None;
     let (sender, receiver) = mpsc::channel();
     if opts.spawn {
@@ -100,7 +101,7 @@ fn main() {
 }
 
 fn spawn_sleeper(opts: Options) -> anyhow::Result<Box<dyn Any>> {
-    let bin = env::args().next().ok_or(format_err!("couldn't get binary name"))?;
+    let bin = env::args().next().ok_or_else(|| format_err!("couldn't get binary name"))?;
     let bin = CString::new(bin).unwrap();
     let args: [&CStr; 2] = [&bin, c"--sleep"];
 

@@ -73,8 +73,7 @@ impl DebugDataProcessor {
     pub(crate) fn new_for_test(directory: DebugDataDirectory) -> DebugDataForTestResult {
         let (sender, receiver) = futures::channel::mpsc::channel(Self::MAX_SENT_VMOS);
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<ftest_debug::DebugDataProcessorMarker>()
-                .expect("create stream");
+            fidl::endpoints::create_proxy_and_stream::<ftest_debug::DebugDataProcessorMarker>();
         let maybe_proxy = std::sync::Mutex::new(Some(proxy));
         DebugDataForTestResult {
             processor: Self {
@@ -306,7 +305,7 @@ mod test {
     use maplit::hashset;
     use std::collections::HashSet;
     use std::task::Poll;
-    use test_diagnostics::collect_string_from_socket;
+    use test_manager_test_lib::collect_string_from_socket_helper;
 
     const VMO_SIZE: u64 = 4096;
 
@@ -323,7 +322,7 @@ mod test {
         let req = stream.try_next().await.expect("get first request").unwrap();
         let dir = match req {
             ftest_debug::DebugDataProcessorRequest::SetDirectory { directory, .. } => {
-                directory.into_proxy().expect("convert to proxy")
+                directory.into_proxy()
             }
             other => panic!("First request should be SetDirectory but got {:?}", other),
         };
@@ -474,12 +473,12 @@ mod test {
             let mut events: Vec<_> = event_recv.collect().await;
             assert_eq!(events.len(), 1);
             let RunEventPayload::DebugData(iterator) = events.pop().unwrap().into_payload();
-            let iterator_proxy = iterator.into_proxy().unwrap();
-            let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next())
+            let iterator_proxy = iterator.into_proxy();
+            let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next_compressed())
                 .and_then(|debug_data| async move {
                     Ok((
                         debug_data.name.unwrap(),
-                        collect_string_from_socket(debug_data.socket.unwrap())
+                        collect_string_from_socket_helper(debug_data.socket.unwrap(), true)
                             .await
                             .expect("Cannot read socket"),
                     ))
@@ -540,12 +539,12 @@ mod test {
             if let SuiteEventPayload::DebugData(iterator) =
                 events.pop().unwrap().unwrap().into_payload()
             {
-                let iterator_proxy = iterator.into_proxy().unwrap();
-                let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next())
+                let iterator_proxy = iterator.into_proxy();
+                let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next_compressed())
                     .and_then(|debug_data| async move {
                         Ok((
                             debug_data.name.unwrap(),
-                            collect_string_from_socket(debug_data.socket.unwrap())
+                            collect_string_from_socket_helper(debug_data.socket.unwrap(), true)
                                 .await
                                 .expect("Cannot read socket"),
                         ))
@@ -612,12 +611,12 @@ mod test {
             let mut events: Vec<_> = event_recv.collect().await;
             assert_eq!(events.len(), 1);
             let RunEventPayload::DebugData(iterator) = events.pop().unwrap().into_payload();
-            let iterator_proxy = iterator.into_proxy().unwrap();
-            let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next())
+            let iterator_proxy = iterator.into_proxy();
+            let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next_compressed())
                 .and_then(|debug_data| async move {
                     Ok((
                         debug_data.name.unwrap(),
-                        collect_string_from_socket(debug_data.socket.unwrap())
+                        collect_string_from_socket_helper(debug_data.socket.unwrap(), true)
                             .await
                             .expect("read socket"),
                     ))
@@ -683,12 +682,12 @@ mod test {
             if let SuiteEventPayload::DebugData(iterator) =
                 events.pop().unwrap().unwrap().into_payload()
             {
-                let iterator_proxy = iterator.into_proxy().unwrap();
-                let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next())
+                let iterator_proxy = iterator.into_proxy();
+                let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next_compressed())
                     .and_then(|debug_data| async move {
                         Ok((
                             debug_data.name.unwrap(),
-                            collect_string_from_socket(debug_data.socket.unwrap())
+                            collect_string_from_socket_helper(debug_data.socket.unwrap(), true)
                                 .await
                                 .expect("read socket"),
                         ))
@@ -717,7 +716,7 @@ mod test {
         let (vmo_send, vmo_recv) = mpsc::channel(5);
         let mut vmo_chunk_stream = vmo_recv.ready_chunks(5).boxed();
         let (publisher_proxy, publisher_stream) =
-            create_proxy_and_stream::<fdebug::PublisherMarker>().unwrap();
+            create_proxy_and_stream::<fdebug::PublisherMarker>();
         let mut serve_fut =
             serve_publisher(publisher_stream, TEST_URL, DebugDataSender { sender: vmo_send })
                 .boxed();

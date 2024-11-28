@@ -7,10 +7,10 @@ mod usb;
 use crate::usb::listen_for_usb_devices;
 use anyhow::{bail, format_err, Context as ErrorContext, Error};
 use argh::FromArgs;
-use async_net::unix::{UnixListener, UnixStream};
 use fuchsia_async::{Task, TimeoutExt};
 use futures::channel::mpsc::unbounded;
 use futures::prelude::*;
+use netext::{TokioAsyncReadExt, UnixListenerStream};
 use overnet_core::AscenddClientRouting;
 use std::io::ErrorKind::{self, TimedOut};
 use std::io::Write;
@@ -19,6 +19,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use tokio::net::{UnixListener, UnixStream};
 
 pub static CIRCUIT_ID: [u8; 8] = *b"CIRCUIT\0";
 
@@ -80,7 +81,7 @@ pub fn short_socket_path(real_path: &Path) -> std::io::Result<ShortPathLink> {
         let tempdir = tempfile::tempdir()?;
         let symlink_path = tempdir.path().join("root");
 
-        short_path = symlink_path.join(socket_filename).to_owned();
+        short_path = symlink_path.join(socket_filename);
         if short_path.as_os_str().len() > ShortPathLink::MAX_SUN_LEN {
             let error_str = format!(
                 "Even tmpdir path was too long to create a short enough socket path for {real_path} (tried: {short_path})",
@@ -343,7 +344,7 @@ async fn run_ascendd(
                         }
                     }
                 };
-                let (mut rx, mut tx) = sock.split();
+                let (mut rx, mut tx) = sock.into_multithreaded_futures_stream().split();
                 run_linked_ascendd(node, &mut rx, &mut tx).await;
                 Ok(())
             }
@@ -362,13 +363,13 @@ async fn run_ascendd(
         {
             let node = Arc::clone(&node);
             async move {
-                incoming
-                    .incoming()
+                UnixListenerStream(incoming)
                     .for_each_concurrent(None, |stream| {
                         let node = Arc::clone(&node);
                         async move {
                             match stream {
                                 Ok(stream) => {
+                                    let stream = stream.into_multithreaded_futures_stream();
                                     let (mut rx, mut tx) = stream.split();
                                     if let Err(e) =
                                         run_stream(Arc::clone(&node), &mut rx, &mut tx).await

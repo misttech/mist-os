@@ -4,9 +4,11 @@
 
 #include "src/devices/bus/drivers/pci/bus.h"
 
+#include <fidl/fuchsia.hardware.pci/cpp/natural_types.h>
 #include <fuchsia/hardware/pciroot/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
+#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
 #include <lib/pci/hw.h>
@@ -25,8 +27,8 @@
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
 
+#include "metadata.h"
 #include "src/devices/bus/drivers/pci/bridge.h"
-#include "src/devices/bus/drivers/pci/common.h"
 #include "src/devices/bus/drivers/pci/config.h"
 #include "src/devices/bus/drivers/pci/device.h"
 
@@ -51,7 +53,7 @@ zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
   // platform tables offered to us.
   std::optional<fdf::MmioBuffer> ecam;
   if (info.cam.vmo != ZX_HANDLE_INVALID) {
-    if (auto result = pci::Bus::MapEcam(zx::vmo(info.cam.vmo)); result.is_ok()) {
+    if (auto result = pci::Bus::MapConfigRegion(zx::vmo(info.cam.vmo)); result.is_ok()) {
       ecam = std::move(result.value());
     } else {
       return result.status_value();
@@ -65,7 +67,7 @@ zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  if ((status = bus->Initialize()) != ZX_OK) {
+  if (zx_status_t status = bus->Initialize(); status != ZX_OK) {
     zxlogf(ERROR, "failed to initialize driver: %s", zx_status_get_string(status));
     if (bus->zxdev() != nullptr) {
       bus->DdkAsyncRemove();
@@ -76,17 +78,23 @@ zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
   }
 
   // The DDK owns the object if we've made it this far.
-  (void)bus.release();
+  [[maybe_unused]] void* released_ptr = bus.release();
   return ZX_OK;
 }
 
 zx_status_t Bus::Initialize() {
-  zx_status_t status;
-  if ((status = DdkAdd(ddk::DeviceAddArgs("bus")
-                           .set_flags(DEVICE_ADD_NON_BINDABLE)
-                           .set_inspect_vmo(GetInspectVmo()))) != ZX_OK) {
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("bus")
+                                  .set_flags(DEVICE_ADD_NON_BINDABLE)
+                                  .set_inspect_vmo(GetInspectVmo()));
+  if (status != ZX_OK) {
     zxlogf(ERROR, "failed to add bus driver: %s", zx_status_get_string(status));
     return status;
+  }
+
+  if (zx::result<PciFidl::BoardConfiguration> result =
+          ddk::GetMetadata<PciFidl::BoardConfiguration>(parent_);
+      result.is_ok()) {
+    board_config_ = std::move(result.value());
   }
 
   // Stash the ops/ctx pointers for the pciroot protocol so we can pass
@@ -124,7 +132,7 @@ zx_status_t Bus::Initialize() {
 
 // Maps a vmo as an mmio_buffer to be used as this Bus driver's ECAM region
 // for config space access.
-zx::result<fdf::MmioBuffer> Bus::MapEcam(zx::vmo cam_vmo) {
+zx::result<fdf::MmioBuffer> Bus::MapConfigRegion(zx::vmo cam_vmo) {
   size_t size;
   zx_status_t status = cam_vmo.get_size(&size);
   if (status != ZX_OK) {
@@ -143,20 +151,17 @@ zx::result<fdf::MmioBuffer> Bus::MapEcam(zx::vmo cam_vmo) {
   return zx::ok(std::move(*result));
 }
 
-zx_status_t Bus::MakeConfig(pci_bdf_t bdf, std::unique_ptr<Config>* out_config) {
-  zx_status_t status;
+zx::result<std::unique_ptr<Config>> Bus::MakeConfig(pci_bdf_t bdf) {
   if (ecam_) {
-    status = MmioConfig::Create(bdf, &(*ecam_), info_.start_bus_num, info_.end_bus_num, out_config);
-  } else {
-    status = ProxyConfig::Create(bdf, &pciroot_, out_config);
+    zx::result result = MmioConfig::Create(bdf, ecam_.value(), info_.start_bus_num,
+                                           info_.end_bus_num, info_.cam.is_extended);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    return zx::ok(std::move(result.value()));
   }
 
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to create config for %02x:%02x.%1x: %d!", bdf.bus_id, bdf.device_id,
-           bdf.function_id, status);
-  }
-
-  return status;
+  return ProxyConfig::Create(bdf, &pciroot_);
 }
 
 // Scan downstream starting at the bus id managed by the Bus's Root.
@@ -198,10 +203,9 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
   for (uint8_t dev_id = _dev_id; dev_id < PCI_MAX_DEVICES_PER_BUS; dev_id++) {
     uint8_t max_functions = 1;
     for (uint8_t func_id = _func_id; func_id < max_functions; func_id++) {
-      std::unique_ptr<Config> config;
       pci_bdf_t bdf = {static_cast<uint8_t>(bus_id), dev_id, func_id};
-      zx_status_t status = MakeConfig(bdf, &config);
-      if (status != ZX_OK) {
+      zx::result<std::unique_ptr<Config>> config = MakeConfig(bdf);
+      if (config.is_error()) {
         continue;
       }
 
@@ -229,8 +233,8 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
       if (is_bridge) {
         fbl::RefPtr<Bridge> bridge;
         uint8_t mbus_id = config->Read(Config::kSecondaryBusId);
-        status = Bridge::Create(zxdev(), std::move(config), upstream, this, std::move(node),
-                                mbus_id, &bridge);
+        zx_status_t status = Bridge::Create(zxdev(), std::move(config.value()), upstream, this,
+                                            std::move(node), mbus_id, &bridge);
         if (status != ZX_OK) {
           zxlogf(ERROR, "failed to create Bridge at %s: %s", config->addr(),
                  zx_status_get_string(status));
@@ -263,8 +267,9 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
       // We're at a leaf node in the topology so create a normal device.
       char addr[ZX_MAX_NAME_LEN];
       strncpy(addr, config->addr(), sizeof(addr));
-      status = pci::Device::Create(zxdev(), std::move(config), upstream, this, std::move(node),
-                                   /*has_acpi=*/DeviceHasAcpi(config->bdf()));
+      zx_status_t status =
+          pci::Device::Create(zxdev(), std::move(config.value()), upstream, this, std::move(node),
+                              /*has_acpi=*/DeviceHasAcpi(config->bdf()));
       if (status != ZX_OK) {
         zxlogf(ERROR, "failed to create device at %s: %s", addr, zx_status_get_string(status));
       }
@@ -333,7 +338,7 @@ zx_status_t Bus::ConfigureLegacyIrqs() {
     uint8_t pin = device.config()->Read(Config::kInterruptPin);
     // If a device has no pin configured in the InterruptPin register then it
     // has no legacy interrupt. PCI Local Bus Spec v3 Section 2.2.6.
-    if (pin == 0) {
+    if (pin == 0 && board_config_.use_intx_workaround().has_value()) {
       pin = 1;  // TODO(365837900): Re-add 'continue' here when crosvm Interrupt Pin is populated.
     }
 
@@ -400,7 +405,8 @@ Bus::~Bus() {
 }
 
 void Bus::StartIrqWorker() {
-  std::thread worker(LegacyIrqWorker, std::ref(legacy_irq_port_), &devices_lock_, &shared_irqs_);
+  std::thread worker(LegacyIrqWorker, std::ref(legacy_irq_port_), &devices_lock_, &shared_irqs_,
+                     &board_config_);
   irq_thread_ = std::move(worker);
 }
 
@@ -409,7 +415,8 @@ zx_status_t Bus::StopIrqWorker() {
   return legacy_irq_port_.queue(&packet);
 }
 
-void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* shared_irq_map) {
+void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* shared_irq_map,
+                          const PciFidl::BoardConfiguration* board_config) {
   zxlogf(TRACE, "IRQ worker started");
   zx_port_packet_t packet = {};
   zx_status_t status = ZX_OK;
@@ -438,7 +445,7 @@ void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* 
       for (auto& device : list) {
         fbl::AutoLock device_lock(device.dev_lock());
         config::Status status = {.value = device.config()->Read(Config::kStatus)};
-        if (status.interrupt_status()) {
+        if (status.interrupt_status() || board_config->use_intx_workaround()) {
           // Trigger the virtual interrupt the device driver is using by proxy.
           zx_status_t signal_status = device.SignalLegacyIrq(packet.interrupt.timestamp);
           if (signal_status != ZX_OK) {
@@ -454,7 +461,7 @@ void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* 
           // no way to re-enable it without changing IRQ modes.
           auto& irqs = device.irqs();
           bool disable_irq = true;
-          if (irqs.mode == fuchsia_hardware_pci::InterruptMode::kLegacyNoack) {
+          if (irqs.mode == PciFidl::InterruptMode::kLegacyNoack) {
             irqs.irqs_in_period++;
             if (packet.interrupt.timestamp - irqs.legacy_irq_period_start >= kLegacyNoAckPeriod) {
               irqs.legacy_irq_period_start = packet.interrupt.timestamp;

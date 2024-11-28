@@ -93,8 +93,7 @@ impl GainControl {
             true
         });
         let mut microphone_gain_hanging_get = HangingGet::new(0, f);
-        let (client_end, request_stream) = fidl::endpoints::create_request_stream()
-            .map_err(|e| Error::system("Could not create gain control fidl endpoints", e))?;
+        let (client_end, request_stream) = fidl::endpoints::create_request_stream();
         Ok(Self {
             client_end: Some(client_end),
             request_stream,
@@ -290,7 +289,7 @@ mod tests {
         let client_end = ctrl.get_client_end().unwrap();
         let wrong_client_end: ClientEnd<bredr::ProfileMarker> =
             ClientEnd::new(client_end.into_channel());
-        let wrong_proxy = wrong_client_end.into_proxy().unwrap();
+        let wrong_proxy = wrong_client_end.into_proxy();
 
         let _resp = wrong_proxy.connect(
             &fidl_fuchsia_bluetooth::PeerId { value: 1 },
@@ -305,7 +304,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn stream_interaction_returns_valid_values() {
         let mut ctrl = GainControl::new().unwrap();
-        let proxy = ctrl.get_client_end().unwrap().into_proxy().unwrap();
+        let proxy = ctrl.get_client_end().unwrap().into_proxy();
 
         proxy.set_speaker_gain(1).expect("success sending a set speaker gain request");
         proxy.set_microphone_gain(2).expect("success sending a set microphone gain request");
@@ -321,7 +320,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn invalid_gain_request_returns_none_and_terminates_with_epitaph() {
         let mut ctrl = GainControl::new().unwrap();
-        let proxy = ctrl.get_client_end().unwrap().into_proxy().unwrap();
+        let proxy = ctrl.get_client_end().unwrap().into_proxy();
 
         proxy.set_speaker_gain(16).expect("success sending a set speaker gain request");
 
@@ -340,7 +339,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let mut ctrl = GainControl::new().unwrap();
-        let proxy = ctrl.get_client_end().unwrap().into_proxy().unwrap();
+        let proxy = ctrl.get_client_end().unwrap().into_proxy();
 
         let mut speaker_gain_fut = proxy.watch_speaker_gain();
         let _ = exec.run_until_stalled(&mut ctrl.next());
@@ -378,7 +377,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let mut ctrl = GainControl::new().unwrap();
-        let proxy = ctrl.get_client_end().unwrap().into_proxy().unwrap();
+        let proxy = ctrl.get_client_end().unwrap().into_proxy();
 
         let mut microphone_gain_fut = proxy.watch_microphone_gain();
         let _ = exec.run_until_stalled(&mut ctrl.next());

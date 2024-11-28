@@ -257,7 +257,7 @@ impl SlcProcedureState for AgIndicatorStatusReceived {
                 {
                     Box::new(AgIndicatorStatusEnableReceived { state: state.clone() })
                 } else {
-                    SlcErrorState::invalid_hf_argument(update.clone())
+                    SlcErrorState::invalid_hf_argument(update)
                 }
             }
             m => SlcErrorState::unexpected_hf(m),

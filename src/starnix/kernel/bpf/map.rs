@@ -61,6 +61,10 @@ pub struct Map {
     entries: OrderedMutex<MapStore, BpfMapEntries>,
 }
 
+/// Maps are normally kept pinned in memory since linked eBPF programs store direct pointers to
+/// the maps they depend on.
+pub type PinnedMap = Pin<Arc<Map>>;
+
 impl Map {
     pub fn new(schema: MapSchema, flags: u32) -> Result<Self, Errno> {
         let id = MAP_IDS.next();

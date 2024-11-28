@@ -147,7 +147,7 @@ mod tests {
     }
 
     async fn wait_for_completion(server: CompletionResponderFidlServer) {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ListenerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ListenerMarker>();
         fasync::Task::local(async move {
             server.serve_completion_responses(stream).await.unwrap();
         })

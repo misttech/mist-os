@@ -88,7 +88,7 @@ impl<'a, 'b> SystemPowerModeHandlerBuilder<'a, 'b> {
         let config_path = data
             .config
             .map(|c| c.system_power_mode_config_path)
-            .unwrap_or(Self::SYSTEM_POWER_MODE_CONFIG_PATH.to_string());
+            .unwrap_or_else(|| Self::SYSTEM_POWER_MODE_CONFIG_PATH.to_string());
 
         // Read the system power mode config file from `config_path`
         let system_power_mode_config = SystemPowerModeConfig::read(&Path::new(&config_path)).ok();
@@ -129,7 +129,7 @@ impl<'a, 'b> SystemPowerModeHandlerBuilder<'a, 'b> {
         // override for tests.
         let inspect_root = self
             .inspect_root
-            .unwrap_or(inspect::component::inspector().root())
+            .unwrap_or_else(|| inspect::component::inspector().root())
             .create_child("SystemPowerModeHandler");
 
         // Create the `ClientStates` to manage states for all clients
@@ -464,7 +464,7 @@ impl SystemPowerModeHandler {
             clone.clone().spawn_mode_requester_handler(stream);
         });
 
-        let clone = self.clone();
+        let clone = self;
         outgoing_svc_dir.add_fidl_service(move |stream| {
             clone.clone().spawn_configurator_handler(stream);
         });
@@ -494,7 +494,7 @@ impl SystemPowerModeHandler {
                             client_type, watcher, ..
                         } => self
                             .client_states
-                            .connect_stream_for_client(client_type, watcher.into_stream()?)?,
+                            .connect_stream_for_client(client_type, watcher.into_stream())?,
                     }
                 }
                 Ok(())
@@ -723,7 +723,7 @@ mod tests {
                 self.connector.connect_to_protocol::<fpowerclient::ConnectorMarker>().unwrap();
 
             let (watcher_proxy, watcher_server_end) =
-                fidl::endpoints::create_proxy::<fpowerclient::WatcherMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fpowerclient::WatcherMarker>();
 
             // Pass the `watcher_server_end` to the node, so it will be associated with power level
             // changes of `client_type`

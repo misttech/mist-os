@@ -3,15 +3,16 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context as _, Result};
-use async_net::TcpStream;
 use futures::prelude::*;
 use futures::task::{Context, Poll};
+use netext::{TokioAsyncReadExt, TokioAsyncWrapper};
 use std::fmt;
 use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::time::Duration;
 use timeout::timeout;
+use tokio::net::TcpStream;
 
 const FB_HANDSHAKE: [u8; 4] = *b"FB01";
 
@@ -216,7 +217,7 @@ pub const HANDSHAKE_TIMEOUT_MILLIS: u64 = 1000;
 pub async fn open_once(
     target: &SocketAddr,
     handshake_timeout: Duration,
-) -> Result<TcpNetworkInterface<TcpStream>> {
+) -> Result<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>> {
     let mut addr: SocketAddr = target.clone();
     if addr.port() == 0 {
         tracing::debug!(
@@ -227,7 +228,10 @@ pub async fn open_once(
 
     tracing::debug!("Trying to establish TCP Connection to address: {addr:?}");
     timeout(handshake_timeout, async {
-        let mut stream = TcpStream::connect(addr).await.context("Establishing TCP connection")?;
+        let mut stream = TcpStream::connect(addr)
+            .await
+            .context("Establishing TCP connection")?
+            .into_futures_stream();
         handshake(&mut stream).await?;
         Ok(TcpNetworkInterface {
             stream,

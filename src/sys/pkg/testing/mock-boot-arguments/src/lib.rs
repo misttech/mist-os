@@ -94,8 +94,7 @@ mod tests {
             "some-key-2".to_string() => Some("some-value-2".to_string())
         }));
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_boot::ArgumentsMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_boot::ArgumentsMarker>();
         fasync::Task::spawn(mock.handle_request_stream(stream)).detach();
 
         let keys = &["some-key".to_string(), "missing-key".to_string(), "some-key-2".to_string()];
@@ -112,8 +111,7 @@ mod tests {
             hashmap! {"some-key".to_string() => Some("some-value".to_string())},
         ));
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_boot::ArgumentsMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_boot::ArgumentsMarker>();
         fasync::Task::spawn(mock.handle_request_stream(stream)).detach();
 
         let value = proxy.get_string("some-key").await.unwrap();

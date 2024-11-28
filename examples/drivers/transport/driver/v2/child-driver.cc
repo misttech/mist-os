@@ -63,7 +63,7 @@ zx::result<> ChildTransportDriver::QueryInfo() {
   fdf::Arena arena('I2CI');
   auto max_transfer_sz_result = i2c_impl_client_.sync().buffer(arena)->GetMaxTransferSize();
   if (!max_transfer_sz_result.ok()) {
-    fdf::error("Failed to request max transfer size: {}", max_transfer_sz_result);
+    fdf::error("Failed to request max transfer size: {}", max_transfer_sz_result.error());
     return zx::error(max_transfer_sz_result.status());
   }
   if (max_transfer_sz_result->is_error()) {

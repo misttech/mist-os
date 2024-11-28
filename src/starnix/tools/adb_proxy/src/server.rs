@@ -37,7 +37,7 @@ async fn handle_connection(host_socket: fidl::Socket) -> Result<()> {
 fn make_con() -> Result<(fidl::Socket, ConnectionProxy, ConnectionTransport), anyhow::Error> {
     let (client_socket, server_socket) = fidl::Socket::create_stream();
     let (client_end, server_end) = endpoints::create_endpoints::<ConnectionMarker>();
-    let client_end = client_end.into_proxy()?;
+    let client_end = client_end.into_proxy();
     let con = ConnectionTransport { data: server_socket, con: server_end };
     Ok((client_socket, client_end, con))
 }
@@ -52,7 +52,7 @@ impl ProxyServer {
         let app_client = connect_to_protocol::<ConnectorMarker>()?;
 
         let (acceptor_remote, acceptor_client) = endpoints::create_endpoints::<AcceptorMarker>();
-        let mut acceptor_client = acceptor_client.into_stream()?;
+        let mut acceptor_client = acceptor_client.into_stream();
 
         app_client.listen(port, acceptor_remote).await?.map_err(zx::Status::from_raw)?;
 

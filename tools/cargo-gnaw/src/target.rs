@@ -156,7 +156,7 @@ impl<'a> GnTarget<'a> {
             "must find a cargo.toml before the root one"
         );
 
-        package_root.to_owned()
+        package_root
     }
 
     pub fn gn_target_type(&self) -> String {

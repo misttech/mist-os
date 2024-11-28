@@ -49,16 +49,22 @@ template("sanitizer_rustflags") {
     rustflags = []
     foreach(lib, needed_libs) {
       # TODO(phosek): use runtime.json instead of invoking Clang.
-      libclang_rt_lib = rebase_path(
-              exec_script("/usr/bin/env",
-                          [
-                            "${rebased_clang_prefix}/clang",
-                            "--target=${current_target_tuple}",
-                            "-print-file-name=libclang_rt.${lib}${extension}",
-                          ],
-                          "trim string"),
-              root_build_dir)
-      rustflags += [ "-Clink-arg=${libclang_rt_lib}" ]
+      libclang_rt_lib_name = "libclang_rt.${lib}${extension}"
+      libclang_rt_lib_path =
+          exec_script("/usr/bin/env",
+                      [
+                        "${rebased_clang_prefix}/clang",
+                        "--target=${current_target_tuple}",
+                        "-print-file-name=${libclang_rt_lib_name}",
+                      ],
+                      "trim string")
+
+      # If there is no runtime library provided for this target tuple,
+      # the --print-file-name returns the original filename unmodified.
+      if (libclang_rt_lib_path != libclang_rt_lib_name) {
+        rustflags += [ "-Clink-arg=" +
+                       rebase_path(libclang_rt_lib_path, root_build_dir) ]
+      }
     }
 
     # Expose the presence of sanitizers as a compile-time condition.
@@ -98,7 +104,7 @@ variant("asan") {
     configs += [ "//zircon/kernel/lib/instrumentation/asan:kasan" ]
   }
 
-  deps = [ ":asan_default_options" ]
+  executable_deps = [ ":asan_default_options" ]
 }
 
 sanitizer_rustflags("asan.rustflags") {
@@ -221,6 +227,7 @@ config("no_sanitizers") {
 # fuzzers.
 variant("rust-asan") {
   rustflags = [ "-Zsanitizer=address" ]
+  executable_deps = [ ":asan_default_options" ]
 }
 
 # TODO(https://fxbug.dev/42120045): Building with this variant alone can still lead to
@@ -238,7 +245,7 @@ variant("lsan") {
     libs = [ "zircon" ]
   }
 
-  deps = [ ":lsan_default_options" ]
+  executable_deps = [ ":lsan_default_options" ]
 }
 
 variant("ubsan") {
@@ -270,7 +277,7 @@ variant("ubsan") {
   # It also includes the ubsan runtime and plumbing for it.
   if (_prebuilt_runtime && toolchain_variant.tags + [ "asan" ] - [ "asan" ] ==
                            toolchain_variant.tags) {
-    deps = [ ":ubsan_default_options" ]
+    executable_deps = [ ":ubsan_default_options" ]
     configs += [
       ":variant-libprefix",
       ":ubsan.rustflags",
@@ -315,6 +322,7 @@ variant("hwasan") {
     ":variant-libprefix",
     ":hwasan.rustflags",
   ]
+  executable_deps = [ ":hwasan_default_options" ]
 }
 
 sanitizer_rustflags("hwasan.rustflags") {

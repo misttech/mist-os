@@ -99,7 +99,7 @@ mod tests {
 
     fn serve_factory_items(items: Vec<ZbiResult>) -> Result<fboot::FactoryItemsProxy, Error> {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fboot::FactoryItemsMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fboot::FactoryItemsMarker>();
         fasync::Task::local(
             FactoryItems::from_parsed_zbi(items)?
                 .serve(stream)

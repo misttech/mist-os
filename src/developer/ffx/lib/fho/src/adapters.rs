@@ -15,11 +15,16 @@ macro_rules! embedded_plugin {
         ) -> $crate::Result<()> {
             #[allow(unused_imports)]
             use $crate::macro_deps::{
-                argh, bug, ffx_writer::Format, global_env_context, return_bug, FfxCommandLine,
+                argh, bug, check_strict_constraints, ffx_writer::Format, global_env_context,
+                return_bug, FfxCommandLine,
             };
             use $crate::FfxMain as _;
 
             let ffx = FfxCommandLine::from_env()?;
+            $crate::macro_deps::check_strict_constraints(
+                &ffx.global,
+                <$tool as $crate::FfxTool>::requires_target(),
+            )?;
             let context = if let Some(gc) = global_env_context() {
                 gc
             } else {

@@ -57,8 +57,8 @@ void Dispatcher::DumpToString(std::vector<std::string>* dump_out) {
 void Dispatcher::Dump(DumpState* out_state) {
   fbl::AutoLock lock(&callback_lock_);
 
-  out_state->running_dispatcher = driver_context::GetCurrentDispatcher();
-  out_state->running_driver = driver_context::GetCurrentDriver();
+  out_state->running_dispatcher = thread_context::GetCurrentDispatcher();
+  out_state->running_driver = thread_context::GetCurrentDriver();
   out_state->dispatcher_to_dump = this;
   out_state->driver_owner =
       out_state->dispatcher_to_dump ? out_state->dispatcher_to_dump->owner() : nullptr;

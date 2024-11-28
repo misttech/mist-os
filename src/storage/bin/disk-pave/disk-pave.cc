@@ -31,6 +31,9 @@
 
 #include "payload-streamer.h"
 
+// Print a message to stdout, along with the program name and function name.
+#define LOG(fmt, ...) printf("disk-pave:[%s] " fmt, __FUNCTION__, ##__VA_ARGS__)
+
 // Print a message to stderr, along with the program name and function name.
 #define ERROR(fmt, ...) fprintf(stderr, "disk-pave:[%s] " fmt, __FUNCTION__, ##__VA_ARGS__)
 
@@ -231,48 +234,6 @@ zx_status_t ReadFileToVmo(fbl::unique_fd payload_fd, fuchsia_mem::wire::Buffer* 
   return ZX_OK;
 }
 
-// Protocol should be either |DataSink| or |DynamicDataSink|.
-template <typename Protocol>
-struct UseBlockDeviceError {
-  zx_status_t error;
-  fidl::ServerEnd<Protocol> unused_server;
-};
-
-// If the block device was opened successfully, tells the paver client to
-// use that block device. Otherwise, hands back the unused data sink server-end
-// together with a status.
-template <typename Protocol>
-fit::result<UseBlockDeviceError<Protocol>> UseBlockDevice(
-    fidl::WireSyncClient<fuchsia_paver::Paver>& paver_client, const char* block_device_path,
-    fidl::ServerEnd<Protocol> data_sink_remote) {
-  static_assert(std::is_same_v<Protocol, fuchsia_paver::DataSink> ||
-                std::is_same_v<Protocol, fuchsia_paver::DynamicDataSink>);
-
-  zx::result block_device = component::Connect<fuchsia_hardware_block::Block>(block_device_path);
-  if (block_device.is_ok()) {
-    std::string controller_path = std::string(block_device_path) + "/device_controller";
-    zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
-    if (controller.is_error()) {
-      ERROR("Unable to open block device controller: %s (%s)\n", controller_path.c_str(),
-            controller.status_string());
-    }
-    // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-    (void)paver_client->UseBlockDevice(
-        std::move(block_device.value()), std::move(controller.value()),
-        // Note: manually converting any DataSink protocol into a DynamicDataSink.
-        fidl::ServerEnd<fuchsia_paver::DynamicDataSink>(data_sink_remote.TakeChannel()));
-    return fit::ok();
-  }
-
-  ERROR("Unable to open block device: %s (%s)\n", block_device_path, block_device.status_string());
-  PrintUsage();
-
-  return fit::error(UseBlockDeviceError<Protocol>{
-      block_device.status_value(),
-      std::move(data_sink_remote),
-  });
-}
-
 zx_status_t RealMain(Flags flags) {
   auto paver_svc = component::Connect<fuchsia_paver::Paver>();
   if (!paver_svc.is_ok()) {
@@ -326,22 +287,18 @@ zx_status_t RealMain(Flags flags) {
       return ZX_OK;
     }
     case Command::kInitPartitionTables: {
-      if (flags.block_device == nullptr) {
-        ERROR("init-partition-tables requires --block-device\n");
-        PrintUsage();
-        return ZX_ERR_INVALID_ARGS;
+      if (flags.block_device != nullptr) {
+        LOG("init-partition-tables has changed!  Flag --block-device is now ignored.  This will "
+            "eventually be an error.\n");
       }
 
-      auto [data_sink_local, data_sink_remote] =
-          fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
-
-      auto block_result =
-          UseBlockDevice(paver_client, flags.block_device, std::move(data_sink_remote));
-      if (block_result.is_error()) {
-        return block_result.error_value().error;
+      auto [sink, remote] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
+      if (fidl::OneWayStatus result = paver_client->FindPartitionTableManager(std::move(remote));
+          !result.ok()) {
+        return result.status();
       }
 
-      auto result = fidl::WireSyncClient(std::move(data_sink_local))->InitializePartitionTables();
+      auto result = fidl::WireSyncClient(std::move(sink))->InitializePartitionTables();
       zx_status_t status = result.ok() ? result.value().status : result.status();
       if (status != ZX_OK) {
         ERROR("Failed to initialize partition tables: %s\n", zx_status_get_string(status));
@@ -351,22 +308,18 @@ zx_status_t RealMain(Flags flags) {
       return ZX_OK;
     }
     case Command::kWipePartitionTables: {
-      if (flags.block_device == nullptr) {
-        ERROR("wipe-partition-tables requires --block-device\n");
-        PrintUsage();
-        return ZX_ERR_INVALID_ARGS;
+      if (flags.block_device != nullptr) {
+        LOG("wipe-partition-tables has changed!  Flag --block-device is now ignored.  This will "
+            "eventually be an error.\n");
       }
 
-      auto [data_sink_local, data_sink_remote] =
-          fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
-
-      auto block_result =
-          UseBlockDevice(paver_client, flags.block_device, std::move(data_sink_remote));
-      if (block_result.is_error()) {
-        return block_result.error_value().error;
+      auto [sink, remote] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
+      if (fidl::OneWayStatus result = paver_client->FindPartitionTableManager(std::move(remote));
+          !result.ok()) {
+        return result.status();
       }
 
-      auto result = fidl::WireSyncClient(std::move(data_sink_local))->WipePartitionTables();
+      auto result = fidl::WireSyncClient(std::move(sink))->WipePartitionTables();
       zx_status_t status = result.ok() ? result.value().status : result.status();
       if (status != ZX_OK) {
         ERROR("Failed to wipe partition tables: %s\n", zx_status_get_string(status));

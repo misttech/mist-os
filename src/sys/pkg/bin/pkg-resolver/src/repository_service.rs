@@ -54,7 +54,7 @@ impl RepositoryService {
                     responder.send(response)?;
                 }
                 RepositoryManagerRequest::List { iterator, control_handle: _ } => {
-                    let stream = iterator.into_stream()?;
+                    let stream = iterator.into_stream();
                     self.serve_list(stream).await;
                 }
             }
@@ -155,8 +155,7 @@ mod tests {
     use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
 
     async fn list(service: &RepositoryService) -> Vec<RepositoryConfig> {
-        let (list_iterator, stream) =
-            create_proxy_and_stream::<RepositoryIteratorMarker>().unwrap();
+        let (list_iterator, stream) = create_proxy_and_stream::<RepositoryIteratorMarker>();
         service.serve_list(stream).await;
 
         let mut results: Vec<RepositoryConfig> = Vec::new();

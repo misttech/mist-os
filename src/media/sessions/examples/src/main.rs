@@ -90,7 +90,7 @@ async fn main() -> Result<()> {
     println!("Registered with Fuchsia Media Session service. ID {}", session_id);
 
     let mut player = Player::new();
-    let mut requests = player_server_end.into_stream()?;
+    let mut requests = player_server_end.into_stream();
 
     let mut staged = Some(PlayerInfoDelta {
         local: Some(true),

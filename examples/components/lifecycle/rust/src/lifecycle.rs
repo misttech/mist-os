@@ -30,7 +30,7 @@ async fn _escrow_example() -> Result<(), anyhow::Error> {
     let lifecycle: zx::Channel = lifecycle.into();
     let lifecycle: ServerEnd<flifecycle::LifecycleMarker> = lifecycle.into();
     let (lifecycle_request_stream, lifecycle_control_handle) =
-        lifecycle.into_stream_and_control_handle().unwrap();
+        lifecycle.into_stream_and_control_handle();
 
     let outgoing_dir = None;
     // Later, when `ServiceFs` has stalled and we have an `outgoing_dir`.

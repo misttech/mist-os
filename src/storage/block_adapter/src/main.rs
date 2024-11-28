@@ -10,17 +10,18 @@ use {fidl_fuchsia_hardware_block as fhardware_block, fuchsia_async as fasync};
 #[fasync::run_singlethreaded]
 async fn main() -> Result<(), Error> {
     let mut args = std::env::args();
-    let name = args.next().ok_or(anyhow!("no arguments provided"))?;
-    let binary = args.next().ok_or(anyhow!("{} invoked without path to child binary", name))?;
+    let name = args.next().ok_or_else(|| anyhow!("no arguments provided"))?;
+    let binary =
+        args.next().ok_or_else(|| anyhow!("{} invoked without path to child binary", name))?;
     let return_code = block_adapter::run(
         ClientEnd::<fhardware_block::BlockMarker>::from(zx::Channel::from(
             fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleInfo::new(
                 HandleType::User0,
                 1,
             ))
-            .ok_or(anyhow!("missing device handle"))?,
+            .ok_or_else(|| anyhow!("missing device handle"))?,
         ))
-        .into_proxy()?,
+        .into_proxy(),
         &binary,
         args,
     )

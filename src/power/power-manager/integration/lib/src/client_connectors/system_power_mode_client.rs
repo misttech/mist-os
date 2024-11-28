@@ -14,7 +14,7 @@ impl PowerLevelClient {
     pub fn new(test_env: &TestEnv, client_type: &str) -> Self {
         let connector = test_env.connect_to_protocol::<fpowerclient::ConnectorMarker>();
         let (watcher_proxy, watcher_remote) =
-            fidl::endpoints::create_proxy::<fpowerclient::WatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fpowerclient::WatcherMarker>();
         connector
             .connect(client_type_from_str(client_type), watcher_remote)
             .expect("Failed to connect power client");

@@ -56,7 +56,10 @@ source_set("driver_runner_test_fixture") {
 test("driver_runner_test") {
   sources = [ "driver_runner_test.cc" ]
 
-  deps = [ ":driver_runner_test_fixture" ]
+  deps = [
+    ":driver_runner_test_fixture",
+    "//sdk/lib/driver/component/cpp:cpp",
+  ]
 }
 
 cc_test_executable("driver_runner_death_test") {
@@ -135,6 +138,7 @@ cc_test_executable("node_test") {
     ":driver_manager_test_base",
     "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
   ]
 }

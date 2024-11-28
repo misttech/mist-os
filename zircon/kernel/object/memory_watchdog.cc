@@ -169,9 +169,8 @@ void MemoryWatchdog::EvictionTrigger() {
     // the WorkerThread knows it should bump the evictor when memory states change.
     continuous_eviction_active_ = true;
   }
-  pmm_evictor()->EvictOneShotAsynchronous(min_free_target_, free_mem_target_,
-                                          Evictor::EvictionLevel::OnlyOldest,
-                                          Evictor::Output::Print);
+  pmm_evictor()->EvictAsynchronous(min_free_target_, free_mem_target_,
+                                   Evictor::EvictionLevel::OnlyOldest, Evictor::Output::Print);
 }
 
 // Helper called by the memory pressure thread when OOM state is entered.
@@ -221,31 +220,18 @@ void MemoryWatchdog::WorkerThread() {
     // If we've hit OOM level perform some immediate synchronous eviction to attempt to avoid OOM.
     if (mem_event_idx_ == PressureLevel::kOutOfMemory) {
       CountPressureEvent(mem_event_idx_);
-      printf("memory-pressure: free memory is %zuMB, evicting pages to prevent OOM...\n",
-             pmm_count_free_pages() * PAGE_SIZE / MB);
-      pmm_page_queues()->Dump();
       // Keep trying to perform eviction for as long as we are evicting non-zero pages and we remain
       // in the out of memory state.
       while (mem_event_idx_ == PressureLevel::kOutOfMemory) {
-        uint64_t evicted_pages = pmm_evictor()->EvictOneShotSynchronous(
-            MB * 10, Evictor::EvictionLevel::IncludeNewest, Evictor::Output::Print,
-            Evictor::TriggerReason::OOM);
+        uint64_t evicted_pages =
+            pmm_evictor()->EvictSynchronous(MB * 10, Evictor::EvictionLevel::IncludeNewest,
+                                            Evictor::Output::NoPrint, Evictor::TriggerReason::OOM);
         if (evicted_pages == 0) {
           printf("memory-pressure: found no pages to evict\n");
           break;
         }
         mem_event_idx_ = CalculatePressureLevel();
       }
-      printf("memory-pressure: free memory after OOM eviction is %zuMB\n",
-             pmm_count_free_pages() * PAGE_SIZE / MB);
-      pmm_page_queues()->Dump();
-      PageQueues::ReclaimCounts pager_counts = pmm_page_queues()->GetReclaimQueueCounts();
-      printf(
-          "memory-pressure: reclaimable working set immediately after OOM eviction is: "
-          "total: %zu MiB newest: %zu MiB oldest: %zu MiB\n",
-          pager_counts.total * PAGE_SIZE / MB, pager_counts.newest * PAGE_SIZE / MB,
-          pager_counts.oldest * PAGE_SIZE / MB);
-      pmm_print_physical_page_borrowing_stats();
     }
 
     // Check to see if the PMM has failed any allocations.  If the PMM has ever failed to allocate
@@ -372,8 +358,8 @@ void MemoryWatchdog::WaitForMemChange(const Deadline& deadline) {
     // See the documentation on EvictOneShotAsynchronous for how eviction requests combine, and why
     // we can repeatedly perform this request correctly.
     if (continuous_eviction_active_) {
-      pmm_evictor()->EvictOneShotAsynchronous(
-          0, free_mem_target_, Evictor::EvictionLevel::OnlyOldest, Evictor::Output::Print);
+      pmm_evictor()->EvictAsynchronous(0, free_mem_target_, Evictor::EvictionLevel::OnlyOldest,
+                                       Evictor::Output::NoPrint);
     }
     // In the case where we raced with additional pmm actions keep looping unless the deadline was
     // reached.

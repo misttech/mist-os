@@ -4,9 +4,9 @@
 
 #include <lib/zbitl/vmo.h>
 #include <zircon/syscalls/object.h>
+#include <zircon/types.h>
 
 #include <cstddef>
-#include <memory>
 
 #include <fbl/alloc_checker.h>
 
@@ -92,6 +92,12 @@ fit::result<zx_status_t, zx::vmo> StorageTraits<zx::vmo>::Create(const zx::vmo& 
 
   zx::vmo vmo;
   if (zx_status_t status = zx::vmo::create(size, options, &vmo); status != ZX_OK) {
+    return fit::error{status};
+  }
+
+  // This VMO will be written to and filled up. We can avoid excessive pagefaults by eagerly
+  // fetching pages.
+  if (zx_status_t status = vmo.op_range(ZX_VMO_OP_COMMIT, 0, size, nullptr, 0); status != ZX_OK) {
     return fit::error{status};
   }
   return fit::ok(std::move(vmo));

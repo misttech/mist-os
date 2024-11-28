@@ -182,7 +182,7 @@ async fn run_server(stream: StoreRequestStream) -> Result<(), Error> {
                     // protocol instance, allowing this call to return immediately and continue the
                     // request stream with other work.
                     responder
-                        .send(iterate(store.clone(), starting_at, iterator.into_stream()?))
+                        .send(iterate(store.clone(), starting_at, iterator.into_stream()))
                         .context("error sending reply")?;
                     println!("Iterate response sent");
                 } //

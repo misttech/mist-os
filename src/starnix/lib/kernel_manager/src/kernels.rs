@@ -5,8 +5,6 @@
 use crate::{generate_kernel_name, StarnixKernel};
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
-#[cfg(feature = "wake_locks")]
-use fidl_fuchsia_power_system as fpower;
 use frunner::{ComponentControllerMarker, ComponentStartInfo};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
@@ -14,10 +12,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use vfs::execution_scope::ExecutionScope;
 use zx::AsHandleRef;
-use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner, zx};
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
+    fidl_fuchsia_power_system as fpower, zx,
+};
 
 /// The component URL of the Starnix kernel.
 const KERNEL_URL: &str = "#meta/starnix_kernel.cm";
+
+/// Create the power lease name for better readability based on the Starnix kernel name.
+fn create_lease_name(kernel_name: &str) -> String {
+    format!("starnix-kernel-{}", kernel_name)
+}
 
 /// [`Kernels`] manages a collection of starnix kernels.
 pub struct Kernels {
@@ -48,7 +54,10 @@ impl Kernels {
                 break 'out None;
             };
 
-            match activity_governor.take_application_activity_lease(&kernel_name).await {
+            match activity_governor
+                .take_application_activity_lease(&create_lease_name(&kernel_name))
+                .await
+            {
                 Ok(l) => Some(l),
                 Err(e) => {
                     tracing::warn!(
@@ -87,7 +96,6 @@ impl Kernels {
     }
 
     /// Drops any active wake lease for the container running in the given `container_job`.
-    #[cfg(feature = "wake_locks")]
     pub fn drop_wake_lease(&self, container_job: &zx::Job) -> Result<(), Error> {
         fuchsia_trace::instant!(
             c"power",
@@ -102,37 +110,28 @@ impl Kernels {
         Ok(())
     }
 
-    #[cfg(not(feature = "wake_locks"))]
-    pub fn drop_wake_lease(&self, _container_job: &zx::Job) -> Result<(), Error> {
-        Ok(())
-    }
-
     /// Acquires a wake lease for the container running in the given `container_job`.
-    #[cfg(feature = "wake_locks")]
     pub async fn acquire_wake_lease(&self, container_job: &zx::Job) -> Result<(), Error> {
         fuchsia_trace::duration!(c"power", c"starnix-runner:acquire-application-activity-lease");
         let job_koid = container_job.get_koid()?;
         if let Some(kernel) = self.kernels.lock().get(&job_koid) {
             let activity_governor = connect_to_protocol::<fpower::ActivityGovernorMarker>()?;
-            let wake_lease =
-                match activity_governor.take_application_activity_lease(&kernel.name).await {
-                    Ok(l) => l,
-                    Err(e) => {
-                        tracing::warn!(
-                            "Failed to acquire application activity lease for kernel: {:?}",
-                            e
-                        );
-                        return Ok(());
-                    }
-                };
+            let wake_lease = match activity_governor
+                .take_application_activity_lease(&create_lease_name(&kernel.name))
+                .await
+            {
+                Ok(l) => l,
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to acquire application activity lease for kernel: {:?}",
+                        e
+                    );
+                    return Ok(());
+                }
+            };
             *kernel.wake_lease.lock() = Some(wake_lease);
             tracing::info!("Acquired wake lease for {:?}", container_job);
         }
-        Ok(())
-    }
-
-    #[cfg(not(feature = "wake_locks"))]
-    pub async fn acquire_wake_lease(&self, _container_job: &zx::Job) -> Result<(), Error> {
         Ok(())
     }
 }

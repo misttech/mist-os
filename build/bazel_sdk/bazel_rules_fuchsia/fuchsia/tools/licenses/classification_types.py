@@ -954,6 +954,8 @@ class ConditionOverrideRule:
     public_source_mirrors: List[str]
     # Issue tracker URL.
     bug: str
+    # Email subject line containing counsel approval.
+    email_subject_line: str
     # List facilitates easier to read multi-line comments in JSON.
     comment: List[str]
 
@@ -976,6 +978,9 @@ class ConditionOverrideRule:
             raise LicenseException(
                 "'bug' fields cannot be empty", rule_file_path
             )
+        email_subject_line = reader.get_or(
+            "email_subject_line", expected_type=str, default=""
+        )
         comment = reader.get_string_list("comment")
 
         def verify_list_not_empty(list_value) -> str:
@@ -1022,6 +1027,7 @@ class ConditionOverrideRule:
             override_condition_to=override_condition_to,
             public_source_mirrors=public_source_mirrors,
             bug=bug,
+            email_subject_line=email_subject_line,
             comment=comment,
             match_license_names=match_license_names,
             match_identifications=match_identifications,
@@ -1043,6 +1049,7 @@ class ConditionOverrideRule:
             {
                 "override_condition_to": self.override_condition_to,
                 "bug": self.bug,
+                "email_subject_line": self.email_subject_line,
                 "comment": self.comment,
                 "match_criteria": {
                     "license_names": self.match_license_names.to_json(),
@@ -1074,6 +1081,7 @@ class ConditionOverrideRule:
             + ">",
             public_source_mirrors=None,
             bug="<INSERT TICKET URL>",
+            email_subject_line="<INSERT EMAIL SUBJECT LINE FOR COUNSEL APPROVAL, IF APPLICABLE>",
             comment=["<INSERT DOCUMENTATION FOR OVERRIDE RULE>"],
             match_license_names=StringMatcher.create([license.name]),
             match_snippet_checksums=StringMatcher.create(

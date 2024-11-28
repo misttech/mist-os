@@ -20,7 +20,7 @@ use crate::watcher::{DirSource, Watcher};
 use anyhow::{anyhow, bail, Context, Error};
 use async_trait::async_trait;
 use device_watcher::{recursive_wait, recursive_wait_and_open};
-use fidl::endpoints::{create_proxy, ServerEnd};
+use fidl::endpoints::{create_proxy, ServerEnd, ServiceMarker as _};
 use fidl_fuchsia_fs_startup::MountOptions;
 use fidl_fuchsia_hardware_block_partition::Guid;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
@@ -37,7 +37,10 @@ pub use fxfs_container::FxfsContainer;
 use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_inspect as finspect};
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync,
+    fuchsia_inspect as finspect,
+};
 
 const INITIAL_SLICE_COUNT: u64 = 1;
 
@@ -56,6 +59,10 @@ pub trait Environment: Send + Sync {
 
     /// Binds an instance of storage-host to the given device.
     async fn launch_storage_host(&mut self, device: &mut dyn Device) -> Result<(), Error>;
+
+    /// Returns a proxy for the exposed dir of the partition table manager.  This can be called
+    /// before the manager is bound and it will get routed once bound.
+    fn partition_manager_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error>;
 
     /// Binds the fvm driver and returns a list of the names of the child partitions.
     async fn bind_and_enumerate_fvm(
@@ -158,18 +165,16 @@ impl Filesystem {
     }
 
     pub fn crypt_service(&mut self) -> Result<Option<fio::DirectoryProxy>, Error> {
-        let (proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
+        let (proxy, server) = create_proxy::<fio::DirectoryMarker>();
         match self {
             Filesystem::Queue(queue) => queue.crypt_service_exposed_dir.push(server),
             Filesystem::Serving(_) => bail!(anyhow!("filesystem doesn't have crypt service")),
-            Filesystem::ServingMultiVolume(crypt_service, ..) => crypt_service
-                .exposed_dir()
-                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
+            Filesystem::ServingMultiVolume(crypt_service, ..) => {
+                crypt_service.exposed_dir().clone2(server.into_channel().into())?
+            }
             Filesystem::ServingVolumeInMultiVolume(crypt_service_option, ..) => {
                 match crypt_service_option {
-                    Some(s) => s
-                        .exposed_dir()
-                        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
+                    Some(s) => s.exposed_dir().clone2(server.into_channel().into())?,
                     None => return Ok(None),
                 }
             }
@@ -183,26 +188,22 @@ impl Filesystem {
         &mut self,
         serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
     ) -> Result<fio::DirectoryProxy, Error> {
-        let (proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
+        let (proxy, server) = create_proxy::<fio::DirectoryMarker>();
         match self {
             Filesystem::Queue(queue) => queue.exposed_dir_queue.push(server),
-            Filesystem::Serving(fs) => fs
-                .exposed_dir()
-                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
+            Filesystem::Serving(fs) => fs.exposed_dir().clone2(server.into_channel().into())?,
             Filesystem::ServingMultiVolume(_, fs, data_volume_name) => fs
                 .volume(&data_volume_name)
-                .ok_or(anyhow!("data volume {} not found", data_volume_name))?
+                .ok_or_else(|| anyhow!("data volume {} not found", data_volume_name))?
                 .exposed_dir()
-                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
+                .clone2(server.into_channel().into())?,
             Filesystem::ServingVolumeInMultiVolume(_, volume_name) => serving_fs
                 .unwrap()
                 .volume(&volume_name)
-                .ok_or(anyhow!("volume {volume_name} not found"))?
+                .ok_or_else(|| anyhow!("volume {volume_name} not found"))?
                 .exposed_dir()
-                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
-            Filesystem::ServingGpt(fs) => fs
-                .exposed_dir()
-                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
+                .clone2(server.into_channel().into())?,
+            Filesystem::ServingGpt(fs) => fs.exposed_dir().clone2(server.into_channel().into())?,
             Filesystem::Shutdown => bail!(anyhow!("filesystem is shutting down")),
         }
         Ok(proxy)
@@ -409,12 +410,6 @@ impl FshostEnvironment {
         self.data.exposed_dir(self.container.maybe_fs())
     }
 
-    /// Returns a proxy for the exposed dir of the GPT.  This must be called before
-    /// the GPT is mounted and it will get routed once bound.
-    pub fn gpt_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        self.gpt.exposed_dir(None)
-    }
-
     /// Returns a proxy for the exposed dir of the data filesystem's crypt service. This can be
     /// called before "/data" is mounted and it will get routed once the data partition is
     /// mounted and the crypt service becomes available. Fails for single volume filesystems.
@@ -570,7 +565,7 @@ impl FshostEnvironment {
             );
 
             let volume_manager = connect_to_protocol_at_path::<VolumeManagerMarker>(
-                &device.fvm_path().ok_or(anyhow!("Not an fvm device"))?,
+                &device.fvm_path().ok_or_else(|| anyhow!("Not an fvm device"))?,
             )
             .context("Failed to connect to fvm volume manager")?;
             let new_instance_guid = *uuid::Uuid::new_v4().as_bytes();
@@ -633,13 +628,13 @@ impl FshostEnvironment {
 
     /// Mounts Blobfs on the given device.
     async fn mount_blobfs(&mut self, device: &mut dyn Device) -> Result<(), Error> {
-        let queue = self.blobfs.queue().ok_or(anyhow!("blobfs already mounted"))?;
+        let queue = self.blobfs.queue().ok_or_else(|| anyhow!("blobfs already mounted"))?;
 
         let mut fs = self.launcher.serve_blobfs(device).await?;
 
         let exposed_dir = fs.exposed_dir(None)?;
         for server in queue.exposed_dir_queue.drain(..) {
-            exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+            exposed_dir.clone2(server.into_channel().into())?;
         }
         self.blobfs = fs;
         Ok(())
@@ -741,7 +736,11 @@ impl Environment for FshostEnvironment {
     }
 
     async fn launch_storage_host(&mut self, device: &mut dyn Device) -> Result<(), Error> {
-        let queue = self.gpt.queue().ok_or_else(|| anyhow!("GPT already bound"))?;
+        if self.gpt.is_serving() {
+            // If we want to support multiple GPT devices, we'll need to change Environment to
+            // separate the system GPT and other GPTs.
+            bail!("GPT already bound");
+        }
         let filesystem = fs_management::filesystem::Filesystem::from_boxed_config(
             device.block_connector()?,
             Box::new(fs_management::Gpt::dynamic_child()),
@@ -749,23 +748,28 @@ impl Environment for FshostEnvironment {
         .serve_multi_volume()
         .await
         .context("Failed to start GPT")?;
+        let queue = self.gpt.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir();
         for server in queue.exposed_dir_queue.drain(..) {
-            exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+            exposed_dir.clone2(server.into_channel().into())?;
         }
         let partitions_dir = fuchsia_fs::directory::open_directory(
             &exposed_dir,
-            "partitions",
-            fio::Flags::PERM_CONNECT | fio::Flags::PERM_ENUMERATE | fio::Flags::PERM_TRAVERSE,
+            fstoragehost::PartitionServiceMarker::SERVICE_NAME,
+            fuchsia_fs::PERM_READABLE,
         )
-        .await?;
-        const PARTITION_SERVICE_SUFFIX: &str = "/svc/fuchsia.storagehost.PartitionService";
+        .await
+        .context("Failed to open partitions dir")?;
         self.watcher
-            .add_source(Box::new(DirSource::with_suffix(partitions_dir, PARTITION_SERVICE_SUFFIX)))
+            .add_source(Box::new(DirSource::new(partitions_dir)))
             .await
             .context("Failed to watch gpt partitions dir")?;
         self.gpt = Filesystem::ServingGpt(filesystem);
         Ok(())
+    }
+
+    fn partition_manager_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
+        self.gpt.exposed_dir(None)
     }
 
     async fn bind_and_enumerate_fvm(
@@ -839,9 +843,9 @@ impl Environment for FshostEnvironment {
             .await
             .context("Failed to open the blob volume")?;
         let exposed_dir = blobfs.exposed_dir();
-        let queue = self.blobfs.queue().ok_or(anyhow!("blobfs already mounted"))?;
+        let queue = self.blobfs.queue().ok_or_else(|| anyhow!("blobfs already mounted"))?;
         for server in queue.exposed_dir_queue.drain(..) {
-            exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+            exposed_dir.clone2(server.into_channel().into())?;
         }
         self.blobfs = Filesystem::ServingVolumeInMultiVolume(None, label.to_string());
         if let Err(e) = container.fs().set_byte_limit(label, self.config.blobfs_max_bytes).await {
@@ -863,12 +867,11 @@ impl Environment for FshostEnvironment {
         let queue = self.data.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir(Some(container.fs()))?;
         for server in queue.exposed_dir_queue.drain(..) {
-            exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+            exposed_dir.clone2(server.into_channel().into())?;
         }
         if let Some(crypt_service) = filesystem.crypt_service()? {
             for server in queue.crypt_service_exposed_dir.drain(..) {
-                crypt_service
-                    .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+                crypt_service.clone2(server.into_channel().into())?;
             }
         }
         self.data = filesystem;
@@ -951,7 +954,8 @@ impl Environment for FshostEnvironment {
                 }
             }
             ServeFilesystemStatus::FormatRequired => {
-                self.format_data(&device.fvm_path().ok_or(anyhow!("Not an fvm device"))?).await?
+                self.format_data(&device.fvm_path().ok_or_else(|| anyhow!("Not an fvm device"))?)
+                    .await?
             }
         };
         self.bind_data(fs)
@@ -1027,16 +1031,13 @@ impl Environment for FshostEnvironment {
         let queue = self.data.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir(None)?;
         for server in queue.exposed_dir_queue.drain(..) {
-            exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+            exposed_dir.clone2(server.into_channel().into())?;
         }
         match &filesystem {
             Filesystem::ServingMultiVolume(..) | Filesystem::ServingVolumeInMultiVolume(..) => {
                 if let Some(crypt_service_exposed_dir) = filesystem.crypt_service()? {
                     for server in queue.crypt_service_exposed_dir.drain(..) {
-                        crypt_service_exposed_dir.clone(
-                            fio::OpenFlags::CLONE_SAME_RIGHTS,
-                            server.into_channel().into(),
-                        )?;
+                        crypt_service_exposed_dir.clone2(server.into_channel().into())?;
                     }
                 }
             }
@@ -1077,10 +1078,12 @@ impl Environment for FshostEnvironment {
         });
         if let Some(container) = self.container.take() {
             container.into_fs().shutdown().await.unwrap_or_else(|error| {
-                tracing::error!(?error, "failed to shut down fxfs");
+                tracing::error!(?error, "failed to shut down container");
             })
         }
-        self.gpt = Filesystem::Queue(FilesystemQueue::default());
+        self.gpt.shutdown(None).await.unwrap_or_else(|error| {
+            tracing::error!(?error, "failed to shut down gpt");
+        });
         Ok(())
     }
 

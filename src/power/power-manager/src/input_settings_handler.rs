@@ -187,9 +187,9 @@ impl InputSettingsHandler {
         let is_enabled = mic_settings[0]
             .state
             .as_ref()
-            .ok_or(format_err!("Microphone DeviceState is None"))?
+            .ok_or_else(|| format_err!("Microphone DeviceState is None"))?
             .toggle_flags
-            .ok_or(format_err!("Microphone ToggleStateFlags is None"))?
+            .ok_or_else(|| format_err!("Microphone ToggleStateFlags is None"))?
             .contains(fsettings::ToggleStateFlags::AVAILABLE);
 
         Ok(is_enabled)
@@ -242,8 +242,7 @@ mod tests {
     impl FakeSettingsSvc {
         fn new() -> (fsettings::InputProxy, Self) {
             let (proxy, stream) =
-                fidl::endpoints::create_proxy_and_stream::<fsettings::InputMarker>()
-                    .expect("Failed to create Input proxy and stream");
+                fidl::endpoints::create_proxy_and_stream::<fsettings::InputMarker>();
             (proxy, Self { stream, pending_request: None })
         }
 

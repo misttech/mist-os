@@ -27,12 +27,15 @@ rustc_library("selinux") {
     "src/sync.rs",
   ]
   inputs = [
+    "testdata/composite_policies/compiled/allow_fork.pp",
     "testdata/composite_policies/compiled/class_defaults_policy.pp",
     "testdata/composite_policies/compiled/minimal_policy.pp",
     "testdata/composite_policies/compiled/range_transition_policy.pp",
     "testdata/composite_policies/compiled/role_transition_not_allowed_policy.pp",
     "testdata/composite_policies/compiled/role_transition_policy.pp",
     "testdata/composite_policies/compiled/type_transition_policy.pp",
+    "testdata/composite_policies/compiled/with_additional_domain_policy.pp",
+    "testdata/composite_policies/compiled/with_unlabeled_access_domain_policy.pp",
     "testdata/expectations/emulator",
     "testdata/expectations/selinux_testsuite",
     "testdata/micro_policies/allow_a_attr_b_attr_class0_perm0_policy.pp",

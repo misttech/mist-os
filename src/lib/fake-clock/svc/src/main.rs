@@ -1044,14 +1044,12 @@ mod tests {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
 
         let (fake_clock_proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<FakeClockMarker>()
-                .expect("failed to connect to fake clock");
+            fidl::endpoints::create_proxy_and_stream::<FakeClockMarker>();
         let fake_clock_server_fut = handle_events(clock_handle.clone(), stream);
         pin_mut!(fake_clock_server_fut);
 
         let (fake_clock_control_proxy, control_stream) =
-            fidl::endpoints::create_proxy_and_stream::<FakeClockControlMarker>()
-                .expect("failed to connect to fake clock control");
+            fidl::endpoints::create_proxy_and_stream::<FakeClockControlMarker>();
         let fake_clock_control_server_fut =
             handle_control_events(clock_handle.clone(), control_stream);
         pin_mut!(fake_clock_control_server_fut);

@@ -43,10 +43,12 @@ source_set("src") {
     "//zircon/system/ulib/hwreg",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/lib/driver/incoming/cpp",
     "//src/graphics/magma/lib/magma/platform:barriers",
     "//src/graphics/magma/lib/magma/platform:buffer",
     "//src/graphics/magma/lib/magma/platform:bus_mapper",
-    "//src/graphics/magma/lib/magma/platform:device",
+    "//src/graphics/magma/lib/magma/platform:device_dfv2",
     "//src/graphics/magma/lib/magma/platform:event",
     "//src/graphics/magma/lib/magma/platform:logger",
     "//src/graphics/magma/lib/magma/platform:semaphore",
@@ -60,7 +62,7 @@ source_set("src") {
     "//zircon/system/ulib/fbl",
   ]
   if (is_fuchsia) {
-    deps += [ "//src/graphics/magma/lib/magma/platform/zircon:device" ]
+    deps += [ "//src/graphics/magma/lib/magma/platform/zircon:device_dfv2" ]
   }
   friend = [
     "../tests/mock:*",

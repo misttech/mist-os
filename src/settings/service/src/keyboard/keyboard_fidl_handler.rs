@@ -150,14 +150,12 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn try_from_set_converts_supplied_params() {
-        let (proxy, server) = fidl::endpoints::create_proxy::<KeyboardMarker>()
-            .expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<KeyboardMarker>();
         let _fut = proxy.set(&KeyboardSettings {
             keymap: Some(fidl_fuchsia_input::KeymapId::FrAzerty),
             ..Default::default()
         });
-        let mut request_stream: KeyboardRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: KeyboardRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await
@@ -171,11 +169,9 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn try_from_watch_converts_supplied_params() {
-        let (proxy, server) = fidl::endpoints::create_proxy::<KeyboardMarker>()
-            .expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<KeyboardMarker>();
         let _fut = proxy.watch();
-        let mut request_stream: KeyboardRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: KeyboardRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await

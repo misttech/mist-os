@@ -13,7 +13,6 @@
 ///
 /// The power elements that SAG creates and manages are as follows:
 /// * [`fuchsia.power.system/ExecutionState`]
-/// * [`fuchsia.power.system/WakeHandling`]
 /// * [`fuchsia.power.system/ApplicationActivity`]
 /// * [`fuchsia.power.system/Cpu`]
 ///
@@ -100,25 +99,6 @@ type ExecutionStateLevel = flexible enum : uint8 {
     ACTIVE = 2;
 };
 
-/// Holds tokens to the wake handling power element.
-///
-/// [`fuchsia.power.system/WakeHandlingLevel`] defines the power levels supported by this power element.
-type WakeHandling = resource table {
-    1: assertive_dependency_token fuchsia.power.broker.DependencyToken;
-};
-
-/// Wake handling power levels
-///
-/// Driver power elements should take an assertive dependency on
-/// `WakeHandlingLevel::ACTIVE` if it does NOT expect the system to
-/// perform a full wakeup. While the drivers are handling a wake event, they
-/// should request a lease to pull the state to Active, and drop the release
-/// once the event is fully handled.
-type WakeHandlingLevel = flexible enum : uint8 {
-    INACTIVE = 0;
-    ACTIVE = 1;
-};
-
 /// Holds tokens to the CPU power element.
 ///
 /// [`fuchsia.power.system/CpuLevel`] defines the power levels supported by this power element.
@@ -157,7 +137,6 @@ type ApplicationActivityLevel = flexible enum : uint8 {
 type PowerElements = resource table {
     1: execution_state ExecutionState;
     3: application_activity ApplicationActivity;
-    4: wake_handling WakeHandling;
 };
 
 /// Error codes for responses from `AddExecutionStateDependency` in

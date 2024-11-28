@@ -189,7 +189,7 @@ mod tests {
         block_count: u64,
         block_size: u32,
     ) -> Result<DiskFormat, Error> {
-        let (proxy, stream) = create_proxy_and_stream::<VolumeMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<VolumeMarker>();
 
         let fake_server = FakeServer::new(block_count, block_size, content);
         let mut request_handler = pin!(fake_server.serve(stream).fuse());

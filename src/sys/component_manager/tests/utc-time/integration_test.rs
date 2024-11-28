@@ -33,7 +33,7 @@ fn mock_boot_handles(
         },
     };
 
-    let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let server = server.into_channel();
 
     let scope = ExecutionScope::new();
@@ -90,11 +90,9 @@ async fn builtin_time_service_and_clock_routed() {
     component_manager_realm
         .add_route(
             Route::new()
-                .capability(
-                    Capability::directory("boot").path("/boot").rights(fio::Operations::all()),
-                )
+                .capability(Capability::directory("boot").path("/boot").rights(fio::R_STAR_DIR))
                 .from(&mock_boot)
-                .to(Ref::child("component_manager")),
+                .to(Ref::self_()),
         )
         .await
         .unwrap();

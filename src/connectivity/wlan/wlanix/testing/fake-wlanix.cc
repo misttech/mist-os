@@ -139,6 +139,15 @@ void FakeWlanix::RemoveStaIface(fuchsia_wlan_wlanix::wire::WifiChipRemoveStaIfac
   completer.ReplySuccess();
 }
 
+void FakeWlanix::SetCountryCode(fuchsia_wlan_wlanix::wire::WifiChipSetCountryCodeRequest* request,
+                                SetCountryCodeCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kWifiChipSetCountryCode});
+  if (!request->has_code()) {
+    ZX_ASSERT_MSG(false, "expect `code` to be present");
+  }
+  completer.ReplySuccess();
+}
+
 void FakeWlanix::GetAvailableModes(GetAvailableModesCompleter::Sync& completer) {
   AppendCommand(Command{.tag = CommandTag::kWifiChipGetAvailableModes});
 
@@ -248,6 +257,33 @@ void FakeWlanix::AddNetwork(fuchsia_wlan_wlanix::wire::SupplicantStaIfaceAddNetw
 
 void FakeWlanix::Disconnect(DisconnectCompleter::Sync& completer) {
   AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceDisconnect});
+}
+
+void FakeWlanix::SetPowerSave(
+    fuchsia_wlan_wlanix::wire::SupplicantStaIfaceSetPowerSaveRequest* request,
+    SetPowerSaveCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceSetPowerSave});
+  if (!request->has_enable()) {
+    ZX_ASSERT_MSG(false, "expect `enable` to be present");
+  }
+}
+
+void FakeWlanix::SetSuspendModeEnabled(
+    fuchsia_wlan_wlanix::wire::SupplicantStaIfaceSetSuspendModeEnabledRequest* request,
+    SetSuspendModeEnabledCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceSetSuspendModeEnabled});
+  if (!request->has_enable()) {
+    ZX_ASSERT_MSG(false, "expect `enable` to be present");
+  }
+}
+
+void FakeWlanix::SetStaCountryCode(
+    fuchsia_wlan_wlanix::wire::SupplicantStaIfaceSetStaCountryCodeRequest* request,
+    SetStaCountryCodeCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceSetStaCountryCode});
+  if (!request->has_code()) {
+    ZX_ASSERT_MSG(false, "expect `code` to be present");
+  }
 }
 
 void FakeWlanix::handle_unknown_method(

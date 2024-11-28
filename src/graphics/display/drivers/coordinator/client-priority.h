@@ -7,7 +7,7 @@
 
 #include <cstdint>
 
-namespace display {
+namespace display_coordinator {
 
 // The presentation priority level of a client connected to the Coordinator.
 //
@@ -19,6 +19,6 @@ enum class ClientPriority : int8_t {
 
 const char* DebugStringFromClientPriority(ClientPriority client_priority);
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CLIENT_PRIORITY_H_

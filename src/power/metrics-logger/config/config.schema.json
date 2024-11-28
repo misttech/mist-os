@@ -17,17 +17,17 @@
             "items": {
                 "type": "object",
                 "properties": {
-                    "name": {
+                    "alias": {
                         "type": "string"
                     },
-                    "topo_path_suffix": {
+                    "sensor_name": {
                         "type": "string"
                     }
                 },
                 "additionalProperties": false,
                 "required": [
-                    "name",
-                    "topo_path_suffix"
+                    "alias",
+                    "sensor_name"
                 ]
             }
         }

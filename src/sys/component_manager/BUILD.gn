@@ -16,34 +16,32 @@ import("//build/testing/environments.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 import("//tools/fidl/measure-tape/measure_tape.gni")
 
-rustc_binary("bin") {
-  name = "component_manager"
+_component_manager_bin = {
   with_unit_tests = true
   edition = "2021"
 
-  configs += [ "//build/config/rust:bootfs" ]
+  # Statically link rust standard library
+  # TODO(https://fxbug.dev/42163719): Dynamically link once security allowlist supports globs.
+  configs_to_add = [
+    "//build/config/fuchsia:static_rust_standard_library",
+    "//build/config/rust:bootfs",
+  ]
+  configs_to_remove = [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
 
   if (is_mistos) {
-    configs += [ "//build/config/mistos:mistos_config" ]
+    configs_to_add -= [ "//build/config/fuchsia:static_rust_standard_library" ]
+    configs_to_add += [ "//build/config/mistos:static_rust_standard_library" ]
 
-    # Statically link rust standard library
-    # TODO(https://fxbug.dev/42163719): Dynamically link once security allowlist supports globs.
-    configs += [ "//build/config/mistos:dynamic_rust_standard_library" ]
-    configs -= [ "//build/config/mistos:dynamic_rust_standard_library" ]
-    configs += [ "//build/config/mistos:static_rust_standard_library" ]
-
-  } else {
-    # Statically link rust standard library
-    # TODO(https://fxbug.dev/42163719): Dynamically link once security allowlist supports globs.
-    configs += [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
-    configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
-    configs += [ "//build/config/fuchsia:static_rust_standard_library" ]
+    configs_to_remove -=
+        [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+    configs_to_remove +=
+        [ "//build/config/mistos:dynamic_rust_standard_library" ]
   }
 
   # As this is a large binary that uses many resources to compile (and takes minutes when LTO is
   # enabled, shift it to the large RBE worker pool)
   _concurrent_jobs = concurrent_jobs.link_highmem
-  configs += _concurrent_jobs.configs
+  configs_to_add += _concurrent_jobs.configs
   forward_variables_from(_concurrent_jobs.vars, "*")
 
   deps = [
@@ -91,6 +89,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-sync",
     "//src/lib/fuchsia-url",
     "//src/lib/include_bytes_from_working_dir",
+    "//src/lib/trace/rust:trace",
     "//src/lib/versioning/version-history/rust",
     "//src/lib/versioning/version-history/rust/data",
     "//src/power/shutdown-shim:lib",
@@ -292,11 +291,40 @@ rustc_binary("bin") {
   ]
 }
 
+config("eng_mode") {
+  rustflags = [ "--cfg=eng" ]
+}
+
+rustc_binary("bin") {
+  output_name = "component_manager"
+  forward_variables_from(_component_manager_bin, "*")
+  configs += configs_to_remove
+  configs -= configs_to_remove
+  configs += configs_to_add
+  assert_no_deps += [
+    # For tracing support, :bin_eng is required
+    "//src/lib/trace/rust:trace-provider",
+  ]
+}
+
+rustc_binary("bin_eng") {
+  testonly = true
+  output_name = "component_manager_eng"
+  forward_variables_from(_component_manager_bin, "*")
+  configs += configs_to_remove
+  configs -= configs_to_remove
+  configs += configs_to_add
+
+  deps += [ "//src/lib/trace/rust:trace-provider" ]
+  configs += [ ":eng_mode" ]
+}
+
 # This v2 component bundles component manager with a config suitable for running
 # a nested component manager inside of realm builder.
 fuchsia_component("component-manager-realm-builder-cmp") {
+  testonly = true
   deps = [
-    ":bin",
+    ":bin_eng",
     ":component_manager_realm_builder_config",
   ]
   component_name = "component_manager"
@@ -306,8 +334,9 @@ fuchsia_component("component-manager-realm-builder-cmp") {
 # This v2 component bundles component manager with a debug config suitable for running
 # a nested component manager inside of realm builder.
 fuchsia_component("component-manager-realm-builder-debug-cmp") {
+  testonly = true
   deps = [
-    ":bin",
+    ":bin_eng",
     ":component_id_index_for_debug_config",
     ":component_manager_realm_builder_debug_config",
   ]

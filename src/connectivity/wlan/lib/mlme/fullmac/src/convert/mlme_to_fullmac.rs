@@ -150,15 +150,6 @@ pub fn convert_disassociate_request(
         ..Default::default()
     }
 }
-pub fn convert_reset_request(
-    req: fidl_mlme::ResetRequest,
-) -> fidl_fullmac::WlanFullmacImplResetRequest {
-    fidl_fullmac::WlanFullmacImplResetRequest {
-        sta_address: Some(req.sta_address),
-        set_default_mib: Some(req.set_default_mib),
-        ..Default::default()
-    }
-}
 
 pub fn convert_start_bss_request(
     req: fidl_mlme::StartRequest,
@@ -212,28 +203,6 @@ pub fn convert_set_keys_request(
     Ok(fidl_fullmac::WlanFullmacImplSetKeysRequest { keylist: Some(keylist), ..Default::default() })
 }
 
-pub fn convert_delete_keys_request(
-    req: fidl_mlme::DeleteKeysRequest,
-) -> Result<fidl_fullmac::WlanFullmacImplDelKeysRequest> {
-    const MAX_NUM_KEYS: usize = fidl_fullmac::WLAN_MAX_KEYLIST_SIZE as usize;
-    if req.keylist.len() > MAX_NUM_KEYS {
-        bail!(
-            "DeleteKeysRequest keylist len ({}) exceeds allowed maximum ({})",
-            req.keylist.len(),
-            MAX_NUM_KEYS
-        );
-    }
-    let keylist: Vec<_> = req
-        .keylist
-        .iter()
-        .map(|descriptor: &fidl_mlme::DeleteKeyDescriptor| {
-            convert_delete_key_descriptor(*descriptor)
-        })
-        .collect();
-
-    Ok(fidl_fullmac::WlanFullmacImplDelKeysRequest { keylist: Some(keylist), ..Default::default() })
-}
-
 pub fn convert_eapol_request(
     req: fidl_mlme::EapolRequest,
 ) -> fidl_fullmac::WlanFullmacImplEapolTxRequest {
@@ -247,10 +216,11 @@ pub fn convert_eapol_request(
 
 pub fn convert_sae_handshake_response(
     resp: fidl_mlme::SaeHandshakeResponse,
-) -> fidl_fullmac::WlanFullmacSaeHandshakeResp {
-    fidl_fullmac::WlanFullmacSaeHandshakeResp {
-        peer_sta_address: resp.peer_sta_address,
-        status_code: resp.status_code,
+) -> fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest {
+    fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest {
+        peer_sta_address: Some(resp.peer_sta_address),
+        status_code: Some(resp.status_code),
+        ..Default::default()
     }
 }
 
@@ -518,30 +488,6 @@ mod tests {
             ],
         };
         assert!(convert_set_keys_request(&mlme).is_err());
-    }
-
-    #[test]
-    fn test_convert_delete_keys_request() {
-        let mlme = fidl_mlme::DeleteKeysRequest { keylist: vec![fake_delete_key_descriptor(); 2] };
-
-        let fullmac = convert_delete_keys_request(mlme).unwrap();
-        assert_eq!(fullmac.keylist.as_ref().unwrap().len(), 2);
-
-        let keylist = fullmac.keylist.unwrap();
-        for key in &keylist[0..2] {
-            assert_eq!(key, &convert_delete_key_descriptor(fake_delete_key_descriptor()));
-        }
-    }
-
-    #[test]
-    fn test_convert_delete_keys_request_keylist_too_long() {
-        let mlme = fidl_mlme::DeleteKeysRequest {
-            keylist: vec![
-                fake_delete_key_descriptor();
-                fidl_fullmac::WLAN_MAX_KEYLIST_SIZE as usize + 1
-            ],
-        };
-        assert!(convert_delete_keys_request(mlme).is_err());
     }
 
     //

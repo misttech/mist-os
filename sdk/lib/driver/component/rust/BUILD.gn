@@ -12,6 +12,7 @@ rustc_library("rust") {
   with_unit_tests = true
 
   deps = [
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/lib/driver/runtime/rust",
@@ -41,6 +42,7 @@ rustc_library("rust") {
     "src/lib.rs",
     "src/macros.rs",
     "src/node.rs",
+    "src/node/offers.rs",
     "src/node/properties.rs",
     "src/server.rs",
   ]

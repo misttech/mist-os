@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::common_utils::common::macros::{fx_err_and_bail, with_line};
-use anyhow::{Context, Error};
+use anyhow::Error;
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_bluetooth::{ChannelMode, ChannelParameters};
 use fidl_fuchsia_bluetooth_bredr::{
@@ -587,8 +587,7 @@ impl ProfileServerFacade {
             ..Default::default()
         }];
 
-        let (connect_client, connect_requests) =
-            create_request_stream().context("ConnectionReceiver creation")?;
+        let (connect_client, connect_requests) = create_request_stream();
 
         match &self.inner.read().profile_server_proxy {
             Some(server) => {
@@ -680,8 +679,7 @@ impl ProfileServerFacade {
             fx_err_and_bail!(&with_line!(tag), log_err)
         };
 
-        let (search_client, result_requests) =
-            create_request_stream().context("SearchResults creation")?;
+        let (search_client, result_requests) = create_request_stream();
 
         match &self.inner.read().profile_server_proxy {
             Some(server) => server.search(ProfileSearchRequest {

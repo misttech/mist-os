@@ -63,8 +63,7 @@ impl AssetLoader for AssetLoaderImpl {
         // Get directory handle from FontResolver
         let font_resolver = connect_to_protocol::<FontResolverMarker>()
             .map_err(|e| AssetCollectionError::ServiceConnectionError(e.into()))?;
-        let (dir_proxy, dir_request) = create_proxy::<io::DirectoryMarker>()
-            .map_err(|e| AssetCollectionError::ServiceConnectionError(e.into()))?;
+        let (dir_proxy, dir_request) = create_proxy::<io::DirectoryMarker>();
 
         let response = font_resolver.resolve(&package_url, dir_request).await.map_err(|e| {
             AssetCollectionError::PackageResolverError(package_locator.clone(), e.into())

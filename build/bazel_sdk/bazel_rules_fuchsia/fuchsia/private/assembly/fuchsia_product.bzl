@@ -61,6 +61,7 @@ def _fuchsia_product_assembly_impl(ctx):
             "--output",
             platform_aibs_file.path,
         ],
+        progress_message = "Gathering AIBs for %s" % ctx.label,
         **LOCAL_ONLY_ACTION_KWARGS
     )
 
@@ -76,7 +77,7 @@ def _fuchsia_product_assembly_impl(ctx):
     board_config_file_path = board_config.config
 
     # Invoke Product Assembly
-    product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
+    product_config_file_path = ctx.attr.product_config[FuchsiaProductConfigInfo].config
     build_type = ctx.attr.product_config[FuchsiaProductConfigInfo].build_type
     build_id_dirs = ctx.attr.product_config[FuchsiaProductConfigInfo].build_id_dirs
 
@@ -92,7 +93,7 @@ def _fuchsia_product_assembly_impl(ctx):
         "assembly",
         "product",
         "--product",
-        product_config_file.path,
+        product_config_file_path,
         "--board-info",
         board_config_file_path,
         "--input-bundles-dir",
@@ -136,7 +137,7 @@ def _fuchsia_product_assembly_impl(ctx):
             ffx_isolate_dir,
         ],
         command = "\n".join(shell_src),
-        progress_message = "Product Assembly for %s" % ctx.label.name,
+        progress_message = "Product Assembly for %s" % ctx.label,
         **LOCAL_ONLY_ACTION_KWARGS
     )
 
@@ -154,6 +155,7 @@ def _fuchsia_product_assembly_impl(ctx):
             "--base-package-manifest-list",
             base_package_list.path,
         ],
+        progress_message = "Creating package manifests list for %s" % ctx.label,
         **LOCAL_ONLY_ACTION_KWARGS
     )
 
@@ -258,7 +260,7 @@ def _fuchsia_product_create_system_impl(ctx):
         ],
         command = shell_src,
         env = shell_env,
-        progress_message = "Assembly Create-system for %s" % ctx.label.name,
+        progress_message = "Assembly Create-system for %s" % ctx.label,
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [

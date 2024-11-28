@@ -1227,8 +1227,7 @@ pub enum WatchError {
 pub fn event_stream_from_state(
     state: fnet_filter::StateProxy,
 ) -> Result<impl Stream<Item = Result<Event, WatchError>>, WatcherCreationError> {
-    let (watcher, server_end) = fidl::endpoints::create_proxy::<fnet_filter::WatcherMarker>()
-        .map_err(WatcherCreationError::CreateProxy)?;
+    let (watcher, server_end) = fidl::endpoints::create_proxy::<fnet_filter::WatcherMarker>();
     state
         .get_watcher(&fnet_filter::WatcherOptions::default(), server_end)
         .map_err(WatcherCreationError::GetWatcher)?;
@@ -1589,8 +1588,7 @@ impl Controller {
         root: &fnet_root::FilterProxy,
         ControllerId(id): &ControllerId,
     ) -> Result<Self, ControllerCreationError> {
-        let (controller, server_end) =
-            fidl::endpoints::create_proxy().map_err(ControllerCreationError::CreateProxy)?;
+        let (controller, server_end) = fidl::endpoints::create_proxy();
         root.open_controller(id, server_end).map_err(ControllerCreationError::OpenController)?;
 
         let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id } = controller
@@ -1611,8 +1609,7 @@ impl Controller {
         control: &fnet_filter::ControlProxy,
         ControllerId(id): &ControllerId,
     ) -> Result<Self, ControllerCreationError> {
-        let (controller, server_end) =
-            fidl::endpoints::create_proxy().map_err(ControllerCreationError::CreateProxy)?;
+        let (controller, server_end) = fidl::endpoints::create_proxy();
         control.open_controller(id, server_end).map_err(ControllerCreationError::OpenController)?;
 
         let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id } = controller
@@ -2244,7 +2241,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn event_stream_from_state_conversion_error() {
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_filter::StateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fnet_filter::StateMarker>();
         let stream = event_stream_from_state(proxy).expect("get event stream");
         futures::pin_mut!(stream);
 
@@ -2257,7 +2254,6 @@ mod tests {
                     .expect("request should not error");
             let fnet_filter::WatcherRequest::Watch { responder } = request
                 .into_stream()
-                .expect("get request stream")
                 .next()
                 .await
                 .expect("client should call watch")
@@ -2283,7 +2279,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn event_stream_from_state_empty_event_batch() {
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_filter::StateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fnet_filter::StateMarker>();
         let stream = event_stream_from_state(proxy).expect("get event stream");
         futures::pin_mut!(stream);
 
@@ -2296,7 +2292,6 @@ mod tests {
                     .expect("request should not error");
             let fnet_filter::WatcherRequest::Watch { responder } = request
                 .into_stream()
-                .expect("get request stream")
                 .next()
                 .await
                 .expect("client should call watch")
@@ -2563,7 +2558,7 @@ mod tests {
             .expect("request should not error")
             .into_open_controller()
             .expect("client should open controller");
-        let (stream, control_handle) = request.into_stream_and_control_handle().unwrap();
+        let (stream, control_handle) = request.into_stream_and_control_handle();
         control_handle.send_on_id_assigned(&id).expect("send assigned ID");
 
         stream
@@ -2600,7 +2595,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn controller_push_changes_reports_invalid_change() {
         let (control, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_filter::ControlMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fnet_filter::ControlMarker>();
         let push_invalid_change = async {
             let mut controller = Controller::new(&control, &ControllerId(String::from("test")))
                 .await
@@ -2640,7 +2635,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn controller_commit_reports_invalid_change() {
         let (control, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_filter::ControlMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fnet_filter::ControlMarker>();
         let commit_invalid_change = async {
             let mut controller = Controller::new(&control, &ControllerId(String::from("test")))
                 .await

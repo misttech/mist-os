@@ -44,14 +44,10 @@ source_set("data_provider") {
 
   deps = [
     ":constants",
-    ":screenshot",
-    "//sdk/fidl/fuchsia.mem:fuchsia.mem_hlcpp",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/vfs/cpp",
     "//src/developer/forensics/feedback/attachments",
     "//src/developer/forensics/utils:archive",
-    "//src/lib/fostr/fidl/fuchsia.images",
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//src/lib/uuid",
@@ -127,28 +123,5 @@ source_set("metadata") {
     ":errors",
     "//src/developer/forensics/utils:errors",
     "//third_party/rapidjson",
-  ]
-}
-
-source_set("screenshot") {
-  sources = [
-    "screenshot.cc",
-    "screenshot.h",
-  ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//sdk/lib/async",
-    "//sdk/lib/fit-promise",
-    "//sdk/lib/sys/cpp",
-    "//src/lib/fsl",
-    "//src/lib/fxl",
-  ]
-
-  deps = [
-    "//sdk/lib/syslog/cpp",
-    "//src/developer/forensics/utils:errors",
-    "//src/developer/forensics/utils:fidl_oneshot",
   ]
 }

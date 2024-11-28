@@ -10,7 +10,7 @@ use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_sys2 as fsys, fuchsia_a
 
 async fn get_manifest(query: &fsys::RealmQueryProxy, moniker: &str) -> fcdecl::Component {
     let iterator = query.get_resolved_declaration(moniker).await.unwrap().unwrap();
-    let iterator = iterator.into_proxy().unwrap();
+    let iterator = iterator.into_proxy();
 
     let mut bytes = vec![];
 
@@ -83,7 +83,7 @@ pub async fn echo_server() {
     let err = query.get_structured_config("./echo_server").await.unwrap().unwrap_err();
     assert_eq!(err, fsys::GetStructuredConfigError::InstanceNotResolved);
 
-    let (_, server_end) = create_proxy().unwrap();
+    let (_, server_end) = create_proxy();
     let err = query
         .open_directory("./echo_server", fsys::OpenDirType::PackageDir, server_end)
         .await
@@ -119,7 +119,7 @@ pub async fn echo_server() {
     assert!(uses.len() == 1 || uses.len() == 2, "{uses:?}");
     assert_eq!(exposes.len(), 2);
 
-    let (pkg_dir, server_end) = create_proxy().unwrap();
+    let (pkg_dir, server_end) = create_proxy();
     query
         .open_directory("./echo_server", fsys::OpenDirType::PackageDir, server_end)
         .await
@@ -149,7 +149,7 @@ pub async fn echo_server() {
         ]
     );
 
-    let (exposed_dir, server_end) = create_proxy().unwrap();
+    let (exposed_dir, server_end) = create_proxy();
     query
         .open_directory("./echo_server", fsys::OpenDirType::ExposedDir, server_end)
         .await
@@ -169,7 +169,7 @@ pub async fn echo_server() {
             },
         ]
     );
-    let (ns_dir, server_end) = create_proxy().unwrap();
+    let (ns_dir, server_end) = create_proxy();
     query
         .open_directory("./echo_server", fsys::OpenDirType::NamespaceDir, server_end)
         .await
@@ -205,7 +205,7 @@ pub async fn echo_server() {
         "{entries:?}"
     );
 
-    let (outgoing_dir, server_end) = create_proxy().unwrap();
+    let (outgoing_dir, server_end) = create_proxy();
     query
         .open_directory("./echo_server", fsys::OpenDirType::OutgoingDir, server_end)
         .await
@@ -216,7 +216,7 @@ pub async fn echo_server() {
     let reply = echo.echo_string(Some("test")).await.unwrap();
     assert_eq!(reply.unwrap(), "test");
 
-    let (runtime_dir, server_end) = create_proxy().unwrap();
+    let (runtime_dir, server_end) = create_proxy();
     query
         .open_directory("./echo_server", fsys::OpenDirType::RuntimeDir, server_end)
         .await
@@ -273,7 +273,7 @@ pub async fn will_not_resolve() {
 pub async fn get_all_instances() {
     let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
     let iterator = query.get_all_instances().await.unwrap().unwrap();
-    let iterator = iterator.into_proxy().unwrap();
+    let iterator = iterator.into_proxy();
     let mut instances = vec![];
 
     loop {

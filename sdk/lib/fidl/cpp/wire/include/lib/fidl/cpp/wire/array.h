@@ -21,22 +21,25 @@ struct Array final {
 
   static constexpr size_t size() { return N; }
 
-  const T* data() const { return data_; }
-  T* data() { return data_; }
+  constexpr size_t max_size() const { return N; }
+  constexpr size_t empty() const { return false; }
 
-  const T& at(size_t offset) const { return data()[offset]; }
-  T& at(size_t offset) { return data()[offset]; }
+  constexpr const T* data() const { return data_; }
+  constexpr T* data() { return data_; }
 
-  const T& operator[](size_t offset) const { return at(offset); }
-  T& operator[](size_t offset) { return at(offset); }
+  constexpr const T& at(size_t offset) const { return data()[offset]; }
+  constexpr T& at(size_t offset) { return data()[offset]; }
 
-  T* begin() { return data(); }
-  const T* begin() const { return data(); }
-  const T* cbegin() const { return data(); }
+  constexpr const T& operator[](size_t offset) const { return at(offset); }
+  constexpr T& operator[](size_t offset) { return at(offset); }
 
-  T* end() { return data() + size(); }
-  const T* end() const { return data() + size(); }
-  const T* cend() const { return data() + size(); }
+  constexpr T* begin() { return data(); }
+  constexpr const T* begin() const { return data(); }
+  constexpr const T* cbegin() const { return data(); }
+
+  constexpr T* end() { return data() + size(); }
+  constexpr const T* end() const { return data() + size(); }
+  constexpr const T* cend() const { return data() + size(); }
 
   // Keeping data_ public such that an aggregate initializer can be used.
   T data_[N];

@@ -200,8 +200,7 @@ impl SoftStreamConfig {
             return Err(Error::InvalidArgs);
         }
         let (client, request_stream) =
-            fidl::endpoints::create_request_stream::<StreamConfigMarker>()
-                .expect("Error creating stream config endpoint");
+            fidl::endpoints::create_request_stream::<StreamConfigMarker>();
 
         let number_of_channels = pcm_format.channel_map.len();
         let attributes = vec![ChannelAttributes::default(); number_of_channels];
@@ -343,8 +342,8 @@ impl SoftStreamConfig {
                 responder.send(formats_vector)?;
             }
             StreamConfigRequest::CreateRingBuffer { format, ring_buffer, control_handle: _ } => {
-                let pcm = (format.pcm_format.ok_or(format_err!("No pcm_format included")))?;
-                self.ring_buffer_stream.set(ring_buffer.into_stream()?);
+                let pcm = format.pcm_format.ok_or_else(|| format_err!("No pcm_format included"))?;
+                self.ring_buffer_stream.set(ring_buffer.into_stream());
                 let current = (pcm.frame_rate, pcm.into(), pcm.number_of_channels.into());
                 self.inspect.record_current_format(&current);
                 self.current_format = Some(current);
@@ -537,7 +536,7 @@ pub(crate) mod tests {
             zx::MonotonicDuration::from_millis(50),
         )
         .expect("should always build");
-        test(exec, client.into_proxy().expect("channel should be available"), frame_stream)
+        test(exec, client.into_proxy(), frame_stream)
     }
 
     #[fuchsia::test]
@@ -630,8 +629,7 @@ pub(crate) mod tests {
         assert_eq!(0, frames_ready(&mut exec, &mut frame_stream));
         let _stream_config_properties = exec.run_until_stalled(&mut stream_config.get_properties());
         let _formats = exec.run_until_stalled(&mut stream_config.get_supported_formats());
-        let (ring_buffer, server) = fidl::endpoints::create_proxy::<RingBufferMarker>()
-            .expect("creating ring buffer endpoint error");
+        let (ring_buffer, server) = fidl::endpoints::create_proxy::<RingBufferMarker>();
 
         #[rustfmt::skip]
         let format = Format {
@@ -729,8 +727,7 @@ pub(crate) mod tests {
         exec.run_until_stalled(&mut frame_fut).expect_pending("no frames at the start");
         let _stream_config_properties = exec.run_until_stalled(&mut stream_config.get_properties());
         let _formats = exec.run_until_stalled(&mut stream_config.get_supported_formats());
-        let (ring_buffer, server) = fidl::endpoints::create_proxy::<RingBufferMarker>()
-            .expect("creating ring buffer endpoint error");
+        let (ring_buffer, server) = fidl::endpoints::create_proxy::<RingBufferMarker>();
 
         #[rustfmt::skip]
         let format = Format {

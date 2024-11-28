@@ -77,14 +77,13 @@ where
             .await
             .expect("FIDL protocol error")
             .expect("Error value returned from the call");
-        let cobalt = cobalt_metric_client.into_proxy().expect("infallible");
+        let cobalt = cobalt_metric_client.into_proxy();
         let rtc_updates = _opts
             .rtc_updates
             .expect("rtc updates should always be present in these tests")
-            .into_proxy()
-            .expect("infallible");
+            .into_proxy();
         let rtc = RemoteRtcUpdates::new(rtc_updates);
-        let push_source_puppet = push_source_puppet.into_proxy().expect("infallible");
+        let push_source_puppet = push_source_puppet.into_proxy();
         let push_source_controller = RemotePushSourcePuppet::new(push_source_puppet);
         tracing::debug!("timekeeper_test: about to run test_fn");
         let result = test_fn(clock, push_source_controller, rtc, cobalt).await;

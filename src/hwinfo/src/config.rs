@@ -43,7 +43,7 @@ async fn read_factory_file(
     path: &str,
     proxy_handle: &MiscFactoryStoreProviderProxy,
 ) -> Result<String, Error> {
-    let (dir_proxy, dir_server_end) = create_proxy::<fio::DirectoryMarker>()?;
+    let (dir_proxy, dir_server_end) = create_proxy::<fio::DirectoryMarker>();
     proxy_handle.get_factory_store(dir_server_end)?;
     let file_proxy = fuchsia_fs::directory::open_file_async(&dir_proxy, path, fio::PERM_READABLE)?;
     let result = fuchsia_fs::file::read_to_string(&file_proxy).await?.trim().to_owned();
@@ -99,7 +99,7 @@ impl DeviceInfo {
         // in vim3
         if device_info.serial_number.is_none() {
             device_info.serial_number = match get_zbi_serial_number().await {
-                Ok(content) => Some(content.to_string()),
+                Ok(content) => Some(content),
                 Err(err) => {
                     tracing::warn!("Failed to read serial number from boot {}", err);
                     None

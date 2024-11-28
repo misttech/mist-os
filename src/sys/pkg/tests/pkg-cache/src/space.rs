@@ -166,8 +166,8 @@ async fn gc_frees_space_so_write_can_succeed(blob_implementation: blobfs_ramdisk
     assert_ne!(*pkg.hash(), orphan_hash);
     let meta_blob_info = fpkg::BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
-    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>();
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let get_fut = env
         .proxies
         .package_cache
@@ -194,7 +194,7 @@ async fn gc_frees_space_so_write_can_succeed(blob_implementation: blobfs_ramdisk
     let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, meta_far.merkle).await;
     let (_, blob_iterator_server_end) =
-        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>();
     let () = needed_blobs.get_missing_blobs(blob_iterator_server_end).unwrap();
 
     let () = get_fut.await.unwrap().unwrap();
@@ -267,9 +267,8 @@ async fn blobs_protected_from_gc_during_get(gc_protection: fpkg::GcProtection) {
     }
     let meta_blob_info =
         fpkg::BlobInfo { blob_id: BlobId::from(*superpackage.hash()).into(), length: 0 };
-    let (needed_blobs, needed_blobs_server) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
-    let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (needed_blobs, needed_blobs_server) = fidl::endpoints::create_proxy::<NeededBlobsMarker>();
+    let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let get_fut = env
         .proxies
         .package_cache
@@ -294,7 +293,7 @@ async fn blobs_protected_from_gc_during_get(gc_protection: fpkg::GcProtection) {
     // Read the superpackage content blob and subpackage meta.far from the missing blobs iterator
     // to guarantee that pkg-cache is ready for them to be written.
     let (blob_iterator, blob_iterator_server_end) =
-        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>();
     let () = needed_blobs.get_missing_blobs(blob_iterator_server_end).unwrap();
     assert_eq!(
         blob_iterator.next().await.unwrap(),
@@ -439,7 +438,7 @@ async fn writing_index_clears_on_get_error() {
         .await
         .unwrap();
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>();
     let get_fut = env
         .proxies
         .package_cache
@@ -469,7 +468,7 @@ async fn writing_index_clears_on_get_error() {
     // It is a protocol violation to call GetMissingBlobs a second time. Doing so will fail the Get
     // with an error, but the package should still be removed from the writing index.
     let (_, blob_iterator_server_end) =
-        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>();
     let () = needed_blobs.get_missing_blobs(blob_iterator_server_end).unwrap();
     assert_matches!(get_fut.await.unwrap(), Err(Status::UNAVAILABLE));
 

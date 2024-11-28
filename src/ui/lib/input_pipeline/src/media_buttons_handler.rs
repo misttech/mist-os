@@ -160,34 +160,33 @@ impl MediaButtonsHandler {
                     listener,
                     responder,
                 } => {
-                    if let Ok(proxy) = listener.into_proxy() {
-                        // Add the listener to the registry.
-                        self.inner
-                            .borrow_mut()
-                            .listeners
-                            .insert(proxy.as_channel().raw_handle(), proxy.clone());
-                        let proxy_clone = proxy.clone();
+                    let proxy = listener.into_proxy();
+                    // Add the listener to the registry.
+                    self.inner
+                        .borrow_mut()
+                        .listeners
+                        .insert(proxy.as_channel().raw_handle(), proxy.clone());
+                    let proxy_clone = proxy.clone();
 
-                        // Send the listener the last media button event.
-                        if let Some(event) = &self.inner.borrow().last_event {
-                            let event_to_send = event.clone();
-                            let fut = async move {
-                                match proxy_clone.on_event(&event_to_send).await {
-                                    Ok(_) => {}
-                                    Err(e) => {
-                                        tracing::info!(
-                                            "Failed to send media buttons event to listener {:?}",
-                                            e
-                                        )
-                                    }
+                    // Send the listener the last media button event.
+                    if let Some(event) = &self.inner.borrow().last_event {
+                        let event_to_send = event.clone();
+                        let fut = async move {
+                            match proxy_clone.on_event(&event_to_send).await {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    tracing::info!(
+                                        "Failed to send media buttons event to listener {:?}",
+                                        e
+                                    )
                                 }
-                            };
-                            let metrics_logger_clone = self.metrics_logger.clone();
-                            self.inner
-                                .borrow()
-                                .send_event_task_tracker
-                                .track(metrics_logger_clone, fasync::Task::local(fut));
-                        }
+                            }
+                        };
+                        let metrics_logger_clone = self.metrics_logger.clone();
+                        self.inner
+                            .borrow()
+                            .send_event_task_tracker
+                            .track(metrics_logger_clone, fasync::Task::local(fut));
                     }
                     let _ = responder.send();
                 }
@@ -344,8 +343,7 @@ mod tests {
         handler: Rc<MediaButtonsHandler>,
     ) -> fidl_ui_policy::DeviceListenerRegistryProxy {
         let (device_listener_proxy, device_listener_stream) =
-            create_proxy_and_stream::<fidl_ui_policy::DeviceListenerRegistryMarker>()
-                .expect("Failed to create DeviceListenerRegistry proxy and stream.");
+            create_proxy_and_stream::<fidl_ui_policy::DeviceListenerRegistryMarker>();
 
         fasync::Task::local(async move {
             let _ = handler
@@ -381,8 +379,7 @@ mod tests {
         expected_time: i64,
     ) -> Option<interaction_observation::AggregatorProxy> {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
 
         fasync::Task::local(async move {
             if let Some(request) = stream.next().await {
@@ -434,8 +431,7 @@ mod tests {
 
         // Set up DeviceListenerRegistry.
         let (aggregator_proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let media_buttons_handler = Rc::new(MediaButtonsHandler {
             aggregator_proxy: Some(aggregator_proxy),
             inner: RefCell::new(MediaButtonsHandlerInner {
@@ -458,8 +454,7 @@ mod tests {
 
         // Register a listener.
         let (listener, mut listener_stream) =
-            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                .unwrap();
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>();
         let register_listener_fut = async {
             let res = device_listener_proxy.register_listener(listener).await;
             assert!(res.is_ok());
@@ -506,8 +501,7 @@ mod tests {
 
         // Register a listener.
         let (listener, listener_stream) =
-            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                .unwrap();
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>();
         let _ = device_listener_proxy.register_listener(listener).await;
 
         // Setup events and expectations.
@@ -566,11 +560,9 @@ mod tests {
 
         // Register two listeners.
         let (first_listener, first_listener_stream) =
-            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                .unwrap();
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>();
         let (second_listener, second_listener_stream) =
-            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                .unwrap();
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>();
         let _ = device_listener_proxy.register_listener(first_listener).await;
         let _ = device_listener_proxy.register_listener(second_listener).await;
 
@@ -628,15 +620,14 @@ mod tests {
 
             // Register three listeners.
             let (first_listener, mut first_listener_stream) =
-                fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                    .unwrap();
+                fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>(
+                );
             let (second_listener, mut second_listener_stream) =
-                fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                    .unwrap();
+                fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>(
+                );
             let (third_listener, third_listener_stream) = fidl::endpoints::create_request_stream::<
                 fidl_ui_policy::MediaButtonsListenerMarker,
-            >()
-            .unwrap();
+            >();
             let _ = device_listener_proxy.register_listener(first_listener).await;
             let _ = device_listener_proxy.register_listener(second_listener).await;
             let _ = device_listener_proxy.register_listener(third_listener).await;
@@ -727,11 +718,9 @@ mod tests {
             spawn_device_listener_registry_server(media_buttons_handler.clone());
 
         let (first_listener, mut first_listener_stream) =
-            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                .unwrap();
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>();
         let (second_listener, mut second_listener_stream) =
-            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                .unwrap();
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>();
         let _ = device_listener_proxy.register_listener(first_listener).await;
         let _ = device_listener_proxy.register_listener(second_listener).await;
 

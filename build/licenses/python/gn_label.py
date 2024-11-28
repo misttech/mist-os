@@ -5,6 +5,7 @@
 """Utilities for working with GnLabel strings."""
 
 import dataclasses
+import logging
 import os
 from pathlib import Path
 from typing import Any, List
@@ -25,9 +26,11 @@ class GnLabel:
     is_local_name: bool = dataclasses.field(hash=False, compare=False)
     """The toolchain part of the label, e.g. `//toolchain` in `//foo/bar(//toolchain)`"""
     toolchain: "GnLabel|None" = dataclasses.field(hash=False, compare=False)
+    """The URL pointing to this GN label, e.g. https://cs.opensource.google/fuchsia/..."""
+    url_str: str = dataclasses.field(hash=False, compare=False)
 
     @staticmethod
-    def from_str(original_str: str) -> "GnLabel":
+    def from_str(original_str: str, url: str = "") -> "GnLabel":
         """Constructs a GnLabel instance from a GN target label string"""
         assert original_str.startswith(
             "//"
@@ -67,23 +70,24 @@ class GnLabel:
             name=name,
             is_local_name=is_local_name,
             path_str=path,
+            url_str=url,
             toolchain=toolchain,
         )
 
     @staticmethod
-    def from_path(path: Path | str) -> "GnLabel":
+    def from_path(path: Path | str, url: str = "") -> "GnLabel":
         """Constructs a GnLabel instance from a Path object."""
         if isinstance(path, Path):
             if path.name == "" and path.parent.name == "":
-                return GnLabel.from_str("//")
-            return GnLabel.from_str(f"//{path}")
+                return GnLabel.from_str("//", url=url)
+            return GnLabel.from_str(f"//{path}", url=url)
         elif isinstance(path, str):
             if (
                 os.path.basename(path) == ""
                 and os.path.basename(os.path.dirname(path)) == ""
             ):
-                return GnLabel.from_str("//")
-            return GnLabel.from_str(f"//{path}")
+                return GnLabel.from_str("//", url=url)
+            return GnLabel.from_str(f"//{path}", url=url)
         else:
             assert False, f"Expected path of type Path but got {type(path)}"
 
@@ -137,11 +141,26 @@ class GnLabel:
         """Returns package_path rebased to a given base_dir."""
         return base_dir / self.path_str
 
-    def code_search_url(self) -> str:
-        """Returns package_path rebased to a given base_dir."""
+    def url(self) -> str:
+        """Returns URL pointing to this GN label."""
+        if self.url_str:
+            return self.url_str
         return f"https://cs.opensource.google/fuchsia/fuchsia/+/main:{self.path_str}"
 
     def is_host_target(self) -> bool:
+        # Some host-tools do not have a toolchain.
+        # Add them here to ensure we skip collecting those licenses.
+        extra_host_targets = [
+            "prebuilt/third_party/rust/",
+            "prebuilt/third_party/python3/",
+        ]
+        if any(substring in self.path_str for substring in extra_host_targets):
+            logging.debug(
+                "Target %s is a host-tool even though the toolchain (%s) does not start with 'host_'",
+                self.path_str,
+                self.toolchain.name if self.toolchain else "",
+            )
+            return True
         return bool(self.toolchain and self.toolchain.name.startswith("host_"))
 
     def is_3rd_party(self) -> bool:
@@ -159,7 +178,9 @@ class GnLabel:
     def is_spdx_json_document(self) -> bool:
         return self.name.endswith(".spdx.json")
 
-    def create_child_from_str(self, child_path_str: str) -> "GnLabel":
+    def create_child_from_str(
+        self, child_path_str: str, url: str = ""
+    ) -> "GnLabel":
         """Create a GnLabel relative to this label from a child path GN string"""
         if child_path_str.startswith("//"):
             return GnLabel.from_str(child_path_str)
@@ -174,10 +195,12 @@ class GnLabel:
                 if self.is_local_name
                 else self.path_str
             )
-            return GnLabel.from_path(os.path.join(parent_path, child_path_str))
+            return GnLabel.from_path(
+                os.path.join(parent_path, child_path_str), url=url
+            )
         else:
             return GnLabel.from_path(
-                os.path.join(self.path_str, child_path_str)
+                os.path.join(self.path_str, child_path_str), url=url
             )
 
     def __str__(self) -> str:

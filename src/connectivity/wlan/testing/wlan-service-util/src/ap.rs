@@ -15,7 +15,7 @@ pub async fn get_sme_proxy(
     wlan_svc: &WlanService,
     iface_id: u16,
 ) -> Result<fidl_sme::ApSmeProxy, Error> {
-    let (sme_proxy, sme_remote) = endpoints::create_proxy()?;
+    let (sme_proxy, sme_remote) = endpoints::create_proxy();
     let result = wlan_svc
         .get_ap_sme(iface_id, sme_remote)
         .await
@@ -172,9 +172,8 @@ mod tests {
     }
 
     fn create_ap_sme_proxy() -> (fidl_sme::ApSmeProxy, ApSmeRequestStream) {
-        let (proxy, server) =
-            endpoints::create_proxy::<ApSmeMarker>().expect("failed to create sme ap channel");
-        let server = server.into_stream().expect("failed to create ap sme response stream");
+        let (proxy, server) = endpoints::create_proxy::<ApSmeMarker>();
+        let server = server.into_stream();
         (proxy, server)
     }
 

@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !build_with_native_toolchain
-
 package dhcp
 
 import (

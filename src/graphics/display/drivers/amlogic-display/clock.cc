@@ -21,7 +21,7 @@
 #include "src/graphics/display/drivers/amlogic-display/fixed-point-util.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 
 namespace amlogic_display {
 

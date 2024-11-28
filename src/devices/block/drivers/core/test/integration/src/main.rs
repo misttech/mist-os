@@ -9,10 +9,10 @@ use ramdevice_client::RamdiskClient;
 async fn test_multiple_sessions() {
     let ramdisk = RamdiskClient::create(512, 1 << 16).await.unwrap();
     let device_channel = ramdisk.open().expect("open failed");
-    let device_proxy = device_channel.into_proxy().expect("into_proxy failed");
+    let device_proxy = device_channel.into_proxy();
     let block_client1 = RemoteBlockClient::new(device_proxy).await.expect("new failed");
     let device_channel = ramdisk.open().expect("open failed");
-    let device_proxy = device_channel.into_proxy().expect("into_proxy failed");
+    let device_proxy = device_channel.into_proxy();
     let block_client2 = RemoteBlockClient::new(device_proxy).await.expect("new failed");
 
     let data1 = [1; 512];

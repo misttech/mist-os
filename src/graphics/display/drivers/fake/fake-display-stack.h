@@ -35,7 +35,9 @@ class FakeDisplayStack {
                    const fake_display::FakeDisplayDeviceConfig& device_config);
   ~FakeDisplayStack();
 
-  Controller* coordinator_controller() { return coordinator_controller_.get(); }
+  display_coordinator::Controller* coordinator_controller() {
+    return coordinator_controller_.get();
+  }
   fake_display::FakeDisplay* display() { return display_.get(); }
 
   const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_client();
@@ -55,7 +57,7 @@ class FakeDisplayStack {
   libsync::Completion coordinator_client_dispatcher_is_shut_down_;
 
   std::unique_ptr<fake_display::FakeDisplay> display_;
-  std::unique_ptr<Controller> coordinator_controller_;
+  std::unique_ptr<display_coordinator::Controller> coordinator_controller_;
 
   bool shutdown_ = false;
 

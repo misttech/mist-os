@@ -7,7 +7,7 @@
 
 #include <fuchsia/hardware/usb/request/c/banjo.h>
 #include <lib/ddk/io-buffer.h>
-#include <lib/ddk/phys-iter.h>
+#include <lib/io-buffer/phys-iter.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <threads.h>

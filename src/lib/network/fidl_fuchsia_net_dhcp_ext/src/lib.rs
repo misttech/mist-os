@@ -157,11 +157,11 @@ impl TryFrom<fnet_dhcp::ClientWatchConfigurationResponse> for Configuration {
                  }| {
                     Ok(Address {
                         address: address
-                            .ok_or(anyhow!("Ipv4AddressWithPrefix should be present"))?,
+                            .ok_or_else(|| anyhow!("Ipv4AddressWithPrefix should be present"))?,
                         address_parameters: address_parameters
-                            .ok_or(anyhow!("AddressParameters should be present"))?,
+                            .ok_or_else(|| anyhow!("AddressParameters should be present"))?,
                         address_state_provider: address_state_provider
-                            .ok_or(anyhow!("AddressStateProvider should be present"))?,
+                            .ok_or_else(|| anyhow!("AddressStateProvider should be present"))?,
                     })
                 },
             )
@@ -249,8 +249,7 @@ impl ClientProviderExt for fnet_dhcp::ClientProviderProxy {
         interface_id: NonZeroU64,
         new_client_params: fnet_dhcp::NewClientParams,
     ) -> fnet_dhcp::ClientProxy {
-        let (client, server) = fidl::endpoints::create_proxy::<fnet_dhcp::ClientMarker>()
-            .expect("create DHCPv4 client fidl endpoints");
+        let (client, server) = fidl::endpoints::create_proxy::<fnet_dhcp::ClientMarker>();
         self.new_client(interface_id.get(), &new_client_params, server)
             .expect("create new DHCPv4 client");
         client
@@ -317,7 +316,7 @@ pub fn merged_configuration_stream(
     client_end: fidl::endpoints::ClientEnd<fnet_dhcp::ClientMarker>,
     shutdown_future: impl Future<Output = ()> + 'static,
 ) -> impl Stream<Item = Result<Configuration, Error>> + 'static {
-    let client = client_end.into_proxy().expect("into_proxy is infallible");
+    let client = client_end.into_proxy();
     let event_stream = client.take_event_stream();
 
     let proxy_for_shutdown = client.clone();
@@ -734,8 +733,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn apply_new_routers() {
         let (route_set, route_set_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_routes_admin::RouteSetV4Marker>()
-                .expect("create route set proxy and stream");
+            fidl::endpoints::create_proxy_and_stream::<fnet_routes_admin::RouteSetV4Marker>();
 
         const REMOVED_ROUTER: Ipv4Addr = net_ip_v4!("1.1.1.1");
         const KEPT_ROUTER: Ipv4Addr = net_ip_v4!("2.2.2.2");
@@ -838,8 +836,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn shutdown_ext(exit_reason: Option<fnet_dhcp::ClientExitReason>) -> Result<(), Error> {
         let (client, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_dhcp::ClientMarker>()
-                .expect("create DHCP client proxy and stream");
+            fidl::endpoints::create_proxy_and_stream::<fnet_dhcp::ClientMarker>();
 
         if let Some(exit_reason) = exit_reason {
             stream.control_handle().send_on_exit(exit_reason).expect("send on exit");
@@ -878,8 +875,7 @@ mod test {
         const ADDRESS: fnet::Ipv4AddressWithPrefix =
             net_declare::fidl_ip_v4_with_prefix!("192.0.2.1/32");
 
-        let (client, stream) = fidl::endpoints::create_request_stream::<fnet_dhcp::ClientMarker>()
-            .expect("create DHCP client client end and stream");
+        let (client, stream) = fidl::endpoints::create_request_stream::<fnet_dhcp::ClientMarker>();
 
         let server_fut = async move {
             pin_mut!(stream);

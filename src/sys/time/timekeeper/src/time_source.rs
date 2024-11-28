@@ -230,7 +230,7 @@ impl TimeSourceLauncher {
 
     // Returns true if the `realm` contains the child referenced by `child_ref`.
     async fn has_child(&self, realm: &RealmProxy, child_ref: &ChildRef) -> Result<bool> {
-        let (iter_proxy, server_end) = fidl::endpoints::create_proxy::<ChildIteratorMarker>()?;
+        let (iter_proxy, server_end) = fidl::endpoints::create_proxy::<ChildIteratorMarker>();
         let collection = CollectionRef { name: TIMESOURCE_COLLECTION_NAME.into() };
         let _response = realm.list_children(&collection, server_end).await?;
         loop {
@@ -580,7 +580,7 @@ mod test {
     #[fuchsia::test]
     async fn push_time_source_events() {
         let (proxy, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<ftexternal::PushSourceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ftexternal::PushSourceMarker>();
 
         let _task = fasync::Task::spawn(async move {
             while let Some(Ok(request)) = requests.next().await {
@@ -621,7 +621,7 @@ mod test {
     #[fuchsia::test]
     async fn push_time_source_failure() {
         let (proxy, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<ftexternal::PushSourceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ftexternal::PushSourceMarker>();
 
         let _task = fasync::Task::spawn(async move {
             while let Some(Ok(request)) = requests.next().await {

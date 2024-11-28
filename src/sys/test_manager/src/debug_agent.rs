@@ -42,7 +42,7 @@ impl DebugAgent {
     async fn from_launcher_proxy(
         launcher_proxy: fdbg::LauncherProxy,
     ) -> Result<Self, DebugAgentError> {
-        let (proxy, agent_server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (proxy, agent_server_end) = fidl::endpoints::create_proxy();
 
         launcher_proxy
             .launch(agent_server_end)
@@ -91,7 +91,7 @@ impl DebugAgent {
         let (client_end, mut server_end) = fidl::handle::fuchsia_handles::Socket::create_stream();
         event_sender.send(Ok(SuiteEvents::suite_stderr(client_end).into())).await.unwrap();
 
-        let (iterator_proxy, iterator_server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (iterator_proxy, iterator_server_end) = fidl::endpoints::create_proxy();
         if let Err(_) = self
             .proxy
             .get_process_info(
@@ -301,8 +301,7 @@ mod test {
         // Creates a new FakeLauncherService.
         fn new() -> (fdbg::LauncherProxy, Self) {
             let (proxy, request_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fdbg::LauncherMarker>()
-                    .expect("create proxy and stream");
+                fidl::endpoints::create_proxy_and_stream::<fdbg::LauncherMarker>();
 
             (proxy, Self { request_stream })
         }
@@ -359,8 +358,7 @@ mod test {
     impl FakeDebugAgentService {
         // Creates a new FakeDebugAgentService.
         fn new(server_end: fidl::endpoints::ServerEnd<fdbg::DebugAgentMarker>) -> Self {
-            let (request_stream, control_handle) =
-                server_end.into_stream_and_control_handle().unwrap();
+            let (request_stream, control_handle) = server_end.into_stream_and_control_handle();
             FakeDebugAgentService { request_stream, control_handle }
         }
 
@@ -470,8 +468,7 @@ mod test {
     async fn serve_process_info_iterator(
         server_end: fidl::endpoints::ServerEnd<fdbg::ProcessInfoIteratorMarker>,
     ) {
-        let mut request_stream =
-            server_end.into_stream().expect("process info server end into stream");
+        let mut request_stream = server_end.into_stream();
 
         // Expect a request and respond with two process infos.
         let request =

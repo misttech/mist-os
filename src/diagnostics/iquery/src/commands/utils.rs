@@ -7,7 +7,7 @@ use crate::commands::ListCommand;
 use crate::types::Error;
 use cm_rust::SourceName;
 use component_debug::realm::*;
-use fidl_fuchsia_diagnostics::{Selector, TreeNames};
+use fidl_fuchsia_diagnostics::{All, Selector, TreeNames};
 use fidl_fuchsia_sys2 as fsys2;
 use moniker::Moniker;
 use regex::Regex;
@@ -20,7 +20,7 @@ static EXPECTED_PROTOCOL_RE: LazyLock<Regex> =
 pub async fn get_selectors_for_manifest<P: DiagnosticsProvider>(
     manifest: String,
     tree_selectors: Vec<String>,
-    accessor: &Option<String>,
+    accessor: Option<String>,
     provider: &P,
 ) -> Result<Vec<Selector>, Error> {
     let list_command = ListCommand {
@@ -162,7 +162,7 @@ pub async fn process_component_query_with_partial_selectors<P: DiagnosticsProvid
     Ok(results)
 }
 
-fn add_tree_name(mut selector: Selector, tree_name: String) -> Selector {
+fn add_tree_name(mut selector: Selector, tree_name: String) -> Result<Selector, Error> {
     match selector.tree_names {
         None => selector.tree_names = Some(TreeNames::Some(vec![tree_name])),
         Some(ref mut names) => match names {
@@ -172,13 +172,17 @@ fn add_tree_name(mut selector: Selector, tree_name: String) -> Selector {
                 }
             }
             TreeNames::All(_) => {}
-            TreeNames::__SourceBreaking { .. } => {
-                unreachable!("source breaking")
+            TreeNames::__SourceBreaking { unknown_ordinal } => {
+                let unknown_ordinal = *unknown_ordinal;
+                return Err(Error::InvalidSelector(format!(
+                    "selector had invalid TreeNames variant {unknown_ordinal}: {:?}",
+                    selector,
+                )));
             }
         },
     }
 
-    selector
+    Ok(selector)
 }
 
 /// Expand selectors.
@@ -201,7 +205,12 @@ pub fn expand_selectors(
 
     for mut selector in selectors {
         if let Some(tree_name) = &tree_name {
-            selector = add_tree_name(selector, tree_name.clone());
+            selector = add_tree_name(selector, tree_name.clone())?;
+        } else {
+            match selector.tree_names {
+                None => selector.tree_names = Some(TreeNames::All(All {})),
+                Some(_) => {}
+            }
         }
         result.push(selector)
     }
@@ -237,7 +246,7 @@ pub async fn get_accessor_selectors(
                     if decl.exposes.iter().any(|expose| expose.source_name() == capability.name()) {
                         let moniker_str = instance.moniker.to_string();
                         let moniker = selectors::sanitize_moniker_for_selectors(&moniker_str);
-                        result.push(format!("{moniker}:expose:{capability_name}"));
+                        result.push(format!("{moniker}:{capability_name}"));
                     }
                 }
             }
@@ -270,11 +279,11 @@ mod test {
         assert_eq!(
             res.unwrap(),
             vec![
-                String::from("example/component:expose:fuchsia.diagnostics.ArchiveAccessor"),
+                String::from("example/component:fuchsia.diagnostics.ArchiveAccessor"),
                 String::from(
-                    "foo/bar/thing\\:instance:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"
+                    "foo/bar/thing\\:instance:fuchsia.diagnostics.FeedbackArchiveAccessor"
                 ),
-                String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+                String::from("foo/component:fuchsia.diagnostics.FeedbackArchiveAccessor"),
             ]
         );
     }
@@ -300,7 +309,7 @@ mod test {
         assert_eq!(actual, expected);
 
         let expected = vec![
-            parse_verbose("core/one:root").unwrap(),
+            parse_verbose("core/one:[...]root").unwrap(),
             parse_verbose("core/one:[name=xyz]root").unwrap(),
         ];
 
@@ -327,7 +336,7 @@ mod test {
     impl DiagnosticsProvider for FakeProvider {
         async fn snapshot<D: diagnostics_data::DiagnosticsData>(
             &self,
-            _: &Option<String>,
+            _: Option<&str>,
             _: impl IntoIterator<Item = Selector>,
         ) -> Result<Vec<diagnostics_data::Data<D>>, Error> {
             unreachable!("unimplemented");

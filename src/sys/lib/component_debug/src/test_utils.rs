@@ -9,7 +9,7 @@ use moniker::Moniker;
 use std::collections::HashMap;
 use std::fs::{create_dir_all, write};
 use tempfile::TempDir;
-use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_sys2 as fsys};
+use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 #[derive(Clone)]
 pub struct File {
@@ -26,7 +26,7 @@ pub enum SeedPath {
 fn serve_instance_iterator(
     instances: Vec<fsys::Instance>,
 ) -> ClientEnd<fsys::InstanceIteratorMarker> {
-    let (client, mut stream) = create_request_stream::<fsys::InstanceIteratorMarker>().unwrap();
+    let (client, mut stream) = create_request_stream::<fsys::InstanceIteratorMarker>();
     Task::spawn(async move {
         let fsys::InstanceIteratorRequest::Next { responder } =
             stream.next().await.unwrap().unwrap();
@@ -43,8 +43,7 @@ fn serve_manifest_bytes_iterator(
     manifest: fcdecl::Component,
 ) -> ClientEnd<fsys::ManifestBytesIteratorMarker> {
     let bytes = fidl::persist(&manifest).unwrap();
-    let (client, mut stream) =
-        create_request_stream::<fsys::ManifestBytesIteratorMarker>().unwrap();
+    let (client, mut stream) = create_request_stream::<fsys::ManifestBytesIteratorMarker>();
     Task::spawn(async move {
         let fsys::ManifestBytesIteratorRequest::Next { responder } =
             stream.next().await.unwrap().unwrap();
@@ -67,7 +66,7 @@ pub fn serve_realm_query(
     configs: HashMap<String, fcdecl::ResolvedConfig>,
     dirs: HashMap<(String, fsys::OpenDirType), TempDir>,
 ) -> fsys::RealmQueryProxy {
-    let (client, mut stream) = create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
+    let (client, mut stream) = create_proxy_and_stream::<fsys::RealmQueryMarker>();
 
     let mut instance_map = HashMap::new();
     for instance in instances {
@@ -152,21 +151,31 @@ pub fn serve_realm_query(
                 fsys::RealmQueryRequest::Open {
                     moniker,
                     dir_type,
-                    flags,
+                    flags: deprecated_flags,
                     mode: _,
                     path,
                     object,
                     responder,
                 } => {
+                    let mut flags = fio::Flags::empty();
+                    if deprecated_flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+                        flags |= fio::PERM_READABLE
+                    }
+                    if deprecated_flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+                        flags |= fio::PERM_WRITABLE
+                    }
+                    if deprecated_flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
+                        flags |= fio::PERM_EXECUTABLE
+                    }
                     eprintln!(
-                        "Open call for {} for {:?} at path '{}' with flags {:?}",
-                        moniker, dir_type, path, flags
+                        "Open call for {} for {:?} at path '{}' with deprecated flags {:?} (open3 flags {:?})",
+                        moniker, dir_type, path, deprecated_flags, flags
                     );
                     let moniker = Moniker::parse_str(&moniker).unwrap().to_string();
                     if let Some(dir) = dirs.get(&(moniker, dir_type)) {
                         let path = dir.path().join(path).display().to_string();
                         let namespace = fdio::Namespace::installed().unwrap();
-                        namespace.open_deprecated(&path, flags, object.into_channel()).unwrap();
+                        namespace.open(&path, flags, object.into_channel()).unwrap();
                         responder.send(Ok(())).unwrap();
                     } else {
                         responder.send(Err(fsys::OpenError::NoSuchDir)).unwrap();
@@ -184,7 +193,7 @@ pub fn serve_lifecycle_controller(
     expected_moniker: &'static str,
 ) -> fsys::LifecycleControllerProxy {
     let (lifecycle_controller, mut stream) =
-        create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+        create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
 
     fuchsia_async::Task::local(async move {
         // Expect 3 requests: Unresolve, Resolve, Start.

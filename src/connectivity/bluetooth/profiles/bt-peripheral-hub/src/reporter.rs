@@ -25,9 +25,9 @@ impl Reporter {
 
     fn validate_information(info: Information) -> Result<(PeerId, BatteryInfo), Error> {
         // The `identifier` and `battery_info` are mandatory fields.
-        let identifier = info.identifier.clone().ok_or(Error::from(&info))?;
+        let identifier = info.identifier.clone().ok_or_else(|| Error::from(&info))?;
         let battery_info =
-            BatteryInfo::try_from(info.battery_info.clone().ok_or(Error::from(&info))?)?;
+            BatteryInfo::try_from(info.battery_info.clone().ok_or_else(|| Error::from(&info))?)?;
 
         // Currently, there is nothing to do if the local_device is specified. This component only
         // handles updates about peripherals.
@@ -75,7 +75,7 @@ mod tests {
     ) -> (impl Future<Output = Result<(), Error>>, ReporterProxy, Arc<PeripheralState>) {
         let shared_state = Arc::new(PeripheralState::new());
         let server = Reporter::new(shared_state.clone());
-        let (c, s) = fidl::endpoints::create_proxy_and_stream::<ReporterMarker>().unwrap();
+        let (c, s) = fidl::endpoints::create_proxy_and_stream::<ReporterMarker>();
         let server_task = server.run(s);
 
         (server_task, c, shared_state)

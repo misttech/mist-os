@@ -877,11 +877,10 @@ impl ResolvedInstanceState {
             self.add_child_internal(component, child, collection, dynamic_offers, input).await?;
 
         if let Some(controller) = controller {
-            if let Ok(stream) = controller.into_stream() {
-                child
-                    .nonblocking_task_group()
-                    .spawn(controller::run_controller(WeakComponentInstance::new(&child), stream));
-            }
+            let stream = controller.into_stream();
+            child
+                .nonblocking_task_group()
+                .spawn(controller::run_controller(WeakComponentInstance::new(&child), stream));
         }
         Ok(child)
     }
@@ -1457,8 +1456,7 @@ impl Routable<Dict> for ProgramDictionaryRouter {
         })?;
         let dir_entry = component.get_outgoing();
 
-        let (inner_router, server_end) =
-            create_proxy::<fsandbox::DictionaryRouterMarker>().unwrap();
+        let (inner_router, server_end) = create_proxy::<fsandbox::DictionaryRouterMarker>();
         dir_entry.open(
             ExecutionScope::new(),
             fio::OpenFlags::empty(),

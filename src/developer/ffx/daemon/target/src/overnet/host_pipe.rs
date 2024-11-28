@@ -102,7 +102,7 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder<'_> {
         node: Arc<overnet_core::Router>,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
-        let verbose_ssh = ffx_config::logging::debugging_on(&ctx).await;
+        let verbose_ssh = ffx_config::logging::debugging_on(&ctx);
 
         HostPipeChild::new_inner(
             self.ssh_path(),
@@ -299,17 +299,17 @@ impl HostPipeChild {
         let stdout = ssh
             .stdout
             .take()
-            .ok_or(PipeError::Error("unable to get stdout from target pipe".into()))?;
+            .ok_or_else(|| PipeError::Error("unable to get stdout from target pipe".into()))?;
 
         let mut stdin = ssh
             .stdin
             .take()
-            .ok_or(PipeError::Error("unable to get stdin from target pipe".into()))?;
+            .ok_or_else(|| PipeError::Error("unable to get stdin from target pipe".into()))?;
 
         let stderr = ssh
             .stderr
             .take()
-            .ok_or(PipeError::Error("unable to stderr from target pipe".into()))?;
+            .ok_or_else(|| PipeError::Error("unable to stderr from target pipe".into()))?;
 
         // Read the first line. This can be either either be an empty string "",
         // which signifies the STDOUT has been closed, or the $SSH_CONNECTION
@@ -519,7 +519,7 @@ where
         log_buf.clear();
 
         let ssh_address =
-            target.ssh_address().ok_or(PipeError::NoAddress(target_nodename.clone()))?;
+            target.ssh_address().ok_or_else(|| PipeError::NoAddress(target_nodename.clone()))?;
 
         let (host_addr, cmd) = builder
             .new(

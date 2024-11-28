@@ -147,7 +147,7 @@ class Environment : public fdf_testing::Environment {
     EXPECT_EQ(ZX_OK, result_sag.status_value());
 
     // Configure and add compat.
-    compat_server_.Init("default", "topo");
+    compat_server_.Initialize("default");
 
     fit::result encoded = fidl::Persist(kSerialInfo);
     ZX_ASSERT(encoded.is_ok());

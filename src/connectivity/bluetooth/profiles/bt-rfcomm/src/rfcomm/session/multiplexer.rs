@@ -202,7 +202,7 @@ impl SessionMultiplexer {
     /// Finds or initializes a new SessionChannel for the provided `dlci`. Returns a mutable
     /// reference to the channel.
     pub fn find_or_create_session_channel(&mut self, dlci: DLCI) -> &mut SessionChannel {
-        let channel = self.channels.entry(dlci).or_insert({
+        let channel = self.channels.entry(dlci).or_insert_with(|| {
             let mut channel = SessionChannel::new(dlci, self.role);
             let _ = channel.iattach(self.inspect.node(), inspect::unique_name("channel_"));
             channel

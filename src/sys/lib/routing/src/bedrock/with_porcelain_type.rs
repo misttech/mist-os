@@ -90,8 +90,7 @@ impl<T: CapabilityBound> WithPorcelainType for Router<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::availability::AvailabilityMetadata;
-    use crate::bedrock::request_metadata::{protocol_metadata, METADATA_KEY_TYPE};
+    use crate::bedrock::request_metadata::{protocol_metadata, Metadata, METADATA_KEY_TYPE};
     use assert_matches::assert_matches;
     use cm_rust::Availability;
     use cm_types::Name;
@@ -144,7 +143,7 @@ mod tests {
                 Capability::Data(Data::String(String::from("directory"))),
             )
             .unwrap();
-        metadata.set_availability(Availability::Optional);
+        metadata.set_metadata(Availability::Optional);
         let error = proxy
             .route(Some(Request { target: FakeInstanceToken::new(), metadata }), false)
             .await

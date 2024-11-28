@@ -70,7 +70,7 @@ async fn resolve(
     };
 
     // Resolve the package URL
-    let (pkg_dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (pkg_dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let _subpackage_context =
         resolver.resolve(&pkg_url, server).await.map_err(|_| zx::Status::INTERNAL)?.map_err(
             |e| {
@@ -92,10 +92,9 @@ mod tests {
     use fuchsia_async as fasync;
 
     fn serve_pkg_resolver_success() -> fpkg::PackageResolverProxy {
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy::<fpkg::PackageResolverMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fpkg::PackageResolverMarker>();
         fasync::Task::spawn(async move {
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             let (package_url, dir, responder) =
                 if let fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } =
                     stream.next().await.unwrap().unwrap()
@@ -122,10 +121,9 @@ mod tests {
     }
 
     fn serve_boot_pkg_resolver_success() -> fpkg::PackageResolverProxy {
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy::<fpkg::PackageResolverMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fpkg::PackageResolverMarker>();
         fasync::Task::spawn(async move {
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             let (package_url, dir, responder) =
                 if let fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } =
                     stream.next().await.unwrap().unwrap()
@@ -152,10 +150,9 @@ mod tests {
     }
 
     fn serve_pkg_resolver_fail(error: fpkg::ResolveError) -> fpkg::PackageResolverProxy {
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy::<fpkg::PackageResolverMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fpkg::PackageResolverMarker>();
         fasync::Task::spawn(async move {
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             let (package_url, responder) =
                 if let fpkg::PackageResolverRequest::Resolve { package_url, responder, .. } =
                     stream.next().await.unwrap().unwrap()

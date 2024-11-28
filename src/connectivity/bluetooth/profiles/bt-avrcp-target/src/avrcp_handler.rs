@@ -28,7 +28,7 @@ async fn handle_target_request(
         }
         TargetHandlerRequest::GetPlayStatus { responder } => {
             if let Ok(state) = media_sessions.get_active_session() {
-                responder.send(Ok(&state.session_info().get_play_status().clone().into()))?;
+                responder.send(Ok(&state.session_info().get_play_status().into()))?;
             } else {
                 responder.send(Err(TargetAvcError::RejectedNoAvailablePlayers))?;
             }
@@ -131,8 +131,7 @@ pub(crate) async fn process_avrcp_requests(
     // Register this target handler with the AVRCP component.
     let avrcp_svc = connect_to_protocol::<PeerManagerMarker>()
         .expect("Failed to connect to Bluetooth AVRCP interface");
-    let (target_client, request_stream) =
-        create_request_stream::<TargetHandlerMarker>().expect("Error creating Controller endpoint");
+    let (target_client, request_stream) = create_request_stream::<TargetHandlerMarker>();
     if let Err(e) = avrcp_svc.register_target_handler(target_client).await? {
         return Err(anyhow!("Error registering target handler: {:?}", e));
     }

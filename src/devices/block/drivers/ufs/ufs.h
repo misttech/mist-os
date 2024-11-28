@@ -130,6 +130,12 @@ struct InspectProperties {
   inspect::BoolProperty rx_termination;           // Set once by the init thread.
   inspect::UintProperty pa_hs_series;             // Set once by the init thread.
   inspect::UintProperty power_mode;               // Updated whenever power state changes.
+  // Write Protect
+  inspect::BoolProperty is_power_on_write_protect_enabled;   // Set once by the init thread.
+  inspect::BoolProperty logical_lun_power_on_write_protect;  // Set once by the init thread.
+  // Background Operations
+  inspect::BoolProperty is_background_op_enabled;  // Updated whenever the power state changes or an
+                                                   // exception event occurs.
   // WriteBooster
   inspect::BoolProperty is_write_booster_enabled;                    // Set once by the init thread.
   inspect::BoolProperty writebooster_buffer_flush_during_hibernate;  // Set once by the init thread.
@@ -222,6 +228,9 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
 
   static zx::result<uint16_t> TranslateUfsLunToScsiLun(uint8_t ufs_lun);
   static zx::result<uint8_t> TranslateScsiLunToUfsLun(uint16_t scsi_lun);
+
+  fdf::Dispatcher &exception_event_dispatcher() { return exception_event_dispatcher_; }
+  libsync::Completion &exception_event_completion() { return exception_event_completion_; }
 
   // for test
   uint32_t GetLogicalUnitCount() const { return logical_unit_count_; }
@@ -329,10 +338,12 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   fdf::Dispatcher irq_worker_dispatcher_;
   fdf::Dispatcher io_worker_dispatcher_;
   fdf::Dispatcher admin_worker_dispatcher_;
+  fdf::Dispatcher exception_event_dispatcher_;
   // Signaled when worker_dispatcher_ is shut down.
   libsync::Completion irq_worker_shutdown_completion_;
   libsync::Completion io_worker_shutdown_completion_;
   libsync::Completion admin_worker_shutdown_completion_;
+  libsync::Completion exception_event_completion_;
   // Signaled when power has been resumed.
   libsync::Completion wait_for_power_resumed_;
 

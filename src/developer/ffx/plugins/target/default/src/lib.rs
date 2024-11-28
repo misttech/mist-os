@@ -39,11 +39,11 @@ pub async fn exec_target_default_impl<W: std::io::Write>(
                 .query(TARGET_DEFAULT_KEY)
                 .level(Some(*level))
                 .get()
-                .unwrap_or("".to_owned());
+                .unwrap_or_else(|_| "".to_owned());
             writeln!(writer, "{}", res)?;
         }
         SubCommand::Get(_) => {
-            let res: String = context.get(TARGET_DEFAULT_KEY).unwrap_or("".to_owned());
+            let res: String = context.get(TARGET_DEFAULT_KEY).unwrap_or_else(|_| "".to_owned());
             writeln!(writer, "{}", res)?;
         }
         SubCommand::Set(set) => {

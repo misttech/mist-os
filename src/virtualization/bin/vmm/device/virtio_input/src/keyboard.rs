@@ -624,7 +624,7 @@ mod tests {
 
         // Create a keyboard listener proxy and send the server_end to the handler.
         let (keyboard_proxy, keyboard_request_stream) =
-            create_proxy_and_stream::<KeyboardListenerMarker>().unwrap();
+            create_proxy_and_stream::<KeyboardListenerMarker>();
 
         let mut keyboard_device = KeyboardDevice::new(device, keyboard_request_stream);
 
@@ -694,7 +694,7 @@ mod tests {
 
         // Create a keyboard listener proxy and send the server_end to the keyboard device.
         let (keyboard_proxy, keyboard_request_stream) =
-            create_proxy_and_stream::<KeyboardListenerMarker>().unwrap();
+            create_proxy_and_stream::<KeyboardListenerMarker>();
 
         let mut keyboard_device = KeyboardDevice::new(device, keyboard_request_stream);
 

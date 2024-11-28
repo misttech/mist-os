@@ -16,7 +16,7 @@ struct MouseReport {
   int64_t movement_y;
   void ToFidlInputReport(
       fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-      fidl::AnyArena& allocator) {
+      fidl::AnyArena& allocator) const {
     auto mouse = fuchsia_input_report::wire::MouseInputReport::Builder(allocator);
     mouse.movement_x(this->movement_x);
     mouse.movement_y(this->movement_y);

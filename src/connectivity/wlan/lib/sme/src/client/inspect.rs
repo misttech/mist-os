@@ -4,7 +4,8 @@
 
 use crate::client::{ClientSmeStatus, ServingApInfo};
 use fuchsia_inspect::{
-    BoolProperty, BytesProperty, IntProperty, Node, Property, StringProperty, UintProperty,
+    BoolProperty, BytesProperty, Inspector, IntProperty, Node, Property, StringProperty,
+    UintProperty,
 };
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::{InspectListClosure, InspectUintArray};
@@ -12,7 +13,10 @@ use fuchsia_inspect_contrib::nodes::{BoundedListNode, MonotonicTimeProperty, Nod
 use fuchsia_sync::Mutex;
 use ieee80211::Ssid;
 use wlan_common::ie::{self, wsc};
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme};
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_mlme as fidl_mlme,
+};
 
 /// These limits are set to capture roughly 5 to 10 recent connection attempts. An average
 /// successful connection attempt would generate about 5 state events and 7 supplicant events (this
@@ -28,6 +32,8 @@ const IDLE_STR: &'static str = "idle";
 
 /// Wrapper struct SME inspection nodes
 pub struct SmeTree {
+    /// Top level inspector that contains the SmeTree root node.
+    pub inspector: Inspector,
     /// Base SME inspection node that holds all other nodes in the SmeTree.
     pub _root_node: Node,
     /// Inspection node to log recent state transitions, or cases where an event would that would
@@ -57,6 +63,7 @@ pub struct SmeTree {
 
 impl SmeTree {
     pub fn new(
+        inspector: Inspector,
         node: Node,
         device_info: &fidl_mlme::DeviceInfo,
         spectrum_management_support: &fidl_common::SpectrumManagementSupport,
@@ -74,8 +81,8 @@ impl SmeTree {
                 bands: InspectListClosure(&device_info.bands, |node, key, band| {
                     inspect_insert!(node, var key: {
                         band: match band.band {
-                            fidl_common::WlanBand::TwoGhz => "2.4Ghz",
-                            fidl_common::WlanBand::FiveGhz => "5Ghz",
+                            fidl_ieee80211::WlanBand::TwoGhz => "2.4Ghz",
+                            fidl_ieee80211::WlanBand::FiveGhz => "5Ghz",
                             _ => "Unknown",
                         },
                         operating_channels: InspectUintArray::new(&band.operating_channels),
@@ -89,6 +96,7 @@ impl SmeTree {
             }
         });
         Self {
+            inspector,
             _root_node: node,
             state_events: Mutex::new(state_events),
             rsn_events: Mutex::new(rsn_events),
@@ -101,6 +109,10 @@ impl SmeTree {
 
     pub fn update_pulse(&self, new_status: ClientSmeStatus) {
         self.last_pulse.lock().update(new_status)
+    }
+
+    pub fn clone_vmo_data(&self) -> Option<fidl::Vmo> {
+        self.inspector.copy_vmo()
     }
 }
 

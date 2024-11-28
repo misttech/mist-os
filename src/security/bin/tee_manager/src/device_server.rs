@@ -19,7 +19,7 @@ pub async fn serve_application_passthrough(
 ) -> Result<(), Error> {
     // Create a ProviderServer to support the TEE driver
     let provider = ProviderServer::try_new(STORAGE_DIR)?;
-    let (client, stream) = fidl::endpoints::create_request_stream()?;
+    let (client, stream) = fidl::endpoints::create_request_stream();
 
     let () = device_connector
         .connect_to_application(&uuid, Some(client), server)

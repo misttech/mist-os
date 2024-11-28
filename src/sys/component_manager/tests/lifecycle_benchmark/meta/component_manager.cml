@@ -8,7 +8,7 @@
     ],
     program: {
         runner: "elf",
-        binary: "bin/component_manager",
+        binary: "bin/component_manager_eng",
         args: [
             "--config",
             "/pkg/data/component_manager_config",
@@ -21,7 +21,6 @@
                 "fuchsia.component.resolver.RealmBuilder",
                 "fuchsia.component.runner.RealmBuilder",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.pkg.PackageResolver",
             ],
         },
     ],

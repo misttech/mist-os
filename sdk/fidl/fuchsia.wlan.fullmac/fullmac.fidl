@@ -24,20 +24,6 @@ type WlanAuthType = flexible enum : uint8 {
     SAE = 4;
 };
 
-type WlanFullmacAuthInd = struct {
-    peer_sta_address ieee80211.MacAddr;
-    auth_type WlanAuthType;
-};
-
-type WlanFullmacAssocInd = struct {
-    peer_sta_address ieee80211.MacAddr;
-    // Interval specified in time units.
-    listen_interval uint16;
-    ssid ieee80211.CSsid;
-    rsne vector<uint8>:ieee80211.WLAN_IE_MAX_LEN;
-    vendor_ie vector<uint8>:WLAN_VIE_MAX_LEN;
-};
-
 const WLAN_MAX_KEYLIST_SIZE uint32 = 4;
 
 type WlanFullmacSetKeysResp = struct {
@@ -48,12 +34,6 @@ type DeleteKeyDescriptor = table {
     1: key_id uint16;
     2: key_type fuchsia.wlan.common.WlanKeyType;
     3: address ieee80211.MacAddr;
-};
-
-/// This struct is sent from SME to wlanif, indicating the result of SAE handshake process.
-type WlanFullmacSaeHandshakeResp = struct {
-    peer_sta_address ieee80211.MacAddr;
-    status_code ieee80211.StatusCode;
 };
 
 /// This struct is sent in both directions, containing the information of SAE authentication
@@ -83,14 +63,6 @@ type WlanAuthResult = flexible enum : uint8 {
     FAILURE_TIMEOUT = 5;
 };
 
-type WlanFullmacDeauthIndication = struct {
-    peer_sta_address ieee80211.MacAddr;
-    reason_code ieee80211.ReasonCode;
-    /// locally_initiated is true if deauth is initiated from the device,
-    /// and is false if it's initiated remotely (e.g. due to deauth frame)
-    locally_initiated bool;
-};
-
 type WlanAssocResult = flexible enum : uint8 {
     SUCCESS = 0;
     REFUSED_REASON_UNSPECIFIED = 1;
@@ -103,18 +75,6 @@ type WlanAssocResult = flexible enum : uint8 {
     REFUSED_TEMPORARILY = 8;
 };
 
-
-type WlanFullmacDisassocConfirm = struct {
-    status zx.Status;
-};
-
-type WlanFullmacDisassocIndication = struct {
-    peer_sta_address ieee80211.MacAddr;
-    reason_code ieee80211.ReasonCode;
-    /// locally_initiated is true if diassoc is initiated from the device,
-    /// and is false if it's initiated remotely (e.g. due to disassoc frame)
-    locally_initiated bool;
-};
 
 type WlanStartResult = flexible enum : uint8 {
     SUCCESS = 0;
@@ -167,7 +127,7 @@ type WlanFullmacSaeHandshakeInd = struct {
 
 type WlanFullmacBandCapability = struct {
     /// The values of this struct apply to the band indicated in this field.
-    band fuchsia.wlan.common.WlanBand;
+    band ieee80211.WlanBand;
 
     /// Basic rates supported in units of 500 kbit/s (as defined in
     /// IEEE Std 802.11-2016, 9.4.2.3), e.g., 0x02 represents 1 Mbps.
@@ -198,14 +158,6 @@ type WlanFullmacBandCapability = struct {
     /// channel to use when starting an AP.
     operating_channel_count uint16;
     operating_channel_list array<uint8, ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS>;
-};
-
-type WlanFullmacQueryInfo = struct {
-    sta_addr ieee80211.MacAddr;
-    /// WLAN_MAC_ROLE_*
-    role fuchsia.wlan.common.WlanMacRole;
-    band_cap_list array<WlanFullmacBandCapability, fuchsia.wlan.common.MAX_BANDS>;
-    band_cap_count uint8;
 };
 
 type WlanFullmacRssiStats = struct {
@@ -463,23 +415,53 @@ closed protocol WlanFullmacImplIfc {
         /// IEs for this association with the AP. Required if `status_code` is success.
         6: association_ies vector<uint8>:MAX;
     }) -> ();
-    strict AuthInd(struct {
-        resp WlanFullmacAuthInd;
+    strict AuthInd(table {
+        1: peer_sta_address ieee80211.MacAddr;
+        2: auth_type WlanAuthType;
     }) -> ();
     strict DeauthConf(table {
         1: peer_sta_address ieee80211.MacAddr;
     }) -> ();
-    strict DeauthInd(struct {
-        ind WlanFullmacDeauthIndication;
+    /// Report that the driver deauthenticated.
+    strict DeauthInd(table {
+        /// MAC address of the peer. Required.
+        1: peer_sta_address ieee80211.MacAddr;
+        /// Reason code for deauthentication. Required.
+        2: reason_code ieee80211.ReasonCode;
+        /// locally_initiated is true if deauth is initiated from the device,
+        /// and is false if it's initiated remotely (e.g. due to deauth frame)
+        3: locally_initiated bool;
     }) -> ();
-    strict AssocInd(struct {
-        resp WlanFullmacAssocInd;
+    strict AssocInd(table {
+        1: peer_sta_address ieee80211.MacAddr;
+        // Interval specified in time units.
+        2: listen_interval uint16;
+        3: ssid ieee80211.Ssid;
+        4: rsne vector<uint8>:ieee80211.WLAN_IE_MAX_LEN;
+        5: vendor_ie vector<uint8>:WLAN_VIE_MAX_LEN;
     }) -> ();
-    strict DisassocConf(struct {
-        resp WlanFullmacDisassocConfirm;
+    /// Report the result of a previously-issued disassociate request. IEEE 802.11-2020 6.3.9.2.
+    strict DisassocConf(table {
+        /// ZX_OK indicates that the disassociate request was serviced and the peer was
+        /// disassociated. Other errors indicate that the request could not be serviced, for these
+        /// or other reasons:
+        ///   - ZX_ERR_BAD_STATE: association not possible in current state (e.g. disconnected)
+        ///   - ZX_ERR_INVALID_ARGS: no association exists with specified peer
+        ///   - ZX_ERR_SHOULD_WAIT: disassociate request could not be serviced because firmware or
+        ///     driver was busy
+        1: status zx.Status;
     }) -> ();
-    strict DisassocInd(struct {
-        ind WlanFullmacDisassocIndication;
+    /// Report that disassociation with the specified peer occurred (IEEE 802.11-2020 6.3.9.3).
+    strict DisassocInd(table {
+        /// Address of the peer that was disassociated. Required.
+        1: peer_sta_address ieee80211.MacAddr;
+        /// Reason for the disassociation. Required.
+        2: reason_code ieee80211.ReasonCode;
+        /// Whether the disassociation was initiated from the device. Required.
+        /// locally_initiated is true if disassociation was initiated from the device (e.g. firmware
+        /// or vendor driver started the disassociation); false if the disassociation was initiated
+        /// externally (e.g. due to receipt of a disassociate frame from an AP).
+        3: locally_initiated bool;
     }) -> ();
     strict StartConf(struct {
         resp WlanFullmacStartConfirm;
@@ -529,17 +511,44 @@ closed protocol WlanFullmacImplIfcBanjo {
 @discoverable
 closed protocol WlanFullmacImpl {
 
-    // Lifecycle operations
-    strict Start(resource struct {
-        ifc client_end:WlanFullmacImplIfc;
-    }) -> (resource struct {
-        sme_channel zx.Handle:CHANNEL;
+    /// Initialize the FullMAC driver. This is the first request that the platform will make to the
+    /// FullMAC driver.
+    ///
+    /// On initialization, MLME provides the client end to the WlanFullmacImplIfc protocol. The
+    /// driver must return the SME server end channel, which is used internally by the platform.
+    /// Typically, the SME server end channel is given to the FullMAC driver by
+    /// fuchsia.wlan.phyimpl/WlanPhyImpl.CreateIface.
+    ///
+    /// If `Init` completes successfully, the platform will begin making other WlanFullmacImpl
+    /// requests to the FullMAC driver, and the FullMAC driver is free to make WlanFullmacImplIfc
+    /// requests to the platform. The platform may continue making WlanFullmacImpl requests until
+    /// the WlanFullmacImpl server unbinds.
+    ///
+    /// Common errors include:
+    ///   - `ZX_ERR_ALREADY_BOUND`: `Init` was already called on this FullMAC driver.
+    strict Init(resource table {
+        /// The WlanFullmacImplifc client end.
+        /// Required.
+        1: ifc client_end:WlanFullmacImplIfc;
+    }) -> (resource table {
+        /// The SME server end channel.
+        /// Required.
+        1: sme_channel zx.Handle:CHANNEL;
     }) error zx.Status;
 
-    // State operation
-    strict Query() -> (struct {
-        info WlanFullmacQueryInfo;
+    /// Returns high-level information describing the state of the FullMAC driver.
+    /// This is safe to call even before the call to WlanFullmacImpl::Start.
+    strict Query() -> (table {
+        /// Station address. Required.
+        1: sta_addr ieee80211.MacAddr;
+
+        /// MAC role. Required.
+        2: role fuchsia.wlan.common.WlanMacRole;
+
+        /// Supported bands. Required.
+        3: band_caps vector<WlanFullmacBandCapability>:fuchsia.wlan.common.MAX_BANDS;
     }) error zx.Status;
+
     strict QueryMacSublayerSupport() -> (struct {
         resp fuchsia.wlan.common.MacSublayerSupport;
     }) error zx.Status;
@@ -623,10 +632,6 @@ closed protocol WlanFullmacImpl {
         1: peer_sta_address ieee80211.MacAddr;
         2: reason_code ieee80211.ReasonCode;
     }) -> ();
-    strict Reset(table {
-        1: sta_address ieee80211.MacAddr;
-        2: set_default_mib bool;
-    }) -> ();
     strict StartBss(table {
         1: ssid ieee80211.CSsid;
         2: bss_type fuchsia.wlan.common.BssType;
@@ -639,14 +644,16 @@ closed protocol WlanFullmacImpl {
     strict StopBss(table {
         1: ssid ieee80211.CSsid;
     }) -> ();
+    /// Sets security keys for a connection. This is typically called after a successful key
+    /// exchange.
+    ///
+    /// Note that the platform assumes that the driver will automatically delete keys on a
+    /// disconnect or key rotation.
     strict SetKeys(table {
         1: keylist vector<fuchsia.wlan.common.WlanKeyConfig>:WLAN_MAX_KEYLIST_SIZE;
     }) -> (struct {
         resp WlanFullmacSetKeysResp;
     });
-    strict DelKeys(table {
-        1: keylist vector<DeleteKeyDescriptor>:WLAN_MAX_KEYLIST_SIZE;
-    }) -> ();
     strict EapolTx(table {
         1: src_addr ieee80211.MacAddr;
         2: dst_addr ieee80211.MacAddr;
@@ -660,23 +667,22 @@ closed protocol WlanFullmacImpl {
     strict GetIfaceHistogramStats() -> (struct {
         stats WlanFullmacIfaceHistogramStats;
     }) error zx.Status;
-    strict SaeHandshakeResp(struct {
-        resp WlanFullmacSaeHandshakeResp;
+    /// Informs the driver of the result of an SAE handshake.
+    strict SaeHandshakeResp(table {
+        /// The peer's MAC address. Required.
+        1: peer_sta_address ieee80211.MacAddr;
+        /// The status of the SAE handshake. Required.
+        2: status_code ieee80211.StatusCode;
     }) -> ();
     strict SaeFrameTx(struct {
         frame WlanFullmacSaeFrame;
     }) -> ();
     strict WmmStatusReq() -> ();
 
-    // Configuration operations
-    strict SetMulticastPromisc(struct {
-        enable bool;
-    }) -> () error zx.Status;
-
     // Notify the interface whether it's online or offline. For client interfaces the online status
     // changes based on such things as being associated/disassociated with an AP. For encrypted
-    // connections this will be regulated by MLME calls to SetControlledPort, for open connections
-    // the interface is considered online as soon as association is confirmed.
+    // connections, the interface is considered online after the key exchange completes successfully,
+    // for open connections the interface is considered online as soon as association is confirmed.
     //
     // A SoftAP interface is set to online when:
     // 1) The driver confirms that a request to start a SoftAP succeeded.
@@ -688,8 +694,8 @@ closed protocol WlanFullmacImpl {
     // above where a call to stop an AP has been made there will be a call to OnLinkStateChanged.
     // However when the driver confirms this there will be no additional call to OnLinkStateChanged
     // because it was already offline.
-    strict OnLinkStateChanged(struct {
-        online bool;
+    strict OnLinkStateChanged(table {
+        1: online bool;
     }) -> ();
 };
 

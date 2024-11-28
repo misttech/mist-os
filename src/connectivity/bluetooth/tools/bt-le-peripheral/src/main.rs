@@ -174,7 +174,7 @@ fn advertise(
     service_names: &[String],
 ) -> Result<(AdvertisedPeripheralRequestStream, QueryResponseFut<Result<(), PeripheralError>>), Error>
 {
-    let (client_end, server_stream) = create_request_stream::<AdvertisedPeripheralMarker>()?;
+    let (client_end, server_stream) = create_request_stream::<AdvertisedPeripheralMarker>();
     let name = match &parameters.data {
         Some(data) => data.name.clone(),
         None => None,
@@ -207,7 +207,7 @@ async fn await_connected(
     responder.send()?;
 
     eprintln!("Connected to central: {}", Peer::try_from(peer)?);
-    Ok(connection.into_proxy()?)
+    Ok(connection.into_proxy())
 }
 
 // This functions implements the main behavior of this tool which involves:
@@ -442,7 +442,7 @@ mod tests {
                     ..Default::default()
                 };
 
-                let proxy = advertised_peripheral.into_proxy()?;
+                let proxy = advertised_peripheral.into_proxy();
                 let _ = proxy.on_connected(&peer, conn_client_end).await;
 
                 responder.send(Ok(()))?;
@@ -460,8 +460,7 @@ mod tests {
 
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_listen() {
-        let (proxy, stream) = create_proxy_and_stream::<PeripheralMarker>()
-            .expect("failed to create Peripheral proxy");
+        let (proxy, stream) = create_proxy_and_stream::<PeripheralMarker>();
 
         let input_parameters = AdvertisingParameters {
             data: None,
@@ -494,8 +493,7 @@ mod tests {
 
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_listen_peripheral_server_closes_immediately() {
-        let (proxy, server) =
-            create_proxy::<PeripheralMarker>().expect("failed to create Peripheral proxy");
+        let (proxy, server) = create_proxy::<PeripheralMarker>();
 
         let input_parameters = AdvertisingParameters {
             data: None,

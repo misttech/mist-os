@@ -38,8 +38,7 @@ pub async fn handle_attach<P: PlatformServices>(
         return Ok(AttachResult::NotRunning);
     }
 
-    let (guest_endpoint, guest_server_end) = create_proxy::<GuestMarker>()
-        .map_err(|err| anyhow!("failed to create guest proxy: {}", err))?;
+    let (guest_endpoint, guest_server_end) = create_proxy::<GuestMarker>();
     manager
         .connect(guest_server_end)
         .await
@@ -107,7 +106,7 @@ mod test {
 
     #[fasync::run_until_stalled(test)]
     async fn launch_invalid_console_returns_error() {
-        let (guest_proxy, mut guest_stream) = create_proxy_and_stream::<GuestMarker>().unwrap();
+        let (guest_proxy, mut guest_stream) = create_proxy_and_stream::<GuestMarker>();
         let (serial_launch_sock, _serial_server_sock) = Socket::create_stream();
 
         let server = async move {

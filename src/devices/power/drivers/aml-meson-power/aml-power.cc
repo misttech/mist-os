@@ -397,29 +397,17 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
   }
 
   zx_status_t st;
-  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> little_cluster_pwm;
+  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> primary_cluster_pwm;
   zx::result client_end =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(parent, "pwm-little");
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(parent, "pwm-primary");
 
   // The fragment may be optional, so we do not return on error.
   if (!client_end.is_error()) {
-    little_cluster_pwm.Bind(std::move(client_end.value()));
-    st = InitPwmProtocolClient(little_cluster_pwm);
+    zxlogf(INFO, "Connected to primary pwm");
+    primary_cluster_pwm.Bind(std::move(client_end.value()));
+    st = InitPwmProtocolClient(primary_cluster_pwm);
     if (st != ZX_OK) {
       zxlogf(ERROR, "%s: Failed to initialize Big Cluster PWM Client, st = %d", __func__, st);
-      return st;
-    }
-  }
-
-  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> big_cluster_pwm;
-  client_end =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(parent, "pwm-big");
-  // The fragment may be optional, so we do not return on error.
-  if (!client_end.is_error()) {
-    big_cluster_pwm.Bind(std::move(client_end.value()));
-    st = InitPwmProtocolClient(big_cluster_pwm);
-    if (st != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to initialize Little Cluster PWM Client, st = %d", __func__, st);
       return st;
     }
   }
@@ -432,21 +420,26 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_vreg::Service::Vreg>(parent, "vreg-pwm-big");
 
   std::vector<DomainInfo> domain_info;
-  if (little_cluster_pwm.is_valid() && voltage_table.is_ok() && pwm_period.is_ok()) {
-    domain_info.emplace_back(std::move(little_cluster_pwm), *voltage_table, *pwm_period.value());
-  } else if (!little_cluster_vreg.is_error()) {
-    domain_info.emplace_back(
-        fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>(std::move(little_cluster_vreg.value())));
+  if (primary_cluster_pwm.is_valid() && voltage_table.is_ok() && pwm_period.is_ok()) {
+    // For Astro.
+    domain_info.emplace_back(std::move(primary_cluster_pwm), *voltage_table, *pwm_period.value());
   } else {
-    zxlogf(ERROR, "Invalid args. Unable to configure first domain");
-    return ZX_ERR_INTERNAL;
-  }
+    // For Vim3.
+    if (big_cluster_vreg.is_error() || little_cluster_vreg.is_error()) {
+      zxlogf(ERROR, "Unable to connect to VReg Devices: big = %s, little = %s",
+             big_cluster_vreg.is_error() ? "Success" : "Failure",
+             little_cluster_vreg.is_error() ? "Success" : "Failure");
+      return ZX_ERR_INTERNAL;
+    }
 
-  if (big_cluster_pwm.is_valid() && voltage_table.is_ok() && pwm_period.is_ok()) {
-    domain_info.emplace_back(std::move(big_cluster_pwm), *voltage_table, *pwm_period.value());
-  } else if (!big_cluster_vreg.is_error()) {
+    // TODO(b/376751395): This conflates power domain IDs with indices in the domain_info vector.
+    //                    In other words domain IDs are implicitly coupled to their index in this
+    //                    vector which creates a fragile mapping from power domain ID to power.
+    //                    We should reconsider this.
     domain_info.emplace_back(
         fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>(std::move(big_cluster_vreg.value())));
+    domain_info.emplace_back(
+        fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>(std::move(little_cluster_vreg.value())));
   }
 
   std::unique_ptr<AmlPower> power_impl_device =

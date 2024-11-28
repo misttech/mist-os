@@ -110,7 +110,9 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
     let client_interface_state = client_realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to client fuchsia.net.interfaces/State");
-    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+        fidl_fuchsia_net_interfaces_ext::AllInterest,
+    >(
         &client_interface_state,
         fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
@@ -118,7 +120,7 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
     let mut event_stream = pin!(event_stream);
 
     let mut properties =
-        fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(client_interface.id());
+        fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(client_interface.id());
     for cycle in 0..cycles {
         // Enable the interface and assert that binding fails before the address is acquired.
         let () = client_interface.stop_dhcp::<D>().await.expect("failed to stop DHCP");
@@ -211,9 +213,17 @@ async fn assert_interface_assigned_addr(
     expected_acquired: fidl_fuchsia_net::Subnet,
     filter_valid_until: impl Fn(fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant) -> bool,
     event_stream: impl futures::Stream<
-        Item = std::result::Result<fidl_fuchsia_net_interfaces::Event, fidl::Error>,
+        Item = std::result::Result<
+            fidl_fuchsia_net_interfaces_ext::EventWithInterest<
+                fidl_fuchsia_net_interfaces_ext::AllInterest,
+            >,
+            fidl::Error,
+        >,
     >,
-    mut properties: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState<()>,
+    mut properties: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState<
+        (),
+        fidl_fuchsia_net_interfaces_ext::AllInterest,
+    >,
 ) -> fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant {
     let valid_until = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
         event_stream,

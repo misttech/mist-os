@@ -260,8 +260,8 @@ high_entry:
     lea _kstack_end(%rip), %rsp
 
     // move_fixups_and_zero_bss copied the fixup code to _end.
-    // It expects %rdi to contain the actual runtime address of __code_start.
-    lea __code_start(%rip), %rdi
+    // It expects %rdi to contain the actual runtime address of __executable_start.
+    lea __executable_start(%rip), %rdi
     call _end
     // The fixup code won't be used again, so the memory can be reused now.
 

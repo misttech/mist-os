@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Context as _, Result};
-use async_io::Async;
-use async_net::UdpSocket;
 use byteorder::{BigEndian, ByteOrder};
 use futures::io::{AsyncRead, AsyncWrite};
 use futures::task::{Context, Poll};
@@ -14,8 +12,10 @@ use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::num::Wrapping;
 use std::pin::Pin;
+use std::rc::Rc;
 use std::time::Duration;
 use timeout::timeout;
+use tokio::net::UdpSocket;
 use zerocopy::byteorder::big_endian::U16;
 use zerocopy::{FromBytes, Immutable, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
@@ -72,7 +72,7 @@ impl<B: SplitByteSlice> Packet<B> {
 pub struct UdpNetworkInterface {
     maximum_size: u16,
     sequence: Wrapping<u16>,
-    socket: UdpSocket,
+    socket: Rc<UdpSocket>,
     read_task: Option<Pin<Box<dyn Future<Output = std::io::Result<(usize, Vec<u8>)>>>>>,
     write_task: Option<Pin<Box<dyn Future<Output = std::io::Result<usize>>>>>,
 }
@@ -133,10 +133,12 @@ impl AsyncRead for UdpNetworkInterface {
                             format!("Could not send emtpy fastboot packet to device: {}", e),
                         )
                     })?;
-                let packet = Packet::parse(&out_buf[..sz]).ok_or(std::io::Error::new(
-                    ErrorKind::Other,
-                    format!("Could not parse response packet"),
-                ))?;
+                let packet = Packet::parse(&out_buf[..sz]).ok_or_else(|| {
+                    std::io::Error::new(
+                        ErrorKind::Other,
+                        format!("Could not parse response packet"),
+                    )
+                })?;
                 let mut buf_inner = Vec::new();
                 match packet.packet_type() {
                     Ok(PacketType::Fastboot) => {
@@ -202,10 +204,12 @@ impl AsyncWrite for UdpNetworkInterface {
                             format!("Could not send emtpy fastboot packet to device: {}", e),
                         )
                     })?;
-                    let response = Packet::parse(&out_buf[..sz]).ok_or(std::io::Error::new(
-                        ErrorKind::Other,
-                        format!("Could not parse response packet"),
-                    ))?;
+                    let response = Packet::parse(&out_buf[..sz]).ok_or_else(|| {
+                        std::io::Error::new(
+                            ErrorKind::Other,
+                            format!("Could not parse response packet"),
+                        )
+                    })?;
                     match response.packet_type() {
                         Ok(PacketType::Fastboot) => (),
                         _ => {
@@ -261,7 +265,8 @@ pub async fn open(addr: SocketAddr) -> Result<UdpNetworkInterface> {
     let (buf, sz) = send_to_device(&make_query_packet(), &socket)
         .await
         .map_err(|e| anyhow!("Sending error: {}", e))?;
-    let packet = Packet::parse(&buf[..sz]).ok_or(anyhow!("Could not parse response packet."))?;
+    let packet =
+        Packet::parse(&buf[..sz]).ok_or_else(|| anyhow!("Could not parse response packet."))?;
     let sequence = match packet.packet_type() {
         Ok(PacketType::Query) => BigEndian::read_u16(&packet.data),
         _ => bail!("Unexpected response to query packet"),
@@ -269,7 +274,8 @@ pub async fn open(addr: SocketAddr) -> Result<UdpNetworkInterface> {
     let (buf, sz) = send_to_device(&make_init_packet(sequence), &socket)
         .await
         .map_err(|e| anyhow!("Sending error: {}", e))?;
-    let packet = Packet::parse(&buf[..sz]).ok_or(anyhow!("Could not parse response packet."))?;
+    let packet =
+        Packet::parse(&buf[..sz]).ok_or_else(|| anyhow!("Could not parse response packet."))?;
     let (version, max) = match packet.packet_type() {
         Ok(PacketType::Init) => {
             (BigEndian::read_u16(&packet.data[..2]), BigEndian::read_u16(&packet.data[2..4]))
@@ -284,7 +290,7 @@ pub async fn open(addr: SocketAddr) -> Result<UdpNetworkInterface> {
     );
 
     Ok(UdpNetworkInterface {
-        socket,
+        socket: socket.into(),
         maximum_size,
         sequence: Wrapping(sequence + 1),
         read_task: None,
@@ -332,7 +338,7 @@ async fn make_sender_socket(addr: SocketAddr) -> Result<UdpSocket> {
         .context("construct datagram socket")?,
     }
     .into();
-    let result: UdpSocket = Async::new(socket)?.into();
+    let result = UdpSocket::from_std(socket)?;
     result.connect(addr).await.context("connect to remote address")?;
     Ok(result)
 }

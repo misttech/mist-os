@@ -212,8 +212,9 @@ impl VsockConnection {
         header: VirtioVsockHeader,
         chain: ReadableChain<'a, 'b, N, M>,
     ) -> Result<(), Error> {
-        let flags = VirtioVsockFlags::from_bits(header.flags.get())
-            .ok_or(anyhow!("Unrecognized VirtioVsockFlags in header: {:#b}", header.flags.get()))?;
+        let flags = VirtioVsockFlags::from_bits(header.flags.get()).ok_or_else(|| {
+            anyhow!("Unrecognized VirtioVsockFlags in header: {:#b}", header.flags.get())
+        })?;
 
         // Cancel any pending async tasks as the state may be updated. The tasks waiting on these
         // tasks will re-wait on them.
@@ -386,8 +387,7 @@ mod tests {
     #[fuchsia::test]
     async fn client_initiated_connection_dropped_without_response() {
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
 
         // Drop the connection immediately after creating it. This simulates the guest and device
         // going away before the connection is established.
@@ -525,8 +525,7 @@ mod tests {
     fn guest_initiated_and_client_closed_connection() {
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
         let mut executor = fasync::TestExecutor::new();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>();
 
         let response_fut = proxy.accept(1, 2, 3);
         let connection = Rc::new(VsockConnection::new_guest_initiated(
@@ -597,8 +596,7 @@ mod tests {
     fn client_initiated_connection_write_data_to_port() {
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
         let mut executor = fasync::TestExecutor::new();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
 
         // Stall on waiting for a FIDL response.
         let mut connect_fut = proxy.connect(12345);

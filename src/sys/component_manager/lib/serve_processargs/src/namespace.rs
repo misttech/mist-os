@@ -180,7 +180,7 @@ mod tests {
     use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
     use vfs::directory::entry_container::Directory as VfsDirectory;
     use vfs::remote::RemoteLike;
-    use vfs::{path, pseudo_directory};
+    use vfs::{path, pseudo_directory, ObjectRequest, ObjectRequestRef};
     use zx::AsHandleRef;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -320,7 +320,7 @@ mod tests {
         assert_eq!(ns[0].path.to_string(), "/svc");
 
         // Check that there is exactly one protocol inside the svc directory.
-        let dir = ns.pop().unwrap().directory.into_proxy().unwrap();
+        let dir = ns.pop().unwrap().directory.into_proxy();
         let entries = fuchsia_fs::directory::readdir(&dir).await.unwrap();
         assert_eq!(
             entries,
@@ -351,7 +351,7 @@ mod tests {
         assert_eq!(ns[0].path.to_string(), "/svc");
 
         // Check that there are exactly two protocols inside the svc directory.
-        let dir = ns.pop().unwrap().directory.into_proxy().unwrap();
+        let dir = ns.pop().unwrap().directory.into_proxy();
         let mut entries = fuchsia_fs::directory::readdir(&dir).await.unwrap();
         let mut expectation = vec![
             DirEntry { name: "a".to_string(), kind: fio::DirentType::Service },
@@ -381,14 +381,14 @@ mod tests {
 
         // Check that there are one protocol inside each directory.
         {
-            let dir = svc1.pop().unwrap().directory.into_proxy().unwrap();
+            let dir = svc1.pop().unwrap().directory.into_proxy();
             assert_eq!(
                 fuchsia_fs::directory::readdir(&dir).await.unwrap(),
                 vec![DirEntry { name: "a".to_string(), kind: fio::DirentType::Service },]
             );
         }
         {
-            let dir = svc2.pop().unwrap().directory.into_proxy().unwrap();
+            let dir = svc2.pop().unwrap().directory.into_proxy();
             assert_eq!(
                 fuchsia_fs::directory::readdir(&dir).await.unwrap(),
                 vec![DirEntry { name: "b".to_string(), kind: fio::DirentType::Service },]
@@ -411,7 +411,7 @@ mod tests {
         assert_eq!(ns.len(), 1);
         assert_eq!(ns[0].path.to_string(), "/svc");
 
-        let dir = ns.pop().unwrap().directory.into_proxy().unwrap();
+        let dir = ns.pop().unwrap().directory.into_proxy();
         let (client_end, server_end) = zx::Channel::create();
         let _ = fdio::service_connect_at(
             &dir.into_channel().unwrap().into_zx_channel(),
@@ -442,23 +442,20 @@ mod tests {
         );
     }
 
-    #[test_case(fio::OpenFlags::RIGHT_READABLE)]
-    #[test_case(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE)]
-    #[test_case(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE)]
-    #[test_case(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE)]
+    #[test_case(fio::PERM_READABLE)]
+    #[test_case(fio::PERM_READABLE | fio::PERM_EXECUTABLE)]
+    #[test_case(fio::PERM_READABLE | fio::PERM_WRITABLE)]
+    #[test_case(fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE | fio::Flags::PERM_INHERIT_EXECUTE)]
     #[fuchsia::test]
-    async fn test_directory_rights(rights: fio::OpenFlags) {
+    async fn test_directory_rights(rights: fio::Flags) {
         fn serve_vfs_dir(
             root: Arc<impl VfsDirectory>,
-            rights: fio::OpenFlags,
+            rights: fio::Flags,
         ) -> ClientEnd<fio::DirectoryMarker> {
             let scope = ExecutionScope::new();
             let (client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-            root.open(
-                scope.clone(),
-                rights,
-                vfs::path::Path::dot(),
-                ServerEnd::new(server.into_channel()),
+            ObjectRequest::new3(rights, &fio::Options::default(), server.into_channel()).handle(
+                |request| root.open3(scope.clone(), vfs::path::Path::dot(), rights, request),
             );
             client
         }
@@ -467,7 +464,7 @@ mod tests {
 
         struct MockDir {
             tx: mpsc::Sender<()>,
-            rights: fio::OpenFlags,
+            rights: fio::Flags,
         }
         impl DirectoryEntry for MockDir {
             fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
@@ -483,13 +480,24 @@ mod tests {
             fn open(
                 self: Arc<Self>,
                 _scope: ExecutionScope,
-                flags: fio::OpenFlags,
-                relative_path: path::Path,
+                _flags: fio::OpenFlags,
+                _relative_path: path::Path,
                 _server_end: ServerEnd<fio::NodeMarker>,
             ) {
+                panic!("open is deprecated, use open3 instead")
+            }
+
+            fn open3(
+                self: Arc<Self>,
+                _scope: ExecutionScope,
+                relative_path: path::Path,
+                flags: fio::Flags,
+                _object_request: ObjectRequestRef<'_>,
+            ) -> Result<(), zx::Status> {
                 assert_eq!(relative_path.into_string(), "");
-                assert_eq!(flags, fio::OpenFlags::DIRECTORY | self.rights);
+                assert_eq!(flags, fio::Flags::PROTOCOL_DIRECTORY | self.rights);
                 self.tx.clone().try_send(()).unwrap();
+                Ok(())
             }
         }
 
@@ -502,13 +510,18 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let mut namespace = NamespaceBuilder::new(scope, ignore_not_found());
-        namespace.add_object(dir.into(), &path("/dir/a")).unwrap();
+        namespace.add_entry(dir.into(), &ns_path("/dir")).unwrap();
         let mut ns = namespace.serve().unwrap();
         let dir_proxy = ns.remove(&"/dir".parse().unwrap()).unwrap();
-        let dir_proxy = dir_proxy.into_proxy().unwrap();
+        let dir_proxy = dir_proxy.into_proxy();
         let (_, server_end) = endpoints::create_endpoints::<fio::NodeMarker>();
         dir_proxy
-            .open(fio::OpenFlags::DIRECTORY | rights, fio::ModeType::empty(), "a/foo", server_end)
+            .open3(
+                "foo",
+                fio::Flags::PROTOCOL_DIRECTORY | rights,
+                &fio::Options::default(),
+                server_end.into_channel(),
+            )
             .unwrap();
 
         // The MockDir should receive the Open request.
@@ -520,11 +533,9 @@ mod tests {
         fn serve_vfs_dir(root: Arc<impl VfsDirectory>) -> ClientEnd<fio::DirectoryMarker> {
             let scope = ExecutionScope::new();
             let (client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-            root.open(
-                scope.clone(),
-                fio::OpenFlags::RIGHT_READABLE,
-                vfs::path::Path::dot(),
-                ServerEnd::new(server.into_channel()),
+            let flags = fio::PERM_READABLE;
+            ObjectRequest::new3(flags, &fio::Options::default(), server.into_channel()).handle(
+                |request| root.open3(scope.clone(), vfs::path::Path::dot(), flags, request),
             );
             client
         }
@@ -554,6 +565,19 @@ mod tests {
                 assert_eq!(flags, fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE);
                 self.0.clone().try_send(()).unwrap();
             }
+
+            fn open3(
+                self: Arc<Self>,
+                _scope: ExecutionScope,
+                relative_path: path::Path,
+                flags: fio::Flags,
+                _object_request: ObjectRequestRef<'_>,
+            ) -> Result<(), zx::Status> {
+                assert_eq!(relative_path.into_string(), "");
+                assert_eq!(flags, fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE);
+                self.0.clone().try_send(()).unwrap();
+                Ok(())
+            }
         }
 
         let mock = Arc::new(MockDir(open_tx));
@@ -565,24 +589,22 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let mut namespace = NamespaceBuilder::new(scope, ignore_not_found());
-        namespace.add_object(dir.into(), &path("/dir/a")).unwrap();
+        namespace.add_entry(dir.into(), &ns_path("/dir")).unwrap();
         let mut ns = namespace.serve().unwrap();
         let dir_proxy = ns.remove(&"/dir".parse().unwrap()).unwrap();
-        let dir_proxy = dir_proxy.into_proxy().unwrap();
+        let dir_proxy = dir_proxy.into_proxy();
 
         // Try to open as executable. Should fail (ACCESS_DENIED)
         let (node, server_end) = endpoints::create_endpoints::<fio::NodeMarker>();
         dir_proxy
-            .open(
-                fio::OpenFlags::DIRECTORY
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_EXECUTABLE,
-                fio::ModeType::empty(),
-                "a/foo",
-                server_end,
+            .open3(
+                "foo",
+                fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_EXECUTABLE,
+                &fio::Options::default(),
+                server_end.into_channel(),
             )
             .unwrap();
-        let node = node.into_proxy().unwrap();
+        let node = node.into_proxy();
         let mut node = node.take_event_stream();
         assert_matches!(
             node.try_next().await,
@@ -592,11 +614,11 @@ mod tests {
         // Try to open as read-only. Should succeed.
         let (_, server_end) = endpoints::create_endpoints::<fio::NodeMarker>();
         dir_proxy
-            .open(
-                fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-                fio::ModeType::empty(),
-                "a/foo",
-                server_end,
+            .open3(
+                "foo",
+                fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE,
+                &fio::Options::default(),
+                server_end.into_channel(),
             )
             .unwrap();
 

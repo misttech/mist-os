@@ -125,7 +125,9 @@ impl NetworkManager {
 
     pub(crate) fn get_network_by_id_as_bytes(&self, network_id: u32) -> BString {
         let network_info = match self.get_network(&network_id) {
-            Some(Some(network)) => serde_json::to_string(&network).unwrap_or("{}".to_string()),
+            Some(Some(network)) => {
+                serde_json::to_string(&network).unwrap_or_else(|_| "{}".to_string())
+            }
             // A network with that was created but hasn't yet
             // been populated with network properties.
             Some(None) | None => "{}".to_string(),
@@ -954,8 +956,7 @@ mod tests {
         let manager = create_test_network_manager_handle(inspect_node);
         let (proxy, mut stream) = fidl::endpoints::create_sync_proxy_and_stream::<
             fnp_socketproxy::StarnixNetworksMarker,
-        >()
-        .unwrap();
+        >();
         let _ = manager.0.starnix_networks.lock().replace(proxy);
         if let Some(sender) = initiate_reconnect_sender {
             manager

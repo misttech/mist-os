@@ -149,13 +149,7 @@ pub fn publish(
                 return None;
             }
         },
-        Some(client_end) => match client_end.into_proxy() {
-            Ok(proxy) => proxy,
-            Err(err) => {
-                error!(%err, "failed to convert ClientEnd to Proxy");
-                return None;
-            }
-        },
+        Some(client_end) => client_end.into_proxy(),
     };
 
     // unwrap: safe since we have a valid tree handle coming from the server we spawn.
@@ -353,7 +347,7 @@ mod tests {
 
         assert_matches!(tree, Ok(InspectSinkRequest::Publish {
             payload: finspect::InspectSinkPublishRequest { tree: Some(tree), .. }, ..}) => {
-                let hierarchy = read(&tree.into_proxy().unwrap()).await.unwrap();
+                let hierarchy = read(&tree.into_proxy()).await.unwrap();
                 assert_json_diff!(hierarchy, root: {
                     hello: "world"
                 });
@@ -368,7 +362,7 @@ mod tests {
         let inspector = Inspector::default();
         inspector.root().record_string("hello", "world");
 
-        let (client, mut request_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client, mut request_stream) = fidl::endpoints::create_request_stream();
         let controller =
             publish(&inspector, PublishOptions::default().on_inspect_sink_client(client))
                 .expect("got controller");
@@ -384,7 +378,7 @@ mod tests {
             }
         };
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<finspect::InspectSinkMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<finspect::InspectSinkMarker>();
         let (client_token, request) = futures::future::join(
             controller.escrow_frozen(EscrowOptions {
                 name: Some("test".into()),

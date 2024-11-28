@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
 
 if (is_host) {
@@ -40,6 +41,11 @@ if (is_host) {
     rustenv = [ "RUST_SYSROOT=$out_rustc_prefix" ]
   }
 
+  install_host_tools("install") {
+    deps = [ ":shush" ]
+    outputs = [ "shush" ]
+  }
+
   rustc_test("shush_test") {
     edition = "2021"
     deps = _deps
@@ -48,12 +54,6 @@ if (is_host) {
 
     test_deps = [ "//build/rust:prebuilt_toolchain_host_test_data" ]
     rustenv = [ "RUST_SYSROOT=$out_rustc_prefix" ]
-  }
-
-  copy("install") {
-    sources = [ "$root_out_dir/shush" ]
-    deps = [ ":shush" ]
-    outputs = [ "$root_build_dir/host-tools/{{source_file_part}}" ]
   }
 
   group("tests") {

@@ -266,8 +266,7 @@ async fn do_connect<'a>(args: &'a [&'a str], client: &'a GattClientPtr) -> Resul
     };
 
     // Initialize the remote service proxy.
-    let (proxy, server) = endpoints::create_proxy::<RemoteServiceMarker>()
-        .context("Failed to create RemoteService endpoints")?;
+    let (proxy, server) = endpoints::create_proxy::<RemoteServiceMarker>();
 
     // First close the connection to the currently active service.
     let _ = client.write().active_service.take();
@@ -669,7 +668,7 @@ async fn do_enable_notify<'a>(args: &'a [&'a str], client: &'a GattClientPtr) ->
     }
 
     let (notifier_client, mut notifier_req_stream) =
-        endpoints::create_request_stream::<CharacteristicNotifierMarker>()?;
+        endpoints::create_request_stream::<CharacteristicNotifierMarker>();
     let proxy = client.read().try_clone_proxy().unwrap();
     proxy
         .register_characteristic_notifier(&Handle { value: id }, notifier_client)
@@ -790,7 +789,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_by_type() {
-        let (client, _stream) = create_proxy_and_stream::<ClientMarker>().unwrap();
+        let (client, _stream) = create_proxy_and_stream::<ClientMarker>();
         let gatt_client = GattClient::new(client);
 
         let args = vec!["0000180d-0000-1000-8000-00805f9b34fb"];
@@ -831,8 +830,7 @@ mod tests {
             _ = connect_fut =>  panic!("connect_fut completed prematurely (characteristics haven't been discovered)"),
             result = expect_connect_fut => result.expect("expect connect failed"),
         };
-        let service_stream =
-            service_server.into_stream().expect("failed to turn server into stream");
+        let service_stream = service_server.into_stream();
         let mut service_mock =
             RemoteServiceMock::from_stream(service_stream, zx::MonotonicDuration::from_seconds(20));
 
@@ -851,7 +849,7 @@ mod tests {
         let (register_result, expect_register_result) = join!(register_fut, expect_register_fut);
         register_result.expect("failed to register notifier");
         let notifier_client = expect_register_result.expect("expect register failed");
-        let notifier = notifier_client.into_proxy().expect("failed to turn notifier into proxy");
+        let notifier = notifier_client.into_proxy();
 
         let notification_value = ReadValue {
             handle: Some(Handle { value: 2 }),

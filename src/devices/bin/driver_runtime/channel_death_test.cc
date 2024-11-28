@@ -8,17 +8,17 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/test_utils.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 
 TEST(ChannelDeathTest, CloseCrashesIfPendingWaitNotCancelled) {
   test_utils::RunWithLsanDisabled([&] {
     uint32_t fake_driver;
-    driver_context::PushDriver(&fake_driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(&fake_driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        {}, "", [](fdf_dispatcher_t* dispatcher) {}, "");
+    auto dispatcher =
+        fdf::SynchronizedDispatcher::Create({}, "", [](fdf_dispatcher_t* dispatcher) {}, "");
     ASSERT_OK(dispatcher.status_value());
 
     auto channels = fdf::ChannelPair::Create(0);

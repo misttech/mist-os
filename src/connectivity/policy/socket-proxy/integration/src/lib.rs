@@ -197,8 +197,7 @@ async fn inner_provider_mock(
                                     responder
                                         .send(Ok(client))
                                         .expect("could not respond to StreamSocket call");
-                                    run_stream_socket(server.into_stream()?, mark_1, mark_2)
-                                        .await?;
+                                    run_stream_socket(server.into_stream(), mark_1, mark_2).await?;
                                 }
                                 fposix_socket::ProviderRequest::DatagramSocketDeprecated {
                                     domain: _,
@@ -218,8 +217,7 @@ async fn inner_provider_mock(
                                     responder
                                         .send(Ok(client))
                                         .expect("could not respond to StreamSocket call");
-                                    run_stream_socket(server.into_stream()?, mark_1, mark_2)
-                                        .await?;
+                                    run_stream_socket(server.into_stream(), mark_1, mark_2).await?;
                                 }
                                 fposix_socket::ProviderRequest::DatagramSocket {
                                     domain: _,
@@ -243,12 +241,8 @@ async fn inner_provider_mock(
                                             responder
                                                 .send(Ok(DatagramSocket(client)))
                                                 .expect("could not respond to StreamSocket call");
-                                            run_stream_socket(
-                                                server.into_stream()?,
-                                                mark_1,
-                                                mark_2,
-                                            )
-                                            .await?;
+                                            run_stream_socket(server.into_stream(), mark_1, mark_2)
+                                                .await?;
                                         }
                                         fposix_socket::DatagramSocketProtocol::IcmpEcho => {
                                             let (client, server) = create_endpoints::<
@@ -258,12 +252,8 @@ async fn inner_provider_mock(
                                             responder
                                                 .send(Ok(SynchronousDatagramSocket(client)))
                                                 .expect("could not respond to StreamSocket call");
-                                            run_stream_socket(
-                                                server.into_stream()?,
-                                                mark_1,
-                                                mark_2,
-                                            )
-                                            .await?;
+                                            run_stream_socket(server.into_stream(), mark_1, mark_2)
+                                                .await?;
                                         }
                                     }
                                 }
@@ -298,8 +288,7 @@ async fn inner_provider_mock(
                                     responder
                                         .send(Ok(client))
                                         .expect("could not respond to StreamSocket call");
-                                    run_stream_socket(server.into_stream()?, mark_1, mark_2)
-                                        .await?;
+                                    run_stream_socket(server.into_stream(), mark_1, mark_2).await?;
                                 }
                             }
                             Ok(())
@@ -374,7 +363,7 @@ async fn integration() -> Result<(), Error> {
             .stream_socket(fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp)
             .await?
             .map_err(|e| anyhow!("Could not get socket: {e:?}"))?
-            .into_proxy()?;
+            .into_proxy();
 
         // With no registered networks, the mark should be unset
         assert_eq!(
@@ -407,7 +396,7 @@ async fn integration() -> Result<(), Error> {
             .stream_socket(fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp)
             .await?
             .map_err(|e| anyhow!("Could not get socket: {e:?}"))?
-            .into_proxy()?;
+            .into_proxy();
 
         // With any registered networks, the mark should be set to 0.
         assert_eq!(socket.get_mark(MarkDomain::Mark1).await?, Ok(OptionalUint32::Value(0)));
@@ -425,7 +414,7 @@ async fn integration() -> Result<(), Error> {
             )
             .await?
             .map_err(|e| anyhow!("Could not get socket: {e:?}"))?
-            .into_proxy()?;
+            .into_proxy();
 
         // With any registered networks, the mark should be set to 0.
         assert_eq!(socket.get_mark(MarkDomain::Mark1).await?, Ok(OptionalUint32::Value(0)));
@@ -451,7 +440,7 @@ async fn integration() -> Result<(), Error> {
         } else {
             panic!("Expected DatagramSocket response");
         }
-        .into_proxy()?;
+        .into_proxy();
 
         // With any registered networks, the mark should be set to 0.
         assert_eq!(socket.get_mark(MarkDomain::Mark1).await?, Ok(OptionalUint32::Value(0)));
@@ -479,7 +468,7 @@ async fn integration() -> Result<(), Error> {
             } else {
                 panic!("Expected SynchronousDatagramSocket response");
             }
-            .into_proxy()?;
+            .into_proxy();
 
         // With any registered networks, the mark should be set to 0.
         assert_eq!(socket.get_mark(MarkDomain::Mark1).await?, Ok(OptionalUint32::Value(0)));
@@ -497,7 +486,7 @@ async fn integration() -> Result<(), Error> {
             )
             .await?
             .map_err(|e| anyhow!("Could not get socket: {e:?}"))?
-            .into_proxy()?;
+            .into_proxy();
 
         // With any registered networks, the mark should be set to 0.
         assert_eq!(socket.get_mark(MarkDomain::Mark1).await?, Ok(OptionalUint32::Value(0)));
@@ -514,7 +503,7 @@ async fn integration() -> Result<(), Error> {
             .stream_socket(fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp)
             .await?
             .map_err(|e| anyhow!("Could not get socket: {e:?}"))?
-            .into_proxy()?;
+            .into_proxy();
 
         // With no registered networks, the mark should be unset
         assert_eq!(

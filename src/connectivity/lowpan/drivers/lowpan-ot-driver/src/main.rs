@@ -108,7 +108,7 @@ impl Config {
             "Unable to set server-side FIDL channel via spinel_device_setup_proxy.set_channel()",
         )?;
 
-        Ok(client_side.into_proxy()?)
+        Ok(client_side.into_proxy())
     }
 
     fn get_backbone_netif_index_by_config(&self) -> Option<ot::NetifIndex> {
@@ -138,8 +138,7 @@ impl Config {
         let state = connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
             .expect("error connecting to StateMarker");
         let (watcher_client, watcher_server) =
-            create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()
-                .expect("error connecting to WatcherMarker");
+            create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>();
         state
             .get_watcher(&fidl_fuchsia_net_interfaces::WatcherOptions::default(), watcher_server)
             .expect("error getting interface watcher");

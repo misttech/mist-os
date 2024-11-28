@@ -51,17 +51,16 @@
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
 #include "src/graphics/display/drivers/coordinator/vsync-monitor.h"
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
-#include "src/graphics/display/lib/edid/timings.h"
 
 namespace fidl_display = fuchsia_hardware_display;
 
-namespace display {
+namespace display_coordinator {
 
 void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   if (!info->edid.has_value()) {
@@ -71,8 +70,20 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   // Go through all the display mode timings and record whether or not
   // a basic layer configuration is acceptable.
   layer_t test_layers[] = {
-      {
-          .type = LAYER_TYPE_PRIMARY,
+      // The width and height will be replaced by the code below.
+      layer_t{
+          .display_destination = {.x = 0, .y = 0, .width = 0, .height = 0},
+          .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
+          .image_handle = INVALID_DISPLAY_ID,
+          .image_metadata = {.width = 0, .height = 0, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
+          .fallback_color =
+              {
+                  .format = static_cast<uint32_t>(fuchsia_images2::PixelFormat::kR8G8B8A8),
+                  .bytes = {0},
+              },
+          .alpha_mode = ALPHA_DISABLE,
+          .alpha_layer_val = 0.0,
+          .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
       },
   };
   display_config_t test_configs[] = {
@@ -106,12 +117,12 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     ZX_DEBUG_ASSERT_MSG(
         static_cast<const layer_t*>(&test_layer) == &test_configs[0].layer_list[0],
         "test_layer should be a non-const alias for the first layer in test_configs");
-    test_layer.cfg.primary.image_metadata.width = width;
-    test_layer.cfg.primary.image_metadata.height = height;
-    test_layer.cfg.primary.image_source.width = width;
-    test_layer.cfg.primary.image_source.height = height;
-    test_layer.cfg.primary.display_destination.width = width;
-    test_layer.cfg.primary.display_destination.height = height;
+    test_layer.image_metadata.width = width;
+    test_layer.image_metadata.height = height;
+    test_layer.image_source.width = width;
+    test_layer.image_source.height = height;
+    test_layer.display_destination.width = width;
+    test_layer.display_destination.height = height;
 
     display_config_t& test_config = test_configs[0];
     test_config.mode = display::ToBanjoDisplayMode(timing);
@@ -143,7 +154,7 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
   }
 
   fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
-  DisplayId display_id = display_info->id;
+  display::DisplayId display_id = display_info->id;
 
   fbl::AutoLock lock(mtx());
   auto display_it = displays_.find(display_id);
@@ -161,42 +172,42 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx::result<> post_task_result =
-      PostTask(std::move(post_task_state), *client_dispatcher()->async_dispatcher(),
-               [this, display_info = std::move(display_info)]() {
-                 if (display_info->edid.has_value()) {
-                   PopulateDisplayTimings(display_info);
-                 }
+  zx::result<> post_task_result = display::PostTask(
+      std::move(post_task_state), *client_dispatcher()->async_dispatcher(),
+      [this, display_info = std::move(display_info)]() {
+        if (display_info->edid.has_value()) {
+          PopulateDisplayTimings(display_info);
+        }
 
-                 // TODO(b/317914671): Pass parsed display metadata to driver.
+        // TODO(b/317914671): Pass parsed display metadata to driver.
 
-                 fbl::AutoLock lock(mtx());
+        fbl::AutoLock lock(mtx());
 
-                 const std::array<DisplayId, 1> added_id_candidates = {display_info->id};
-                 cpp20::span<const DisplayId> added_ids(added_id_candidates);
+        const std::array<display::DisplayId, 1> added_id_candidates = {display_info->id};
+        cpp20::span<const display::DisplayId> added_ids(added_id_candidates);
 
-                 // TODO(https://fxbug.dev/339311596): Do not trigger the client's
-                 // `OnDisplaysChanged` if an added display is ignored.
-                 //
-                 // Dropping some add events can result in spurious removes, but
-                 // those are filtered out in the clients.
-                 if (!display_info->edid.has_value() || !display_info->edid->timings.is_empty()) {
-                   display_info->init_done = true;
-                   display_info->InitializeInspect(&root_);
-                 } else {
-                   FDF_LOG(WARNING, "Ignoring display with no compatible edid timings");
-                   added_ids = {};
-                 }
+        // TODO(https://fxbug.dev/339311596): Do not trigger the client's
+        // `OnDisplaysChanged` if an added display is ignored.
+        //
+        // Dropping some add events can result in spurious removes, but
+        // those are filtered out in the clients.
+        if (!display_info->edid.has_value() || !display_info->edid->timings.is_empty()) {
+          display_info->init_done = true;
+          display_info->InitializeInspect(&root_);
+        } else {
+          FDF_LOG(WARNING, "Ignoring display with no compatible edid timings");
+          added_ids = {};
+        }
 
-                 if (virtcon_client_ready_) {
-                   ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
-                   virtcon_client_->OnDisplaysChanged(added_ids, /*removed_display_ids=*/{});
-                 }
-                 if (primary_client_ready_) {
-                   ZX_DEBUG_ASSERT(primary_client_ != nullptr);
-                   primary_client_->OnDisplaysChanged(added_ids, /*removed_display_ids=*/{});
-                 }
-               });
+        if (virtcon_client_ready_) {
+          ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
+          virtcon_client_->OnDisplaysChanged(added_ids, /*removed_display_ids=*/{});
+        }
+        if (primary_client_ready_) {
+          ZX_DEBUG_ASSERT(primary_client_ != nullptr);
+          primary_client_->OnDisplaysChanged(added_ids, /*removed_display_ids=*/{});
+        }
+      });
 
   if (post_task_result.is_error()) {
     FDF_LOG(ERROR, "Failed to dispatch task: %s", post_task_result.status_string());
@@ -204,7 +215,7 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
   return post_task_result;
 }
 
-zx::result<> Controller::RemoveDisplay(DisplayId display_id) {
+zx::result<> Controller::RemoveDisplay(display::DisplayId display_id) {
   fbl::AutoLock lock(mtx());
   fbl::RefPtr<DisplayInfo> removed_display = displays_.erase(display_id);
   if (!removed_display) {
@@ -224,10 +235,10 @@ zx::result<> Controller::RemoveDisplay(DisplayId display_id) {
     FDF_LOG(ERROR, "No memory when processing hotplug");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-  zx::result<> post_task_result = PostTask(
+  zx::result<> post_task_result = display::PostTask(
       std::move(post_task_state), *client_dispatcher()->async_dispatcher(), [this, display_id]() {
         fbl::AutoLock lock(mtx());
-        const std::array<DisplayId, 1> removed_display_ids = {
+        const std::array<display::DisplayId, 1> removed_display_ids = {
             display_id,
         };
         if (virtcon_client_ready_) {
@@ -256,7 +267,7 @@ void Controller::DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* b
 }
 
 void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id) {
-  DisplayId display_id = ToDisplayId(banjo_display_id);
+  display::DisplayId display_id = display::ToDisplayId(banjo_display_id);
   zx::result<> remove_display_result = RemoveDisplay(display_id);
   if (remove_display_result.is_error()) {
     FDF_LOG(WARNING, "Failed to remove a display: %s", remove_display_result.status_string());
@@ -272,11 +283,11 @@ void Controller::DisplayEngineListenerOnCaptureComplete() {
   }
 
   zx::result<> post_task_result =
-      PostTask<kDisplayTaskTargetSize>(*client_dispatcher()->async_dispatcher(), [this]() {
+      display::PostTask<kDisplayTaskTargetSize>(*client_dispatcher()->async_dispatcher(), [this]() {
         // Free an image that was previously used by the hardware.
-        if (pending_release_capture_image_id_ != kInvalidDriverCaptureImageId) {
+        if (pending_release_capture_image_id_ != display::kInvalidDriverCaptureImageId) {
           ReleaseCaptureImage(pending_release_capture_image_id_);
-          pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
+          pending_release_capture_image_id_ = display::kInvalidDriverCaptureImageId;
         }
 
         fbl::AutoLock lock(mtx());
@@ -303,11 +314,12 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   TRACE_INSTANT("gfx", "VSYNC", TRACE_SCOPE_THREAD, "display_id", banjo_display_id);
   TRACE_DURATION("gfx", "Display::Controller::OnDisplayVsync", "display_id", banjo_display_id);
 
-  const DisplayId display_id(banjo_display_id);
+  const display::DisplayId display_id(banjo_display_id);
 
   zx::time vsync_timestamp = zx::time(banjo_timestamp);
-  ConfigStamp vsync_config_stamp =
-      banjo_config_stamp_ptr ? ToConfigStamp(*banjo_config_stamp_ptr) : kInvalidConfigStamp;
+  display::ConfigStamp vsync_config_stamp = banjo_config_stamp_ptr
+                                                ? display::ToConfigStamp(*banjo_config_stamp_ptr)
+                                                : display::kInvalidConfigStamp;
   vsync_monitor_.OnVsync(vsync_timestamp, vsync_config_stamp);
 
   fbl::AutoLock lock(mtx());
@@ -332,7 +344,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
     bool done = vsync_config_stamp >= info->pending_layer_change_controller_config_stamp;
     if (done) {
       info->pending_layer_change = false;
-      info->pending_layer_change_controller_config_stamp = kInvalidConfigStamp;
+      info->pending_layer_change_controller_config_stamp = display::kInvalidConfigStamp;
       info->switching_client = false;
 
       if (active_client_ && info->delayed_apply) {
@@ -412,7 +424,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   // OnVsync() DisplayController FIDL events. In the future we'll remove this
   // logic and only return config seqnos in OnVsync() events instead.
 
-  if (vsync_config_stamp != kInvalidConfigStamp) {
+  if (vsync_config_stamp != display::kInvalidConfigStamp) {
     auto& config_image_queue = info->config_image_queue;
 
     // Evict retired configurations from the queue.
@@ -461,8 +473,9 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   }
 }
 
-void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStamp config_stamp,
-                             uint32_t layer_stamp, ClientId client_id) {
+void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
+                             display::ConfigStamp config_stamp, uint32_t layer_stamp,
+                             ClientId client_id) {
   zx_time_t timestamp = zx_clock_get_monotonic();
   last_valid_apply_config_timestamp_ns_property_.Set(timestamp);
   last_valid_apply_config_interval_ns_property_.Set(timestamp - last_valid_apply_config_timestamp_);
@@ -479,7 +492,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
   // The applied configuration's stamp.
   //
   // Populated from `controller_stamp_` while the mutex is held.
-  ConfigStamp applied_config_stamp = {};
+  display::ConfigStamp applied_config_stamp = {};
 
   {
     fbl::AutoLock lock(mtx());
@@ -595,21 +608,21 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
   engine_driver_client_->ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
 }
 
-void Controller::ReleaseImage(DriverImageId driver_image_id) {
+void Controller::ReleaseImage(display::DriverImageId driver_image_id) {
   engine_driver_client_->ReleaseImage(driver_image_id);
 }
 
-void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id) {
+void Controller::ReleaseCaptureImage(display::DriverCaptureImageId driver_capture_image_id) {
   if (!supports_capture_) {
     return;
   }
-  if (driver_capture_image_id == kInvalidDriverCaptureImageId) {
+  if (driver_capture_image_id == display::kInvalidDriverCaptureImageId) {
     return;
   }
 
   const zx::result<> result = engine_driver_client_->ReleaseCapture(driver_capture_image_id);
   if (result.is_error() && result.error_value() == ZX_ERR_SHOULD_WAIT) {
-    ZX_DEBUG_ASSERT_MSG(pending_release_capture_image_id_ == kInvalidDriverCaptureImageId,
+    ZX_DEBUG_ASSERT_MSG(pending_release_capture_image_id_ == display::kInvalidDriverCaptureImageId,
                         "multiple pending releases for capture images");
     // Delay the image release until the hardware is done.
     pending_release_capture_image_id_ = driver_capture_image_id;
@@ -664,7 +677,8 @@ void Controller::OnClientDead(ClientProxy* client) {
       [client](std::unique_ptr<ClientProxy>& list_client) { return list_client.get() == client; });
 }
 
-zx::result<cpp20::span<const DisplayTiming>> Controller::GetDisplayTimings(DisplayId display_id) {
+zx::result<cpp20::span<const display::DisplayTiming>> Controller::GetDisplayTimings(
+    display::DisplayId display_id) {
   if (unbinding_) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
@@ -682,7 +696,7 @@ zx::result<cpp20::span<const DisplayTiming>> Controller::GetDisplayTimings(Displ
 }
 
 zx::result<fbl::Array<CoordinatorPixelFormat>> Controller::GetSupportedPixelFormats(
-    DisplayId display_id) {
+    display::DisplayId display_id) {
   fbl::Array<CoordinatorPixelFormat> formats_out;
   for (auto& display : displays_) {
     if (display.id == display_id) {
@@ -776,7 +790,7 @@ zx_status_t Controller::CreateClient(
   }
   HandleClientOwnershipChanges();
 
-  zx::result<> post_task_result = PostTask(
+  zx::result<> post_task_result = display::PostTask(
       std::move(post_task_state), *client_dispatcher()->async_dispatcher(), [this, client_id]() {
         fbl::AutoLock lock(mtx());
         if (unbinding_) {
@@ -794,7 +808,7 @@ zx_status_t Controller::CreateClient(
 
         // Add all existing displays to the client
         if (displays_.size() > 0) {
-          DisplayId current_displays[displays_.size()];
+          display::DisplayId current_displays[displays_.size()];
           int initialized_display_count = 0;
           for (const DisplayInfo& display : displays_) {
             if (display.init_done) {
@@ -802,9 +816,9 @@ zx_status_t Controller::CreateClient(
               ++initialized_display_count;
             }
           }
-          cpp20::span<DisplayId> removed_display_ids = {};
+          cpp20::span<display::DisplayId> removed_display_ids = {};
           client_proxy->OnDisplaysChanged(
-              cpp20::span<DisplayId>(current_displays, initialized_display_count),
+              cpp20::span<display::DisplayId>(current_displays, initialized_display_count),
               removed_display_ids);
         }
 
@@ -857,7 +871,7 @@ void Controller::OpenCoordinatorWithListenerForPrimary(
   }
 }
 
-ConfigStamp Controller::TEST_controller_stamp() const {
+display::ConfigStamp Controller::TEST_controller_stamp() const {
   fbl::AutoLock lock(mtx());
   return controller_stamp_;
 }
@@ -961,7 +975,7 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
   last_valid_apply_config_interval_ns_property_ =
       root_.CreateUint("last_valid_apply_config_interval_ns", 0);
   last_valid_apply_config_config_stamp_property_ =
-      root_.CreateUint("last_valid_apply_config_stamp", kInvalidConfigStamp.value());
+      root_.CreateUint("last_valid_apply_config_stamp", display::kInvalidConfigStamp.value());
 }
 
 Controller::~Controller() { FDF_LOG(INFO, "Controller::~Controller"); }
@@ -977,4 +991,4 @@ size_t Controller::TEST_imported_images_count() const {
   return virtcon_images + primary_images + display_images;
 }
 
-}  // namespace display
+}  // namespace display_coordinator

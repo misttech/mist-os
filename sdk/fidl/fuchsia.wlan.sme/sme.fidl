@@ -344,6 +344,9 @@ closed protocol Telemetry {
     strict GetHistogramStats() -> (struct {
         stats fuchsia.wlan.stats.IfaceHistogramStats;
     }) error zx.Status;
+    strict CloneInspectVmo() -> (resource struct {
+        inspect_vmo zx.Handle:VMO;
+    }) error zx.Status;
 };
 
 closed protocol FeatureSupport {

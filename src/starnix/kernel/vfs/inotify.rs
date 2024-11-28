@@ -169,6 +169,7 @@ impl InotifyFileObject {
         remove_watcher_after_notify: bool,
     ) {
         // Holds a DirEntry pending deletion to be dropped after releasing the state mutex.
+        #[allow(clippy::collection_is_never_read)]
         let _dir_entry: Option<DirEntryHandle>;
         {
             let mut state = self.state.lock();

@@ -89,7 +89,7 @@ pub(crate) fn write_formatted_output_for_ffx(
 
     writeln!(output_writer, "{}", HEADER)?;
     write_command(output_writer, 1, "", &value)?;
-    Ok((value.name.into(), value.description.into(), output_md_path.clone()))
+    Ok((value.name.into(), value.description.into(), output_md_path))
 }
 
 fn write_command(

@@ -56,8 +56,7 @@ impl FfxMain for RecordTool {
         };
 
         let (record_remote, record_local) = fidl::Socket::create_datagram();
-        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>()
-            .map_err(|e| anyhow!("FIDL Error creating canceler proxy: {e}"))?;
+        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>();
 
         let request = fac::RecorderRecordRequest {
             source: Some(location),
@@ -124,7 +123,7 @@ mod tests {
         let test_buffers = TestBuffers::default();
         let result_writer: SimpleWriter = SimpleWriter::new_test(&test_buffers);
 
-        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>().unwrap();
+        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>();
 
         let test_stdout = TestBuffer::default();
 
@@ -171,7 +170,7 @@ mod tests {
         let test_buffers = TestBuffers::default();
         let result_writer: SimpleWriter = SimpleWriter::new_test(&test_buffers);
 
-        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>().unwrap();
+        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>();
 
         let test_stdout = TestBuffer::default();
 

@@ -22,9 +22,9 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace {
@@ -447,16 +447,25 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   auto bottom_color = pipe_regs.PipeBottomColor().FromValue(0);
   bottom_color.set_csc_enable(!!banjo_display_config->cc_flags);
   bool has_color_layer = banjo_display_config->layer_count &&
-                         banjo_display_config->layer_list[0].type == LAYER_TYPE_COLOR;
+                         (banjo_display_config->layer_list[0].image_metadata.width == 0 ||
+                          banjo_display_config->layer_list[0].image_metadata.height == 0);
   if (has_color_layer) {
-    const color_layer_t* layer = &banjo_display_config->layer_list[0].cfg.color;
-    const auto format = static_cast<fuchsia_images2::wire::PixelFormat>(layer->format);
-    ZX_DEBUG_ASSERT(format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
-    uint32_t color = *reinterpret_cast<const uint32_t*>(layer->color_list);
+    const layer_t* layer = &banjo_display_config->layer_list[0];
+    const auto format =
+        static_cast<fuchsia_images2::wire::PixelFormat>(layer->fallback_color.format);
 
-    bottom_color.set_r(encode_pipe_color_component(static_cast<uint8_t>(color >> 16)));
-    bottom_color.set_g(encode_pipe_color_component(static_cast<uint8_t>(color >> 8)));
-    bottom_color.set_b(encode_pipe_color_component(static_cast<uint8_t>(color)));
+    if (format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8) {
+      bottom_color.set_r(encode_pipe_color_component(layer->fallback_color.bytes[2]));
+      bottom_color.set_g(encode_pipe_color_component(layer->fallback_color.bytes[1]));
+      bottom_color.set_b(encode_pipe_color_component(layer->fallback_color.bytes[0]));
+    } else if (format == fuchsia_images2::wire::PixelFormat::kR8G8B8A8) {
+      bottom_color.set_r(encode_pipe_color_component(layer->fallback_color.bytes[0]));
+      bottom_color.set_g(encode_pipe_color_component(layer->fallback_color.bytes[1]));
+      bottom_color.set_b(encode_pipe_color_component(layer->fallback_color.bytes[2]));
+    } else {
+      // CheckConfig() was supposed to reject this format.
+      ZX_DEBUG_ASSERT(false);
+    }
     config_stamp_with_color_layer_ = config_stamp;
   } else {
     config_stamp_with_color_layer_ = display::kInvalidConfigStamp;
@@ -466,11 +475,11 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
 
   bool scaler_1_claimed = false;
   for (unsigned plane = 0; plane < 3; plane++) {
-    const primary_layer_t* primary = nullptr;
+    const layer_t* primary = nullptr;
     for (unsigned layer_index = 0; layer_index < banjo_display_config->layer_count; ++layer_index) {
       const layer_t& layer = banjo_display_config->layer_list[layer_index];
-      if (layer.type == LAYER_TYPE_PRIMARY && layer_index == plane + has_color_layer) {
-        primary = &layer.cfg.primary;
+      if (layer.image_handle != INVALID_DISPLAY_ID && layer_index == plane + has_color_layer) {
+        primary = &layer;
         break;
       }
     }
@@ -500,9 +509,8 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   }
 }
 
-void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* primary,
-                                 bool enable_csc, bool* scaler_1_claimed,
-                                 registers::pipe_arming_regs_t* regs,
+void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, bool enable_csc,
+                                 bool* scaler_1_claimed, registers::pipe_arming_regs_t* regs,
                                  display::ConfigStamp config_stamp,
                                  const SetupGttImageFunc& setup_gtt_image,
                                  const GetImagePixelFormatFunc& get_pixel_format) {

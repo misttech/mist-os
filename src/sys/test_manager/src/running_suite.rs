@@ -96,7 +96,12 @@ impl RunningSuite {
 
         let test_package = match AbsoluteComponentUrl::parse(test_url) {
             Ok(component_url) => component_url.package_url().name().to_string(),
-            Err(_) => return Err(LaunchTestError::InvalidResolverData),
+            Err(_) => match fuchsia_url::boot_url::BootUrl::parse(test_url) {
+                Ok(boot_url) => boot_url.path().to_string(),
+                Err(_) => {
+                    return Err(LaunchTestError::InvalidResolverData);
+                }
+            },
         };
         above_root_capabilities_for_test
             .validate(facets.collection)
@@ -132,8 +137,7 @@ impl RunningSuite {
             .map_err(|e| LaunchTestError::CreateTestFidl(e))?
             .map_err(|e| LaunchTestError::CreateTest(e))?;
 
-        let (exposed_dir, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let child_ref = fdecl::ChildRef {
             name: TEST_ROOT_REALM_NAME.into(),
             collection: Some(TEST_ROOT_COLLECTION.into()),
@@ -388,7 +392,7 @@ impl RunningSuite {
         let artifact_storage_admin = self.connect_to_storage_admin()?;
 
         let root_moniker = "./";
-        let (iterator, iter_server) = create_proxy::<fsys::StorageIteratorMarker>()?;
+        let (iterator, iter_server) = create_proxy::<fsys::StorageIteratorMarker>();
         artifact_storage_admin
             .list_storage_in_realm(&root_moniker, iter_server)
             .await?
@@ -549,8 +553,7 @@ pub(crate) async fn enumerate_test_cases(
     matcher: Option<&CaseMatcher>,
 ) -> Result<Vec<Invocation>, anyhow::Error> {
     debug!("enumerating tests");
-    let (case_iterator, server_end) =
-        fidl::endpoints::create_proxy().expect("cannot create case iterator");
+    let (case_iterator, server_end) = fidl::endpoints::create_proxy();
     suite.get_tests(server_end).map_err(enumeration_error)?;
     let mut invocations = vec![];
 
@@ -999,8 +1002,7 @@ async fn run_invocations(
     sender: &mut mpsc::Sender<Result<SuiteEvents, LaunchError>>,
     timeout_fut: futures::future::Shared<fasync::Timer>,
 ) -> Result<SuiteStatus, anyhow::Error> {
-    let (run_listener_client, mut run_listener) =
-        fidl::endpoints::create_request_stream().expect("cannot create request stream");
+    let (run_listener_client, mut run_listener) = fidl::endpoints::create_request_stream();
     suite.run(&invocations, &run_options, run_listener_client)?;
 
     let tasks = Arc::new(lock::Mutex::new(vec![]));
@@ -1030,8 +1032,7 @@ async fn run_invocations(
                     for event in events {
                         sender_clone.send(event).await.unwrap();
                     }
-                    let listener =
-                        listener.into_stream().context("Cannot convert listener to stream")?;
+                    let listener = listener.into_stream();
                     running_test_cases.lock().await.insert(identifier);
                     let running_test_cases = running_test_cases.clone();
                     let mut sender = sender_clone.clone();

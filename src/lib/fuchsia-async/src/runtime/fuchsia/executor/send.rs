@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::common::{Executor, ExecutorTime};
+use super::common::{Executor, ExecutorTime, MAIN_TASK_ID};
 use super::scope::ScopeHandle;
 use crate::atomic_future::AtomicFuture;
 use fuchsia_sync::{Condvar, Mutex};
@@ -90,6 +90,7 @@ impl SendExecutor {
                 false,
             ),
         );
+        self.root_scope.detach(MAIN_TASK_ID);
 
         // Start worker threads, handing off timers from the current thread.
         self.inner.done.store(false, Ordering::SeqCst);

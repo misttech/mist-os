@@ -79,7 +79,7 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
             info!("fidl_wlanix::WifiChipRequest::CreateStaIface");
             match payload.iface {
                 Some(iface) => {
-                    let reqs = iface.into_stream().context("create WifiStaIface stream")?;
+                    let reqs = iface.into_stream();
                     let iface_id = iface_manager.create_client_iface(chip_id).await?;
                     telemetry_sender.send(TelemetryEvent::ClientIfaceCreated { iface_id });
                     responder.send(Ok(())).context("send CreateStaIface response")?;
@@ -109,7 +109,7 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
             match payload.iface {
                 Some(iface) => {
                     // TODO(b/298030634): Use the iface name to identify the correct iface here.
-                    let reqs = iface.into_stream().context("create WifiStaIface stream")?;
+                    let reqs = iface.into_stream();
                     let ifaces = iface_manager.list_ifaces();
                     if ifaces.is_empty() {
                         warn!("No iface available for GetStaIface.");
@@ -153,6 +153,10 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
                     }
                 }
             }
+        }
+        fidl_wlanix::WifiChipRequest::SetCountryCode { payload: _, responder } => {
+            info!("fidl_wlanix::WifiChipRequest::SetCountryCode");
+            responder.send(Ok(())).context("send SetCountryCode response")?;
         }
         // TODO(https://fxbug.dev/366027488): GetAvailableModes is hardcoded.
         fidl_wlanix::WifiChipRequest::GetAvailableModes { responder } => {
@@ -267,7 +271,7 @@ async fn handle_wifi_request<I: IfaceManager>(
         fidl_wlanix::WifiRequest::RegisterEventCallback { payload, .. } => {
             info!("fidl_wlanix::WifiRequest::RegisterEventCallback");
             if let Some(callback) = payload.callback {
-                state.lock().callbacks.push(callback.into_proxy()?);
+                state.lock().callbacks.push(callback.into_proxy());
             }
         }
         fidl_wlanix::WifiRequest::Start { responder } => {
@@ -328,7 +332,7 @@ async fn handle_wifi_request<I: IfaceManager>(
             info!("fidl_wlanix::WifiRequest::GetChip - chip_id {:?}", payload.chip_id);
             match (payload.chip_id, payload.chip) {
                 (Some(chip_id), Some(chip)) => {
-                    let chip_stream = chip.into_stream().context("create WifiChip stream")?;
+                    let chip_stream = chip.into_stream();
                     match u16::try_from(chip_id) {
                         Ok(chip_id) => {
                             responder.send(Ok(())).context("send GetChip response")?;
@@ -393,7 +397,6 @@ struct SupplicantStaNetworkState {
     bssid: Option<Bssid>,
 }
 
-#[derive(Default)]
 struct SupplicantStaIfaceState {
     callbacks: Vec<fidl_wlanix::SupplicantStaIfaceCallbackProxy>,
 }
@@ -787,7 +790,7 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
         fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback { payload, .. } => {
             info!("fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback");
             if let Some(callback) = payload.callback {
-                sta_iface_state.lock().callbacks.push(callback.into_proxy()?);
+                sta_iface_state.lock().callbacks.push(callback.into_proxy());
             } else {
                 warn!("Empty callback field in received RegisterCallback request.")
             }
@@ -795,9 +798,7 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
         fidl_wlanix::SupplicantStaIfaceRequest::AddNetwork { payload, .. } => {
             info!("fidl_wlanix::SupplicantStaIfaceRequest::AddNetwork");
             if let Some(supplicant_sta_network) = payload.network {
-                let supplicant_sta_network_stream = supplicant_sta_network
-                    .into_stream()
-                    .context("create SupplicantStaNetwork stream")?;
+                let supplicant_sta_network_stream = supplicant_sta_network.into_stream();
                 // TODO(https://fxbug.dev/316035436): Should we return NetworkAdded event?
                 serve_supplicant_sta_network(
                     telemetry_sender,
@@ -819,6 +820,36 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
                 warn!("Failed to send disconnect response: {}", e);
             }
         }
+        fidl_wlanix::SupplicantStaIfaceRequest::SetPowerSave { payload, responder } => {
+            info!("fidl_wlanix::SupplicantStaIfaceRequest::SetPowerSave");
+            match payload.enable {
+                Some(enable) => match iface.set_power_save_mode(enable).await {
+                    Ok(()) => info!("Set power save mode to {}", enable),
+                    Err(e) => warn!("Failed to set power save mode: {:?}", e),
+                },
+                None => error!("Got SetPowerSave without a payload"),
+            }
+            if let Err(e) = responder.send() {
+                warn!("Failed to send disconnect response: {}", e);
+            }
+        }
+        fidl_wlanix::SupplicantStaIfaceRequest::SetSuspendModeEnabled { payload, responder } => {
+            info!("fidl_wlanix::SupplicantStaIfaceRequest::SetSuspendModeEnabled");
+            match payload.enable {
+                Some(enable) => match iface.set_suspend_mode(enable).await {
+                    Ok(()) => info!("Set suspend mode to {}", enable),
+                    Err(e) => warn!("Failed to set suspend mode: {:?}", e),
+                },
+                None => error!("Got SetSuspendModeEnabled without a payload"),
+            }
+            if let Err(e) = responder.send() {
+                warn!("Failed to send disconnect response: {}", e);
+            }
+        }
+        fidl_wlanix::SupplicantStaIfaceRequest::SetStaCountryCode { payload: _, responder } => {
+            info!("fidl_wlanix::SupplicantStaIfaceRequest::SetStaCountryCode");
+            responder.send(Ok(())).context("send SetStaCountryCode response")?;
+        }
         fidl_wlanix::SupplicantStaIfaceRequest::_UnknownMethod { ordinal, .. } => {
             warn!("Unknown SupplicantStaIfaceRequest ordinal: {}", ordinal);
         }
@@ -833,7 +864,7 @@ async fn serve_supplicant_sta_iface<C: ClientIface>(
     iface: Arc<C>,
     iface_id: u16,
 ) {
-    let sta_iface_state = Arc::new(Mutex::new(SupplicantStaIfaceState::default()));
+    let sta_iface_state = Arc::new(Mutex::new(SupplicantStaIfaceState { callbacks: vec![] }));
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
@@ -874,9 +905,7 @@ async fn handle_supplicant_request<I: IfaceManager>(
                     bail!("AddStaInterface but no interfaces exist.");
                 } else {
                     let client_iface = iface_manager.get_client_iface(ifaces[0]).await?;
-                    let supplicant_sta_iface_stream = supplicant_sta_iface
-                        .into_stream()
-                        .context("create SupplicantStaIface stream")?;
+                    let supplicant_sta_iface_stream = supplicant_sta_iface.into_stream();
                     serve_supplicant_sta_iface(
                         telemetry_sender,
                         supplicant_sta_iface_stream,
@@ -1352,19 +1381,9 @@ async fn serve_nl80211<I: IfaceManager>(
             Ok(fidl_wlanix::Nl80211Request::GetMulticast { payload, .. }) => {
                 if let Some(multicast) = payload.multicast {
                     if payload.group == Some("scan".to_string()) {
-                        match multicast.into_proxy() {
-                            Ok(proxy) => {
-                                state.lock().scan_multicast_proxy.replace(proxy);
-                            }
-                            Err(e) => error!("Failed to create scan multicast proxy: {}", e),
-                        }
+                        state.lock().scan_multicast_proxy.replace(multicast.into_proxy());
                     } else if payload.group == Some("mlme".to_string()) {
-                        match multicast.into_proxy() {
-                            Ok(proxy) => {
-                                state.lock().mlme_multicast_proxy.replace(proxy);
-                            }
-                            Err(e) => error!("Failed to create mlme multicast proxy: {}", e),
-                        }
+                        state.lock().mlme_multicast_proxy.replace(multicast.into_proxy());
                     } else {
                         warn!(
                             "Dropping channel for unsupported multicast group {:?}",
@@ -1394,7 +1413,7 @@ async fn handle_wlanix_request<I: IfaceManager>(
         fidl_wlanix::WlanixRequest::GetWifi { payload, .. } => {
             info!("fidl_wlanix::WlanixRequest::GetWifi");
             if let Some(wifi) = payload.wifi {
-                let wifi_stream = wifi.into_stream().context("create Wifi stream")?;
+                let wifi_stream = wifi.into_stream();
                 serve_wifi(
                     wifi_stream,
                     Arc::clone(&state),
@@ -1407,8 +1426,7 @@ async fn handle_wlanix_request<I: IfaceManager>(
         fidl_wlanix::WlanixRequest::GetSupplicant { payload, .. } => {
             info!("fidl_wlanix::WlanixRequest::GetSupplicant");
             if let Some(supplicant) = payload.supplicant {
-                let supplicant_stream =
-                    supplicant.into_stream().context("create Supplicant stream")?;
+                let supplicant_stream = supplicant.into_stream();
                 serve_supplicant(
                     supplicant_stream,
                     Arc::clone(&iface_manager),
@@ -1421,7 +1439,7 @@ async fn handle_wlanix_request<I: IfaceManager>(
         fidl_wlanix::WlanixRequest::GetNl80211 { payload, .. } => {
             info!("fidl_wlanix::WlanixRequest::GetNl80211");
             if let Some(nl80211) = payload.nl80211 {
-                let nl80211_stream = nl80211.into_stream().context("create Nl80211 stream")?;
+                let nl80211_stream = nl80211.into_stream();
                 serve_nl80211(nl80211_stream, Arc::clone(&state), Arc::clone(&iface_manager)).await;
             }
         }
@@ -1798,8 +1816,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let (wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
-            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>()
-                .expect("create WifiStaIface proxy should succeed");
+            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>();
         let mut get_sta_iface_fut =
             test_helper.wifi_chip_proxy.get_sta_iface(fidl_wlanix::WifiChipGetStaIfaceRequest {
                 iface_name: Some("FOO".to_string()),
@@ -1828,8 +1845,7 @@ mod tests {
         let _ = test_helper.iface_manager.client_iface.lock().take();
 
         let (_wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
-            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>()
-                .expect("create WifiStaIface proxy should succeed");
+            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>();
         let mut get_sta_iface_fut =
             test_helper.wifi_chip_proxy.get_sta_iface(fidl_wlanix::WifiChipGetStaIfaceRequest {
                 iface_name: Some("FOO".to_string()),
@@ -1873,18 +1889,15 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
-        let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
-            .expect("create Wlanix proxy should succeed");
-        let (wifi_proxy, wifi_server_end) =
-            create_proxy::<fidl_wlanix::WifiMarker>().expect("create Wifi proxy should succeed");
+        let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>();
+        let (wifi_proxy, wifi_server_end) = create_proxy::<fidl_wlanix::WifiMarker>();
         let result = wlanix_proxy.get_wifi(fidl_wlanix::WlanixGetWifiRequest {
             wifi: Some(wifi_server_end),
             ..Default::default()
         });
         assert_variant!(result, Ok(()));
 
-        let (wifi_chip_proxy, wifi_chip_server_end) = create_proxy::<fidl_wlanix::WifiChipMarker>()
-            .expect("create WifiChip proxy should succeed");
+        let (wifi_chip_proxy, wifi_chip_server_end) = create_proxy::<fidl_wlanix::WifiChipMarker>();
         let get_chip_fut = wifi_proxy.get_chip(fidl_wlanix::WifiGetChipRequest {
             chip_id: Some(CHIP_ID),
             chip: Some(wifi_chip_server_end),
@@ -1894,8 +1907,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut get_chip_fut), Poll::Pending);
 
         let (wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
-            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>()
-                .expect("create WifiStaIface proxy should succeed");
+            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>();
         let create_sta_iface_fut =
             wifi_chip_proxy.create_sta_iface(fidl_wlanix::WifiChipCreateStaIfaceRequest {
                 iface: Some(wifi_sta_iface_server_end),
@@ -2457,6 +2469,45 @@ mod tests {
         assert_eq!(signal_report_ind, mocked_signal_report);
     }
 
+    #[test_case(true)]
+    #[test_case(false)]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_supplicant_set_power_save_mode(desired: bool) {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+
+        let mut set_fut: fidl::client::QueryResponseFut<()> = test_helper
+            .supplicant_sta_iface_proxy
+            .set_power_save(fidl_fuchsia_wlan_wlanix::SupplicantStaIfaceSetPowerSaveRequest {
+                enable: Some(desired),
+                ..Default::default()
+            });
+        assert_variant!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        assert_variant!(&iface_calls.lock().last().unwrap(), ClientIfaceCall::SetPowerSaveMode(setting) => assert_eq!(*setting, desired));
+        assert_variant!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Ready(Ok(())));
+    }
+
+    #[test_case(true)]
+    #[test_case(false)]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_supplicant_set_suspend_mode(desired: bool) {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+
+        let mut set_fut: fidl::client::QueryResponseFut<()> =
+            test_helper.supplicant_sta_iface_proxy.set_suspend_mode_enabled(
+                fidl_fuchsia_wlan_wlanix::SupplicantStaIfaceSetSuspendModeEnabledRequest {
+                    enable: Some(desired),
+                    ..Default::default()
+                },
+            );
+        assert_variant!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        assert_variant!(&iface_calls.lock().last().unwrap(), ClientIfaceCall::SetSuspendMode(setting)  => assert_eq!(*setting, desired));
+        assert_variant!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Ready(Ok(())));
+    }
+
     struct SupplicantTestHelper {
         _wlanix_proxy: fidl_wlanix::WlanixProxy,
         _supplicant_proxy: fidl_wlanix::SupplicantProxy,
@@ -2475,19 +2526,16 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
-        let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
-            .expect("create Wlanix proxy should succeed");
+        let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>();
         let (supplicant_proxy, supplicant_server_end) =
-            create_proxy::<fidl_wlanix::SupplicantMarker>()
-                .expect("create Supplicant proxy should succeed");
+            create_proxy::<fidl_wlanix::SupplicantMarker>();
         let result = wlanix_proxy.get_supplicant(fidl_wlanix::WlanixGetSupplicantRequest {
             supplicant: Some(supplicant_server_end),
             ..Default::default()
         });
         assert_variant!(result, Ok(()));
 
-        let (nl80211_proxy, nl80211_server_end) = create_proxy::<fidl_wlanix::Nl80211Marker>()
-            .expect("create Nl80211 proxy should succeed");
+        let (nl80211_proxy, nl80211_server_end) = create_proxy::<fidl_wlanix::Nl80211Marker>();
         let result = wlanix_proxy.get_nl80211(fidl_wlanix::WlanixGetNl80211Request {
             nl80211: Some(nl80211_server_end),
             ..Default::default()
@@ -2495,8 +2543,7 @@ mod tests {
         assert_variant!(result, Ok(()));
 
         let (supplicant_sta_iface_proxy, supplicant_sta_iface_server_end) =
-            create_proxy::<fidl_wlanix::SupplicantStaIfaceMarker>()
-                .expect("create SupplicantStaIface proxy should succeed");
+            create_proxy::<fidl_wlanix::SupplicantStaIfaceMarker>();
         let result =
             supplicant_proxy.add_sta_interface(fidl_wlanix::SupplicantAddStaInterfaceRequest {
                 iface: Some(supplicant_sta_iface_server_end),
@@ -2506,8 +2553,7 @@ mod tests {
         assert_variant!(result, Ok(()));
 
         let (supplicant_sta_iface_callback_client_end, supplicant_sta_iface_callback_stream) =
-            create_request_stream::<fidl_wlanix::SupplicantStaIfaceCallbackMarker>()
-                .expect("create SupplicantStaIfaceCallback request stream should succeed");
+            create_request_stream::<fidl_wlanix::SupplicantStaIfaceCallbackMarker>();
         let result = supplicant_sta_iface_proxy.register_callback(
             fidl_wlanix::SupplicantStaIfaceRegisterCallbackRequest {
                 callback: Some(supplicant_sta_iface_callback_client_end),
@@ -2517,8 +2563,7 @@ mod tests {
         assert_variant!(result, Ok(()));
 
         let (supplicant_sta_network_proxy, supplicant_sta_network_server_end) =
-            create_proxy::<fidl_wlanix::SupplicantStaNetworkMarker>()
-                .expect("create SupplicantStaNetwork proxy should succeed");
+            create_proxy::<fidl_wlanix::SupplicantStaNetworkMarker>();
         let result = supplicant_sta_iface_proxy.add_network(
             fidl_wlanix::SupplicantStaIfaceAddNetworkRequest {
                 network: Some(supplicant_sta_network_server_end),
@@ -2558,8 +2603,7 @@ mod tests {
         group: &str,
     ) -> fidl_wlanix::Nl80211MulticastRequestStream {
         let (mcast_client, mcast_stream) =
-            create_request_stream::<fidl_wlanix::Nl80211MulticastMarker>()
-                .expect("Failed to create mcast request stream");
+            create_request_stream::<fidl_wlanix::Nl80211MulticastMarker>();
         nl80211_proxy
             .get_multicast(fidl_wlanix::Nl80211GetMulticastRequest {
                 group: Some(group.to_string()),
@@ -2586,16 +2630,14 @@ mod tests {
     #[test]
     fn get_nl80211() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
-            .expect("Failed to get proxy and req stream");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>();
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new());
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let wlanix_fut =
             serve_wlanix(stream, state, iface_manager, TelemetrySender::new(telemetry_sender));
         let mut wlanix_fut = pin!(wlanix_fut);
-        let (nl_proxy, nl_server) =
-            create_proxy::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (nl_proxy, nl_server) = create_proxy::<fidl_wlanix::Nl80211Marker>();
         proxy
             .get_nl80211(fidl_wlanix::WlanixGetNl80211Request {
                 nl80211: Some(nl_server),
@@ -2609,8 +2651,7 @@ mod tests {
     #[test]
     fn unsupported_mcast_group() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new());
@@ -2663,8 +2704,7 @@ mod tests {
         }
 
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2696,8 +2736,7 @@ mod tests {
     #[test]
     fn get_interface() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2730,8 +2769,7 @@ mod tests {
     #[test]
     fn get_station() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2760,8 +2798,7 @@ mod tests {
     #[test]
     fn trigger_scan() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2802,8 +2839,7 @@ mod tests {
     #[test]
     fn trigger_scan_no_iface_arg() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2827,8 +2863,7 @@ mod tests {
     #[test]
     fn trigger_scan_invalid_iface() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2854,8 +2889,7 @@ mod tests {
     #[test_case(Err(format_err!("scan ended unexpectedly")); "Scan fails with error")]
     fn scan_abort(scan_result: Result<ScanEnd, Error>) {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let (iface_manager, scan_end_sender) =
@@ -2894,8 +2928,7 @@ mod tests {
     #[test]
     fn get_scan_results() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2925,8 +2958,7 @@ mod tests {
     #[test]
     fn get_scan_results_no_iface_args() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2950,8 +2982,7 @@ mod tests {
     #[test]
     fn get_reg() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());

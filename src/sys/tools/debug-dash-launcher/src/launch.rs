@@ -77,7 +77,7 @@ async fn explore_over_handles(
 fn split_pty_into_handles(
     pty: ClientEnd<pty::DeviceMarker>,
 ) -> Result<(zx::Handle, zx::Handle, zx::Handle), LauncherError> {
-    let pty = pty.into_proxy().unwrap();
+    let pty = pty.into_proxy();
 
     // Split the PTY into 3 channels (stdin, stdout, stderr).
     let (stdout, to_pty_stdout) = fidl::endpoints::create_endpoints::<pty::DeviceMarker>();

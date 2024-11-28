@@ -8,6 +8,7 @@ use crate::node::Node;
 use anyhow::{Error, Result};
 use async_trait::async_trait;
 use energy_model_config::{EnergyModel, PowerLevelDomain};
+use fidl::AsHandleRef;
 use fuchsia_inspect::ArrayProperty;
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use futures::stream::FuturesUnordered;
@@ -25,7 +26,8 @@ use {fuchsia_inspect as inspect, serde_json as json};
 /// from kernel for runtime processor power management.
 ///
 /// Sends Messages:
-///   - SetCpuProcessorPowerDomain
+///   - SetProcessorPowerDomain
+///   - SetProcessorPowerState
 ///   - SetOperatingPoint
 ///   - GetOperatingPoint
 ///
@@ -38,7 +40,8 @@ pub struct RppmHandlerBuilder<'a> {
     energy_model: Option<EnergyModel>,
     // Allow test to inject a fake inspect root.
     inspect_root: Option<&'a inspect::Node>,
-    // This node handles the SetCpuProcessorPowerDomain message.
+    // This node handles the SetProcessorPowerDomain and SetProcessorPowerState
+    // messages.
     syscall_handler: Rc<dyn Node>,
     // Map from domain id to the node that handles the SetOperatingPoint
     // and GetOperatingPoint message for this domain.
@@ -133,7 +136,8 @@ impl<'a> RppmHandlerBuilder<'a> {
         };
 
         // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
         let inspect_data = InspectData::new(inspect_root, &self.node_name);
         inspect_data.log_energy_model(&energy_model);
 
@@ -159,17 +163,13 @@ pub struct RppmHandler {
 
 impl RppmHandler {
     fn run<'a>(self: Rc<Self>) -> LocalBoxFuture<'a, ()> {
-        // TODO(https://fxbug.dev/375639741): Investigate if zx::Port lib can be extended and used.
         async move {
-            let mut handle = 0;
-            let status = unsafe { sys::zx_port_create(0, &mut handle) };
-            zx::Status::ok(status).expect(
-                "port creation always succeeds except with OOM or when job policy denies it",
-            );
+            // TODO(https://fxbug.dev/375533194): Add unit tests for handling port messages.
+            let port = zx::Port::create();
 
             for power_level_domain in self.energy_model.0.clone() {
                 // Register energy model with kernel.
-                self.register_energy_model(handle, power_level_domain.clone()).await;
+                self.register_energy_model(port.raw_handle(), power_level_domain.clone()).await;
                 let domain_id = power_level_domain.power_domain.domain_id;
 
                 // Query initial pstate from CPU driver and send it to kernel.
@@ -189,7 +189,7 @@ impl RppmHandler {
                             control_argument: opp as u64,
                             options: 0,
                         };
-                        Self::set_processor_power_state(handle, pstate);
+                        self.set_processor_power_state(port.raw_handle(), pstate).await;
                     }
                     result => {
                         tracing::error!("Unexpected result from GetOperatingPoint: {:?}", result);
@@ -197,60 +197,52 @@ impl RppmHandler {
                 }
             }
 
-            let mut packet: sys::zx_port_packet_t = Default::default();
             loop {
-                let status = unsafe {
-                    sys::zx_port_wait(
-                        handle,
-                        zx::MonotonicInstant::INFINITE.into_nanos(),
-                        &mut packet,
-                    )
-                };
-
-                match zx::Status::ok(status) {
+                match port.wait(zx::MonotonicInstant::INFINITE) {
                     Err(e) => tracing::error!("zx_port_wait failed with error: {}", e),
-                    _ => {
-                        let sys::zx_packet_processor_power_level_transition_request_t {
-                            domain_id,
-                            options,
-                            control_interface,
-                            control_argument,
-                            reserved: _,
-                        } = unsafe {
-                            std::mem::transmute::<
-                                [u8; 32],
-                                sys::zx_packet_processor_power_level_transition_request_t,
-                            >(packet.union)
-                        };
-                        assert_eq!(control_interface, sys::ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER);
-                        assert_eq!(options, 0);
+                    Ok(p) => {
+                        match p.contents() {
+                            zx::PacketContents::PowerTransition(packet) => {
+                                assert_eq!(
+                                    packet.control_interface(),
+                                    sys::ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER
+                                );
+                                assert_eq!(packet.options(), 0);
+                                let control_argument = packet.control_argument();
 
-                        // Request CPU driver to make OPP change.
-                        let msg = Message::SetOperatingPoint(control_argument.try_into().unwrap());
-                        match self
-                            .power_domain_handlers
-                            .get(&domain_id)
-                            .unwrap()
-                            .handle_message(&msg)
-                            .await
-                        {
-                            Ok(MessageReturn::SetOperatingPoint) => {
-                                // Notify the kernel about the updated OPP.
-                                let pstate = sys::zx_processor_power_state_t {
-                                    domain_id,
-                                    control_interface,
-                                    control_argument,
-                                    options,
+                                // Request CPU driver to make OPP change.
+                                let msg = Message::SetOperatingPoint(
+                                    control_argument.try_into().unwrap(),
+                                );
+                                match self
+                                    .power_domain_handlers
+                                    .get(&packet.domain_id())
+                                    .unwrap()
+                                    .handle_message(&msg)
+                                    .await
+                                {
+                                    Ok(MessageReturn::SetOperatingPoint) => {
+                                        // Notify the kernel about the updated OPP.
+                                        let pstate = sys::zx_processor_power_state_t {
+                                            domain_id: packet.domain_id(),
+                                            control_interface:
+                                                sys::ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER,
+                                            control_argument,
+                                            options: 0,
+                                        };
+                                        self.set_processor_power_state(port.raw_handle(), pstate)
+                                            .await;
+                                    }
+                                    Ok(other) => {
+                                        panic!("Unexpected SetOperatingPoint result: {:?}", other)
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("Error requesting OPP change: {}", e);
+                                    }
                                 };
-                                Self::set_processor_power_state(handle, pstate);
                             }
-                            Ok(other) => {
-                                panic!("Unexpected SetOperatingPoint result: {:?}", other)
-                            }
-                            Err(e) => {
-                                tracing::error!("Error requesting OPP change: {}", e);
-                            }
-                        };
+                            _ => panic!("wrong packet type"),
+                        }
                     }
                 }
             }
@@ -259,15 +251,15 @@ impl RppmHandler {
     }
 
     async fn register_energy_model(
-        self: &Rc<Self>,
+        &self,
         handle: sys::zx_handle_t,
         power_level_domain: PowerLevelDomain,
     ) {
-        let msg = Message::SetCpuProcessorPowerDomain(power_level_domain, handle);
+        let msg = Message::SetProcessorPowerDomain(power_level_domain, handle);
         match self.syscall_handler.handle_message(&msg).await {
-            Ok(MessageReturn::SetCpuProcessorPowerDomain) => (),
+            Ok(MessageReturn::SetProcessorPowerDomain) => (),
             Ok(other) => {
-                panic!("Unexpected SetCpuProcessorPowerDomain result: {:?}", other)
+                panic!("Unexpected SetProcessorPowerDomain result: {:?}", other)
             }
             Err(e) => {
                 tracing::error!("Error sending energy model to kernel: {}", e);
@@ -275,14 +267,21 @@ impl RppmHandler {
         };
     }
 
-    fn set_processor_power_state(
+    async fn set_processor_power_state(
+        &self,
         handle: sys::zx_handle_t,
         pstate: sys::zx_processor_power_state_t,
     ) {
-        let status = unsafe { sys::zx_system_set_processor_power_state(handle, &pstate) };
-        if let Err(e) = zx::Status::ok(status) {
-            tracing::error!("zx_system_set_processor_power_state failed with error: {}", e);
-        }
+        let msg = Message::SetProcessorPowerState(handle, pstate);
+        match self.syscall_handler.handle_message(&msg).await {
+            Ok(MessageReturn::SetProcessorPowerState) => (),
+            Ok(other) => {
+                panic!("Unexpected SetProcessorPowerState result: {:?}", other)
+            }
+            Err(e) => {
+                tracing::error!("Error sending updated power state to kernel: {}", e);
+            }
+        };
     }
 }
 
@@ -373,7 +372,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
     use zx::sys::{
-        zx_cpu_set_t, zx_processor_power_domain_t, zx_processor_power_level_t,
+        zx_processor_power_domain_t, zx_processor_power_level_t,
         zx_processor_power_level_transition_t,
     };
 
@@ -410,37 +409,30 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let futures_out = FuturesUnordered::new();
         let energy_model = EnergyModel(vec![PowerLevelDomain {
-            power_domain: zx_processor_power_domain_t {
-                cpus: zx_cpu_set_t { mask: [0; 8] },
-                domain_id: 0,
-                padding1: Default::default(),
-            },
+            power_domain: zx_processor_power_domain_t::default(),
             power_levels: vec![
-                zx_processor_power_level_t {
-                    options: 0,
-                    processing_rate: 100,
-                    power_coefficient_nw: 200,
-                    control_interface: 2,
-                    control_argument: 1,
-                    diagnostic_name: [0; 32],
-                    padding: [0; 32],
+                {
+                    let mut ret = zx_processor_power_level_t::default();
+                    ret.processing_rate = 100;
+                    ret.power_coefficient_nw = 200;
+                    ret.control_interface = 2;
+                    ret.control_argument = 1;
+                    ret
                 },
-                zx_processor_power_level_t {
-                    options: 1,
-                    processing_rate: 200,
-                    power_coefficient_nw: 300,
-                    control_interface: 0,
-                    control_argument: 0,
-                    diagnostic_name: [0; 32],
-                    padding: [0; 32],
+                {
+                    let mut ret = zx_processor_power_level_t::default();
+                    ret.options = 1;
+                    ret.processing_rate = 200;
+                    ret.power_coefficient_nw = 300;
+                    ret
                 },
             ],
-            power_level_transitions: vec![zx_processor_power_level_transition_t {
-                from: 0,
-                to: 1,
-                energy: 200,
-                latency: 100,
-                padding: [0; 6],
+            power_level_transitions: vec![{
+                let mut ret = zx_processor_power_level_transition_t::default();
+                ret.to = 1;
+                ret.energy = 200;
+                ret.latency = 100;
+                ret
             }],
         }]);
 

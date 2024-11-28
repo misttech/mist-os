@@ -46,13 +46,13 @@ impl TunNetworkInterface {
     pub async fn try_new(name: Option<String>) -> Result<TunNetworkInterface, Error> {
         let tun_control = connect_to_protocol::<ftun::ControlMarker>()?;
 
-        let (tun_dev, req) = create_proxy::<ftun::DeviceMarker>()?;
+        let (tun_dev, req) = create_proxy::<ftun::DeviceMarker>();
 
         tun_control
             .create_device(&ftun::DeviceConfig { blocking: Some(true), ..Default::default() }, req)
             .context("failed to create tun pair")?;
 
-        let (tun_port, port_req) = create_proxy::<ftun::PortMarker>()?;
+        let (tun_port, port_req) = create_proxy::<ftun::PortMarker>();
         tun_dev
             .add_port(
                 &ftun::DevicePortConfig {
@@ -87,13 +87,13 @@ impl TunNetworkInterface {
 
         let (control, control_sync) = {
             let installer = connect_to_protocol::<fnetifadmin::InstallerMarker>()?;
-            let (device_control, server_end) = create_proxy::<fnetifadmin::DeviceControlMarker>()?;
+            let (device_control, server_end) = create_proxy::<fnetifadmin::DeviceControlMarker>();
             installer.install_device(device, server_end).context("install_device failed")?;
             // Interface lifetime is already tied to us because of tun device,
             // no need to keep this extra channel around.
             device_control.detach().context("device control detach failed")?;
 
-            let (port, server_end) = create_proxy::<fhwnet::PortMarker>()?;
+            let (port, server_end) = create_proxy::<fhwnet::PortMarker>();
             tun_port.get_port(server_end).context("get_port failed")?;
             let port_id = port
                 .get_info()
@@ -245,8 +245,7 @@ impl NetworkInterface for TunNetworkInterface {
         info!("TunNetworkInterface: Adding Address: {:?}", addr);
         let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-        >()
-        .expect("create proxy");
+        >();
         address_state_provider.detach()?;
 
         let device_addr = addr;
@@ -427,7 +426,7 @@ impl NetworkInterface for TunNetworkInterface {
             async move {
                 if state.watcher.is_none() {
                     let fnif_state = connect_to_protocol::<StateMarker>()?;
-                    let (watcher, req) = create_proxy::<WatcherMarker>()?;
+                    let (watcher, req) = create_proxy::<WatcherMarker>();
                     fnif_state.get_watcher(&WatcherOptions::default(), req)?;
                     state.watcher = Some(watcher);
                 }

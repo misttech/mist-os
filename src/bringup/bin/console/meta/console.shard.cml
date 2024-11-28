@@ -336,6 +336,17 @@
             availability: "optional",
             source_availability: "unknown",
         },
+        {
+            protocol: [
+                "fuchsia.test.manager.Query",
+                "fuchsia.test.manager.RunBuilder",
+                "fuchsia.test.manager.SuiteRunner",
+                "fuchsia.test.manager.TestCaseEnumerator",
+            ],
+            from: "#test_manager",
+            to: "#console-launcher",
+            source_availability: "unknown",
+        },
     ],
     expose: [
         {

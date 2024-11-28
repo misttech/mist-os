@@ -4,9 +4,9 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use ffx_target_echo_args::EchoCommand;
 use fho::{Connector, FfxMain, FfxTool, VerifiedMachineWriter};
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -50,7 +50,7 @@ async fn echo_impl(
     cmd: EchoCommand,
     writer: &mut VerifiedMachineWriter<EchoMessage>,
 ) -> Result<()> {
-    let echo_text = cmd.text.unwrap_or("Ffx".to_string());
+    let echo_text = cmd.text.unwrap_or_else(|| "Ffx".to_string());
     // This outer loop retries connecting to the target every time the
     // connection fails. If we only connect once it only runs once.
     loop {
@@ -72,7 +72,7 @@ async fn echo_impl(
                 let err_string = connect_err
                     .as_ref()
                     .map(|e| format!(". Error encountered: {e}"))
-                    .unwrap_or(".".to_owned());
+                    .unwrap_or_else(|| ".".to_owned());
                 let message = if let Some(target) = &target {
                     format!("Waiting for target {target} to return{err_string}")
                 } else {
@@ -120,15 +120,17 @@ async fn echo_impl(
 mod test {
     use super::*;
     use anyhow::Context;
+    use fdomain_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlRequest};
     use fho::testing::ToolEnv;
     use fho::{Format, TestBuffers, TryFromEnv};
-    use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlRequest};
+    use futures::FutureExt;
     use serde_json::json;
+    use std::sync::Arc;
 
-    fn setup_fake_service() -> RemoteControlProxy {
+    async fn setup_fake_service(client: Arc<fdomain_client::Client>) -> RemoteControlProxy {
         use futures::TryStreamExt;
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+            client.create_proxy_and_stream::<RemoteControlMarker>().await.unwrap();
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
@@ -147,7 +149,9 @@ mod test {
     }
 
     async fn run_echo_test(cmd: EchoCommand) -> String {
-        let tool_env = ToolEnv::new().remote_factory_closure(|| async { Ok(setup_fake_service()) });
+        let client = fdomain_local::local_client(|| Err(fidl::Status::NOT_SUPPORTED));
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure_f(move || setup_fake_service(Arc::clone(&client)).map(Ok));
 
         let env = tool_env.make_environment(ffx_config::EnvironmentContext::no_context(
             ffx_config::environment::ExecutableKind::Test,
@@ -183,7 +187,9 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_echo_with_machine() -> Result<()> {
-        let tool_env = ToolEnv::new().remote_factory_closure(|| async { Ok(setup_fake_service()) });
+        let client = fdomain_local::local_client(|| Err(fidl::Status::NOT_SUPPORTED));
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure_f(move || setup_fake_service(Arc::clone(&client)).map(Ok));
 
         let env = tool_env.make_environment(ffx_config::EnvironmentContext::no_context(
             ffx_config::environment::ExecutableKind::Test,

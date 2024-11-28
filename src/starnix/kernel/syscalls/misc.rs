@@ -18,7 +18,7 @@ use crate::arch::ARCH_NAME;
 #[cfg(not(feature = "starnix_lite"))]
 use crate::device::android::bootloader_message_store::BootloaderMessage;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
-use crate::task::CurrentTask;
+use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{FdNumber, FsString};
 use starnix_logging::{log_error, log_info, log_warn, track_stub};
 use starnix_syscalls::{
@@ -72,7 +72,7 @@ pub fn sys_uname(
             log_error!("FIDL error getting build info: {e}");
             errno!(EIO)
         })?;
-        Ok(buildinfo.version.unwrap_or("starnix".to_string()))
+        Ok(buildinfo.version.unwrap_or_else(|| "starnix".to_string()))
     })?;
 
     init_array(&mut result.version, version.as_bytes());
@@ -221,6 +221,13 @@ pub fn sys_getrandom(
     Ok(bytes_written)
 }
 
+fn panic_or_error(kernel: &Kernel, errno: Errno) -> Result<(), Errno> {
+    if kernel.features.error_on_failed_reboot {
+        return Err(errno);
+    }
+    panic!("Fatal: {errno:?}");
+}
+
 pub fn sys_reboot(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -268,7 +275,12 @@ pub fn sys_reboot(
                     // System is rebooting... wait until runtime ends.
                     zx::MonotonicInstant::INFINITE.sleep();
                 }
-                Err(e) => return error!(EINVAL, format!("Failed to power off, status: {e}")),
+                Err(e) => {
+                    return panic_or_error(
+                        current_task.kernel(),
+                        errno!(EINVAL, format!("Failed to power off, status: {e}")),
+                    )
+                }
             }
             Ok(())
         }
@@ -283,7 +295,12 @@ pub fn sys_reboot(
                         // System is rebooting... wait until runtime ends.
                         zx::MonotonicInstant::INFINITE.sleep();
                     }
-                    Err(e) => return error!(EINVAL, format!("Failed to reboot, status: {e}")),
+                    Err(e) => {
+                        return panic_or_error(
+                            current_task.kernel(),
+                            errno!(EINVAL, format!("Failed to reboot, status: {e}")),
+                        )
+                    }
                 }
             }
 
@@ -310,9 +327,12 @@ pub fn sys_reboot(
                                         zx::MonotonicInstant::INFINITE.sleep();
                                     }
                                     Err(e) => {
-                                        return error!(
-                                            EINVAL,
-                                            format!("Failed to reboot for FDR, status: {e}")
+                                        return panic_or_error(
+                                            current_task.kernel(),
+                                            errno!(
+                                                EINVAL,
+                                                format!("Failed to reboot for FDR, status: {e}")
+                                            ),
                                         )
                                     }
                                 }
@@ -345,7 +365,12 @@ pub fn sys_reboot(
                     // System is rebooting... wait until runtime ends.
                     zx::MonotonicInstant::INFINITE.sleep();
                 }
-                Err(e) => return error!(EINVAL, format!("Failed to reboot, status: {e}")),
+                Err(e) => {
+                    return panic_or_error(
+                        current_task.kernel(),
+                        errno!(EINVAL, format!("Failed to reboot, status: {e}")),
+                    )
+                }
             }
             Ok(())
         }

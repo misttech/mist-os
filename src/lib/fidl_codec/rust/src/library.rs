@@ -661,6 +661,6 @@ impl Namespace {
         self.methods_by_ordinal
             .get(&ordinal)
             .and_then(|(x, y)| y.upgrade().map(|y| (x.clone(), y)))
-            .ok_or(Error::LibraryError(format!("No method with ordinal {}", ordinal)))
+            .ok_or_else(|| Error::LibraryError(format!("No method with ordinal {}", ordinal)))
     }
 }

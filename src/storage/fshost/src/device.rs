@@ -251,11 +251,11 @@ impl BlockDevice {
     ) -> Result<Self, Error> {
         let topological_path =
             controller_proxy.get_topological_path().await?.map_err(zx::Status::from_raw)?;
-        let (partition_proxy, server) = create_proxy::<PartitionMarker>()?;
+        let (partition_proxy, server) = create_proxy::<PartitionMarker>();
         controller_proxy.connect_to_device_fidl(server.into_channel())?;
         Ok(Self {
             path: path.to_string(),
-            topological_path: topological_path.to_string(),
+            topological_path: topological_path,
             controller_proxy,
             partition_proxy,
             content_format: None,
@@ -299,7 +299,7 @@ impl Device for BlockDevice {
         if self.partition_label.is_none() {
             let (status, name) = self.partition_proxy.get_name().await?;
             zx::Status::ok(status)?;
-            self.partition_label = Some(name.ok_or(anyhow!("Expected name"))?);
+            self.partition_label = Some(name.ok_or_else(|| anyhow!("Expected name"))?);
         }
         Ok(self.partition_label.as_ref().unwrap())
     }
@@ -308,7 +308,8 @@ impl Device for BlockDevice {
         if self.partition_type.is_none() {
             let (status, partition_type) = self.partition_proxy.get_type_guid().await?;
             zx::Status::ok(status)?;
-            self.partition_type = Some(partition_type.ok_or(anyhow!("Expected type"))?.value);
+            self.partition_type =
+                Some(partition_type.ok_or_else(|| anyhow!("Expected type"))?.value);
         }
         Ok(self.partition_type.as_ref().unwrap())
     }
@@ -322,7 +323,7 @@ impl Device for BlockDevice {
                 .context("Transport error get_instance_guid")?;
             zx::Status::ok(status).context("get_instance_guid failed")?;
             self.partition_instance =
-                Some(instance_guid.ok_or(anyhow!("Expected instance guid"))?.value);
+                Some(instance_guid.ok_or_else(|| anyhow!("Expected instance guid"))?.value);
         }
         Ok(self.partition_instance.as_ref().unwrap())
     }
@@ -352,13 +353,13 @@ impl Device for BlockDevice {
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {
-        let (proxy, server) = create_proxy::<BlockMarker>()?;
+        let (proxy, server) = create_proxy::<BlockMarker>();
         self.controller_proxy.connect_to_device_fidl(server.into_channel())?;
         Ok(proxy)
     }
 
     fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
-        let (proxy, server) = create_proxy::<VolumeMarker>()?;
+        let (proxy, server) = create_proxy::<VolumeMarker>();
         self.controller_proxy.connect_to_device_fidl(server.into_channel())?;
         Ok(proxy)
     }
@@ -410,7 +411,7 @@ pub struct VolumeProtocolDevice {
 impl VolumeProtocolDevice {
     pub fn new(dir: fio::DirectoryProxy, path: impl ToString) -> Result<Self, Error> {
         let connector = Box::new(DirBasedBlockConnector::new(dir, path.to_string() + "/volume"));
-        let volume_proxy = connector.connect_volume()?.into_proxy()?;
+        let volume_proxy = connector.connect_volume()?.into_proxy();
         Ok(Self {
             connector,
             volume_proxy,
@@ -454,7 +455,7 @@ impl Device for VolumeProtocolDevice {
         if self.partition_label.is_none() {
             let (status, name) = self.volume_proxy.get_name().await?;
             zx::Status::ok(status)?;
-            self.partition_label = Some(name.ok_or(anyhow!("Expected name"))?);
+            self.partition_label = Some(name.ok_or_else(|| anyhow!("Expected name"))?);
         }
         Ok(self.partition_label.as_ref().unwrap())
     }
@@ -463,7 +464,8 @@ impl Device for VolumeProtocolDevice {
         if self.partition_type.is_none() {
             let (status, partition_type) = self.volume_proxy.get_type_guid().await?;
             zx::Status::ok(status)?;
-            self.partition_type = Some(partition_type.ok_or(anyhow!("Expected type"))?.value);
+            self.partition_type =
+                Some(partition_type.ok_or_else(|| anyhow!("Expected type"))?.value);
         }
         Ok(self.partition_type.as_ref().unwrap())
     }
@@ -477,7 +479,7 @@ impl Device for VolumeProtocolDevice {
                 .context("Transport error get_instance_guid")?;
             zx::Status::ok(status).context("get_instance_guid failed")?;
             self.partition_instance =
-                Some(instance_guid.ok_or(anyhow!("Expected instance guid"))?.value);
+                Some(instance_guid.ok_or_else(|| anyhow!("Expected instance guid"))?.value);
         }
         Ok(self.partition_instance.as_ref().unwrap())
     }
@@ -496,11 +498,11 @@ impl Device for VolumeProtocolDevice {
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {
-        self.connector.connect_block().and_then(|c| Ok(c.into_proxy()?))
+        self.connector.connect_block().and_then(|c| Ok(c.into_proxy()))
     }
 
     fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
-        self.connector.connect_volume().and_then(|c| Ok(c.into_proxy()?))
+        self.connector.connect_volume().and_then(|c| Ok(c.into_proxy()))
     }
 
     async fn get_child(&self, _suffix: &str) -> Result<Box<dyn Device>, Error> {
@@ -529,7 +531,7 @@ pub struct RamdiskDevice {
 impl RamdiskDevice {
     pub fn new(ramdisk: RamdiskClient) -> Result<Self, Error> {
         let volume_proxy =
-            ClientEnd::<VolumeMarker>::new(ramdisk.open()?.into_channel()).into_proxy()?;
+            ClientEnd::<VolumeMarker>::new(ramdisk.open()?.into_channel()).into_proxy();
         Ok(Self { ramdisk: Arc::new(ramdisk), volume_proxy, content_format: None })
     }
 }
@@ -585,11 +587,11 @@ impl Device for RamdiskDevice {
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {
-        Ok(self.ramdisk.open()?.into_proxy()?)
+        Ok(self.ramdisk.open()?.into_proxy())
     }
 
     fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
-        Ok(ClientEnd::<VolumeMarker>::new(self.ramdisk.open()?.into_channel()).into_proxy()?)
+        Ok(ClientEnd::<VolumeMarker>::new(self.ramdisk.open()?.into_channel()).into_proxy())
     }
 
     async fn get_child(&self, _suffix: &str) -> Result<Box<dyn Device>, Error> {
@@ -655,10 +657,13 @@ impl RegisteredDevices {
     }
 }
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DeviceTag {
     /// The fshost ramdisk device.
     Ramdisk,
+
+    /// The block device containing the partition table in which the Fuchsia system resides.
+    SystemPartitionTable,
 
     /// The Fxblob device that isn't the ramdisk.
     FxblobOnRecovery,

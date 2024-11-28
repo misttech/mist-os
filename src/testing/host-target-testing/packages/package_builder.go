@@ -15,8 +15,8 @@ import (
 	"strings"
 
 	versionHistory "go.fuchsia.dev/fuchsia/src/lib/versioning/version-history/go"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/pkg"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/build"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/pkg"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 

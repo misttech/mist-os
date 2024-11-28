@@ -492,12 +492,13 @@ async fn get_loopback_id(realm: &netemul::TestRealm<'_>) -> u64 {
         .expect("failed to connect to fuchsia.net.interfaces/State");
 
     fidl_fuchsia_net_interfaces_ext::wait_interface(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interfaces_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(
+            &interfaces_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
         )
         .expect("failed to create event stream"),
-        &mut HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+        &mut HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>>::new(),
         |if_map| {
             if_map.values().find_map(
                 |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
@@ -681,6 +682,7 @@ async fn inspect_devices(name: &str) {
                     Addresses: {
                         "127.0.0.1/8": {
                             ValidUntil: "infinite",
+                            PreferredLifetime: "infinite",
                         }
                     },
                     Configuration: {
@@ -696,6 +698,7 @@ async fn inspect_devices(name: &str) {
                             PreferredLifetime: "infinite",
                             IsSlaac: false,
                             Assigned: true,
+                            Temporary: false,
                         }
                     },
                     Configuration: {
@@ -739,6 +742,7 @@ async fn inspect_devices(name: &str) {
                     "Addresses": {
                         "192.168.0.1/24": {
                             ValidUntil: "infinite",
+                            PreferredLifetime: "infinite",
                         }
                     },
                     Configuration: {
@@ -756,6 +760,7 @@ async fn inspect_devices(name: &str) {
                             // This will always be `false` because DAD will never complete; we set
                             // the number of DAD transmits to `u16::MAX` above.
                             Assigned: false,
+                            Temporary: false,
                         }
                     },
                     Configuration: {
@@ -1492,7 +1497,7 @@ async fn inspect_filtering_state(name: &str) {
                                         invert: false \
                                     }",
                                 },
-                                "action": "Jump(UninstalledRoutine(2))",
+                                "action": "Jump(UninstalledRoutine(1))",
                             },
                         },
                     },
@@ -1528,7 +1533,7 @@ async fn inspect_filtering_state(name: &str) {
                 // only exists in the IPv4 filtering state.
                 "uninstalled": {
                     "routines": 1u64,
-                    "2": {
+                    "1": {
                         "rules": 0u64,
                     },
                 },

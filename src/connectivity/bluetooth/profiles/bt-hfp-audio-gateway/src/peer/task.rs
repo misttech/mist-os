@@ -254,8 +254,7 @@ impl PeerTask {
     }
 
     async fn notify_peer_connected(&mut self, manager_id: hfp::ManagerConnectionId) {
-        let (proxy, handle) =
-            fidl::endpoints::create_proxy().expect("Cannot create required fidl handle");
+        let (proxy, handle) = fidl::endpoints::create_proxy();
         self.hfp_sender
             .send(hfp::Event::PeerConnected { peer_id: self.id, manager_id, handle })
             .await
@@ -1000,7 +999,7 @@ mod tests {
         TestAudioControl,
     ) {
         let (sender, receiver) = mpsc::channel(1);
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>();
         let test_audio = TestAudioControl::default();
         let sco_connector = ScoConnector::build(proxy.clone(), HashSet::new());
         let audio: Arc<Mutex<Box<dyn AudioControl>>> =
@@ -1089,8 +1088,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let mut peer = setup_peer_task(None).0;
         assert!(peer.handler.is_none());
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         {
             let request_fut = pin!(peer.peer_request(PeerRequest::Handle(proxy)));
@@ -1117,7 +1115,7 @@ mod tests {
     async fn handle_peer_request_decline_to_handle() {
         let mut peer = setup_peer_task(None).0;
         assert!(peer.handler.is_none());
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<PeerHandlerMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<PeerHandlerMarker>();
 
         // close the PeerHandler channel by dropping the server endpoint.
         drop(server_end);
@@ -1212,8 +1210,7 @@ mod tests {
         let (connection, mut remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, _profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         // A vec to hold all the stream items we don't care about for this test.
         let mut junk_drawer = vec![];
@@ -1377,8 +1374,7 @@ mod tests {
         let (connection, mut remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, _profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         // Pass in the client end connected to the call manager
         let result = exec.run_singlethreaded(sender.send(PeerRequest::Handle(proxy)));
@@ -1390,7 +1386,7 @@ mod tests {
 
         // Send the incoming call
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        let (client_end, _call_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, _call_stream) = fidl::endpoints::create_request_stream();
         let next_call = NextCall {
             call: Some(client_end),
             remote: Some("1234567".to_string()),
@@ -1421,8 +1417,7 @@ mod tests {
         let (connection, _remote) = create_and_initialize_slc(SlcState::default());
         let (peer, mut sender, receiver, mut profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         // Pass in the client end connected to the call manager
         let result = exec.run_singlethreaded(sender.send(PeerRequest::Handle(proxy)));
@@ -1434,7 +1429,7 @@ mod tests {
 
         // Send the incoming call
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream();
         let next_call = NextCall {
             call: Some(client_end),
             remote: Some("1234567".to_string()),
@@ -1518,8 +1513,7 @@ mod tests {
         let (connection, mut remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, _profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
         // The battery level that will be reported by the peer.
         let expected_level = 4;
 
@@ -1605,8 +1599,7 @@ mod tests {
         let (connection, mut remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, _profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         let run_fut = peer.run(receiver);
         let run_fut = pin!(run_fut);
@@ -1619,7 +1612,7 @@ mod tests {
 
         // Send the incoming waiting call.
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        let (client_end, _call_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, _call_stream) = fidl::endpoints::create_request_stream();
         let next_call = NextCall {
             call: Some(client_end),
             remote: Some(raw_number.to_string()),
@@ -1658,8 +1651,7 @@ mod tests {
         let (connection, remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, mut profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         let run_fut = peer.run(receiver);
         let run_fut = pin!(run_fut);
@@ -1671,7 +1663,7 @@ mod tests {
 
         // Send the incoming waiting call.
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream();
         let next_call = NextCall {
             call: Some(client_end),
             remote: Some("1234567".to_string()),
@@ -1932,7 +1924,7 @@ mod tests {
                 x => panic!("Unexpected request to profile stream: {:?}", x),
             };
             tracing::info!("Got a SCO connection: {params:?}");
-            let (request_stream, control) = connection.into_stream_and_control_handle().unwrap();
+            let (request_stream, control) = connection.into_stream_and_control_handle();
             match result {
                 Ok(()) => {
                     let accepted_params = params.into_iter().find(|p| {
@@ -2026,8 +2018,7 @@ mod tests {
         let (connection, mut remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, mut profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         let run_fut = peer.run(receiver);
         let run_fut = pin!(run_fut);
@@ -2039,7 +2030,7 @@ mod tests {
 
         // Send the incoming waiting call.
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream();
         let next_call = NextCall {
             call: Some(client_end),
             remote: Some("1234567".to_string()),
@@ -2240,7 +2231,7 @@ mod tests {
 
             // Send the held call response
             let responder = stream.next().await.unwrap();
-            let (client_end, call_stream) = fidl::endpoints::create_request_stream().unwrap();
+            let (client_end, call_stream) = fidl::endpoints::create_request_stream();
             let next_call = NextCall {
                 call: Some(client_end),
                 remote: Some("1234567".to_string()),
@@ -2253,8 +2244,7 @@ mod tests {
             (stream, call_stream)
         }
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
         let call_manager_fut = call_manager(stream);
         let call_manager_fut = pin!(call_manager_fut);
 

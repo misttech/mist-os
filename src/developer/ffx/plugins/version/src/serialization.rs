@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use chrono::{Offset, TimeZone};
+use ffx_build_version::VersionInfo;
 use fho::{FfxContext, Result};
 use fidl_fuchsia_developer_ffx::{self as ffx};
 use schemars::JsonSchema;
@@ -12,67 +13,48 @@ use std::io::Write;
 
 const UNKNOWN_BUILD_HASH: &str = "(unknown)";
 
-/// Since the fidl-derived versioninfo struct doesn't implement serde::Serialize,
-/// and it uses a private member to make it non_exhaustive, we can't
-/// really use the serde remote serializer mechanism. So this is just a simple
-/// serializeable copy of VersionInfo.
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, JsonSchema)]
-pub struct VersionInfo {
-    pub commit_hash: Option<String>,
-    pub commit_timestamp: Option<u64>,
-    pub build_version: Option<String>,
-    pub abi_revision: Option<u64>,
-    pub api_level: Option<u64>,
-    pub exec_path: Option<String>,
-    pub build_id: Option<String>,
-}
-
-impl From<ffx::VersionInfo> for VersionInfo {
-    fn from(value: ffx::VersionInfo) -> Self {
-        let ffx::VersionInfo {
-            commit_hash,
-            commit_timestamp,
-            build_version,
-            abi_revision,
-            api_level,
-            exec_path,
-            build_id,
-            ..
-        } = value;
-        VersionInfo {
-            commit_hash,
-            commit_timestamp,
-            build_version,
-            abi_revision,
-            api_level,
-            exec_path,
-            build_id,
-        }
+pub(crate) fn from_ffx_version_info(value: ffx::VersionInfo) -> VersionInfo {
+    let ffx::VersionInfo {
+        commit_hash,
+        commit_timestamp,
+        build_version,
+        abi_revision,
+        api_level,
+        exec_path,
+        build_id,
+        ..
+    } = value;
+    VersionInfo {
+        commit_hash,
+        commit_timestamp,
+        build_version,
+        abi_revision,
+        api_level,
+        exec_path,
+        build_id,
     }
 }
-
-impl From<VersionInfo> for ffx::VersionInfo {
-    fn from(value: VersionInfo) -> Self {
-        let VersionInfo {
-            commit_hash,
-            commit_timestamp,
-            build_version,
-            abi_revision,
-            api_level,
-            exec_path,
-            build_id,
-            ..
-        } = value;
-        ffx::VersionInfo {
-            commit_hash,
-            commit_timestamp,
-            build_version,
-            abi_revision,
-            api_level,
-            exec_path,
-            build_id,
-            ..Default::default()
-        }
+#[cfg(test)]
+pub(crate) fn to_ffx_version_info(value: VersionInfo) -> ffx::VersionInfo {
+    let VersionInfo {
+        commit_hash,
+        commit_timestamp,
+        build_version,
+        abi_revision,
+        api_level,
+        exec_path,
+        build_id,
+        ..
+    } = value;
+    ffx::VersionInfo {
+        commit_hash,
+        commit_timestamp,
+        build_version,
+        abi_revision,
+        api_level,
+        exec_path,
+        build_id,
+        ..Default::default()
     }
 }
 

@@ -63,8 +63,7 @@ impl FsNodeOps for KObjectSymlinkDirectory {
         let kobject = self.kobject();
         match kobject.get_child(name) {
             Some(child_kobject) => {
-                let (link, info) =
-                    sysfs_create_link(kobject.clone(), child_kobject, FsCred::root());
+                let (link, info) = sysfs_create_link(kobject, child_kobject, FsCred::root());
                 Ok(node.fs().create_node(current_task, link, info))
             }
             None => error!(ENOENT),

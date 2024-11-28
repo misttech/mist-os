@@ -14,12 +14,13 @@ use crate::{
     expose_root, parse_features, parse_numbered_handles, run_container_features,
     serve_component_runner, serve_container_controller, Features, MountAction,
 };
-use anyhow::{anyhow, bail, Error};
+use anyhow::{anyhow, bail, Context, Error};
 use bstr::BString;
 #[cfg(not(feature = "starnix_lite"))]
 use fasync::OnSignals;
-use fidl::endpoints::{ControlHandle, RequestStream};
+use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl::AsyncChannel;
+use fidl_fuchsia_component_runner::{TaskProviderRequest, TaskProviderRequestStream};
 use fidl_fuchsia_feedback::CrashReporterMarker;
 use fidl_fuchsia_scheduler::RoleManagerMarker;
 use fuchsia_async::DurationExt;
@@ -123,7 +124,7 @@ fn attribution_info_for_kernel(
     // a handle to get detailed attribution. We start a new task as each incoming connection is
     // independent.
     let (client_end, server_end) =
-        fidl::endpoints::create_request_stream::<fattribution::ProviderMarker>().unwrap();
+        fidl::endpoints::create_request_stream::<fattribution::ProviderMarker>();
     fuchsia_async::Task::spawn(serve_memory_attribution_provider_container(server_end, kernel))
         .detach();
 
@@ -191,6 +192,9 @@ struct Config {
     /// The data directory of the container, used to persist data.
     data_dir: Option<zx::Channel>,
 
+    /// The runtime directory of the container, used to provide CF introspection.
+    runtime_dir: Option<ServerEnd<fio::DirectoryMarker>>,
+
     /// Component moniker token for the container component. This token is used in various protocols
     /// to uniquely identify a component.
     component_instance: Option<zx::Event>,
@@ -250,6 +254,7 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
         svc_dir,
         data_dir,
         component_instance,
+        runtime_dir: start_info.runtime_dir,
     }
 }
 
@@ -300,7 +305,7 @@ impl Container {
             fs.dir("svc").add_fidl_service(ExposedServices::GraphicalPresenter);
 
             // Expose the root of the container's filesystem.
-            let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy()?;
+            let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy();
             fs.add_remote("fs_root", fs_root);
             expose_root(
                 self.kernel.kthreads.unlocked_for_async().deref_mut(),
@@ -404,14 +409,15 @@ async fn server_component_controller(
 
 pub async fn create_component_from_stream(
     mut request_stream: frunner::ComponentRunnerRequestStream,
+    structured_config: &starnix_kernel_structured_config::Config,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
     if let Some(event) = request_stream.try_next().await? {
         match event {
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
-                let request_stream = controller.into_stream()?;
+                let request_stream = controller.into_stream();
                 let mut config = get_config_from_component_start_info(start_info);
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
-                let container = create_container(&mut config, sender)
+                let container = create_container(&mut config, sender, structured_config)
                     .await
                     .with_source_context(|| format!("creating container \"{}\"", &config.name))?;
                 let service_config = ContainerServiceConfig { config, request_stream, receiver };
@@ -444,6 +450,7 @@ pub async fn create_component_from_stream(
 async fn create_container(
     config: &mut Config,
     task_complete: oneshot::Sender<TaskResult>,
+    structured_config: &starnix_kernel_structured_config::Config,
 ) -> Result<Container, Error> {
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
     const DEFAULT_INIT: &str = "/container/init";
@@ -463,7 +470,7 @@ async fn create_container(
 
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
 
-    let features = parse_features(&config.features)?;
+    let features = parse_features(&config.features, structured_config)?;
 
     #[cfg(not(feature = "starnix_lite"))]
     let mut kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
@@ -636,8 +643,13 @@ async fn create_container(
 
     let memory_attribution_manager = ContainerMemoryAttributionManager::new(
         Arc::downgrade(&kernel),
-        config.component_instance.take().ok_or(Error::msg("No component instance"))?,
+        config.component_instance.take().ok_or_else(|| Error::msg("No component instance"))?,
     );
+
+    // Serve the runtime directory.
+    if let Some(runtime_dir) = config.runtime_dir.take() {
+        kernel.kthreads.spawn_future(serve_runtime_dir(runtime_dir));
+    }
 
     Ok(Container {
         kernel,
@@ -674,7 +686,7 @@ fn create_fs_context(
         // /container will mount the container pkg
         // /container/component will be a tmpfs where component using the starnix kernel will have their
         // package mounted.
-        let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
+        let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
         let container_fs = LayeredFs::new_fs(
             kernel,
             create_remotefs_filesystem(
@@ -792,7 +804,7 @@ fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
     };
     u64::from_str_radix(string, 10)
         .map_err(|_| anyhow!("Invalid block size {string}"))
-        .and_then(|val| multiplier.checked_mul(val).ok_or(anyhow!("Block size overflow")))
+        .and_then(|val| multiplier.checked_mul(val).ok_or_else(|| anyhow!("Block size overflow")))
 }
 
 #[cfg(not(feature = "starnix_lite"))]
@@ -834,6 +846,42 @@ async fn wait_for_init_file(
             Ok(_) => break,
             Err(error) if error == ENOENT => continue,
             Err(error) => return Err(anyhow::Error::from(error)),
+        }
+    }
+    Ok(())
+}
+
+async fn serve_runtime_dir(runtime_dir: ServerEnd<fio::DirectoryMarker>) {
+    let mut fs = fuchsia_component::server::ServiceFs::new();
+    match fs.serve_connection(runtime_dir) {
+        Ok(_) => {
+            fs.add_fidl_service(|job_requests: TaskProviderRequestStream| {
+                fuchsia_async::Task::local(async move {
+                    if let Err(e) = serve_task_provider(job_requests).await {
+                        log_warn!(?e, "Error serving TaskProvider");
+                    }
+                })
+                .detach();
+            });
+            fs.collect::<()>().await;
+        }
+        Err(e) => log_error!("Couldn't serve runtime directory: {e:?}"),
+    }
+}
+
+async fn serve_task_provider(mut job_requests: TaskProviderRequestStream) -> Result<(), Error> {
+    while let Some(request) = job_requests.next().await {
+        match request.context("getting next TaskProvider request")? {
+            TaskProviderRequest::GetJob { responder } => {
+                responder
+                    .send(
+                        fuchsia_runtime::job_default()
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .map_err(|s| s.into_raw()),
+                    )
+                    .context("sending job for runtime dir")?;
+            }
+            unknown => bail!("Unknown TaskProvider method {unknown:?}"),
         }
     }
     Ok(())

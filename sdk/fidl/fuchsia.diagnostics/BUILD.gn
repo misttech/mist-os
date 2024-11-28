@@ -13,6 +13,7 @@ fidl("fuchsia.diagnostics") {
     "format.fidl",
     "interest.fidl",
     "log_settings.fidl",
+    "log_stream.fidl",
     "overview.fidl",
     "reader.fidl",
     "selector.fidl",

@@ -693,8 +693,7 @@ mod tests {
         }
         .remote_handle();
         let _task = fasync::Task::spawn(task);
-        let (proxy, controller) =
-            create_proxy_and_stream::<ftest_manager::RunControllerMarker>().unwrap();
+        let (proxy, controller) = create_proxy_and_stream::<ftest_manager::RunControllerMarker>();
         let run_controller = fasync::Task::spawn(async move {
             TestRunBuilder::run_controller(
                 controller,
@@ -721,8 +720,7 @@ mod tests {
         // Create a future that normally never resolves.
         let (task, remote_handle) = futures::future::pending().remote_handle();
         let pending_task = fasync::Task::spawn(task);
-        let (proxy, controller) =
-            create_proxy_and_stream::<ftest_manager::RunControllerMarker>().unwrap();
+        let (proxy, controller) = create_proxy_and_stream::<ftest_manager::RunControllerMarker>();
         let run_controller = fasync::Task::spawn(async move {
             TestRunBuilder::run_controller(
                 controller,
@@ -754,8 +752,7 @@ mod tests {
         }
         .remote_handle();
         let _task = fasync::Task::spawn(task);
-        let (proxy, controller) =
-            create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>().unwrap();
+        let (proxy, controller) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let run_controller = fasync::Task::spawn(async move {
             Suite::run_controller(controller, stop_sender, remote_handle, recv).await
         });
@@ -776,8 +773,7 @@ mod tests {
         // Create a future that normally never resolves.
         let (task, remote_handle) = futures::future::pending().remote_handle();
         let pending_task = fasync::Task::spawn(task);
-        let (proxy, controller) =
-            create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>().unwrap();
+        let (proxy, controller) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let run_controller = fasync::Task::spawn(async move {
             Suite::run_controller(controller, stop_sender, remote_handle, recv).await
         });
@@ -797,8 +793,7 @@ mod tests {
         let (stop_sender, stop_recv) = oneshot::channel::<()>();
         let (task, remote_handle) = async {}.remote_handle();
         let _task = fasync::Task::spawn(task);
-        let (proxy, controller) =
-            create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>().unwrap();
+        let (proxy, controller) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let run_controller = fasync::Task::spawn(async move {
             Suite::run_controller(controller, stop_sender, remote_handle, recv).await
         });
@@ -844,15 +839,12 @@ mod tests {
 
     async fn create_fake_suite(test_url: String) -> Suite {
         let (_controller_proxy, controller_stream) =
-            create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>()
-                .expect("create controller proxy");
+            create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let (resolver_proxy, _resolver_stream) =
-            create_proxy_and_stream::<fresolution::ResolverMarker>()
-                .expect("create resolver proxy");
+            create_proxy_and_stream::<fresolution::ResolverMarker>();
         let resolver_proxy = Arc::new(resolver_proxy);
         let (pkg_resolver_proxy, _pkg_resolver_stream) =
-            create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
-                .expect("create resolver proxy");
+            create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>();
         let pkg_resolver_proxy = Arc::new(pkg_resolver_proxy);
         let routing_info = Arc::new(AboveRootCapabilitiesForTest::new_empty_for_tests());
         Suite {
@@ -909,8 +901,7 @@ mod tests {
         let (stop_sender, _stop_recv) = oneshot::channel::<()>();
         let (task, remote_handle) = async {}.remote_handle();
         let _task = fasync::Task::spawn(task);
-        let (proxy, controller) =
-            create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>().unwrap();
+        let (proxy, controller) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let _run_controller = fasync::Task::spawn(async move {
             Suite::run_controller(controller, stop_sender, remote_handle, recv).await
         });

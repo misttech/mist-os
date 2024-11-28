@@ -45,8 +45,9 @@ closed protocol ClientListener {
 /// Individual calls provided by the API are triggered after registering with
 /// the wlan ClientProvider via the OpenControlChannel call.
 closed protocol ClientController {
-    /// Enables wlan to initiate connections to networks (either by autoconnecting
-    /// to saved networks or acting on incoming calls triggering connections).
+    /// Enables WLAN client functionality. Once enabled, automatic connections will be
+    /// attempted for saved networks, and callers can initiate operations via the
+    /// ScanForNetworks() and Connect() APIs.
     /// Depending on the underlying capabilities of the device, this call may impact
     /// other device operation (for example, acting as an access point).
     /// The returned status represents acknowledgement of the request.  The
@@ -89,7 +90,8 @@ closed protocol ClientController {
     /// entries for the same NetworkIdentifier can exist if the credentials are
     /// different.  If a caller attempts to save a NetworkConfig with the same
     /// NetworkIdentifier and same Credentials as a previously saved network
-    /// the method will effectively be a no-op.
+    /// the method will effectively be a no-op. Saved networks will be used to
+    /// autoconnect, and are also available to use with the Connect() API.
     strict SaveNetwork(struct {
         config NetworkConfig;
     }) -> () error NetworkConfigChangeError;

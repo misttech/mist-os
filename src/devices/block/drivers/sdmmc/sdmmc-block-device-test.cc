@@ -122,11 +122,7 @@ class FakeSystemActivityGovernor
     fuchsia_power_system::ExecutionState exec_state = {
         {.opportunistic_dependency_token = std::move(execution_element)}};
 
-    fuchsia_power_system::WakeHandling wake_handling = {
-        {.assertive_dependency_token = std::move(wake_handling_element)}};
-
-    elements = {
-        {.execution_state = std::move(exec_state), .wake_handling = std::move(wake_handling)}};
+    elements = {{.execution_state = std::move(exec_state)}};
 
     completer.Reply({{std::move(elements)}});
   }
@@ -436,7 +432,7 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
 
       ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
 
-      incoming->device_server.Init("default", "");
+      incoming->device_server.Initialize("default");
       // Serve metadata.
       ASSERT_OK(incoming->device_server.AddMetadata(DEVICE_METADATA_SDMMC, metadata->data(),
                                                     metadata->size()));
@@ -474,8 +470,8 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
         // Add our package
         {
           auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-          ASSERT_OK(fdio_open("/pkg/", static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable),
-                              server.TakeChannel().release()));
+          ASSERT_OK(fdio_open3("/pkg/", static_cast<uint64_t>(fuchsia_io::wire::kPermReadable),
+                               server.TakeChannel().release()));
           ASSERT_OK(incoming->env.incoming_directory().AddDirectory(std::move(client), "pkg"));
         }
       }
@@ -527,9 +523,10 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
     auto [service_client, service_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     std::string path = std::string(component::kServiceDirectory) + "/" +
                        fuchsia_hardware_block_volume::Service::Name;
-    if (zx_status_t status = fdio_open_at(outgoing_directory_client_.channel().get(), path.c_str(),
-                                          static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                          service_server.TakeChannel().release());
+    if (zx_status_t status =
+            fdio_open3_at(outgoing_directory_client_.channel().get(), path.c_str(),
+                          static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
+                          service_server.TakeChannel().release());
         status != ZX_OK) {
       return zx::error(status);
     }
@@ -560,8 +557,8 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
     auto [volume_client, volume_server] =
         fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
     std::string volume_path = instance_name + "/volume";
-    if (zx_status_t status = fdio_open_at(service_dir_caller.borrow_channel(), volume_path.c_str(),
-                                          0, volume_server.TakeChannel().release());
+    if (zx_status_t status = fdio_open3_at(service_dir_caller.borrow_channel(), volume_path.c_str(),
+                                           0, volume_server.TakeChannel().release());
         status != ZX_OK) {
       return zx::error(status);
     }
@@ -2083,12 +2080,14 @@ TEST_P(SdmmcBlockDeviceTest, Inspect) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
+    out_data[MMC_EXT_CSD_CACHE_FLUSH_POLICY] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
     out_data[MMC_EXT_CSD_CACHE_SIZE_250] = 0x56;
     out_data[MMC_EXT_CSD_CACHE_SIZE_251] = 0x34;
     out_data[MMC_EXT_CSD_CACHE_SIZE_MSB] = 0x12;
     out_data[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_A] = 3;
     out_data[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_B] = 7;
+    out_data[MMC_EXT_CSD_BARRIER_SUPPORT] = 1;
     out_data[MMC_EXT_CSD_MAX_PACKED_WRITES] = 63;
     out_data[MMC_EXT_CSD_MAX_PACKED_READS] = 62;
   });
@@ -2133,6 +2132,16 @@ TEST_P(SdmmcBlockDeviceTest, Inspect) {
       root->node().get_property<inspect::BoolPropertyValue>("cache_enabled");
   ASSERT_NOT_NULL(cache_enabled);
   EXPECT_TRUE(cache_enabled->value());
+
+  const auto* cache_flush_fifo =
+      root->node().get_property<inspect::BoolPropertyValue>("cache_flush_fifo");
+  ASSERT_NOT_NULL(cache_flush_fifo);
+  EXPECT_TRUE(cache_flush_fifo->value());
+
+  const auto* barrier_supported =
+      root->node().get_property<inspect::BoolPropertyValue>("barrier_supported");
+  ASSERT_NOT_NULL(barrier_supported);
+  EXPECT_TRUE(barrier_supported->value());
 
   const auto* max_packed_reads =
       root->node().get_property<inspect::UintPropertyValue>("max_packed_reads");

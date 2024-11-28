@@ -128,12 +128,13 @@ pub fn create_sme(
     mac_sublayer_support: fidl_common::MacSublayerSupport,
     security_support: fidl_common::SecuritySupport,
     spectrum_management_support: fidl_common::SpectrumManagementSupport,
-    inspect_node: fuchsia_inspect::Node,
+    inspector: fuchsia_inspect::Inspector,
     persistence_req_sender: auto_persist::PersistenceReqSender,
     generic_sme_request_stream: <fidl_sme::GenericSmeMarker as fidl::endpoints::ProtocolMarker>::RequestStream,
 ) -> Result<(MlmeStream, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>), anyhow::Error>
 {
     let device_info = device_info.clone();
+    let inspect_node = inspector.root().create_child("usme");
     let (server, mlme_req_sink, mlme_req_stream, telemetry_sender, sme_fut) = match device_info.role
     {
         fidl_common::WlanMacRole::Client => {
@@ -148,6 +149,7 @@ pub fn create_sme(
                 mlme_event_stream,
                 receiver,
                 telemetry_endpoint_receiver,
+                inspector,
                 inspect_node,
                 persistence_req_sender,
             );
@@ -293,13 +295,7 @@ async fn serve_fidl_endpoint<
     endpoint: ServerEnd<T>,
     event_handler: impl Fn(C, fidl::endpoints::Request<T>) -> Fut + Copy,
 ) {
-    let stream = match endpoint.into_stream() {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to create a stream from a zircon channel: {}", e);
-            return;
-        }
-    };
+    let stream = endpoint.into_stream();
     const MAX_CONCURRENT_REQUESTS: usize = 1000;
     let handler = &event_handler;
     let r = stream
@@ -333,12 +329,10 @@ mod tests {
         let mut _exec = fasync::TestExecutor::new();
         let inspector = Inspector::default();
         let (_mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
-        let inspect_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_stream) =
             test_utils::create_inspect_persistence_channel();
         let (_generic_sme_proxy, generic_sme_stream) =
-            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>()
-                .expect("failed to create MlmeProxy");
+            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>();
         let device_info = fidl_mlme::DeviceInfo {
             role: fidl_common::WlanMacRole::unknown(),
             ..test_utils::fake_device_info([0; 6].into())
@@ -350,7 +344,7 @@ mod tests {
             fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
-            inspect_node,
+            inspector,
             persistence_req_sender,
             generic_sme_stream,
         );
@@ -363,12 +357,10 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (_mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
         let inspector = Inspector::default();
-        let inspect_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_stream) =
             test_utils::create_inspect_persistence_channel();
         let (generic_sme_proxy, generic_sme_stream) =
-            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>()
-                .expect("failed to create MlmeProxy");
+            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>();
         let (_mlme_req_stream, serve_fut) = create_sme(
             crate::Config::default(),
             mlme_event_stream,
@@ -376,7 +368,7 @@ mod tests {
             fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
-            inspect_node,
+            inspector,
             persistence_req_sender,
             generic_sme_stream,
         )
@@ -413,12 +405,10 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let inspector = Inspector::default();
         let (mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
-        let inspect_node = inspector.root().create_child("sme");
         let (persistence_req_sender, persistence_stream) =
             test_utils::create_inspect_persistence_channel();
         let (generic_sme_proxy, generic_sme_stream) =
-            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>()
-                .expect("failed to create MlmeProxy");
+            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>();
         let device_info =
             fidl_mlme::DeviceInfo { role, ..test_utils::fake_device_info([0; 6].into()) };
         let (mlme_req_stream, serve_fut) = create_sme(
@@ -428,7 +418,7 @@ mod tests {
             fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
-            inspect_node,
+            inspector.clone(),
             persistence_req_sender,
             generic_sme_stream,
         )?;
@@ -453,7 +443,7 @@ mod tests {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();
 
-        let (client_proxy, client_server) = create_proxy().unwrap();
+        let (client_proxy, client_server) = create_proxy();
         let mut client_sme_fut = helper.proxy.get_client_sme(client_server);
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
@@ -474,7 +464,7 @@ mod tests {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();
 
-        let (_ap_proxy, ap_server) = create_proxy().unwrap();
+        let (_ap_proxy, ap_server) = create_proxy();
         let mut client_sme_fut = helper.proxy.get_ap_sme(ap_server);
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
@@ -488,7 +478,7 @@ mod tests {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Ap).unwrap();
 
-        let (ap_proxy, ap_server) = create_proxy().unwrap();
+        let (ap_proxy, ap_server) = create_proxy();
         let mut ap_sme_fut = helper.proxy.get_ap_sme(ap_server);
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(helper.exec.run_until_stalled(&mut ap_sme_fut), Poll::Ready(Ok(Ok(()))));
@@ -506,7 +496,7 @@ mod tests {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Ap).unwrap();
 
-        let (_client_proxy, client_server) = create_proxy().unwrap();
+        let (_client_proxy, client_server) = create_proxy();
         let mut client_sme_fut = helper.proxy.get_client_sme(client_server);
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
@@ -519,7 +509,7 @@ mod tests {
         helper: &mut GenericSmeTestHelper,
         serve_fut: &mut Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>,
     ) -> fidl_sme::TelemetryProxy {
-        let (proxy, server) = create_proxy().unwrap();
+        let (proxy, server) = create_proxy();
         let mut telemetry_fut = helper.proxy.get_sme_telemetry(server);
         assert_variant!(helper.exec.run_until_stalled(serve_fut), Poll::Pending);
         assert_variant!(helper.exec.run_until_stalled(&mut telemetry_fut), Poll::Ready(Ok(Ok(()))));
@@ -573,7 +563,7 @@ mod tests {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Ap).unwrap();
 
-        let (_telemetry_proxy, telemetry_server) = create_proxy().unwrap();
+        let (_telemetry_proxy, telemetry_server) = create_proxy();
         let mut telemetry_fut = helper.proxy.get_sme_telemetry(telemetry_server);
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(helper.exec.run_until_stalled(&mut telemetry_fut), Poll::Ready(Ok(Err(_))));
@@ -583,7 +573,7 @@ mod tests {
         helper: &mut GenericSmeTestHelper,
         serve_fut: &mut Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>,
     ) -> fidl_sme::FeatureSupportProxy {
-        let (proxy, server) = create_proxy().unwrap();
+        let (proxy, server) = create_proxy();
         let mut features_fut = helper.proxy.get_feature_support(server);
         assert_variant!(helper.exec.run_until_stalled(serve_fut), Poll::Pending);
         assert_variant!(helper.exec.run_until_stalled(&mut features_fut), Poll::Ready(Ok(Ok(()))));

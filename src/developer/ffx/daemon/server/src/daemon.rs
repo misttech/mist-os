@@ -226,13 +226,13 @@ impl DaemonProtocolProvider for Daemon {
         let target = self.get_rcs_ready_target(target_identifier).await?;
         let rcs = target
             .rcs()
-            .ok_or(anyhow!("rcs disconnected after event fired"))
+            .ok_or_else(|| anyhow!("rcs disconnected after event fired"))
             .context("getting rcs instance")?;
         let (server, client) = fidl::Channel::create();
 
         // TODO(awdavies): Handle these errors properly so the client knows what happened.
         rcs.proxy
-            .open_capability(
+            .deprecated_open_capability(
                 moniker,
                 fsys::OpenDirType::ExposedDir,
                 capability_name,
@@ -269,9 +269,9 @@ impl DaemonProtocolProvider for Daemon {
         // Ensure auto-connect has at least started.
         let mut rcs = target
             .rcs()
-            .ok_or(anyhow!("rcs disconnected after event fired"))
+            .ok_or_else(|| anyhow!("rcs disconnected after event fired"))
             .context("getting rcs instance")?;
-        let (proxy, remote) = fidl::endpoints::create_proxy::<RemoteControlMarker>()?;
+        let (proxy, remote) = fidl::endpoints::create_proxy::<RemoteControlMarker>();
         rcs.copy_to_channel(remote.into_channel())?;
         Ok(proxy)
     }
@@ -399,8 +399,10 @@ impl Daemon {
         let buildid = context.daemon_version_string()?;
         let version_info = build_info();
         let commit_hash = version_info.commit_hash.as_deref().unwrap_or("<unknown>");
-        let commit_timestamp =
-            version_info.commit_timestamp.map(|t| t.to_string()).unwrap_or("<unknown>".to_owned());
+        let commit_timestamp = version_info
+            .commit_timestamp
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| "<unknown>".to_owned());
         let build_version = version_info.build_version.as_deref().unwrap_or("<unknown>");
 
         tracing::info!(
@@ -429,11 +431,11 @@ impl Daemon {
             .map_err(|e| anyhow!("{:#?}", e))
             .context("getting default target")?;
         if matches!(target.get_connection_state(), TargetConnectionState::Fastboot(_)) {
-            let nodename = target.nodename().unwrap_or("<No Nodename>".to_string());
+            let nodename = target.nodename().unwrap_or_else(|| "<No Nodename>".to_string());
             bail!("Attempting to open RCS on a fastboot target: {}", nodename);
         }
         if matches!(target.get_connection_state(), TargetConnectionState::Zedboot(_)) {
-            let nodename = target.nodename().unwrap_or("<No Nodename>".to_string());
+            let nodename = target.nodename().unwrap_or_else(|| "<No Nodename>".to_string());
             bail!("Attempting to connect to RCS on a zedboot target: {}", nodename);
         }
         let Some(overnet_node) = self.overnet_node.as_ref() else {
@@ -819,9 +821,19 @@ impl Daemon {
                             fidl::AsyncChannel::from_channel(chan);
                         let daemon_clone = self.clone();
                         let mut quit_tx = quit_tx.clone();
-                        let info = info.clone();
+                        let version_info = info.clone();
                         Task::local(async move {
-                            if let Err(err) = daemon_clone.handle_requests_from_stream(&quit_tx, DaemonRequestStream::from_channel(chan), &info).await {
+                            let ffx_version_info = VersionInfo {
+                                commit_hash: version_info.commit_hash,
+                                commit_timestamp: version_info.commit_timestamp,
+                                build_version: version_info.build_version,
+                                abi_revision: version_info.abi_revision,
+                                api_level: version_info.api_level,
+                                exec_path: version_info.exec_path,
+                                build_id: version_info.build_id,
+                                ..Default::default()
+                            };
+                            if let Err(err) = daemon_clone.handle_requests_from_stream(&quit_tx, DaemonRequestStream::from_channel(chan), &ffx_version_info).await {
                                 tracing::error!("error handling request: {:?}", err);
                                 quit_tx.send(()).await.expect("Failed to gracefully send quit message, aborting.");
                             }
@@ -919,12 +931,24 @@ mod test {
         let socket_path = tempdir.path().join("ascendd.sock");
         let d = Daemon::new(socket_path);
 
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<DaemonMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<DaemonMarker>();
         let (quit_tx, _quit_rx) = mpsc::channel(1);
 
         let d2 = d.clone();
         let task = Task::local(async move {
-            d2.handle_requests_from_stream(&quit_tx, stream, &build_info()).await
+            let version_info = build_info();
+            let ffx_version_info = VersionInfo {
+                commit_hash: version_info.commit_hash,
+                commit_timestamp: version_info.commit_timestamp,
+                build_version: version_info.build_version,
+                abi_revision: version_info.abi_revision,
+                api_level: version_info.api_level,
+                exec_path: version_info.exec_path,
+                build_id: version_info.build_id,
+                ..Default::default()
+            };
+
+            d2.handle_requests_from_stream(&quit_tx, stream, &ffx_version_info).await
         });
 
         (proxy, d, task)

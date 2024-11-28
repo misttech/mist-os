@@ -44,13 +44,7 @@ impl TemperatureFacade {
         if let Some(proxy) = &self.device_proxy {
             Ok(proxy.clone())
         } else {
-            let (proxy, server) = match fidl::endpoints::create_proxy::<DeviceMarker>() {
-                Ok(r) => r,
-                Err(e) => fx_err_and_bail!(
-                    &with_line!(tag),
-                    format_err!("Failed to create proxy {:?}", e)
-                ),
-            };
+            let (proxy, server) = fidl::endpoints::create_proxy::<DeviceMarker>();
 
             if Path::new(&device_path).exists() {
                 fdio::service_connect(device_path.as_ref(), server.into_channel())?;
@@ -171,7 +165,7 @@ mod tests {
     /// returns the expected temperature value.
     #[fasync::run_singlethreaded(test)]
     async fn test_get_temperature_celsius() {
-        let (proxy, mut stream) = create_proxy_and_stream::<DeviceMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<DeviceMarker>();
         let facade = TemperatureFacade { device_proxy: Some(proxy), logger_proxy: None };
         let facade_fut = async move {
             assert_eq!(
@@ -201,7 +195,7 @@ mod tests {
         let query_interval_ms = 500;
         let query_duration_ms = 10_000;
 
-        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>();
 
         let _stream_task = fasync::Task::local(async move {
             match stream.try_next().await {
@@ -250,7 +244,7 @@ mod tests {
     async fn test_start_logging_forever() {
         let query_interval_ms = 500;
 
-        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>();
 
         let _stream_task = fasync::Task::local(async move {
             match stream.try_next().await {
@@ -290,7 +284,7 @@ mod tests {
     /// Tests that the `stop_logging` method correctly queries the logger.
     #[fasync::run_singlethreaded(test)]
     async fn test_stop_logging() {
-        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>();
 
         let _stream_task = fasync::Task::local(async move {
             match stream.try_next().await {

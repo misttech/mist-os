@@ -235,7 +235,7 @@ pub fn process(input: TokenStream) -> TokenStream {
         let mut states = vec![transition.from_name.clone()];
         states.extend(transition.to_names.iter().cloned());
         for state in states {
-            if generics.entry(state.name.clone()).or_insert(state.clone()) != &state {
+            if generics.entry(state.name.clone()).or_insert_with(|| state.clone()) != &state {
                 panic!("State {} uses multiple generic argument lists", state.name);
             }
         }
@@ -283,6 +283,7 @@ pub fn process(input: TokenStream) -> TokenStream {
         });
 
         // Implement From<State<S>> for the newly defined state machine:
+        #[allow(clippy::redundant_clone)] // false positive
         let enum_name = enum_data.name.clone();
         let enum_generic = tokenize_opt(&enum_data.generic_args);
         let states_from_impl = state_set.iter().fold(quote!(), |code, x| {

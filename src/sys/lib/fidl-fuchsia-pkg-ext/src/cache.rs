@@ -42,7 +42,7 @@ impl Client {
         gc_protection: fpkg::GcProtection,
     ) -> Result<Get, fidl::Error> {
         let (needed_blobs, needed_blobs_server_end) =
-            fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>()?;
+            fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>();
         let (pkg_dir, pkg_dir_server_end) = PackageDirectory::create_request()?;
 
         let get_fut = self.proxy.get(
@@ -312,7 +312,7 @@ impl Get {
         }
 
         let (blob_iterator, blob_iterator_server_end) =
-            fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>()?;
+            fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>();
 
         self.needed_blobs.get_missing_blobs(blob_iterator_server_end)?;
         Ok(Some(blob_iterator))
@@ -704,8 +704,7 @@ mod tests {
 
     impl MockPackageCache {
         fn new() -> (Client, Self) {
-            let (proxy, stream) =
-                fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>().unwrap();
+            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>();
             (Client::from_proxy(proxy), Self { stream })
         }
 
@@ -724,8 +723,8 @@ mod tests {
                 })) => {
                     assert_eq!(BlobInfo::from(meta_far_blob), blob_info);
                     assert_eq!(gc_protection, expected_gc_protection);
-                    let needed_blobs = needed_blobs.into_stream().unwrap();
-                    let dir = dir.into_stream().unwrap();
+                    let needed_blobs = needed_blobs.into_stream();
+                    let dir = dir.into_stream();
 
                     PendingGet { stream: needed_blobs, dir, responder }
                 }
@@ -804,7 +803,7 @@ mod tests {
         async fn expect_get_missing_blobs(mut self, response_chunks: Vec<Vec<BlobInfo>>) -> Self {
             match self.stream.next().await {
                 Some(Ok(NeededBlobsRequest::GetMissingBlobs { iterator, control_handle: _ })) => {
-                    let mut stream = iterator.into_stream().unwrap();
+                    let mut stream = iterator.into_stream();
 
                     // Respond to each next request with the next chunk.
                     for chunk in response_chunks {
@@ -837,7 +836,7 @@ mod tests {
         ) -> Self {
             match self.stream.next().await {
                 Some(Ok(NeededBlobsRequest::GetMissingBlobs { iterator, control_handle: _ })) => {
-                    let mut stream = iterator.into_stream().unwrap();
+                    let mut stream = iterator.into_stream();
 
                     // Respond to each next request with the next chunk.
                     for chunk in response_chunks {
@@ -864,7 +863,6 @@ mod tests {
                 Some(Ok(NeededBlobsRequest::GetMissingBlobs { iterator, control_handle: _ })) => {
                     iterator
                         .into_stream_and_control_handle()
-                        .unwrap()
                         .1
                         .shutdown_with_epitaph(Status::ADDRESS_IN_USE);
                 }
@@ -905,8 +903,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn constructor() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>();
         let client = Client::from_proxy(proxy);
 
         drop(stream);
@@ -1167,10 +1164,9 @@ mod tests {
         }
 
         fn new() -> (NeededBlob, Self) {
-            let (blob_proxy, blob) =
-                fidl::endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+            let (blob_proxy, blob) = fidl::endpoints::create_proxy_and_stream::<fio::FileMarker>();
             let (needed_blobs_proxy, needed_blobs) =
-                fidl::endpoints::create_proxy_and_stream::<fpkg::NeededBlobsMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fpkg::NeededBlobsMarker>();
             (
                 NeededBlob {
                     blob: Blob {

@@ -6,7 +6,7 @@ use crate::convert::{fullmac_to_mlme, mlme_to_fullmac};
 use crate::device::DeviceOps;
 use crate::wlan_fullmac_impl_ifc_request_handler::serve_wlan_fullmac_impl_ifc_request_handler;
 use crate::{DriverState, FullmacDriverEvent, FullmacDriverEventSink};
-use anyhow::bail;
+use anyhow::{bail, Context};
 use futures::channel::{mpsc, oneshot};
 use futures::{select, Future, StreamExt};
 use std::pin::Pin;
@@ -71,7 +71,11 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
         fullmac_ifc_request_stream: fidl_fullmac::WlanFullmacImplIfcRequestStream,
         driver_event_sink: FullmacDriverEventSink,
     ) -> anyhow::Result<()> {
-        let mac_role = self.device.query_device_info()?.role;
+        let mac_role = self
+            .device
+            .query_device_info()?
+            .role
+            .context("Vendor driver query response missing MAC role")?;
 
         // The WlanFullmacImplIfc server is a background task so that a blocking call into the
         // vendor driver does not prevent MLME from handling incoming WlanFullmacImplIfc requests.
@@ -143,23 +147,16 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
                 self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
                 self.device.disassoc(mlme_to_fullmac::convert_disassociate_request(req))?;
             }
-            Reset(req) => {
-                self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
-                self.device.reset(mlme_to_fullmac::convert_reset_request(req))?;
-            }
             Start(req) => {
                 self.device.start_bss(mlme_to_fullmac::convert_start_bss_request(req)?)?
             }
             Stop(req) => self.device.stop_bss(mlme_to_fullmac::convert_stop_bss_request(req)?)?,
             SetKeys(req) => self.handle_mlme_set_keys_request(req)?,
-            DeleteKeys(req) => {
-                self.device.del_keys(mlme_to_fullmac::convert_delete_keys_request(req)?)?
-            }
             Eapol(req) => self.device.eapol_tx(mlme_to_fullmac::convert_eapol_request(req))?,
             SetCtrlPort(req) => self.set_link_state(req.state)?,
             QueryDeviceInfo(responder) => {
                 let device_info =
-                    fullmac_to_mlme::convert_device_info(self.device.query_device_info()?);
+                    fullmac_to_mlme::convert_device_info(self.device.query_device_info()?)?;
                 responder.respond(device_info);
             }
             QueryDiscoverySupport(..) => info!("QueryDiscoverySupport is unsupported"),
@@ -344,8 +341,12 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
             return Ok(());
         }
 
-        let online = new_link_state == fidl_mlme::ControlledPortState::Open;
-        self.device.on_link_state_changed(online)?;
+        let req = fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest {
+            online: Some(new_link_state == fidl_mlme::ControlledPortState::Open),
+            ..Default::default()
+        };
+
+        self.device.on_link_state_changed(req)?;
         self.device_link_state = new_link_state;
         Ok(())
     }
@@ -469,9 +470,12 @@ mod handle_mlme_request_tests {
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         assert!(h.mlme.is_bss_protected);
+
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+              assert_eq!(req.online, Some(false));
+          }
         );
         assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::ConnectReq { req })) => {
             let selected_bss = req.selected_bss.clone().unwrap();
@@ -560,7 +564,9 @@ mod handle_mlme_request_tests {
 
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+              assert_eq!(req.online, Some(false));
+          }
         );
         let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::DeauthReq { req })) => req);
         assert_eq!(driver_req.peer_sta_address, Some([1u8; 6]));
@@ -598,7 +604,9 @@ mod handle_mlme_request_tests {
 
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+              assert_eq!(req.online, Some(false));
+          }
         );
 
         let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::Disassoc{ req })) => req);
@@ -606,33 +614,6 @@ mod handle_mlme_request_tests {
         assert_eq!(
             driver_req.reason_code,
             Some(fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc)
-        );
-    }
-
-    #[test]
-    fn test_reset_request() {
-        let mut h = TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        let fidl_req = wlan_sme::MlmeRequest::Reset(fidl_mlme::ResetRequest {
-            sta_address: [1u8; 6],
-            set_default_mib: true,
-        });
-
-        h.mlme.handle_mlme_request(fidl_req).unwrap();
-
-        assert_variant!(
-            h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
-        );
-
-        let driver_req =
-            assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::Reset { req })) => req);
-        assert_eq!(
-            driver_req,
-            fidl_fullmac::WlanFullmacImplResetRequest {
-                sta_address: Some([1u8; 6]),
-                set_default_mib: Some(true),
-                ..Default::default()
-            }
         );
     }
 
@@ -820,27 +801,6 @@ mod handle_mlme_request_tests {
     }
 
     #[test]
-    fn test_delete_keys_request() {
-        let mut h = TestHelper::set_up();
-        let fidl_req = wlan_sme::MlmeRequest::DeleteKeys(fidl_mlme::DeleteKeysRequest {
-            keylist: vec![fidl_mlme::DeleteKeyDescriptor {
-                key_id: 1,
-                key_type: fidl_mlme::KeyType::PeerKey,
-                address: [2u8; 6],
-            }],
-        });
-
-        h.mlme.handle_mlme_request(fidl_req).unwrap();
-
-        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::DelKeys { req })) => req);
-        assert_eq!(driver_req.keylist.as_ref().unwrap().len(), 1);
-        let keylist = driver_req.keylist.unwrap();
-        assert_eq!(keylist[0].key_id, Some(1));
-        assert_eq!(keylist[0].key_type, Some(fidl_common::WlanKeyType::Peer));
-        assert_eq!(keylist[0].address, Some([2u8; 6]));
-    }
-
-    #[test]
     fn test_eapol_request() {
         let mut h = TestHelper::set_up();
         let fidl_req = wlan_sme::MlmeRequest::Eapol(fidl_mlme::EapolRequest {
@@ -877,8 +837,8 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::OnLinkStateChanged { online })) => {
-            assert_eq!(online, expected_link_state);
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+            assert_eq!(req.online, Some(expected_link_state));
         });
     }
 
@@ -1045,8 +1005,11 @@ mod handle_mlme_request_tests {
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SaeHandshakeResp { resp })) => resp);
-        assert_eq!(driver_req.peer_sta_address, [1u8; 6]);
-        assert_eq!(driver_req.status_code, fidl_ieee80211::StatusCode::AntiCloggingTokenRequired);
+        assert_eq!(driver_req.peer_sta_address.unwrap(), [1u8; 6]);
+        assert_eq!(
+            driver_req.status_code.unwrap(),
+            fidl_ieee80211::StatusCode::AntiCloggingTokenRequired
+        );
     }
 
     #[test]
@@ -1282,13 +1245,17 @@ mod handle_driver_event_tests {
 
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+              assert_eq!(req.online, Some(false));
+          }
         );
         assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::ConnectReq { .. })));
         if expected_online {
             assert_variant!(
                 h.driver_calls.try_next(),
-                Ok(Some(DriverCall::OnLinkStateChanged { online: true }))
+                Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+                  assert_eq!(req.online, Some(true));
+              }
             );
         } else {
             assert_variant!(h.driver_calls.try_next(), Err(_));
@@ -1300,9 +1267,10 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let auth_ind = fidl_fullmac::WlanFullmacAuthInd {
-            peer_sta_address: [1u8; 6],
-            auth_type: fidl_fullmac::WlanAuthType::OpenSystem,
+        let auth_ind = fidl_fullmac::WlanFullmacImplIfcAuthIndRequest {
+            peer_sta_address: Some([1u8; 6]),
+            auth_type: Some(fidl_fullmac::WlanAuthType::OpenSystem),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.auth_ind(&auth_ind)),
@@ -1327,7 +1295,8 @@ mod handle_driver_event_tests {
     fn test_deauth_conf(mac_role: fidl_common::WlanMacRole) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role =
+            Some(mac_role);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let deauth_conf = fidl_fullmac::WlanFullmacImplIfcDeauthConfRequest {
@@ -1343,7 +1312,9 @@ mod handle_driver_event_tests {
         if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
                 h.driver_calls.try_next(),
-                Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+                Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+                  assert_eq!(req.online, Some(false));
+              }
             );
         } else {
             assert_variant!(h.driver_calls.try_next(), Err(_));
@@ -1361,13 +1332,15 @@ mod handle_driver_event_tests {
     fn test_deauth_ind(mac_role: fidl_common::WlanMacRole) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role =
+            Some(mac_role);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let deauth_ind = fidl_fullmac::WlanFullmacDeauthIndication {
-            peer_sta_address: [1u8; 6],
-            reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
-            locally_initiated: true,
+        let deauth_ind = fidl_fullmac::WlanFullmacImplIfcDeauthIndRequest {
+            peer_sta_address: Some([1u8; 6]),
+            reason_code: Some(fidl_ieee80211::ReasonCode::LeavingNetworkDeauth),
+            locally_initiated: Some(true),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.deauth_ind(&deauth_ind)),
@@ -1378,7 +1351,9 @@ mod handle_driver_event_tests {
         if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
                 h.driver_calls.try_next(),
-                Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+                Ok(Some(DriverCall::OnLinkStateChanged { req })) =>{
+                  assert_eq!(req.online, Some(false));
+              }
             );
         } else {
             assert_variant!(h.driver_calls.try_next(), Err(_));
@@ -1401,12 +1376,13 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let assoc_ind = fidl_fullmac::WlanFullmacAssocInd {
-            peer_sta_address: [1u8; 6],
-            listen_interval: 2,
-            ssid: fidl_ieee80211::CSsid { data: [3u8; 32], len: 4 },
-            rsne: vec![5u8; 6],
-            vendor_ie: vec![7u8; 8],
+        let assoc_ind = fidl_fullmac::WlanFullmacImplIfcAssocIndRequest {
+            peer_sta_address: Some([1u8; 6]),
+            listen_interval: Some(2),
+            ssid: vec![3u8; 4].into(),
+            rsne: Some(vec![5u8; 6]),
+            vendor_ie: Some(vec![7u8; 8]),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.assoc_ind(&assoc_ind)),
@@ -1435,10 +1411,14 @@ mod handle_driver_event_tests {
     fn test_disassoc_conf(mac_role: fidl_common::WlanMacRole) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role =
+            Some(mac_role);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let disassoc_conf = fidl_fullmac::WlanFullmacDisassocConfirm { status: 1 };
+        let disassoc_conf = fidl_fullmac::WlanFullmacImplIfcDisassocConfRequest {
+            status: Some(1),
+            ..Default::default()
+        };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.disassoc_conf(&disassoc_conf)),
             Poll::Ready(Ok(()))
@@ -1448,7 +1428,9 @@ mod handle_driver_event_tests {
         if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
                 h.driver_calls.try_next(),
-                Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+                Ok(Some(DriverCall::OnLinkStateChanged { req })) =>{
+                  assert_eq!(req.online, Some(false));
+              }
             );
         } else {
             assert_variant!(h.driver_calls.try_next(), Err(_));
@@ -1465,13 +1447,15 @@ mod handle_driver_event_tests {
     fn test_disassoc_ind(mac_role: fidl_common::WlanMacRole) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role =
+            Some(mac_role);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let disassoc_ind = fidl_fullmac::WlanFullmacDisassocIndication {
-            peer_sta_address: [1u8; 6],
-            reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
-            locally_initiated: true,
+        let disassoc_ind = fidl_fullmac::WlanFullmacImplIfcDisassocIndRequest {
+            peer_sta_address: Some([1u8; 6]),
+            reason_code: Some(fidl_ieee80211::ReasonCode::LeavingNetworkDeauth),
+            locally_initiated: Some(true),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.disassoc_ind(&disassoc_ind)),
@@ -1482,7 +1466,9 @@ mod handle_driver_event_tests {
         if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
                 h.driver_calls.try_next(),
-                Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+                Ok(Some(DriverCall::OnLinkStateChanged { req })) =>{
+                  assert_eq!(req.online, Some(false));
+              }
             );
         } else {
             assert_variant!(h.driver_calls.try_next(), Err(_));
@@ -1521,7 +1507,9 @@ mod handle_driver_event_tests {
         if expected_link_state_changed {
             assert_variant!(
                 h.driver_calls.try_next(),
-                Ok(Some(DriverCall::OnLinkStateChanged { online: true }))
+                Ok(Some(DriverCall::OnLinkStateChanged { req }))=>{
+                  assert_eq!(req.online, Some(true));
+              }
             );
         } else {
             assert_variant!(h.driver_calls.try_next(), Err(_));
@@ -1621,7 +1609,9 @@ mod handle_driver_event_tests {
         // Receipt of a roam start causes MLME to close the controlled port.
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req }))=>{
+              assert_eq!(req.online, Some(false));
+          }
         );
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -1654,7 +1644,9 @@ mod handle_driver_event_tests {
         // Receipt of a roam request causes MLME to close the controlled port.
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+                assert_eq!(req.online, Some(false));
+            }
         );
         assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::RoamReq { req })) => {
             assert_eq!(selected_bss, req.selected_bss.clone().unwrap());
@@ -1691,7 +1683,9 @@ mod handle_driver_event_tests {
         // Receipt of a roam result success causes MLME to open the controlled port on an open network.
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: true }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req }))=>{
+              assert_eq!(req.online, Some(true));
+          }
         );
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -1741,7 +1735,9 @@ mod handle_driver_event_tests {
         // Receipt of a roam result success causes MLME to open the controlled port on an open network.
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: true }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+                assert_eq!(req.online, Some(true));
+            }
         );
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -1989,8 +1985,7 @@ mod handle_driver_event_tests {
 
             let (fullmac_ifc_proxy, fullmac_ifc_request_stream) =
                 fidl::endpoints::create_proxy_and_stream::<fidl_fullmac::WlanFullmacImplIfcMarker>(
-                )
-                .unwrap();
+                );
 
             let mocks = fake_device.mocks.clone();
             let main_loop = MlmeMainLoop {

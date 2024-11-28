@@ -94,8 +94,7 @@ static bool vmo_commit_test() {
 
   auto ret = vmo->CommitRange(0, alloc_size);
   ASSERT_EQ(ZX_OK, ret, "committing vm object\n");
-  EXPECT_EQ(ROUNDUP_PAGE_SIZE(alloc_size), vmo->GetAttributedMemory().uncompressed_bytes,
-            "committing vm object\n");
+  EXPECT_TRUE(make_private_attribution_counts(alloc_size, 0) == vmo->GetAttributedMemory())
   EXPECT_TRUE(PagesInAnyAnonymousQueue(vmo.get(), 0, alloc_size));
   END_TEST;
 }
@@ -105,7 +104,7 @@ static bool vmo_commit_compressed_pages_test() {
 
   AutoVmScannerDisable scanner_disable;
   // Need a working compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -119,8 +118,7 @@ static bool vmo_commit_compressed_pages_test() {
   ASSERT_OK(status);
 
   // Validate these are committed.
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = kPages * PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
+  EXPECT_TRUE(make_private_attribution_counts(kPages * PAGE_SIZE, 0) == vmo->GetAttributedMemory())
   EXPECT_TRUE(PagesInAnyAnonymousQueue(vmo.get(), 0, kPages * PAGE_SIZE));
 
   // Lookup and compress each page;
@@ -140,15 +138,14 @@ static bool vmo_commit_compressed_pages_test() {
 
   // Should be no real pages, and one of the pages should have been deduped to zero and not even be
   // compressed.
-  EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = (kPages - 1) * PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
+  EXPECT_TRUE(make_private_attribution_counts(0, (kPages - 1) * PAGE_SIZE) ==
+              vmo->GetAttributedMemory())
 
   // Now use commit again, this should decompress things.
   status = vmo->CommitRange(0, kPages * PAGE_SIZE);
   ASSERT_OK(status);
 
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = kPages * PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
+  EXPECT_TRUE(make_private_attribution_counts(kPages * PAGE_SIZE, 0) == vmo->GetAttributedMemory())
   EXPECT_TRUE(PagesInAnyAnonymousQueue(vmo.get(), 0, kPages * PAGE_SIZE));
 
   END_TEST;
@@ -467,13 +464,14 @@ static bool vmo_reference_attribution_commit_test() {
 
   auto ret = vmo->CommitRange(0, alloc_size);
   EXPECT_EQ(ZX_OK, ret, "committing vm object\n");
-  EXPECT_EQ(alloc_size, vmo->GetAttributedMemory().uncompressed_bytes, "committing vm object\n");
+  EXPECT_TRUE(make_private_attribution_counts(alloc_size, 0) == vmo->GetAttributedMemory())
 
-  EXPECT_EQ(0u, vmo_reference->GetAttributedMemory().uncompressed_bytes,
-            "vmo_reference attribution\n");
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo_reference->GetAttributedMemory(),
+              "vmo_reference attribution\n");
 
-  EXPECT_EQ(alloc_size, vmo_reference->GetAttributedMemoryInReferenceOwner().uncompressed_bytes,
-            "vmo_reference explicit reference attribution\n");
+  EXPECT_TRUE(make_private_attribution_counts(alloc_size, 0) ==
+                  vmo_reference->GetAttributedMemoryInReferenceOwner(),
+              "vmo_reference explicit reference attribution\n");
 
   END_TEST;
 }
@@ -1237,8 +1235,8 @@ static bool vmo_lookup_test() {
 
   status = vmo->CommitRange(PAGE_SIZE, PAGE_SIZE);
   EXPECT_EQ(ZX_OK, status, "committing vm object\n");
-  EXPECT_EQ((size_t)PAGE_SIZE, vmo->GetAttributedMemory().uncompressed_bytes,
-            "committing vm object\n");
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == vmo->GetAttributedMemory(),
+              "committing vm object\n");
 
   // Should not see any pages in the early range.
   status = vmo->Lookup(0, PAGE_SIZE, lookup_fn);
@@ -1269,7 +1267,8 @@ static bool vmo_lookup_test() {
   // Commit the rest
   status = vmo->CommitRange(0, alloc_size);
   EXPECT_EQ(ZX_OK, status, "committing vm object\n");
-  EXPECT_EQ(alloc_size, vmo->GetAttributedMemory().uncompressed_bytes, "committing vm object\n");
+  EXPECT_TRUE(make_private_attribution_counts(alloc_size, 0) == vmo->GetAttributedMemory(),
+              "committing vm object\n");
 
   status = vmo->Lookup(0, alloc_size, lookup_fn);
   EXPECT_EQ(ZX_OK, status, "lookup on partially committed pages\n");
@@ -1429,7 +1428,7 @@ static bool vmo_clones_of_compressed_pages_test() {
   BEGIN_TEST;
 
   // Need a compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -1450,8 +1449,7 @@ static bool vmo_clones_of_compressed_pages_test() {
   uint64_t data = 42;
   EXPECT_OK(vmo->Write(&data, 0, sizeof(data)));
 
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == vmo->GetAttributedMemory());
 
   vm_page_t* page = nullptr;
   status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
@@ -1465,8 +1463,7 @@ static bool vmo_clones_of_compressed_pages_test() {
     EXPECT_EQ(reclaimed, 1u);
   }
   page = nullptr;
-  EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
+  EXPECT_TRUE(make_private_attribution_counts(0, PAGE_SIZE) == vmo->GetAttributedMemory());
 
   // Creating a clone should keep the page compressed.
   fbl::RefPtr<VmObject> clone;
@@ -1474,17 +1471,25 @@ static bool vmo_clones_of_compressed_pages_test() {
       vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true, &clone);
   ASSERT_OK(status);
   clone->set_user_id(43);
-  EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
+#if ENABLE_LEGACY_ATTRIBUTION
+  EXPECT_TRUE((VmObject::AttributionCounts{
+                  .compressed_bytes = PAGE_SIZE,
+              }) == vmo->GetAttributedMemory());
   EXPECT_TRUE((VmObject::AttributionCounts{}) == clone->GetAttributedMemory());
+#else
+  EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE,
+                                           .scaled_compressed_bytes = vm::FractionalBytes(
+                                               PAGE_SIZE, 2)}) == vmo->GetAttributedMemory());
+  EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE,
+                                           .scaled_compressed_bytes = vm::FractionalBytes(
+                                               PAGE_SIZE, 2)}) == clone->GetAttributedMemory());
+#endif
 
   // Forking the page into a child will decompress in order to do the copy.
   status = clone->Write(&data, 0, sizeof(data));
   EXPECT_OK(status);
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
-              clone->GetAttributedMemory());
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == vmo->GetAttributedMemory());
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == clone->GetAttributedMemory());
 
   // Compress the parent page again by reaching into the hidden VMO parent.
   fbl::RefPtr<VmCowPages> hidden_root = vmo->DebugGetCowPages()->DebugGetParent();
@@ -1500,16 +1505,13 @@ static bool vmo_clones_of_compressed_pages_test() {
     EXPECT_EQ(reclaimed, 1u);
   }
   page = nullptr;
-  EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
-              clone->GetAttributedMemory());
+  EXPECT_TRUE(make_private_attribution_counts(0, PAGE_SIZE) == vmo->GetAttributedMemory());
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == clone->GetAttributedMemory());
 
   // Closing the child VMO should allow the now merged VMO to just have the compressed page without
   // causing it to be decompressed.
   clone.reset();
-  EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
+  EXPECT_TRUE(make_private_attribution_counts(0, PAGE_SIZE) == vmo->GetAttributedMemory());
 
   END_TEST;
 }
@@ -1519,7 +1521,7 @@ static bool vmo_clone_kernel_mapped_compressed_test() {
   BEGIN_TEST;
 
   // Need a compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -1857,7 +1859,7 @@ static bool vmo_eviction_hints_clone_test() {
   // Fork the page in the clone. And make sure hints no longer apply.
   uint64_t data = 0xff;
   clone->Write(&data, 0, sizeof(data));
-  EXPECT_EQ((size_t)PAGE_SIZE, clone->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == clone->GetAttributedMemory());
 
   // The write will have moved the page to the first page queue, because the page is still accessed
   // in order to perform the fork. So hint using the parent again to move to the DontNeed queue.
@@ -1944,9 +1946,9 @@ static bool vmo_eviction_test() {
   __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
   // Eviction should actually drop the number of committed pages.
-  EXPECT_EQ((size_t)PAGE_SIZE, vmo2->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == vmo2->GetAttributedMemory());
   ASSERT_EQ(reclaim_page(vmo2, page2, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 1u);
-  EXPECT_EQ(0u, vmo2->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo2->GetAttributedMemory());
   EXPECT_GT(vmo2->ReclamationEventCount(), 0u);
 
   // Pinned pages should not be evictable.
@@ -2005,9 +2007,9 @@ static bool vmo_attribution_clones_test() {
   status = vmo->CommitRange(0, 2 * PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   expected_gen_count += 2;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                             make_private_attribution_counts(2ul * PAGE_SIZE, 0)));
 
   // Create a clone that sees the second and third pages.
   fbl::RefPtr<VmObject> clone;
@@ -2018,31 +2020,47 @@ static bool vmo_attribution_clones_test() {
 
   // Creation of the clone should increment the generation count.
   ++expected_gen_count;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE}));
+#if ENABLE_LEGACY_ATTRIBUTION
+  EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                                   AttributionCounts{
+                                                       .uncompressed_bytes = 2ul * PAGE_SIZE,
+                                                   }));
   EXPECT_EQ(true,
             verify_object_memory_attribution(clone.get(), expected_gen_count, AttributionCounts{}));
+#else
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(
+                vmo.get(), expected_gen_count,
+                AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE,
+                                  .private_uncompressed_bytes = PAGE_SIZE,
+                                  .scaled_uncompressed_bytes = vm::FractionalBytes(PAGE_SIZE, 2) +
+                                                               vm::FractionalBytes(PAGE_SIZE)}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(
+                clone.get(), expected_gen_count,
+                AttributionCounts{.uncompressed_bytes = PAGE_SIZE,
+                                  .scaled_uncompressed_bytes = vm::FractionalBytes(PAGE_SIZE, 2)}));
+#endif
 
   // Commit both pages in the clone. This should increment the generation count by the no. of pages
   // committed in the clone.
   status = clone->CommitRange(0, 2 * PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   expected_gen_count += 2;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE}));
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      clone.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                             make_private_attribution_counts(2ul * PAGE_SIZE, 0)));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(clone.get(), expected_gen_count,
+                                             make_private_attribution_counts(2ul * PAGE_SIZE, 0)));
 
   // Commit the last page in the original vmo, which should increment the generation count by 1.
   status = vmo->CommitRange(3 * PAGE_SIZE, PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   ++expected_gen_count;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 3ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                             make_private_attribution_counts(3ul * PAGE_SIZE, 0)));
 
   // Create a slice that sees all four pages of the original vmo.
   fbl::RefPtr<VmObject> slice;
@@ -2052,12 +2070,12 @@ static bool vmo_attribution_clones_test() {
 
   // Creation of the slice should increment the generation count.
   ++expected_gen_count;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 3ul * PAGE_SIZE}));
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      clone.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                             make_private_attribution_counts(3ul * PAGE_SIZE, 0)));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(clone.get(), expected_gen_count,
+                                             make_private_attribution_counts(2ul * PAGE_SIZE, 0)));
   EXPECT_EQ(true,
             verify_object_memory_attribution(slice.get(), expected_gen_count, AttributionCounts{}));
 
@@ -2065,21 +2083,21 @@ static bool vmo_attribution_clones_test() {
   // increment the generation count.
   status = slice->CommitRange(3 * PAGE_SIZE, PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 3ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                             make_private_attribution_counts(3ul * PAGE_SIZE, 0)));
 
   // Committing the remaining 3 pages in the slice will commit pages in the original vmo, and should
   // increment the generation count by 3 (1 per page committed).
   status = slice->CommitRange(0, 4 * PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   expected_gen_count += 3;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 4ul * PAGE_SIZE}));
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      clone.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                             make_private_attribution_counts(4ul * PAGE_SIZE, 0)));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(clone.get(), expected_gen_count,
+                                             make_private_attribution_counts(2ul * PAGE_SIZE, 0)));
   EXPECT_EQ(true,
             verify_object_memory_attribution(slice.get(), expected_gen_count, AttributionCounts{}));
 
@@ -2087,18 +2105,18 @@ static bool vmo_attribution_clones_test() {
   // (the clone and the hidden parent).
   clone.reset();
   expected_gen_count += 2;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 4ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                             make_private_attribution_counts(4ul * PAGE_SIZE, 0)));
   EXPECT_EQ(true,
             verify_object_memory_attribution(slice.get(), expected_gen_count, AttributionCounts{}));
 
   // Removing the slice should increment the generation count.
   slice.reset();
   ++expected_gen_count;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 4ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                             make_private_attribution_counts(4ul * PAGE_SIZE, 0)));
 
   END_TEST;
 }
@@ -2141,7 +2159,7 @@ static bool vmo_attribution_ops_test() {
     status = vmo->CommitRange(0, 4 * PAGE_SIZE);
     ASSERT_EQ(ZX_OK, status);
     expected_gen_count += 4;
-    expected_attribution_counts.uncompressed_bytes = 4ul * PAGE_SIZE;
+    expected_attribution_counts = make_private_attribution_counts(4ul * PAGE_SIZE, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
 
@@ -2149,7 +2167,7 @@ static bool vmo_attribution_ops_test() {
     // count.
     status = vmo->CommitRange(0, 4 * PAGE_SIZE);
     ASSERT_EQ(ZX_OK, status);
-    expected_attribution_counts.uncompressed_bytes = 4ul * PAGE_SIZE;
+    expected_attribution_counts = make_private_attribution_counts(4ul * PAGE_SIZE, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
 
@@ -2157,7 +2175,7 @@ static bool vmo_attribution_ops_test() {
     status = vmo->DecommitRange(0, 4 * PAGE_SIZE);
     ASSERT_EQ(ZX_OK, status);
     ++expected_gen_count;
-    expected_attribution_counts.uncompressed_bytes = 0;
+    expected_attribution_counts = make_private_attribution_counts(0, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
 
@@ -2165,7 +2183,7 @@ static bool vmo_attribution_ops_test() {
     status = vmo->CommitRange(0, 4 * PAGE_SIZE);
     ASSERT_EQ(ZX_OK, status);
     expected_gen_count += 4;
-    expected_attribution_counts.uncompressed_bytes = 4ul * PAGE_SIZE;
+    expected_attribution_counts = make_private_attribution_counts(4ul * PAGE_SIZE, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
 
@@ -2173,7 +2191,7 @@ static bool vmo_attribution_ops_test() {
     status = vmo->DecommitRange(0, 4 * PAGE_SIZE);
     ASSERT_EQ(ZX_OK, status);
     ++expected_gen_count;
-    expected_attribution_counts.uncompressed_bytes = 0;
+    expected_attribution_counts = make_private_attribution_counts(0, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
 
@@ -2196,9 +2214,7 @@ static bool vmo_attribution_ops_test() {
     status = vmo->Write(buf.data(), 0, 2 * PAGE_SIZE);
     ASSERT_EQ(ZX_OK, status);
     expected_gen_count += 2;
-    DEBUG_ASSERT(expected_attribution_counts.uncompressed_bytes == 0);
-    expected_attribution_counts.uncompressed_bytes += 2ul * PAGE_SIZE;
-    DEBUG_ASSERT(expected_attribution_counts.uncompressed_bytes == 2ul * PAGE_SIZE);
+    expected_attribution_counts = make_private_attribution_counts(2ul * PAGE_SIZE, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
 
@@ -2207,8 +2223,7 @@ static bool vmo_attribution_ops_test() {
     status = vmo->Write(buf.data(), 2 * PAGE_SIZE, 2 * PAGE_SIZE);
     ASSERT_EQ(ZX_OK, status);
     expected_gen_count += 2;
-    expected_attribution_counts.uncompressed_bytes += 2ul * PAGE_SIZE;
-    DEBUG_ASSERT(expected_attribution_counts.uncompressed_bytes == 4ul * PAGE_SIZE);
+    expected_attribution_counts = make_private_attribution_counts(4ul * PAGE_SIZE, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
 
@@ -2216,7 +2231,7 @@ static bool vmo_attribution_ops_test() {
     status = vmo->Resize(2 * PAGE_SIZE);
     ASSERT_EQ(ZX_OK, status);
     ++expected_gen_count;
-    expected_attribution_counts.uncompressed_bytes -= 2ul * PAGE_SIZE;
+    expected_attribution_counts = make_private_attribution_counts(2ul * PAGE_SIZE, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
 
@@ -2224,7 +2239,7 @@ static bool vmo_attribution_ops_test() {
     status = vmo->ZeroRange(0, 2 * PAGE_SIZE);
     ASSERT_EQ(ZX_OK, status);
     ++expected_gen_count;
-    expected_attribution_counts.uncompressed_bytes -= 2ul * PAGE_SIZE;
+    expected_attribution_counts = make_private_attribution_counts(0, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
   }
@@ -2262,7 +2277,7 @@ static bool vmo_attribution_ops_contiguous_test() {
 
     uint64_t expected_gen_count = 1;
     VmObject::AttributionCounts expected_attribution_counts;
-    expected_attribution_counts.uncompressed_bytes = 4ul * PAGE_SIZE;
+    expected_attribution_counts = make_private_attribution_counts(4ul * PAGE_SIZE, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
 
@@ -2270,7 +2285,7 @@ static bool vmo_attribution_ops_contiguous_test() {
     status = vmo->CommitRange(0, 4 * PAGE_SIZE);
     ASSERT_EQ(ZX_OK, status);
     // expected_gen_count doesn't change because the pages are already committed.
-    expected_attribution_counts.uncompressed_bytes = 4ul * PAGE_SIZE;
+    expected_attribution_counts = make_private_attribution_counts(4ul * PAGE_SIZE, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
 
@@ -2278,7 +2293,7 @@ static bool vmo_attribution_ops_contiguous_test() {
     // count.
     status = vmo->CommitRange(0, 4 * PAGE_SIZE);
     ASSERT_EQ(ZX_OK, status);
-    expected_attribution_counts.uncompressed_bytes = 4ul * PAGE_SIZE;
+    expected_attribution_counts = make_private_attribution_counts(4ul * PAGE_SIZE, 0);
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
 
@@ -2291,7 +2306,7 @@ static bool vmo_attribution_ops_contiguous_test() {
     } else {
       ASSERT_EQ(ZX_OK, status);
       ++expected_gen_count;
-      expected_attribution_counts.uncompressed_bytes = 0;
+      expected_attribution_counts = make_private_attribution_counts(0, 0);
     }
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
@@ -2305,7 +2320,7 @@ static bool vmo_attribution_ops_contiguous_test() {
       DEBUG_ASSERT(expected_attribution_counts.uncompressed_bytes == 4ul * PAGE_SIZE);
     } else {
       expected_gen_count++;
-      expected_attribution_counts.uncompressed_bytes = 4ul * PAGE_SIZE;
+      expected_attribution_counts = make_private_attribution_counts(4ul * PAGE_SIZE, 0);
     }
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
@@ -2320,7 +2335,7 @@ static bool vmo_attribution_ops_contiguous_test() {
     } else {
       ASSERT_EQ(ZX_OK, status);
       ++expected_gen_count;
-      expected_attribution_counts.uncompressed_bytes = 0;
+      expected_attribution_counts = make_private_attribution_counts(0, 0);
     }
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
@@ -2340,9 +2355,7 @@ static bool vmo_attribution_ops_contiguous_test() {
       DEBUG_ASSERT(expected_attribution_counts.uncompressed_bytes == 4ul * PAGE_SIZE);
     } else {
       ++expected_gen_count;
-      DEBUG_ASSERT(expected_attribution_counts.uncompressed_bytes == 0);
-      expected_attribution_counts.uncompressed_bytes += 2ul * PAGE_SIZE;
-      DEBUG_ASSERT(expected_attribution_counts.uncompressed_bytes == 2ul * PAGE_SIZE);
+      expected_attribution_counts = make_private_attribution_counts(2ul * PAGE_SIZE, 0);
     }
 
     // Write the last two pages. This will commit 2 pages and should increment the generation
@@ -2355,8 +2368,7 @@ static bool vmo_attribution_ops_contiguous_test() {
       DEBUG_ASSERT(expected_attribution_counts.uncompressed_bytes == 4ul * PAGE_SIZE);
     } else {
       ++expected_gen_count;
-      expected_attribution_counts.uncompressed_bytes += 2ul * PAGE_SIZE;
-      DEBUG_ASSERT(expected_attribution_counts.uncompressed_bytes == 4ul * PAGE_SIZE);
+      expected_attribution_counts = make_private_attribution_counts(4ul * PAGE_SIZE, 0);
     }
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
@@ -2380,7 +2392,7 @@ static bool vmo_attribution_ops_contiguous_test() {
       ASSERT_EQ(ZX_OK, status);
       ++expected_gen_count;
       // We were able to decommit two pages.
-      expected_attribution_counts.uncompressed_bytes = 2ul * PAGE_SIZE;
+      expected_attribution_counts = make_private_attribution_counts(2ul * PAGE_SIZE, 0);
     }
     EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                                      expected_attribution_counts));
@@ -2433,18 +2445,17 @@ static bool vmo_attribution_pager_test() {
   status = aux_vmo->CommitRange(0, alloc_size);
   ASSERT_EQ(ZX_OK, status);
   aux_expected_gen_count += 2;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      aux_vmo.get(), aux_expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(aux_vmo.get(), aux_expected_gen_count,
+                                             make_private_attribution_counts(2ul * PAGE_SIZE, 0)));
 
   // Taking pages from the aux vmo should increment its generation count.
   VmPageSpliceList page_list;
   status = aux_vmo->TakePages(0, PAGE_SIZE, &page_list);
   ASSERT_EQ(ZX_OK, status);
   ++aux_expected_gen_count;
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(aux_vmo.get(), aux_expected_gen_count,
-                                             AttributionCounts{.uncompressed_bytes = PAGE_SIZE}));
+  EXPECT_EQ(true, verify_object_memory_attribution(aux_vmo.get(), aux_expected_gen_count,
+                                                   make_private_attribution_counts(PAGE_SIZE, 0)));
   EXPECT_EQ(true,
             verify_object_memory_attribution(vmo.get(), expected_gen_count, AttributionCounts{}));
 
@@ -2452,12 +2463,10 @@ static bool vmo_attribution_pager_test() {
   status = vmo->SupplyPages(0, PAGE_SIZE, &page_list, SupplyOptions::PagerSupply);
   ASSERT_EQ(ZX_OK, status);
   ++expected_gen_count;
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(vmo.get(), expected_gen_count,
-                                             AttributionCounts{.uncompressed_bytes = PAGE_SIZE}));
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(aux_vmo.get(), aux_expected_gen_count,
-                                             AttributionCounts{.uncompressed_bytes = PAGE_SIZE}));
+  EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                                   make_private_attribution_counts(PAGE_SIZE, 0)));
+  EXPECT_EQ(true, verify_object_memory_attribution(aux_vmo.get(), aux_expected_gen_count,
+                                                   make_private_attribution_counts(PAGE_SIZE, 0)));
 
   aux_vmo.reset();
 
@@ -2470,9 +2479,8 @@ static bool vmo_attribution_pager_test() {
 
   // Creation of the clone should increment the generation count.
   ++expected_gen_count;
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(vmo.get(), expected_gen_count,
-                                             AttributionCounts{.uncompressed_bytes = PAGE_SIZE}));
+  EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                                   make_private_attribution_counts(PAGE_SIZE, 0)));
   EXPECT_EQ(true,
             verify_object_memory_attribution(clone.get(), expected_gen_count, AttributionCounts{}));
 
@@ -2480,19 +2488,16 @@ static bool vmo_attribution_pager_test() {
   status = clone->CommitRange(0, PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   ++expected_gen_count;
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(vmo.get(), expected_gen_count,
-                                             AttributionCounts{.uncompressed_bytes = PAGE_SIZE}));
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(clone.get(), expected_gen_count,
-                                             AttributionCounts{.uncompressed_bytes = PAGE_SIZE}));
+  EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                                   make_private_attribution_counts(PAGE_SIZE, 0)));
+  EXPECT_EQ(true, verify_object_memory_attribution(clone.get(), expected_gen_count,
+                                                   make_private_attribution_counts(PAGE_SIZE, 0)));
 
   // Removal of the clone should increment the generation count.
   clone.reset();
   ++expected_gen_count;
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(vmo.get(), expected_gen_count,
-                                             AttributionCounts{.uncompressed_bytes = PAGE_SIZE}));
+  EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                                   make_private_attribution_counts(PAGE_SIZE, 0)));
 
   END_TEST;
 }
@@ -2511,9 +2516,8 @@ static bool vmo_attribution_evict_test() {
   ASSERT_EQ(ZX_OK, status);
 
   uint64_t expected_gen_count = 2;
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(vmo.get(), expected_gen_count,
-                                             AttributionCounts{.uncompressed_bytes = PAGE_SIZE}));
+  EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                                   make_private_attribution_counts(PAGE_SIZE, 0)));
 
   // We stack-own loaned pages from ReclaimPage() to pmm_free_page().
   __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
@@ -2546,9 +2550,9 @@ static bool vmo_attribution_dedup_test() {
   status = vmo->CommitRange(0, 2 * PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   expected_gen_count += 2;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                             make_private_attribution_counts(2ul * PAGE_SIZE, 0)));
 
   vm_page_t* page;
   status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
@@ -2558,9 +2562,8 @@ static bool vmo_attribution_dedup_test() {
   auto vmop = static_cast<VmObjectPaged*>(vmo.get());
   ASSERT_TRUE(vmop->DebugGetCowPages()->DedupZeroPage(page, 0));
   ++expected_gen_count;
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(vmo.get(), expected_gen_count,
-                                             AttributionCounts{.uncompressed_bytes = PAGE_SIZE}));
+  EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                                   make_private_attribution_counts(PAGE_SIZE, 0)));
 
   // Dedupe the second page. This should increment the generation count.
   status = vmo->GetPageBlocking(PAGE_SIZE, 0, nullptr, &page, nullptr);
@@ -2574,9 +2577,9 @@ static bool vmo_attribution_dedup_test() {
   status = vmo->CommitRange(0, 2 * PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   expected_gen_count += 2;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                             make_private_attribution_counts(2ul * PAGE_SIZE, 0)));
 
   END_TEST;
 }
@@ -2587,7 +2590,7 @@ static bool vmo_attribution_compression_test() {
   BEGIN_TEST;
 
   // Need a compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -2609,9 +2612,9 @@ static bool vmo_attribution_compression_test() {
   status = vmo->CommitRange(0, 2 * PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
   expected_gen_count += 2;
-  EXPECT_EQ(true, verify_object_memory_attribution(
-                      vmo.get(), expected_gen_count,
-                      AttributionCounts{.uncompressed_bytes = 2ul * PAGE_SIZE}));
+  EXPECT_EQ(true,
+            verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                             make_private_attribution_counts(2ul * PAGE_SIZE, 0)));
   EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
 
   // Writing to one of the pages to make it have non-zero contents, should not impact the
@@ -2631,10 +2634,9 @@ static bool vmo_attribution_compression_test() {
               1u);
   }
   expected_gen_count += 2;
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(
-                vmo.get(), expected_gen_count,
-                AttributionCounts{.uncompressed_bytes = PAGE_SIZE, .compressed_bytes = PAGE_SIZE}));
+  EXPECT_EQ(true, verify_object_memory_attribution(
+                      vmo.get(), expected_gen_count,
+                      make_private_attribution_counts(PAGE_SIZE, PAGE_SIZE)));
   {
     const uint64_t new_reclamation_count = vmo->ReclamationEventCount();
     EXPECT_GT(new_reclamation_count, reclamation_count);
@@ -2651,9 +2653,8 @@ static bool vmo_attribution_compression_test() {
               1u);
   }
   expected_gen_count += 2;
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(vmo.get(), expected_gen_count,
-                                             AttributionCounts{.compressed_bytes = PAGE_SIZE}));
+  EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                                   make_private_attribution_counts(0, PAGE_SIZE)));
   {
     const uint64_t new_reclamation_count = vmo->ReclamationEventCount();
     EXPECT_GT(new_reclamation_count, reclamation_count);
@@ -2664,17 +2665,15 @@ static bool vmo_attribution_compression_test() {
   status = vmo->GetPageBlocking(0, VMM_PF_FLAG_HW_FAULT, nullptr, &page, nullptr);
   ASSERT_EQ(ZX_OK, status);
   expected_gen_count += 1;
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(vmo.get(), expected_gen_count,
-                                             AttributionCounts{.uncompressed_bytes = PAGE_SIZE}));
+  EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                                   make_private_attribution_counts(PAGE_SIZE, 0)));
   EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
 
   // Reading the second page should not change the gen count, as we will just get the zero page.
   status = vmo->GetPageBlocking(PAGE_SIZE, VMM_PF_FLAG_HW_FAULT, nullptr, &page, nullptr);
   ASSERT_EQ(ZX_OK, status);
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(vmo.get(), expected_gen_count,
-                                             AttributionCounts{.uncompressed_bytes = PAGE_SIZE}));
+  EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
+                                                   make_private_attribution_counts(PAGE_SIZE, 0)));
   EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
 
   END_TEST;
@@ -2927,7 +2926,7 @@ static bool vmo_discard_test() {
   vm_page_t* page = nullptr;
   ASSERT_OK(vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr));
   EXPECT_EQ(kSize, vmo->size());
-  EXPECT_EQ(kSize, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE(make_private_attribution_counts(kSize, 0) == vmo->GetAttributedMemory());
 
   // Cannot discard when locked.
   EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages());
@@ -2935,7 +2934,7 @@ static bool vmo_discard_test() {
                 ->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow, nullptr)
                 .Total(),
             0u);
-  EXPECT_EQ(kSize, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE(make_private_attribution_counts(kSize, 0) == vmo->GetAttributedMemory());
 
   // Unlock.
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kSize));
@@ -2952,7 +2951,7 @@ static bool vmo_discard_test() {
                 ->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow, nullptr)
                 .Total());
   page = nullptr;
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
   EXPECT_GT(vmo->ReclamationEventCount(), reclamation_count);
   // Verify that the size is not affected.
   EXPECT_EQ(kSize, vmo->size());
@@ -2961,18 +2960,18 @@ static bool vmo_discard_test() {
   constexpr uint64_t kNewSize = 5 * PAGE_SIZE;
   EXPECT_EQ(ZX_OK, vmo->Resize(kNewSize));
   EXPECT_EQ(kNewSize, vmo->size());
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
 
   // Lock the vmo.
   zx_vmo_lock_state_t lock_state = {};
   EXPECT_EQ(ZX_OK, vmo->LockRange(0, kNewSize, &lock_state));
   EXPECT_EQ(kNewSize, vmo->size());
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
 
   // Commit and pin some pages, then unlock.
   EXPECT_EQ(ZX_OK, vmo->CommitRangePinned(0, kSize, false));
   ASSERT_OK(vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr));
-  EXPECT_EQ(kSize, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE(make_private_attribution_counts(kSize, 0) == vmo->GetAttributedMemory());
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kNewSize));
 
   // Page is pinned, so not in the reclaim queue, but in the wired queue.
@@ -2988,7 +2987,7 @@ static bool vmo_discard_test() {
                 .Total(),
             0u);
   EXPECT_EQ(kNewSize, vmo->size());
-  EXPECT_EQ(kSize, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE(make_private_attribution_counts(kSize, 0) == vmo->GetAttributedMemory());
   EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
 
   // Unpin the pages. Should be able to discard now.
@@ -3000,7 +2999,7 @@ static bool vmo_discard_test() {
                 .Total());
   page = nullptr;
   EXPECT_EQ(kNewSize, vmo->size());
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
   EXPECT_GT(vmo->ReclamationEventCount(), reclamation_count);
 
   // Lock and commit pages, this time by writing them through a user mapping.
@@ -3050,7 +3049,7 @@ static bool vmo_discard_failure_test() {
   // Lock and commit all pages, write something and read it back to verify.
   EXPECT_EQ(ZX_OK, vmo->TryLockRange(0, kSize));
   EXPECT_EQ(ZX_OK, vmo->Write(fill.data(), 0, kSize));
-  EXPECT_EQ(kSize, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE(make_private_attribution_counts(kSize, 0) == vmo->GetAttributedMemory());
   EXPECT_EQ(ZX_OK, vmo->Read(buf.data(), 0, kSize));
   EXPECT_EQ(0, memcmp(fill.data(), buf.data(), kSize));
 
@@ -3080,47 +3079,47 @@ static bool vmo_discard_failure_test() {
   // Unlock and discard.
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kSize));
   EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages());
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
   EXPECT_EQ(kSize, vmo->size());
 
   // Reads, writes, commits and pins should fail now.
   EXPECT_EQ(ZX_ERR_NOT_FOUND, vmo->Read(buf.data(), 0, kSize));
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
   EXPECT_EQ(ZX_ERR_NOT_FOUND, vmo->Write(buf.data(), 0, kSize));
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
   EXPECT_EQ(ZX_ERR_NOT_FOUND, vmo->CommitRange(0, kSize));
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
   EXPECT_EQ(ZX_ERR_NOT_FOUND, vmo->CommitRangePinned(0, kSize, false));
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
 
   // Decommit and ZeroRange should trivially succeed.
   EXPECT_EQ(ZX_OK, vmo->DecommitRange(0, kSize));
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
   EXPECT_EQ(ZX_OK, vmo->ZeroRange(0, kSize));
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
 
   // Creating a mapping succeeds.
   auto mapping2_result = aspace->RootVmar()->CreateVmMapping(0, kMapSize, 0, 0, vmo,
                                                              kSize - kMapSize, kArchFlags, "test2");
   ASSERT(mapping2_result.is_ok());
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
 
   // Lock the vmo again.
   zx_vmo_lock_state_t lock_state = {};
   EXPECT_EQ(ZX_OK, vmo->LockRange(0, kSize, &lock_state));
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
   EXPECT_EQ(kSize, vmo->size());
 
   // Should be able to read now. Verify that previous contents are lost and zeros are read.
   EXPECT_EQ(ZX_OK, vmo->Read(buf.data(), 0, kSize));
   memset(fill.data(), 0, kSize);
   EXPECT_EQ(0, memcmp(fill.data(), buf.data(), kSize));
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
 
   // Write should succeed as well.
   fill_region(0x99, fill.data(), kSize);
   EXPECT_EQ(ZX_OK, vmo->Write(fill.data(), 0, kSize));
-  EXPECT_EQ(kSize, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE(make_private_attribution_counts(kSize, 0) == vmo->GetAttributedMemory());
 
   // Verify contents via the mapping.
   fill_region_user(0xaa, uptr, kMapSize);
@@ -3192,7 +3191,7 @@ static bool vmo_lookup_compressed_pages_test() {
 
   AutoVmScannerDisable scanner_disable;
   // Need a working compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -3203,8 +3202,7 @@ static bool vmo_lookup_compressed_pages_test() {
   ASSERT_OK(status);
   uint64_t data = 42;
   EXPECT_OK(vmo->Write(&data, 0, sizeof(data)));
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory())
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == vmo->GetAttributedMemory());
 
   // Compress the page.
   vm_page_t* page;
@@ -3216,22 +3214,18 @@ static bool vmo_lookup_compressed_pages_test() {
     EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
               1u);
   }
-  EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory())
+  EXPECT_TRUE(make_private_attribution_counts(0, PAGE_SIZE) == vmo->GetAttributedMemory());
 
   // Looking up the page for read or write, without it being a fault, should fail and not cause the
   // page to get decompressed.
   EXPECT_NE(ZX_OK, vmo->GetPageBlocking(0, 0, nullptr, nullptr, nullptr));
-  EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory())
+  EXPECT_TRUE(make_private_attribution_counts(0, PAGE_SIZE) == vmo->GetAttributedMemory());
   EXPECT_NE(ZX_OK, vmo->GetPageBlocking(0, VMM_PF_FLAG_WRITE, nullptr, nullptr, nullptr));
-  EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory())
+  EXPECT_TRUE(make_private_attribution_counts(0, PAGE_SIZE) == vmo->GetAttributedMemory());
 
   // Read or write faults should decompress.
   ASSERT_OK(vmo->GetPageBlocking(0, VMM_PF_FLAG_HW_FAULT, nullptr, &page, nullptr));
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory())
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == vmo->GetAttributedMemory());
   status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
   ASSERT_OK(status);
   {
@@ -3240,13 +3234,11 @@ static bool vmo_lookup_compressed_pages_test() {
     EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
               1u);
   }
-  EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory())
+  EXPECT_TRUE(make_private_attribution_counts(0, PAGE_SIZE) == vmo->GetAttributedMemory());
 
   EXPECT_OK(
       vmo->GetPageBlocking(0, VMM_PF_FLAG_WRITE | VMM_PF_FLAG_SW_FAULT, nullptr, &page, nullptr));
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory())
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == vmo->GetAttributedMemory());
 
   END_TEST;
 }
@@ -3751,7 +3743,7 @@ static bool vmo_supply_compressed_pages_test() {
 
   AutoVmScannerDisable scanner_disable;
   // Need a working compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -3776,8 +3768,7 @@ static bool vmo_supply_compressed_pages_test() {
     EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
               1u);
   }
-  EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
+  EXPECT_TRUE(make_private_attribution_counts(0, PAGE_SIZE) == vmo->GetAttributedMemory());
 
   // Taking the pages should work.
   VmPageSpliceList pl;
@@ -3786,8 +3777,7 @@ static bool vmo_supply_compressed_pages_test() {
 
   // After being supplied the pager backed VMO should not have compressed pages.
   EXPECT_OK(vmop->SupplyPages(0, PAGE_SIZE, &pl, SupplyOptions::PagerSupply));
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
-              vmop->GetAttributedMemory());
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == vmop->GetAttributedMemory());
 
   END_TEST;
 }
@@ -3955,7 +3945,7 @@ static bool vmo_dedup_dirty_test() {
   EXPECT_TRUE(vmo->DebugGetCowPages()->DedupZeroPage(page, 0));
 
   // No committed pages remaining.
-  EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
 
   // Write to the page making it dirty.
   uint8_t data = 0xff;
@@ -3968,7 +3958,7 @@ static bool vmo_dedup_dirty_test() {
 
   // We should not be able to dedup the page.
   EXPECT_FALSE(vmo->DebugGetCowPages()->DedupZeroPage(page, 0));
-  EXPECT_EQ((size_t)PAGE_SIZE, vmo->GetAttributedMemory().uncompressed_bytes);
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == vmo->GetAttributedMemory());
 
   END_TEST;
 }
@@ -4026,7 +4016,7 @@ static bool vmo_high_priority_reclaim_test() {
   EXPECT_EQ(page, vmo->DebugGetPage(0));
 
   // If we have a compressor, then compressing should also fail.
-  VmCompression* compression = pmm_page_compression();
+  VmCompression* compression = Pmm::Node().GetPageCompression();
   if (compression) {
     auto compressor = compression->AcquireCompressor();
     EXPECT_OK(compressor.get().Arm());
@@ -4072,18 +4062,18 @@ static bool vmo_snapshot_modified_test() {
   ASSERT_NONNULL(clone2, "vmobject partial clone\n");
   clone2->set_user_id(44);
 
-  // Ensure pages are attributed to vmo (not clones)
-  EXPECT_EQ(alloc_size, vmo->GetAttributedMemory().uncompressed_bytes, "vmo attribution\n");
-  EXPECT_EQ(0u, clone->GetAttributedMemory().uncompressed_bytes, "clone attribution\n");
-  EXPECT_EQ(0u, clone2->GetAttributedMemory().uncompressed_bytes, "clone2 attribution\n");
+  // Ensures all pages are attributed to the root VMO, and not the clones, as the root VMO is not a
+  // hidden node.
+  EXPECT_TRUE(make_private_attribution_counts(alloc_size, 0) == vmo->GetAttributedMemory());
+  EXPECT_TRUE((vm::AttributionCounts{}) == clone->GetAttributedMemory());
+  EXPECT_TRUE((vm::AttributionCounts{}) == clone2->GetAttributedMemory());
 
   // COW page into clone & check that it is attributed.
   uint8_t data = 0xff;
   status = clone->Write(&data, 0, sizeof(data));
   ASSERT_EQ(ZX_OK, status);
 
-  EXPECT_EQ((size_t)PAGE_SIZE, clone->GetAttributedMemory().uncompressed_bytes,
-            "clone attribution\n");
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == clone->GetAttributedMemory());
 
   // Try to COW a page into clone2 that it doesn't see.
   status = clone2->Write(&data, PAGE_SIZE, sizeof(data));
@@ -4096,10 +4086,20 @@ static bool vmo_snapshot_modified_test() {
   ASSERT_EQ(ZX_OK, status, "vmobject snapshot-modified\n");
   ASSERT_NONNULL(snapshot, "vmobject snapshot-modified clone\n");
 
-  // Pages in hidden parent will be attributed to the left child.
-  EXPECT_EQ((size_t)PAGE_SIZE, clone->GetAttributedMemory().uncompressed_bytes,
-            "clone attribution\n");
-  EXPECT_EQ(0u, snapshot->GetAttributedMemory().uncompressed_bytes, "snapshot attribution\n");
+#if ENABLE_LEGACY_ATTRIBUTION
+  EXPECT_TRUE((vm::AttributionCounts{
+                  .uncompressed_bytes = PAGE_SIZE,
+              }) == clone->GetAttributedMemory());
+  EXPECT_TRUE((vm::AttributionCounts{}) == snapshot->GetAttributedMemory());
+#else
+  // Pages in hidden parent will be attributed to both children.
+  EXPECT_TRUE((vm::AttributionCounts{.uncompressed_bytes = PAGE_SIZE,
+                                     .scaled_uncompressed_bytes = vm::FractionalBytes(
+                                         PAGE_SIZE, 2)}) == clone->GetAttributedMemory());
+  EXPECT_TRUE((vm::AttributionCounts{.uncompressed_bytes = PAGE_SIZE,
+                                     .scaled_uncompressed_bytes = vm::FractionalBytes(
+                                         PAGE_SIZE, 2)}) == snapshot->GetAttributedMemory());
+#endif
 
   // Calling CreateClone directly with SnapshotAtLeastOnWrite should upgrade to snapshot-modified.
   fbl::RefPtr<VmObject> atleastonwrite;
@@ -4326,7 +4326,7 @@ static bool vmo_prefetch_compressed_pages_test() {
   AutoVmScannerDisable scanner_disable;
 
   // Need a working compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -4338,7 +4338,7 @@ static bool vmo_prefetch_compressed_pages_test() {
   uint64_t data = 42;
   EXPECT_OK(vmo->Write(&data, 0, sizeof(data)));
   EXPECT_OK(vmo->Write(&data, PAGE_SIZE, sizeof(data)));
-  EXPECT_TRUE((VmObject::AttributionCounts{2 * PAGE_SIZE, 0}) == vmo->GetAttributedMemory())
+  EXPECT_TRUE(make_private_attribution_counts(2ul * PAGE_SIZE, 0) == vmo->GetAttributedMemory())
 
   // Compress the second page.
   vm_page_t* page;
@@ -4350,14 +4350,13 @@ static bool vmo_prefetch_compressed_pages_test() {
     ASSERT_TRUE(reclaim_page(vmo, page, PAGE_SIZE, VmCowPages::EvictionHintAction::Follow,
                              &compressor.get()));
   }
-  EXPECT_TRUE((VmObject::AttributionCounts{1 * PAGE_SIZE, 1 * PAGE_SIZE}) ==
-              vmo->GetAttributedMemory())
+  EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, PAGE_SIZE) == vmo->GetAttributedMemory())
 
   // Prefetch the entire VMO.
   EXPECT_OK(vmo->PrefetchRange(0, PAGE_SIZE * 2));
 
   // Both pages should be back to being uncompressed.
-  EXPECT_TRUE((VmObject::AttributionCounts{2 * PAGE_SIZE, 0}) == vmo->GetAttributedMemory())
+  EXPECT_TRUE(make_private_attribution_counts(2ul * PAGE_SIZE, 0) == vmo->GetAttributedMemory())
 
   END_TEST;
 }

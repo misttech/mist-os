@@ -5,10 +5,10 @@
 #![deny(missing_docs)]
 
 use std::collections::BTreeSet;
-use std::fmt;
 
 use crate::common::{PackageDetails, PackagedDriverDetails};
 use crate::platform_config::sysmem_config::BoardSysmemConfig;
+use assembly_constants::Arm64DebugDapSoc;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_images_config::BoardFilesystemConfig;
 use serde::{Deserialize, Serialize};
@@ -301,43 +301,12 @@ pub struct ConnectivityConfig {
     pub network: NetworkConfig,
 }
 
-/// This enum lists all the supported soc that can enable DAP
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum DapSoc {
-    /// Enable DAP for amlogic-t931g
-    #[serde(rename = "amlogic-t931g")]
-    AmlogicT931g,
-
-    /// Enable DAP for amlogic-s905d2
-    #[serde(rename = "amlogic-s905d2")]
-    AmlogicS905d2,
-
-    /// Enable DAP for amlogic-s905d3g
-    #[serde(rename = "amlogic-s905d3g")]
-    AmlogicS905d3g,
-
-    /// Enable DAP for amlogic-a311d
-    #[serde(rename = "amlogic-a311d")]
-    AmlogicA311d,
-}
-
-impl fmt::Display for DapSoc {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DapSoc::AmlogicT931g => write!(f, "amlogic-t931g"),
-            DapSoc::AmlogicS905d2 => write!(f, "amlogic-s905d2"),
-            DapSoc::AmlogicS905d3g => write!(f, "amlogic-s905d3g"),
-            DapSoc::AmlogicA311d => write!(f, "amlogic-a311d"),
-        }
-    }
-}
-
 /// This struct defines development support configurations.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct DevelopmentSupportConfig {
     /// Configure debug access port for specific SoC
-    pub enable_debug_access_port_for_soc: Option<DapSoc>,
+    pub enable_debug_access_port_for_soc: Option<Arm64DebugDapSoc>,
 }
 
 /// This struct defines network configurations.
@@ -451,7 +420,7 @@ mod test {
             platform: PlatformConfig {
                 connectivity: ConnectivityConfig::default(),
                 development_support: DevelopmentSupportConfig {
-                    enable_debug_access_port_for_soc: Some(DapSoc::AmlogicT931g),
+                    enable_debug_access_port_for_soc: Some(Arm64DebugDapSoc::AmlogicT931g),
                 },
                 graphics: GraphicsConfig::default(),
                 sysmem_defaults: BoardSysmemConfig::default(),

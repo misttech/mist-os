@@ -11,11 +11,12 @@
 
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 
-namespace display {
+namespace display_coordinator {
 
-CaptureImage::CaptureImage(Controller* controller, DriverCaptureImageId driver_capture_image_id,
+CaptureImage::CaptureImage(Controller* controller,
+                           display::DriverCaptureImageId driver_capture_image_id,
                            inspect::Node* parent_node, ClientId client_id)
     : driver_capture_image_id_(driver_capture_image_id),
       client_id_(client_id),
@@ -34,4 +35,4 @@ void CaptureImage::InitializeInspect(inspect::Node* parent_node) {
   node_.CreateUint("client_id", client_id_.value(), &properties_);
 }
 
-}  // namespace display
+}  // namespace display_coordinator

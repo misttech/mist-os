@@ -71,7 +71,7 @@ zx_status_t fdio_ns_create(fdio_ns_t** out) {
   // via the C API.
   //
   // This reference is reclaimed in fdio_ns_destroy.
-  fbl::RefPtr<fdio_namespace> ns = fdio_namespace::Create();
+  fbl::RefPtr ns = fbl::MakeRefCounted<fdio_namespace>();
   *out = fbl::ExportToRawPtr(&ns);
   return ZX_OK;
 }

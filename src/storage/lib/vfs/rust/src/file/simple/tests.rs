@@ -103,8 +103,7 @@ fn read_only_read_with_describe() {
     let server = SimpleFile::read_only(b"Read only test");
 
     run_client(exec, || async move {
-        let (proxy, server_end) =
-            create_proxy::<fio::FileMarker>().expect("Failed to create connection endpoints");
+        let (proxy, server_end) = create_proxy::<fio::FileMarker>();
 
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
         flags
@@ -130,8 +129,7 @@ fn read_only_write_is_not_supported() {
     let server = SimpleFile::read_only(b"Read only test");
 
     run_client(exec, || async move {
-        let (proxy, server_end) =
-            create_proxy::<fio::FileMarker>().expect("Failed to create connection endpoints");
+        let (proxy, server_end) = create_proxy::<fio::FileMarker>();
 
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
         flags

@@ -1,24 +1,24 @@
 {
     "temperature_drivers": [
         {
-            "name": "soc_pll",
-            "topo_path_suffix": "/thermal"
+            "alias": "soc_pll",
+            "sensor_name": "aml-thermal-pll"
         },
         {
-            "name": "therm_ambient",
-            "topo_path_suffix": "/thermistor-device/therm-ambient"
+            "alias": "therm_ambient",
+            "sensor_name": "therm-ambient"
         },
         {
-            "name": "therm_dsp",
-            "topo_path_suffix": "/thermistor-device/therm-dsp"
+            "alias": "therm_dsp",
+            "sensor_name": "therm-dsp"
         },
         {
-            "name": "therm_soc",
-            "topo_path_suffix": "/thermistor-device/therm-soc"
+            "alias": "therm_soc",
+            "sensor_name": "therm-soc"
         },
         {
-            "name": "therm_wifi",
-            "topo_path_suffix": "/thermistor-device/therm-wifi"
+            "alias": "therm_wifi",
+            "sensor_name": "therm-wifi"
         }
     ]
 }

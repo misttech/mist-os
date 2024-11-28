@@ -49,9 +49,8 @@ pub fn bind_editor(
     ime_service: &ui_input::ImeServiceProxy,
 ) -> Result<(ui_input::InputMethodEditorProxy, ui_input::InputMethodEditorClientRequestStream)> {
     let (ime, ime_server_end) =
-        fidl::endpoints::create_proxy::<ui_input::InputMethodEditorMarker>().unwrap();
-    let (editor_client_end, editor_request_stream) =
-        fidl::endpoints::create_request_stream().unwrap();
+        fidl::endpoints::create_proxy::<ui_input::InputMethodEditorMarker>();
+    let (editor_client_end, editor_request_stream) = fidl::endpoints::create_request_stream();
     ime_service.get_input_method_editor(
         ui_input::KeyboardType::Text,
         ui_input::InputMethodAction::Done,

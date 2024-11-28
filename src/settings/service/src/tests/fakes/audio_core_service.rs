@@ -85,7 +85,7 @@ impl Service for AudioCoreService {
         }
 
         let mut manager_stream =
-            ServerEnd::<fidl_fuchsia_media::AudioCoreMarker>::new(channel).into_stream()?;
+            ServerEnd::<fidl_fuchsia_media::AudioCoreMarker>::new(channel).into_stream();
 
         let (tx, rx) = oneshot::channel::<()>();
         self.exit_tx = Some(tx);
@@ -145,7 +145,7 @@ fn process_volume_control_stream(
     streams: Rc<RwLock<HashMap<AudioRenderUsage, (f32, bool)>>>,
     suppress_client_errors: bool,
 ) {
-    let mut stream = volume_control.into_stream().expect("volume control stream error");
+    let mut stream = volume_control.into_stream();
     fasync::Task::local(async move {
         while let Some(req) = stream.try_next().await.unwrap() {
             #[allow(unreachable_patterns)]

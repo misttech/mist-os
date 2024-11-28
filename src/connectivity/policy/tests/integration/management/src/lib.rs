@@ -536,32 +536,32 @@ async fn test_oir_interface_name_conflict_uninstall_existing<M: Manager, N: Nets
     let interface_state = realm
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
         .expect("connect to fuchsia.net.interfaces/State service");
-    let interfaces_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-        &interface_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
-    .expect("get interface event stream")
-    .map(|r| r.expect("watcher error"))
-    .filter_map(|event| {
-        futures::future::ready(match event {
-            fidl_fuchsia_net_interfaces::Event::Added(
-                fidl_fuchsia_net_interfaces::Properties { id, name, .. },
-            )
-            | fidl_fuchsia_net_interfaces::Event::Existing(
-                fidl_fuchsia_net_interfaces::Properties { id, name, .. },
-            ) => Some(InterfaceWatcherEvent::Added {
-                id: id.expect("missing interface ID"),
-                name: name.expect("missing interface name"),
-            }),
-            fidl_fuchsia_net_interfaces::Event::Removed(id) => {
-                Some(InterfaceWatcherEvent::Removed { id })
-            }
-            fidl_fuchsia_net_interfaces::Event::Idle(fidl_fuchsia_net_interfaces::Empty {})
-            | fidl_fuchsia_net_interfaces::Event::Changed(
-                fidl_fuchsia_net_interfaces::Properties { .. },
-            ) => None,
-        })
-    });
+    let interfaces_stream =
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fnet_interfaces_ext::DefaultInterest,
+        >(&interface_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
+        .expect("get interface event stream")
+        .map(|r| r.expect("watcher error"))
+        .filter_map(|event| {
+            futures::future::ready(match event.into_inner() {
+                fidl_fuchsia_net_interfaces::Event::Added(
+                    fidl_fuchsia_net_interfaces::Properties { id, name, .. },
+                )
+                | fidl_fuchsia_net_interfaces::Event::Existing(
+                    fidl_fuchsia_net_interfaces::Properties { id, name, .. },
+                ) => Some(InterfaceWatcherEvent::Added {
+                    id: id.expect("missing interface ID"),
+                    name: name.expect("missing interface name"),
+                }),
+                fidl_fuchsia_net_interfaces::Event::Removed(id) => {
+                    Some(InterfaceWatcherEvent::Removed { id })
+                }
+                fidl_fuchsia_net_interfaces::Event::Idle(fidl_fuchsia_net_interfaces::Empty {})
+                | fidl_fuchsia_net_interfaces::Event::Changed(
+                    fidl_fuchsia_net_interfaces::Properties { .. },
+                ) => None,
+            })
+        });
     let interfaces_stream = futures::stream::select(
         interfaces_stream,
         futures::stream::once(wait_for_netmgr.map(|r| panic!("network manager exited {:?}", r))),
@@ -683,32 +683,32 @@ async fn test_oir_interface_name_conflict_reject<M: Manager, N: Netstack>(
     let interface_state = realm
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
         .expect("connect to fuchsia.net.interfaces/State service");
-    let interfaces_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-        &interface_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
-    .expect("get interface event stream")
-    .map(|r| r.expect("watcher error"))
-    .filter_map(|event| {
-        futures::future::ready(match event {
-            fidl_fuchsia_net_interfaces::Event::Added(
-                fidl_fuchsia_net_interfaces::Properties { id, name, .. },
-            )
-            | fidl_fuchsia_net_interfaces::Event::Existing(
-                fidl_fuchsia_net_interfaces::Properties { id, name, .. },
-            ) => Some(InterfaceWatcherEvent::Added {
-                id: id.expect("missing interface ID"),
-                name: name.expect("missing interface name"),
-            }),
-            fidl_fuchsia_net_interfaces::Event::Removed(id) => {
-                Some(InterfaceWatcherEvent::Removed { id })
-            }
-            fidl_fuchsia_net_interfaces::Event::Idle(fidl_fuchsia_net_interfaces::Empty {})
-            | fidl_fuchsia_net_interfaces::Event::Changed(
-                fidl_fuchsia_net_interfaces::Properties { .. },
-            ) => None,
-        })
-    });
+    let interfaces_stream =
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(&interface_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
+        .expect("get interface event stream")
+        .map(|r| r.expect("watcher error"))
+        .filter_map(|event| {
+            futures::future::ready(match event.into_inner() {
+                fidl_fuchsia_net_interfaces::Event::Added(
+                    fidl_fuchsia_net_interfaces::Properties { id, name, .. },
+                )
+                | fidl_fuchsia_net_interfaces::Event::Existing(
+                    fidl_fuchsia_net_interfaces::Properties { id, name, .. },
+                ) => Some(InterfaceWatcherEvent::Added {
+                    id: id.expect("missing interface ID"),
+                    name: name.expect("missing interface name"),
+                }),
+                fidl_fuchsia_net_interfaces::Event::Removed(id) => {
+                    Some(InterfaceWatcherEvent::Removed { id })
+                }
+                fidl_fuchsia_net_interfaces::Event::Idle(fidl_fuchsia_net_interfaces::Empty {})
+                | fidl_fuchsia_net_interfaces::Event::Changed(
+                    fidl_fuchsia_net_interfaces::Properties { .. },
+                ) => None,
+            })
+        });
     let interfaces_stream = futures::stream::select(
         interfaces_stream,
         futures::stream::once(wait_for_netmgr.map(|r| panic!("network manager exited {:?}", r))),
@@ -878,14 +878,14 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
         let interface_state = realm
             .connect_to_protocol::<fnet_interfaces::StateMarker>()
             .expect("connect to fuchsia.net.interfaces/State service");
-        let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interface_state,
-            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-        )
-        .expect("get interface event stream");
+        let event_stream =
+            fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+                fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+            >(&interface_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
+            .expect("get interface event stream");
         let mut event_stream = pin!(event_stream);
         let mut if_map =
-            HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new();
+            HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>>::new();
         let (wlan_ap_id, wlan_ap_name) = fidl_fuchsia_net_interfaces_ext::wait_interface(
             event_stream.by_ref(),
             &mut if_map,
@@ -1263,8 +1263,7 @@ async fn test_prefix_provider_not_supported<M: Manager, N: Netstack>(name: &str)
     // Attempt to Acquire a prefix when DHCPv6 is not supported (DHCPv6 client
     // is not made available to netcfg).
     let (prefix_control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
-            .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
+        fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>();
     prefix_provider
         .acquire_prefix(&fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
         .expect("acquire prefix");
@@ -1315,8 +1314,7 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
     {
         // Acquire a prefix.
         let (_prefix_control, server_end) =
-            fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
-                .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
+            fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>();
         prefix_provider
             .acquire_prefix(&fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
             .expect("acquire prefix");
@@ -1324,8 +1322,7 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
         // Calling acquire_prefix a second time results in ALREADY_ACQUIRING.
         {
             let (prefix_control, server_end) =
-                fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
-                    .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
+                fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>();
             prefix_provider
                 .acquire_prefix(&fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
                 .expect("acquire prefix");
@@ -1345,8 +1342,7 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
     // closure) and expect that it succeeds eventually.
     loop {
         let (prefix_control, server_end) =
-            fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
-                .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
+            fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>();
         prefix_provider
             .acquire_prefix(&fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
             .expect("acquire prefix");
@@ -1425,8 +1421,7 @@ async fn test_prefix_provider_config_error<M: Manager, N: Netstack>(
         .connect_to_protocol::<fnet_dhcpv6::PrefixProviderMarker>()
         .expect("connect to fuchsia.net.dhcpv6/PrefixProvider server");
     let (prefix_control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
-            .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
+        fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>();
     prefix_provider.acquire_prefix(&config, server_end).expect("acquire prefix");
     let fnet_dhcpv6::PrefixControlEvent::OnExit { reason } = prefix_control
         .take_event_stream()
@@ -1470,8 +1465,7 @@ async fn test_prefix_provider_double_watch<M: Manager, N: Netstack>(name: &str) 
         .expect("connect to fuchsia.net.dhcpv6/PrefixProvider server");
     // Acquire a prefix.
     let (prefix_control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
-            .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
+        fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>();
     prefix_provider
         .acquire_prefix(&fnet_dhcpv6::AcquirePrefixConfig::default(), server_end)
         .expect("acquire prefix");
@@ -1690,8 +1684,7 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                     .connect_to_protocol::<fnet_dhcpv6::PrefixProviderMarker>()
                     .expect("connect to fuchsia.net.dhcpv6/PrefixProvider server");
                 let (prefix_control, server_end) =
-                    fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
-                        .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
+                    fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>();
                 prefix_provider
                     .acquire_prefix(
                         &fnet_dhcpv6::AcquirePrefixConfig {
@@ -1816,8 +1809,7 @@ async fn disable_interface_while_having_dhcpv6_prefix<M: Manager, N: Netstack>(n
                     .connect_to_protocol::<fnet_dhcpv6::PrefixProviderMarker>()
                     .expect("connect to fuchsia.net.dhcpv6/PrefixProvider server");
                 let (prefix_control, server_end) =
-                    fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
-                        .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
+                    fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>();
                 prefix_provider
                     .acquire_prefix(
                         &fnet_dhcpv6::AcquirePrefixConfig {
@@ -1871,8 +1863,7 @@ async fn disable_interface_while_having_dhcpv6_prefix<M: Manager, N: Netstack>(n
                     .connect_to_protocol::<fnet_root::InterfacesMarker>()
                     .expect("connect to fuchsia.net.root.Interfaces");
                 let (control, server_end) =
-                    fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-                        .expect("create proxy");
+                    fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
                 root_interfaces.get_admin(if_id, server_end).expect("get admin");
 
                 let mut interface_event_stream = Box::pin(
@@ -1881,7 +1872,7 @@ async fn disable_interface_while_having_dhcpv6_prefix<M: Manager, N: Netstack>(n
 
                 let mut if_state = fnet_interfaces_ext::existing(
                     interface_event_stream.by_ref(),
-                    fnet_interfaces_ext::InterfaceState::Unknown::<()>(if_id),
+                    fnet_interfaces_ext::InterfaceState::Unknown::<(), _>(if_id),
                 )
                 .await
                 .expect("collect initial state of interface");
@@ -2215,8 +2206,7 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
         .connect_to_protocol::<fnet_masquerade::FactoryMarker>()
         .expect("connect to fuchsia.net.masquerade/Factory server");
     let (masq_control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>()
-            .expect("create fuchsia.net.masquerade/Control proxy and server end");
+        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>();
 
     masq.create(
         &fnet_masquerade::ControlConfig {
@@ -2310,8 +2300,7 @@ async fn test_masquerade_errors<N: Netstack, M: Manager>(
     };
 
     let (_masq_control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>()
-            .expect("create fuchsia.net.masquerade/Control proxy and server end");
+        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>();
     assert_eq!(
         masq.create(&config, server_end).await.expect("masq create fidl"),
         Err(test_case.expected_error())
@@ -2343,8 +2332,7 @@ async fn test_masquerade_lifetime<N: Netstack, M: Manager>(name: &str, setup: Ma
         .connect_to_protocol::<fnet_masquerade::FactoryMarker>()
         .expect("connect to fuchsia.net.masquerade/Factory server");
     let (masq_control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>()
-            .expect("create fuchsia.net.masquerade/Control proxy and server end");
+        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>();
 
     masq.create(
         &fnet_masquerade::ControlConfig {
@@ -2416,8 +2404,7 @@ async fn test_masquerade_multiple_controllers<N: Netstack, M: Manager>(
         .connect_to_protocol::<fnet_masquerade::FactoryMarker>()
         .expect("connect to fuchsia.net.masquerade/Factory server");
     let (masq_control1, server_end1) =
-        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>()
-            .expect("create fuchsia.net.masquerade/Control proxy and server end");
+        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>();
     masq.create(
         &fnet_masquerade::ControlConfig {
             src_subnet: client1_masquerade_subnet,
@@ -2441,8 +2428,7 @@ async fn test_masquerade_multiple_controllers<N: Netstack, M: Manager>(
     // Creating a second controller with the same configuration should get
     // rejected.
     let (_masq_control2, server_end2) =
-        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>()
-            .expect("create fuchsia.net.masquerade/Control proxy and server end");
+        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>();
     let result = masq
         .create(
             &fnet_masquerade::ControlConfig {
@@ -2460,8 +2446,7 @@ async fn test_masquerade_multiple_controllers<N: Netstack, M: Manager>(
 
     // Create a second controller with different configuration.
     let (masq_control2, server_end2) =
-        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>()
-            .expect("create fuchsia.net.masquerade/Control proxy and server end");
+        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>();
     masq.create(
         &fnet_masquerade::ControlConfig {
             src_subnet: client2_masquerade_subnet,
@@ -2607,7 +2592,9 @@ async fn dhcpv4_client_restarts_after_delay() {
                     .expect("start_serving should not encounter FIDL error")
                     .expect("start_serving should succeed");
 
-                let if_event_stream = fnet_interfaces_ext::event_stream_from_state(
+                let if_event_stream = fnet_interfaces_ext::event_stream_from_state::<
+                    fnet_interfaces_ext::DefaultInterest,
+                >(
                     client_state,
                     fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
                 )
@@ -2617,7 +2604,7 @@ async fn dhcpv4_client_restarts_after_delay() {
                 let mut client_if_state =
                     fnet_interfaces_ext::InterfaceState::Unknown(client_interface_id);
 
-                let find_ipv4_addr = |properties: &fnet_interfaces_ext::Properties| {
+                let find_ipv4_addr = |properties: &fnet_interfaces_ext::Properties<_>| {
                     properties.addresses.iter().find_map(|addr| match addr.addr.addr {
                         fnet::IpAddress::Ipv4(_) => Some(addr.clone()),
                         fnet::IpAddress::Ipv6(_) => None,
@@ -2674,8 +2661,7 @@ async fn dhcpv4_client_restarts_after_delay() {
                     .expect("connect to fuchsia.net.root.RoutesV4");
 
                 let (global_route_set, server_end) =
-                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>()
-                        .expect("create RouteSetV4 proxy");
+                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>();
                 root_routes.global_route_set(server_end).expect("create global RouteSetV4");
 
                 let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =

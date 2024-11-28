@@ -143,14 +143,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> FastbootProxy<T> {
 
 #[async_trait(?Send)]
 impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
-    async fn prepare(&mut self, _listener: Sender<RebootEvent>) -> Result<(), FastbootError> {
-        // TODO(colnnelson): This is a part of the original fastboot interface, and is
-        // "wrong". The device needs to be in fastboot mode before now.
-        // This function exists soely to reboot the target from
-        // product/zedboot into fastboot mode.
-        Ok(())
-    }
-
     #[tracing::instrument]
     async fn get_var(&mut self, name: &str) -> core::result::Result<String, FastbootError> {
         let command = Command::GetVar(ClientVariable::Oem(name.to_string()));
@@ -282,7 +274,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
             Reply::Fail(s) => {
                 return Err(FastbootError::ErasePartitionFailed {
                     partition: partition_name.to_string(),
-                    message: s.to_string(),
+                    message: s,
                 })
             }
             r @ _ => Err(FastbootError::UnexpectedReply {

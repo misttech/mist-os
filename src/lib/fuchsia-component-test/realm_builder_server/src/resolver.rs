@@ -267,8 +267,7 @@ impl Registry {
         )
         .await?;
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        package_dir
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end.into_channel()))?;
+        package_dir.clone2(ServerEnd::new(server_end.into_channel()))?;
         let package = Some(fresolution::Package {
             url: Some(component_url.to_string()),
             directory: Some(client_end),
@@ -340,7 +339,7 @@ impl Registry {
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
         component
             .package_dir
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end.into_channel()))
+            .clone2(ServerEnd::new(server_end.into_channel()))
             .map_err(|_| fresolution::ResolverError::Io)?;
         let package_dir_for_config = match component.config_override_policy {
             ConfigOverridePolicy::DisallowValuesFromBuilder => {

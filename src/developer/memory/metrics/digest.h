@@ -19,13 +19,14 @@ namespace memory {
 
 class Bucket {
  public:
-  Bucket(std::string name, uint64_t size) : name_(std::move(name)), size_(size) {}
+  Bucket(std::string name, uint64_t size)
+      : name_(std::move(name)), size_(FractionalBytes{.integral = size}) {}
   const std::string& name() const { return name_; }
-  uint64_t size() const { return size_; }
+  uint64_t size() const { return size_.integral; }
 
  private:
   std::string name_;
-  uint64_t size_;
+  FractionalBytes size_;
 
   friend class Digester;
 };

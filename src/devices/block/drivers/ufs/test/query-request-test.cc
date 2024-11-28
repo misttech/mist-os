@@ -155,7 +155,7 @@ TEST_F(QueryRequestTest, ClearFlag) {
   ASSERT_EQ(device_init, mock_device_.GetFlag(Flags::fDeviceInit));
 }
 
-TEST(QueryRequestTest, QueryOpcodeToString) {
+TEST(QueryOpcodeToString, QueryOpcodeToString) {
   ASSERT_EQ(QueryOpcodeToString(QueryOpcode::kNop), "Nop");
   ASSERT_EQ(QueryOpcodeToString(QueryOpcode::kReadDescriptor), "Read Descriptor");
   ASSERT_EQ(QueryOpcodeToString(QueryOpcode::kWriteDescriptor), "Write Descriptor");

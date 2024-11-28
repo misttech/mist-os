@@ -56,7 +56,7 @@ impl AudioConsumerSink {
         compression: Option<Compression>,
         flags_receiver: mpsc::Receiver<u32>,
     ) -> Result<AudioConsumerSink, Error> {
-        let (stream_sink, stream_sink_server) = fidl::endpoints::create_proxy()?;
+        let (stream_sink, stream_sink_server) = fidl::endpoints::create_proxy();
 
         let audio_stream_type = AudioStreamType {
             sample_format: AudioSampleFormat::Signed16,
@@ -145,7 +145,8 @@ impl AudioConsumerSink {
     fn send_frame(&mut self, frame: &[u8], flags: u32) -> Result<(), Error> {
         trace::duration!(c"bt-a2dp-sink", c"Media:PacketSent");
 
-        let buffer_index = self.copy_to_buffer(frame).ok_or(format_err!("No free buffers"))?;
+        let buffer_index =
+            self.copy_to_buffer(frame).ok_or_else(|| format_err!("No free buffers"))?;
 
         self.tx_count += 1;
         trace::flow_begin!(c"stream-sink", c"SendPacket", self.tx_count.into());
@@ -332,7 +333,7 @@ impl Player {
             decoder = Some(dec);
         }
 
-        let (mut audio_consumer, audio_consumer_server) = fidl::endpoints::create_proxy()?;
+        let (mut audio_consumer, audio_consumer_server) = fidl::endpoints::create_proxy();
 
         audio_consumer_factory.create_audio_consumer(session_id, audio_consumer_server)?;
 
@@ -448,7 +449,8 @@ impl Player {
                 }
                 &MediaCodecType::AUDIO_AAC => {
                     let element = AudioMuxElement::try_from_bytes(&payload[offset..])?;
-                    let frame = element.get_payload(0).ok_or(format_err!("Payload not found"))?;
+                    let frame =
+                        element.get_payload(0).ok_or_else(|| format_err!("Payload not found"))?;
                     if let Err(e) = self.audio_sink.write_all(frame).await {
                         info!("Failed to write packet to sink: {:?}", e);
                     }
@@ -550,9 +552,7 @@ pub(crate) mod tests {
 
         let _ = buffers[0].write(&[0], 0).expect_err("Write should fail");
 
-        let sink_request_stream = stream_sink_request
-            .into_stream()
-            .expect("a sink request stream to be created from the request");
+        let sink_request_stream = stream_sink_request.into_stream();
 
         (sink_request_stream, buffers)
     }
@@ -580,8 +580,7 @@ pub(crate) mod tests {
 
         assert_eq!(session_id, expected_session_id);
 
-        let mut audio_consumer_request_stream =
-            audio_consumer_create_request.into_stream().expect("audio consumer stream");
+        let mut audio_consumer_request_stream = audio_consumer_create_request.into_stream();
 
         let expect_compression = codec_type == MediaCodecType::AUDIO_AAC;
 
@@ -625,8 +624,7 @@ pub(crate) mod tests {
         let codec_type = codec_config.codec_type().clone();
 
         let (audio_consumer_factory_proxy, mut audio_consumer_factory_request_stream) =
-            create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>()
-                .expect("proxy pair creation");
+            create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>();
 
         let mut player = Player::new(TEST_SESSION_ID, codec_config, audio_consumer_factory_proxy)
             .expect("player to build");
@@ -910,7 +908,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (mut audio_consumer_proxy, mut audio_consumer_request_stream) =
-            create_proxy_and_stream::<AudioConsumerMarker>().expect("proxy creation");
+            create_proxy_and_stream::<AudioConsumerMarker>();
         let (_sender, receiver) = mpsc::channel(1);
 
         let mut sink = AudioConsumerSink::build(&mut audio_consumer_proxy, 48000, None, receiver)

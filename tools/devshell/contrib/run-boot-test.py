@@ -289,8 +289,8 @@ def main():
     parser.add_argument(
         "--build",
         action=argparse.BooleanOptionalAction,
-        help="Use `fx build` to update images before running them.",
-        default=False,
+        help="Use `fx build` to update images before running them (default).",
+        default=True,
     )
     args = parser.parse_args()
 

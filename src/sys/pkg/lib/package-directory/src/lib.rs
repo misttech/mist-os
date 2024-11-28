@@ -362,7 +362,7 @@ async fn verify_open_adjusts_flags(
     in_flags: fio::OpenFlags,
     expected_flags: fio::OpenFlags,
 ) {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
     entry.open(ExecutionScope::new(), in_flags, VfsPath::dot(), server_end);
 
@@ -386,7 +386,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn serve() {
-        let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy();
         let package = PackageBuilder::new("just-meta-far").build().await.expect("created pkg");
         let (metafar_blob, _) = package.contents();
         let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
@@ -413,7 +413,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn serve_path_open_root() {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let package = PackageBuilder::new("just-meta-far").build().await.expect("created pkg");
         let (metafar_blob, _) = package.contents();
         let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
@@ -441,7 +441,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn serve_path_open_meta() {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
         let package = PackageBuilder::new("just-meta-far").build().await.expect("created pkg");
         let (metafar_blob, _) = package.contents();
         let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
@@ -466,7 +466,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn serve_path_open_missing_path_in_package() {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let package = PackageBuilder::new("just-meta-far").build().await.expect("created pkg");
         let (metafar_blob, _) = package.contents();
         let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
@@ -492,7 +492,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn serve_path_open_missing_package() {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let (_blobfs_fake, blobfs_client) = FakeBlobfs::new();
 
         assert_matches!(
@@ -630,7 +630,7 @@ mod tests {
     }
 
     fn serve_directory(directory: Arc<vfs::directory::immutable::Simple>) -> fio::DirectoryProxy {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         vfs::directory::entry_container::Directory::open(
             directory,
             vfs::execution_scope::ExecutionScope::new(),

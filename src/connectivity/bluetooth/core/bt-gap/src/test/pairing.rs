@@ -29,22 +29,21 @@ async fn set_pairing_delegate() {
     hd.set_active_host(HostId(1)).expect("can set active host");
 
     // Create the pairing server
-    let (pairing_client, pairing_server) =
-        endpoints::create_proxy_and_stream::<PairingMarker>().unwrap();
+    let (pairing_client, pairing_server) = endpoints::create_proxy_and_stream::<PairingMarker>();
     let run_pairing = pin!(pairing::run(hd.clone(), pairing_server));
 
     // First client to request to set the delegate should be OK.
     let input = InputCapability::None;
     let output = OutputCapability::None;
     let (delegate_client1, mut delegate_server1) =
-        endpoints::create_request_stream::<PairingDelegateMarker>().unwrap();
+        endpoints::create_request_stream::<PairingDelegateMarker>();
     let _ = pairing_client
         .set_pairing_delegate(input, output, delegate_client1)
         .expect("FIDL request is OK");
 
     // Second client can't claim the delegate. The `delegate_server2` end should subsequently close.
     let (delegate_client2, mut delegate_server2) =
-        endpoints::create_request_stream::<PairingDelegateMarker>().unwrap();
+        endpoints::create_request_stream::<PairingDelegateMarker>();
     let _ = pairing_client
         .set_pairing_delegate(input, output, delegate_client2)
         .expect("FIDL request is OK");

@@ -56,7 +56,7 @@ mod tests {
         let energy_info_resource = get_energy_info_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::EnergyInfoResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::EnergyInfoResourceMarker>();
         fasync::Task::local(
             EnergyInfoResource::new(energy_info_resource)
                 .unwrap_or_else(|e| {

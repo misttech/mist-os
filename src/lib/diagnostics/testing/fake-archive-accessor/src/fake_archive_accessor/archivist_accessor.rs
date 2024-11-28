@@ -7,14 +7,13 @@
 // Unlike the original, it does not spawn tasks; it's fully synchronous.
 
 use super::archivist_server::{AccessorServer, ServerError};
-use anyhow::{bail, Error};
+use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_diagnostics as diagnostics;
 use fidl_fuchsia_diagnostics::{
     self, ClientSelectorConfiguration, DataType, Format, Selector, SelectorArgument, StreamMode,
 };
 use selectors::VerboseError;
-use tracing::warn;
 
 /// ArchiveAccessor serves an incoming connection from a client to an Archivist
 /// instance, through which the client may make Reader requests to get Inspect
@@ -72,13 +71,7 @@ impl ArchiveAccessor {
         result_stream: ServerEnd<diagnostics::BatchIteratorMarker>,
         inspect_data: &str,
     ) -> Result<(), Error> {
-        let (requests, control) = match result_stream.into_stream_and_control_handle() {
-            Ok(r) => r,
-            Err(e) => {
-                warn!("Couldn't bind results channel to executor: {:?}", e);
-                bail!("Couldn't bind results channel to executor: {:?}", e);
-            }
-        };
+        let (requests, control) = result_stream.into_stream_and_control_handle();
 
         if let Err(e) = AccessorServer::new(requests).send(inspect_data).await {
             e.close(control);

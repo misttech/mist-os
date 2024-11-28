@@ -181,7 +181,7 @@ impl FontDb {
                                 Ok(typeface_id)
                             } else {
                                 Err(FontDbError::UnknownFallbackChainEntry {
-                                    entry: typeface_id.clone().into(),
+                                    entry: typeface_id.into(),
                                 })
                             }
                         }

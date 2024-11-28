@@ -77,7 +77,7 @@ fn include_bytes_from_working_dir_env_impl(input: TokenStream) -> Result<TokenSt
 }
 
 fn inner_impl(path: &str) -> Result<TokenStream> {
-    let build_dir = env::var("FUCHSIA_BUILD_DIR").unwrap_or(".".to_string());
+    let build_dir = env::var("FUCHSIA_BUILD_DIR").unwrap_or_else(|_| ".".to_string());
     let contents = std::fs::read(Path::new(&build_dir).join(path)).map_err(|err| {
         Error::new(Span::call_site(), format!("Unable to read file {path:?}: {err:?}"))
     })?;

@@ -119,12 +119,6 @@ declare_args() {
   # with specific boards, due to driver and hardware challenges.
   additional_bootserver_arguments = ""
 
-  # Whether to perform check on the build's eligibility for production.
-  # If true, base_packages and cache_packages are checked against dependencies
-  # on //build/validate:non_production_tag, which is used to tag any
-  # non-production GN labels. Build will fail if such dependency is found.
-  check_production_eligibility = false
-
   # Controls what type of delivery blob pkg-resolver fetches and blobfs accepts.
   # Supported types can be found in //src/storage/blobfs/delivery_blob.h
   # Valid values are integers, for example: 1
@@ -200,6 +194,11 @@ declare_args() {
   # Extra GN targets to include when Bazel assembly is enabled. This list is
   # useful for including verification and other Bazel assembly specific targets.
   extra_bazel_assembly_targets = []
+
+  # Whether to include bootfs test package support inside our bringup image.
+  # Individual tests can be included through either the board or product
+  # bootfs package lists.
+  include_bringup_test_support = false
 }
 
 recovery_is_zedboot =

@@ -34,16 +34,22 @@ zx::result<std::unique_ptr<DevicePartitioner>> SherlockPartitioner::Initialize(
   if (status_or_gpt.is_error()) {
     return status_or_gpt.take_error();
   }
+  if (status_or_gpt->initialize_partition_tables) {
+    LOG("Found GPT but it was missing expected partitions.  The device should be re-initialized "
+        "via fastboot.\n");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
 
   auto partitioner = WrapUnique(new SherlockPartitioner(std::move(status_or_gpt->gpt)));
-  if (status_or_gpt->initialize_partition_tables) {
-    if (auto status = partitioner->ResetPartitionTables(); status.is_error()) {
-      return status.take_error();
-    }
-  }
 
   LOG("Successfully initialized SherlockPartitioner Device Partitioner\n");
   return zx::ok(std::move(partitioner));
+}
+
+const paver::BlockDevices& SherlockPartitioner::Devices() const { return gpt_->devices(); }
+
+fidl::UnownedClientEnd<fuchsia_io::Directory> SherlockPartitioner::SvcRoot() const {
+  return gpt_->svc_root();
 }
 
 // Sherlock bootloader types:
@@ -199,18 +205,10 @@ zx::result<std::unique_ptr<DevicePartitioner>> SherlockPartitionerFactory::New(
   return SherlockPartitioner::Initialize(devices, svc_root, std::move(block_device));
 }
 
-zx::result<std::unique_ptr<abr::Client>> SherlockAbrClientFactory::New(
-    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-    std::shared_ptr<paver::Context> context) {
-  auto partitioner = SherlockPartitioner::Initialize(devices, svc_root, {});
-
-  if (partitioner.is_error()) {
-    return partitioner.take_error();
-  }
-
+zx::result<std::unique_ptr<abr::Client>> SherlockPartitioner::CreateAbrClient() const {
   // ABR metadata has no need of a content type since it's always local rather
   // than provided in an update package, so just use the default content type.
-  auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+  auto partition = FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
   if (partition.is_error()) {
     return partition.take_error();
   }

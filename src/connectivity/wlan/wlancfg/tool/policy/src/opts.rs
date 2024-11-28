@@ -86,7 +86,7 @@ impl From<PolicyNetworkConfig> for wlan_policy::NetworkConfig {
             }
             None => {
                 // If credential type is not provided, infer it from the credential value.
-                credential_from_string(arg.credential.unwrap_or("".to_string()))
+                credential_from_string(arg.credential.unwrap_or_else(|| "".to_string()))
             }
         };
 

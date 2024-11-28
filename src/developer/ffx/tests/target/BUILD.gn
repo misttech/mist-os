@@ -22,6 +22,7 @@ if (is_host && target_cpu == "x64" && build_uefi_disk &&
 
     deps = [
       "//src/developer/ffx/lib/isolate:lib",
+      "//src/developer/ffx/lib/netext:lib",
       "//src/developer/ffx/testing:ffx_testing",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-async",

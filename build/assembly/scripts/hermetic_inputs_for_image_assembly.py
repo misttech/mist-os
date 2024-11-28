@@ -116,8 +116,9 @@ def main() -> int:
                         script_dir = os.path.dirname(
                             script["board_script_path"]
                         )
-                        for file in os.listdir(script_dir):
-                            inputs.add(os.path.join(script_dir, file))
+                        for root, _, files in os.walk(script_dir):
+                            for file in files:
+                                inputs.add(os.path.join(root, file))
 
     if deps:
         with open(args.depfile, "w") as depfile:

@@ -54,7 +54,7 @@ pub async fn run_ltp_cases(
         let (component_controller, std_handles) =
             start_command(&mut start_info, component_runner, &base_path, &command)?;
 
-        let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
+        let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>();
         run_listener_proxy.on_test_case_started(&test, std_handles, case_listener)?;
 
         let allow_skipped = expected_test_results[test_name] == "IGNORED";

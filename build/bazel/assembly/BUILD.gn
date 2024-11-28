@@ -8,7 +8,6 @@ import("//build/images/args.gni")
 import("//build/images/custom_signing.gni")
 import("//build/product.gni")
 import("//build/testing/verify_files_match.gni")
-import("//products/terminal/cache_packages.gni")
 
 # Only do drivers lists comparison when both GN and Bazel assembly are done in
 # the same build.
@@ -100,25 +99,6 @@ verify_assembly_configs("verify_assembly_configs") {
     },
   ]
 
-  if (build_info_product == "terminal") {
-    product_configs += [
-      {
-        name = "terminal_product_config"
-        gn_target = "//products/terminal"
-        bazel_target = "//products/terminal:product_config"
-        deps = terminal_cache_package_bazel_inputs +
-               [ "//src/fonts/asset_providers:open-fonts-collection-bazel" ]
-      },
-      {
-        name = "terminal_with_netstack2_product_config"
-        gn_target = "//products/terminal:terminal_with_netstack2"
-        bazel_target = "//products/terminal:product_config_with_netstack2"
-        deps = terminal_cache_package_bazel_inputs +
-               [ "//src/fonts/asset_providers:open-fonts-collection-bazel" ]
-      },
-    ]
-  }
-
   # Avoid building board configs in both GN and Bazel.
   board_configs = []
 
@@ -164,6 +144,16 @@ verify_assembly_configs("verify_assembly_configs") {
         gn_target = "//boards/partitions:riscv64"
         bazel_target =
             "//build/bazel/assembly/partitions_configurations:riscv64"
+      },
+    ]
+  }
+  if (_partitions_config_label_no_toolchain == "//boards/partitions:default") {
+    partitions_configs += [
+      {
+        name = "default_partitions_config"
+        gn_target = "//boards/partitions:default"
+        bazel_target =
+            "//build/bazel/assembly/partitions_configurations:default"
       },
     ]
   }

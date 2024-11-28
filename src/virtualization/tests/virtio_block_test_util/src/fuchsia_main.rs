@@ -74,11 +74,9 @@ async fn main() -> Result<(), anyhow::Error> {
             }
         }
         Command::Read { offset, expected } => {
-            let device_offset = offset.checked_mul(block_size.into()).ok_or(anyhow::anyhow!(
-                "offset={} * block_size={} overflows",
-                offset,
-                block_size
-            ))?;
+            let device_offset = offset.checked_mul(block_size.into()).ok_or_else(|| {
+                anyhow::anyhow!("offset={} * block_size={} overflows", offset, block_size)
+            })?;
             let block_size = block_size.try_into()?;
             let mut data = {
                 let mut data = Vec::new();
@@ -112,11 +110,9 @@ async fn main() -> Result<(), anyhow::Error> {
             }
         }
         Command::Write { offset, value } => {
-            let device_offset = offset.checked_mul(block_size.into()).ok_or(anyhow::anyhow!(
-                "offset={} * block_size={} overflows",
-                offset,
-                block_size
-            ))?;
+            let device_offset = offset.checked_mul(block_size.into()).ok_or_else(|| {
+                anyhow::anyhow!("offset={} * block_size={} overflows", offset, block_size)
+            })?;
             let block_size = block_size.try_into()?;
             let data = {
                 let mut data = Vec::new();

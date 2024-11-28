@@ -113,6 +113,7 @@ struct OwnedInterface {
   std::string name;
   std::shared_ptr<std::vector<OwnedAddress>> ipv6addrs;
   std::unique_ptr<FakeControl> fake_control;
+  std::shared_ptr<bool> forwarding_enabled;
 };
 
 // A fake implementation of the
@@ -197,10 +198,12 @@ class FakeAddressStateProvider
 class FakeControl : public fuchsia::net::interfaces::admin::testing::Control_TestBase {
  public:
   FakeControl() = delete;
-  FakeControl(std::shared_ptr<std::vector<OwnedAddress>> addresses, async_dispatcher_t* dispatcher,
+  FakeControl(std::shared_ptr<std::vector<OwnedAddress>> addresses,
+              std::shared_ptr<bool> forwarding_enabled, async_dispatcher_t* dispatcher,
               fidl::InterfaceRequest<fuchsia::net::interfaces::admin::Control> request,
               std::optional<zx_status_t> add_addresses_fail_with_err) {
     addresses_ = addresses;
+    forwarding_enabled_ = forwarding_enabled;
     // Hang on to the dispatcher for later; which will allow us to spawn
     // `FakeAddressStateProvider` handlers when serving `AddAddress`.
     dispatcher_ = dispatcher;
@@ -245,8 +248,23 @@ class FakeControl : public fuchsia::net::interfaces::admin::testing::Control_Tes
                            .on_hangup_notifier = on_hangup_notifier});
   }
 
+  void SetConfiguration(::fuchsia::net::interfaces::admin::Configuration config,
+                        SetConfigurationCallback callback) override {
+    // The only config change made by Warm is to enable IPv6 forwarding.
+    EXPECT_FALSE(config.has_ipv4());
+    ASSERT_TRUE(config.has_ipv6());
+    ASSERT_TRUE(config.ipv6().has_unicast_forwarding());
+    ASSERT_TRUE(config.ipv6().unicast_forwarding());
+    *forwarding_enabled_ = true;
+    auto result = ::fuchsia::net::interfaces::admin::Control_SetConfiguration_Result();
+    auto response = ::fuchsia::net::interfaces::admin::Control_SetConfiguration_Response();
+    result.set_response(std::move(response));
+    callback(std::move(result));
+  }
+
   fidl::Binding<fuchsia::net::interfaces::admin::Control> binding_{this};
   std::shared_ptr<std::vector<OwnedAddress>> addresses_;
+  std::shared_ptr<bool> forwarding_enabled_;
   std::optional<zx_status_t> add_addresses_fail_with_err_;
   async_dispatcher_t* dispatcher_;
 };
@@ -344,28 +362,10 @@ class FakeNetstack : public fuchsia::net::root::testing::Interfaces_TestBase,
     if (it == interfaces_.end()) {
       server_end.Close(ZX_ERR_NOT_FOUND);
     } else {
-      it->fake_control = std::make_unique<FakeControl>(
-          it->ipv6addrs, dispatcher_, std::move(server_end), add_addresses_fail_with_err_);
+      it->fake_control =
+          std::make_unique<FakeControl>(it->ipv6addrs, it->forwarding_enabled, dispatcher_,
+                                        std::move(server_end), add_addresses_fail_with_err_);
     }
-  }
-
-  // fuchsia::net::stack::Stack interface definitions.
-  void SetInterfaceIpForwardingDeprecated(
-      uint64_t id, fuchsia::net::IpVersion ip_version, bool enabled,
-      SetInterfaceIpForwardingDeprecatedCallback callback) override {
-    fuchsia::net::stack::Stack_SetInterfaceIpForwardingDeprecated_Result result;
-    fuchsia::net::stack::Stack_SetInterfaceIpForwardingDeprecated_Response response;
-
-    EXPECT_EQ(ip_version, fuchsia::net::IpVersion::V6);
-    EXPECT_TRUE(enabled);
-
-    if (forwarding_success_) {
-      ip_forwarded_interfaces_.push_back(id);
-      result.set_response(std::move(response));
-    } else {
-      result.set_err(fuchsia::net::stack::Error::INTERNAL);
-    }
-    callback(std::move(result));
   }
 
   void AddForwardingEntry(fuchsia::net::stack::ForwardingEntry route_table_entry,
@@ -402,6 +402,7 @@ class FakeNetstack : public fuchsia::net::root::testing::Interfaces_TestBase,
         .id = ++last_id_assigned,
         .name = name,
         .ipv6addrs = std::make_shared<std::vector<OwnedAddress>>(),
+        .forwarding_enabled = std::make_shared<bool>(false),
     });
 
     // The real Weavestack installs the Tun Interface, and provides an accessor
@@ -447,18 +448,20 @@ class FakeNetstack : public fuchsia::net::root::testing::Interfaces_TestBase,
   OwnedInterface& GetInterfaceByName(const std::string name) {
     auto it = std::find_if(interfaces_.begin(), interfaces_.end(),
                            [&](const OwnedInterface& interface) { return interface.name == name; });
-    EXPECT_NE(it, interfaces_.end());
+    ZX_DEBUG_ASSERT(it != interfaces_.end());
     return *it;
   }
 
-  // Set the success of an IP forwarding request.
-  void SetForwardingSuccess(bool forwarding_success) { forwarding_success_ = forwarding_success; }
+  // Get a pointer to an interface by ID.
+  OwnedInterface& GetInterfaceById(const uint64_t id) {
+    auto it = std::find_if(interfaces_.begin(), interfaces_.end(),
+                           [&](const OwnedInterface& interface) { return interface.id == id; });
+    ZX_DEBUG_ASSERT(it != interfaces_.end());
+    return *it;
+  }
 
   // Check if interface is forwarded.
-  bool IsInterfaceForwarded(uint64_t id) {
-    return std::find(ip_forwarded_interfaces_.begin(), ip_forwarded_interfaces_.end(), id) !=
-           ip_forwarded_interfaces_.end();
-  }
+  bool IsInterfaceForwarded(uint64_t id) { return *GetInterfaceById(id).forwarding_enabled; }
 
   fidl::InterfaceRequestHandler<fuchsia::net::stack::Stack> GetStackHandler(
       async_dispatcher_t* dispatcher) {
@@ -499,8 +502,6 @@ class FakeNetstack : public fuchsia::net::root::testing::Interfaces_TestBase,
   async_dispatcher_t* dispatcher_;
   std::vector<fuchsia::net::stack::ForwardingEntry> route_table_;
   std::vector<OwnedInterface> interfaces_;
-  std::vector<uint64_t> ip_forwarded_interfaces_;
-  bool forwarding_success_ = true;
   uint32_t last_id_assigned = 0;
   std::optional<zx_status_t> add_addresses_fail_with_err_;
 };
@@ -833,7 +834,7 @@ TEST_F(WarmTest, CheckInterfaceForwarding) {
   auto result = AddRemoveHostRoute(kInterfaceTypeTunnel, prefix, kRoutePriorityHigh, /*add*/ true);
   EXPECT_EQ(result, kPlatformResultSuccess);
 
-  // Confirm that this interface is not forwarded, consistent with configuration.
+  // Confirm that this interface is forwarded, consistent with configuration.
   EXPECT_TRUE(fake_net_stack().IsInterfaceForwarded(tunnel_iface_id));
 }
 

@@ -24,13 +24,14 @@ pub async fn list_composite_node_specs(
 
     if !cmd.verbose {
         for composite_info in composite_infos {
-            let name = composite_info.spec.and_then(|spec| spec.name).unwrap_or("N/A".to_string());
+            let name =
+                composite_info.spec.and_then(|spec| spec.name).unwrap_or_else(|| "N/A".to_string());
             let driver = composite_info
                 .matched_driver
                 .and_then(|matched_driver| matched_driver.composite_driver)
                 .and_then(|composite_driver| composite_driver.driver_info)
                 .and_then(|driver_info| driver_info.url)
-                .unwrap_or("None".to_string());
+                .unwrap_or_else(|| "None".to_string());
             writeln!(writer, "{:<20}: {}", name, driver)?;
         }
         return Ok(());
@@ -123,8 +124,7 @@ mod tests {
         Fut: Future<Output = Result<()>> + Send + Sync,
     {
         let (driver_development_proxy, mut driver_development_requests) =
-            fidl::endpoints::create_proxy_and_stream::<fdd::ManagerMarker>()
-                .context("Failed to create FIDL proxy")?;
+            fidl::endpoints::create_proxy_and_stream::<fdd::ManagerMarker>();
 
         // Run the command and mock driver development server.
         let mut writer = Vec::new();
@@ -151,8 +151,7 @@ mod tests {
         mut specs: Vec<fdf::CompositeInfo>,
         iterator: ServerEnd<fdd::CompositeNodeSpecIteratorMarker>,
     ) -> Result<()> {
-        let mut iterator =
-            iterator.into_stream().context("Failed to convert iterator into a stream")?;
+        let mut iterator = iterator.into_stream();
         while let Some(res) = iterator.next().await {
             let request = res.context("Failed to get request")?;
             match request {

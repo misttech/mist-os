@@ -14,7 +14,7 @@ use core::time::Duration;
 use log::{debug, error};
 use net_types::ip::{Ip, Ipv6, Ipv6Addr, Ipv6ReservedScope, Ipv6Scope, Ipv6SourceAddr};
 use net_types::{LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr, Witness};
-use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer, Instant, WeakDeviceIdentifier};
+use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer, WeakDeviceIdentifier};
 use netstack3_filter as filter;
 use packet::serialize::Serializer;
 use packet::InnerPacketBuilder;
@@ -33,12 +33,10 @@ use thiserror::Error;
 use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpLayerHandler, IpPacketDestination};
-use crate::internal::device::IpDeviceSendContext;
 use crate::internal::gmp::{
-    gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
-    GmpBindingsTypes, GmpContext, GmpDelayedReportTimerId, GmpMessage, GmpMessageType,
-    GmpStateContext, GmpStateMachine, GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
-    ProtocolSpecific, QueryTarget,
+    self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner,
+    GmpDelayedReportTimerId, GmpGroupState, GmpMessage, GmpMessageType, GmpStateContext,
+    GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
 };
 
 /// The bindings types for MLD.
@@ -53,30 +51,39 @@ impl<BC> MldBindingsContext for BC where BC: GmpBindingsContext {}
 pub trait MldStateContext<BT: MldBindingsTypes>: DeviceIdContext<AnyDevice> {
     /// Calls the function with an immutable reference to the device's MLD
     /// state.
-    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<BT::Instant>>) -> O>(
+    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<BT>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
     ) -> O;
 }
 
-/// The execution context for the Multicast Listener Discovery (MLD) protocol.
-pub trait MldContext<BT: MldBindingsTypes>:
-    DeviceIdContext<AnyDevice> + IpDeviceSendContext<Ipv6, BT> + IpLayerHandler<Ipv6, BT>
+/// The execution context capable of sending frames for MLD.
+pub trait MldSendContext<BT: MldBindingsTypes>:
+    DeviceIdContext<AnyDevice> + IpLayerHandler<Ipv6, BT>
 {
-    /// Calls the function with a mutable reference to the device's MLD state
-    /// and whether or not MLD is enabled for the `device`.
-    fn with_mld_state_mut<O, F: FnOnce(GmpStateRef<'_, Ipv6, Self, BT>) -> O>(
-        &mut self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> O;
-
     /// Gets the IPv6 link local address on `device`.
     fn get_ipv6_link_local_addr(
         &mut self,
         device: &Self::DeviceId,
     ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>>;
+}
+
+/// The execution context for the Multicast Listener Discovery (MLD) protocol.
+pub trait MldContext<BT: MldBindingsTypes>: DeviceIdContext<AnyDevice> {
+    /// The inner context given to `with_mld_state_mut`.
+    type SendContext<'a>: MldSendContext<BT, DeviceId = Self::DeviceId> + 'a;
+
+    /// Calls the function with a mutable reference to the device's MLD state
+    /// and whether or not MLD is enabled for the `device`.
+    fn with_mld_state_mut<
+        O,
+        F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, Self, BT>) -> O,
+    >(
+        &mut self,
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O;
 }
 
 /// A handler for incoming MLD packets.
@@ -108,11 +115,11 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
                 let body = msg.body();
                 let addr = body.group_addr();
                 SpecifiedAddr::new(addr)
-                    .map_or(Some(QueryTarget::Unspecified), |addr| {
-                        MulticastAddr::new(addr.get()).map(QueryTarget::Specified)
+                    .map_or(Some(gmp::v1::QueryTarget::Unspecified), |addr| {
+                        MulticastAddr::new(addr.get()).map(gmp::v1::QueryTarget::Specified)
                     })
                     .map_or(Err(MldError::NotAMember { addr }), |group_addr| {
-                        handle_query_message(
+                        gmp::v1::handle_query_message(
                             self,
                             bindings_ctx,
                             device,
@@ -127,10 +134,12 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
             }
             MldPacket::MulticastListenerReport(msg) => {
                 let addr = msg.body().group_addr();
-                MulticastAddr::new(msg.body().group_addr())
-                    .map_or(Err(MldError::NotAMember { addr }), |group_addr| {
-                        handle_report_message(self, bindings_ctx, device, group_addr)
-                    })
+                MulticastAddr::new(msg.body().group_addr()).map_or(
+                    Err(MldError::NotAMember { addr }),
+                    |group_addr| {
+                        gmp::v1::handle_report_message(self, bindings_ctx, device, group_addr)
+                    },
+                )
             }
             MldPacket::MulticastListenerDone(_) => {
                 debug!("Hosts are not interested in Done messages");
@@ -173,15 +182,12 @@ impl IpExt for Ipv6 {
 }
 
 impl<BT: MldBindingsTypes, CC: DeviceIdContext<AnyDevice>> GmpTypeLayout<Ipv6, BT> for CC {
-    type ProtocolSpecific = MldProtocolSpecific;
-    type GroupState = MldGroupState<BT::Instant>;
+    type Actions = Never;
+    type Config = MldConfig;
 }
 
 impl<BT: MldBindingsTypes, CC: MldStateContext<BT>> GmpStateContext<Ipv6, BT> for CC {
-    fn with_gmp_state<
-        O,
-        F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<BT::Instant>>) -> O,
-    >(
+    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<BT>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -192,8 +198,12 @@ impl<BT: MldBindingsTypes, CC: MldStateContext<BT>> GmpStateContext<Ipv6, BT> fo
 
 impl<BC: MldBindingsContext, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
     type Err = MldError;
+    type Inner<'a> = CC::SendContext<'a>;
 
-    fn with_gmp_state_mut<O, F: FnOnce(GmpStateRef<'_, Ipv6, Self, BC>) -> O>(
+    fn with_gmp_state_mut_and_ctx<
+        O,
+        F: FnOnce(Self::Inner<'_>, GmpStateRef<'_, Ipv6, Self, BC>) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -201,15 +211,21 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
         self.with_mld_state_mut(device, cb)
     }
 
+    fn not_a_member_err(addr: Ipv6Addr) -> Self::Err {
+        Self::Err::NotAMember { addr }
+    }
+}
+
+impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> for CC {
     fn send_message(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<Ipv6Addr>,
-        msg_type: GmpMessageType<MldProtocolSpecific>,
+        msg_type: GmpMessageType,
     ) {
         let result = match msg_type {
-            GmpMessageType::Report(MldProtocolSpecific) => send_mld_packet::<_, _, _>(
+            GmpMessageType::Report => send_mld_packet::<_, _, _>(
                 self,
                 bindings_ctx,
                 device,
@@ -238,12 +254,8 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
         }
     }
 
-    fn run_actions(&mut self, _bindings_ctx: &mut BC, device: &CC::DeviceId, actions: Never) {
-        unreachable!("actions ({actions:?} should not be constructable; device = {device:?}")
-    }
-
-    fn not_a_member_err(addr: Ipv6Addr) -> Self::Err {
-        Self::Err::NotAMember { addr }
+    fn run_actions(&mut self, _bindings_ctx: &mut BC, _device: &CC::DeviceId, actions: Never) {
+        match actions {}
     }
 }
 
@@ -259,9 +271,6 @@ pub(crate) enum MldError {
 }
 
 pub(crate) type MldResult<T> = Result<T, MldError>;
-
-#[derive(PartialEq, Eq, Clone, Copy, Default, Debug)]
-pub struct MldProtocolSpecific;
 
 #[derive(Debug)]
 pub struct MldConfig {
@@ -283,51 +292,22 @@ impl Default for MldConfig {
     }
 }
 
-impl ProtocolSpecific for MldProtocolSpecific {
-    type Actions = Never;
-    type Config = MldConfig;
-
-    fn cfg_unsolicited_report_interval(cfg: &Self::Config) -> Duration {
-        cfg.unsolicited_report_interval
+impl gmp::v1::ProtocolConfig for MldConfig {
+    fn unsolicited_report_interval(&self) -> Duration {
+        self.unsolicited_report_interval
     }
 
-    fn cfg_send_leave_anyway(cfg: &Self::Config) -> bool {
-        cfg.send_leave_anyway
+    fn send_leave_anyway(&self) -> bool {
+        self.send_leave_anyway
     }
 
-    fn get_max_resp_time(resp_time: Duration) -> Option<NonZeroDuration> {
+    fn get_max_resp_time(&self, resp_time: Duration) -> Option<NonZeroDuration> {
         NonZeroDuration::new(resp_time)
     }
 
-    fn do_query_received_specific(
-        _cfg: &Self::Config,
-        _max_resp_time: Duration,
-        old: Self,
-    ) -> (Self, Option<Never>) {
-        (old, None)
-    }
-}
-
-/// The state on a multicast address.
-#[cfg_attr(test, derive(Debug))]
-pub struct MldGroupState<I: Instant>(GmpStateMachine<I, MldProtocolSpecific>);
-
-impl<I: Instant> From<GmpStateMachine<I, MldProtocolSpecific>> for MldGroupState<I> {
-    fn from(state: GmpStateMachine<I, MldProtocolSpecific>) -> MldGroupState<I> {
-        MldGroupState(state)
-    }
-}
-
-impl<I: Instant> From<MldGroupState<I>> for GmpStateMachine<I, MldProtocolSpecific> {
-    fn from(MldGroupState(state): MldGroupState<I>) -> GmpStateMachine<I, MldProtocolSpecific> {
-        state
-    }
-}
-
-impl<I: Instant> AsMut<GmpStateMachine<I, MldProtocolSpecific>> for MldGroupState<I> {
-    fn as_mut(&mut self) -> &mut GmpStateMachine<I, MldProtocolSpecific> {
-        let Self(s) = self;
-        s
+    type QuerySpecificActions = Never;
+    fn do_query_received_specific(&self, _max_resp_time: Duration) -> Option<Never> {
+        None
     }
 }
 
@@ -359,7 +339,7 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> HandleableTimer<CC, BC>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let Self(id) = self;
-        gmp_handle_timer(core_ctx, bindings_ctx, id);
+        gmp::v1::handle_timer(core_ctx, bindings_ctx, id);
     }
 }
 
@@ -369,7 +349,7 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> HandleableTimer<CC, BC>
 /// `RouterAlert` option in its Hop-by-Hop Options extensions header.
 fn send_mld_packet<
     BC: MldBindingsContext,
-    CC: MldContext<BC>,
+    CC: MldSendContext<BC>,
     M: IcmpMldv1MessageType + filter::IcmpMessage<Ipv6>,
 >(
     core_ctx: &mut CC,
@@ -413,32 +393,25 @@ fn send_mld_packet<
 #[cfg(test)]
 mod tests {
 
+    use core::cell::RefCell;
+
+    use alloc::rc::Rc;
     use assert_matches::assert_matches;
     use net_types::ethernet::Mac;
-    use net_types::ip::{Ip as _, IpVersionMarker, Mtu};
+    use net_types::ip::{Ip as _, IpVersionMarker};
     use netstack3_base::testutil::{
         assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
         FakeWeakDeviceId,
     };
-    use netstack3_base::{
-        CounterContext, CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext,
-        SendFrameError,
-    };
-    use netstack3_filter::ProofOfEgressCheck;
+    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext};
     use packet::{BufferMut, ParseBuffer};
     use packet_formats::icmp::mld::MulticastListenerQuery;
     use packet_formats::icmp::{IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet};
 
     use super::*;
-    use crate::internal::base::{
-        self, DeviceIpLayerMetadata, IpCounters, IpDeviceMtuContext, IpLayerPacketMetadata,
-        IpPacketDestination, IpSendFrameError, SendIpPacketMeta,
-    };
+    use crate::internal::base::{IpPacketDestination, IpSendFrameError, SendIpPacketMeta};
     use crate::internal::fragmentation::FragmentableIpSerializer;
-    use crate::internal::gmp::{
-        GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
-        QueryReceivedActions, QueryReceivedGenericAction,
-    };
+    use crate::internal::gmp::{GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult};
 
     /// Metadata for sending an MLD packet in an IP packet.
     #[derive(Debug, PartialEq)]
@@ -457,30 +430,43 @@ mod tests {
     /// IPv6 link-local address that may be returned in calls to
     /// [`MldContext::get_ipv6_link_local_addr`].
     struct FakeMldCtx {
-        groups: MulticastGroupSet<Ipv6Addr, MldGroupState<FakeInstant>>,
-        gmp_state: GmpState<Ipv6, FakeBindingsCtxImpl>,
+        shared: Rc<RefCell<Shared>>,
         mld_enabled: bool,
         ipv6_link_local: Option<LinkLocalUnicastAddr<Ipv6Addr>>,
-        ip_counters: IpCounters<Ipv6>,
     }
 
-    impl CounterContext<IpCounters<Ipv6>> for FakeMldCtx {
-        fn with_counters<O, F: FnOnce(&IpCounters<Ipv6>) -> O>(&self, cb: F) -> O {
-            cb(&self.ip_counters)
+    impl FakeMldCtx {
+        fn gmp_state(&mut self) -> &mut GmpState<Ipv6, FakeBindingsCtxImpl> {
+            &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().gmp_state
         }
+
+        fn groups(
+            &mut self,
+        ) -> &mut MulticastGroupSet<Ipv6Addr, GmpGroupState<FakeBindingsCtxImpl>> {
+            &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().groups
+        }
+    }
+
+    /// The parts of `FakeMldCtx` that are behind a RefCell, mocking a lock.
+    struct Shared {
+        groups: MulticastGroupSet<Ipv6Addr, GmpGroupState<FakeBindingsCtxImpl>>,
+        gmp_state: GmpState<Ipv6, FakeBindingsCtxImpl>,
+        config: MldConfig,
     }
 
     fn new_context() -> FakeCtxImpl {
         FakeCtxImpl::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeMldCtx {
-                groups: MulticastGroupSet::default(),
-                gmp_state: GmpState::new::<_, IntoCoreTimerCtx>(
-                    bindings_ctx,
-                    FakeWeakDeviceId(FakeDeviceId),
-                ),
+                shared: Rc::new(RefCell::new(Shared {
+                    groups: MulticastGroupSet::default(),
+                    gmp_state: GmpState::new::<_, IntoCoreTimerCtx>(
+                        bindings_ctx,
+                        FakeWeakDeviceId(FakeDeviceId),
+                    ),
+                    config: Default::default(),
+                })),
                 mld_enabled: true,
                 ipv6_link_local: None,
-                ip_counters: Default::default(),
             })
         })
     }
@@ -501,29 +487,36 @@ mod tests {
     impl MldStateContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_mld_state<
             O,
-            F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<FakeInstant>>) -> O,
+            F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<FakeBindingsCtxImpl>>) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            cb(&self.state.groups)
+            cb(&self.state.shared.borrow().groups)
         }
     }
 
     impl MldContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
+        type SendContext<'a> = &'a mut Self;
         fn with_mld_state_mut<
             O,
-            F: FnOnce(GmpStateRef<'_, Ipv6, Self, FakeBindingsCtxImpl>) -> O,
+            F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, Self, FakeBindingsCtxImpl>) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeMldCtx { groups, mld_enabled, gmp_state, .. } = &mut self.state;
-            cb(GmpStateRef { enabled: *mld_enabled, groups, gmp: gmp_state })
+            let FakeMldCtx { mld_enabled, shared, .. } = &mut self.state;
+            let enabled = *mld_enabled;
+            let shared = Rc::clone(shared);
+            let mut shared = shared.borrow_mut();
+            let Shared { gmp_state, groups, config } = &mut *shared;
+            cb(self, GmpStateRef { enabled, groups, gmp: gmp_state, config })
         }
+    }
 
+    impl MldSendContext<FakeBindingsCtxImpl> for &mut FakeCoreCtxImpl {
         fn get_ipv6_link_local_addr(
             &mut self,
             _device: &FakeDeviceId,
@@ -532,7 +525,7 @@ mod tests {
         }
     }
 
-    impl IpLayerHandler<Ipv6, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
+    impl IpLayerHandler<Ipv6, FakeBindingsCtxImpl> for &mut FakeCoreCtxImpl {
         fn send_ip_packet_from_device<S>(
             &mut self,
             _bindings_ctx: &mut FakeBindingsCtxImpl,
@@ -560,43 +553,13 @@ mod tests {
         where
             S: FragmentableIpSerializer<Ipv6, Buffer: BufferMut> + netstack3_filter::IpPacket<Ipv6>,
         {
-            base::send_ip_frame(
-                self,
-                bindings_ctx,
-                device,
-                destination,
-                body,
-                IpLayerPacketMetadata::default(),
-                Mtu::no_limit(),
-            )
-        }
-    }
-
-    impl IpDeviceMtuContext<Ipv6> for FakeCoreCtxImpl {
-        fn get_mtu(&mut self, _device_id: &Self::DeviceId) -> Mtu {
-            Mtu::max()
-        }
-    }
-
-    impl IpDeviceSendContext<Ipv6, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
-        fn send_ip_frame<S>(
-            &mut self,
-            bindings_ctx: &mut FakeBindingsCtxImpl,
-            device_id: &Self::DeviceId,
-            destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
-            _ip_layer_metadata: DeviceIpLayerMetadata,
-            body: S,
-            ProofOfEgressCheck { .. }: ProofOfEgressCheck,
-        ) -> Result<(), SendFrameError<S>>
-        where
-            S: Serializer,
-            S::Buffer: BufferMut,
-        {
             let addr = match destination {
                 IpPacketDestination::Multicast(addr) => addr,
                 _ => panic!("destination is not multicast: {:?}", destination),
             };
-            self.send_frame(bindings_ctx, MldFrameMetadata::new(device_id.clone(), addr), body)
+            (*self)
+                .send_frame(bindings_ctx, MldFrameMetadata::new(device.clone(), addr), body)
+                .map_err(|e| e.err_into())
         }
     }
 
@@ -610,17 +573,13 @@ mod tests {
             // host should send the report immediately instead of setting a
             // timer.
             let mut rng = new_rng(seed);
-            let (mut s, _actions) = GmpStateMachine::<_, MldProtocolSpecific>::join_group(
-                &mut rng,
-                FakeInstant::default(),
-                false,
-            );
+            let cfg = MldConfig::default();
+            let (mut s, _actions) =
+                gmp::v1::GmpStateMachine::join_group(&mut rng, FakeInstant::default(), false, &cfg);
             assert_eq!(
-                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default()),
-                QueryReceivedActions {
-                    generic: Some(QueryReceivedGenericAction::StopTimerAndSendReport(
-                        MldProtocolSpecific
-                    )),
+                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default(), &cfg),
+                gmp::v1::QueryReceivedActions {
+                    generic: Some(gmp::v1::QueryReceivedGenericAction::StopTimerAndSendReport),
                     protocol_specific: None
                 }
             );
@@ -767,7 +726,7 @@ mod tests {
                 Duration::from_secs(10),
                 GROUP_ADDR,
             );
-            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
+            core_ctx.state.gmp_state().timers.assert_top(&GROUP_ADDR, &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
 
             // We should get two MLD reports - one for the unsolicited one for
@@ -819,7 +778,7 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 1);
 
-            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
+            core_ctx.state.gmp_state().timers.assert_top(&GROUP_ADDR, &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
@@ -832,13 +791,13 @@ mod tests {
 
             // We have received a query, hence we are falling back to Delay
             // Member state.
-            let MldGroupState(group_state) = core_ctx.state.groups.get(&GROUP_ADDR).unwrap();
+            let group_state = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
-                MemberState::Delaying(_) => {}
+                gmp::v1::MemberState::Delaying(_) => {}
                 _ => panic!("Wrong State!"),
             }
 
-            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
+            core_ctx.state.gmp_state().timers.assert_top(&GROUP_ADDR, &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 3);
             // The frames are all reports.
@@ -861,7 +820,7 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 1);
 
-            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
+            core_ctx.state.gmp_state().timers.assert_top(&GROUP_ADDR, &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
@@ -869,9 +828,9 @@ mod tests {
 
             // Since it is an immediate query, we will send a report immediately
             // and turn into Idle state again.
-            let MldGroupState(group_state) = core_ctx.state.groups.get(&GROUP_ADDR).unwrap();
+            let group_state = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
-                MemberState::Idle(_) => {}
+                gmp::v1::MemberState::Idle(_) => {}
                 _ => panic!("Wrong State!"),
             }
 
@@ -897,7 +856,7 @@ mod tests {
             GroupJoinResult::Joined(())
         );
 
-        core_ctx.state.gmp_state.timers.assert_timers([(
+        core_ctx.state.gmp_state().timers.assert_timers([(
             GROUP_ADDR,
             (),
             FakeInstant::from(Duration::from_micros(590_354)),
@@ -908,7 +867,7 @@ mod tests {
 
         receive_mld_query(&mut core_ctx, &mut bindings_ctx, duration, GROUP_ADDR);
         assert_eq!(core_ctx.frames().len(), 1);
-        core_ctx.state.gmp_state.timers.assert_timers([(
+        core_ctx.state.gmp_state().timers.assert_timers([(
             GROUP_ADDR,
             (),
             FakeInstant::from(Duration::from_micros(34_751)),
@@ -938,7 +897,7 @@ mod tests {
             );
             let now = bindings_ctx.now();
 
-            core_ctx.state.gmp_state.timers.assert_range([(
+            core_ctx.state.gmp_state().timers.assert_range([(
                 &GROUP_ADDR,
                 now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
@@ -981,7 +940,7 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             let now = bindings_ctx.now();
-            core_ctx.state.gmp_state.timers.assert_range([(
+            core_ctx.state.gmp_state().timers.assert_range([(
                 &GROUP_ADDR,
                 now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
@@ -1016,7 +975,7 @@ mod tests {
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
+            core_ctx.state.gmp_state().timers.assert_top(&GROUP_ADDR, &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             for (_, frame) in core_ctx.frames() {
                 ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
@@ -1064,7 +1023,7 @@ mod tests {
                     GroupLeaveResult::Left(())
                 );
                 // We should have left the group but not executed any `Actions`.
-                assert!(core_ctx.state.groups.get(&group).is_none());
+                assert!(core_ctx.state.groups().get(&group).is_none());
                 assert_no_effect(&core_ctx, &bindings_ctx);
             };
 
@@ -1112,7 +1071,7 @@ mod tests {
             let now = bindings_ctx.now();
             let range = now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL);
 
-            core_ctx.state.gmp_state.timers.assert_range([(&GROUP_ADDR, range.clone())]);
+            core_ctx.state.gmp_state().timers.assert_range([(&GROUP_ADDR, range.clone())]);
             let frame = &core_ctx.frames().last().unwrap().1;
             ensure_frame(frame, 131, GROUP_ADDR, GROUP_ADDR);
             ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
@@ -1123,7 +1082,7 @@ mod tests {
             );
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
-            core_ctx.state.gmp_state.timers.assert_range([(&GROUP_ADDR, range.clone())]);
+            core_ctx.state.gmp_state().timers.assert_range([(&GROUP_ADDR, range.clone())]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1132,7 +1091,7 @@ mod tests {
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
 
-            core_ctx.state.gmp_state.timers.assert_range([(&GROUP_ADDR, range)]);
+            core_ctx.state.gmp_state().timers.assert_range([(&GROUP_ADDR, range)]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),

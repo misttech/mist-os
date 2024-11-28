@@ -134,10 +134,7 @@ pub async fn connect_to_balloon_controller<P: PlatformServices>(
         return Err(BalloonResult::NotRunning);
     }
 
-    let (guest_endpoint, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>()
-        .map_err(|err| {
-            BalloonResult::Internal(format!("failed to create guest endpoints: {}", err))
-        })?;
+    let (guest_endpoint, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>();
     guest_manager
         .connect(guest_server_end)
         .await
@@ -145,9 +142,7 @@ pub async fn connect_to_balloon_controller<P: PlatformServices>(
         .map_err(|err| BalloonResult::Internal(format!("failed to connect: {:?}", err)))?;
 
     let (balloon_controller, balloon_server_end) =
-        fidl::endpoints::create_proxy::<BalloonControllerMarker>().map_err(|err| {
-            BalloonResult::Internal(format!("failed to create balloon endpoints: {}", err))
-        })?;
+        fidl::endpoints::create_proxy::<BalloonControllerMarker>();
     guest_endpoint
         .get_balloon_controller(balloon_server_end)
         .await
@@ -244,7 +239,7 @@ mod test {
 
     #[fasync::run_until_stalled(test)]
     async fn balloon_valid_page_num_returns_ok() {
-        let (proxy, mut stream) = create_proxy_and_stream::<BalloonControllerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<BalloonControllerMarker>();
         let expected_string = "Resizing memory balloon to 0 pages!";
 
         let result = handle_balloon_set(proxy, 0);
@@ -261,7 +256,7 @@ mod test {
 
     #[fasync::run_until_stalled(test)]
     async fn balloon_stats_server_shut_down_returns_err() {
-        let (proxy, mut stream) = create_proxy_and_stream::<BalloonControllerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<BalloonControllerMarker>();
         let _task = fasync::Task::spawn(async move {
             let _ = stream
                 .next()
@@ -282,7 +277,7 @@ mod test {
 
     #[fasync::run_until_stalled(test)]
     async fn balloon_stats_empty_input_returns_err() {
-        let (proxy, mut stream) = create_proxy_and_stream::<BalloonControllerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<BalloonControllerMarker>();
 
         let _task = fasync::Task::spawn(async move {
             let get_balloon_size_responder = stream
@@ -330,7 +325,7 @@ mod test {
 
         let current_num_pages = 6;
         let requested_num_pages = 8;
-        let (proxy, mut stream) = create_proxy_and_stream::<BalloonControllerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<BalloonControllerMarker>();
         let _task = fasync::Task::spawn(async move {
             let get_balloon_size_responder = stream
                 .next()

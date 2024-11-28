@@ -29,7 +29,10 @@
             path: "/fs/factory",
         },
         {
-            protocol: [ "fuchsia.fshost.Admin" ],
+            protocol: [
+                "fuchsia.fshost.Admin",
+                "fuchsia.fshost.Recovery",
+            ],
         },
     ],
     use: [
@@ -81,7 +84,10 @@
             as: "tmp",
         },
         {
-            protocol: [ "fuchsia.fshost.Admin" ],
+            protocol: [
+                "fuchsia.fshost.Admin",
+                "fuchsia.fshost.Recovery",
+            ],
             from: "self",
         },
     ],

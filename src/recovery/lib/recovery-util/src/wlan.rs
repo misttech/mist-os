@@ -41,11 +41,9 @@ fn get_client_controller(
 ) -> Result<(wlan_policy::ClientControllerProxy, wlan_policy::ClientStateUpdatesRequestStream), Error>
 {
     let policy_provider = connect_to_protocol::<wlan_policy::ClientProviderMarker>()?;
-    let (client_controller, server_end) = create_proxy::<wlan_policy::ClientControllerMarker>()
-        .context("create ClientController proxy")?;
+    let (client_controller, server_end) = create_proxy::<wlan_policy::ClientControllerMarker>();
     let (update_client_end, update_stream) =
-        create_request_stream::<wlan_policy::ClientStateUpdatesMarker>()
-            .context("create ClientStateUpdates request stream")?;
+        create_request_stream::<wlan_policy::ClientStateUpdatesMarker>();
     policy_provider
         .get_controller(server_end, update_client_end)
         .context("PolicyProvider.get_controller")?;
@@ -160,8 +158,7 @@ impl WifiConnect for WifiConnectImpl {
 async fn handle_scan(
     client_controller: wlan_policy::ClientControllerProxy,
 ) -> Result<Vec<wlan_policy::ScanResult>, Error> {
-    let (client_proxy, server_end) =
-        create_proxy::<wlan_policy::ScanResultIteratorMarker>().unwrap();
+    let (client_proxy, server_end) = create_proxy::<wlan_policy::ScanResultIteratorMarker>();
     client_controller.scan_for_networks(server_end)?;
 
     let mut scanned_networks = Vec::<wlan_policy::ScanResult>::new();
@@ -199,9 +196,9 @@ mod tests {
     {
         // Create FIDL endpoints for ClientController and ClientStateUpdates protocols.
         let (client_controller_proxy, client_controller_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<wlan_policy::ClientControllerMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<wlan_policy::ClientControllerMarker>();
         let (client_state_updates_proxy, client_state_updates_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<wlan_policy::ClientStateUpdatesMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<wlan_policy::ClientStateUpdatesMarker>();
 
         // Spawn handler.
         fasync::Task::local(handler(client_controller_request_stream, client_state_updates_proxy))

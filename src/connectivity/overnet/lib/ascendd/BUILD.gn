@@ -14,15 +14,16 @@ if (is_host) {
     deps = [
       "//src/connectivity/overnet/lib/circuit",
       "//src/connectivity/overnet/lib/core",
+      "//src/developer/ffx/lib/netext:lib",
       "//src/devices/bind/fuchsia.google.platform.usb:fuchsia.google.platform.usb_rust",
       "//src/devices/bind/fuchsia.usb:fuchsia.usb_rust",
       "//src/lib/fuchsia-async",
       "//src/lib/usb_rs",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
-      "//third_party/rust_crates:async-net",
       "//third_party/rust_crates:futures",
       "//third_party/rust_crates:tempfile",
+      "//third_party/rust_crates:tokio",
       "//third_party/rust_crates:tracing",
     ]
 

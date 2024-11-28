@@ -235,8 +235,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Takes an image and directly composites it to a hardware layer on the display.
   void ApplyLayerImage(const fuchsia_hardware_display::LayerId& layer_id,
                        const ImageRect& rectangle, const allocation::ImageMetadata& image,
-                       const scenic_impl::DisplayEventId& wait_id,
-                       const scenic_impl::DisplayEventId& signal_id)
+                       const scenic_impl::DisplayEventId& wait_id)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Checks if the display coordinator is capable of applying the configuration settings that

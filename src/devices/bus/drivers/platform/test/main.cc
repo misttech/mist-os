@@ -59,7 +59,6 @@ TEST(PbusTest, Enumeration) {
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/test-parent/child-1/child-3-top/child-3")
                 .status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/gpio/test-gpio/gpio/gpio-3").status_value());
-  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/clock/test-clock/clock-1").status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/spi/test-spi/spi/spi-0-0").status_value());
   // TODO(316176095): Figure out why this driver binds but never starts.
   // EXPECT_EQ(RecursiveWaitForFile(dirfd,
@@ -75,7 +74,6 @@ TEST(PbusTest, Enumeration) {
   EXPECT_EQ(fstatat(dirfd, "sys/platform/test-parent/child-1/child-2/child-4", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/test-parent/child-1/child-3-top/child-3", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/gpio/test-gpio/gpio/gpio-3", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/clock/test-clock/clock-1", &st, 0), 0);
   // TODO(316176095): Figure out why this driver binds but never starts.
   // EXPECT_EQ(
   //    fstatat(dirfd,
@@ -84,9 +82,10 @@ TEST(PbusTest, Enumeration) {
 
   auto svc_dir = devmgr->svc_dir();
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  auto flags = static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDirectory);
-  ASSERT_OK(fdio_open_at(svc_dir.channel().get(), "fuchsia.sysinfo.Service", flags,
-                         server_end.TakeChannel().release()));
+  auto flags =
+      static_cast<uint64_t>(fio::wire::kPermReadable | fio::wire::Flags::kProtocolDirectory);
+  ASSERT_OK(fdio_open3_at(svc_dir.channel().get(), "fuchsia.sysinfo.Service", flags,
+                          server_end.TakeChannel().release()));
   fbl::unique_fd dir_fd;
   ASSERT_OK(fdio_fd_create(client_end.TakeChannel().release(), dir_fd.reset_and_get_address()));
   std::vector<std::string> entries;

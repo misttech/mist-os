@@ -52,7 +52,6 @@ use syncio::{
     zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, DirentIterator,
     XattrSetMode, Zxio, ZxioDirent, ZxioOpenOptions, ZXIO_ROOT_HASH_LENGTH,
 };
-use vfs::{ProtocolsExt, ToFlags};
 use zx::{HandleBased, Status};
 #[cfg(not(feature = "starnix_lite"))]
 use {
@@ -70,7 +69,7 @@ pub fn new_remote_fs(
         .container_data_dir
         .as_ref()
         .ok_or_else(|| errno!(EPERM, "Missing container data directory"))?;
-    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
     return create_remotefs_filesystem(kernel, data_dir, options, rights);
 }
 
@@ -80,7 +79,7 @@ pub fn create_remotefs_filesystem(
     kernel: &Arc<Kernel>,
     root: &fio::DirectorySynchronousProxy,
     options: FileSystemOptions,
-    rights: fio::OpenFlags,
+    rights: fio::Flags,
 ) -> Result<FileSystemHandle, Errno> {
     let root = syncio::directory_open_directory_async(
         root,
@@ -216,7 +215,7 @@ impl RemoteFs {
         kernel: &Arc<Kernel>,
         root: zx::Channel,
         mut options: FileSystemOptions,
-        rights: fio::OpenFlags,
+        rights: fio::Flags,
     ) -> Result<FileSystemHandle, Errno> {
         // See if open3 works.  We assume that if open3 works on the root, it will work for all
         // descendent nodes in this filesystem.  At the time of writing, this is true for Fxfs.
@@ -226,7 +225,7 @@ impl RemoteFs {
             .open3(
                 ".",
                 fio::Flags::PROTOCOL_DIRECTORY
-                    | fio::R_STAR_DIR.to_flags()
+                    | fio::PERM_READABLE
                     | fio::Flags::PERM_INHERIT_WRITE
                     | fio::Flags::PERM_INHERIT_EXECUTE
                     | fio::Flags::FLAG_SEND_REPRESENTATION,
@@ -260,7 +259,7 @@ impl RemoteFs {
                 Ok(zxio) => (RemoteNode { zxio: Arc::new(zxio), rights }, attrs.id),
             };
 
-        if !rights.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+        if !rights.contains(fio::PERM_WRITABLE) {
             options.flags |= MountFlags::RDONLY;
         }
         // NOTE: This mount option exists for now to workaround selinux issues.  The `defcontext`
@@ -291,7 +290,7 @@ struct RemoteNode {
 
     /// The fuchsia.io rights for the dir handle. Subdirs will be opened with
     /// the same rights.
-    rights: fio::OpenFlags,
+    rights: fio::Flags,
 }
 
 /// Create a file handle from a zx::Handle.
@@ -582,7 +581,7 @@ impl FsNodeOps for RemoteNode {
         };
         zxio = Arc::new(
             self.zxio
-                .open3(
+                .open(
                     name,
                     fio::Flags::FLAG_MUST_CREATE
                         | fio::Flags::PROTOCOL_FILE
@@ -654,11 +653,12 @@ impl FsNodeOps for RemoteNode {
         };
         zxio = Arc::new(
             self.zxio
-                .open3(
+                .open(
                     name,
                     fio::Flags::FLAG_MUST_CREATE
                         | fio::Flags::PROTOCOL_DIRECTORY
-                        | fio::RW_STAR_DIR.to_flags(),
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE,
                     ZxioOpenOptions::new(
                         Some(&mut attrs),
                         Some(zxio_node_attributes_t {
@@ -725,14 +725,9 @@ impl FsNodeOps for RemoteNode {
             },
             ..Default::default()
         };
-        let open_operations = self.rights.rights().unwrap_or(fio::Operations::empty());
         zxio = Arc::new(
             self.zxio
-                .open3(
-                    name,
-                    open_operations.to_flags(),
-                    ZxioOpenOptions::new(Some(&mut attrs), None),
-                )
+                .open(name, self.rights, ZxioOpenOptions::new(Some(&mut attrs), None))
                 .map_err(|status| from_status_like_fdio!(status, name))?,
         );
         mode = get_mode(&attrs);
@@ -1542,9 +1537,9 @@ mod test {
     #[::fuchsia::test]
     async fn test_tree() -> Result<(), anyhow::Error> {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
+        let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
         let (server, client) = zx::Channel::create();
-        fdio::open_deprecated("/pkg", rights, server).expect("failed to open /pkg");
+        fdio::open("/pkg", rights, server).expect("failed to open /pkg");
         let fs = RemoteFs::new_fs(
             &kernel,
             client,
@@ -1703,15 +1698,12 @@ mod test {
         {
             let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
             let (server, client) = zx::Channel::create();
-            fixture
-                .root()
-                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-                .expect("clone failed");
+            fixture.root().clone2(server.into()).expect("clone failed");
             let fs = RemoteFs::new_fs(
                 &kernel,
                 client,
                 FileSystemOptions { source: b"/".into(), ..Default::default() },
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
             )
             .expect("new_fs failed");
             let ns = Namespace::new(fs);
@@ -1751,15 +1743,12 @@ mod test {
         {
             let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
             let (server, client) = zx::Channel::create();
-            fixture
-                .root()
-                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-                .expect("clone failed after remount");
+            fixture.root().clone2(server.into()).expect("clone failed after remount");
             let fs = RemoteFs::new_fs(
                 &kernel,
                 client,
                 FileSystemOptions { source: b"/".into(), ..Default::default() },
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
             )
             .expect("new_fs failed after remount");
             let ns = Namespace::new(fs);
@@ -1800,10 +1789,7 @@ mod test {
         // Simulate a first run of starnix.
         {
             let (server, client) = zx::Channel::create();
-            fixture
-                .root()
-                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-                .expect("clone failed");
+            fixture.root().clone2(server.into()).expect("clone failed");
 
             let (kernel, _init_task) = create_kernel_and_task();
             kernel
@@ -1819,8 +1805,7 @@ mod test {
                             fsgid: 2,
                             ..current_task.creds()
                         });
-                        let rights =
-                            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                        let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                         let fs = RemoteFs::new_fs(
                             &kernel,
                             client,
@@ -1876,10 +1861,7 @@ mod test {
         .await;
 
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -1888,7 +1870,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -1935,10 +1917,7 @@ mod test {
         let fixture = TestFixture::new().await;
 
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFDIR.bits() | 0o777);
 
@@ -1949,7 +1928,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2035,10 +2014,7 @@ mod test {
     async fn test_remote_special_node() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
         const FIFO_MODE: FileMode = FileMode::from_bits(FileMode::IFIFO.bits() | 0o777);
         const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
         let (kernel, _init_task) = create_kernel_and_task();
@@ -2049,7 +2025,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2116,10 +2092,7 @@ mod test {
         let fixture = TestFixture::new().await;
 
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -2128,7 +2101,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2176,10 +2149,7 @@ mod test {
         .await;
 
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -2188,7 +2158,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2220,10 +2190,7 @@ mod test {
     async fn test_lookup_on_fsverity_enabled_file() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
@@ -2234,7 +2201,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2275,10 +2242,7 @@ mod test {
         )
         .await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -2287,7 +2251,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2314,10 +2278,7 @@ mod test {
     async fn test_update_attributes_persists() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
@@ -2328,7 +2289,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2364,10 +2325,7 @@ mod test {
         )
         .await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -2376,7 +2334,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2403,10 +2361,7 @@ mod test {
     async fn test_statfs() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         let (kernel, _init_task, mut locked) = create_kernel_task_and_unlocked();
         kernel
@@ -2415,7 +2370,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |_, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2446,10 +2401,7 @@ mod test {
     async fn test_allocate_workaround() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -2458,7 +2410,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2507,10 +2459,7 @@ mod test {
     async fn test_allocate_overflow() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -2519,7 +2468,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2569,10 +2518,7 @@ mod test {
     async fn test_time_modify_persists() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
@@ -2583,7 +2529,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2640,10 +2586,7 @@ mod test {
         )
         .await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
         let (kernel, _init_task) = create_kernel_and_task();
         let refreshed_modified_time = kernel
             .kthreads
@@ -2651,7 +2594,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2685,10 +2628,7 @@ mod test {
     async fn test_update_atime_mtime() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
@@ -2699,7 +2639,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2772,10 +2712,7 @@ mod test {
     async fn test_write_updates_mtime_ctime() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
@@ -2786,7 +2723,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2856,10 +2793,7 @@ mod test {
     async fn test_casefold_persists() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         let _ = kernel
@@ -2868,7 +2802,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,
@@ -2912,10 +2846,7 @@ mod test {
         )
         .await;
         let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
+        fixture.root().clone2(server.into()).expect("clone failed");
         let (kernel, _init_task) = create_kernel_and_task();
         let casefold = kernel
             .kthreads
@@ -2923,7 +2854,7 @@ mod test {
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
                 move |locked, current_task| {
-                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
                         client,

@@ -74,7 +74,7 @@ impl LowpanServiceTree {
                 *lazy_telemetry = LazyNode::default();
             }
 
-            dead_iface_list.insert(iface_id, child_holder.clone());
+            dead_iface_list.insert(iface_id, child_holder);
         }
     }
 }
@@ -153,7 +153,7 @@ impl IfaceTreeHolder {
 
     pub fn update_identity(&self, new_identity: Identity) {
         let mut status = self.status.lock();
-        let new_net_type = new_identity.net_type.unwrap_or("".to_string());
+        let new_net_type = new_identity.net_type.unwrap_or_else(|| "".to_string());
         let mut status_change_messages = Vec::new();
         if new_net_type != status.net_type_value {
             status_change_messages
@@ -221,6 +221,7 @@ pub async fn watch_device_changes<
     inspect_tree: Arc<LowpanServiceTree>,
     lookup: Arc<LP>,
 ) {
+    #[allow(clippy::collection_is_never_read)]
     let mut device_table: HashMap<String, Arc<Task<()>>> = HashMap::new();
     let lookup_clone = lookup.clone();
     let mut lookup_stream = HangingGetStream::new(lookup_clone, |lookup| lookup.watch_devices());
@@ -324,11 +325,11 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
     connect_to_protocol::<CountersConnectorMarker>()?.connect(&name, counters_server)?;
     connect_to_protocol::<TelemetryProviderConnectorMarker>()?.connect(&name, telemetry_server)?;
 
-    let device = device_client.into_proxy().context("into_proxy() failed")?;
-    let device_extra = device_extra_client.into_proxy().context("into_proxy() failed")?;
-    let device_test = device_test_client.into_proxy().context("into_proxy() failed")?;
-    let counters = counters_client.into_proxy().context("into_proxy() failed")?;
-    let telemetry = telemetry_client.into_proxy().context("into_proxy() failed")?;
+    let device = device_client.into_proxy();
+    let device_extra = device_extra_client.into_proxy();
+    let device_test = device_test_client.into_proxy();
+    let counters = counters_client.into_proxy();
+    let telemetry = telemetry_client.into_proxy();
 
     {
         // "iface-*/counters" node

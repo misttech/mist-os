@@ -64,6 +64,13 @@ Err::~Err() = default;
 
 bool Err::operator==(const Err& other) const { return type_ == other.type_ && msg_ == other.msg_; }
 
+std::string Err::ToString() const {
+  std::string ret = ErrTypeToString(type());
+  ret += ": ";
+  ret += msg();
+  return ret;
+}
+
 std::string ErrTypeToString(ErrType type) {
   switch (type) {
     case ErrType::kNone:

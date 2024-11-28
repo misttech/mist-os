@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
-use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry, NamedMap, PackageDestination};
+use assembly_constants::PackageDestination;
+use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry, NamedMap};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use std::collections::BTreeMap;

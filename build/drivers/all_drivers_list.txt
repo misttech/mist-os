@@ -13,6 +13,8 @@
 //examples/drivers/transport/banjo/v2:parent_driver
 //examples/drivers/transport/driver/v1:child_driver
 //examples/drivers/transport/driver/v1:parent_driver
+//examples/drivers/transport/zircon/rust/child:driver
+//examples/drivers/transport/zircon/rust/parent:driver
 //examples/drivers/transport/zircon/v1:child_driver
 //examples/drivers/transport/zircon/v1:parent_driver
 //examples/drivers/transport/zircon/v2:child_driver
@@ -98,9 +100,9 @@
 //src/devices/block/drivers/virtio:virtio_block-driver
 //src/devices/block/drivers/virtio:virtio_scsi-driver
 //src/devices/block/drivers/zxcrypt:zxcrypt-driver
-//src/devices/board/drivers/acpi-arm64:acpi-arm64-driver
 //src/devices/board/drivers/astro/post-init:post-init-driver
 //src/devices/board/drivers/astro:astro-driver
+//src/devices/board/drivers/crosvm:driver
 //src/devices/board/drivers/integration-test:integration-test-driver
 //src/devices/board/drivers/machina:machina-driver
 //src/devices/board/drivers/nelson/post-init:post-init-driver
@@ -123,7 +125,6 @@
 //src/devices/bus/drivers/platform/test:test-child-1-driver
 //src/devices/bus/drivers/platform/test:test-child-2-driver
 //src/devices/bus/drivers/platform/test:test-child-3-driver
-//src/devices/bus/drivers/platform/test:test-clock-driver
 //src/devices/bus/drivers/platform/test:test-composite-node-spec-driver
 //src/devices/bus/drivers/platform/test:test-gpio-driver
 //src/devices/bus/drivers/platform/test:test-parent-driver

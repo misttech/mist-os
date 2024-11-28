@@ -128,9 +128,9 @@ impl<'a> Debugger<'a> {
 
         while let Some(mut instruction) = instructions.next() {
             let condition = FromPrimitive::from_u32(instruction.condition())
-                .ok_or(DebuggerError::InvalidCondition(instruction.condition()))?;
+                .ok_or_else(|| DebuggerError::InvalidCondition(instruction.condition()))?;
             let operation = FromPrimitive::from_u32(instruction.operation())
-                .ok_or(DebuggerError::InvalidOperation(instruction.operation()))?;
+                .ok_or_else(|| DebuggerError::InvalidOperation(instruction.operation()))?;
 
             let condition_succeeds = if condition == RawCondition::Always {
                 true
@@ -180,11 +180,11 @@ impl<'a> Debugger<'a> {
         condition_succeeds: bool,
     ) -> Result<(), DebuggerError> {
         let condition = FromPrimitive::from_u32(instruction.condition())
-            .ok_or(DebuggerError::InvalidCondition(instruction.condition()))?;
+            .ok_or_else(|| DebuggerError::InvalidCondition(instruction.condition()))?;
         let operation = FromPrimitive::from_u32(instruction.operation())
-            .ok_or(DebuggerError::InvalidOperation(instruction.operation()))?;
+            .ok_or_else(|| DebuggerError::InvalidOperation(instruction.operation()))?;
         let ast_location = FromPrimitive::from_u32(instruction.ast_location())
-            .ok_or(DebuggerError::InvalidAstLocation(instruction.ast_location()))?;
+            .ok_or_else(|| DebuggerError::InvalidAstLocation(instruction.ast_location()))?;
 
         match (operation, condition) {
             (RawOp::Abort, RawCondition::Equal) | (RawOp::Abort, RawCondition::NotEqual) => {

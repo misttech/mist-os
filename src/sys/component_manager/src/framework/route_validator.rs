@@ -187,7 +187,7 @@ impl RouteValidatorCapabilityProvider {
                     fsys::DeclType::Any => {
                         let mut use_target = target.clone();
                         use_target.decl_type = fsys::DeclType::Use;
-                        let mut expose_target = target.clone();
+                        let mut expose_target = target;
                         expose_target.decl_type = fsys::DeclType::Expose;
                         vec![use_target, expose_target].into_iter()
                     }
@@ -235,6 +235,8 @@ impl RouteValidatorCapabilityProvider {
                     }
                     fsys::DeclType::Expose => {
                         let exposes = routing::aggregate_exposes(resolved.decl().exposes.iter());
+
+                        #[allow(clippy::needless_collect)] // aligns the iterator type w/ above
                         let matching_requests: Vec<_> = exposes
                             .into_iter()
                             .filter_map(|(target_name, e)| {
@@ -522,7 +524,7 @@ impl FrameworkCapability for RouteValidatorFrameworkCapability {
     ) -> Box<dyn CapabilityProvider> {
         Box::new(RouteValidatorCapabilityProvider {
             model: self.model.clone(),
-            scope_moniker: scope.moniker.clone(),
+            scope_moniker: scope.moniker,
         })
     }
 }
@@ -536,7 +538,7 @@ struct RouteValidatorCapabilityProvider {
 impl InternalCapabilityProvider for RouteValidatorCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fsys::RouteValidatorMarker>::new(server_end);
-        self.serve(server_end.into_stream().unwrap()).await;
+        self.serve(server_end.into_stream()).await;
     }
 }
 
@@ -659,7 +661,7 @@ mod tests {
         test: &TestModelResult,
     ) -> (fsys::RouteValidatorProxy, RouteValidatorFrameworkCapability) {
         let host = RouteValidatorFrameworkCapability::new(Arc::downgrade(&test.model));
-        let (proxy, server) = endpoints::create_proxy::<fsys::RouteValidatorMarker>().unwrap();
+        let (proxy, server) = endpoints::create_proxy::<fsys::RouteValidatorMarker>();
         capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
         (proxy, host)
     }
@@ -1608,7 +1610,7 @@ mod tests {
             assert_eq!(ns.len(), 2);
             let ns = ns.remove(1);
             assert_eq!(ns.path.to_string(), "/svc");
-            let svc_dir = ns.directory.into_proxy().unwrap();
+            let svc_dir = ns.directory.into_proxy();
             fuchsia_fs::directory::open_directory(&svc_dir, "foo.bar", fio::Flags::empty())
                 .await
                 .unwrap();

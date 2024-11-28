@@ -12,8 +12,7 @@ async fn verify_cache_packages(
     env: &TestEnv,
     mut expected_entries: impl Iterator<Item = (String, Hash)>,
 ) {
-    let (pkg_iterator, server_end) =
-        fidl::endpoints::create_proxy::<PackageIndexIteratorMarker>().unwrap();
+    let (pkg_iterator, server_end) = fidl::endpoints::create_proxy::<PackageIndexIteratorMarker>();
     env.proxies.package_cache.cache_package_index(server_end).unwrap();
 
     loop {

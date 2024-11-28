@@ -11,8 +11,8 @@ use fuchsia_component_test::{
 use tracing::warn;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_diagnostics as fdiagnostics,
-    fidl_fuchsia_inspect as finspect, fidl_fuchsia_logger as flogger,
-    fidl_fuchsia_tracing_provider as ftracing,
+    fidl_fuchsia_diagnostics_host as fdiagnostics_host, fidl_fuchsia_inspect as finspect,
+    fidl_fuchsia_logger as flogger, fidl_fuchsia_tracing_provider as ftracing,
 };
 
 const ARCHIVIST_URL: &str = "#meta/archivist.cm";
@@ -104,9 +104,11 @@ impl ArchivistRealmFactory {
         // LINT.ThenChange(//src/diagnostics/archivist/testing/realm-factory/meta/realm-factory.cml)
         let archivist_to_parent = Route::new()
             .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
+            .capability(Capability::protocol::<fdiagnostics_host::ArchiveAccessorMarker>())
             .capability(Capability::protocol_by_name("fuchsia.diagnostics.FeedbackArchiveAccessor"))
             .capability(Capability::protocol_by_name("fuchsia.diagnostics.LoWPANArchiveAccessor"))
             .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
+            .capability(Capability::protocol::<fdiagnostics::LogStreamMarker>())
             .capability(Capability::protocol::<flogger::LogSinkMarker>())
             .capability(Capability::protocol::<finspect::InspectSinkMarker>())
             .capability(Capability::protocol::<flogger::LogMarker>());
@@ -122,7 +124,6 @@ impl ArchivistRealmFactory {
             .capability(Capability::configuration(
                 "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
             ))
-            .capability(Capability::configuration("fuchsia.diagnostics.NumThreads"))
             .capability(Capability::configuration("fuchsia.diagnostics.AllowSerialLogs"))
             .capability(Capability::configuration("fuchsia.diagnostics.DenySerialLogs"))
             .capability(Capability::configuration("fuchsia.diagnostics.LogToDebuglog"));
@@ -205,10 +206,8 @@ impl ArchivistRealmFactory {
                 test_realm
                     .add_route(
                         Route::new()
-                            .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
                             .capability(Capability::protocol::<flogger::LogSinkMarker>())
                             .capability(Capability::protocol::<finspect::InspectSinkMarker>())
-                            .capability(Capability::protocol::<flogger::LogMarker>())
                             .from(&archivist)
                             .to(&puppet),
                     )

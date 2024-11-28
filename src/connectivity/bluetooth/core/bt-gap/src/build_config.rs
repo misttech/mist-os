@@ -129,8 +129,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn apply_config() {
-        let (host_proxy, host_server) =
-            fidl::endpoints::create_proxy_and_stream::<HostMarker>().unwrap();
+        let (host_proxy, host_server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>();
         let host_device = HostDevice::mock(
             HostId(42),
             Address::Public([1, 2, 3, 4, 5, 6]),

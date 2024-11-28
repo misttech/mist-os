@@ -53,7 +53,7 @@ impl SystemController {
                     let root = self
                         .top_instance
                         .upgrade()
-                        .ok_or(format_err!("model is dropped"))?
+                        .ok_or_else(|| format_err!("model is dropped"))?
                         .root()
                         .clone();
 
@@ -163,8 +163,7 @@ mod tests {
             // allow simulated shutdown to take up to 30 days
             Duration::from_secs(60 * 60 * 24 * 30),
         );
-        let (controller_proxy, stream) =
-            create_proxy_and_stream::<fsys::SystemControllerMarker>().unwrap();
+        let (controller_proxy, stream) = create_proxy_and_stream::<fsys::SystemControllerMarker>();
         let _task = fasync::Task::spawn(async move {
             sys_controller.serve(stream).await.expect("error serving system controller");
         });
@@ -249,7 +248,7 @@ mod tests {
                 Duration::from_secs(u64::try_from(TIMEOUT_SECONDS).unwrap()),
             );
             let (controller_proxy, stream) =
-                create_proxy_and_stream::<fsys::SystemControllerMarker>().unwrap();
+                create_proxy_and_stream::<fsys::SystemControllerMarker>();
             let _task = fasync::Task::spawn(async move {
                 sys_controller.serve(stream).await.expect("error serving system controller");
             });

@@ -15,7 +15,7 @@
 #include <memory>
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 
 namespace amlogic_display {
 

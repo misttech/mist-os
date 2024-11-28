@@ -22,7 +22,7 @@ use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::{error, gid_t, statfs, uid_t, TMPFS_MAGIC};
 use std::sync::Arc;
 
-pub struct TmpFs(());
+pub struct TmpFs(&'static FsStr);
 
 impl FileSystemOps for Arc<TmpFs> {
     fn statfs(
@@ -40,7 +40,7 @@ impl FileSystemOps for Arc<TmpFs> {
         })
     }
     fn name(&self) -> &'static FsStr {
-        "tmpfs".into()
+        self.0
     }
 
     fn rename(
@@ -139,11 +139,24 @@ impl TmpFs {
         Self::new_fs_with_options(kernel, Default::default()).expect("empty options cannot fail")
     }
 
+    pub fn new_fs_with_name(kernel: &Arc<Kernel>, name: &'static FsStr) -> FileSystemHandle {
+        Self::new_fs_with_options_and_name(kernel, Default::default(), name)
+            .expect("empty options cannot fail")
+    }
+
     pub fn new_fs_with_options(
         kernel: &Arc<Kernel>,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, Arc::new(TmpFs(())), options)?;
+        Self::new_fs_with_options_and_name(kernel, options, "tmpfs".into())
+    }
+
+    fn new_fs_with_options_and_name(
+        kernel: &Arc<Kernel>,
+        options: FileSystemOptions,
+        name: &'static FsStr,
+    ) -> Result<FileSystemHandle, Errno> {
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, Arc::new(TmpFs(name)), options)?;
         let mut mount_options = fs.options.params.clone();
         let mode = if let Some(mode) = mount_options.remove(b"mode") {
             FileMode::from_string(mode.as_ref())?

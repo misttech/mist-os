@@ -45,6 +45,11 @@ class AllocChecker {
     ok_ = (size == 0 || result);
   }
 
+  // Allow calls with anything explicitly convertible to bool, not just
+  // anything implicitly convertible to bool.  This makes smart-pointer types
+  // usable directly as the second argument.
+  void arm(size_t size, const auto& result) { arm(size, static_cast<bool>(result)); }
+
   // Return true if the previous allocation succeeded.
   bool check() {
     armed_ = false;

@@ -148,7 +148,7 @@ impl ComponentInstanceForAnalyzer {
         input: ComponentInput,
     ) -> Arc<Self> {
         let self_ = Arc::new(Self {
-            moniker: moniker.clone(),
+            moniker: moniker,
             decl: decl.clone(),
             config,
             url,

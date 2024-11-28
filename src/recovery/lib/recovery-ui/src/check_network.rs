@@ -56,7 +56,7 @@ impl CheckNetworkViewAssistant {
         button_infos: Vec<ButtonInfo>,
     ) -> Result<CheckNetworkViewAssistant, Error> {
         Ok(CheckNetworkViewAssistant {
-            app_sender: app_sender.clone(),
+            app_sender: app_sender,
             view_key,
             scene_details: None,
             title_text,

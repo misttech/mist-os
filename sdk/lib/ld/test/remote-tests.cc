@@ -5,13 +5,21 @@
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/ld/remote-abi-stub.h>
 #include <lib/ld/remote-dynamic-linker.h>
+#include <lib/ld/remote-perfect-symbol-filter.h>
 #include <lib/ld/remote-zygote.h>
 
 #include <gtest/gtest.h>
 
 #include "ld-remote-process-tests.h"
+#include "remote-perfect-symbol-filter-test.h"
 
 namespace {
+
+using ::testing::Each;
+using ::testing::Field;
+using ::testing::IsTrue;
+using ::testing::Pointee;
+using ::testing::Property;
 
 // These tests reuse the fixture that supports the LdLoadTests (load-tests.cc)
 // for the common handling of creating and launching a Zircon process.  The
@@ -714,6 +722,243 @@ TEST_F(LdRemoteTests, LoadedBy) {
       }
     }
   }
+}
+
+TEST_F(LdRemoteTests, SymbolFilter) {
+  ASSERT_NO_FATAL_FAILURE(Init());
+
+  LdsvcPathPrefix("symbol-filter");
+
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+
+  Linker linker;
+  linker.set_abi_stub(ld::RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize));
+  ASSERT_TRUE(linker.abi_stub());
+
+  zx::vmo vdso_vmo;
+  zx_status_t status = ld::testing::GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
+  EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
+
+  auto decode = [](zx::vmo vmo) {
+    auto diag = elfldltl::testing::ExpectOkDiagnostics();
+    return Linker::Module::Decoded::Create(diag, std::move(vmo), kPageSize);
+  };
+
+  Linker::InitModuleList init_modules = {
+      Linker::Executable(decode(GetExecutableVmo("symbol-filter"))),
+      Linker::Implicit(decode(GetLibVmo("libsymbol-filter-dep17.so"))),
+      Linker::Implicit(decode(GetLibVmo("libsymbol-filter-dep23.so"))),
+      Linker::Implicit(decode(GetLibVmo("libsymbol-filter-dep42.so"))),
+      Linker::Implicit(decode(std::move(vdso_vmo))),
+  };
+  ASSERT_THAT(init_modules,
+              Each(Field("decoded_module", &Linker::InitModule::decoded_module,
+                         Pointee(Property("successfully decoded", &Linker::DecodedModule::HasModule,
+                                          IsTrue())))));
+
+  auto init_result = linker.Init(diag, std::move(init_modules), GetDepFunction(diag));
+  ASSERT_TRUE(init_result);
+
+  auto filter_out = [](auto... ignore_names) {
+    return [ignore_names...](const auto& module,
+                             auto& name) -> fit::result<bool, const elfldltl::Elf<>::Sym*> {
+      auto diag = elfldltl::testing::ExpectOkDiagnostics();
+      const bool ignore = ((name == ignore_names) || ...);
+      return fit::ok(ignore ? nullptr : name.Lookup(module.symbol_info()));
+    };
+  };
+
+  // Dependency order should be dep17, dep23, dep42.
+  EXPECT_EQ(std::next(init_result->at(1)), init_result->at(2));
+  EXPECT_EQ(std::next(init_result->at(2)), init_result->at(3));
+
+  // first can come from dep17, but not second or third.
+  init_result->at(1)->set_symbol_filter(filter_out("second", "third"));
+
+  // first and second can come from dep23, but not third.
+  init_result->at(2)->set_symbol_filter(filter_out("third"));
+
+  // Hence: first from dep17; second from dep23; third from dep42.
+  constexpr int64_t kReturnValue = (17 * 1) + (23 * 2) + (42 * 3);
+
+  EXPECT_TRUE(linker.Allocate(diag, root_vmar().borrow()));
+  set_entry(linker.main_entry());
+  set_stack_size(linker.main_stack_size());
+  set_vdso_base(init_result->back()->module().vaddr_start());
+
+  EXPECT_TRUE(linker.Relocate(diag));
+  ASSERT_TRUE(linker.Load(diag));
+  linker.Commit();
+
+  EXPECT_EQ(Run(), kReturnValue);
+
+  ExpectLog("");
+}
+
+// This reuses one of the modules from the SymbolFilter test, but it only uses
+// the test fixture to acquire the VMO (and the cached page size).  It doesn't
+// do any dynamic linking, it just decodes a module and then unit-tests the
+// generated filter function.
+template <class Elf, class Test>
+void PerfectSymbolFilterTest(Test& test, std::string_view path_prefix) {
+  using size_type = Elf::size_type;
+  using Sym = Elf::Sym;
+  using Module = ld::RemoteLoadModule<Elf>;
+
+  test.LdsvcPathPrefix(path_prefix);
+
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+  auto decoded = Module::Decoded::Create(diag, test.GetLibVmo("libsymbol-filter-dep17.so"),
+                                         static_cast<size_type>(Test::kPageSize));
+  ASSERT_TRUE(decoded);
+  ASSERT_TRUE(decoded->HasModule());
+
+  // The original module has all three symbols.
+
+  constexpr elfldltl::SymbolName kFirst = "first";
+  const Sym* first_sym = kFirst.Lookup(decoded->symbol_info());
+  EXPECT_NE(first_sym, nullptr);
+
+  constexpr elfldltl::SymbolName kSecond = "second";
+  const Sym* second_sym = kSecond.Lookup(decoded->symbol_info());
+  EXPECT_NE(second_sym, nullptr);
+
+  constexpr elfldltl::SymbolName kThird = "third";
+  const Sym* third_sym = kThird.Lookup(decoded->symbol_info());
+  EXPECT_NE(third_sym, nullptr);
+
+  // These are distinct symbols.
+  EXPECT_NE(first_sym, second_sym);
+  EXPECT_NE(first_sym, third_sym);
+  EXPECT_NE(second_sym, third_sym);
+
+  // Populate the filter.
+  typename Module::SymbolFilter filter = ld::testing::PerfectSymbolFilterTest<Elf>(diag, decoded);
+  ASSERT_TRUE(filter);
+
+  // Mock up a module object.  It won't be referenced by calls to the filter.
+  Module mod;
+
+  // First symbol is found by the filter.
+  elfldltl::SymbolName name = kFirst;
+  auto first_result = filter(mod, name);
+  ASSERT_TRUE(first_result.is_ok()) << first_result.error_value();
+  EXPECT_EQ(*first_result, first_sym);
+
+  // Second symbol is filtered out: not found.
+  name = kSecond;
+  auto second_result = filter(mod, name);
+  ASSERT_TRUE(second_result.is_ok()) << second_result.error_value();
+  EXPECT_EQ(*second_result, nullptr);
+
+  // Third symbol is found by the filter.
+  name = kThird;
+  auto third_result = filter(mod, name);
+  ASSERT_TRUE(third_result.is_ok()) << third_result.error_value();
+  EXPECT_EQ(*third_result, third_sym);
+
+  // Now install the filter and get the same results via the module.  Nothing
+  // else will be used, so the module stays otherwise default-constructed.
+  mod.set_symbol_filter(std::move(filter));
+
+  name = kFirst;
+  first_result = mod.Lookup(diag, name);
+  ASSERT_TRUE(first_result.is_ok()) << first_result.error_value();
+  EXPECT_EQ(*first_result, first_sym);
+
+  name = kSecond;
+  second_result = mod.Lookup(diag, name);
+  ASSERT_TRUE(second_result.is_ok()) << second_result.error_value();
+  EXPECT_EQ(*second_result, nullptr);
+
+  name = kThird;
+  third_result = mod.Lookup(diag, name);
+  ASSERT_TRUE(third_result.is_ok()) << third_result.error_value();
+  EXPECT_EQ(*third_result, third_sym);
+}
+
+TEST_F(LdRemoteTests, PerfectSymbolFilter) {
+  ASSERT_NO_FATAL_FAILURE(PerfectSymbolFilterTest<elfldltl::Elf<>>(*this, "symbol-filter"));
+}
+
+TEST_F(LdRemoteTests, PerfectSymbolFilterElf32) {
+  ASSERT_NO_FATAL_FAILURE(PerfectSymbolFilterTest<elfldltl::Elf32<>>(*this, "symbol-filter-elf32"));
+}
+
+TEST_F(LdRemoteTests, ForeignMachine) {
+  using ForeignElf = elfldltl::Elf32<elfldltl::ElfData::k2Lsb>;
+  using ForeignLinker = ld::RemoteDynamicLinker<ForeignElf>;
+  constexpr elfldltl::ElfMachine kForeignMachine = elfldltl::ElfMachine::kArm;
+  constexpr uint32_t kForeignPageSize = 0x1000;
+
+  // Init() creates the process where the test modules will be loaded, and
+  // provides its root VMAR.  The modules understand only a 32-bit address
+  // space, so they must go into the low 4GiB of the test process.
+  ASSERT_NO_FATAL_FAILURE(Init());
+
+  // The kernel reserves the lowest part of the address space, so the root VMAR
+  // doesn't start at zero.  The VMAR for the 32-bit address space will not be
+  // quite 4GiB in size, so adjust to make sure it ends at exactly 4GiB.  In
+  // fact, no 32-bit userland ever expects to have a segment in the very last
+  // page, where the page-rounded vaddr+memsz wraps around to 0.  So make the
+  // VMAR one page smaller to ensure nothing gets placed all the way up there.
+  const size_t kAddressLimit = (size_t{1} << 32) - zx_system_get_page_size();
+  zx_info_vmar_t root_vmar_info;
+  zx_status_t status =
+      root_vmar().get_info(ZX_INFO_VMAR, &root_vmar_info, sizeof(root_vmar_info), nullptr, nullptr);
+  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  ASSERT_LT(root_vmar_info.base, kAddressLimit);
+
+  constexpr zx_vm_option_t kVmarOptions =
+      // Require the specific offset of 0 and allow exact placement within.
+      ZX_VM_SPECIFIC | ZX_VM_CAN_MAP_SPECIFIC |
+      // Allow all kinds of mappings.
+      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_EXECUTE;
+  const size_t vmar_size = kAddressLimit - root_vmar_info.base;
+  zx::vmar vmar;
+  uintptr_t vmar_addr;
+  status = root_vmar().allocate(kVmarOptions, 0, vmar_size, &vmar, &vmar_addr);
+  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  EXPECT_EQ(vmar_addr, root_vmar_info.base);
+
+  LdsvcPathPrefix("symbol-filter-elf32");
+
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+  ForeignLinker linker;
+  linker.set_abi_stub(
+      ld::RemoteAbiStub<ForeignElf>::Create(diag, GetLibVmo("ld-stub.so"), kForeignPageSize));
+  ASSERT_TRUE(linker.abi_stub());
+
+  // The non-Fuchsia executable gets packaged under lib/ in the test data.
+  ForeignLinker::Module::DecodedPtr executable;
+  ASSERT_TRUE(executable = ForeignLinker::Module::Decoded::Create(
+                  diag, GetLibVmo("symbol-filter-elf32"), kForeignPageSize));
+
+  auto get_dep = GetDepFunction<ForeignLinker>(diag, kForeignPageSize);
+  ASSERT_NO_FATAL_FAILURE(Needed({
+      "libsymbol-filter-dep17.so",
+      "libsymbol-filter-dep23.so",
+      "libsymbol-filter-dep42.so",
+  }));
+  ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
+
+  auto init_result = linker.Init(diag, {ForeignLinker::Executable(std::move(executable))}, get_dep,
+                                 kForeignMachine);
+  ASSERT_TRUE(init_result);
+
+  EXPECT_TRUE(linker.Allocate(diag, vmar.borrow()));
+
+  // These won't really be used, but they can be extracted.
+  set_entry(linker.main_entry());
+  set_stack_size(linker.main_stack_size());
+
+  // Now it can be relocated for the foreign machine.
+  EXPECT_TRUE(linker.Relocate<kForeignMachine>(diag));
+
+  // It can even be loaded.  But it can't be run.
+  ASSERT_TRUE(linker.Load(diag));
+
+  ExpectLog("");
 }
 
 }  // namespace

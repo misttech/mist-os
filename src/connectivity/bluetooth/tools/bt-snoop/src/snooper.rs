@@ -106,7 +106,7 @@ impl Snooper {
 
     pub fn from_client(client: ClientEnd<SnoopMarker>, path: &str) -> Snooper {
         let device_name = path.to_owned();
-        let proxy = client.into_proxy().unwrap();
+        let proxy = client.into_proxy();
         let event_stream = proxy.take_event_stream();
         Snooper { device_name, proxy, event_stream, is_terminated: false }
     }
@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn test_from_proxy() {
         let _exec = fasync::TestExecutor::new();
-        let (client, _stream) = fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
+        let (client, _stream) = fidl::endpoints::create_request_stream::<SnoopMarker>();
         let snooper = Snooper::from_client(client, "c");
         assert_eq!(snooper.device_name, "c");
     }
@@ -222,7 +222,7 @@ mod tests {
     fn test_from_directory_proxy_timeout() {
         let _exec = fasync::TestExecutor::new();
         let (proxy, _requests) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_io::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_io::DirectoryMarker>();
         let _ = Snooper::new(&proxy, "foo").expect_err("should have timed out");
     }
 
@@ -280,7 +280,7 @@ mod tests {
     fn test_snoop_stream() {
         let mut exec = fasync::TestExecutor::new();
         let (snoop_client, mut req_stream) =
-            fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<SnoopMarker>();
         let snoop_control = req_stream.control_handle();
         let mut snooper = Snooper::from_client(snoop_client, "c");
         let req_0 = SnoopOnObservePacketRequest {
@@ -336,8 +336,7 @@ mod tests {
     #[test]
     fn test_snoop_stream_missing_sequence() {
         let mut exec = fasync::TestExecutor::new();
-        let (snoop_client, snoop_stream) =
-            fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
+        let (snoop_client, snoop_stream) = fidl::endpoints::create_request_stream::<SnoopMarker>();
         let snoop_control = snoop_stream.control_handle();
         let mut snooper = Snooper::from_client(snoop_client, "c");
 

@@ -160,8 +160,10 @@ impl StationaryMonitor {
             // Updated fields for tracking roam scan decisions and initiated roam search.
             self.connection_data.previous_roam_scan_data.time_prev_roam_scan =
                 fasync::MonotonicInstant::now();
-            self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan = roam_reasons;
+            self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan =
+                roam_reasons.clone();
             self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan = rssi;
+            info!("Initiating roam search for roam reasons: {:?}", roam_reasons);
             return RoamTriggerDataOutcome::RoamSearch(
                 self.connection_data.network_identifier.clone(),
                 self.connection_data.credential.clone(),
@@ -190,7 +192,6 @@ impl RoamMonitorApi for StationaryMonitor {
             info!("Selected roam candidate is the currently connected candidate, ignoring");
             return Ok(false);
         }
-
         // Only send roam scan if the selected candidate shows a significant signal improvement,
         // compared to the most up-to-date roaming connection data
         let latest_rssi = self.connection_data.signal_data.ewma_rssi.get();
@@ -204,7 +205,6 @@ impl RoamMonitorApi for StationaryMonitor {
             );
             return Ok(false);
         }
-
         Ok(true)
     }
 }
@@ -728,7 +728,7 @@ mod test {
             .should_send_roam_request(candidate)
             .expect("failed to check roam request"));
 
-        // Verify that a roam recommendation is made if RSSI improvement exceeds threshold.
+        // Verify that a roam recommendation is made if RSSI improvement exceeds threshold
         let candidate = types::ScannedCandidate {
             bss: types::Bss {
                 signal: types::Signal {

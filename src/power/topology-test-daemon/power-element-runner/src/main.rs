@@ -4,9 +4,7 @@
 
 use anyhow::Result;
 use fidl::endpoints::ClientEnd;
-use fidl_test_powerelementrunner::{
-    ControlRequest, ControlRequestStream, ControlStartResult, StartPowerElementError,
-};
+use fidl_test_powerelementrunner::{ControlRequest, ControlRequestStream, ControlStartResult};
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
 use tracing::*;
@@ -60,14 +58,8 @@ fn run_power_element(
     required_level_client: ClientEnd<fbroker::RequiredLevelMarker>,
     current_level_client: ClientEnd<fbroker::CurrentLevelMarker>,
 ) -> ControlStartResult {
-    let current_level_proxy = current_level_client.into_proxy().map_err(|err| {
-        tracing::error!(%err, "Failed to convert current_level client_end to proxy");
-        StartPowerElementError::InvalidClientEnd
-    })?;
-    let required_level_proxy = required_level_client.into_proxy().map_err(|err| {
-        tracing::error!(%err, "Failed to convert requried_level client_end to proxy");
-        StartPowerElementError::InvalidClientEnd
-    })?;
+    let current_level_proxy = current_level_client.into_proxy();
+    let required_level_proxy = required_level_client.into_proxy();
     fasync::Task::local(async move {
         let mut last_required_level = initial_current_level;
 

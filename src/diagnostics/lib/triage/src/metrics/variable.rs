@@ -37,8 +37,9 @@ impl<'a> VariableName {
     }
 
     pub fn full_name(&self, namespace: &str) -> String {
-        let name_parts: Vec<_> = self.name.split("::").collect();
-        if name_parts.len() == 1 {
+        let mut name_parts = self.name.split("::");
+        let _ = name_parts.next();
+        if name_parts.next().is_none() {
             namespace.to_owned() + &self.name
         } else {
             self.name.clone()

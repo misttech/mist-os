@@ -8,10 +8,10 @@ use ftest_manager::{CaseStatus, RunOptions, SuiteStatus};
 use fuchsia_component::client;
 use futures::prelude::*;
 use pretty_assertions::assert_eq;
-use test_diagnostics::collect_string_from_socket;
+use test_case::test_case;
 use test_manager_test_lib::{
-    collect_suite_events, default_run_option, AttributedLog, GroupRunEventByTestCase, RunEvent,
-    TestBuilder, TestRunEventPayload,
+    collect_string_from_socket_helper, collect_suite_events, default_run_option, AttributedLog,
+    GroupRunEventByTestCase, RunEvent, TestBuilder, TestRunEventPayload,
 };
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -126,7 +126,7 @@ async fn enumerate_echo_test() {
         ..Default::default()
     }));
 
-    let (iterator, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (iterator, server_end) = fidl::endpoints::create_proxy();
 
     proxy
         .enumerate_in_realm(
@@ -262,8 +262,10 @@ async fn update_log_severity_for_all_components() {
     );
 }
 
+#[test_case(true; "compressed debug_data")]
+#[test_case(false; "uncompressed debug_data")]
 #[fuchsia::test]
-async fn debug_data_test() {
+async fn debug_data_test(compressed: bool) {
     let test_url =
         "fuchsia-pkg://fuchsia.com/test_manager_specified_realm_test#meta/debug_data_write_test.cm";
 
@@ -279,8 +281,11 @@ async fn debug_data_test() {
         )
         .await
         .expect("Cannot create suite instance");
-    let (run_events_result, suite_events_result) =
-        futures::future::join(builder.run(), collect_suite_events(suite_instance)).await;
+    let (run_events_result, suite_events_result) = futures::future::join(
+        builder.run_with_option(compressed),
+        collect_suite_events(suite_instance),
+    )
+    .await;
 
     let suite_events = suite_events_result.unwrap().0;
     let expected_events = vec![
@@ -300,7 +305,7 @@ async fn debug_data_test() {
     let num_debug_data_events = stream::iter(run_events_result.unwrap())
         .then(|run_event| async move {
             let TestRunEventPayload::DebugData { socket, .. } = run_event.payload;
-            let content = collect_string_from_socket(socket).await.unwrap();
+            let content = collect_string_from_socket_helper(socket, compressed).await.unwrap();
             content == "Debug data from test\n"
         })
         .filter(|matches_vmo| futures::future::ready(*matches_vmo))
@@ -311,6 +316,7 @@ async fn debug_data_test() {
 
 #[fuchsia::test]
 async fn debug_data_accumulate_test() {
+    let compressed_debug_data = true;
     let test_url =
         "fuchsia-pkg://fuchsia.com/test_manager_specified_realm_test#meta/debug_data_write_test.cm";
 
@@ -329,13 +335,17 @@ async fn debug_data_accumulate_test() {
             )
             .await
             .expect("Cannot create suite instance");
-        let (run_events_result, _) =
-            futures::future::join(builder.run(), collect_suite_events(suite_instance)).await;
+        let (run_events_result, _) = futures::future::join(
+            builder.run_with_option(compressed_debug_data),
+            collect_suite_events(suite_instance),
+        )
+        .await;
 
         let num_debug_data_events = stream::iter(run_events_result.unwrap())
             .then(|run_event| async move {
                 let TestRunEventPayload::DebugData { socket, .. } = run_event.payload;
-                let content = collect_string_from_socket(socket).await.unwrap();
+                let content =
+                    collect_string_from_socket_helper(socket, compressed_debug_data).await.unwrap();
                 content == "Debug data from test\n"
             })
             .filter(|matches_vmo| futures::future::ready(*matches_vmo))
@@ -345,8 +355,10 @@ async fn debug_data_accumulate_test() {
     }
 }
 
+#[test_case(true; "compressed debug_data")]
+#[test_case(false; "uncompressed debug_data")]
 #[fuchsia::test]
-async fn debug_data_isolated_test() {
+async fn debug_data_isolated_test(compressed: bool) {
     let test_url =
         "fuchsia-pkg://fuchsia.com/test_manager_specified_realm_test#meta/debug_data_write_test.cm";
     // By default, when I run the same test twice, debug data is not accumulated.
@@ -363,13 +375,16 @@ async fn debug_data_isolated_test() {
             )
             .await
             .expect("Cannot create suite instance");
-        let (run_events_result, _) =
-            futures::future::join(builder.run(), collect_suite_events(suite_instance)).await;
+        let (run_events_result, _) = futures::future::join(
+            builder.run_with_option(compressed),
+            collect_suite_events(suite_instance),
+        )
+        .await;
 
         let num_debug_data_events = stream::iter(run_events_result.unwrap())
             .then(|run_event| async move {
                 let TestRunEventPayload::DebugData { socket, .. } = run_event.payload;
-                let content = collect_string_from_socket(socket).await.unwrap();
+                let content = collect_string_from_socket_helper(socket, compressed).await.unwrap();
                 content == "Debug data from test\n"
             })
             .filter(|matches_vmo| futures::future::ready(*matches_vmo))

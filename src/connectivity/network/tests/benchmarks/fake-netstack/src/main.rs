@@ -108,8 +108,7 @@ async fn handle_provider_request(
         fposix_socket::ProviderRequest::DatagramSocket { domain, proto, responder } => {
             let (client_end, request_stream) = fidl::endpoints::create_request_stream::<
                 fposix_socket::SynchronousDatagramSocketMarker,
-            >()
-            .context("create request stream")?;
+            >();
             responder
                 .send(Ok(fposix_socket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(
                     client_end,
@@ -131,8 +130,7 @@ async fn handle_provider_request(
         }
         fposix_socket::ProviderRequest::StreamSocket { domain, proto, responder } => {
             let (client_end, request_stream) =
-                fidl::endpoints::create_request_stream::<fposix_socket::StreamSocketMarker>()
-                    .context("create request stream")?;
+                fidl::endpoints::create_request_stream::<fposix_socket::StreamSocketMarker>();
             responder.send(Ok(client_end)).context("send StreamSocket response")?;
             let socket = Rc::new(RefCell::new(StreamSocket::new(
                 proto,
@@ -333,8 +331,7 @@ impl StreamSocket {
         };
 
         let (client_end, request_stream) =
-            fidl::endpoints::create_request_stream::<fposix_socket::StreamSocketMarker>()
-                .expect("create request stream");
+            fidl::endpoints::create_request_stream::<fposix_socket::StreamSocketMarker>();
         // Create the new connected socket.
         let mut other_connected =
             StreamSocket::new(this.protocol, this.domain, request_stream.control_handle());

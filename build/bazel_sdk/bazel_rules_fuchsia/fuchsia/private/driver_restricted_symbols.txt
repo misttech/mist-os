@@ -323,7 +323,6 @@ freeaddrinfo
 freeifaddrs
 __freelocale
 freopen
-frexp
 frexpf
 frexpl
 fscanf
@@ -760,7 +759,6 @@ pthread_setaffinity_np
 pthread_setcancelstate
 pthread_setcanceltype
 pthread_setconcurrency
-pthread_sigmask
 pthread_spin_destroy
 pthread_spin_init
 pthread_spin_lock
@@ -929,7 +927,6 @@ sigaltstack
 sigandset
 sigdelset
 sigemptyset
-sigfillset
 siginterrupt
 sigisemptyset
 sigismember

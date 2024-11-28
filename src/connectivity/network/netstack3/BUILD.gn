@@ -61,6 +61,7 @@ common_deps = [
   "//src/lib/replace-with",
   "//src/lib/trace/rust:trace",
   "//src/lib/trace/rust:trace-provider",
+  "//src/starnix/lib/ebpf",
   "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
   "//third_party/rust_crates:assert_matches",
   "//third_party/rust_crates:async-ringbuf",
@@ -100,6 +101,7 @@ common_test_deps = [
 
 common_sources = [
   "src/bindings.rs",
+  "src/bindings/bpf.rs",
   "src/bindings/counters.rs",
   "src/bindings/debug_fidl_worker.rs",
   "src/bindings/devices.rs",
@@ -108,6 +110,7 @@ common_sources = [
   "src/bindings/filter/conversion.rs",
   "src/bindings/filter/conversion/actions.rs",
   "src/bindings/filter/conversion/matchers.rs",
+  "src/bindings/health_check_worker.rs",
   "src/bindings/inspect.rs",
   "src/bindings/integration_tests.rs",
   "src/bindings/interfaces_admin.rs",

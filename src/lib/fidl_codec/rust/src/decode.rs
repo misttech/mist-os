@@ -276,7 +276,7 @@ fn decode_type<'t>(
             Type::Unknown(library::TypeInfo { identifier: s, .. }) => {
                 return Err(Error::LibraryError(format!(
                     "Unresolved Type: {}",
-                    s.as_ref().unwrap_or(&"<unidentified>".to_owned())
+                    s.as_ref().map_or("<unidentified>", String::as_str)
                 ))
                 .into())
             }
@@ -550,9 +550,9 @@ fn decode_bits<'b>(
                       counter: RecursionCounter| {
                     let (bytes, value) = defer.complete(bytes, handles, counter)?;
 
-                    let data = value
-                        .bits()
-                        .ok_or(Error::LibraryError("Bits with non-integer type.".to_owned()))?;
+                    let data = value.bits().ok_or_else(|| {
+                        Error::LibraryError("Bits with non-integer type.".to_owned())
+                    })?;
 
                     if bits.strict && data != data & bits.mask {
                         Err(Error::DecodeError("Invalid value for bits field.".to_owned()).into())

@@ -88,6 +88,7 @@ load(
     "//fuchsia/private/assembly:fuchsia_product_configuration.bzl",
     _BUILD_TYPES = "BUILD_TYPES",
     _INPUT_DEVICE_TYPE = "INPUT_DEVICE_TYPE",
+    _fuchsia_hybrid_product_configuration = "fuchsia_hybrid_product_configuration",
     _fuchsia_prebuilt_product_configuration = "fuchsia_prebuilt_product_configuration",
     _fuchsia_product_configuration = "fuchsia_product_configuration",
 )
@@ -146,6 +147,7 @@ fuchsia_board_input_bundle = _fuchsia_board_input_bundle
 fuchsia_prebuilt_board_input_bundle = _fuchsia_prebuilt_board_input_bundle
 fuchsia_prebuilt_board_configuration = _fuchsia_prebuilt_board_configuration
 fuchsia_hybrid_board_configuration = _fuchsia_hybrid_board_configuration
+fuchsia_hybrid_product_configuration = _fuchsia_hybrid_product_configuration
 fuchsia_product = _fuchsia_product
 fuchsia_partitions_configuration = _fuchsia_partitions_configuration
 fuchsia_prebuilt_partitions_configuration = _fuchsia_prebuilt_partitions_configuration

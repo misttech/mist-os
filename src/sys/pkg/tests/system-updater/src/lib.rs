@@ -651,8 +651,7 @@ impl MockRetainedPackagesService {
                     responder.send().unwrap();
                 }
                 fidl_fuchsia_pkg::RetainedPackagesRequest::Replace { iterator, responder } => {
-                    let blobs =
-                        Self::collect_blob_id_iterator(iterator.into_proxy().unwrap()).await;
+                    let blobs = Self::collect_blob_id_iterator(iterator.into_proxy()).await;
                     self.interactions.lock().push(ReplaceRetainedPackages(blobs));
                     responder.send().unwrap();
                 }

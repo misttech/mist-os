@@ -387,7 +387,7 @@ impl GuestManager {
     async fn host_network_state() -> Result<HostNetworkState, Error> {
         // Connect to interface watcher.
         let state_proxy = connect_to_protocol::<ninterfaces::StateMarker>()?;
-        let (watcher_proxy, watcher_server) = create_proxy::<ninterfaces::WatcherMarker>()?;
+        let (watcher_proxy, watcher_server) = create_proxy::<ninterfaces::WatcherMarker>();
         state_proxy.get_watcher(&ninterfaces::WatcherOptions::default(), watcher_server)?;
 
         // Collect interface state events until Idle is received, indicating the end of current
@@ -673,8 +673,7 @@ mod tests {
         fn new_with_config_file(path: String) -> ManagerFixture {
             let (stream_tx, state_rx) = mpsc::unbounded::<GuestManagerRequestStream>();
             let (lifecycle_proxy, lifecycle_stream) =
-                create_proxy_and_stream::<GuestLifecycleMarker>()
-                    .expect("failed to create proxy/stream");
+                create_proxy_and_stream::<GuestLifecycleMarker>();
 
             ManagerFixture {
                 manager: RefCell::new(GuestManager::new(PathBuf::from(""), path)),
@@ -707,8 +706,7 @@ mod tests {
         }
 
         fn new_proxy(&self) -> GuestManagerProxy {
-            let (manager_proxy, manager_server) =
-                create_proxy_and_stream::<GuestManagerMarker>().unwrap();
+            let (manager_proxy, manager_server) = create_proxy_and_stream::<GuestManagerMarker>();
             self.stream_tx.unbounded_send(manager_server).expect("stream should not be closed");
             manager_proxy
         }
@@ -790,15 +788,13 @@ mod tests {
             GuestManager::new(PathBuf::from(""), tmpfile.path().to_str().unwrap().to_string());
         let (stream_tx, state_rx) = mpsc::unbounded::<GuestManagerRequestStream>();
 
-        let (proxy, server) = create_proxy_and_stream::<GuestLifecycleMarker>()
-            .expect("failed to create proxy/stream");
+        let (proxy, server) = create_proxy_and_stream::<GuestLifecycleMarker>();
 
         let run_fut = manager.run(Rc::new(proxy), state_rx).fuse();
         futures::pin_mut!(run_fut);
         let mut vmm = MockVmm::new(server);
 
-        let (manager_proxy, manager_server) =
-            create_proxy_and_stream::<GuestManagerMarker>().expect("failed to create proxy/stream");
+        let (manager_proxy, manager_server) = create_proxy_and_stream::<GuestManagerMarker>();
 
         // Launch Guest
         let (guest_client_end, guest_server_end) =

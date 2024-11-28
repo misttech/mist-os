@@ -23,8 +23,7 @@ async fn get_display_coordinator_path() -> anyhow::Result<String> {
 async fn open_display_provider() -> Result<display::ProviderProxy, Error> {
     tracing::trace!("Opening display coordinator");
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<display::ProviderMarker>()
-        .context("Failed to create fuchsia.hardware.display.Provider proxy")?;
+    let (proxy, server) = fidl::endpoints::create_proxy::<display::ProviderMarker>();
     let display_coordinator_path: String =
         get_display_coordinator_path().await.context("Failed to get display coordinator path")?;
     println!("Display coordinator path: {}", display_coordinator_path);
@@ -74,12 +73,9 @@ impl DisplayProviderClient {
     // hard-coded path.
     async fn open_display_coordinator(self) -> Result<DisplayCoordinatorClient, Error> {
         let (display_coordinator, coordinator_server) =
-            fidl::endpoints::create_proxy::<display::CoordinatorMarker>()
-                .context("Failed to create fuchsia.hardware.display.Coordinator proxy")?;
-        let (listener_client, listener_requests) = fidl::endpoints::create_request_stream::<
-            display::CoordinatorListenerMarker,
-        >()
-        .context("Failed to create fuchsia.hardware.display.CoordinatorListener request stream")?;
+            fidl::endpoints::create_proxy::<display::CoordinatorMarker>();
+        let (listener_client, listener_requests) =
+            fidl::endpoints::create_request_stream::<display::CoordinatorListenerMarker>();
 
         let payload = display::ProviderOpenCoordinatorWithListenerForPrimaryRequest {
             coordinator: Some(coordinator_server),
@@ -170,7 +166,7 @@ mod tests {
     #[fuchsia::test]
     async fn display_client_rpc_success() {
         let (provider, mut provider_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>();
         let provider_client = DisplayProviderClient { provider };
 
         let test_future = async move {
@@ -198,7 +194,7 @@ mod tests {
                 };
 
             let (mut coordinator_request_stream, _) =
-                coordinator_server.into_stream_and_control_handle().unwrap();
+                coordinator_server.into_stream_and_control_handle();
 
             let added_displays = &[display::Info {
                 id: display_types::DisplayId { value: 42 },
@@ -211,7 +207,7 @@ mod tests {
                 vertical_size_mm: 0,
                 using_fallback_size: false,
             }];
-            let coordinator_listener_proxy = coordinator_listener_client.into_proxy().unwrap();
+            let coordinator_listener_proxy = coordinator_listener_client.into_proxy();
             coordinator_listener_proxy.on_displays_changed(added_displays, &[]).unwrap();
 
             match coordinator_request_stream.next().await.unwrap() {
@@ -231,7 +227,7 @@ mod tests {
     #[fuchsia::test]
     async fn display_client_no_displays() {
         let (provider, mut provider_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>();
         let provider_client = DisplayProviderClient { provider };
 
         let test_future = async move {
@@ -264,7 +260,7 @@ mod tests {
                     request => panic!("Unexpected request to Provider: {:?}", request),
                 };
 
-            let coordinator_listener_proxy = coordinator_listener_client.into_proxy().unwrap();
+            let coordinator_listener_proxy = coordinator_listener_client.into_proxy();
             coordinator_listener_proxy.on_displays_changed(&[], &[]).unwrap();
         };
         futures::join!(test_future, provider_service_future);
@@ -273,7 +269,7 @@ mod tests {
     #[fuchsia::test]
     async fn display_client_error_opening_coordinator() {
         let (provider, mut provider_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>();
         let provider_client = DisplayProviderClient { provider };
 
         let test_future = async move {
@@ -302,7 +298,7 @@ mod tests {
     #[fuchsia::test]
     async fn display_client_error_waiting_for_display_info() {
         let (provider, mut provider_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>();
         let provider_client = DisplayProviderClient { provider };
 
         let test_future = async move {

@@ -612,7 +612,7 @@ fn process_completed_exception(
                 if task_state.ptrace_on_signal_consume() {
                     task_state.set_stopped(
                         StopState::SignalDeliveryStopping,
-                        Some(signal.clone()),
+                        Some(signal),
                         Some(&current_task),
                         None,
                     );

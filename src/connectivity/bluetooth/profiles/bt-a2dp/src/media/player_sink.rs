@@ -157,13 +157,7 @@ impl ConfiguredSinkTask {
             let inspect = self.inspect.clone_weak();
             let session_fut = async move {
                 let _ = &builder;
-                let (player_client, player_requests) = match create_request_stream() {
-                    Ok((client, requests)) => (client, requests),
-                    Err(e) => {
-                        warn!(%peer_id, ?e, "Couldn't create player FIDL client");
-                        return;
-                    }
-                };
+                let (player_client, player_requests) = create_request_stream();
 
                 let registration = sessions2::PlayerRegistration {
                     domain: Some(builder.domain),
@@ -339,7 +333,7 @@ async fn media_stream_task(
     inspect.start();
     loop {
         let mut player_event_fut =
-            player.as_mut().map(|p| p.next_event().fuse()).unwrap_or(Fuse::terminated());
+            player.as_mut().map(|p| p.next_event().fuse()).unwrap_or_else(Fuse::terminated);
 
         select! {
             stream_packet = stream.next() => {
@@ -432,8 +426,7 @@ mod tests {
     use {fidl_fuchsia_metrics as cobalt, fuchsia_inspect as inspect};
 
     fn fake_cobalt_sender() -> (bt_metrics::MetricsLogger, cobalt::MetricEventLoggerRequestStream) {
-        let (c, s) = fidl::endpoints::create_proxy_and_stream::<cobalt::MetricEventLoggerMarker>()
-            .expect("failed to create MetricsEventLogger proxy");
+        let (c, s) = fidl::endpoints::create_proxy_and_stream::<cobalt::MetricEventLoggerMarker>();
         (bt_metrics::MetricsLogger::from_proxy(c), s)
     }
 
@@ -441,10 +434,9 @@ mod tests {
     fn sink_task_works_without_session() {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, mut session_requests) =
-            fidl::endpoints::create_proxy_and_stream::<PublisherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PublisherMarker>();
         let (audio_consumer_factory_proxy, mut audio_factory_requests) =
-            create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>()
-                .expect("proxy pair creation");
+            create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>();
         let builder = Builder::new(
             bt_metrics::MetricsLogger::default(),
             proxy,
@@ -498,10 +490,9 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (metrics_logger, mut recv) = fake_cobalt_sender();
         let (proxy, mut session_requests) =
-            fidl::endpoints::create_proxy_and_stream::<PublisherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PublisherMarker>();
         let (audio_consumer_factory_proxy, _audio_factory_requests) =
-            create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>()
-                .expect("proxy pair creation");
+            create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>();
         let builder = Builder::new(
             metrics_logger,
             proxy,
@@ -757,8 +748,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
 
         let (audio_consumer_factory_proxy, mut audio_consumer_factory_request_stream) =
-            create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>()
-                .expect("proxy pair creation");
+            create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>();
 
         let sbc_config = MediaCodecConfig::min_sbc();
         let codec_type = sbc_config.codec_type().clone();

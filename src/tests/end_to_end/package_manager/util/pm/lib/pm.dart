@@ -165,8 +165,12 @@ class PackageManagerRepo {
   Future<void> startServerUnusedPort(String repoName) async {
     await getUnusedPort<bool>((unusedPort) async {
       _log.info('Serve is starting on port: $unusedPort');
-      if (await tryServe(repoName, unusedPort)) {
-        return true;
+      try {
+        if (await tryServe(repoName, unusedPort)) {
+          return true;
+        }
+      } catch (e) {
+        _log.warning('Failed to start server on port $unusedPort: $e');
       }
       return null;
     });

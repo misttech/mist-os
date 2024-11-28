@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::power::{WakeLease, WakeLeaseInterlockOps};
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, WaitCanceler,
     WaitQueue, Waiter,
@@ -37,9 +36,6 @@ struct WaitObject {
     events: FdEvents,
     data: u64,
     wait_canceler: Option<WaitCanceler>,
-    // TODO(https://fxbug.dev/325469447): Revisit after the decision of handling wakelocks is made.
-    /// The wake lease to prevent system suspending wile processing the event.
-    wake_lease: WakeLease,
 }
 
 impl WaitObject {
@@ -226,7 +222,6 @@ impl EpollFileObject {
                     events: epoll_event.events() | FdEvents::POLLHUP | FdEvents::POLLERR,
                     data: epoll_event.data(),
                     wait_canceler: None,
-                    wake_lease: WakeLease::new("epoll"),
                 });
                 self.wait_on_file(locked, current_task, key, wait_object)
             }
@@ -260,7 +255,6 @@ impl EpollFileObject {
                 if wait_object.events.contains(FdEvents::EPOLLWAKEUP)
                     && !epoll_event.events().contains(FdEvents::EPOLLWAKEUP)
                 {
-                    wait_object.wake_lease.take_lease();
                     current_task.kernel().suspend_resume_manager.remove_epoll(key);
                 }
                 self.wait_on_file(locked, current_task, key.into(), wait_object)
@@ -421,8 +415,6 @@ impl EpollFileObject {
             for to_wait in rearm_list.iter() {
                 // TODO handle interrupts here
                 let w = state.wait_objects.get_mut(&to_wait.key).unwrap();
-                // Drop the wake lease
-                w.wake_lease.take_lease();
                 if let ReadyItemKey::Usize(key) = to_wait.key {
                     current_task.kernel().suspend_resume_manager.remove_epoll(key)
                 };
@@ -467,7 +459,6 @@ impl EpollFileObject {
                 // When this is the first time epoll_wait on this epoll fd, create and
                 // hold a wake lease until the next epoll_wait.
                 if wait.events.contains(FdEvents::EPOLLWAKEUP) {
-                    wait.wake_lease.activate()?;
                     if let ReadyItemKey::Usize(key) = pending_event.key {
                         current_task.kernel().suspend_resume_manager.add_epoll(key)
                     }
@@ -489,8 +480,7 @@ impl EpollFileObject {
     pub fn drop_lease(&self, current_task: &CurrentTask, file: &FileHandle) {
         let mut guard = self.state.lock();
         let key = as_epoll_key(file);
-        if let Entry::Occupied(entry) = guard.wait_objects.entry(key.into()) {
-            entry.get().wake_lease.take_lease();
+        if let Entry::Occupied(_) = guard.wait_objects.entry(key.into()) {
             current_task.kernel().suspend_resume_manager.remove_epoll(key);
         }
     }
@@ -506,12 +496,8 @@ impl EpollFileObject {
         _baton_lease: &zx::Handle,
     ) -> Result<(), Errno> {
         let key = as_epoll_key(file);
-        let mut guard = self.state.lock();
-        let Entry::Occupied(entry) = guard.wait_objects.entry(key.into()) else {
-            return error!(EINVAL);
-        };
         current_task.kernel().suspend_resume_manager.add_epoll(key);
-        entry.get().wake_lease.activate()
+        Ok(())
     }
 }
 

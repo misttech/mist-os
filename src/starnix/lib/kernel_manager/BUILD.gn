@@ -25,6 +25,7 @@ rustc_library("kernel_manager") {
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
     "//sdk/rust/zx",
@@ -44,11 +45,6 @@ rustc_library("kernel_manager") {
   test_deps = [ "//src/lib/fuchsia" ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
-
-  if (starnix_enable_wake_locks) {
-    features = [ "wake_locks" ]
-    deps += [ "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust" ]
-  }
 }
 
 fuchsia_unittest_package("starnix_kernel_manager-tests") {

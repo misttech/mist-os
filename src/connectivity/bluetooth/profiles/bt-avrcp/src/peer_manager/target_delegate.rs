@@ -285,10 +285,8 @@ mod tests {
     #[test]
     fn set_target_test() {
         let mut exec = fasync::TestExecutor::new();
-        let (target_proxy_1, target_stream_1) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Error creating TargetHandler endpoint");
-        let (target_proxy_2, _target_stream_2) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Error creating TargetHandler endpoint");
+        let (target_proxy_1, target_stream_1) = create_proxy_and_stream::<TargetHandlerMarker>();
+        let (target_proxy_2, _target_stream_2) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         let target_delegate = TargetDelegate::new();
         assert_matches!(target_delegate.set_target_handler(target_proxy_1), Ok(()));
@@ -310,8 +308,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let target_delegate = TargetDelegate::new();
 
-        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Error creating TargetHandler endpoint");
+        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>();
         assert_matches!(target_delegate.set_target_handler(target_proxy), Ok(()));
 
         let mut get_media_attr_fut = pin!(target_delegate.send_get_media_attributes_command());
@@ -339,8 +336,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let target_delegate = TargetDelegate::new();
 
-        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Error creating TargetHandler endpoint");
+        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>();
         assert_matches!(target_delegate.set_target_handler(target_proxy), Ok(()));
 
         let mut list_pas_fut =
@@ -371,8 +367,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let target_delegate = TargetDelegate::new();
 
-        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Error creating TargetHandler endpoint");
+        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>();
         assert_matches!(target_delegate.set_target_handler(target_proxy), Ok(()));
 
         let attributes = vec![PlayerApplicationSettingAttributeId::ShuffleMode];
@@ -416,8 +411,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let target_delegate = TargetDelegate::new();
 
-        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Error creating TargetHandler endpoint");
+        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>();
         assert_matches!(target_delegate.set_target_handler(target_proxy), Ok(()));
 
         // Current media doesn't support Equalizer.
@@ -454,8 +448,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let target_delegate = TargetDelegate::new();
 
-        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Error creating TargetHandler endpoint");
+        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>();
         assert_matches!(target_delegate.set_target_handler(target_proxy), Ok(()));
 
         let mut get_media_fut = pin!(target_delegate.send_get_media_player_items_command());
@@ -509,8 +502,7 @@ mod tests {
         {
             // try with a target handler
             let (target_proxy, mut target_stream) =
-                create_proxy_and_stream::<TargetHandlerMarker>()
-                    .expect("Error creating TargetHandler endpoint");
+                create_proxy_and_stream::<TargetHandlerMarker>();
             assert_matches!(target_delegate.set_target_handler(target_proxy), Ok(()));
 
             let mut get_supported_events_fut = pin!(target_delegate.get_supported_events());

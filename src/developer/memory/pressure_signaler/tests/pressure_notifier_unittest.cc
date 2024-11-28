@@ -4,12 +4,12 @@
 
 #include "src/developer/memory/pressure_signaler/pressure_notifier.h"
 
-#include <fuchsia/feedback/cpp/fidl_test_base.h>
-#include <fuchsia/memory/debug/cpp/fidl.h>
+#include <fidl/fuchsia.feedback/cpp/fidl.h>
+#include <fidl/fuchsia.feedback/cpp/test_base.h>
+#include <fidl/fuchsia.memory.debug/cpp/fidl.h>
 #include <lib/async/default.h>
-#include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/zx/clock.h>
+#include <lib/zx/time.h>
 
 #include <cstddef>
 
@@ -19,67 +19,59 @@
 
 namespace pressure_signaler::test {
 
-namespace fmp = fuchsia::memorypressure;
+namespace fmp = fuchsia_memorypressure;
 
-class CrashReporterForTest : public fuchsia::feedback::testing::CrashReporter_TestBase {
+class CrashReporterForTest : public fidl::testing::TestBase<fuchsia_feedback::CrashReporter> {
  public:
-  CrashReporterForTest() : binding_(this) {}
-
-  void FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) override {
+  void FileReport(FileReportRequest& request, FileReportCompleter::Sync& completer) override {
     num_crash_reports_++;
-    fuchsia::feedback::CrashReporter_FileReport_Result result;
-    result.set_response({});
-    callback(std::move(result));
+    completer.Reply(fit::ok(fuchsia_feedback::CrashReporterFileReportResponse{}));
   }
 
-  fidl::InterfaceRequestHandler<fuchsia::feedback::CrashReporter> GetHandler() {
-    return [this](fidl::InterfaceRequest<fuchsia::feedback::CrashReporter> request) {
-      binding_.Bind(std::move(request));
-    };
-  }
-
-  void NotImplemented_(const std::string& name) override {
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     FX_NOTIMPLEMENTED() << name << " is not implemented";
   }
 
   size_t num_crash_reports() const { return num_crash_reports_; }
 
  private:
-  fidl::Binding<fuchsia::feedback::CrashReporter> binding_;
   size_t num_crash_reports_ = 0;
 };
 
-class PressureNotifierUnitTest : public fuchsia::memory::debug::MemoryPressure,
+class PressureNotifierUnitTest : public fidl::Server<fuchsia_memory_debug::MemoryPressure>,
                                  public gtest::TestLoopFixture {
  public:
   void SetUp() override {
-    context_provider_ =
-        std::make_unique<sys::testing::ComponentContextProvider>(async_get_default_dispatcher());
-    context_provider_->service_directory_provider()->AddService(crash_reporter_.GetHandler());
-    SetUpNewPressureNotifier(true /*notify_crash_reproter*/);
+    SetUpNewPressureNotifier(true /*notify_crash_reporter*/);
     last_level_ = Level::kNormal;
   }
 
  protected:
   void SetUpNewPressureNotifier(bool send_critical_pressure_crash_reports) {
-    notifier_ = std::make_unique<PressureNotifier>(false, send_critical_pressure_crash_reports,
-                                                   context_provider_->context(),
-                                                   async_get_default_dispatcher());
+    auto endpoints = fidl::CreateEndpoints<fuchsia_feedback::CrashReporter>().value();
+    auto _ = fidl::BindServer<fuchsia_feedback::CrashReporter>(
+        dispatcher(), std::move(std::move(endpoints.server)), &crash_reporter_);
+    auto client =
+        fidl::Client<fuchsia_feedback::CrashReporter>(std::move(endpoints.client), dispatcher());
+    notifier_ =
+        std::make_unique<PressureNotifier>(false, send_critical_pressure_crash_reports,
+                                           std::move(client), async_get_default_dispatcher());
     // Set up initial pressure level.
     notifier_->observer_.WaitOnLevelChange();
   }
 
-  fmp::ProviderPtr Provider() {
-    fmp::ProviderPtr provider;
-    context_provider_->ConnectToPublicService(provider.NewRequest());
-    return provider;
+  fidl::Client<fmp::Provider> Provider() {
+    auto endpoints = fidl::CreateEndpoints<fmp::Provider>().value();
+    auto _ =
+        fidl::BindServer<fmp::Provider>(dispatcher(), std::move(endpoints.server), notifier_.get());
+    return fidl::Client<fmp::Provider>(std::move(endpoints.client), dispatcher());
   }
 
   size_t GetWatcherCount() { return notifier_->watchers_.size(); }
 
   void ReleaseWatchers() {
     for (auto& w : notifier_->watchers_) {
-      notifier_->ReleaseWatcher(w->proxy.get());
+      notifier_->ReleaseWatcher(w.get());
     }
   }
 
@@ -93,13 +85,16 @@ class PressureNotifierUnitTest : public fuchsia::memory::debug::MemoryPressure,
   }
 
   void SetupMemDebugService() {
-    context_provider_->context()->outgoing()->AddPublicService(memdebug_bindings_.GetHandler(this));
+    auto endpoints = fidl::CreateEndpoints<fuchsia_memory_debug::MemoryPressure>().value();
+    auto _ = fidl::BindServer<fuchsia_memory_debug::MemoryPressure>(
+        dispatcher(), std::move(endpoints.server), this);
+    memdebug_ = fidl::Client<fuchsia_memory_debug::MemoryPressure>(std::move(endpoints.client),
+                                                                   dispatcher());
   }
 
   void TestSimulatedPressure(fmp::Level level) {
-    fuchsia::memory::debug::MemoryPressurePtr memdebug;
-    context_provider_->ConnectToPublicService(memdebug.NewRequest());
-    memdebug->Signal(level);
+    auto result = memdebug_->Signal({{.level = level}});
+    ASSERT_TRUE(result.is_ok());
   }
 
   void SetCrashReportInterval(uint32_t mins) {
@@ -115,53 +110,63 @@ class PressureNotifierUnitTest : public fuchsia::memory::debug::MemoryPressure,
   Level last_level() const { return last_level_; }
 
  private:
-  void Signal(fmp::Level level) override { notifier_->DebugNotify(level); }
+  void Signal(SignalRequest& request, SignalCompleter::Sync& completer) override {
+    notifier_->DebugNotify(request.level());
+  }
 
-  std::unique_ptr<sys::testing::ComponentContextProvider> context_provider_;
   std::unique_ptr<PressureNotifier> notifier_;
-  fidl::BindingSet<fuchsia::memory::debug::MemoryPressure> memdebug_bindings_;
   CrashReporterForTest crash_reporter_;
   Level last_level_;
+  fidl::Client<fuchsia_memory_debug::MemoryPressure> memdebug_;
 };
 
-class PressureWatcherForTest : public fmp::Watcher {
+class PressureWatcherForTest : public fidl::Server<fmp::Watcher> {
  public:
-  PressureWatcherForTest(bool send_responses)
-      : binding_(this, watcher_ptr_.NewRequest()), send_responses_(send_responses) {}
+  PressureWatcherForTest(bool send_responses, async_dispatcher_t* dispatcher)
+      : send_responses_(send_responses) {
+    auto endpoints = fidl::CreateEndpoints<fmp::Watcher>();
+    client_ = std::move(endpoints->client);
+    binding_ = fidl::BindServer<fmp::Watcher>(dispatcher, std::move(endpoints->server), this);
+  }
 
-  void OnLevelChanged(fmp::Level level, OnLevelChangedCallback cb) override {
+  ~PressureWatcherForTest() override { binding_->Close({}); }
+
+  void OnLevelChanged(OnLevelChangedRequest& request,
+                      OnLevelChangedCompleter::Sync& completer) override {
     changes_++;
-    last_level_ = level;
+    last_level_ = request.level();
     if (send_responses_) {
-      cb();
+      completer.Reply();
     } else {
-      stashed_cb_ = std::move(cb);
+      stashed_cb_ = completer.ToAsync();
     }
   }
 
-  void Respond() { stashed_cb_(); }
+  void Respond() { stashed_cb_->Reply(); }
 
-  void Register(fmp::ProviderPtr provider) { provider->RegisterWatcher(watcher_ptr_.Unbind()); }
+  void Register(fidl::Client<fmp::Provider> provider) {
+    auto result = provider->RegisterWatcher({{.watcher = std::move(client_)}});
+    ASSERT_TRUE(result.is_ok());
+  }
 
   int NumChanges() const { return changes_; }
 
   fmp::Level LastLevel() const { return last_level_; }
 
  private:
-  fmp::WatcherPtr watcher_ptr_;
-  fidl::Binding<Watcher> binding_;
   fmp::Level last_level_;
   int changes_ = 0;
   bool send_responses_;
-  OnLevelChangedCallback stashed_cb_;
+  std::optional<OnLevelChangedCompleter::Async> stashed_cb_;
+  fidl::ClientEnd<fmp::Watcher> client_;
+  std::optional<fidl::ServerBindingRef<fmp::Watcher>> binding_;
 };
 
 TEST_F(PressureNotifierUnitTest, Watcher) {
   // Scoped so that the Watcher gets deleted. We can then verify that the Provider has no watchers
   // remaining.
   {
-    PressureWatcherForTest watcher(true);
-
+    PressureWatcherForTest watcher(true, dispatcher());
     // Registering the watcher should call OnLevelChanged().
     watcher.Register(Provider());
     RunLoopUntilIdle();
@@ -179,8 +184,7 @@ TEST_F(PressureNotifierUnitTest, Watcher) {
 }
 
 TEST_F(PressureNotifierUnitTest, NoResponse) {
-  PressureWatcherForTest watcher(false);
-
+  PressureWatcherForTest watcher(false, dispatcher());
   watcher.Register(Provider());
   RunLoopUntilIdle();
   ASSERT_EQ(GetWatcherCount(), 1ul);
@@ -193,8 +197,7 @@ TEST_F(PressureNotifierUnitTest, NoResponse) {
 }
 
 TEST_F(PressureNotifierUnitTest, DelayedResponse) {
-  PressureWatcherForTest watcher(false);
-
+  PressureWatcherForTest watcher(false, dispatcher());
   // Signal a specific pressure level here, so that the next one can be different. Delayed callbacks
   // will only come through if the client has missed a level that wasn't the same as the previous
   // one it received a signal for.
@@ -219,8 +222,8 @@ TEST_F(PressureNotifierUnitTest, MultipleWatchers) {
   // Scoped so that the Watcher gets deleted. We can then verify that the Provider has no watchers
   // remaining.
   {
-    PressureWatcherForTest watcher1(true);
-    PressureWatcherForTest watcher2(true);
+    PressureWatcherForTest watcher1(true, dispatcher());
+    PressureWatcherForTest watcher2(true, dispatcher());
 
     // Registering the watchers should call OnLevelChanged().
     watcher1.Register(Provider());
@@ -242,8 +245,8 @@ TEST_F(PressureNotifierUnitTest, MultipleWatchers) {
 }
 
 TEST_F(PressureNotifierUnitTest, MultipleWatchersNoResponse) {
-  PressureWatcherForTest watcher1(false);
-  PressureWatcherForTest watcher2(false);
+  PressureWatcherForTest watcher1(false, dispatcher());
+  PressureWatcherForTest watcher2(false, dispatcher());
 
   watcher1.Register(Provider());
   watcher2.Register(Provider());
@@ -260,8 +263,8 @@ TEST_F(PressureNotifierUnitTest, MultipleWatchersNoResponse) {
 }
 
 TEST_F(PressureNotifierUnitTest, MultipleWatchersDelayedResponse) {
-  PressureWatcherForTest watcher1(false);
-  PressureWatcherForTest watcher2(false);
+  PressureWatcherForTest watcher1(false, dispatcher());
+  PressureWatcherForTest watcher2(false, dispatcher());
 
   // Signal a specific pressure level here, so that the next one can be different. Delayed callbacks
   // will only come through if the client has missed a level that wasn't the same as the previous
@@ -291,8 +294,8 @@ TEST_F(PressureNotifierUnitTest, MultipleWatchersDelayedResponse) {
 
 TEST_F(PressureNotifierUnitTest, MultipleWatchersMixedResponse) {
   // Set up watcher1 to not respond immediately, and watcher2 to respond immediately.
-  PressureWatcherForTest watcher1(false);
-  PressureWatcherForTest watcher2(true);
+  PressureWatcherForTest watcher1(false, dispatcher());
+  PressureWatcherForTest watcher2(true, dispatcher());
 
   // Signal a specific pressure level here, so that the next one can be different. Delayed callbacks
   // will only come through if the client has missed a level that wasn't the same as the previous
@@ -323,7 +326,7 @@ TEST_F(PressureNotifierUnitTest, MultipleWatchersMixedResponse) {
 }
 
 TEST_F(PressureNotifierUnitTest, ReleaseWatcherNoPendingCallback) {
-  PressureWatcherForTest watcher(true);
+  PressureWatcherForTest watcher(true, dispatcher());
 
   watcher.Register(Provider());
   RunLoopUntilIdle();
@@ -343,7 +346,7 @@ TEST_F(PressureNotifierUnitTest, ReleaseWatcherNoPendingCallback) {
 }
 
 TEST_F(PressureNotifierUnitTest, ReleaseWatcherPendingCallback) {
-  PressureWatcherForTest watcher(false);
+  PressureWatcherForTest watcher(false, dispatcher());
 
   watcher.Register(Provider());
   RunLoopUntilIdle();
@@ -369,7 +372,7 @@ TEST_F(PressureNotifierUnitTest, ReleaseWatcherPendingCallback) {
 }
 
 TEST_F(PressureNotifierUnitTest, WatcherDoesNotSeeImminentOOM) {
-  PressureWatcherForTest watcher(true);
+  PressureWatcherForTest watcher(true, dispatcher());
 
   TriggerLevelChange(Level::kImminentOOM);
   watcher.Register(Provider());
@@ -377,44 +380,44 @@ TEST_F(PressureNotifierUnitTest, WatcherDoesNotSeeImminentOOM) {
   ASSERT_EQ(GetWatcherCount(), 1ul);
   ASSERT_EQ(watcher.NumChanges(), 1);
   // Watcher sees the initial level as Critical even though it was Imminent-OOM.
-  ASSERT_EQ(watcher.LastLevel(), fmp::Level::CRITICAL);
+  ASSERT_EQ(watcher.LastLevel(), fmp::Level::kCritical);
 
   TriggerLevelChange(Level::kWarning);
   RunLoopUntilIdle();
   ASSERT_EQ(watcher.NumChanges(), 2);
   // Non Imminent-OOM levels come through as expected.
-  ASSERT_EQ(watcher.LastLevel(), fmp::Level::WARNING);
+  ASSERT_EQ(watcher.LastLevel(), fmp::Level::kWarning);
 
   TriggerLevelChange(Level::kImminentOOM);
   RunLoopUntilIdle();
   // Watcher does not see this change as the PressureNotifier won't signal it.
   ASSERT_EQ(watcher.NumChanges(), 2);
-  ASSERT_EQ(watcher.LastLevel(), fmp::Level::WARNING);
+  ASSERT_EQ(watcher.LastLevel(), fmp::Level::kWarning);
 }
 
 TEST_F(PressureNotifierUnitTest, DelayedWatcherDoesNotSeeImminentOOM) {
   // Don't send responses right away, but wait for the delayed callback to come through.
-  PressureWatcherForTest watcher(false);
+  PressureWatcherForTest watcher(false, dispatcher());
 
   TriggerLevelChange(Level::kNormal);
   watcher.Register(Provider());
   RunLoopUntilIdle();
   ASSERT_EQ(GetWatcherCount(), 1ul);
   ASSERT_EQ(watcher.NumChanges(), 1);
-  ASSERT_EQ(watcher.LastLevel(), fmp::Level::NORMAL);
+  ASSERT_EQ(watcher.LastLevel(), fmp::Level::kNormal);
 
   // This should not trigger a new notification as the watcher has not responded to the last one.
   TriggerLevelChange(Level::kImminentOOM);
   RunLoopUntilIdle();
   ASSERT_EQ(watcher.NumChanges(), 1);
-  ASSERT_EQ(watcher.LastLevel(), fmp::Level::NORMAL);
+  ASSERT_EQ(watcher.LastLevel(), fmp::Level::kNormal);
 
   // Respond to the last message. This should send a new notification to the watcher.
   watcher.Respond();
   RunLoopUntilIdle();
   ASSERT_EQ(watcher.NumChanges(), 2);
   // Watcher will see the delayed Imminent-OOM level as Critical.
-  ASSERT_EQ(watcher.LastLevel(), fmp::Level::CRITICAL);
+  ASSERT_EQ(watcher.LastLevel(), fmp::Level::kCritical);
 }
 
 TEST_F(PressureNotifierUnitTest, CrashReportOnCritical) {
@@ -594,8 +597,8 @@ TEST_F(PressureNotifierUnitTest, SimulatePressure) {
   // Scoped so that the Watcher gets deleted. We can then verify that the Provider has no watchers
   // remaining.
   {
-    PressureWatcherForTest watcher1(true);
-    PressureWatcherForTest watcher2(true);
+    PressureWatcherForTest watcher1(true, dispatcher());
+    PressureWatcherForTest watcher2(true, dispatcher());
 
     // Registering the watchers should call OnLevelChanged().
     watcher1.Register(Provider());
@@ -609,24 +612,24 @@ TEST_F(PressureNotifierUnitTest, SimulatePressure) {
     SetupMemDebugService();
 
     // Simulate pressure via the fuchsia.memory.debug.MemoryPressure service.
-    TestSimulatedPressure(fmp::Level::CRITICAL);
+    TestSimulatedPressure(fmp::Level::kCritical);
     RunLoopUntilIdle();
     // Verify that watchers saw the change.
     ASSERT_EQ(watcher1.NumChanges(), 2);
     ASSERT_EQ(watcher2.NumChanges(), 2);
 
-    TestSimulatedPressure(fmp::Level::WARNING);
+    TestSimulatedPressure(fmp::Level::kWarning);
     RunLoopUntilIdle();
     ASSERT_EQ(watcher1.NumChanges(), 3);
     ASSERT_EQ(watcher2.NumChanges(), 3);
 
     // Repeating the same level should count too.
-    TestSimulatedPressure(fmp::Level::WARNING);
+    TestSimulatedPressure(fmp::Level::kWarning);
     RunLoopUntilIdle();
     ASSERT_EQ(watcher1.NumChanges(), 4);
     ASSERT_EQ(watcher2.NumChanges(), 4);
 
-    TestSimulatedPressure(fmp::Level::NORMAL);
+    TestSimulatedPressure(fmp::Level::kNormal);
     RunLoopUntilIdle();
     ASSERT_EQ(watcher1.NumChanges(), 5);
     ASSERT_EQ(watcher2.NumChanges(), 5);

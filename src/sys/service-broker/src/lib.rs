@@ -16,7 +16,7 @@ use {
 
 async fn wait_for_first_instance(svc: &fio::DirectoryProxy) -> Result<String> {
     const INPUT_SERVICE: &str = "input";
-    let (service_dir, request) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (service_dir, request) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     svc.as_ref_directory().open(INPUT_SERVICE, fio::Flags::PROTOCOL_DIRECTORY, request.into())?;
     let watcher = Watcher::new(&service_dir).await.context("failed to create watcher")?;
     let mut stream =
@@ -33,7 +33,7 @@ async fn wait_for_first_instance(svc: &fio::DirectoryProxy) -> Result<String> {
             })
         });
     let first = stream.try_next().await?.unwrap();
-    let filename = first.to_str().ok_or(format_err!("to_str for filename failed"))?;
+    let filename = first.to_str().ok_or_else(|| format_err!("to_str for filename failed"))?;
     Ok(format!("{INPUT_SERVICE}/{filename}"))
 }
 
@@ -73,7 +73,7 @@ async fn first_instance_to_default<T: ServiceObjTrait>(
     // TODO(surajmalhotra): Do this wait every time we get a connection request to handle cases
     // where the instance goes away and comes back.
     let instance_dir_path = wait_for_first_instance(&svc).await?;
-    let (instance_dir, request) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (instance_dir, request) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     svc.as_ref_directory().open(
         &instance_dir_path,
         fio::Flags::PROTOCOL_DIRECTORY,
@@ -146,7 +146,7 @@ pub async fn main(
     let Some(program) = program else {
         bail!("No program section provided");
     };
-    let svc = svc.directory.into_proxy().unwrap();
+    let svc = svc.directory.into_proxy();
     let mut fs = ServiceFs::new();
     match get_program_string(&program, "policy")? {
         "first_instance_to_protocol" => {

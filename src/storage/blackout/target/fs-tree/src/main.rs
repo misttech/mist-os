@@ -218,7 +218,7 @@ impl Test for FsTree {
             ))
             .context("connecting to gpt controller")?;
 
-            let (volume_manager, server) = create_proxy::<VolumeManagerMarker>().unwrap();
+            let (volume_manager, server) = create_proxy::<VolumeManagerMarker>();
             gpt_controller
                 .connect_to_device_fidl(server.into_channel())
                 .context("connecting to gpt fidl")?;

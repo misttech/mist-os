@@ -200,9 +200,9 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
     }
     let wait_for_dhcpv4 = || async {
         let mut state =
-            fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(client_if.id());
+            fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(client_if.id());
         let fnet::Subnet { addr, prefix_len: _ } = fnet_interfaces_ext::wait_interface_with_id(
-            fnet_interfaces_ext::event_stream_from_state(
+            fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
                 &client_interfaces_state,
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )

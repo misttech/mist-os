@@ -45,7 +45,7 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
         match request {
             RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
                 let realm = create_realm(options).await?;
-                let request_stream = realm_server.into_stream()?;
+                let request_stream = realm_server.into_stream();
                 task_group.spawn(async move {
                     realm_proxy::service::serve(realm, request_stream).await.unwrap();
                 });
@@ -157,5 +157,5 @@ fn spawn_vfs(dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
         vfs::path::Path::dot(),
         ServerEnd::new(server_end.into_channel()),
     );
-    client_end.into_proxy().unwrap()
+    client_end.into_proxy()
 }

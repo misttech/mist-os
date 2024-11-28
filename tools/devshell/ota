@@ -87,7 +87,10 @@ function main {
     shift
   done
 
-  check-for-package-server || return 1
+  use_main_pb=$(fx-command-run jq '.main_pb_label != null' "${FUCHSIA_BUILD_DIR}/args.json")
+  if ! $use_main_pb; then
+    check-for-package-server || return 1
+  fi
 
   if target-using-omaha-client; then
     fx-warn "The target device is using omaha-client for update management, which will not"
@@ -96,20 +99,27 @@ function main {
 
   if $build; then
     fx-info "Building/refreshing ${build_targets[@]}"
-    fx-command-run build "${build_targets[@]}" || return 1
+    if $use_main_pb; then
+      fx-command-run build-main-pb
+    else
+      fx-command-run build "${build_targets[@]}" || return 1
+    fi
   fi
 
   # Note: the following command continues to run as the system goes into
   # reboot, so we lose SSH connection before it "completes". As such the
   # following command completes with error, but that is not actually an error.
-  fx-command-run ffx \
-    target update check-now --monitor || true
+  if $use_main_pb; then
+    fx-command-run ffx target update check-now --monitor --product-bundle || true
+  else
+    fx-command-run ffx target update check-now --monitor || true
+  fi
 
   fx-command-run wait
 
   fx-command-run shell update wait-for-commit
 
-  if needs-update; then
+  if ! $use_main_pb && needs-update; then
     fx-error "After update, system appears still out of date. OTA may have failed. Run 'fx log' for details."
     fx-error "Also ensure your firewall rules are up to date (e.g. fx setup-ufw)"
     return 1

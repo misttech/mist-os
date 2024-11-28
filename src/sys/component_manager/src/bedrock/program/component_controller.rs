@@ -166,8 +166,7 @@ mod tests {
     #[fuchsia::test]
     async fn handles_diagnostics_event() {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentControllerMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentControllerMarker>();
         let (sender, receiver) = oneshot::channel();
         let _controller = ComponentController::new(proxy, Some(sender));
         stream
@@ -186,8 +185,7 @@ mod tests {
     #[fuchsia::test]
     async fn handles_connection_epitaph() {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentControllerMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentControllerMarker>();
         let controller = ComponentController::new(proxy, None);
         let epitaph_fut = controller.wait_for_termination();
         stream.control_handle().shutdown_with_epitaph(zx::Status::UNAVAILABLE);
@@ -197,8 +195,7 @@ mod tests {
     #[fuchsia::test]
     async fn handles_epitaph_for_closed_connection() {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentControllerMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentControllerMarker>();
         let controller = ComponentController::new(proxy, None);
         let epitaph_fut = controller.wait_for_termination();
         drop(stream);
@@ -207,8 +204,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn handles_epitaph_for_dropped_controller() {
-        let (proxy, _) =
-            fidl::endpoints::create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
+        let (proxy, _) = fidl::endpoints::create_proxy::<fcrunner::ComponentControllerMarker>();
         let controller = ComponentController::new(proxy, None);
         let epitaph_fut = controller.wait_for_termination();
         drop(controller);

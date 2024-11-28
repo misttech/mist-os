@@ -214,10 +214,8 @@ async fn client_provider_two_overlapping_clients_on_same_interface<N: Netstack>(
     let proxy = client_realm.connect_to_protocol::<ClientProviderMarker>().unwrap();
     let client_iface = &client_iface;
 
-    let (client_a, server_end_a) =
-        endpoints::create_proxy::<ClientMarker>().expect("create proxy should succeed");
-    let (client_b, server_end_b) =
-        endpoints::create_proxy::<ClientMarker>().expect("create proxy should succeed");
+    let (client_a, server_end_a) = endpoints::create_proxy::<ClientMarker>();
+    let (client_b, server_end_b) = endpoints::create_proxy::<ClientMarker>();
 
     proxy
         .new_client(
@@ -279,8 +277,7 @@ async fn client_provider_two_non_overlapping_clients_on_same_interface<N: Netsta
     // and shutdown DHCP clients on the same interface without running
     // afoul of the multiple-clients-on-same-interface restriction.
     for () in [(), ()] {
-        let (client, server_end) =
-            endpoints::create_proxy::<ClientMarker>().expect("create proxy should succeed");
+        let (client, server_end) = endpoints::create_proxy::<ClientMarker>();
 
         proxy
             .new_client(
@@ -324,8 +321,7 @@ async fn client_provider_double_watch<N: Netstack>(name: &str) {
     let proxy = client_realm.connect_to_protocol::<ClientProviderMarker>().unwrap();
     let client_iface = &client_iface;
 
-    let (client, server_end) =
-        endpoints::create_proxy::<ClientMarker>().expect("create proxy should succeed");
+    let (client, server_end) = endpoints::create_proxy::<ClientMarker>();
     proxy
         .new_client(
             client_iface.id(),
@@ -369,8 +365,7 @@ async fn client_provider_shutdown<N: Netstack>(name: &str) {
     let proxy = client_realm.connect_to_protocol::<ClientProviderMarker>().unwrap();
     let client_iface = &client_iface;
 
-    let (client, server_end) =
-        endpoints::create_proxy::<ClientMarker>().expect("create proxy should succeed");
+    let (client, server_end) = endpoints::create_proxy::<ClientMarker>();
     proxy
         .new_client(
             client_iface.id(),
@@ -410,9 +405,7 @@ enum AspServerEnd {
 impl AspServerEnd {
     fn into_stream(self) -> fnet_interfaces_admin::AddressStateProviderRequestStream {
         match self {
-            AspServerEnd::ServerEnd(server_end) => {
-                server_end.into_stream().expect("into_stream should succeed")
-            }
+            AspServerEnd::ServerEnd(server_end) => server_end.into_stream(),
             AspServerEnd::Stream(stream) => stream,
         }
     }
@@ -581,7 +574,7 @@ async fn client_explicitly_removes_address_when_lease_expires<N: Netstack>(name:
 
     // The client should fail to renew and have the lease expire, causing it to
     // remove the address.
-    let request_stream = address_state_provider.into_stream().expect("should succeed");
+    let request_stream = address_state_provider.into_stream();
     let mut request_stream = pin!(request_stream);
 
     let control_handle = assert_matches!(
@@ -683,7 +676,7 @@ async fn client_rebinds_same_lease_to_other_server<N: Netstack>(name: &str) {
         .await;
 
     // The client should successfully renew without ever removing the address.
-    let mut request_stream = address_state_provider.into_stream().expect("should succeed");
+    let mut request_stream = address_state_provider.into_stream();
 
     {
         let request_stream = &mut request_stream;
@@ -885,9 +878,8 @@ async fn client_handles_address_removal<N: Netstack>(
     );
 
     {
-        let (_asp_request_stream, asp_control_handle) = address_state_provider
-            .into_stream_and_control_handle()
-            .expect("into stream should succeed");
+        let (_asp_request_stream, asp_control_handle) =
+            address_state_provider.into_stream_and_control_handle();
         // NB: We're acting as the AddressStateProvider server_end.
         // Send the removal reason and close the channel to indicate the address
         // is being removed.

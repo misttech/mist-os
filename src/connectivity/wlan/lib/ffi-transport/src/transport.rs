@@ -486,7 +486,7 @@ impl WlanRx {
         .map_err(|(error, _event)| {
             let e = format!("Failed to queue WlanRx.Transfer request: {}", error);
             error!("{}", error);
-            wtrace::async_end_wlansoftmac_rx(async_id.into(), &e.to_string());
+            wtrace::async_end_wlansoftmac_rx(async_id.into(), &e);
         });
     }
 }

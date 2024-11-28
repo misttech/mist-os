@@ -43,7 +43,7 @@ pub async fn convert_bundle_to_configs(
                     Some(virtual_device) => virtual_device,
                     None if device_name.is_some() => bail!(
                         "No virtual device matches '{}'.",
-                        device_name.unwrap_or("<empty>".to_string())
+                        device_name.unwrap_or_else(|| "<empty>".to_string())
                     ),
                     None => {
                         bail!("No default virtual device is available, please specify one by name.")
@@ -131,7 +131,7 @@ fn convert_v2_bundle_to_configs(
     let system = product_bundle
         .system_a
         .as_ref()
-        .ok_or(anyhow!("No systems to boot in the product bundle"))?;
+        .ok_or_else(|| anyhow!("No systems to boot in the product bundle"))?;
 
     let kernel_image: Option<PathBuf> = system.iter().find_map(|i| match i {
         Image::QemuKernel(path) => Some(path.clone().into()),

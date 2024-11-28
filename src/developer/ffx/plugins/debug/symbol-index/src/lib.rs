@@ -45,7 +45,8 @@ fn list(cmd: ListCommand, global_symbol_index_path: &str) -> Result<()> {
 
 fn add(cmd: AddCommand, global_symbol_index_path: &str) -> Result<()> {
     // Create a new one if the global symbol-index.json doesn't exist or is malformed.
-    let mut index = SymbolIndex::load(global_symbol_index_path).unwrap_or(SymbolIndex::new());
+    let mut index =
+        SymbolIndex::load(global_symbol_index_path).unwrap_or_else(|_| SymbolIndex::new());
 
     // Determine if this is a path or a URL.
     if cmd.source.starts_with("https://") || cmd.source.starts_with("http://") {

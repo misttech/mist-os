@@ -78,7 +78,7 @@ pub struct ShowCommand {
     /// A string specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to.
     /// This can be copied from the output of `ffx inspect list-accessors`.
     /// The selector will be in the form of:
-    /// <moniker>:<directory>:fuchsia.diagnostics.ArchiveAccessorName
+    /// <moniker>:fuchsia.diagnostics.ArchiveAccessorName
     pub accessor: Option<String>,
 
     #[argh(option)]
@@ -105,8 +105,13 @@ impl Command for ShowCommand {
             )
             .await?
         } else if let Some(manifest) = self.manifest {
-            utils::get_selectors_for_manifest(manifest, self.selectors, &self.accessor, provider)
-                .await?
+            utils::get_selectors_for_manifest(
+                manifest,
+                self.selectors,
+                self.accessor.clone(),
+                provider,
+            )
+            .await?
         } else {
             utils::process_fuzzy_inputs(self.selectors, provider).await?
         };
@@ -114,7 +119,7 @@ impl Command for ShowCommand {
         let selectors = utils::expand_selectors(selectors, self.name)?;
 
         let inspect_data_iter =
-            provider.snapshot::<Inspect>(&self.accessor, selectors).await?.into_iter();
+            provider.snapshot::<Inspect>(self.accessor.as_deref(), selectors).await?.into_iter();
 
         let mut results = inspect_data_iter
             .map(|mut d: InspectData| {

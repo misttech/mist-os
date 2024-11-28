@@ -129,13 +129,8 @@ impl InputDevice {
                 .next()
                 .await
                 .unwrap_or_else(|| panic!("stream ended without a call to GetInputReportsReader"));
-            InputReportsReader {
-                request_stream: reader_server_end.into_stream().unwrap_or_else(|e| {
-                    panic!("failed to convert ServerEnd<InputReportsReader>: {e}")
-                }),
-                report_receiver,
-            }
-            .into_future()
+            InputReportsReader { request_stream: reader_server_end.into_stream(), report_receiver }
+                .into_future()
         };
         pin_mut!(input_reports_reader_fut);
 
@@ -226,8 +221,7 @@ mod tests {
 
         #[fasync::run_until_stalled(test)]
         async fn single_request_before_call_to_get_feature_report() -> Result<(), Error> {
-            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
-                .context("creating InputDevice proxy and stream")?;
+            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>();
 
             let input_device_server_fut = Box::new(InputDevice::new(
                 request_stream,
@@ -241,8 +235,7 @@ mod tests {
             // reports reader, to help debug integration test failures where no component
             // read events from the fake device.
             let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("internal error creating InputReportsReader proxy and server end")?;
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             let _ = proxy.get_input_reports_reader(input_reports_reader_server_end);
 
             std::mem::drop(proxy); // Drop `proxy` to terminate `request_stream`.
@@ -265,8 +258,7 @@ mod tests {
 
         #[fasync::run_until_stalled(test)]
         async fn single_request_before_call_to_get_input_reports_reader() -> Result<(), Error> {
-            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
-                .context("creating InputDevice proxy and stream")?;
+            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>();
 
             let input_device_server_fut = Box::new(InputDevice::new(
                 request_stream,
@@ -280,8 +272,7 @@ mod tests {
             // reports reader, to help debug integration test failures where no component
             // read events from the fake device.
             let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("internal error creating InputReportsReader proxy and server end")?;
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             let _ = proxy.get_input_reports_reader(input_reports_reader_server_end);
 
             std::mem::drop(proxy); // Drop `proxy` to terminate `request_stream`.
@@ -295,8 +286,7 @@ mod tests {
         #[test]
         fn multiple_requests_before_call_to_get_input_reports_reader() -> Result<(), Error> {
             let mut executor = fasync::TestExecutor::new();
-            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
-                .context("creating InputDevice proxy and stream")?;
+            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>();
 
             let input_device_server_fut = Box::new(InputDevice::new(
                 request_stream,
@@ -340,8 +330,7 @@ mod tests {
             pin_mut!(input_device_server_fut);
 
             let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("internal error creating InputReportsReader proxy and server end")?;
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             input_device_proxy
                 .get_input_reports_reader(input_reports_reader_server_end)
                 .context("sending get_input_reports_reader request")?;
@@ -679,8 +668,7 @@ mod tests {
         pub(super) fn make_input_device_proxy_and_struct(
         ) -> (InputDeviceProxy, Box<InputDevice>, AsyncEvent) {
             let (input_device_proxy, input_device_request_stream) =
-                endpoints::create_proxy_and_stream::<InputDeviceMarker>()
-                    .expect("creating InputDevice proxy and stream");
+                endpoints::create_proxy_and_stream::<InputDeviceMarker>();
             let got_input_reports_reader = AsyncEvent::new();
             let input_device = Box::new(InputDevice::new(
                 input_device_request_stream,
@@ -700,8 +688,7 @@ mod tests {
             input_device_proxy: &InputDeviceProxy,
         ) -> InputReportsReaderProxy {
             let (input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .expect("internal error creating InputReportsReader proxy and server end");
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             input_device_proxy
                 .get_input_reports_reader(input_reports_reader_server_end)
                 .expect("sending get_input_reports_reader request");

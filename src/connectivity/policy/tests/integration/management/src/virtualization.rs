@@ -133,15 +133,13 @@ impl<'a> Guest<'a> {
         ep.set_link_up(true).await.expect("failed to enable endpoint");
 
         let (device, port_id) = ep.get_netdevice().await.expect("failed to get netdevice");
-        let device =
-            device.into_proxy().expect("fuchsia.hardware.network/Device into_proxy failed");
+        let device = device.into_proxy();
         let (port, server_end) =
             fidl::endpoints::create_endpoints::<fhardware_network::PortMarker>();
         device.get_port(&port_id, server_end).expect("get_port");
 
         let (interface_proxy, server_end) =
-            fidl::endpoints::create_proxy::<fnet_virtualization::InterfaceMarker>()
-                .expect("failed to create fuchsia.net.virtualization/Interface proxy");
+            fidl::endpoints::create_proxy::<fnet_virtualization::InterfaceMarker>();
         network_proxy.add_port(port, server_end).expect("add_port");
         Self { interface_proxy, realm, _net: net, _ep: ep, guest_if }
     }
@@ -171,8 +169,7 @@ fn create_bridged_network(
     virtualization_control: &fnet_virtualization::ControlProxy,
 ) -> fnet_virtualization::NetworkProxy {
     let (network_proxy, server_end) =
-        fidl::endpoints::create_proxy::<fnet_virtualization::NetworkMarker>()
-            .expect("failed to create fuchsia.net.virtualization/Network proxy");
+        fidl::endpoints::create_proxy::<fnet_virtualization::NetworkMarker>();
     virtualization_control
         .create_network(
             &fnet_virtualization::Config::Bridged(fnet_virtualization::Bridged::default()),
@@ -436,10 +433,12 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
                 if step.may_reconstruct_bridge() {
                     let mut interfaces_map = HashMap::<
                         u64,
-                        fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>,
+                        fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>,
                     >::new();
                     let bridge_id = fnet_interfaces_ext::wait_interface(
-                        fnet_interfaces_ext::event_stream_from_state(
+                        fnet_interfaces_ext::event_stream_from_state::<
+                            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+                        >(
                             &host_interfaces_state,
                             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
                         )

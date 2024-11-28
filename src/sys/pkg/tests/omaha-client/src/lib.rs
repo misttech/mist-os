@@ -605,8 +605,7 @@ impl TestEnv {
             allow_attaching_to_existing_update_check: Some(false),
             ..Default::default()
         };
-        let (client_end, stream) =
-            fidl::endpoints::create_request_stream::<MonitorMarker>().unwrap();
+        let (client_end, stream) = fidl::endpoints::create_request_stream::<MonitorMarker>();
         self.proxies
             .update_manager
             .check_now(&options, Some(client_end))
@@ -618,7 +617,7 @@ impl TestEnv {
 
     async fn monitor_all_update_checks(&self) -> AttemptsMonitorRequestStream {
         let (client_end, stream) =
-            fidl::endpoints::create_request_stream::<AttemptsMonitorMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<AttemptsMonitorMarker>();
         self.proxies
             .update_manager
             .monitor_all_update_checks(client_end)
@@ -1319,7 +1318,7 @@ async fn test_omaha_client_attempt_monitor_update_progress_with_mock_installer()
     assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
     assert_matches!(responder.send(), Ok(()));
-    let mut monitor_stream = monitor.into_stream().unwrap();
+    let mut monitor_stream = monitor.into_stream();
 
     expect_states(
         &mut monitor_stream,
@@ -1866,6 +1865,7 @@ async fn test_omaha_client_policy_config_inspect() {
                 "startup_delay": 61u64,
                 "retry_delay": 5 * 60u64,
                 "allow_reboot_when_idle": false,
+                "fuzz_percentage_range": 25u64,
             }
         }
     );

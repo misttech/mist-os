@@ -131,8 +131,7 @@ pub(super) async fn start_client(
     info!("starting DHCPv4 client for {} (id={})", interface_name, interface_id);
 
     let (route_set, server_end) =
-        fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>()
-            .expect("failed to create RouteSetV4 proxy");
+        fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>();
 
     route_set_provider.new_route_set(server_end).expect("create new route set");
 

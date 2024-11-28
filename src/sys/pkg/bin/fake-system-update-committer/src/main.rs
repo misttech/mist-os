@@ -61,7 +61,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn fake_system_update_committer() {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<CommitStatusProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<CommitStatusProviderMarker>();
 
         let (p0, p1) = zx::EventPair::create();
         let () = p0

@@ -28,6 +28,7 @@ mod internal {
     pub(super) mod raw;
     pub(super) mod reassembly;
     pub(super) mod routing;
+    pub(super) mod sas;
     pub(super) mod socket;
     pub(super) mod types;
     pub(super) mod uninstantiable;
@@ -63,14 +64,14 @@ pub mod device {
         SLAAC_MIN_REGEN_ADVANCE,
     };
     pub use crate::internal::device::state::{
-        AddressIdIter, AssignedAddress, DefaultHopLimit, DualStackIpDeviceState, IpDeviceAddresses,
-        IpDeviceConfiguration, IpDeviceFlags, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes,
-        IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressEntry, Ipv4AddressState,
-        Ipv4DeviceConfiguration, Ipv4DeviceConfigurationAndFlags, Ipv6AddrConfig,
-        Ipv6AddrManualConfig, Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags,
-        Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
-        Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, SlaacConfig,
-        TemporarySlaacConfig,
+        AddressIdIter, AssignedAddress, CommonAddressProperties, DefaultHopLimit,
+        DualStackIpDeviceState, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceFlags,
+        IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv4AddrConfig,
+        Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration,
+        Ipv4DeviceConfigurationAndFlags, Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddrSlaacConfig,
+        Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState,
+        Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags, Ipv6NetworkLearnedParameters,
+        Lifetime, PreferredLifetime, SlaacConfig, TemporarySlaacConfig,
     };
     pub use crate::internal::device::{
         add_ip_addr_subnet_with_config, clear_ipv4_device_state, clear_ipv6_device_state,
@@ -100,15 +101,16 @@ pub mod device {
 /// Group management protocols.
 pub mod gmp {
     pub use crate::internal::gmp::igmp::{
-        IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext, IgmpTimerId,
+        IgmpContext, IgmpSendContext, IgmpState, IgmpStateContext, IgmpTimerId,
         IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
     };
     pub use crate::internal::gmp::mld::{
-        MldContext, MldGroupState, MldStateContext, MldTimerId,
+        MldContext, MldSendContext, MldStateContext, MldTimerId,
         MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
     };
     pub use crate::internal::gmp::{
-        GmpDelayedReportTimerId, GmpHandler, GmpQueryHandler, GmpStateRef, IpExt, MulticastGroupSet,
+        GmpDelayedReportTimerId, GmpGroupState, GmpHandler, GmpQueryHandler, GmpStateRef, IpExt,
+        MulticastGroupSet,
     };
 }
 
@@ -167,9 +169,6 @@ pub mod nud {
 
 /// IP Layer definitions supporting sockets.
 pub mod socket {
-    pub use crate::internal::socket::ipv6_source_address_selection::{
-        select_ipv6_source_address, SasCandidate,
-    };
     pub use crate::internal::socket::{
         DefaultIpSocketOptions, DelegatedRouteResolutionOptions, DelegatedSendOptions,
         DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError,
@@ -227,15 +226,15 @@ pub use internal::base::{
     gen_ip_packet_id, receive_ipv4_packet, receive_ipv4_packet_action, receive_ipv6_packet,
     receive_ipv6_packet_action, resolve_output_route_to_destination, AddressStatus,
     BaseTransportIpContext, DeviceIpLayerMetadata, DropReason, FilterHandlerProvider, HopLimits,
-    IpCounters, IpDeviceConfirmReachableContext, IpDeviceContext, IpDeviceMtuContext,
-    IpDeviceStateContext, IpLayerBindingsContext, IpLayerContext, IpLayerEvent, IpLayerHandler,
-    IpLayerIpExt, IpLayerTimerId, IpPacketDestination, IpRouteTablesContext, IpSendFrameError,
-    IpSendFrameErrorReason, IpStateContext, IpStateInner, IpTransportContext,
-    IpTransportDispatchContext, Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder,
-    Ipv6PresentAddressStatus, Ipv6State, Ipv6StateBuilder, MulticastMembershipHandler,
-    ReceiveIpPacketMeta, ReceivePacketAction, ResolveRouteError, RoutingTableId, SendIpPacketMeta,
-    TransparentLocalDelivery, TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS,
-    DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
+    IpCounters, IpDeviceConfirmReachableContext, IpDeviceContext, IpDeviceEgressStateContext,
+    IpDeviceIngressStateContext, IpDeviceMtuContext, IpLayerBindingsContext, IpLayerContext,
+    IpLayerEvent, IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination,
+    IpRouteTablesContext, IpSendFrameError, IpSendFrameErrorReason, IpStateContext, IpStateInner,
+    IpTransportContext, IpTransportDispatchContext, Ipv4PresentAddressStatus, Ipv4State,
+    Ipv4StateBuilder, Ipv6PresentAddressStatus, Ipv6State, Ipv6StateBuilder,
+    MulticastMembershipHandler, ReceiveIpPacketMeta, ReceivePacketAction, ResolveRouteError,
+    RoutingTableId, SendIpPacketMeta, TransparentLocalDelivery, TransportIpContext,
+    TransportReceiveError, DEFAULT_HOP_LIMITS, DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
 };
 pub use internal::fragmentation::FragmentationCounters;
 pub use internal::path_mtu::{PmtuCache, PmtuContext};
@@ -248,6 +247,7 @@ pub use internal::routing::{
     request_context_add_route, request_context_del_routes, AddRouteError, IpRoutingDeviceContext,
     NonLocalSrcAddrPolicy, PacketOrigin, RoutingTable,
 };
+pub use internal::sas::IpSasHandler;
 pub use internal::types::{
     AddableEntry, AddableEntryEither, AddableMetric, Destination, Entry, EntryEither, Generation,
     InternalForwarding, Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,

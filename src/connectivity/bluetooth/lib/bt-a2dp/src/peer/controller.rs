@@ -16,7 +16,7 @@ use fuchsia_sync::Mutex;
 use futures::{TryFutureExt, TryStreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use crate::peer::Peer;
 
@@ -225,7 +225,7 @@ impl Controller {
         peer_id: PeerId,
     ) -> Result<(), anyhow::Error> {
         while let Some(req) = stream.try_next().await? {
-            let peer = { peer.upgrade().ok_or(format_err!("Peer disconnected"))? };
+            let peer = { peer.upgrade().ok_or_else(|| format_err!("Peer disconnected"))? };
             // Find the first discovered stream by the A2DP peer.
             let infos = match peer.collect_capabilities().await {
                 Ok(endpoints) => endpoints,
@@ -273,17 +273,13 @@ async fn start_control_service(
                     Some(peer) => peer.clone(),
                 };
                 info!("GetPeer: Creating peer controller for peer with id {}.", peer_id);
-                match handle_to_client.into_stream() {
-                    Err(err) => {
-                        warn!("Error. Unable to create server endpoint from stream: {:?}.", err);
-                    }
-                    Ok(client_stream) => fasync::Task::local(async move {
-                        Controller::process_requests(client_stream, peer, peer_id)
-                            .await
-                            .unwrap_or_else(|e| error!("Requests failed: {:?}", e))
-                    })
-                    .detach(),
-                };
+                let client_stream = handle_to_client.into_stream();
+                fasync::Task::local(async move {
+                    Controller::process_requests(client_stream, peer, peer_id)
+                        .await
+                        .unwrap_or_else(|e| error!("Requests failed: {:?}", e))
+                })
+                .detach();
             }
             PeerManagerRequest::ConnectedPeers { responder } => {
                 let connected_peers: Vec<fidl_fuchsia_bluetooth::PeerId> =
@@ -372,7 +368,7 @@ impl ControllerPool {
     /// There can only be one active client at a time. As such, any client connections thereafter
     /// will be dropped.
     pub fn connected(&self, stream: PeerManagerRequestStream) {
-        if self.inner.lock().set_control_handle(stream.control_handle().clone()) {
+        if self.inner.lock().set_control_handle(stream.control_handle()) {
             // Spawns the control service task if the control handle hasn't been set.
             let inner = self.inner.clone();
             fasync::Task::local(
@@ -457,7 +453,7 @@ mod tests {
     async fn test_client_connected_to_peer_manager() {
         // Create the ControllerPool. This stores all active peers and handles listening
         // to PeerManager and PeerController requests.
-        let (pm_proxy, pm_stream) = create_proxy_and_stream::<PeerManagerMarker>().unwrap();
+        let (pm_proxy, pm_stream) = create_proxy_and_stream::<PeerManagerMarker>();
         let controller_pool = ControllerPool::new();
         let mut peer_map = DetachableMap::new();
 
@@ -466,8 +462,7 @@ mod tests {
 
         // Create a fake peer, and simulate connection by sending the `peer_connected` signal.
         let fake_peer_id = PeerId(12345);
-        let (profile_proxy, _requests) =
-            create_proxy_and_stream::<ProfileMarker>().expect("test proxy pair creation");
+        let (profile_proxy, _requests) = create_proxy_and_stream::<ProfileMarker>();
         let (remote, signaling) = Channel::create();
         let avdtp_peer = AvdtpPeer::new(signaling);
         let mut streams = Streams::default();
@@ -493,7 +488,7 @@ mod tests {
 
         // Client connects to controller by sending `get_peer`.
         let (client, server) = create_endpoints::<PeerControllerMarker>();
-        let client_proxy = client.into_proxy().expect("Couldn't obtain client proxy");
+        let client_proxy = client.into_proxy();
         let res = pm_proxy.get_peer(&fake_peer_id.into(), server);
         assert_eq!(Ok(()), res.map_err(|e| e.to_string()));
 

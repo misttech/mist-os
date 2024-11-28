@@ -106,6 +106,7 @@ void OnAspaceComplete(fxl::RefPtr<CommandContext> cmd_context, const Err& err,
   uint64_t total_mapped = 0;
   uint64_t total_committed = 0;
 
+  const uint64_t page_size = console->context().session()->arch_info().page_size();
   debug::Platform platform = cmd_context->GetConsoleContext()->session()->platform();
 
   // Only Linux has the shared bit.
@@ -128,11 +129,11 @@ void OnAspaceComplete(fxl::RefPtr<CommandContext> cmd_context, const Err& err,
       bool has_koid = region.vmo_koid != 0;
       row.push_back(has_koid ? std::to_string(region.vmo_koid) : std::string());
       row.push_back(has_koid ? to_hex_string(region.vmo_offset) : std::string());
-      row.push_back(has_koid ? std::to_string(region.committed_pages) : std::string());
+      row.push_back(has_koid ? std::to_string(region.committed_bytes / page_size) : std::string());
 
       if (has_koid) {
         total_mapped += region.size;
-        total_committed += region.committed_pages;
+        total_committed += region.committed_bytes;
       }
     } else {
       // Non-Fuchsia has only the offset which is unconditionally shown.
@@ -162,7 +163,6 @@ void OnAspaceComplete(fxl::RefPtr<CommandContext> cmd_context, const Err& err,
 
   // Format the section at the bottom showing statistics. These are formatted so the "=" align
   // horizontally (hence extra left-spacing on the strings).
-  uint64_t page_size = console->context().session()->arch_info().page_size();
   out.Append("\n");
   out.Append(Syntax::kHeading, "              Page size: ");
   out.Append(std::to_string(page_size));
@@ -174,8 +174,8 @@ void OnAspaceComplete(fxl::RefPtr<CommandContext> cmd_context, const Err& err,
     out.Append("\n");
 
     out.Append(Syntax::kHeading, "  Total committed pages: ");
-    out.Append(std::to_string(total_committed));
-    out.Append(" = " + std::to_string(total_committed * page_size) + " bytes\n");
+    out.Append(std::to_string(total_committed / page_size));
+    out.Append(" = " + std::to_string(total_committed) + " bytes\n");
     out.Append("                         (See \"help aspace\" for what committed pages mean.)\n");
   }
 

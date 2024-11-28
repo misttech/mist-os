@@ -83,6 +83,8 @@ struct UpiuHeader {
 
   DEF_SUBFIELD(cmd_set_type_and_initiator_id, 3, 0, command_set_type);
   DEF_SUBFIELD(cmd_set_type_and_initiator_id, 7, 4, initiator_id);
+
+  DEF_SUBBIT(device_infomation, 0, event_alert);
 } __PACKED;
 static_assert(sizeof(UpiuHeader) == 12, "UpiuHeader struct must be 12 bytes");
 

@@ -40,6 +40,12 @@ pub struct VmoInfo {
     pub metadata_bytes: u64,
     pub committed_change_events: u64,
     pub populated_bytes: u64,
+    pub committed_private_bytes: u64,
+    pub populated_private_bytes: u64,
+    pub committed_scaled_bytes: u64,
+    pub populated_scaled_bytes: u64,
+    pub committed_fractional_scaled_bytes: u64,
+    pub populated_fractional_scaled_bytes: u64,
 }
 
 impl Default for VmoInfo {
@@ -65,6 +71,12 @@ impl From<sys::zx_info_vmo_t> for VmoInfo {
             metadata_bytes: info.metadata_bytes,
             committed_change_events: info.committed_change_events,
             populated_bytes: info.populated_bytes,
+            committed_private_bytes: info.committed_private_bytes,
+            populated_private_bytes: info.populated_private_bytes,
+            committed_scaled_bytes: info.committed_scaled_bytes,
+            populated_scaled_bytes: info.populated_scaled_bytes,
+            committed_fractional_scaled_bytes: info.committed_fractional_scaled_bytes,
+            populated_fractional_scaled_bytes: info.populated_fractional_scaled_bytes,
         }
     }
 }
@@ -387,8 +399,13 @@ bitflags! {
     pub struct VmoInfoFlags: u32 {
         const RESIZABLE = sys::ZX_INFO_VMO_RESIZABLE;
         const IS_COW_CLONE = sys::ZX_INFO_VMO_IS_COW_CLONE;
+        const VIA_HANDLE = sys::ZX_INFO_VMO_VIA_HANDLE;
+        const VIA_MAPPING = sys::ZX_INFO_VMO_VIA_MAPPING;
         const PAGER_BACKED = sys::ZX_INFO_VMO_PAGER_BACKED;
         const CONTIGUOUS = sys::ZX_INFO_VMO_CONTIGUOUS;
+        const DISCARDABLE = sys::ZX_INFO_VMO_DISCARDABLE;
+        const IMMUTABLE = sys::ZX_INFO_VMO_IMMUTABLE;
+        const VIA_IOB_HANDLE = sys::ZX_INFO_VMO_VIA_IOB_HANDLE;
     }
 }
 

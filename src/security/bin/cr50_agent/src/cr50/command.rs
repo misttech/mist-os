@@ -263,8 +263,7 @@ mod tests {
         }
 
         pub fn serve(self: Arc<Self>) -> TpmDeviceProxy {
-            let (proxy, mut stream) =
-                fidl::endpoints::create_proxy_and_stream::<TpmDeviceMarker>().unwrap();
+            let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<TpmDeviceMarker>();
 
             Task::spawn(async move {
                 while let Some(req) = stream.try_next().await.unwrap() {

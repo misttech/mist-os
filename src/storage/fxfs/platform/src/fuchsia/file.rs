@@ -67,7 +67,8 @@ impl FxFile {
         file
     }
 
-    pub fn create_connection_async(
+    /// Creates a new connection on the given `scope`. May take a read lock on the object.
+    pub async fn create_connection_async(
         this: OpenedNode<FxFile>,
         scope: ExecutionScope,
         flags: impl ProtocolsExt,
@@ -76,16 +77,25 @@ impl FxFile {
         if let Some(rights) = flags.rights() {
             if rights.intersects(fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES) {
                 if let Some(fut) = this.handle.pre_fetch_keys() {
-                    this.handle.owner().scope().spawn(fut);
+                    // Keep the object from being deleted until after the fetch is complete.
+                    let fs = this.handle.owner().store().filesystem();
+                    let read_lock = fs
+                        .clone()
+                        .lock_manager()
+                        .read_lock(lock_keys!(LockKey::object(
+                            this.handle.owner().store().store_object_id(),
+                            this.object_id()
+                        )))
+                        .await
+                        .into_owned(fs);
+                    this.handle.owner().scope().spawn(async move {
+                        let _read_lock = read_lock;
+                        fut.await
+                    });
                 }
             }
         }
-        object_request.create_connection(
-            scope.clone(),
-            this.take(),
-            flags,
-            StreamIoConnection::create,
-        )
+        object_request.create_connection(scope, this.take(), flags, StreamIoConnection::create)
     }
 
     /// Marks the file to be purged when the open count drops to zero.
@@ -473,7 +483,10 @@ impl File for FxFile {
         length: u64,
         _mode: fio::AllocateMode,
     ) -> Result<(), Status> {
-        self.handle.allocate(offset..(offset + length)).await.map_err(map_to_status)
+        // NB: FILE_BIG is used so the error converts to EFBIG when passed through starnix, which
+        // is the required error code when the requested range is larger than the file size.
+        let range = offset..offset.checked_add(length).ok_or(Status::FILE_BIG)?;
+        self.handle.allocate(range).await.map_err(map_to_status)
     }
 
     async fn sync(&self, mode: SyncMode) -> Result<(), Status> {
@@ -1503,7 +1516,7 @@ mod tests {
 
         {
             let (iterator_client, iterator_server) =
-                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>();
             file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
             let (chunk, last) = iterator_client
                 .get_next()
@@ -1532,7 +1545,7 @@ mod tests {
 
         {
             let (iterator_client, iterator_server) =
-                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>();
             file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
             let (chunk, last) = iterator_client
                 .get_next()
@@ -1557,7 +1570,7 @@ mod tests {
 
         {
             let (iterator_client, iterator_server) =
-                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>();
             file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
             let (chunk, last) = iterator_client
                 .get_next()

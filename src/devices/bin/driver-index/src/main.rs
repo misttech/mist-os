@@ -57,19 +57,24 @@ fn log_error(err: anyhow::Error) -> anyhow::Error {
     err
 }
 
-fn create_and_setup_index(boot_drivers: Vec<ResolvedDriver>, config: &Config) -> Rc<Indexer> {
-    if !config.enable_driver_load_fuzzer {
+fn create_and_setup_index(
+    boot_drivers: Vec<ResolvedDriver>,
+    enable_driver_load_fuzzer: bool,
+    delay_fallback_until_base_drivers_indexed: bool,
+    driver_load_fuzzer_max_delay_ms: i64,
+) -> Rc<Indexer> {
+    if !enable_driver_load_fuzzer {
         return Rc::new(Indexer::new(
             boot_drivers,
             BaseRepo::NotResolved,
-            config.delay_fallback_until_base_drivers_indexed,
+            delay_fallback_until_base_drivers_indexed,
         ));
     }
 
     let indexer = Rc::new(Indexer::new(
         vec![],
         BaseRepo::NotResolved,
-        config.delay_fallback_until_base_drivers_indexed,
+        delay_fallback_until_base_drivers_indexed,
     ));
 
     // TODO(https://fxbug.dev/42076984): Pass in a seed from the input, if available.
@@ -79,7 +84,7 @@ fn create_and_setup_index(boot_drivers: Vec<ResolvedDriver>, config: &Config) ->
         Session::new(
             sender,
             boot_drivers,
-            zx::MonotonicDuration::from_millis(config.driver_load_fuzzer_max_delay_ms),
+            zx::MonotonicDuration::from_millis(driver_load_fuzzer_max_delay_ms),
             None,
         ),
     );
@@ -158,7 +163,7 @@ async fn run_driver_development_server(
                         return Ok(());
                     }
                     let driver_info = Arc::new(Mutex::new(driver_info));
-                    let iterator = iterator.into_stream()?;
+                    let iterator = iterator.into_stream();
                     fasync::Task::spawn(async move {
                         run_driver_info_iterator_server(driver_info, iterator)
                             .await
@@ -176,7 +181,7 @@ async fn run_driver_development_server(
                         return Ok(());
                     }
                     let specs = Arc::new(Mutex::new(specs));
-                    let iterator = iterator.into_stream()?;
+                    let iterator = iterator.into_stream();
                     fasync::Task::spawn(async move {
                         run_composite_node_specs_iterator_server(specs, iterator)
                             .await
@@ -327,9 +332,9 @@ async fn run_index_server_with_timeout(
 async fn run_load_base_drivers(
     should_load_base_drivers: bool,
     index: &Rc<Indexer>,
-    config: Config,
+    base_drivers: &Vec<String>,
     eager_drivers: HashSet<cm_types::Url>,
-    disabled_drivers: HashSet<cm_types::Url>,
+    disabled_drivers: &HashSet<cm_types::Url>,
 ) -> Result<()> {
     if should_load_base_drivers {
         let base_resolver = client::connect_to_protocol_at_path::<fresolution::ResolverMarker>(
@@ -338,10 +343,10 @@ async fn run_load_base_drivers(
         .context("Failed to connect to base component resolver")?;
         let res = load_base_drivers(
             index.clone(),
-            &config.base_drivers,
+            &base_drivers,
             &base_resolver,
             &eager_drivers,
-            &disabled_drivers,
+            disabled_drivers,
         )
         .await
         .context("Error loading base packages")
@@ -464,9 +469,8 @@ async fn main() -> Result<()> {
     let lifecycle = fidl::endpoints::ServerEnd::<flifecycle::LifecycleMarker>::new(
         zx::Channel::from(lifecycle),
     );
-    let (lifecycle_request_stream, lifecycle_control_handle) = lifecycle
-        .into_stream_and_control_handle()
-        .expect("Could not convert lifecycle handle to stream and control handle.");
+    let (lifecycle_request_stream, lifecycle_control_handle) =
+        lifecycle.into_stream_and_control_handle();
 
     let config = Config::take_from_startup_handle();
     let full_resolver = if config.enable_ephemeral_drivers {
@@ -528,21 +532,34 @@ async fn main() -> Result<()> {
     )
     .context("Failed to connect to boot resolver")?;
 
+    let (boot_driver_list, base_driver_list) = {
+        // We only provide empty vectors for these in the driver test realm when the
+        // fuchsia.driver.test.DriverLists protocol is available to provide these to us dynamically.
+        if config.boot_drivers.is_empty() && config.base_drivers.is_empty() {
+            let test_driver_lists =
+                client::connect_to_protocol::<fidl_fuchsia_driver_test::DriverListsMarker>()
+                    .context("Failed to connect to driver test DriverLists protocol.")?;
+            test_driver_lists
+                .get_driver_lists()
+                .await?
+                .map_err(|e| anyhow!("Failed to get_driver_lists {:?}", e))?
+        } else {
+            (config.boot_drivers, config.base_drivers)
+        }
+    };
+
     let boot_repo_resume = resumed_state.as_ref().and_then(|s| s.boot_repo.clone());
     let boot_drivers = match boot_repo_resume {
         Some(boot_repo) => {
             tracing::info!("loading boot drivers from escrow.");
             boot_repo
         }
-        None => load_boot_drivers(
-            &config.boot_drivers,
-            &boot_resolver,
-            &eager_drivers,
-            &disabled_drivers,
-        )
-        .await
-        .context("Failed to load boot drivers")
-        .map_err(log_error)?,
+        None => {
+            load_boot_drivers(&boot_driver_list, &boot_resolver, &eager_drivers, &disabled_drivers)
+                .await
+                .context("Failed to load boot drivers")
+                .map_err(log_error)?
+        }
     };
 
     let mut should_load_base_drivers = true;
@@ -560,7 +577,12 @@ async fn main() -> Result<()> {
         fasync::MonotonicDuration::INFINITE
     };
 
-    let index = create_and_setup_index(boot_drivers, &config);
+    let index = create_and_setup_index(
+        boot_drivers,
+        config.enable_driver_load_fuzzer,
+        config.delay_fallback_until_base_drivers_indexed,
+        config.driver_load_fuzzer_max_delay_ms,
+    );
     if let Some(resume_state) = resumed_state {
         let base_loaded = apply_state(resume_state, index.clone());
         if base_loaded {
@@ -578,9 +600,9 @@ async fn main() -> Result<()> {
         run_load_base_drivers(
             should_load_base_drivers,
             &index,
-            config,
+            &base_driver_list,
             eager_drivers,
-            disabled_drivers,
+            &disabled_drivers,
         ),
         run_driver_index(
             &index,
@@ -675,7 +697,7 @@ mod tests {
         driver_filter: &[String],
     ) -> Vec<fdf::DriverInfo> {
         let (info_iterator, info_iterator_server) =
-            fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>();
         development_proxy.get_driver_info(driver_filter, info_iterator_server).unwrap();
 
         let mut driver_infos = Vec::new();
@@ -703,7 +725,7 @@ mod tests {
             fio::PERM_READABLE | fio::PERM_EXECUTABLE,
             server_end,
         )?;
-        let proxy = client_end.into_proxy()?;
+        let proxy = client_end.into_proxy();
         let component_url = url::Url::parse(component_url)?;
         let decl_file = fuchsia_fs::directory::open_file_async(
             &proxy,
@@ -793,8 +815,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn run_with_timeout() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
         let index = Rc::new(Indexer::new(vec![], BaseRepo::Resolved(std::vec![]), false));
         run_index_server_with_timeout(
             index.clone(),
@@ -820,10 +841,9 @@ mod tests {
     #[fuchsia::test]
     async fn read_from_json() {
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>();
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved, false));
 
@@ -974,8 +994,7 @@ mod tests {
             disabled: false,
         },]);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let index = Rc::new(Indexer::new(std::vec![], base_repo, false));
 
@@ -1051,8 +1070,7 @@ mod tests {
             disabled: false,
         },]);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let index = Rc::new(Indexer::new(std::vec![], base_repo, false));
 
@@ -1132,8 +1150,7 @@ mod tests {
             },
         ];
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let index = Rc::new(Indexer::new(boot_repo, BaseRepo::Resolved(std::vec![]), false));
 
@@ -1202,8 +1219,7 @@ mod tests {
             },
         ];
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let index = Rc::new(Indexer::new(boot_repo, BaseRepo::Resolved(std::vec![]), false));
 
@@ -1307,11 +1323,10 @@ mod tests {
             },
         ];
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let (development_proxy, development_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DevelopmentManagerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fdi::DevelopmentManagerMarker>();
 
         let index = Rc::new(Indexer::new(boot_repo, BaseRepo::Resolved(std::vec![]), false));
 
@@ -1453,8 +1468,7 @@ mod tests {
             },
         ];
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let index = Rc::new(Indexer::new(boot_repo, BaseRepo::Resolved(std::vec![]), false));
 
@@ -1553,8 +1567,7 @@ mod tests {
             },
         ]);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let index = Rc::new(Indexer::new(boot_repo, base_repo, false));
 
@@ -1596,7 +1609,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_load_packaged_boot_drivers() {
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>();
 
         let eager_drivers = HashSet::new();
         let disabled_drivers = HashSet::new();
@@ -1630,7 +1643,7 @@ mod tests {
         )
         .unwrap();
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>();
         let eager_drivers = HashSet::from([eager_driver_component_url.clone()]);
         let disabled_drivers = HashSet::new();
         let boot_drivers =
@@ -1666,7 +1679,7 @@ mod tests {
         .unwrap();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>();
 
         let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved, false));
 
@@ -1721,7 +1734,7 @@ mod tests {
         .unwrap();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>();
         let eager_drivers = HashSet::new();
         let disabled_drivers = HashSet::from([disabled_driver_component_url.clone()]);
         let boot_drivers = vec![];
@@ -1753,7 +1766,7 @@ mod tests {
         .unwrap();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>();
 
         let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved, false));
 
@@ -1810,8 +1823,7 @@ mod tests {
             disabled: false,
         }];
         let index = Indexer::new(boot_repo, BaseRepo::NotResolved, true);
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         execute_driver_index_test(index, stream, async move {
             let property = fdf::NodeProperty {
@@ -1845,8 +1857,7 @@ mod tests {
             disabled: false,
         }];
         let index = Indexer::new(boot_repo, BaseRepo::NotResolved, false);
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         execute_driver_index_test(index, stream, async move {
             let property = fdf::NodeProperty {
@@ -1881,8 +1892,7 @@ mod tests {
                 .await
                 .unwrap();
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let index = Rc::new(Indexer::new(drivers, BaseRepo::NotResolved, false));
 
@@ -1959,8 +1969,7 @@ mod tests {
     async fn test_parent_spec_match() {
         let base_repo = BaseRepo::Resolved(std::vec![]);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
         let index = Rc::new(Indexer::new(std::vec![], base_repo, false));
         let index_task = run_index_server(index.clone(), stream).fuse();
 
@@ -2058,8 +2067,7 @@ mod tests {
     async fn test_parent_spec_match_too_large() {
         let base_repo = BaseRepo::Resolved(std::vec![]);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
         let index = Rc::new(Indexer::new(std::vec![], base_repo, false));
         let index_task = run_index_server(index.clone(), stream).fuse();
 
@@ -2202,8 +2210,7 @@ mod tests {
             disabled: false,
         },]);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let index = Rc::new(Indexer::new(std::vec![], base_repo, false));
 
@@ -2405,8 +2412,7 @@ mod tests {
             disabled: false,
         },]);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let index = Rc::new(Indexer::new(std::vec![], base_repo, false));
 
@@ -2608,8 +2614,7 @@ mod tests {
             disabled: false,
         },]);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let index = Rc::new(Indexer::new(std::vec![], base_repo, false));
 
@@ -2751,8 +2756,7 @@ mod tests {
             cm_types::Url::new("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
                 .unwrap();
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         // Start our index out without any drivers.
         let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved, false));
@@ -2956,8 +2960,7 @@ mod tests {
             cm_types::Url::new("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
                 .unwrap();
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         // Start our index out without any drivers.
         let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved, false));
@@ -3161,8 +3164,7 @@ mod tests {
             cm_types::Url::new("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
                 .unwrap();
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         // Start our index out without any drivers.
         let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved, false));
@@ -3342,8 +3344,7 @@ mod tests {
             disabled: false,
         },]);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
         let index = Rc::new(Indexer::new(std::vec![], base_repo, false));
         let index_task = run_index_server(index.clone(), stream).fuse();
 
@@ -3446,8 +3447,7 @@ mod tests {
             disabled: false,
         },]);
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
         let index = Rc::new(Indexer::new(std::vec![], base_repo, false));
         let index_task = run_index_server(index.clone(), stream).fuse();
 
@@ -3502,14 +3502,13 @@ mod tests {
         let component_manifest_url =
             "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind-component.cm";
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         let (registrar_proxy, registrar_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>();
 
         let full_resolver = Some(resolver);
 
@@ -3579,13 +3578,13 @@ mod tests {
             "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind-component.cm";
 
         let (registrar_proxy, registrar_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>();
 
         let (development_proxy, development_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdi::DevelopmentManagerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fdi::DevelopmentManagerMarker>();
 
         let full_resolver = Some(resolver);
 
@@ -3651,10 +3650,10 @@ mod tests {
             "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind-component.cm";
 
         let (registrar_proxy, registrar_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>();
 
         let full_resolver = Some(resolver);
 
@@ -3715,10 +3714,10 @@ mod tests {
             "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind-component.cm";
 
         let (registrar_proxy, registrar_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>();
 
         let (resolver, resolver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>();
 
         let full_resolver = Some(resolver);
 

@@ -705,7 +705,7 @@ fxl::RefPtr<AsyncOutputBuffer> FormatScope(const ErrOrValue& scope_state,
                     out->Append(Syntax::kStringBold, "Scope");
                     out->Append(Syntax::kNumberDim, "(");
                     out->Append(Syntax::kNumberDim,
-                                to_hex_string(mutex_ptr.value().GetAs<TargetPointer>()));
+                                to_hex_string(arc_inner_ptr.value().GetAs<TargetPointer>()));
                     out->Append(Syntax::kNumberDim, ")\n");
                     out->Append(FormatScope(child_state, options, context, 3 + indent));
                     out->Complete();

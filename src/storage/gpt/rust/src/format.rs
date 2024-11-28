@@ -120,7 +120,7 @@ impl Header {
             .num_parts
             .checked_mul(self.part_size)
             .and_then(|v| v.checked_next_multiple_of(block_size as u32))
-            .ok_or(anyhow!("Partition table size overflow"))?
+            .ok_or_else(|| anyhow!("Partition table size overflow"))?
             as u64)
             / block_size;
         ensure!(partition_table_blocks < block_count, "Invalid partition table size");
@@ -179,6 +179,17 @@ pub struct PartitionTableEntry {
 impl PartitionTableEntry {
     pub fn is_empty(&self) -> bool {
         self.as_bytes().iter().all(|b| *b == 0)
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            type_guid: [0u8; 16],
+            instance_guid: [0u8; 16],
+            first_lba: 0,
+            last_lba: 0,
+            flags: 0,
+            name: [0u16; 36],
+        }
     }
 
     pub fn ensure_integrity(&self) -> Result<(), Error> {

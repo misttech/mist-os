@@ -14,7 +14,7 @@ impl ThermalClient {
     pub fn new(test_env: &TestEnv, client_type: &str) -> Self {
         let connector = test_env.connect_to_protocol::<fthermal::ClientStateConnectorMarker>();
         let (watcher_proxy, watcher_remote) =
-            fidl::endpoints::create_proxy::<fthermal::ClientStateWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fthermal::ClientStateWatcherMarker>();
         connector.connect(client_type, watcher_remote).expect("Failed to connect thermal client");
         Self { watcher_proxy }
     }

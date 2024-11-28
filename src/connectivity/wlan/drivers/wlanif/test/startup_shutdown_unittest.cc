@@ -23,8 +23,8 @@ struct BaseWlanFullmacServerForStartup
                      std::move(server_end), this, fidl::kIgnoreBindingClosure);
   }
 
-  void Start(StartRequest& request, StartCompleter::Sync& completer) override {
-    // Acquire/Construct the WlanFullmacIfc, UsmeBootstrap, and GenericSme endpoints.
+  void Init(InitRequest& request, InitCompleter::Sync& completer) override {
+    // Acquire/construct the WlanFullmacIfc, UsmeBootstrap, and GenericSme endpoints.
     fullmac_ifc_client_endpoint_ = std::move(request.ifc());
     auto usme_bootstrap_endpoints = fidl::CreateEndpoints<fuchsia_wlan_sme::UsmeBootstrap>();
     usme_bootstrap_client_ =
@@ -33,7 +33,7 @@ struct BaseWlanFullmacServerForStartup
     auto generic_sme_endpoints = fidl::CreateEndpoints<fuchsia_wlan_sme::GenericSme>();
     generic_sme_client_endpoint_ = std::move(generic_sme_endpoints.value().client);
 
-    // Make the required UsmeBootstrap.Start during driver Start.
+    // Make the required UsmeBootstrap.Start during driver Init.
     usme_bootstrap_client_.value()
         ->Start(fuchsia_wlan_sme::UsmeBootstrapStartRequest(
             std::move(generic_sme_endpoints.value().server),
@@ -43,24 +43,23 @@ struct BaseWlanFullmacServerForStartup
           inspect_vmo_ = std::move(result->inspect_vmo());
         });
 
-    completer.Reply(zx::ok(fuchsia_wlan_fullmac::WlanFullmacImplStartResponse(
-        usme_bootstrap_endpoints.value().server.TakeChannel())));
+    fuchsia_wlan_fullmac::WlanFullmacImplInitResponse response;
+    response.sme_channel() = usme_bootstrap_endpoints.value().server.TakeChannel();
+    completer.Reply(zx::ok(std::move(response)));
   }
 
   void Query(QueryCompleter::Sync& completer) override {
     fuchsia_wlan_fullmac::WlanFullmacImplQueryResponse response;
 
     fuchsia_wlan_fullmac::WlanFullmacBandCapability band_capability;
-    band_capability.band(fuchsia_wlan_common::WlanBand::kTwoGhz)
+    band_capability.band(fuchsia_wlan_ieee80211::WlanBand::kTwoGhz)
         .basic_rates({1})
         .operating_channel_count(1)
         .operating_channel_list({1});
 
-    response.info()
-        .sta_addr(std::array<uint8_t, 6>{8, 8, 8, 8, 8, 8})
-        .role(fuchsia_wlan_common::WlanMacRole::kClient)
-        .band_cap_count(1)
-        .band_cap_list({band_capability});
+    response.sta_addr({std::array<uint8_t, 6>{8, 8, 8, 8, 8, 8}})
+        .role({fuchsia_wlan_common::WlanMacRole::kClient})
+        .band_caps({{band_capability}});
 
     completer.Reply(fit::ok(std::move(response)));
   }

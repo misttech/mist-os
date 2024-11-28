@@ -412,17 +412,16 @@ impl XdgSurface {
         ftrace::duration!(c"wayland", c"XdgSurface::add_child_view");
         let xdg_surface = this.get(client)?;
         let surface = xdg_surface.surface_ref().get(client)?;
-        let flatland = surface
-            .flatland()
-            .ok_or(format_err!("Unable to create a child view without a flatland instance."))?;
+        let flatland = surface.flatland().ok_or_else(|| {
+            format_err!("Unable to create a child view without a flatland instance.")
+        })?;
         let transform = flatland.borrow_mut().alloc_transform_id();
         let task_queue = client.task_queue();
-        let (child_view_watcher, server_end) = create_proxy::<ChildViewWatcherMarker>()
-            .expect("failed to create ChildViewWatcher endpoints");
+        let (child_view_watcher, server_end) = create_proxy::<ChildViewWatcherMarker>();
         XdgSurface::spawn_child_view_listener(
             this,
             child_view_watcher,
-            task_queue.clone(),
+            task_queue,
             transform.value,
         );
         if let Some(view) = this.get_mut(client)?.view.clone() {
@@ -449,8 +448,7 @@ impl XdgSurface {
         let xdg_surface = this.get(client)?;
         let surface_ref = xdg_surface.surface_ref();
         let task_queue = client.task_queue();
-        let (parent_viewport_watcher, server_end) = create_proxy::<ParentViewportWatcherMarker>()
-            .expect("failed to create ParentViewportWatcherProxy");
+        let (parent_viewport_watcher, server_end) = create_proxy::<ParentViewportWatcherMarker>();
         flatland
             .borrow()
             .proxy()
@@ -463,7 +461,7 @@ impl XdgSurface {
         );
         let view_ptr = XdgSurfaceView::new(
             flatland,
-            task_queue.clone(),
+            task_queue,
             this,
             surface_ref,
             parent_view,
@@ -1153,7 +1151,7 @@ impl XdgToplevel {
         let surface_ref = this.get(client)?.surface_ref;
         let xdg_surface_ref = this.get(client)?.xdg_surface_ref;
         let task_queue = client.task_queue();
-        let mut stream = server_end.into_stream().unwrap();
+        let mut stream = server_end.into_stream();
         let control_handle = stream.control_handle();
         fasync::Task::local(
             async move {
@@ -1168,17 +1166,13 @@ impl XdgToplevel {
                             let viewref_pair = ViewRefPair::new()?;
                             let view_identity = ViewIdentityOnCreation::from(viewref_pair);
                             let (parent_viewport_watcher, parent_viewport_watcher_request) =
-                                create_proxy::<ParentViewportWatcherMarker>()
-                                    .expect("failed to create ParentViewportWatcherProxy");
+                                create_proxy::<ParentViewportWatcherMarker>();
                             let (view_ref_focused, view_ref_focused_request) =
-                                create_proxy::<ViewRefFocusedMarker>()
-                                    .expect("failed to create ViewRefFocusedProxy");
+                                create_proxy::<ViewRefFocusedMarker>();
                             let (touch_source, touch_source_request) =
-                                create_proxy::<TouchSourceMarker>()
-                                    .expect("failed to create TouchSourceProxy");
+                                create_proxy::<TouchSourceMarker>();
                             let (mouse_source, mouse_source_request) =
-                                create_proxy::<MouseSourceMarker>()
-                                    .expect("failed to create MouseSourceProxy");
+                                create_proxy::<MouseSourceMarker>();
                             let view_bound_protocols = ViewBoundProtocols {
                                 view_ref_focused: Some(view_ref_focused_request),
                                 touch_source: Some(touch_source_request),
@@ -1262,7 +1256,7 @@ impl XdgToplevel {
         flatland: FlatlandPtr,
     ) -> Result<ViewControllerProxy, Error> {
         ftrace::duration!(c"wayland", c"XdgToplevel::spawn_view");
-        let (proxy, server_end) = create_proxy::<ViewControllerMarker>()?;
+        let (proxy, server_end) = create_proxy::<ViewControllerMarker>();
         let stream = proxy.take_event_stream();
         let creation_tokens = ViewCreationTokenPair::new().expect("failed to create token pair");
         let viewref_pair = ViewRefPair::new()?;
@@ -1283,14 +1277,10 @@ impl XdgToplevel {
             ..Default::default()
         };
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
-            create_proxy::<ParentViewportWatcherMarker>()
-                .expect("failed to create ParentViewportWatcherProxy");
-        let (view_ref_focused, view_ref_focused_request) =
-            create_proxy::<ViewRefFocusedMarker>().expect("failed to create ViewRefFocusedProxy");
-        let (touch_source, touch_source_request) =
-            create_proxy::<TouchSourceMarker>().expect("failed to create TouchSourceProxy");
-        let (mouse_source, mouse_source_request) =
-            create_proxy::<MouseSourceMarker>().expect("failed to create MouseSourceProxy");
+            create_proxy::<ParentViewportWatcherMarker>();
+        let (view_ref_focused, view_ref_focused_request) = create_proxy::<ViewRefFocusedMarker>();
+        let (touch_source, touch_source_request) = create_proxy::<TouchSourceMarker>();
+        let (mouse_source, mouse_source_request) = create_proxy::<MouseSourceMarker>();
         let view_bound_protocols = ViewBoundProtocols {
             view_ref_focused: Some(view_ref_focused_request),
             touch_source: Some(touch_source_request),
@@ -1369,7 +1359,7 @@ impl XdgToplevel {
             let surface = surface_ref.get(client)?;
             let flatland = surface
                 .flatland()
-                .ok_or(format_err!("Unable to spawn view without a flatland instance"))?;
+                .ok_or_else(|| format_err!("Unable to spawn view without a flatland instance"))?;
 
             // Spawn a child view if `XdgToplevel` has a parent or there's an existing
             // `XdgSurface` that can be used as parent.
@@ -1387,19 +1377,17 @@ impl XdgToplevel {
                     XdgSurface::spawn_child_view(
                         xdg_surface_ref,
                         client,
-                        flatland.clone(),
+                        flatland,
                         parent_ref,
                         offset,
                         geometry,
                     )?;
                     (None, None)
                 } else if client.take_view_provider_request() {
-                    let control_handle =
-                        XdgToplevel::spawn_view_provider(this, client, flatland.clone())?;
+                    let control_handle = XdgToplevel::spawn_view_provider(this, client, flatland)?;
                     (Some(control_handle), None)
                 } else {
-                    let view_controller_proxy =
-                        XdgToplevel::spawn_view(this, client, flatland.clone())?;
+                    let view_controller_proxy = XdgToplevel::spawn_view(this, client, flatland)?;
                     (None, Some(view_controller_proxy))
                 }
             };

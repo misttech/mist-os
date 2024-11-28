@@ -408,6 +408,13 @@ pub(crate) mod testutil {
         type WeakDeviceId = D::Weak;
     }
 
+    impl<S, Meta, D: StrongDeviceIdentifier> DeviceIdContext<AnyDevice>
+        for &mut FakeCoreCtx<S, Meta, D>
+    {
+        type DeviceId = D;
+        type WeakDeviceId = D::Weak;
+    }
+
     impl PartialEq<FakeWeakDeviceId<MultipleDevicesId>> for MultipleDevicesId {
         fn eq(&self, FakeWeakDeviceId(other): &FakeWeakDeviceId<MultipleDevicesId>) -> bool {
             self == other

@@ -32,8 +32,7 @@ impl LowpanContext {
         Ok(LowpanContext {
             device_watcher,
             device_name: device_name
-                .clone()
-                .unwrap_or(LowpanContext::DEFAULT_DEVICE_NAME.to_string()),
+                .unwrap_or_else(|| LowpanContext::DEFAULT_DEVICE_NAME.to_string()),
         })
     }
 
@@ -45,7 +44,7 @@ impl LowpanContext {
             .context("Failed to connect to DeviceConnector")?
             .connect(&self.device_name, server)?;
 
-        client.into_proxy().context("into_proxy() failed")
+        Ok(client.into_proxy())
     }
 
     /// Returns the default FactoryDeviceProxy.
@@ -57,7 +56,7 @@ impl LowpanContext {
 
         lookup.lookup(&self.device_name, server)?;
 
-        client.into_proxy().context("into_proxy() failed")
+        Ok(client.into_proxy())
     }
 
     /// Returns the default DeviceProxy, DeviceExtraProxy and DeviceTestProxy.
@@ -80,10 +79,6 @@ impl LowpanContext {
             .context("Failed to connect to DeviceTestConnector")?
             .connect(&self.device_name, server_test)?;
 
-        Ok((
-            client.into_proxy().context("into_proxy() failed")?,
-            client_extra.into_proxy().context("into_proxy() failed")?,
-            client_test.into_proxy().context("into_proxy() failed")?,
-        ))
+        Ok((client.into_proxy(), client_extra.into_proxy(), client_test.into_proxy()))
     }
 }

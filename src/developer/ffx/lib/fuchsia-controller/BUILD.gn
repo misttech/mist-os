@@ -49,6 +49,7 @@ rustc_staticlib("lib") {
     "//sdk/rust/zx-types",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/plugins/target/wait:ffx_wait",
@@ -58,11 +59,11 @@ rustc_staticlib("lib") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-channel",
     "//third_party/rust_crates:async-lock",
-    "//third_party/rust_crates:async-net",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures-lite",
     "//third_party/rust_crates:nix",
+    "//third_party/rust_crates:tokio",
     "//third_party/rust_crates:tracing",
   ]
 
@@ -152,8 +153,14 @@ python_library("fuchsia_controller_py") {
     "wrappers.py",
   ]
 
-  # make sure no fidl libraries not in the SDK are used.
+  # Ensure all FIDL dependencies are available and stable. Use the
+  # "partner_internal" SDK category and greater as an approximation of this.
+  # However, note that not everything in those categories is stable.
+  # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
   assert_no_deps = [
+    "//sdk:marker-cts",
+    "//sdk:marker-excluded",
+    "//sdk:marker-experimental",
     "//sdk:marker-internal",
     "//sdk:marker-unknown",
   ]

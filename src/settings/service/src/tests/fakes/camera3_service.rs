@@ -64,7 +64,7 @@ impl Service for Camera3Service {
         }
 
         let mut device_watcher_stream =
-            ServerEnd::<DeviceWatcherMarker>::new(channel).into_stream()?;
+            ServerEnd::<DeviceWatcherMarker>::new(channel).into_stream();
 
         let camera_sw_muted = Rc::clone(&self.camera_sw_muted);
         let has_camera_device = Rc::clone(&self.has_camera_device);
@@ -104,7 +104,7 @@ impl Service for Camera3Service {
                         request, // ServerEnd<DeviceMarker>
                         control_handle: _,
                     } => {
-                        let mut stream = request.into_stream().unwrap();
+                        let mut stream = request.into_stream();
                         let camera_sw_muted = Rc::clone(&camera_sw_muted);
                         fasync::Task::local(async move {
                             while let Some(req) = stream.try_next().await.unwrap() {

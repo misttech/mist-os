@@ -434,11 +434,11 @@ Once you have started the debugger:
 
 [fuchsia-dev-ext]: /docs/reference/tools/editors/vscode/fuchsia-ext-install.md
 [get-started-sdk]: https://fuchsia.googlesource.com/sdk-samples/getting-started
-[sdk-start-emulator]: /docs/development/sdk/ffx/start-the-fuchsia-emulator.md
+[sdk-start-emulator]: /docs/development/tools/ffx/workflows/start-the-fuchsia-emulator.md
 [zx_clock_get_monotonic]: /reference/syscalls/clock_get_monotonic.md
 [add-tags-logging]: /docs/development/languages/rust/logging.md#add_tags
 [log-severity]: /docs/development/diagnostics/logs/severity.md
-[monitor-device-logs]: /docs/development/sdk/ffx/view-device-logs.md#monitor-device-logs
+[monitor-device-logs]: /docs/development/tools/ffx/workflows/view-device-logs.md#monitor-device-logs
 [zxdb-docs]: /docs/development/debugging/debugging.md
 [run-components]: /docs/development/components/run.md#run
 [zxdb-commands-docs]: /docs/development/debugger/commands.md

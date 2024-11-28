@@ -17,8 +17,7 @@ use tracing::warn;
 /// # Returns
 /// `LoggerProxy` for log messages to be sent to.
 pub fn get_logger() -> Result<MetricEventLoggerProxy, Error> {
-    let (logger_proxy, server_end) =
-        fidl::endpoints::create_proxy().context("Failed to create endpoints")?;
+    let (logger_proxy, server_end) = fidl::endpoints::create_proxy();
     let logger_factory = connect_to_protocol::<MetricEventLoggerFactoryMarker>()
         .context("Failed to connect to the Cobalt MetricEventLoggerFactory")?;
 
@@ -84,8 +83,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_log_session_launch_time() {
         let (logger_proxy, mut logger_server) =
-            create_proxy_and_stream::<MetricEventLoggerMarker>()
-                .expect("Failed to create Logger FIDL.");
+            create_proxy_and_stream::<MetricEventLoggerMarker>();
         let start_time = zx::MonotonicInstant::from_nanos(0);
         let end_time = zx::MonotonicInstant::from_nanos(5000);
 
@@ -113,8 +111,7 @@ mod tests {
     /// Tests that an error is raised if end_time < start_time.
     #[fuchsia::test(allow_stalls = false)]
     async fn test_log_session_launch_time_swap_start_end_time() {
-        let (logger_proxy, _logger_server) = create_proxy_and_stream::<MetricEventLoggerMarker>()
-            .expect("Failed to create Logger FIDL.");
+        let (logger_proxy, _logger_server) = create_proxy_and_stream::<MetricEventLoggerMarker>();
         let start_time = zx::MonotonicInstant::from_nanos(0);
         let end_time = zx::MonotonicInstant::from_nanos(5000);
 

@@ -27,6 +27,7 @@ template("variant") {
                            [
                              "common_flags",
                              "deps",
+                             "executable_deps",
                            ])
     if (defined(invoker.common_flags)) {
       asmflags += invoker.common_flags
@@ -39,6 +40,13 @@ template("variant") {
     # public_configs that will be applied to variant executables.
     if (defined(invoker.deps)) {
       public_deps = invoker.deps
+    }
+  }
+  group("${target_name}_executable_deps") {
+    # Propagate it as public_deps so that targets in deps can have
+    # public_configs that will be applied to variant executables.
+    if (defined(invoker.executable_deps)) {
+      public_deps = invoker.executable_deps
     }
   }
 }

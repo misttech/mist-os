@@ -361,19 +361,19 @@ impl RunnerServer {
                 let runner_ctrl = responder.control_handle().clone();
                 match any_target {
                     AnyTarget::Closed(target) => {
-                        let (stream, ctrl) = target.into_stream_and_control_handle().unwrap();
+                        let (stream, ctrl) = target.into_stream_and_control_handle();
                         self.target_ctrl = Some(TargetControlHandle::Closed(ctrl));
                         self.target_serve_fut =
                             serve_closed_target(stream, runner_ctrl, self.tag).boxed().fuse();
                     }
                     AnyTarget::Ajar(target) => {
-                        let (stream, ctrl) = target.into_stream_and_control_handle().unwrap();
+                        let (stream, ctrl) = target.into_stream_and_control_handle();
                         self.target_ctrl = Some(TargetControlHandle::Ajar(ctrl));
                         self.target_serve_fut =
                             serve_ajar_target(stream, runner_ctrl, self.tag).boxed().fuse();
                     }
                     AnyTarget::Open(target) => {
-                        let (stream, ctrl) = target.into_stream_and_control_handle().unwrap();
+                        let (stream, ctrl) = target.into_stream_and_control_handle();
                         self.target_ctrl = Some(TargetControlHandle::Open(ctrl));
                         self.target_serve_fut =
                             serve_open_target(stream, runner_ctrl, self.tag).boxed().fuse();

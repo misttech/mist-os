@@ -261,7 +261,7 @@ impl Vsock {
         let mut start_device = |device: &DeviceProxy| {
             let (callbacks_client, callbacks_server) =
                 endpoints::create_endpoints::<CallbacksMarker>();
-            server_streams.push(callbacks_server.into_stream().unwrap());
+            server_streams.push(callbacks_server.into_stream());
 
             device.start(callbacks_client).map(map_driver_result).err_into::<anyhow::Error>()
         };
@@ -313,7 +313,7 @@ impl Vsock {
         acceptor: fidl::endpoints::ClientEnd<fidl_fuchsia_vsock::AcceptorMarker>,
         local_port: u32,
     ) -> Result<(), Error> {
-        let acceptor = acceptor.into_proxy().map_err(|x| Error::ClientCommunication(x.into()))?;
+        let acceptor = acceptor.into_proxy();
         let stream = self.listen_port(local_port)?;
         self.borrow_mut().tasks.local(
             self.clone()
@@ -329,7 +329,7 @@ impl Vsock {
         listener: fidl::endpoints::ServerEnd<fidl_fuchsia_vsock::ListenerMarker>,
         port: Addr,
     ) -> Result<(), Error> {
-        let stream = listener.into_stream().map_err(|x| Error::ClientCommunication(x.into()))?;
+        let stream = listener.into_stream();
         self.bind_port(port.clone())?;
         self.borrow_mut().tasks.local(
             self.clone()
@@ -550,7 +550,7 @@ impl Vsock {
     ) -> Result<addr::Vsock, Error> {
         if let Some(addr) = socket.pop_addr() {
             let data = con.data;
-            let con = con.con.into_stream().map_err(|x| Error::ClientCommunication(x.into()))?;
+            let con = con.con.into_stream();
             let shutdown_event = self.send_response(&addr, data)?.await?;
             self.borrow_mut().tasks.local(
                 self.clone()
@@ -620,10 +620,7 @@ impl Vsock {
                 match maybe_con {
                     Some(con) => {
                         let data = con.data;
-                        let con = con
-                            .con
-                            .into_stream()
-                            .map_err(|x| Error::ClientCommunication(x.into()))?;
+                        let con = con.con.into_stream();
                         let shutdown_event = self.send_response(&addr, data)?.await?;
                         self.borrow_mut().tasks.local(
                             self.clone()
@@ -657,7 +654,7 @@ impl Vsock {
             return Err(Error::ConnectionRefused);
         }
         let data = con.data;
-        let con = con.con.into_stream().map_err(|x| Error::ClientCommunication(x.into()))?;
+        let con = con.con.into_stream();
         let port = self.clone().alloc_ephemeral_port(remote_cid).ok_or(Error::OutOfPorts)?;
         let port_value = port.port.1;
         let addr = addr::Vsock::new(port_value, remote_port, remote_cid);

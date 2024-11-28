@@ -110,7 +110,7 @@ async fn mmap_anonymous() {
             find_mapping_in_range(&process, |map, info| {
                 // Within the restricted aspace.
                 if map.base >= base && map.base + map.size <= base + len {
-                    if info.populated_pages == 4200 {  // See mmap_anonymous_then_sleep.c for size.
+                    if info.populated_bytes == (4200 * zx::system_get_page_size()) as usize {  // See mmap_anonymous_then_sleep.c for size.
                         return true;
                     }
                 }
@@ -222,7 +222,7 @@ async fn init_attribution_test() -> AttributionTest {
 
     // Start the container and obtain its execution controller.
     let (container_controller, server_end) =
-        fidl::endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fcomponent::ControllerMarker>();
     let realm_proxy =
         realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
     realm_proxy
@@ -234,7 +234,7 @@ async fn init_attribution_test() -> AttributionTest {
         .unwrap()
         .expect("open_controller");
     let (container_execution, server_end) =
-        fidl::endpoints::create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fcomponent::ExecutionControllerMarker>();
     container_controller
         .start(fcomponent::StartChildArgs::default(), server_end)
         .await
@@ -258,21 +258,13 @@ async fn init_attribution_test() -> AttributionTest {
 
     let attribution_provider = loop {
         std::thread::sleep(std::time::Duration::from_secs(1));
-        let (attribution_provider, server_end) =
-            fidl::endpoints::create_proxy::<fattribution::ProviderMarker>().unwrap();
-        match realm_query
-            .open(
-                &starnix_kernel_moniker,
-                fsys2::OpenDirType::ExposedDir,
-                fio::OpenFlags::empty(),
-                fio::ModeType::empty(),
-                fattribution::ProviderMarker::PROTOCOL_NAME,
-                server_end.into_channel().into(),
-            )
-            .await
-            .unwrap()
+        match connect_to_service_in_exposed_dir::<fattribution::ProviderMarker>(
+            &realm_query,
+            &starnix_kernel_moniker,
+        )
+        .await
         {
-            Ok(()) => break attribution_provider,
+            Ok(provider) => break provider,
             Err(OpenError::InstanceNotResolved) => continue,
             Err(e) => panic!("Error opening the starnix kernel memory provider: {:?}", e),
         }
@@ -307,20 +299,12 @@ async fn get_process_handle_by_name(realm: &RealmInstance, name: &str) -> zx::Pr
     let realm_query =
         realm.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
     let starnix_kernel_moniker = find_starnix_kernel_moniker(&realm_query).await.unwrap();
-    let (starnix_controller, server_end) =
-        fidl::endpoints::create_proxy::<fcontainer::ControllerMarker>().unwrap();
-    realm_query
-        .open(
-            &starnix_kernel_moniker,
-            fsys2::OpenDirType::ExposedDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            fcontainer::ControllerMarker::PROTOCOL_NAME,
-            server_end.into_channel().into(),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+    let starnix_controller = connect_to_service_in_exposed_dir::<fcontainer::ControllerMarker>(
+        &realm_query,
+        &starnix_kernel_moniker,
+    )
+    .await
+    .unwrap();
     let starnix_kernel_job = starnix_controller.get_job_handle().await.unwrap().job.unwrap();
 
     // Find the process named with the given name in the job.
@@ -339,7 +323,7 @@ async fn get_process_handle_by_name(realm: &RealmInstance, name: &str) -> zx::Pr
 async fn find_starnix_kernel_moniker(realm_query: &fsys2::RealmQueryProxy) -> Option<String> {
     // Enumerate the instances until we find the starnix kernel.
     let iterator = realm_query.get_all_instances().await.unwrap().unwrap();
-    let iterator = iterator.into_proxy().unwrap();
+    let iterator = iterator.into_proxy();
     while let Ok(instances) = iterator.next().await {
         for instance in instances {
             if let Some(url) = instance.url {
@@ -351,6 +335,26 @@ async fn find_starnix_kernel_moniker(realm_query: &fsys2::RealmQueryProxy) -> Op
     }
 
     None
+}
+
+/// Connects to a named service in the component's exposed directory referenced by `moniker`
+/// relative to `realm`.
+async fn connect_to_service_in_exposed_dir<T: DiscoverableProtocolMarker>(
+    realm: &fsys2::RealmQueryProxy,
+    moniker: &str,
+) -> Result<T::Proxy, OpenError> {
+    let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    realm.open_directory(moniker, fsys2::OpenDirType::ExposedDir, server_end).await.unwrap()?;
+    let (service, server_end) = fidl::endpoints::create_proxy::<T>();
+    exposed_dir
+        .open3(
+            T::PROTOCOL_NAME,
+            fio::Flags::PROTOCOL_SERVICE,
+            &Default::default(),
+            server_end.into_channel(),
+        )
+        .unwrap();
+    Ok(service)
 }
 
 /// Find a mapping in the process that satisfies the predicate.

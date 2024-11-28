@@ -17,17 +17,17 @@ pub const NUM_PLATFORM_MAX_ROAMS_PER_DAY: usize = 5;
 pub const TIMESPAN_TO_LIMIT_SCANS: zx::MonotonicDuration = zx::MonotonicDuration::from_hours(24);
 
 // LINT.IfChange
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum RoamingPolicy {
     Disabled,
     Enabled { profile: RoamingProfile, mode: RoamingMode },
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum RoamingProfile {
     Stationary,
 }
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub enum RoamingMode {
     MetricsOnly,
     #[default]

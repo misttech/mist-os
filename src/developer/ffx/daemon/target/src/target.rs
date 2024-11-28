@@ -471,7 +471,7 @@ impl Target {
             t.nodename.take(),
             t.serial.take(),
             t.addresses.drain(..).collect(),
-            t.fastboot_interface.ok_or(anyhow!("No fastboot mode?"))?,
+            t.fastboot_interface.ok_or_else(|| anyhow!("No fastboot mode?"))?,
         ))
     }
 
@@ -727,7 +727,7 @@ impl Target {
     }
 
     pub fn nodename_str(&self) -> String {
-        self.nodename().unwrap_or("<unknown>".to_owned())
+        self.nodename().unwrap_or_else(|| "<unknown>".to_owned())
     }
 
     pub fn boot_timestamp_nanos(&self) -> Option<u64> {
@@ -1265,7 +1265,7 @@ impl Target {
                 bail!("RCS connection issue")
             }
         }
-        self.rcs().ok_or(anyhow!("rcs dropped after event fired")).map(|r| r.proxy)
+        self.rcs().ok_or_else(|| anyhow!("rcs dropped after event fired")).map(|r| r.proxy)
     }
 
     pub async fn is_fastboot_tcp(&self) -> Result<bool> {
@@ -1576,8 +1576,7 @@ mod test {
         send_internal_error: bool,
         nodename_response: String,
     ) -> RemoteControlProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
 
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
@@ -1624,8 +1623,7 @@ mod test {
     fn setup_fake_unresponsive_remote_control_service(
         done: channel::oneshot::Receiver<()>,
     ) -> RemoteControlProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
 
         fuchsia_async::Task::local(async move {
             while let Ok(Some(_req)) = stream.try_next().await {}

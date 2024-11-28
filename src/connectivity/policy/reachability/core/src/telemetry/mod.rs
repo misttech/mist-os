@@ -27,8 +27,7 @@ pub async fn create_metrics_logger(
     factory_proxy: fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy,
 ) -> Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, Error> {
     let (cobalt_proxy, cobalt_server) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-            .context("failed to create MetricEventLoggerMarker endponts")?;
+        fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
     let project_spec = fidl_fuchsia_metrics::ProjectSpec {
         customer_id: None, // defaults to fuchsia.
@@ -1090,8 +1089,7 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let (cobalt_proxy, cobalt_stream) =
-            create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-                .expect("failed to create MetricsEventLogger proxy");
+            create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
         let inspector = Inspector::default();
         let inspect_node = inspector.root().create_child("telemetry");

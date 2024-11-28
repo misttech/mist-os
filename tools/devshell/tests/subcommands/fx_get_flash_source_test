@@ -167,11 +167,11 @@ EOF
   BT_EXPECT_FILE_CONTAINS_SUBSTRING stderr "Failed to find a product bundle"
 }
 
-TEST_fx-get-flash-source-with-main-product-label() {
+TEST_fx-get-flash-source-with-main-pb-label() {
   cat > "${BT_TEMP_DIR}/out/default/args.json" <<EOF
 {
   "use_bazel_images_only": true,
-  "main_product_label": "//build/images/fuchsia:product_bundle_eng"
+  "main_pb_label": "//build/images/fuchsia:product_bundle_eng"
 }
 EOF
   cat > "${BT_TEMP_DIR}/out/default/product_bundles.json" <<EOF

@@ -25,7 +25,7 @@ impl Stressor {
 
     pub async fn get_instances_in_realm(&self) -> Vec<String> {
         let iterator = self.realm_query.get_all_instances().await.unwrap().unwrap();
-        let iterator = iterator.into_proxy().unwrap();
+        let iterator = iterator.into_proxy();
 
         let mut instances = vec![];
 

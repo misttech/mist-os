@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Common utilities needed by @fuchsia_workspace rules."""
+"""Common utilities needed by @rules_fuchsia rules."""
 
 def normalize_os(ctx):
     # On osx os.name => "mac os x".

@@ -77,8 +77,8 @@ impl RoutineType {
 impl From<fnet_filter_ext::RoutineType> for RoutineType {
     fn from(routine_type: fnet_filter_ext::RoutineType) -> Self {
         match routine_type {
-            fnet_filter_ext::RoutineType::Ip(installation) => Self::Ip(installation.map_or(
-                IpRoutineType::Uninstalled(ROUTINE_COUNTER.fetch_add(1, Ordering::Relaxed)),
+            fnet_filter_ext::RoutineType::Ip(installation) => Self::Ip(installation.map_or_else(
+                || IpRoutineType::Uninstalled(ROUTINE_COUNTER.fetch_add(1, Ordering::Relaxed)),
                 |fnet_filter_ext::InstalledIpRoutine { hook, priority }| {
                     IpRoutineType::Installed(InstalledIpRoutine {
                         hook,
@@ -87,8 +87,8 @@ impl From<fnet_filter_ext::RoutineType> for RoutineType {
                     })
                 },
             )),
-            fnet_filter_ext::RoutineType::Nat(installation) => Self::Nat(installation.map_or(
-                NatRoutineType::Uninstalled(ROUTINE_COUNTER.fetch_add(1, Ordering::Relaxed)),
+            fnet_filter_ext::RoutineType::Nat(installation) => Self::Nat(installation.map_or_else(
+                || NatRoutineType::Uninstalled(ROUTINE_COUNTER.fetch_add(1, Ordering::Relaxed)),
                 |fnet_filter_ext::InstalledNatRoutine { hook, priority }| {
                     NatRoutineType::Installed(InstalledNatRoutine {
                         hook,

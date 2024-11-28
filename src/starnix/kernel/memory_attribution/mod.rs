@@ -40,7 +40,7 @@ struct InitialState {
 impl MemoryAttributionManager {
     pub fn new(kernel: Weak<Kernel>) -> Self {
         let (publisher_tx, publisher_rx) = mpsc::sync_channel(1);
-        let weak_kernel = kernel.clone();
+        let weak_kernel = kernel;
         let publisher_rx = Arc::new(Mutex::new(Some(publisher_rx)));
         let memory_attribution_server = AttributionServer::new(Box::new(move || {
             // Initial scan of the PID table when a client connects.
@@ -116,6 +116,8 @@ impl MemoryAttributionManager {
                 for thread_group in pids.get_thread_groups() {
                     let pid = thread_group.leader;
                     new_processes.insert(pid);
+                    // TODO(https://fxbug.dev/379733655): Remove this
+                    #[allow(clippy::set_contains_or_insert)]
                     if !processes.contains(&pid) {
                         let name = get_thread_group_identifier(&thread_group);
                         let mut update = attribution_info_for_thread_group(name, &thread_group);
@@ -155,7 +157,7 @@ fn attribution_info_for_thread_group(
     name: String,
     thread_group: &ThreadGroup,
 ) -> Vec<fattribution::AttributionUpdate> {
-    let new = new_principal(thread_group.leader, name.clone());
+    let new = new_principal(thread_group.leader, name);
     let updated = updated_principal(thread_group);
     iter::once(new).chain(updated.into_iter()).collect()
 }

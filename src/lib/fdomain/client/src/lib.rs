@@ -416,7 +416,7 @@ impl ClientInner {
                 if let Entry::Occupied(mut o) = self.socket_read_subscriptions.entry(msg.handle) {
                     match msg.socket_message {
                         proto::SocketMessage::Data(data) => {
-                            if o.get_mut().unbounded_send(Ok(data.clone())).is_err() {
+                            if o.get_mut().unbounded_send(Ok(data)).is_err() {
                                 let _ = o.remove();
                                 self.request(
                                     ordinals::READ_SOCKET_STREAMING_STOP,
@@ -448,7 +448,7 @@ impl ClientInner {
                 if let Entry::Occupied(mut o) = self.channel_read_subscriptions.entry(msg.handle) {
                     match msg.channel_sent {
                         proto::ChannelSent::Message(data) => {
-                            if o.get_mut().unbounded_send(Ok(data.clone())).is_err() {
+                            if o.get_mut().unbounded_send(Ok(data)).is_err() {
                                 let _ = o.remove();
                                 self.request(
                                     ordinals::READ_CHANNEL_STREAMING_STOP,
@@ -580,12 +580,20 @@ impl Client {
         Ok((client_end, server_end))
     }
 
-    /// Creates client and server endpoints connected to by a channel.
+    /// Creates a client proxy and a server endpoint connected by a channel.
     pub async fn create_proxy<F: crate::fidl::ProtocolMarker>(
         self: &Arc<Self>,
     ) -> Result<(F::Proxy, crate::fidl::ServerEnd<F>), Error> {
         let (client_end, server_end) = self.create_endpoints::<F>().await?;
         Ok((client_end.into_proxy()?, server_end))
+    }
+
+    /// Creates a client proxy and a server request stream connected by a channel.
+    pub async fn create_proxy_and_stream<F: crate::fidl::ProtocolMarker>(
+        self: &Arc<Self>,
+    ) -> Result<(F::Proxy, F::RequestStream), Error> {
+        let (client_end, server_end) = self.create_endpoints::<F>().await?;
+        Ok((client_end.into_proxy()?, server_end.into_stream()?))
     }
 
     /// Create a new socket in the connected FDomain.

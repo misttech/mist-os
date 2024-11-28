@@ -170,8 +170,7 @@ where
 
         let proxy = self.installer_connector.connect().map_err(FuchsiaInstallError::Connect)?;
         let (reboot_controller, reboot_controller_server_end) =
-            fidl::endpoints::create_proxy::<RebootControllerMarker>()
-                .map_err(FuchsiaInstallError::Fidl)?;
+            fidl::endpoints::create_proxy::<RebootControllerMarker>();
 
         if self.allow_reboot {
             self.reboot_controller = Some(reboot_controller);
@@ -538,9 +537,8 @@ mod tests {
         CupRequestStream,
     ) {
         let (installer_proxy, installer_stream) =
-            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
-        let (cup_proxy, cup_stream) =
-            fidl::endpoints::create_proxy_and_stream::<CupMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>();
+        let (cup_proxy, cup_stream) = fidl::endpoints::create_proxy_and_stream::<CupMarker>();
         let app = omaha_client::common::App::builder().id("system_id").version([1]).build();
         let app_metadata = AppMetadata { appid_source: AppIdSource::VbMetadata };
         let app_set = Rc::new(AsyncMutex::new(FuchsiaAppSet::new(app, app_metadata)));
@@ -604,7 +602,7 @@ mod tests {
                     assert!(should_write_recovery);
                     assert!(allow_attach_to_existing_attempt);
                     responder.send(Ok("00000000-0000-0000-0000-000000000001")).unwrap();
-                    let monitor = monitor.into_proxy().unwrap();
+                    let monitor = monitor.into_proxy();
                     let () = monitor
                         .on_state(&State::Stage(fidl_fuchsia_update_installer::StageData {
                             info: Some(UpdateInfo {
@@ -703,7 +701,7 @@ mod tests {
                     assert!(should_write_recovery);
                     assert!(allow_attach_to_existing_attempt);
                     responder.send(Ok("00000000-0000-0000-0000-000000000001")).unwrap();
-                    let monitor = monitor.into_proxy().unwrap();
+                    let monitor = monitor.into_proxy();
                     let () = monitor
                         .on_state(&State::Stage(fidl_fuchsia_update_installer::StageData {
                             info: Some(UpdateInfo {
@@ -738,7 +736,7 @@ mod tests {
                         .unwrap();
 
                     let mut reboot_controller_request_stream =
-                        reboot_controller.unwrap().into_stream().unwrap();
+                        reboot_controller.unwrap().into_stream();
                     assert_matches!(
                         reboot_controller_request_stream.next().await.unwrap(),
                         Ok(RebootControllerRequest::Detach { .. })
@@ -841,7 +839,7 @@ mod tests {
                 Ok(InstallerRequest::StartUpdate { monitor, responder, .. }) => {
                     responder.send(Ok("00000000-0000-0000-0000-000000000002")).unwrap();
 
-                    let monitor = monitor.into_proxy().unwrap();
+                    let monitor = monitor.into_proxy();
                     let () = monitor
                         .on_state(&State::FailPrepare(FailPrepareData {
                             reason: Some(
@@ -876,7 +874,7 @@ mod tests {
                 Ok(InstallerRequest::StartUpdate { monitor, responder, .. }) => {
                     responder.send(Ok("00000000-0000-0000-0000-000000000003")).unwrap();
 
-                    let monitor = monitor.into_proxy().unwrap();
+                    let monitor = monitor.into_proxy();
                     let () = monitor
                         .on_state(&State::Prepare(
                             fidl_fuchsia_update_installer::PrepareData::default(),
@@ -920,7 +918,7 @@ mod tests {
     async fn test_reboot() {
         let mut installer = new_installer();
         let (reboot_controller, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<RebootControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<RebootControllerMarker>();
         installer.reboot_controller = Some(reboot_controller);
 
         {

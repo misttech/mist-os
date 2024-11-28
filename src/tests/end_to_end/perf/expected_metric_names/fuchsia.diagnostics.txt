@@ -3,6 +3,10 @@ fuchsia.diagnostics.lib.selectors: parse_selector/no_wildcard/24
 fuchsia.diagnostics.lib.selectors: parse_selector/no_wildcard/644
 fuchsia.diagnostics.lib.selectors: parse_selector/with_escaped/24
 fuchsia.diagnostics.lib.selectors: parse_selector/with_escaped/644
+fuchsia.diagnostics.lib.selectors: parse_selector/with_tree_name/59
+fuchsia.diagnostics.lib.selectors: parse_selector/with_tree_name/856
+fuchsia.diagnostics.lib.selectors: parse_selector/with_tree_name_and_odd_chars/1944
+fuchsia.diagnostics.lib.selectors: parse_selector/with_tree_name_and_odd_chars/93
 fuchsia.diagnostics.lib.selectors: parse_selector/with_wildcard/24
 fuchsia.diagnostics.lib.selectors: parse_selector/with_wildcard/644
 fuchsia.diagnostics.lib.selectors: sanitize_string_for_selectors/empty

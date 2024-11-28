@@ -171,6 +171,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.test:fuchsia.test",
   "//sdk/fidl/fuchsia.thermal:fuchsia.thermal",
   "//sdk/fidl/fuchsia.tracing:fuchsia.tracing",
+  "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller",
   "//sdk/fidl/fuchsia.tracing.perfetto:fuchsia.tracing.perfetto",
   "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider",
   "//sdk/fidl/fuchsia.ui.activity:fuchsia.ui.activity",

@@ -4,9 +4,9 @@
 
 use argh::FromArgs;
 use assembly_config_schema::BuildType;
-use assembly_util::{
+use assembly_constants::{
     BlobfsCompiledPackageDestination, BootfsCompiledPackageDestination, BootfsDestination,
-    BootfsPackageDestination, PackageDestination,
+    BootfsPackageDestination, KernelArg, PackageDestination,
 };
 use camino::Utf8PathBuf;
 use strum::IntoEnumIterator;
@@ -25,6 +25,10 @@ struct Args {
     /// the path to the output bootfs file allowlist.
     #[argh(option)]
     bootfs_files: Utf8PathBuf,
+
+    /// the path to the output kernel args allowlist.
+    #[argh(option)]
+    kernel_args: Utf8PathBuf,
 
     /// build type of the product.
     #[argh(option)]
@@ -183,4 +187,9 @@ fn main() {
         .collect();
     bootfs_files.sort();
     std::fs::write(args.bootfs_files, bootfs_files.join("\n")).expect("Writing bootfs allowlist");
+
+    let kernel_args: Vec<String> =
+        KernelArg::iter().map(|a| a.allowlist_entries()).flatten().collect();
+    std::fs::write(args.kernel_args, kernel_args.join("\n"))
+        .expect("Writing kernel args allowlist");
 }

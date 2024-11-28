@@ -37,9 +37,6 @@ pub(crate) enum ResolverError {
     #[error("failed to read the manifest")]
     ReadManifest(#[source] mem_util::DataError),
 
-    #[error("failed to create FIDL endpoints")]
-    CreateEndpoints(#[source] fidl::Error),
-
     #[error("serve package directory")]
     ServePackageDirectory(#[source] package_directory::Error),
 
@@ -91,10 +88,7 @@ impl From<&ResolverError> for fcomponent_resolution::ResolverError {
             ParsingManifest(_) | UnsupportedConfigSource(_) | InvalidConfigSource => {
                 ferror::InvalidManifest
             }
-            ReadManifest(_)
-            | CreateEndpoints(_)
-            | ServePackageDirectory(_)
-            | ReadingSubpackageManifest(_) => ferror::Io,
+            ReadManifest(_) | ServePackageDirectory(_) | ReadingSubpackageManifest(_) => ferror::Io,
             ConvertProxyToChannel | SuperpackageNotOpen { .. } => ferror::Internal,
             SubpackageNotFound | PackageNotInBase(_) => ferror::PackageNotFound,
             AbiRevision(_) => ferror::InvalidAbiRevision,
@@ -122,10 +116,7 @@ impl From<&ResolverError> for fpkg::ResolveError {
             | InvalidConfigSource
             | ConvertProxyToChannel
             | SuperpackageNotOpen { .. } => ferror::Internal,
-            ReadManifest(_)
-            | CreateEndpoints(_)
-            | ServePackageDirectory(_)
-            | ReadingSubpackageManifest(_) => ferror::Io,
+            ReadManifest(_) | ServePackageDirectory(_) | ReadingSubpackageManifest(_) => ferror::Io,
             PackageNotInBase(_) | SubpackageNotFound => ferror::PackageNotFound,
             ContextWithAbsoluteUrl | InvalidContext(_) => ferror::InvalidContext,
         }

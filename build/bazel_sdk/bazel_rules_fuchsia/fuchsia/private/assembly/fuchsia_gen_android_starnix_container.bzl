@@ -4,6 +4,7 @@
 
 load("//fuchsia/private:fuchsia_prebuilt_package.bzl", "fuchsia_prebuilt_package")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 def _gen_android_starnix_container_impl(ctx):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
@@ -68,6 +69,7 @@ def _gen_android_starnix_container_impl(ctx):
         arguments = _args,
         inputs = _package_inputs,
         outputs = _outputs,
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     return [

@@ -310,7 +310,7 @@ impl<D: Decodable<Error = Error>> CommandResponseFut<D> {
             }
             Ok(header) => header,
         };
-        let response = CommandResponse { id: header.label(), inner: Some(inner.clone()) };
+        let response = CommandResponse { id: header.label(), inner: Some(inner) };
         let err_timeout: fn() -> Result<Vec<u8>> = || Err(Error::Timeout);
         let timedout_fut = response.on_timeout(Peer::COMMAND_TIMEOUT.after_now(), err_timeout);
 

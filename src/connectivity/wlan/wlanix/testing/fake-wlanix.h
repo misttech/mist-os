@@ -32,6 +32,7 @@ enum class CommandTag {
   kWifiChipGetStaIfaceNames,
   kWifiChipGetStaIface,
   kWifiChipRemoveStaIface,
+  kWifiChipSetCountryCode,
   kWifiChipGetAvailableModes,
   kWifiChipGetId,
   kWifiChipGetMode,
@@ -44,6 +45,9 @@ enum class CommandTag {
   kSupplicantStaIfaceRegisterCallback,
   kSupplicantStaIfaceAddNetwork,
   kSupplicantStaIfaceDisconnect,
+  kSupplicantStaIfaceSetPowerSave,
+  kSupplicantStaIfaceSetSuspendModeEnabled,
+  kSupplicantStaIfaceSetStaCountryCode,
   kSupplicantStaIfaceUnknownMethod,
   kSupplicantStaNetworkSetBssid,
   kSupplicantStaNetworkClearBssid,
@@ -103,6 +107,8 @@ class FakeWlanix : public fidl::WireServer<fuchsia_wlan_wlanix::Wlanix>,
                    GetStaIfaceCompleter::Sync& completer) override;
   void RemoveStaIface(fuchsia_wlan_wlanix::wire::WifiChipRemoveStaIfaceRequest* request,
                       RemoveStaIfaceCompleter::Sync& completer) override;
+  void SetCountryCode(fuchsia_wlan_wlanix::wire::WifiChipSetCountryCodeRequest* request,
+                      SetCountryCodeCompleter::Sync& completer) override;
   void GetAvailableModes(GetAvailableModesCompleter::Sync& completer) override;
   void GetId(GetIdCompleter::Sync& completer) override;
   void GetMode(GetModeCompleter::Sync& completer) override;
@@ -129,6 +135,14 @@ class FakeWlanix : public fidl::WireServer<fuchsia_wlan_wlanix::Wlanix>,
   void AddNetwork(fuchsia_wlan_wlanix::wire::SupplicantStaIfaceAddNetworkRequest* request,
                   AddNetworkCompleter::Sync& completer) override;
   void Disconnect(DisconnectCompleter::Sync& completer) override;
+  void SetPowerSave(fuchsia_wlan_wlanix::wire::SupplicantStaIfaceSetPowerSaveRequest* request,
+                    SetPowerSaveCompleter::Sync& completer) override;
+  void SetSuspendModeEnabled(
+      fuchsia_wlan_wlanix::wire::SupplicantStaIfaceSetSuspendModeEnabledRequest* request,
+      SetSuspendModeEnabledCompleter::Sync& completer) override;
+  void SetStaCountryCode(
+      fuchsia_wlan_wlanix::wire::SupplicantStaIfaceSetStaCountryCodeRequest* request,
+      SetStaCountryCodeCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::SupplicantStaIface> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;

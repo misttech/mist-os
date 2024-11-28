@@ -22,8 +22,8 @@ zx::result<> ParentZirconTransportDriver::Start() {
   }
 
   // Add a child with a `fuchsia.hardware.i2c.Service` offer.
-  zx::result child_result =
-      AddChild("zircon_transport_child", {}, {fdf::MakeOffer2<fuchsia_hardware_i2c::Service>()});
+  zx::result child_result = AddChild("zircon_transport_child", {},
+                                     std::array{fdf::MakeOffer2<fuchsia_hardware_i2c::Service>()});
   if (child_result.is_error()) {
     return child_result.take_error();
   }

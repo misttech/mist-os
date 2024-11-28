@@ -11,8 +11,7 @@ pub fn open_get_proxy<M>(proxy: &fio::DirectoryProxy, flags: fio::OpenFlags, pat
 where
     M: ProtocolMarker,
 {
-    let (new_proxy, new_server_end) =
-        create_proxy::<M>().expect("Failed to create connection endpoints");
+    let (new_proxy, new_server_end) = create_proxy::<M>();
 
     proxy
         .open(
@@ -35,8 +34,7 @@ pub fn open3_get_proxy<M>(
 where
     M: ProtocolMarker,
 {
-    let (new_proxy, new_server_end) =
-        create_proxy::<M>().expect("Failed to create connection endpoints");
+    let (new_proxy, new_server_end) = create_proxy::<M>();
 
     proxy.open3(path, flags, options, new_server_end.into_channel()).unwrap();
 
@@ -66,8 +64,7 @@ where
     M: ProtocolMarker,
     Proxy: NodeProxyApi,
 {
-    let (new_proxy, new_server_end) =
-        create_proxy::<M>().expect("Failed to create connection endpoints");
+    let (new_proxy, new_server_end) = create_proxy::<M>();
 
     proxy.clone(flags, new_server_end.into_channel().into()).unwrap();
 

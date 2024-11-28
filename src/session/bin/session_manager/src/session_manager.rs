@@ -64,8 +64,7 @@ struct PendingSession {
 
 impl PendingSession {
     fn new() -> (fio::DirectoryProxy, Self) {
-        let (exposed_dir, exposed_dir_server_end) =
-            create_proxy::<fio::DirectoryMarker>().expect("creating proxy should not fail");
+        let (exposed_dir, exposed_dir_server_end) = create_proxy::<fio::DirectoryMarker>();
         (exposed_dir, Self { exposed_dir_server_end })
     }
 }
@@ -565,7 +564,7 @@ mod tests {
 
     fn serve_launcher(session_manager: SessionManager) -> fsession::LauncherProxy {
         let (launcher_proxy, launcher_stream) =
-            create_proxy_and_stream::<fsession::LauncherMarker>().unwrap();
+            create_proxy_and_stream::<fsession::LauncherMarker>();
         {
             let mut session_manager_ = session_manager.clone();
             fuchsia_async::Task::spawn(async move {
@@ -581,7 +580,7 @@ mod tests {
 
     fn serve_restarter(session_manager: SessionManager) -> fsession::RestarterProxy {
         let (restarter_proxy, restarter_stream) =
-            create_proxy_and_stream::<fsession::RestarterMarker>().unwrap();
+            create_proxy_and_stream::<fsession::RestarterMarker>();
         {
             let mut session_manager_ = session_manager.clone();
             fuchsia_async::Task::spawn(async move {
@@ -597,7 +596,7 @@ mod tests {
 
     fn serve_lifecycle(session_manager: SessionManager) -> fsession::LifecycleProxy {
         let (lifecycle_proxy, lifecycle_stream) =
-            create_proxy_and_stream::<fsession::LifecycleMarker>().unwrap();
+            create_proxy_and_stream::<fsession::LifecycleMarker>();
         {
             let mut session_manager_ = session_manager.clone();
             fuchsia_async::Task::spawn(async move {
@@ -666,8 +665,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -710,8 +708,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -746,8 +743,7 @@ mod tests {
     async fn test_restarter_restart_error_not_running() {
         let realm = spawn_stream_handler(move |_realm_request| async move {
             panic!("Realm should not receive any requests as there is no session to launch")
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -784,8 +780,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -828,8 +823,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager =
@@ -875,8 +869,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -924,8 +917,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -989,7 +981,7 @@ mod tests {
                     _ => panic!("Realm handler received an unexpected request"),
                 };
             }
-        })?;
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -997,7 +989,7 @@ mod tests {
 
         // Open an arbitrary node in the session's exposed dir.
         // The actual protocol does not matter because it's not being served.
-        let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
         open_session_exposed_dir(session_manager, fio::OpenFlags::empty(), svc_path, server_end);
         // Start the session.
@@ -1050,7 +1042,7 @@ mod tests {
                     _ => panic!("Realm handler received an unexpected request"),
                 };
             }
-        })?;
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -1066,7 +1058,7 @@ mod tests {
 
         // Open an arbitrary node in the session's exposed dir.
         // The actual protocol does not matter because it's not being served.
-        let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
         open_session_exposed_dir(session_manager, fio::OpenFlags::empty(), svc_path, server_end);
 

@@ -19,9 +19,7 @@ where
     P: Proxy + 'static,
     P::Protocol: DiscoverableProtocolMarker,
 {
-    let protocol_name = P::Protocol::PROTOCOL_NAME; // for error messages.
-    fidl::endpoints::create_proxy::<P::Protocol>()
-        .with_bug_context(|| format!("Failed creating proxy for protocol '{protocol_name}'"))
+    Ok(fidl::endpoints::create_proxy::<P::Protocol>())
 }
 
 pub async fn connect_to_rcs(env: &FhoEnvironment) -> Result<RemoteControlProxy> {
@@ -66,7 +64,7 @@ where
     P: Proxy + 'static,
     P::Protocol: DiscoverableProtocolMarker,
 {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>().unwrap();
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>();
     rcs::open_with_timeout::<P::Protocol>(
         timeout,
         moniker,
@@ -120,7 +118,7 @@ where
 {
     let svc_name = <P::Protocol as DiscoverableProtocolMarker>::PROTOCOL_NAME;
     let daemon = DaemonProxy::try_from_env(env).await.map_err(|err| anyhow::Error::from(err))?;
-    let (proxy, server_end) = create_proxy()?;
+    let (proxy, server_end) = create_proxy().bug_context("creating proxy")?;
 
     daemon
         .connect_to_protocol(svc_name, server_end.into_channel())

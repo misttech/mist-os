@@ -138,10 +138,10 @@ impl TryFrom<ffx::TargetInfo> for AddressesTarget {
     type Error = Error;
 
     fn try_from(t: ffx::TargetInfo) -> Result<Self> {
-        let addrs = t.addresses.ok_or(anyhow!("must contain an address"))?;
+        let addrs = t.addresses.ok_or_else(|| anyhow!("must contain an address"))?;
         let addrs = addrs.iter().map(TargetAddr::from).collect::<Vec<_>>();
 
-        Ok(Self((&addrs).to_ssh_addr().ok_or(anyhow!("could not convert to ssh addr"))?))
+        Ok(Self((&addrs).to_ssh_addr().ok_or_else(|| anyhow!("could not convert to ssh addr"))?))
     }
 }
 
@@ -225,11 +225,14 @@ impl TryFrom<ffx::TargetInfo> for SimpleTarget {
     type Error = Error;
 
     fn try_from(t: ffx::TargetInfo) -> Result<Self> {
-        let nodename = t.nodename.unwrap_or("".to_string());
-        let addrs = t.addresses.ok_or(anyhow!("must contain an address"))?;
+        let nodename = t.nodename.unwrap_or_else(|| "".to_string());
+        let addrs = t.addresses.ok_or_else(|| anyhow!("must contain an address"))?;
         let addrs = addrs.iter().map(TargetAddr::from).collect::<Vec<_>>();
 
-        Ok(Self(nodename, (&addrs).to_ssh_addr().ok_or(anyhow!("could not convert to ssh addr"))?))
+        Ok(Self(
+            nodename,
+            (&addrs).to_ssh_addr().ok_or_else(|| anyhow!("could not convert to ssh addr"))?,
+        ))
     }
 }
 
@@ -496,7 +499,9 @@ impl TryFrom<(Option<usize>, ffx::TargetInfo)> for StringifiedTarget {
         );
         Ok(Self {
             nodename: StringifiedField::String(nodename_to_string(index, target.nodename)),
-            serial: StringifiedField::String(target.serial_number.unwrap_or(UNKNOWN.to_string())),
+            serial: StringifiedField::String(
+                target.serial_number.unwrap_or_else(|| UNKNOWN.to_string()),
+            ),
             addresses: StringifiedTarget::field_from_addresses(
                 target.addresses.ok_or(StringifyError::MissingAddresses)?,
             ),
@@ -518,7 +523,7 @@ impl TryFrom<(Option<usize>, ffx::TargetInfo)> for JsonTarget {
     fn try_from((index, target): (Option<usize>, ffx::TargetInfo)) -> Result<Self, Self::Error> {
         Ok(Self {
             nodename: nodename_to_string(index, target.nodename),
-            serial: target.serial_number.unwrap_or(UNKNOWN.to_string()),
+            serial: target.serial_number.unwrap_or_else(|| UNKNOWN.to_string()),
             addresses: target
                 .addresses
                 .unwrap_or(vec![])

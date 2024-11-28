@@ -77,8 +77,7 @@ impl PartialEq for BackingDirectoryInfo {
 async fn open_storage_root(
     storage_source_info: &BackingDirectoryInfo,
 ) -> Result<fio::DirectoryProxy, ModelError> {
-    let (mut dir_proxy, local_server_end) =
-        create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
+    let (mut dir_proxy, local_server_end) = create_proxy::<fio::DirectoryMarker>();
     let mut full_backing_directory_path = storage_source_info.backing_directory_path.clone();
     full_backing_directory_path.extend(storage_source_info.backing_directory_subdir.clone());
     let path = full_backing_directory_path.to_string();
@@ -419,9 +418,8 @@ pub fn build_storage_admin_dictionary(
                     "storage admin protocol",
                     Some(component.context.policy().clone()),
                     Arc::new(move |channel, _target| {
-                        let stream = ServerEnd::<fsys::StorageAdminMarker>::new(channel)
-                            .into_stream()
-                            .unwrap();
+                        let stream =
+                            ServerEnd::<fsys::StorageAdminMarker>::new(channel).into_stream();
                         StorageAdmin::new()
                             .serve(storage_decl.clone(), weak_component.clone(), stream)
                             .boxed()

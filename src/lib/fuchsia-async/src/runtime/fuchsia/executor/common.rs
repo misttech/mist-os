@@ -12,10 +12,10 @@ use fuchsia_sync::Mutex;
 use zx::BootDuration;
 
 use std::any::Any;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::future::Future;
 use std::mem::ManuallyDrop;
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Weak};
 use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 use std::{fmt, u64, usize};
@@ -52,18 +52,37 @@ enum PollReadyTasksResult {
     MainTaskCompleted,
 }
 
-// -- Helpers for threads_state below --
+///  24           16           8            0
+///  +------------+------------+------------+
+///  |  foreign   |  notified  |  sleeping  |
+///  +------------+------------+------------+
+///
+///  sleeping : the number of threads sleeping
+///  notified : the number of notifications posted to wake sleeping threads
+///  foreign  : the number of foreign threads processing tasks
+#[derive(Clone, Copy, Eq, PartialEq)]
+struct ThreadsState(u32);
 
-fn threads_sleeping(state: u16) -> u8 {
-    state as u8
-}
+impl ThreadsState {
+    const fn sleeping(&self) -> u8 {
+        self.0 as u8
+    }
 
-fn threads_notified(state: u16) -> u8 {
-    (state >> 8) as u8
-}
+    const fn notified(&self) -> u8 {
+        (self.0 >> 8) as u8
+    }
 
-fn make_threads_state(sleeping: u8, notified: u8) -> u16 {
-    sleeping as u16 | ((notified as u16) << 8)
+    const fn with_sleeping(self, sleeping: u8) -> Self {
+        Self((self.0 & !0xff) | sleeping as u32)
+    }
+
+    const fn with_notified(self, notified: u8) -> Self {
+        Self(self.0 & !0xff00 | (notified as u32) << 8)
+    }
+
+    const fn with_foreign(self, foreign: u8) -> Self {
+        Self(self.0 & !0xff0000 | (foreign as u32) << 16)
+    }
 }
 
 #[cfg(test)]
@@ -81,7 +100,7 @@ pub(crate) struct Executor {
     time: ExecutorTime,
     // The low byte is the number of threads currently sleeping. The high byte is the number of
     // of wake-up notifications pending.
-    pub(super) threads_state: AtomicU16,
+    pub(super) threads_state: AtomicU32,
     pub(super) num_threads: u8,
     pub(super) polled: AtomicU64,
     // Data that belongs to the user that can be accessed via EHandle::local(). See
@@ -120,7 +139,7 @@ impl Executor {
             task_count: AtomicUsize::new(MAIN_TASK_ID + 1),
             ready_tasks: SegQueue::new(),
             time,
-            threads_state: AtomicU16::new(0),
+            threads_state: AtomicU32::new(0),
             num_threads,
             polled: AtomicU64::new(0),
             owner_data: Mutex::new(None),
@@ -149,13 +168,13 @@ impl Executor {
             }
             // We didn't finish all the ready tasks. If there are sleeping threads, post a
             // notification to wake one up.
-            let mut threads_state = self.threads_state.load(Ordering::Relaxed);
+            let mut threads_state = ThreadsState(self.threads_state.load(Ordering::Relaxed));
             loop {
-                if threads_sleeping(threads_state) == 0 {
+                if threads_state.sleeping() == 0 {
                     // All threads are awake now. Prevent starvation.
                     return PollReadyTasksResult::MoreReady;
                 }
-                if threads_notified(threads_state) >= threads_sleeping(threads_state) {
+                if threads_state.notified() >= threads_state.sleeping() {
                     // All sleeping threads have been notified. Keep going and poll more tasks.
                     break;
                 }
@@ -213,12 +232,11 @@ impl Executor {
         // which means notifications only get fired if this is from a non-async thread, or a thread
         // that belongs to a different executor. We use SeqCst ordering here to make sure this load
         // happens *after* the change to ready_tasks and to synchronize with worker_lifecycle.
-        let mut threads_state = self.threads_state.load(Ordering::SeqCst);
+        let mut threads_state = ThreadsState(self.threads_state.load(Ordering::SeqCst));
 
-        // We compare threads_state directly against self.num_threads (which means that
-        // notifications must be zero) because we only want to notify if there are no pending
-        // notifications and *all* threads are currently asleep.
-        while threads_state == self.num_threads as u16 {
+        // We only want to notify if there are no pending notifications and there are no other
+        // threads running.
+        while threads_state == ThreadsState(0).with_sleeping(self.num_threads) {
             match self.try_notify(threads_state) {
                 Ok(()) => break,
                 Err(s) => threads_state = s,
@@ -227,26 +245,25 @@ impl Executor {
     }
 
     /// Tries to notify a thread to wake up. Returns threads_state if it fails.
-    fn try_notify(&self, old_threads_state: u16) -> Result<(), u16> {
+    fn try_notify(&self, old_threads_state: ThreadsState) -> Result<(), ThreadsState> {
         self.threads_state
             .compare_exchange_weak(
-                old_threads_state,
-                old_threads_state + 0x100, // <- Add one to notifications.
+                old_threads_state.0,
+                old_threads_state.0 + ThreadsState(0).with_notified(1).0,
                 Ordering::Relaxed,
                 Ordering::Relaxed,
             )
             .map(|_| self.notify_id(TASK_READY_WAKEUP_ID))
+            .map_err(ThreadsState)
     }
 
     pub fn wake_one_thread(&self) {
-        let mut threads_state = self.threads_state.load(Ordering::Relaxed);
-        let current_sleeping = threads_sleeping(threads_state);
+        let mut threads_state = ThreadsState(self.threads_state.load(Ordering::Relaxed));
+        let current_sleeping = threads_state.sleeping();
         if current_sleeping == 0 {
             return;
         }
-        while threads_notified(threads_state) == 0
-            && threads_sleeping(threads_state) >= current_sleeping
-        {
+        while threads_state.notified() == 0 && threads_state.sleeping() >= current_sleeping {
             match self.try_notify(threads_state) {
                 Ok(()) => break,
                 Err(s) => threads_state = s,
@@ -365,16 +382,16 @@ impl Executor {
         // workers. This might be more notifications than required, but this way we don't have to
         // worry about races where tasks are just about to sleep; when a task receives the
         // notification, it will check done and terminate.
-        let mut threads_state = self.threads_state.load(Ordering::Relaxed);
+        let mut threads_state = ThreadsState(self.threads_state.load(Ordering::Relaxed));
         let num_threads = self.num_threads;
         loop {
-            let notified = threads_notified(threads_state);
+            let notified = threads_state.notified();
             if notified >= num_threads {
                 break;
             }
             match self.threads_state.compare_exchange_weak(
-                threads_state,
-                make_threads_state(threads_sleeping(threads_state), num_threads),
+                threads_state.0,
+                threads_state.with_notified(num_threads).0,
                 Ordering::Relaxed,
                 Ordering::Relaxed,
             ) {
@@ -384,7 +401,7 @@ impl Executor {
                     }
                     return;
                 }
-                Err(old) => threads_state = old,
+                Err(old) => threads_state = ThreadsState(old),
             }
         }
     }
@@ -491,7 +508,8 @@ impl Executor {
                     // want this change here to happen *before* we check ready_tasks below. This
                     // synchronizes with notify_task_ready which is called *after* a task is added
                     // to ready_tasks.
-                    self.threads_state.fetch_add(1, Ordering::SeqCst);
+                    const ONE_SLEEPING: ThreadsState = ThreadsState(0).with_sleeping(1);
+                    self.threads_state.fetch_add(ONE_SLEEPING.0, Ordering::SeqCst);
                     // Check ready tasks again. If a task got posted, wake up. This has to be done
                     // because a notification won't get sent if there is at least one active thread
                     // so there's a window between the preceding two lines where a task could be
@@ -501,7 +519,7 @@ impl Executor {
                         sleeping = true;
                     } else {
                         // We lost a race, we're no longer sleeping.
-                        self.threads_state.fetch_sub(1, Ordering::Relaxed);
+                        self.threads_state.fetch_sub(ONE_SLEEPING.0, Ordering::Relaxed);
                     }
                 }
                 PollReadyTasksResult::MoreReady => {}
@@ -551,9 +569,10 @@ impl Executor {
                 }
             };
 
-            let threads_state_sub = make_threads_state(sleeping as u8, notified as u8);
-            if threads_state_sub > 0 {
-                self.threads_state.fetch_sub(threads_state_sub, Ordering::Relaxed);
+            let threads_state_sub =
+                ThreadsState(0).with_sleeping(sleeping as u8).with_notified(notified as u8);
+            if threads_state_sub.0 > 0 {
+                self.threads_state.fetch_sub(threads_state_sub.0, Ordering::Relaxed);
             }
 
             match work {
@@ -580,7 +599,10 @@ impl Executor {
         let task_waker = unsafe {
             Waker::from_raw(RawWaker::new(Arc::as_ptr(task) as *const (), &BORROWED_VTABLE))
         };
-        match task.future.try_poll(&mut Context::from_waker(&task_waker)) {
+        let poll_result = Task::set_current_with(&*task, || {
+            task.future.try_poll(&mut Context::from_waker(&task_waker))
+        });
+        match poll_result {
             AttemptPollResult::Yield => {
                 self.ready_tasks.push(task.clone());
                 false
@@ -601,6 +623,42 @@ impl Executor {
     /// Returns the boot timers.
     pub fn boot_timers(&self) -> &Timers<BootInstant> {
         &self.boot_timers
+    }
+
+    fn poll_tasks(&self, callback: impl FnOnce()) {
+        assert!(!self.is_local);
+
+        // Increment the count of foreign threads.
+        const ONE_FOREIGN: ThreadsState = ThreadsState(0).with_foreign(1);
+        self.threads_state.fetch_add(ONE_FOREIGN.0, Ordering::Relaxed);
+
+        callback();
+
+        // Poll up to 16 tasks.
+        for _ in 0..16 {
+            let Some(task) = self.ready_tasks.pop() else {
+                break;
+            };
+            if self.try_poll(&task) && task.id == MAIN_TASK_ID {
+                break;
+            }
+            self.polled.fetch_add(1, Ordering::Relaxed);
+        }
+
+        let mut threads_state = ThreadsState(
+            self.threads_state.fetch_sub(ONE_FOREIGN.0, Ordering::SeqCst) - ONE_FOREIGN.0,
+        );
+
+        if !self.ready_tasks.is_empty() {
+            // There are tasks still ready to run, so wake up a thread if all the other threads are
+            // sleeping.
+            while threads_state == ThreadsState(0).with_sleeping(self.num_threads) {
+                match self.try_notify(threads_state) {
+                    Ok(()) => break,
+                    Err(s) => threads_state = s,
+                }
+            }
+        }
     }
 }
 
@@ -650,7 +708,7 @@ impl EHandle {
     ///
     /// Most users should create an owned scope with
     /// [`Scope::new`][crate::Scope::new] instead of using this method.
-    pub fn root_scope(&self) -> &ScopeHandle {
+    pub fn global_scope(&self) -> &ScopeHandle {
         &self.root_scope
     }
 
@@ -699,7 +757,7 @@ impl EHandle {
     /// Tasks spawned using this method must be thread-safe (implement the `Send` trait), as they
     /// may be run on either a singlethreaded or multithreaded executor.
     pub fn spawn_detached(&self, future: impl Future<Output = ()> + Send + 'static) {
-        self.inner().spawn(self.root_scope(), AtomicFuture::new(future, true));
+        self.inner().spawn(self.global_scope(), AtomicFuture::new(future, true));
     }
 
     /// See `Inner::spawn_local`.
@@ -717,7 +775,7 @@ impl EHandle {
     /// have to be threads-safe (implement the `Send` trait). In return, this method requires that
     /// this executor is a LocalExecutor.
     pub fn spawn_local_detached(&self, future: impl Future<Output = ()> + 'static) {
-        self.inner().spawn_local(self.root_scope(), future, true);
+        self.inner().spawn_local(self.global_scope(), future, true);
     }
 
     pub(crate) fn mono_timers(&self) -> &Arc<Timers<MonotonicInstant>> {
@@ -726,6 +784,28 @@ impl EHandle {
 
     pub(crate) fn boot_timers(&self) -> &Arc<Timers<BootInstant>> {
         &self.inner().boot_timers
+    }
+
+    /// Calls `callback` in the context of the executor and then polls (a limited number of) tasks
+    /// that are ready to run.  If tasks remain ready and no other threads are running, a thread
+    /// will be woken.  This can end up being a performance win in the case that the queue can be
+    /// cleared without needing to wake any other thread.
+    ///
+    /// # Panics
+    ///
+    /// If called on a single-threaded executor or if this thread is a thread managed by the
+    /// executor.
+    pub fn poll_tasks(&self, callback: impl FnOnce()) {
+        EXECUTOR.with(|e| {
+            assert!(
+                e.borrow_mut().replace(self.root_scope.clone()).is_none(),
+                "This thread is already associated with an executor"
+            );
+        });
+
+        self.inner().poll_tasks(callback);
+
+        EXECUTOR.with(|e| *e.borrow_mut() = None);
     }
 }
 
@@ -761,6 +841,29 @@ impl Drop for Task {
             // provenance lands.
             Weak::from_raw(self);
         }
+    }
+}
+
+thread_local! {
+    static CURRENT_TASK: Cell<*const Task> = Cell::new(std::ptr::null());
+}
+
+impl Task {
+    pub(crate) fn with_current<R>(f: impl FnOnce(Option<&Task>) -> R) -> R {
+        CURRENT_TASK.with(|cur| {
+            let cur = cur.get();
+            let cur = unsafe { cur.as_ref() };
+            f(cur)
+        })
+    }
+
+    fn set_current_with<R>(task: &Task, f: impl FnOnce() -> R) -> R {
+        CURRENT_TASK.with(|cur| {
+            cur.set(task);
+            let result = f();
+            cur.set(std::ptr::null());
+            result
+        })
     }
 }
 
@@ -805,14 +908,39 @@ fn waker_drop(weak_raw: *const ()) {
 
 #[cfg(test)]
 mod tests {
-    use super::ACTIVE_EXECUTORS;
+    use super::{EHandle, ACTIVE_EXECUTORS};
     use crate::SendExecutor;
-    use std::sync::atomic::Ordering;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
 
     #[test]
     fn test_no_leaks() {
         std::thread::spawn(|| SendExecutor::new(1).run(async {})).join().unwrap();
 
         assert_eq!(ACTIVE_EXECUTORS.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn poll_tasks() {
+        SendExecutor::new(1).run(async {
+            let ehandle = EHandle::local();
+
+            // This will tie up the executor's only running thread which ensures that the task
+            // we spawn below can only run on the foreign thread.
+            std::thread::spawn(move || {
+                let ran = Arc::new(AtomicU64::new(0));
+                ehandle.poll_tasks(|| {
+                    let ran = ran.clone();
+                    ehandle.spawn_detached(async move {
+                        ran.fetch_add(1, Ordering::Relaxed);
+                    });
+                });
+
+                // The spawned task should have run in this thread.
+                assert_eq!(ran.load(Ordering::Relaxed), 1);
+            })
+            .join()
+            .unwrap();
+        });
     }
 }

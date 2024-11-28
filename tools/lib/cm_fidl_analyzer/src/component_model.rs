@@ -496,7 +496,7 @@ impl ComponentModelForAnalyzer {
     }
 
     fn does_child_reference_offer(self: &Arc<Self>, offer: &OfferDecl, child: Moniker) -> bool {
-        let instance = if let Ok(i) = self.get_instance(&child.clone().into()) {
+        let instance = if let Ok(i) = self.get_instance(&child.into()) {
             i
         } else {
             // We couldn't find the instance that references this offer.
@@ -840,10 +840,8 @@ impl ComponentModelForAnalyzer {
             }
             UseDecl::Service(use_service_decl) => {
                 let capability = use_service_decl.source_name.clone();
-                let (result, route) = Self::route_capability_sync(
-                    RouteRequest::UseService(use_service_decl.clone()),
-                    target,
-                );
+                let (result, route) =
+                    Self::route_capability_sync(RouteRequest::UseService(use_service_decl), target);
 
                 // Ignore any valid routes to void.
                 if let Ok(ref source) = result {
@@ -992,7 +990,7 @@ impl ComponentModelForAnalyzer {
                 match result {
                     Ok(source) => Some(VerifyRouteResult {
                         using_node: target.moniker().clone(),
-                        target_decl: TargetDecl::Use(UseDecl::Runner(use_runner.clone())),
+                        target_decl: TargetDecl::Use(UseDecl::Runner(use_runner)),
                         capability: Some(runner.clone()),
                         error: None,
                         route,
@@ -1000,7 +998,7 @@ impl ComponentModelForAnalyzer {
                     }),
                     Err(err) => Some(VerifyRouteResult {
                         using_node: target.moniker().clone(),
-                        target_decl: TargetDecl::Use(UseDecl::Runner(use_runner.clone())),
+                        target_decl: TargetDecl::Use(UseDecl::Runner(use_runner)),
                         capability: Some(runner.clone()),
                         error: Some(err.into()),
                         route,
@@ -1837,7 +1835,7 @@ mod tests {
         let mut config = RuntimeConfig::default();
         config.builtin_boot_resolver = component_internal::BuiltinBootResolver::Boot;
 
-        let builtin_runner_name: Name = "builtin_runner".parse().unwrap();
+        let builtin_runner_name: Name = "builtin_elf_runner".parse().unwrap();
         let builtin_runner_registration = RunnerRegistration {
             source_name: builtin_runner_name.clone(),
             source: RegistrationSource::Self_,

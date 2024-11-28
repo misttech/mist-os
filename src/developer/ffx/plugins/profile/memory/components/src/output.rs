@@ -54,8 +54,7 @@ impl PluginOutput {
             let resource = &resource_ref.borrow();
             if resource.claims.is_empty() {
                 match &resource.resource_type {
-                    fplugin::ResourceType::Job(_) => println!("{:#?}", resource),
-                    fplugin::ResourceType::Process(_) => println!("{:#?}", resource),
+                    fplugin::ResourceType::Job(_) | fplugin::ResourceType::Process(_) => {}
                     fplugin::ResourceType::Vmo(vmo) => {
                         undigested += vmo.committed_bytes.unwrap();
                     }
@@ -333,7 +332,26 @@ pub struct KernelStatistics {
     /// On a system with zRAM, the size in bytes of all memory,
     /// including metadata, fragmentation and other overheads, of
     /// the compressed memory area.
-    pub zram_compressed_total: Option<u64>,
+    pub zram_compressed_total: u64,
+    // The amount of memory committed to VMOs that is reclaimable by the kernel.
+    pub vmo_reclaim_total_bytes: u64,
+    // The amount of memory committed to reclaimable VMOs, that has been most
+    // recently accessed, and would not be eligible for eviction by the kernel
+    // under memory pressure.
+    pub vmo_reclaim_newest_bytes: u64,
+    // The amount of memory committed to reclaimable VMOs, that has been least
+    // recently accessed, and would be the first to be evicted by the kernel
+    // under memory pressure.
+    pub vmo_reclaim_oldest_bytes: u64,
+    // The amount of memory in VMOs that would otherwise be tracked for
+    // reclamation, but has had reclamation disabled.
+    pub vmo_reclaim_disabled_bytes: u64,
+    // The amount of memory committed to discardable VMOs that is currently
+    // locked, or unreclaimable by the kernel under memory pressure.
+    pub vmo_discardable_locked_bytes: u64,
+    // The amount of memory committed to discardable VMOs that is currently
+    // unlocked, or reclaimable by the kernel under memory pressure.
+    pub vmo_discardable_unlocked_bytes: u64,
 }
 
 impl Display for KernelStatistics {
@@ -346,10 +364,41 @@ impl Display for KernelStatistics {
         writeln!(w, "    heap:  {}", format_bytes(self.total_heap as f64))?;
         writeln!(w, "    mmu:   {}", format_bytes(self.mmu as f64))?;
         writeln!(w, "    ipc:   {}", format_bytes(self.ipc as f64))?;
-        if let Some(zram) = self.zram_compressed_total {
-            writeln!(w, "    zram:  {}", format_bytes(zram as f64))?;
+        if self.zram_compressed_total != 0 {
+            writeln!(w, "    zram:  {}", format_bytes(self.zram_compressed_total as f64))?;
         }
         writeln!(w, "    other: {}", format_bytes(self.other as f64))?;
+        writeln!(w, "  including:")?;
+        writeln!(
+            w,
+            "    vmo_reclaim_total_bytes:        {}",
+            format_bytes(self.vmo_reclaim_total_bytes as f64)
+        )?;
+        writeln!(
+            w,
+            "    vmo_reclaim_newest_bytes:       {}",
+            format_bytes(self.vmo_reclaim_newest_bytes as f64)
+        )?;
+        writeln!(
+            w,
+            "    vmo_reclaim_oldest_bytes:       {}",
+            format_bytes(self.vmo_reclaim_oldest_bytes as f64)
+        )?;
+        writeln!(
+            w,
+            "    vmo_reclaim_disabled_bytes:     {}",
+            format_bytes(self.vmo_reclaim_disabled_bytes as f64)
+        )?;
+        writeln!(
+            w,
+            "    vmo_discardable_locked_bytes:   {}",
+            format_bytes(self.vmo_discardable_locked_bytes as f64)
+        )?;
+        writeln!(
+            w,
+            "    vmo_discardable_unlocked_bytes: {}",
+            format_bytes(self.vmo_discardable_unlocked_bytes as f64)
+        )?;
         writeln!(w)
     }
 }

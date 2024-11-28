@@ -412,7 +412,7 @@ impl Surface {
     fn apply(&mut self, command: SurfaceCommand) -> Result<(), Error> {
         match command {
             SurfaceCommand::AttachBuffer(attachment) => {
-                self.content = Some(attachment.clone());
+                self.content = Some(attachment);
             }
             SurfaceCommand::ClearBuffer => {}
             SurfaceCommand::Frame(callback) => {
@@ -596,7 +596,7 @@ impl Surface {
                 node.flatland.borrow_mut().add_release_fence(
                     release_fence.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
                 );
-                let task_queue = task_queue.clone();
+                let task_queue = task_queue;
                 fasync::Task::local(async move {
                     let _signals =
                         fasync::OnSignals::new(&release_fence, zx::Signals::EVENT_SIGNALED)
@@ -720,7 +720,7 @@ impl RequestReceiver<WlSurface> for Surface {
                     // state.
                     let task_queue = client.task_queue();
                     let surface = this.get_mut(client)?;
-                    surface.commit_self(task_queue.clone(), &mut callbacks)?;
+                    surface.commit_self(task_queue, &mut callbacks)?;
                     surface.role
                 };
 

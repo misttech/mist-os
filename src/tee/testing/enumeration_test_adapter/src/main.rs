@@ -79,15 +79,14 @@ async fn start_runner(
                 // Return list of test cases from config
                 let names = names.clone();
                 fasync::Task::local(async move {
-                    start_case_iterator(names, iterator.into_stream().unwrap())
+                    start_case_iterator(names, iterator.into_stream())
                         .await
                         .expect("iterating test cases")
                 })
                 .detach();
             }
             ftest::SuiteRequest::Run { tests, options, listener, control_handle: _ } => {
-                let parent_listener =
-                    listener.into_proxy().context("creating RunListener proxy for parent")?;
+                let parent_listener = listener.into_proxy();
                 for invocation in tests {
                     let name = invocation.name.unwrap();
                     let tag = invocation.tag;
@@ -108,8 +107,7 @@ async fn start_runner(
                     if !test_started {
                         // Report a failure if we didn't start a test.
                         let (case_listener, case_listener_server) =
-                            fidl::endpoints::create_proxy::<ftest::CaseListenerMarker>()
-                                .context("creating case listener for synthetic test failure")?;
+                            fidl::endpoints::create_proxy::<ftest::CaseListenerMarker>();
                         case_listener.finished(&ftest::Result_ {
                             status: Some(ftest::Status::Failed),
                             ..Default::default()
@@ -181,8 +179,7 @@ async fn run_test_case_in_child(
         ..Default::default()
     };
     // Create a child in the collection specified in launch_config
-    let (child_controller, child_controller_server) =
-        fidl::endpoints::create_proxy().context("creating child controller channel")?;
+    let (child_controller, child_controller_server) = fidl::endpoints::create_proxy();
     let create_child_args = fidl_fuchsia_component::CreateChildArgs {
         controller: Some(child_controller_server),
         ..Default::default()
@@ -203,8 +200,7 @@ async fn run_test_case_in_child(
         );
     }
     // Open fuchsia.test.Suite protocol via realm.open_exposed_dir on the child
-    let (child_exposed_dir, child_exposed_dir_server) =
-        fidl::endpoints::create_proxy().context("creating exposed directory channel")?;
+    let (child_exposed_dir, child_exposed_dir_server) = fidl::endpoints::create_proxy();
     if let Err(e) = realm
         .open_exposed_dir(
             &fidl_fuchsia_component_decl::ChildRef {
@@ -234,8 +230,7 @@ async fn run_test_case_in_child(
         ..Default::default()
     };
     let (run_listener_client, mut run_listener) =
-        fidl::endpoints::create_request_stream::<ftest::RunListenerMarker>()
-            .context("creating RunListener for child")?;
+        fidl::endpoints::create_request_stream::<ftest::RunListenerMarker>();
     child_test_protocol.run(&child_invocation, &child_options, run_listener_client)?;
     let mut test_started = false;
     while let Some(result_event) = run_listener.try_next().await? {

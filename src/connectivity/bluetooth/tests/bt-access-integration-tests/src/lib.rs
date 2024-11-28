@@ -15,7 +15,7 @@ use fuchsia_bluetooth::types::Address;
 use hci_emulator_client::Emulator;
 
 async fn create_le_peer(hci: &Emulator, address: Address) -> Result<PeerProxy, Error> {
-    let (peer, remote) = fidl::endpoints::create_proxy()?;
+    let (peer, remote) = fidl::endpoints::create_proxy();
     let peer_params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),
@@ -50,7 +50,7 @@ async fn create_le_peer(hci: &Emulator, address: Address) -> Result<PeerProxy, E
 async fn start_discovery(access: &AccessHarness) -> Result<ProcedureTokenProxy, Error> {
     // We create a capability to capture the discovery token, and pass it to the access provider
     // Discovery will stop once we drop this token
-    let (token, token_server) = fidl::endpoints::create_proxy()?;
+    let (token, token_server) = fidl::endpoints::create_proxy();
     let fidl_response = access.aux().start_discovery(token_server);
     fidl_response
         .await?
@@ -61,7 +61,7 @@ async fn start_discovery(access: &AccessHarness) -> Result<ProcedureTokenProxy, 
 async fn make_discoverable(access: &AccessHarness) -> Result<ProcedureTokenProxy, Error> {
     // We create a capability to capture the discoverable token, and pass it to the access provider
     // Discoverable will stop once we drop this token
-    let (token, token_server) = fidl::endpoints::create_proxy()?;
+    let (token, token_server) = fidl::endpoints::create_proxy();
     let fidl_response = access.aux().make_discoverable(token_server);
     fidl_response
         .await?

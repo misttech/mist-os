@@ -19,10 +19,9 @@ async fn connect_to_protocol<S: fidl::endpoints::DiscoverableProtocolMarker>(
     remote_control: &fremotecontrol::RemoteControlProxy,
     moniker: &str,
 ) -> anyhow::Result<S::Proxy> {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
-        .with_context(|| format!("failed to create proxy to {}", S::PROTOCOL_NAME))?;
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<S>();
     remote_control
-        .open_capability(
+        .deprecated_open_capability(
             moniker,
             fsys::OpenDirType::ExposedDir,
             S::PROTOCOL_NAME,
@@ -306,8 +305,7 @@ mod test {
         response_handler: F,
     ) {
         let (controller, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fntr::ControllerMarker>()
-                .expect("create_proxy_and_stream failed");
+            fidl::endpoints::create_proxy_and_stream::<fntr::ControllerMarker>();
         let op = handle_command(controller, command);
         let op_response = async {
             let request = requests

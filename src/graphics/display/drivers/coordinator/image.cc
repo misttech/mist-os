@@ -20,16 +20,16 @@
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
-#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
-#include "src/graphics/display/lib/api-types-cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
 
-namespace display {
+namespace display_coordinator {
 
-Image::Image(Controller* controller, const ImageMetadata& metadata, DriverImageId driver_id,
-             inspect::Node* parent_node, ClientId client_id)
+Image::Image(Controller* controller, const display::ImageMetadata& metadata,
+             display::DriverImageId driver_id, inspect::Node* parent_node, ClientId client_id)
     : driver_id_(driver_id), metadata_(metadata), controller_(controller), client_id_(client_id) {
-  ZX_DEBUG_ASSERT(metadata.tiling_type() != kImageTilingTypeCapture);
+  ZX_DEBUG_ASSERT(metadata.tiling_type() != display::ImageTilingType::kCapture);
   InitializeInspect(parent_node);
 }
 Image::~Image() {
@@ -57,10 +57,8 @@ fbl::RefPtr<Image> Image::RemoveFromDoublyLinkedList() {
   return doubly_linked_list_node_state_.RemoveFromContainer<DefaultDoublyLinkedListTraits>();
 }
 
-void Image::PrepareFences(fbl::RefPtr<FenceReference>&& wait,
-                          fbl::RefPtr<FenceReference>&& retire) {
+void Image::PrepareFences(fbl::RefPtr<FenceReference>&& wait) {
   wait_fence_ = std::move(wait);
-  retire_fence_ = std::move(retire);
 
   if (wait_fence_) {
     zx_status_t status = wait_fence_->StartReadyWait();
@@ -92,22 +90,7 @@ void Image::EarlyRetire() {
   // A client may re-use an image as soon as retire_fence_ fires. Set in_use_ first.
   std::atomic_store(&in_use_, false);
   if (wait_fence_) {
-    wait_fence_->SetImmediateRelease(std::move(retire_fence_));
     wait_fence_ = nullptr;
-  } else if (retire_fence_) {
-    retire_fence_->Signal();
-    retire_fence_ = nullptr;
-  }
-}
-
-void Image::RetireWithFence(fbl::RefPtr<FenceReference>&& fence) {
-  // Retire and acquire are not synchronized, so set in_use_ before signaling so
-  // that the image can be reused as soon as the event is signaled. We don't have
-  // to worry about the armed signal fence being overwritten on reuse since it is
-  // on set in StartRetire, which is called under the same lock as OnRetire.
-  std::atomic_store(&in_use_, false);
-  if (fence) {
-    fence->Signal();
   }
 }
 
@@ -115,11 +98,10 @@ void Image::StartRetire() {
   ZX_DEBUG_ASSERT(wait_fence_ == nullptr);
 
   if (!presenting_) {
-    RetireWithFence(std::move(retire_fence_));
+    std::atomic_store(&in_use_, false);
   } else {
     retiring_ = true;
     retiring_property_.Set(true);
-    armed_retire_fence_ = std::move(retire_fence_);
   }
 }
 
@@ -128,7 +110,7 @@ void Image::OnRetire() {
   presenting_property_.Set(false);
 
   if (retiring_) {
-    RetireWithFence(std::move(armed_retire_fence_));
+    std::atomic_store(&in_use_, false);
     retiring_ = false;
     retiring_property_.Set(false);
   }
@@ -145,11 +127,8 @@ bool Image::Acquire() { return !std::atomic_exchange(&in_use_, true); }
 void Image::ResetFences() {
   if (wait_fence_) {
     wait_fence_->ResetReadyWait();
+    wait_fence_ = nullptr;
   }
-
-  wait_fence_ = nullptr;
-  armed_retire_fence_ = nullptr;
-  retire_fence_ = nullptr;
 }
 
-}  // namespace display
+}  // namespace display_coordinator

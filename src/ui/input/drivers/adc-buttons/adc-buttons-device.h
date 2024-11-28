@@ -67,7 +67,7 @@ class AdcButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevi
 
     void ToFidlInputReport(
         fidl::WireTableBuilder<fuchsia_input_report::wire::InputReport>& input_report,
-        fidl::AnyArena& allocator);
+        fidl::AnyArena& allocator) const;
   };
 
   void PollingTask(async_dispatcher_t* dispatcher, async::TaskBase* task, zx_status_t status);

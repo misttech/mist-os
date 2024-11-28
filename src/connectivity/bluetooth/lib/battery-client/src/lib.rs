@@ -97,9 +97,9 @@ impl TryFrom<fpower::BatteryInfo> for BatteryInfo {
 
         // Per the `fidl_fuchsia_power_battery` documentation, if `level_status` is known, then the
         // level percentage will also be provided.
-        let level = src
-            .level_percent
-            .ok_or(BatteryClientError::info(format_err!("Missing battery level percentage")))?;
+        let level = src.level_percent.ok_or_else(|| {
+            BatteryClientError::info(format_err!("Missing battery level percentage"))
+        })?;
         if level < MIN_BATTERY_LEVEL as f32 || level > MAX_BATTERY_LEVEL as f32 {
             return Err(BatteryClientError::info(format_err!(
                 "Invalid battery level percentage: {:?}",
@@ -150,8 +150,7 @@ impl BatteryClient {
     pub fn register_updates(
         battery_svc: fpower::BatteryManagerProxy,
     ) -> Result<Self, BatteryClientError> {
-        let (watcher_client, watcher) =
-            create_request_stream::<fpower::BatteryInfoWatcherMarker>()?;
+        let (watcher_client, watcher) = create_request_stream::<fpower::BatteryInfoWatcherMarker>();
         battery_svc.watch(watcher_client)?;
 
         Ok(Self {
@@ -236,7 +235,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (c, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::BatteryManagerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpower::BatteryManagerMarker>();
         let mut client = BatteryClient::register_updates(c).expect("can register");
         expect_stream_pending(&mut exec, &mut client);
 
@@ -244,9 +243,7 @@ mod tests {
             let fut = stream.next();
             let mut fut = pin!(fut);
             match exec.run_until_stalled(&mut fut).expect("fut is ready").unwrap() {
-                Ok(fpower::BatteryManagerRequest::Watch { watcher, .. }) => {
-                    watcher.into_proxy().unwrap()
-                }
+                Ok(fpower::BatteryManagerRequest::Watch { watcher, .. }) => watcher.into_proxy(),
                 x => panic!("Expected Watch request, got: {:?}", x),
             }
         };

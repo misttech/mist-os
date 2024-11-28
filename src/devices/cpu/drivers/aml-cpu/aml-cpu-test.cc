@@ -211,7 +211,7 @@ class AmlCpuEnvironment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) {
     auto dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-    device_server_.Init("pdev", "root");
+    device_server_.Initialize("pdev");
     EXPECT_EQ(ZX_OK, device_server_.Serve(dispatcher, &to_driver_vfs));
 
     std::map<uint32_t, fake_pdev::Mmio> mmios;

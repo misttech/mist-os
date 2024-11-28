@@ -14,6 +14,7 @@ const CHILD_PROPORTION_DISPLAY_THRESHOLD: f64 = 0.005;
 pub struct SelfProfilesReport {
     name: String,
     root_summary: DurationSummary,
+    custom_rollups: Vec<CustomRollup>,
 }
 
 impl SelfProfilesReport {
@@ -45,7 +46,7 @@ impl SelfProfilesReport {
         node: &DiagnosticsHierarchy,
     ) -> Result<Self, AnalysisError> {
         let root_summary = DurationSummaryBuilder::from_inspect(node)?.build();
-        Ok(Self { name: name.to_string(), root_summary })
+        Ok(Self { name: name.to_string(), root_summary, custom_rollups: vec![] })
     }
 
     pub fn name(&self) -> &str {
@@ -77,7 +78,19 @@ impl SelfProfilesReport {
         Ok(Self {
             name: self.name.clone(),
             root_summary: self.root_summary.delta_from(&baseline.root_summary)?,
+            custom_rollups: vec![],
         })
+    }
+
+    pub fn add_rollup(
+        &mut self,
+        title: impl Into<String>,
+        prefixes: impl IntoIterator<Item = impl Into<String>>,
+    ) {
+        self.custom_rollups.push(CustomRollup {
+            display_title: title.into(),
+            match_prefixes: prefixes.into_iter().map(|s| s.into()).collect(),
+        });
     }
 }
 
@@ -85,13 +98,27 @@ impl std::fmt::Display for SelfProfilesReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Profile duration summary for `{}`:\n\n{}\n", self.name, self.root_summary)?;
 
+        let leaf_durations = self.leaf_durations();
+        let root_runtime = self.root_summary.runtime;
+
         writeln!(f, "Rolled up leaf durations:\n")?;
-        for (name, duration) in self.leaf_durations() {
-            let root_runtime = self.root_summary.runtime;
+        for (name, duration) in &leaf_durations {
             let proportion_of_total =
                 duration.runtime.cpu_time as f64 / root_runtime.cpu_time as f64;
             if proportion_of_total >= CHILD_PROPORTION_DISPLAY_THRESHOLD {
-                write!(f, "{}", duration.display_tree(&name, root_runtime))?;
+                write!(f, "{}", duration.display_tree(name, root_runtime))?;
+            }
+        }
+
+        for rollup in &self.custom_rollups {
+            writeln!(f, "Custom rollup: {}\n", rollup.display_title)?;
+
+            for (name, duration) in &leaf_durations {
+                if let Some(_) =
+                    rollup.match_prefixes.iter().find(|prefix| name.starts_with(prefix.as_str()))
+                {
+                    write!(f, "{}", duration.display_tree(&name, root_runtime))?;
+                }
             }
         }
 
@@ -464,4 +491,10 @@ impl std::iter::Sum for TaskRuntimeInfo {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Self::default(), |l, r| l + r)
     }
+}
+
+#[derive(Debug, PartialEq)]
+struct CustomRollup {
+    display_title: String,
+    match_prefixes: Vec<String>,
 }

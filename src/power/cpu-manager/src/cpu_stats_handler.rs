@@ -97,7 +97,8 @@ impl<'a> CpuStatsHandlerBuilder<'a> {
         };
 
         // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
 
         let node = Rc::new(CpuStatsHandler {
             stats_svc_proxy: proxy,
@@ -203,7 +204,7 @@ impl CpuStatsHandler {
                 .get_cpu_stats()
                 .await?
                 .per_cpu_stats
-                .ok_or(format_err!("Received null per_cpu_stats"))?
+                .ok_or_else(|| format_err!("Received null per_cpu_stats"))?
                 .iter()
                 .enumerate()
                 .map(|(i, per_cpu_stats)| match per_cpu_stats.idle_time {
@@ -361,8 +362,7 @@ pub mod tests {
     fn setup_fake_service(
         mut get_idle_times: impl FnMut() -> Vec<Nanoseconds> + 'static,
     ) -> fstats::StatsProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fstats::StatsMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<fstats::StatsMarker>();
 
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {

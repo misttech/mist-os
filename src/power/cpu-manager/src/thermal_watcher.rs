@@ -95,7 +95,7 @@ impl<'a> ThermalWatcherBuilder<'a> {
             // and the capability routes are correct.
             let connector = connect_to_protocol::<fthermal::ClientStateConnectorMarker>()?;
             let (watcher_proxy, watcher_service) =
-                fidl::endpoints::create_proxy::<fthermal::ClientStateWatcherMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fthermal::ClientStateWatcherMarker>();
             connector.connect("CPU", watcher_service).expect("Failed to connect thermal client");
 
             watcher_proxy
@@ -196,8 +196,7 @@ mod tests {
     impl FakeThermalStateProvider {
         fn new() -> (fthermal::ClientStateWatcherProxy, Self) {
             let (watcher_proxy, watcher_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fthermal::ClientStateWatcherMarker>()
-                    .expect("failed to create watcher.");
+                fidl::endpoints::create_proxy_and_stream::<fthermal::ClientStateWatcherMarker>();
 
             (watcher_proxy, Self { watcher_stream })
         }

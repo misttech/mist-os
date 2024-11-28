@@ -94,7 +94,10 @@ where
     for entry in virtual_devices {
         match entry {
             VirtualDevice::V1(v) => {
-                table.row(vec![v.name, v.description.unwrap_or("No description.".to_string())]);
+                table.row(vec![
+                    v.name,
+                    v.description.unwrap_or_else(|| "No description.".to_string()),
+                ]);
             }
         }
     }

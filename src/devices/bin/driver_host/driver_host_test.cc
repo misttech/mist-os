@@ -59,10 +59,9 @@ class TestFile : public fio::testing::File_TestBase {
   void GetBackingMemory(fio::VmoFlags flags, GetBackingMemoryCallback callback) override {
     EXPECT_EQ(fio::VmoFlags::READ | fio::VmoFlags::EXECUTE | fio::VmoFlags::PRIVATE_CLONE, flags);
     auto endpoints = fidl::Endpoints<fuchsia_io::File>::Create();
-    EXPECT_EQ(ZX_OK, fdio_open(path_.data(),
-                               static_cast<uint32_t>(fio::OpenFlags::RIGHT_READABLE |
-                                                     fio::OpenFlags::RIGHT_EXECUTABLE),
-                               endpoints.server.channel().release()));
+    EXPECT_EQ(ZX_OK, fdio_open3(path_.data(),
+                                static_cast<uint64_t>(fio::PERM_READABLE | fio::PERM_EXECUTABLE),
+                                endpoints.server.channel().release()));
 
     fidl::WireSyncClient<fuchsia_io::File> file(std::move(endpoints.client));
     fidl::WireResult result = file->GetBackingMemory(fuchsia_io::wire::VmoFlags(uint32_t(flags)));
@@ -166,15 +165,9 @@ class DriverHostTest : public testing::Test {
     TestDirectory pkg_directory;
     fidl::Binding<fio::Directory> pkg_binding(&pkg_directory);
     pkg_binding.Bind(pkg_endpoints.server.TakeChannel(), loop_.dispatcher());
-    pkg_directory.SetOpenHandler(
-        [this, &file_binding](fio::OpenFlags flags, std::string path, auto object) {
-          EXPECT_EQ(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE, flags);
-          EXPECT_EQ("driver/library.so", path);
-          file_binding.Bind(object.TakeChannel(), loop_.dispatcher());
-        });
     pkg_directory.SetOpen3Handler(
         [this, &file_binding](fio::Flags flags, std::string_view path, zx::channel object) {
-          EXPECT_EQ(fio::Flags::PERM_READ | fio::Flags::PERM_EXECUTE, flags);
+          EXPECT_EQ(fio::PERM_READABLE | fio::PERM_EXECUTABLE, flags);
           EXPECT_EQ("driver/library.so", path);
           file_binding.Bind(std::move(object), loop_.dispatcher());
         });
@@ -488,15 +481,9 @@ TEST_F(DriverHostTest, Start_InvalidBinary) {
   TestDirectory pkg_directory;
   fidl::Binding<fio::Directory> pkg_binding(&pkg_directory);
   pkg_binding.Bind(pkg_endpoints.server.TakeChannel(), loop().dispatcher());
-  pkg_directory.SetOpenHandler(
-      [this, &file_binding](fio::OpenFlags flags, std::string path, auto object) {
-        EXPECT_EQ(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE, flags);
-        EXPECT_EQ("driver/library.so", path);
-        file_binding.Bind(object.TakeChannel(), loop().dispatcher());
-      });
   pkg_directory.SetOpen3Handler(
       [this, &file_binding](fio::Flags flags, std::string_view path, zx::channel object) {
-        EXPECT_EQ(fio::Flags::PERM_READ | fio::Flags::PERM_EXECUTE, flags);
+        EXPECT_EQ(fio::PERM_READABLE | fio::PERM_EXECUTABLE, flags);
         EXPECT_EQ("driver/library.so", path);
         file_binding.Bind(std::move(object), loop().dispatcher());
       });

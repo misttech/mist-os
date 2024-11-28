@@ -193,7 +193,7 @@ fn open_hci_transport(device_path: &str) -> Result<HciTransportProxy, Error> {
     >(device_path)?;
     let proxy = block_on(interface.open_hci_transport())?
         .map_err(|_| format_err!("open_hci_transport failed"))?
-        .into_proxy()?;
+        .into_proxy();
     Ok(proxy)
 }
 
@@ -214,8 +214,8 @@ mod tests {
     #[test]
     fn test_command_channel_stream_lifecycle() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, server) = fidl::endpoints::create_proxy::<HciTransportMarker>().unwrap();
-        let (stream, control_handle) = server.into_stream_and_control_handle().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<HciTransportMarker>();
+        let (stream, control_handle) = server.into_stream_and_control_handle();
         let mut command_channel = CommandChannel::from_proxy(proxy).unwrap();
 
         let event = vec![0x0e, 0x04, 0x01, 0x03, 0x0c, 0x00];
@@ -235,8 +235,8 @@ mod tests {
     #[test]
     fn test_command_channel() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, server) = fidl::endpoints::create_proxy::<HciTransportMarker>().unwrap();
-        let (stream, control_handle) = server.into_stream_and_control_handle().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<HciTransportMarker>();
+        let (stream, control_handle) = server.into_stream_and_control_handle();
         let mut command_channel = CommandChannel::from_proxy(proxy).unwrap();
         let mut mock = HciTransportMock::from_stream(stream, timeout_duration());
 

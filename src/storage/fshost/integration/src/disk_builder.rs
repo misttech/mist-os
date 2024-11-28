@@ -208,7 +208,7 @@ pub async fn write_test_blob(
         (hash.to_string(), data)
     };
 
-    let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
+    let (blob, server_end) = create_proxy::<fio::FileMarker>();
     let flags =
         fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
     blob_volume_root
@@ -238,7 +238,7 @@ pub async fn write_test_blob_fxblob(blob_creator: BlobCreatorProxy, data: &[u8])
         .expect("transport error on create")
         .expect("failed to create blob");
 
-    let writer = blob_writer_client_end.into_proxy().unwrap();
+    let writer = blob_writer_client_end.into_proxy();
     let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
         .await
         .expect("failed to create BlobWriter");
@@ -286,6 +286,8 @@ enum FxfsType {
 
 pub struct DiskBuilder {
     size: u64,
+    // Overrides all other options.  The disk will be unformatted.
+    uninitialized: bool,
     blob_hash: Option<Hash>,
     data_volume_size: u64,
     data_spec: DataSpec,
@@ -302,9 +304,14 @@ pub struct DiskBuilder {
 }
 
 impl DiskBuilder {
+    pub fn uninitialized() -> DiskBuilder {
+        Self { uninitialized: true, ..Self::new() }
+    }
+
     pub fn new() -> DiskBuilder {
         DiskBuilder {
             size: DEFAULT_DISK_SIZE,
+            uninitialized: false,
             blob_hash: None,
             data_volume_size: DEFAULT_DATA_VOLUME_SIZE,
             data_spec: DataSpec { format: None, zxcrypt: false },
@@ -521,6 +528,10 @@ impl DiskBuilder {
     pub async fn build(mut self) -> zx::Vmo {
         let vmo = zx::Vmo::create(self.size).unwrap();
 
+        if self.uninitialized {
+            return vmo;
+        }
+
         // Initialize the VMO with GPT headers and an *empty* FVM partition.
         if self.gpt {
             initialize_gpt(&vmo, RAMDISK_BLOCK_SIZE);
@@ -575,7 +586,7 @@ impl DiskBuilder {
 
     async fn init_data_minfs(&self, data_device: ControllerProxy) {
         if self.corrupt_data {
-            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
+            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
             let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
 
             // Just write the magic so it appears formatted to fshost.
@@ -591,7 +602,7 @@ impl DiskBuilder {
 
     async fn init_data_f2fs(&self, data_device: ControllerProxy) {
         if self.corrupt_data {
-            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
+            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
             let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
 
             // Just write the magic so it appears formatted to fshost.
@@ -610,7 +621,7 @@ impl DiskBuilder {
         let (mut fs, crypt_realm) = match fxfs {
             FxfsType::Fxfs(data_device) => {
                 if self.corrupt_data {
-                    let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
+                    let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
                     let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
 
                     // Just write the magic so it appears formatted to fshost.

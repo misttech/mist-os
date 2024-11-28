@@ -157,8 +157,7 @@ async fn main() -> Result<(), Error> {
 
     // Connect to the gatt2.Server protocol to publish the service.
     let gatt_server = connect_to_protocol::<gatt::Server_Marker>()?;
-    let (service_client, service_stream) = create_request_stream::<gatt::LocalServiceMarker>()
-        .context("Can't create LocalService endpoints")?;
+    let (service_client, service_stream) = create_request_stream::<gatt::LocalServiceMarker>();
     let service_notification_handle = service_stream.control_handle();
 
     // Connect to the battery service and initialize the shared state.
@@ -214,7 +213,7 @@ mod tests {
     fn read_battery_level() {
         let mut exec = fasync::TestExecutor::new();
         let (client, server) =
-            fidl::endpoints::create_proxy_and_stream::<gatt::LocalServiceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<gatt::LocalServiceMarker>();
         let service_notification_handle = server.control_handle();
         let state = BatteryState::new(service_notification_handle);
         let mut gatt_server_fut = pin!(gatt_service_delegate(&state, server));
@@ -236,7 +235,7 @@ mod tests {
     fn battery_level_change_notifications() {
         let mut exec = fasync::TestExecutor::new();
         let (client, server) =
-            fidl::endpoints::create_proxy_and_stream::<gatt::LocalServiceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<gatt::LocalServiceMarker>();
         let service_notification_handle = server.control_handle();
         let state = BatteryState::new(service_notification_handle);
         let mut gatt_server_fut = pin!(gatt_service_delegate(&state, server));
@@ -278,7 +277,7 @@ mod tests {
     fn write_is_error() {
         let mut exec = fasync::TestExecutor::new();
         let (client, server) =
-            fidl::endpoints::create_proxy_and_stream::<gatt::LocalServiceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<gatt::LocalServiceMarker>();
         let service_notification_handle = server.control_handle();
         let state = BatteryState::new(service_notification_handle);
         let mut gatt_server_fut = pin!(gatt_service_delegate(&state, server));

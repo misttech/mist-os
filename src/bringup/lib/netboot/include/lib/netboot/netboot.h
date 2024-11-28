@@ -121,6 +121,7 @@ typedef struct {
 #define NETBOOT_PATH_MAX 4096
 
 typedef struct {
+  // NOTE: this field is no longer used.  It is kept for binary compatibility.
   char block_device_path[NETBOOT_PATH_MAX];
 } netboot_block_device_t;
 

@@ -60,7 +60,6 @@ impl MediaSessionFacade {
         if let Some(session_control_marker) = session {
             let info_delta = session_control_marker
                 .into_proxy()
-                .map_err(|e| format_err!("Failed to get session control proxy: {}", e))?
                 .watch_status()
                 .await
                 .map_err(|e| format_err!("Failed to watch session status: {}", e))?;
@@ -81,8 +80,7 @@ impl MediaSessionFacade {
             let publisher = fuchsia_component::client::connect_to_protocol::<PublisherMarker>()
                 .expect("Failed to connect to Publisher");
 
-            let (player_client, mut player_request_stream) =
-                create_request_stream().expect("Failed to create request stream");
+            let (player_client, mut player_request_stream) = create_request_stream();
 
             publisher
                 .publish(
@@ -95,6 +93,7 @@ impl MediaSessionFacade {
                 .await
                 .expect("Failed to publish Player");
 
+            #[allow(clippy::collection_is_never_read)]
             let mut _player_info_change_responder = None;
             let mut sent_response = false;
 

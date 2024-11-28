@@ -42,6 +42,12 @@ fn get_power_source_proxy(file: &PathBuf) -> Result<hpower::SourceProxy, Error> 
 // services like everyone else.
 pub async fn get_power_info(file: &PathBuf) -> Result<hpower::SourceInfo, Error> {
     let power_source = get_power_source_proxy(&file)?;
+    load_power_info(&power_source).await
+}
+
+pub async fn load_power_info(
+    power_source: &hpower::SourceProxy,
+) -> Result<hpower::SourceInfo, Error> {
     match power_source.get_power_info().map_err(|_| zx::Status::IO).await? {
         result => {
             let (status, info) = result;
@@ -60,6 +66,12 @@ pub async fn get_power_info(file: &PathBuf) -> Result<hpower::SourceInfo, Error>
 // services like everyone else.
 pub async fn get_battery_info(file: &PathBuf) -> Result<hpower::BatteryInfo, Error> {
     let power_source = get_power_source_proxy(&file)?;
+    load_battery_info(&power_source).await
+}
+
+pub async fn load_battery_info(
+    power_source: &hpower::SourceProxy,
+) -> Result<hpower::BatteryInfo, Error> {
     match power_source.get_battery_info().map_err(|_| zx::Status::IO).await? {
         result => {
             let (status, info) = result;
@@ -74,27 +86,25 @@ where
     F: 'static + Send + Fn(hpower::SourceInfo, Option<hpower::BatteryInfo>) + Sync,
 {
     let power_source = get_power_source_proxy(&file)?;
-    let file_copy = file.clone();
-
     debug!("::power:: spawn device state change event listener");
     fasync::Task::spawn(
         async move {
+            let (_status, handle) =
+                power_source.get_state_change_event().map_err(|_| zx::Status::IO).await?;
+
             loop {
-                // Note that get_state_change_event & wait on signal must
+                // Note that load_battery_info & wait on signal must
                 // occur within the loop as it is the former call that
                 // clears the signal bit following its setting during
                 // the notification.
-                let (_status, handle) =
-                    power_source.get_state_change_event().map_err(|_| zx::Status::IO).await?;
-
                 debug!("::power event listener:: waiting on signal for state change event");
                 fasync::OnSignals::new(&handle, Signals::USER_0).await?;
                 debug!("::power event listener:: got signal for state change event");
 
-                let power_info = get_power_info(&file_copy).await?;
+                let power_info = load_power_info(&power_source).await?;
                 let mut battery_info = None;
                 if power_info.type_ == hpower::PowerType::Battery {
-                    battery_info = Some(get_battery_info(&file_copy).await?);
+                    battery_info = Some(load_battery_info(&power_source).await?);
                 }
                 callback(power_info, battery_info);
             }
@@ -174,7 +184,7 @@ async fn process_watch_event(
     {
         debug!("::power:: process_watch_event => UPDATE_STATUS");
         battery_manager
-            .update_status(power_info.clone(), battery_info.clone())
+            .update_status(power_info.clone(), battery_info)
             .context("adding watch events")?;
     }
 

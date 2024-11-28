@@ -593,13 +593,12 @@ impl ViewStrategy for DisplayDirectViewStrategy {
             let image_id = DisplayImageId(prepared);
             self.display
                 .coordinator
-                .set_layer_image(
+                .set_layer_image2(
                     &self.display.layer_id.into(),
                     &image_id.into(),
                     &wait_event_id.into(),
-                    &fidl_fuchsia_hardware_display::EventId { value: 0 },
                 )
-                .expect("Frame::present() set_layer_image");
+                .expect("Frame::present() set_layer_image2");
 
             self.last_config_stamp += 1;
             let stamp = ConfigStamp { value: self.last_config_stamp };

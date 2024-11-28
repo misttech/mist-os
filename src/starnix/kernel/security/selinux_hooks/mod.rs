@@ -10,8 +10,8 @@ use super::FsNodeSecurityXattr;
 use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntry, DirEntryHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString, PathBuilder,
-    UnlinkKind, ValueOrSize, XattrOp,
+    DirEntry, DirEntryHandle, FileHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
+    PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
 };
 use bstr::BStr;
 use linux_uapi::XATTR_NAME_SELINUX;
@@ -22,7 +22,7 @@ use selinux::{
     FileSystemLabelingScheme, FileSystemMountOptions, FileSystemPermission, InitialSid,
     ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
 };
-use starnix_logging::{log_debug, log_error, log_warn, track_stub};
+use starnix_logging::{log_debug, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::WeakKey;
@@ -31,7 +31,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::{errno, error};
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 /// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
@@ -94,7 +94,7 @@ where
 
     let sid = match label.scheme {
         // mountpoint-labelling labels every node from the "context=" mount option.
-        FileSystemLabelingScheme::Mountpoint => label.sid,
+        FileSystemLabelingScheme::Mountpoint { sid } => sid,
         // fs_use_xattr-labelling defers to the security attribute on the file node, with fall-back
         // behaviours for missing and invalid labels.
         FileSystemLabelingScheme::FsUse { fs_use_type, def_sid, root_sid, .. } => {
@@ -112,7 +112,7 @@ where
                         Ok(ValueOrSize::Value(security_context)) => Some(
                             security_server
                                 .security_context_to_sid((&security_context).into())
-                                .unwrap_or(SecurityId::initial(InitialSid::Unlabeled)),
+                                .unwrap_or_else(|_| SecurityId::initial(InitialSid::Unlabeled)),
                         ),
                         _ => {
                             // TODO: https://fxbug.dev/334094811 - Determine how to handle errors besides
@@ -129,11 +129,15 @@ where
                 if dir_entry.parent().is_none() {
                     root_sid
                 } else {
-                    log_warn!(
-                        "Unlabeled node in {} ({:?}-labeled) filesystem",
-                        fs.name(),
-                        fs_use_type
-                    );
+                    if fs.name() == "remotefs" {
+                        track_stub!(TODO("https://fxbug.dev/378688761"), "RemoteFS node missing security label. Perhaps your device needs re-flashing?");
+                    } else {
+                        log_warn!(
+                            "Unlabeled node in {} ({:?}-labeled) filesystem",
+                            fs.name(),
+                            fs_use_type
+                        );
+                    }
                     def_sid
                 }
             })
@@ -157,7 +161,7 @@ where
                     sub_path.as_slice().into(),
                     Some(class_id),
                 )
-                .unwrap_or(SecurityId::initial(InitialSid::Unlabeled))
+                .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled))
         }
     };
 
@@ -189,6 +193,10 @@ fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
         starnix_uapi::S_IFBLK => Ok(FileClass::Block),
         starnix_uapi::S_IFIFO => Ok(FileClass::Fifo),
         starnix_uapi::S_IFSOCK => Ok(FileClass::Socket),
+        0 => {
+            track_stub!(TODO("https://fxbug.dev/378864191"), "File with zero IFMT?");
+            Ok(FileClass::File)
+        }
         _ => error!(EINVAL, format!("mode: {:?}", mode)),
     }
 }
@@ -213,6 +221,57 @@ macro_rules! todo_check_permission {
     }};
 }
 
+/// Returns the SID with which an `FsNode` of `new_node_class` would be labeled, if created by
+/// `current_task` under the specified `parent` node.
+/// Policy-defined labeling rules, including transitions, are taken into account.
+///
+/// If no policy has yet been applied to the `parent`s [`create:vfs::FileSystem`] then no SID
+/// is returned.
+fn compute_new_fs_node_sid(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    new_node_class: FileClass,
+) -> Result<Option<(SecurityId, FileSystemLabel)>, Errno> {
+    let fs = parent.fs();
+    let label = match &*fs.security_state.state.0.lock() {
+        FileSystemLabelState::Unlabeled { .. } => {
+            return Ok(None);
+        }
+        FileSystemLabelState::Labeled { label } => label.clone(),
+    };
+
+    // Determine the SID with which the new `FsNode` would be labeled.
+    match label.scheme {
+        // TODO: https://fxbug.dev/377915469 - How should creation of new files under "genfscon" be handled?
+        FileSystemLabelingScheme::GenFsCon => {
+            track_stub!(TODO("https://fxbug.dev/377915469"), "New file in genfscon fs");
+            Ok(Some((label.sid, label)))
+        }
+        FileSystemLabelingScheme::Mountpoint { sid } => Ok(Some((sid, label))),
+        FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
+            if let Some(fscreate_sid) = current_task.security_state.lock().fscreate_sid {
+                return Ok(Some((fscreate_sid, label)));
+            }
+
+            let current_task_sid = current_task.security_state.lock().current_sid;
+            if fs_use_type == FsUseType::Task {
+                // TODO: https://fxbug.dev/377912777 - verify that this is how fs_use_task is
+                // supposed to work (https://selinuxproject.org/page/NB_ComputingSecurityContexts).
+                Ok(Some((current_task_sid, label)))
+            } else {
+                let parent_sid = fs_node_effective_sid(parent);
+                let sid = security_server
+                    .compute_new_file_sid(current_task_sid, parent_sid, new_node_class)
+                    // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
+                    // for compute_new_file_sid to have failed?
+                    .map_err(|_| errno!(EPERM))?;
+                Ok(Some((sid, label)))
+            }
+        }
+    }
+}
+
 /// Called by file-system implementations when creating the `FsNode` for a new file.
 pub(super) fn fs_node_init_on_create(
     security_server: &SecurityServer,
@@ -227,56 +286,36 @@ pub(super) fn fs_node_init_on_create(
         track_stub!(TODO("https://fxbug.dev/369067922"), "new FsNode already labeled");
     }
 
-    // If the creating task's "fscreate" attribute is set then it overrides the normal process
-    // for labeling new files.
-    if let Some(fscreate_sid) = current_task.read().security_state.attrs.fscreate_sid.clone() {
-        set_cached_sid(new_node, fscreate_sid);
-        return Ok(Some(make_fs_node_security_xattr(security_server, fscreate_sid)?));
-    }
-
-    let fs = new_node.fs();
-    let label = match &*fs.security_state.state.0.lock() {
-        FileSystemLabelState::Unlabeled { .. } => {
-            return Ok(None);
-        }
-        FileSystemLabelState::Labeled { label } => label.clone(),
-    };
-
-    // Compute both the SID to store on the in-memory node and the xattr to persist on-disk
-    // (or None if this circumstance is such that there's no xattr to persist).
-    let (sid, xattr) = match label.scheme {
-        FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
-            let current_task_sid = current_task.read().security_state.attrs.current_sid;
-            if fs_use_type == FsUseType::Task {
-                // TODO: https://fxbug.dev/377912777 - verify that this is how fs_use_task is
-                // supposed to work (https://selinuxproject.org/page/NB_ComputingSecurityContexts).
-                (current_task_sid, None)
-            } else {
-                let parent_sid = fs_node_effective_sid(parent);
-                let sid = security_server
-                    .compute_new_file_sid(
-                        current_task_sid,
-                        parent_sid,
-                        file_class_from_file_mode(new_node.info().mode)?,
-                    )
-                    // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
-                    // for compute_new_file_sid to have failed?
-                    .map_err(|_| errno!(EPERM))?;
+    // Determine the SID with which to label the `new_node` with, dependent on the file
+    // class, etc. This will only fail if the filesystem containing the nodes does not yet
+    // have labeling information resolved.
+    let new_node_class = file_class_from_file_mode(new_node.info().mode)?;
+    if let Some((sid, label)) =
+        compute_new_fs_node_sid(security_server, current_task, parent, new_node_class)?
+    {
+        // If the labeling scheme is "fs_use_xattr" then also construct an xattr value
+        // for the caller to apply to `new_node`.
+        let (sid, xattr) = match label.scheme {
+            FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
                 let xattr = (fs_use_type == FsUseType::Xattr)
                     .then(|| make_fs_node_security_xattr(security_server, sid))
                     .transpose()?;
                 (sid, xattr)
             }
-        }
-        FileSystemLabelingScheme::Mountpoint | FileSystemLabelingScheme::GenFsCon => {
-            // The label in this case is decided in the `fs_node_init_with_dentry` hook.
-            return Ok(None);
-        }
-    };
+            FileSystemLabelingScheme::Mountpoint { .. } => (sid, None),
+            FileSystemLabelingScheme::GenFsCon => {
+                // Defer labeling to `fs_node_init_with_dentry()`, so that the path of the new
+                // node can be taken into account.
+                return Ok(None);
+            }
+        };
 
-    set_cached_sid(new_node, sid);
+        set_cached_sid(new_node, sid);
 
-    Ok(xattr)
+        Ok(xattr)
+    } else {
+        Ok(None)
+    }
 }
 
 /// Helper used by filesystem node creation checks to validate that `current_task` has necessary
@@ -288,24 +327,12 @@ fn may_create(
     new_file_mode: FileMode, // Only used to determine the file class.
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let (current_sid, fscreate_sid) = {
-        let attrs = &current_task.read().security_state.attrs;
-        (attrs.current_sid, attrs.fscreate_sid)
-    };
 
-    let file_sid = if let Some(sid) = fscreate_sid {
-        sid
-    } else {
-        track_stub!(TODO("https://fxbug.dev/375381156"), "Use new file's SID in may_create checks");
-        return Ok(());
-    };
-
+    // Verify that the caller has permissions required to add new entries to the target
+    // directory node.
+    let current_sid = current_task.security_state.lock().current_sid;
     let parent_sid = fs_node_effective_sid(parent);
-    let filesystem_sid = match &*parent.fs().security_state.state.0.lock() {
-        FileSystemLabelState::Labeled { label } => Ok(label.sid),
-        _ => error!(EPERM),
-    }?;
-    let new_file_type = file_class_from_file_mode(new_file_mode)?;
+
     todo_check_permission!(
         TODO("https://fxbug.dev/374910392", "Check search permission."),
         &permission_check,
@@ -320,20 +347,44 @@ fn may_create(
         parent_sid,
         DirPermission::AddName
     )?;
+
+    // Verify that the caller has permission to create new nodes of the desired type.
+    let new_file_type = file_class_from_file_mode(new_file_mode)?;
+    let new_file_sid = compute_new_fs_node_sid(
+        security_server,
+        current_task,
+        parent,
+        file_class_from_file_mode(new_file_mode)?,
+    )?
+    .map(|(sid, _)| sid)
+    .unwrap_or_else(|| SecurityId::initial(InitialSid::File));
     todo_check_permission!(
         TODO("https://fxbug.dev/375381156", "Check create permission."),
         &permission_check,
         current_sid,
-        file_sid,
+        new_file_sid,
         CommonFilePermission::Create.for_class(new_file_type)
     )?;
+
+    // Verify that the new node's label is permitted to be created in the target filesystem.
+    let filesystem_sid = match &*parent.fs().security_state.state.0.lock() {
+        FileSystemLabelState::Labeled { label } => Ok(label.sid),
+        FileSystemLabelState::Unlabeled { .. } => {
+            track_stub!(
+                TODO("https://fxbug.dev/367585803"),
+                "may_create() should not be called until policy load has completed"
+            );
+            error!(EPERM)
+        }
+    }?;
     todo_check_permission!(
         TODO("https://fxbug.dev/375381156", "Check associate permission."),
         &permission_check,
-        file_sid,
+        new_file_sid,
         filesystem_sid,
         FileSystemPermission::Associate
     )?;
+
     Ok(())
 }
 
@@ -346,7 +397,7 @@ fn may_link(
     existing_node: &FsNode,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let parent_sid = fs_node_effective_sid(parent);
     let file_sid = fs_node_effective_sid(existing_node);
     let file_class = file_class_from_file_mode(existing_node.info().mode)?;
@@ -375,36 +426,24 @@ fn may_unlink_or_rmdir(
     operation: UnlinkKind,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let parent_sid = fs_node_effective_sid(parent);
 
     check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
-
-    todo_check_permission!(
-        TODO("https://fxbug.dev/375590486", "Check remove_name permission."),
-        &permission_check,
-        current_sid,
-        parent_sid,
-        DirPermission::RemoveName
-    )?;
+    check_permission(&permission_check, current_sid, parent_sid, DirPermission::RemoveName)?;
 
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     match operation {
-        UnlinkKind::NonDirectory => todo_check_permission!(
-            TODO("https://fxbug.dev/375381156", "Check unlink permission."),
+        UnlinkKind::NonDirectory => check_permission(
             &permission_check,
             current_sid,
             file_sid,
-            CommonFilePermission::Unlink.for_class(file_class)
+            CommonFilePermission::Unlink.for_class(file_class),
         )?,
-        UnlinkKind::Directory => todo_check_permission!(
-            TODO("https://fxbug.dev/375381156", "Check rmdir permission."),
-            &permission_check,
-            current_sid,
-            file_sid,
-            DirPermission::RemoveDir
-        )?,
+        UnlinkKind::Directory => {
+            check_permission(&permission_check, current_sid, file_sid, DirPermission::RemoveDir)?
+        }
     }
     Ok(())
 }
@@ -488,6 +527,85 @@ pub(super) fn check_fs_node_rmdir_access(
     may_unlink_or_rmdir(security_server, current_task, parent, child, UnlinkKind::Directory)
 }
 
+/// Validates that `current_task` has the permissions to move `moving_node`.
+pub(super) fn check_fs_node_rename_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    old_parent: &FsNode,
+    moving_node: &FsNode,
+    new_parent: &FsNode,
+    replaced_node: Option<&FsNode>,
+) -> Result<(), Errno> {
+    let permission_check = security_server.as_permission_check();
+    let current_sid = current_task.security_state.lock().current_sid;
+    let old_parent_sid = fs_node_effective_sid(old_parent);
+
+    check_permission(&permission_check, current_sid, old_parent_sid, DirPermission::Search)?;
+    check_permission(&permission_check, current_sid, old_parent_sid, DirPermission::RemoveName)?;
+
+    let file_sid = fs_node_effective_sid(moving_node);
+    let file_class = file_class_from_file_mode(moving_node.info().mode)?;
+    check_permission(
+        &permission_check,
+        current_sid,
+        file_sid,
+        CommonFilePermission::Rename.for_class(file_class),
+    )?;
+
+    let new_parent_sid = fs_node_effective_sid(new_parent);
+    check_permission(&permission_check, current_sid, new_parent_sid, DirPermission::AddName)?;
+
+    // If a file already exists with the new name, then verify that the existing file can be
+    // removed.
+    if let Some(replaced_node) = replaced_node {
+        let replaced_node_class = file_class_from_file_mode(replaced_node.info().mode)?;
+        may_unlink_or_rmdir(
+            security_server,
+            current_task,
+            new_parent,
+            replaced_node,
+            if replaced_node_class == FileClass::Dir {
+                UnlinkKind::Directory
+            } else {
+                UnlinkKind::NonDirectory
+            },
+        )?;
+    }
+
+    if !std::ptr::eq(old_parent, new_parent) {
+        // If the parent nodes are the same directory, we have already verified the search
+        // permission during the `old_parent_sid` verification.
+        check_permission(&permission_check, current_sid, new_parent_sid, DirPermission::Search)?;
+
+        // If the file is a directory and its parent directory is being changed by the rename,
+        // we additionally check for the reparent permission. Note that the `reparent` permission is
+        // only defined for directories.
+        if file_class == FileClass::Dir {
+            check_permission(&permission_check, current_sid, file_sid, DirPermission::Reparent)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Validates that `current_task` has the permissions to read the symbolic link `fs_node`.
+pub(super) fn check_fs_node_read_link_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+) -> Result<(), Errno> {
+    let current_sid = current_task.security_state.lock().current_sid;
+    let file_sid = fs_node_effective_sid(fs_node);
+    let file_class = file_class_from_file_mode(fs_node.info().mode)?;
+    todo_check_permission!(
+        TODO("https://fxbug.dev/378863048", "Check read permission on links."),
+        &security_server.as_permission_check(),
+        current_sid,
+        file_sid,
+        CommonFilePermission::Read.for_class(file_class),
+    )
+}
+
 pub(super) fn check_fs_node_setxattr_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -496,7 +614,7 @@ pub(super) fn check_fs_node_setxattr_access(
     _value: &FsStr,
     _op: XattrOp,
 ) -> Result<(), Errno> {
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     check_permission(
@@ -513,7 +631,7 @@ pub(super) fn check_fs_node_getxattr_access(
     fs_node: &FsNode,
     _name: &FsStr,
 ) -> Result<(), Errno> {
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     check_permission(
@@ -529,7 +647,7 @@ pub(super) fn check_fs_node_listxattr_access(
     current_task: &CurrentTask,
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     check_permission(
@@ -548,7 +666,7 @@ pub(super) fn check_fs_node_removexattr_access(
 ) -> Result<(), Errno> {
     // TODO: https://fxbug.dev/364568818 - Verify the correct permission check here; is removing a
     // security.* attribute even allowed?
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     check_permission(
@@ -641,7 +759,7 @@ where
 
     // If the "mountpoint"-labeling is used by this filesystem then setting labels is not supported.
     // TODO: https://fxbug.dev/377915469 - Is re-labeling of "genfscon" nodes allowed?
-    if fs_label.scheme == FileSystemLabelingScheme::Mountpoint {
+    if let FileSystemLabelingScheme::Mountpoint { .. } = fs_label.scheme {
         return error!(ENOTSUP);
     }
 
@@ -651,16 +769,26 @@ where
     let new_sid = security_server.security_context_to_sid(value.into()).ok();
     if security_server.is_enforcing() {
         let new_sid = new_sid.ok_or_else(|| errno!(EINVAL))?;
-        let task_sid = current_task.read().security_state.attrs.current_sid;
+        let task_sid = current_task.security_state.lock().current_sid;
         let old_sid = fs_node_effective_sid(fs_node);
         let file_class = file_class_from_file_mode(fs_node.info().mode)?;
         let permission_check = security_server.as_permission_check();
-        check_permission(
-            &permission_check,
-            task_sid,
-            old_sid,
-            CommonFilePermission::RelabelFrom.for_class(file_class),
-        )?;
+        if old_sid == SecurityId::initial(InitialSid::File) {
+            todo_check_permission!(
+                TODO("https://fxbug.dev/381275592", "relabelfrom unlabeled file"),
+                &permission_check,
+                task_sid,
+                old_sid,
+                CommonFilePermission::RelabelFrom.for_class(file_class),
+            )?;
+        } else {
+            check_permission(
+                &permission_check,
+                task_sid,
+                old_sid,
+                CommonFilePermission::RelabelFrom.for_class(file_class),
+            )?;
+        }
         check_permission(
             &permission_check,
             task_sid,
@@ -687,7 +815,8 @@ where
 
     // If the operation succeeded then update the label cached on the file node.
     if result.is_ok() {
-        let effective_new_sid = new_sid.unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
+        let effective_new_sid =
+            new_sid.unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled));
         set_cached_sid(fs_node, effective_new_sid);
     }
 
@@ -696,21 +825,31 @@ where
 
 /// Returns the `SecurityId` that should be used for SELinux access control checks against `fs_node`.
 fn fs_node_effective_sid(fs_node: &FsNode) -> SecurityId {
-    if let Some(sid) = get_cached_sid(&fs_node) {
+    let maybe_sid = get_cached_sid(&fs_node);
+    if let Some(sid) = maybe_sid {
         return sid;
     }
 
-    let info = fs_node.info();
-    if fs_node.fs().name() == "anon" {
+    // We should never reach here, but for now enforce it (see above) in debug builds.
+    let fs_name = fs_node.fs().name();
+    if fs_name == "anon" {
         track_stub!(TODO("https://fxbug.dev/376237171"), "Label anon nodes properly");
+    } else if fs_name == "sockfs" {
+        track_stub!(TODO("https://fxbug.dev/364568517"), "Label socket nodes properly");
+    } else if fs_name == "pipefs" {
+        track_stub!(TODO("https://fxbug.dev/380448690"), "Label fifo nodes properly");
     } else {
-        log_error!(
+        #[cfg(is_debug)]
+        panic!(
             "Unlabeled FsNode@{} of class {:?} in {}",
-            info.ino,
-            file_class_from_file_mode(info.mode),
+            fs_node.info().ino,
+            file_class_from_file_mode(fs_node.info().mode),
             fs_node.fs().name()
         );
+        #[cfg(not(is_debug))]
+        track_stub!(TODO("https://fxbug.dev/381210513"), "SID requested for unlabeled FsNode");
     }
+
     SecurityId::initial(InitialSid::Unlabeled)
 }
 
@@ -774,7 +913,11 @@ fn check_permission_internal<P: ClassPermission + Into<Permission> + Clone + 'st
 
 /// Returns the security state structure for the kernel.
 pub(super) fn kernel_init_security() -> KernelState {
-    KernelState { server: SecurityServer::new(), pending_file_systems: Mutex::default() }
+    KernelState {
+        server: SecurityServer::new(),
+        pending_file_systems: Mutex::default(),
+        selinuxfs_null: OnceLock::default(),
+    }
 }
 
 /// Return security state to associate with a filesystem based on the supplied mount options.
@@ -787,11 +930,9 @@ pub(super) fn file_system_init_security(
     let fs_context = mount_params.get(FsStr::new(b"fscontext")).cloned();
     let root_context = mount_params.get(FsStr::new(b"rootcontext")).cloned();
 
-    // If a "context" is specified then it is used for all nodes in the filesystem, so none of the other
-    // security context options would be meaningful to combine with it.
-    if context.is_some()
-        && (def_context.is_some() || fs_context.is_some() || root_context.is_some())
-    {
+    // If a "context" is specified then it is used for all nodes in the filesystem, so the other
+    // security context options would not be meaningful to combine with it, except "fscontext".
+    if context.is_some() && (def_context.is_some() || root_context.is_some()) {
         return error!(EINVAL);
     }
 
@@ -862,7 +1003,21 @@ where
 
 /// Returns the security state for a new file object created by `current_task`.
 pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
-    FileObjectState { _sid: current_task.read().security_state.attrs.current_sid }
+    FileObjectState { sid: current_task.security_state.lock().current_sid }
+}
+
+pub(super) fn selinuxfs_init_null(current_task: &CurrentTask, null_file_handle: &FileHandle) {
+    let kernel_state = current_task
+        .kernel()
+        .security_state
+        .state
+        .as_ref()
+        .expect("selinux kernel state exists when selinux is enabled");
+
+    kernel_state
+        .selinuxfs_null
+        .set(null_file_handle.clone())
+        .expect("selinuxfs null file initialized at most once");
 }
 
 /// Called by the "selinuxfs" when a policy has been successfully loaded, to allow policy-dependent
@@ -895,7 +1050,7 @@ pub(super) fn selinuxfs_check_access(
     current_task: &CurrentTask,
     permission: SecurityPermission,
 ) -> Result<(), Errno> {
-    let source_sid = current_task.read().security_state.attrs.current_sid;
+    let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = SecurityId::initial(InitialSid::Security);
     let permission_check = security_server.as_permission_check();
     check_permission(&permission_check, source_sid, target_sid, permission)
@@ -909,6 +1064,10 @@ pub(super) struct KernelState {
     /// Set of [`create::vfs::FileSystem`]s that have been constructed, and must be labeled as soon
     /// as a policy is loaded into the `server`.
     pub(super) pending_file_systems: Mutex<HashSet<WeakKey<FileSystem>>>,
+
+    /// Stashed reference to "/sys/fs/selinux/null" used for replacing inaccessible file descriptors
+    /// with a null file.
+    pub(super) selinuxfs_null: OnceLock<FileHandle>,
 }
 
 /// The SELinux security structure for `ThreadGroup`.
@@ -961,7 +1120,7 @@ impl TaskAttrs {
 /// that the [`crate::task::Task`] that created the file object had.
 #[derive(Debug)]
 pub(super) struct FileObjectState {
-    _sid: SecurityId,
+    sid: SecurityId,
 }
 
 /// Security state for a [`crate::vfs::FileSystem`] instance. This holds the security fields
@@ -1032,7 +1191,7 @@ pub(super) fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
     match fs_node.security_state.lock().label.clone() {
         FsNodeLabel::SecurityId { sid } => Some(sid),
         FsNodeLabel::FromTask { weak_task } => {
-            weak_task.upgrade().map(|t| t.read().security_state.attrs.current_sid)
+            weak_task.upgrade().map(|t| t.security_state.lock().current_sid)
         }
         FsNodeLabel::Uninitialized => None,
     }

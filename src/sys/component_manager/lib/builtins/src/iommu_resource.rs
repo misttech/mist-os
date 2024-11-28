@@ -54,7 +54,7 @@ mod tests {
         let iommu_resource = get_iommu_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::IommuResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::IommuResourceMarker>();
         fasync::Task::local(
             IommuResource::new(iommu_resource)
                 .unwrap_or_else(|e| panic!("Error while creating iommu resource service: {}", e))

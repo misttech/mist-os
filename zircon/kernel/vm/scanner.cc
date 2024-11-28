@@ -98,7 +98,7 @@ void scanner_print_stats() {
   printf("[SCAN]: Found %lu locked pages in discardable vmos\n", counts.locked);
   printf("[SCAN]: Found %lu unlocked pages in discardable vmos\n", counts.unlocked);
   pmm_page_queues()->Dump();
-  if (VmCompression* compression = pmm_page_compression()) {
+  if (VmCompression* compression = Pmm::Node().GetPageCompression()) {
     compression->Dump();
   }
 }
@@ -200,13 +200,13 @@ int scanner_request_thread(void*) {
     if (op & kScannerOpReclaimAll) {
       op &= ~kScannerOpReclaimAll;
       reclaim_all = true;
-      pmm_evictor()->SetOneShotEvictionTarget(Evictor::EvictionTarget{
+      Evictor::EvictionTarget target = {
           .pending = true,
           .free_pages_target = UINT64_MAX,
           .level = Evictor::EvictionLevel::IncludeNewest,
           .print_counts = print,
-      });
-      pmm_evictor()->EvictOneShotFromPreloadedTarget();
+      };
+      pmm_evictor()->EvictFromExternalTarget(target);
       // To ensure any page table eviction that was set earlier actually occurs, force an accessed
       // scan to happen right now.
       scanner_wait_for_accessed_scan(current_time(), true);
@@ -396,7 +396,7 @@ static void scanner_init_func(uint level) {
                                           gBootOptions->page_scanner_accessed_scan_interval_ms));
 
   if (fbl::RefPtr<VmCompression> compression = VmCompression::CreateDefault()) {
-    zx_status_t status = pmm_set_page_compression(ktl::move(compression));
+    zx_status_t status = Pmm::Node().SetPageCompression(ktl::move(compression));
     ASSERT_MSG(status == ZX_OK, "status: %d", status);
     if (gBootOptions->random_debug_compress) {
       pmm_page_queues()->StartDebugCompressor();
@@ -486,7 +486,7 @@ static int cmd_scanner(int argc, const cmd_args* argv, uint32_t flags) {
       eviction_level = Evictor::EvictionLevel::OnlyOldest;
     }
     const uint64_t bytes = argv[2].u * MB;
-    pmm_evictor()->EvictOneShotAsynchronous(bytes, 0, eviction_level, Evictor::Output::Print);
+    pmm_evictor()->EvictAsynchronous(bytes, 0, eviction_level, Evictor::Output::Print);
   } else if (!strcmp(argv[1].str, "pt_reclaim")) {
     if (argc < 3) {
       goto usage;

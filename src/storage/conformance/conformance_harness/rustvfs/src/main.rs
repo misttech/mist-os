@@ -53,7 +53,7 @@ fn add_entry(entry: io_test::DirectoryEntry, dest: &Arc<Simple>) -> Result<(), E
             remote_client,
             ..
         }) => {
-            dest.add_entry(name, remote_dir(remote_client.into_proxy()?))?;
+            dest.add_entry(name, remote_dir(remote_client.into_proxy()))?;
         }
         io_test::DirectoryEntry::File(io_test::File { name, contents, .. }) => {
             let new_file = vmo::read_only(contents);
@@ -86,32 +86,33 @@ async fn run(mut stream: TestHarnessRequestStream) -> Result<(), Error> {
                     supports_link_into: false,
                     supports_get_token: false,
                     supports_append: false,
+                    supports_truncate: false,
                     supports_modify_directory: false,
                     supports_mutable_file: false,
                 };
                 responder.send(&config)?;
             }
-            TestHarnessRequest::GetDirectory {
-                root,
+            TestHarnessRequest::CreateDirectory {
+                contents,
                 flags,
-                directory_request,
+                object_request,
                 control_handle: _,
             } => {
                 let dir = simple();
-                for entry in root.entries {
+                for entry in contents {
                     if let Some(entry) = entry {
                         add_entry(*entry, &dir)?;
                     }
                 }
-
-                dir.open(
-                    ExecutionScope::new(),
+                let mut object_request = vfs::ObjectRequest::new3(
                     flags,
-                    Path::dot(),
-                    directory_request.into_channel().into(),
+                    &Default::default(),
+                    object_request.into_channel(),
                 );
+                dir.open3(ExecutionScope::new(), Path::dot(), flags, &mut object_request)
+                    .expect("failed to open directory");
             }
-            TestHarnessRequest::GetServiceDir { responder } => {
+            TestHarnessRequest::OpenServiceDirectory { responder } => {
                 const FLAGS: fio::Flags = fio::PERM_READABLE;
                 let svc_dir = simple();
                 let service = vfs::service::host(run_echo_server);

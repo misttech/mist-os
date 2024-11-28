@@ -12,8 +12,7 @@ use cm_util::TaskGroup;
 use errors::{CapabilityProviderError, OpenError};
 use moniker::Moniker;
 use router_error::RouterError;
-use routing::availability::AvailabilityMetadata;
-use routing::bedrock::request_metadata::METADATA_KEY_TYPE;
+use routing::bedrock::request_metadata::{Metadata, METADATA_KEY_TYPE};
 use routing::component_instance::ComponentInstanceInterface;
 use routing::error::{ComponentInstanceError, RoutingError};
 use routing::{DictExt, GenericRouterResponse};
@@ -75,7 +74,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 sandbox::Capability::Data(sandbox::Data::String(porcelain_type.to_string())),
             )
             .unwrap();
-        metadata.set_availability(Availability::Transitional);
+        metadata.set_metadata(Availability::Transitional);
         let resp = source
             .get_program_output_dict()
             .await?

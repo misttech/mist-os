@@ -25,7 +25,7 @@ impl InternalCapabilityProvider for CapabilityStoreCapabilityProvider {
         let server_end = ServerEnd::<fsandbox::CapabilityStoreMarker>::new(server_end);
         // We only need to look up the component matching this scope.
         // These operations should all work, even if the component is not running.
-        let serve_result = self.serve(server_end.into_stream().unwrap()).await;
+        let serve_result = self.serve(server_end.into_stream()).await;
         if let Err(error) = serve_result {
             warn!(%error, "CapabilityStore serve failed");
         }

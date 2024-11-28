@@ -43,7 +43,7 @@ async fn run_test(url: &str, expected_result: &str) {
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.sys2.RealmQuery"))
                 .capability(Capability::protocol_by_name("fuchsia.sys2.LifecycleController"))
-                .from(Ref::child("component_manager"))
+                .from(Ref::self_())
                 .to(Ref::parent()),
         )
         .await
@@ -62,7 +62,7 @@ async fn run_test(url: &str, expected_result: &str) {
         .root
         .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
         .expect("failed to connect to RealmQuery");
-    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>().unwrap();
+    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>();
     let server_end = server_end.into_channel().into();
     realm_query
         .open(
@@ -209,17 +209,6 @@ async fn route_directories_from_component_manager_namespace() {
     let (cm_builder, _task) =
         builder.with_nested_component_manager(COMPONENT_MANAGER_URL).await.unwrap();
 
-    cm_builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.sys2.RealmQuery"))
-                .capability(Capability::protocol_by_name("fuchsia.sys2.LifecycleController"))
-                .from(Ref::child("component_manager"))
-                .to(Ref::parent()),
-        )
-        .await
-        .unwrap();
-
     let instance = cm_builder.build().await.unwrap();
 
     let lifecycle_controller = instance
@@ -234,7 +223,7 @@ async fn route_directories_from_component_manager_namespace() {
         .root
         .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
         .expect("failed to connect to RealmQuery");
-    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>().unwrap();
+    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>();
     let server_end = server_end.into_channel().into();
     realm_query
         .open(

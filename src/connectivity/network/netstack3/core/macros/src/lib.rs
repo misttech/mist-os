@@ -126,7 +126,7 @@ pub fn instantiate_ip_impl_block(attr: TokenStream, input: TokenStream) -> Token
     );
     syn::visit_mut::visit_item_impl_mut(
         &mut IdentifierReplacementVisitor {
-            search: ip_ident.clone(),
+            search: ip_ident,
             replace: syn::parse_quote!(net_types::ip::Ipv6),
         },
         &mut v6,

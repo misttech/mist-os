@@ -24,6 +24,7 @@ sdk_source_set("mmio") {
 
   public_deps = [
     "//sdk/lib/driver/devicetree/manager:headers",
+    "//sdk/lib/driver/devicetree/visitors:property-parser",
     "//zircon/system/ulib/zx",
   ]
 }

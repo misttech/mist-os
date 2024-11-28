@@ -24,7 +24,7 @@ async fn test_list() {
     test.assert(AssertionParameters {
         command: IqueryCommand::List,
         golden_basename: "list_test",
-        iquery_args: vec!["--accessor", "archivist:expose:fuchsia.diagnostics.ArchiveAccessor"],
+        iquery_args: vec!["--accessor", "archivist:fuchsia.diagnostics.ArchiveAccessor"],
         opts: vec![AssertionOption::Retry],
     })
     .await;
@@ -36,7 +36,7 @@ async fn test_list_no_duplicates() {
     test.assert(AssertionParameters {
         command: IqueryCommand::List,
         golden_basename: "list_no_dups",
-        iquery_args: vec!["--accessor", "archivist:expose:fuchsia.diagnostics.ArchiveAccessor"],
+        iquery_args: vec!["--accessor", "archivist:fuchsia.diagnostics.ArchiveAccessor"],
         opts: vec![AssertionOption::Retry],
     })
     .await;
@@ -59,7 +59,7 @@ async fn test_list_filter_manifest() {
             "--manifest",
             "test_component.cm",
             "--accessor",
-            "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
+            "archivist:fuchsia.diagnostics.ArchiveAccessor",
         ],
         opts: vec![AssertionOption::Retry],
     })
@@ -81,7 +81,7 @@ async fn test_list_with_urls() {
         golden_basename: "list_with_url",
         iquery_args: vec![
             "--accessor",
-            "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
+            "archivist:fuchsia.diagnostics.ArchiveAccessor",
             "--with-url",
         ],
         opts: vec![AssertionOption::Retry],
@@ -95,7 +95,7 @@ async fn list_archive() {
     test.assert(AssertionParameters {
         command: IqueryCommand::List,
         golden_basename: "list_archive",
-        iquery_args: vec!["--accessor", "archivist:expose:fuchsia.diagnostics.ArchiveAccessor"],
+        iquery_args: vec!["--accessor", "archivist:fuchsia.diagnostics.ArchiveAccessor"],
         opts: vec![AssertionOption::Retry],
     })
     .await;
@@ -127,7 +127,7 @@ async fn test_selectors() {
         golden_basename: "selectors_test",
         iquery_args: vec![
             "--accessor",
-            "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
+            "archivist:fuchsia.diagnostics.ArchiveAccessor",
             &format!("{}/basic-1:root/fuchsia.inspect.Health", prefix),
             &format!("{}/basic-2:root", prefix),
             &format!("{}/test", prefix),
@@ -152,7 +152,7 @@ async fn test_selectors_filter_serve_fs() {
         golden_basename: "selectors_filter_test_serve_fs",
         iquery_args: vec![
             "--accessor",
-            "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
+            "archivist:fuchsia.diagnostics.ArchiveAccessor",
             "--manifest",
             "basic_component.cm",
             "root/fuchsia.inspect.Health",
@@ -177,7 +177,7 @@ async fn test_selectors_filter() {
         golden_basename: "selectors_filter_test",
         iquery_args: vec![
             "--accessor",
-            "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
+            "archivist:fuchsia.diagnostics.ArchiveAccessor",
             "--manifest",
             "basic_component.cm",
             "root/fuchsia.inspect.Health",
@@ -207,7 +207,7 @@ async fn show_test() {
         golden_basename: "show_test",
         iquery_args: vec![
             "--accessor",
-            "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
+            "archivist:fuchsia.diagnostics.ArchiveAccessor",
             &format!("{}/basic-1:root/fuchsia.inspect.Health", prefix),
             &format!("{}/basic-2:root:iquery", prefix),
             &format!("{}/basic-3", prefix),
@@ -231,7 +231,7 @@ async fn show_component_does_not_exist() {
     let result = utils::execute_command(&[
         "show",
         "--accessor",
-        "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
+        "archivist:fuchsia.diagnostics.ArchiveAccessor",
         "doesnt_exist",
     ])
     .await;
@@ -253,7 +253,7 @@ async fn show_filter_manifest_serve_fs() {
         golden_basename: "show_filter_test_serve_fs",
         iquery_args: vec![
             "--accessor",
-            "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
+            "archivist:fuchsia.diagnostics.ArchiveAccessor",
             "--manifest",
             "basic_component.cm",
             "root/fuchsia.inspect.Health",
@@ -278,7 +278,7 @@ async fn show_filter_manifest() {
         golden_basename: "show_filter_test",
         iquery_args: vec![
             "--accessor",
-            "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
+            "archivist:fuchsia.diagnostics.ArchiveAccessor",
             "--manifest",
             "basic_component.cm",
             "root/fuchsia.inspect.Health",
@@ -303,7 +303,7 @@ async fn show_filter_manifest_no_selectors_serve_fs() {
         golden_basename: "show_filter_no_selectors_test_serve_fs",
         iquery_args: vec![
             "--accessor",
-            "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
+            "archivist:fuchsia.diagnostics.ArchiveAccessor",
             "--manifest",
             "basic_component.cm",
         ],
@@ -327,7 +327,7 @@ async fn show_filter_manifest_no_selectors() {
         golden_basename: "show_filter_no_selectors_test",
         iquery_args: vec![
             "--accessor",
-            "archivist:expose:fuchsia.diagnostics.ArchiveAccessor",
+            "archivist:fuchsia.diagnostics.ArchiveAccessor",
             "--manifest",
             "basic_component.cm",
         ],

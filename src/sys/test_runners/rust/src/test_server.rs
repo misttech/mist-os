@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
+use fidl::AsHandleRef;
+use fidl_fuchsia_component::IntrospectorMarker;
 use ftest::{Invocation, RunListenerProxy};
+use fuchsia_component::client::connect_to_protocol;
 use futures::future::{abortable, join3, AbortHandle, FutureExt as _};
 use futures::lock::Mutex;
 use futures::prelude::*;
@@ -14,13 +17,13 @@ use std::collections::HashSet;
 use std::sync::{Arc, Weak};
 use test_runners_lib::cases::TestCaseInfo;
 use test_runners_lib::elf::{
-    Component, ComponentError, EnumeratedTestCases, FidlError, KernelError,
-    MemoizedFutureContainer, PinnedFuture, SuiteServer,
+    Component, ComponentError, EnumeratedTestCases, KernelError, MemoizedFutureContainer,
+    PinnedFuture, SuiteServer,
 };
 use test_runners_lib::errors::*;
 use test_runners_lib::launch;
 use test_runners_lib::logs::{LogStreamReader, LoggerStream, SocketLogWriter};
-use tracing::{debug, error};
+use tracing::{debug, error, warn};
 use zx::{self as zx, HandleBased, Task};
 use {
     fidl_fuchsia_process as fproc, fidl_fuchsia_test as ftest, fuchsia_async as fasync,
@@ -91,9 +94,7 @@ impl SuiteServer for TestServer {
                 let (test_stdout, stdout_client) = zx::Socket::create_stream();
                 let (test_stderr, stderr_client) = zx::Socket::create_stream();
                 let (case_listener_proxy, listener) =
-                    fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>()
-                        .map_err(FidlError::CreateProxy)
-                        .unwrap();
+                    fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>();
                 let test_stdout = fasync::Socket::from_socket(test_stdout);
                 let test_stderr = fasync::Socket::from_socket(test_stderr);
 
@@ -353,6 +354,43 @@ impl TestServer {
         // Load bearing to hold job guard.
         let (process, job, stdout_logger, stderr_logger) =
             launch_component_process::<RunTestError>(&test_component, args, test_invoke).await?;
+
+        let pid = process.get_koid().unwrap().raw_koid();
+        if fuchsia_trace::category_enabled(c"component:start") {
+            let moniker = match connect_to_protocol::<IntrospectorMarker>() {
+                Ok(introspector) => {
+                    let component_instance = test_component
+                        .component_instance
+                        .as_ref()
+                        .unwrap()
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .unwrap();
+                    match introspector.get_moniker(component_instance).await {
+                        Ok(Ok(moniker)) => moniker,
+                        Ok(Err(oops)) => {
+                            warn!("Couldn't get moniker: {:?}", oops);
+                            format!("Couldn't get moniker: {oops:?}")
+                        }
+                        Err(oops) => {
+                            warn!("Couldn't get moniker: {:?}", oops);
+                            format!("Couldn't get moniker: {oops:?}")
+                        }
+                    }
+                }
+                Err(oops) => {
+                    warn!("Couldn't get introspector: {:?}", oops);
+                    format!("Couldn't get introspector: {oops:?}")
+                }
+            };
+            fuchsia_trace::instant!(
+                c"component:start",
+                c"rust-test",
+                fuchsia_trace::Scope::Thread,
+                "moniker" => format!("{}", moniker).as_str(),
+                "url" => test_component.url.as_str(),
+                "pid" => pid
+            );
+        }
 
         let test_exit_task = async {
             // Wait for the test process to exit
@@ -709,14 +747,11 @@ mod tests {
         let server = TestServer::new();
 
         let (run_listener_client, run_listener) =
-            fidl::endpoints::create_request_stream::<RunListenerMarker>()
-                .context("Failed to create run_listener")?;
+            fidl::endpoints::create_request_stream::<RunListenerMarker>();
         let (test_suite_client, test_suite) =
-            fidl::endpoints::create_request_stream::<SuiteMarker>()
-                .context("failed to create suite")?;
+            fidl::endpoints::create_request_stream::<SuiteMarker>();
 
-        let suite_proxy =
-            test_suite_client.into_proxy().context("can't convert suite into proxy")?;
+        let suite_proxy = test_suite_client.into_proxy();
         fasync::Task::spawn(async move {
             server
                 .serve_test_suite(test_suite, weak_component)

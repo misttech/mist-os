@@ -327,7 +327,7 @@ async fn avrcp_disallows_handler_double_sets(mut tf: AvrcpIntegrationTest) {
         .await
         .unwrap();
     // Create absolute volume handler, register with AVRCP
-    let (avh_client, avh_stream) = create_request_stream::<AbsoluteVolumeHandlerMarker>().unwrap();
+    let (avh_client, avh_stream) = create_request_stream::<AbsoluteVolumeHandlerMarker>();
     let avh_fut = run_absolute_volume_handler(avh_stream);
     fasync::Task::spawn(avh_fut).detach();
     avrcp_svc
@@ -346,7 +346,7 @@ async fn avrcp_disallows_handler_double_sets(mut tf: AvrcpIntegrationTest) {
         .expect_err("AVRCP should reject absolute volume handler double sets");
 
     // Create target handler, register with AVRCP
-    let (t_client, t_stream) = create_request_stream::<TargetHandlerMarker>().unwrap();
+    let (t_client, t_stream) = create_request_stream::<TargetHandlerMarker>();
     let t_fut = t_stream.for_each(|_request| async move {});
     fasync::Task::spawn(t_fut).detach();
     avrcp_svc
@@ -397,7 +397,7 @@ async fn avrcp_remote_receives_set_absolute_volume_request(mut tf: AvrcpIntegrat
         .unwrap();
 
     // Create absolute volume handler server which simply forwards the desired volume unmodified
-    let (avh_client, avh_server) = create_request_stream::<AbsoluteVolumeHandlerMarker>().unwrap();
+    let (avh_client, avh_server) = create_request_stream::<AbsoluteVolumeHandlerMarker>();
     let avh_fut = run_absolute_volume_handler(avh_server);
     avrcp_svc
         .set_absolute_volume_handler(avh_client)
@@ -407,7 +407,7 @@ async fn avrcp_remote_receives_set_absolute_volume_request(mut tf: AvrcpIntegrat
     let _avh_task = fasync::Task::spawn(avh_fut);
 
     // Get controller for mock peer
-    let (c_proxy, c_server) = create_proxy::<ControllerMarker>().unwrap();
+    let (c_proxy, c_server) = create_proxy::<ControllerMarker>();
     avrcp_svc
         .get_controller_for_target(&tf.mock_peer.peer_id().into(), c_server)
         .await

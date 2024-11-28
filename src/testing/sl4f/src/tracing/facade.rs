@@ -90,8 +90,7 @@ impl TracingFacade {
         let request: InitializeRequest = parse_args(args)?;
 
         let trace_provisioner = app::client::connect_to_protocol::<ProvisionerMarker>()?;
-        let (trace_controller, server_end) =
-            fidl::endpoints::create_proxy::<SessionMarker>().unwrap();
+        let (trace_controller, server_end) = fidl::endpoints::create_proxy::<SessionMarker>();
         let (write_socket, read_socket) = zx::Socket::create_stream();
         let mut config = TraceConfig::default();
         match request.categories {

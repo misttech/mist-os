@@ -25,7 +25,7 @@ use netstack_testing_common::devices::{
 use netstack_testing_common::interfaces::{self, add_address_wait_assigned, TestInterfaceExt as _};
 use netstack_testing_common::ndp::{send_ra_with_router_lifetime, wait_for_router_solicitation};
 use netstack_testing_common::realms::{
-    Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _,
+    Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt as _,
 };
 use netstack_testing_common::ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
@@ -162,21 +162,28 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-        &interface_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+        fnet_interfaces_ext::AllInterest,
+    >(&interface_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
     .expect("event stream from state")
     .fuse();
     let mut event_stream = pin!(event_stream);
 
     let mut if_state =
-        fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(interface.id());
+        fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(interface.id());
     async fn wait_for_lifetimes(
         event_stream: impl futures::Stream<
-            Item = Result<fidl_fuchsia_net_interfaces::Event, fidl::Error>,
+            Item = Result<
+                fidl_fuchsia_net_interfaces_ext::EventWithInterest<
+                    fidl_fuchsia_net_interfaces_ext::AllInterest,
+                >,
+                fidl::Error,
+            >,
         >,
-        if_state: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState<()>,
+        if_state: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState<
+            (),
+            fidl_fuchsia_net_interfaces_ext::AllInterest,
+        >,
         want_valid_until: fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant,
     ) -> Result<(), anyhow::Error> {
         fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
@@ -212,8 +219,7 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
 
     let no_interest_event_stream = {
         let (watcher, server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()
-                .expect("should succeed");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>();
         let () = interface_state
             .get_watcher(
                 // Register interest in no fields.
@@ -340,7 +346,9 @@ async fn add_address_sets_correct_valid_until<N: Netstack>(name: &str) {
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+        fidl_fuchsia_net_interfaces_ext::AllInterest,
+    >(
         &interface_state,
         fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
@@ -464,6 +472,70 @@ async fn add_address_errors<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+async fn invalid_address_properties(name: &str) {
+    // NB: Only runs on netstack3 because netstack2 doesn't perform property
+    // validation.
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let network = sandbox.create_network(name).await.expect("create network");
+    let iface = realm.join_network(&network, "testif1").await.expect("join network");
+    let control = iface.control();
+
+    let invalid_properties = [
+        finterfaces_admin::AddressProperties { valid_lifetime_end: Some(-1), ..Default::default() },
+        finterfaces_admin::AddressProperties { valid_lifetime_end: Some(0), ..Default::default() },
+        finterfaces_admin::AddressProperties {
+            preferred_lifetime_info: Some(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(
+                -1,
+            )),
+            ..Default::default()
+        },
+        finterfaces_admin::AddressProperties {
+            preferred_lifetime_info: Some(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(
+                0,
+            )),
+            ..Default::default()
+        },
+    ];
+    const ADDR: fnet::Subnet = fidl_subnet!("1.1.1.1/24");
+    // Adding an address with invalid properties always fails.
+    for p in invalid_properties {
+        assert_matches::assert_matches!(
+            interfaces::add_address_wait_assigned(
+                control,
+                ADDR,
+                finterfaces_admin::AddressParameters {
+                    initial_properties: Some(p.clone()),
+                    ..Default::default()
+                }
+            )
+            .await,
+            Err(fnet_interfaces_ext::admin::AddressStateProviderError::AddressRemoved(
+                finterfaces_admin::AddressRemovalReason::InvalidProperties
+            ))
+        );
+
+        // Now do the same thing but attempting to update properties.
+        let asp = interfaces::add_address_wait_assigned(control, ADDR, Default::default())
+            .await
+            .expect("add address");
+        let mut events = asp.take_event_stream().filter_map(|m| {
+            futures::future::ready(match m.expect("stream error") {
+                finterfaces_admin::AddressStateProviderEvent::OnAddressAdded { .. } => None,
+                finterfaces_admin::AddressStateProviderEvent::OnAddressRemoved { error } => {
+                    Some(error)
+                }
+            })
+        });
+        assert_matches!(asp.update_address_properties(&p).await, Err(e) if e.is_closed());
+        assert_eq!(
+            events.next().await,
+            Some(finterfaces_admin::AddressRemovalReason::InvalidProperties)
+        );
+    }
+}
+
+#[netstack_test]
 #[variant(N, Netstack)]
 async fn add_ipv4_mapped_ipv6_address<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -538,7 +610,7 @@ async fn supported_port_frame_types<N: Netstack>(
     let fhardware_network::PortInfo { id, .. } = network_port.get_info().await.expect("get info");
     let port_id = id.expect("port id");
     let (admin_control, server_end) =
-        fidl::endpoints::create_proxy::<finterfaces_admin::ControlMarker>().expect("create proxy");
+        fidl::endpoints::create_proxy::<finterfaces_admin::ControlMarker>();
     let admin_control = fnet_interfaces_ext::admin::Control::new(admin_control);
 
     let () = admin_device_control
@@ -751,10 +823,9 @@ async fn race_address_and_interface_removal<N: Netstack>(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
 
-    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-        &interfaces_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
+    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+        fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+    >(&interfaces_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
     .expect("create event stream")
     .map(|r| r.expect("watcher error"))
     .fuse();
@@ -762,7 +833,7 @@ async fn race_address_and_interface_removal<N: Netstack>(name: &str) {
 
     let _existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>>::new(),
     )
     .await
     .expect("existing");
@@ -772,7 +843,7 @@ async fn race_address_and_interface_removal<N: Netstack>(name: &str) {
     core::mem::drop((interface, address_state_provider));
     loop {
         let event = watcher.next().await.expect("watcher closed");
-        match event {
+        match event.into_inner() {
             e @ fnet_interfaces::Event::Existing(_)
             | e @ fnet_interfaces::Event::Idle(_)
             | e @ fnet_interfaces::Event::Added(_) => panic!("unexpected event {e:?}"),
@@ -806,8 +877,7 @@ async fn add_address_offline<N: Netstack>(name: &str) {
         .expect(<fidl_fuchsia_net_root::InterfacesMarker as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME);
 
     let (control, server) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::ControlMarker>()
-            .expect("create Control proxy");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::ControlMarker>();
     let () = root_control.get_admin(id, server).expect("get admin");
 
     let valid_address_parameters = fidl_fuchsia_net_interfaces_admin::AddressParameters::default();
@@ -817,8 +887,7 @@ async fn add_address_offline<N: Netstack>(name: &str) {
 
     let (address_state_provider, server) = fidl::endpoints::create_proxy::<
         fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-    >()
-    .expect("create AddressStateProvider proxy");
+    >();
     let () = control
         .add_address(&address, &valid_address_parameters, server)
         .expect("Control.AddAddress FIDL error");
@@ -916,12 +985,11 @@ async fn create_realm_and_interface<'a, N: Netstack>(
         .expect(<fidl_fuchsia_net_interfaces::StateMarker as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME);
 
     let interfaces = fidl_fuchsia_net_interfaces_ext::existing(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interface_state,
-            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-        )
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(&interface_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
         .expect("create watcher event stream"),
-        HashMap::<_, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+        HashMap::<_, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>>::new(),
     )
     .await
     .expect("initial");
@@ -1049,13 +1117,12 @@ async fn add_address_and_remove<N: Netstack>(
     });
     assert_eq!(subnet_route_is_present, expect_subnet_route);
 
-    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-        &interface_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+        fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+    >(&interface_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
     .expect("event stream from state");
     let mut event_stream = pin!(event_stream);
-    let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(id);
+    let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(id);
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
         event_stream.by_ref(),
         &mut properties,
@@ -1153,7 +1220,7 @@ async fn add_address_and_remove<N: Netstack>(
     // synchronously gone from interface watchers as there's no synchronization
     // guarantee between interfaces-admin and interface watchers on netstack2.
     fnet_interfaces_ext::wait_interface_with_id(
-        fnet_interfaces_ext::event_stream_from_state(
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
             &interface_state,
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
@@ -1244,12 +1311,11 @@ async fn add_address_and_detach<N: Netstack>(
 
     std::mem::drop(address_state_provider);
 
-    let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(id);
+    let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(id);
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interface_state,
-            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-        )
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(&interface_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
         .expect("get interface event stream"),
         &mut properties,
         |iface| {
@@ -1362,8 +1428,8 @@ async fn remove_slaac_address<N: Netstack>(name: &str) {
 
     // Wait for the SLAAC address to appear.
     let slaac_addr = fnet_interfaces_ext::wait_interface_with_id(
-        iface.get_interface_event_stream().expect("get interface event stream"),
-        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        realm.get_interface_event_stream().expect("get interface event stream"),
+        &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |fnet_interfaces_ext::PropertiesAndState {
              state: (),
              properties: fnet_interfaces_ext::Properties { addresses, .. },
@@ -1410,8 +1476,7 @@ async fn device_control_create_interface<N: Netstack>(name: &str) {
 
     let (device, port_id) = endpoint.get_netdevice().await.expect("get netdevice");
     let (device_control, device_control_server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>();
     let () = installer.install_device(device, device_control_server_end).expect("install device");
 
     let (control, control_server_end) =
@@ -1434,12 +1499,11 @@ async fn device_control_create_interface<N: Netstack>(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
     let interface_state = fidl_fuchsia_net_interfaces_ext::existing(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interfaces_state,
-            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-        )
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(&interfaces_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
         .expect("create watcher event stream"),
-        fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(iface_id),
+        fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(iface_id),
     )
     .await
     .expect("get interface state");
@@ -1483,8 +1547,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
     let (tun_dev, netdevice_client_end) = create_tun_device();
 
     let (device_control, device_control_server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>();
     let installer = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
         .expect("connect to protocol");
@@ -1495,10 +1558,9 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
     let interfaces_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-        &interfaces_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
+    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+        fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+    >(&interfaces_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
     .expect("create event stream")
     .map(|r| r.expect("watcher error"))
     .fuse();
@@ -1507,7 +1569,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>>::new(),
     )
     .await
     .expect("existing");
@@ -1523,8 +1585,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
     for index in 1..=PORT_COUNT {
         let (iface_id, port, control) = async {
             let (port, port_server_end) =
-                fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::PortMarker>()
-                    .expect("create proxy");
+                fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::PortMarker>();
             let () = tun_dev
                 .add_port(
                     &fidl_fuchsia_net_tun::DevicePortConfig {
@@ -1549,8 +1610,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
                 .expect("add port");
             let port_id = {
                 let (device_port, server) =
-                    fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>()
-                        .expect("create endpoints");
+                    fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>();
                 let () = port.get_port(server).expect("get port");
                 device_port.get_info().await.expect("get info").id.expect("missing port id")
             };
@@ -1572,7 +1632,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
             // Observe interface creation in watcher.
             let event = watcher.select_next_some().await;
             assert_matches::assert_matches!(
-                event,
+                event.into_inner(),
                 fidl_fuchsia_net_interfaces::Event::Added(
                     fidl_fuchsia_net_interfaces::Properties { id: Some(id), .. }
                 ) if id == iface_id
@@ -1641,10 +1701,10 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
         // Drop device_control and wait for futures to resolve.
         std::mem::drop(device_control);
 
-        let interfaces_removed_fut = async_utils::fold::fold_while(
-            watcher,
-            interfaces,
-            |mut interfaces, event| match event {
+        let interfaces_removed_fut =
+            async_utils::fold::fold_while(watcher, interfaces, |mut interfaces, event| match event
+                .into_inner()
+            {
                 fidl_fuchsia_net_interfaces::Event::Removed(id) => {
                     assert!(interfaces.remove(&id));
                     futures::future::ready(if interfaces.is_empty() {
@@ -1654,9 +1714,8 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
                     })
                 }
                 event => panic!("unexpected event {:?}", event),
-            },
-        )
-        .map(|fold_result| fold_result.short_circuited().expect("watcher ended"));
+            })
+            .map(|fold_result| fold_result.short_circuited().expect("watcher ended"));
 
         let ports_are_detached_fut =
             ports_detached_stream.map(|_port_index: u8| ()).collect::<()>();
@@ -1722,8 +1781,7 @@ async fn control_terminal_events<N: Netstack>(
 
     let create_port = |config: fidl_fuchsia_net_tun::BasePortConfig| {
         let (port, port_server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::PortMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::PortMarker>();
         let () = tun_dev
             .add_port(
                 &fidl_fuchsia_net_tun::DevicePortConfig {
@@ -1739,8 +1797,7 @@ async fn control_terminal_events<N: Netstack>(
             let () = port.set_online(false).await.expect("calling set_online");
 
             let (device_port, server) =
-                fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>()
-                    .expect("create endpoints");
+                fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>();
             let () = port.get_port(server).expect("get port");
             let id = device_port.get_info().await.expect("get info").id.expect("missing port id");
 
@@ -1749,14 +1806,12 @@ async fn control_terminal_events<N: Netstack>(
     };
 
     let (device_control, device_control_server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>();
     let () = installer.install_device(device, device_control_server_end).expect("install device");
 
     let create_interface = |port_id, options| {
         let (control, control_server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::ControlMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::ControlMarker>();
         let () = device_control
             .create_interface(&port_id, control_server_end, &options)
             .expect("create interface");
@@ -1863,8 +1918,7 @@ async fn control_terminal_events<N: Netstack>(
                 .connect_to_protocol::<fnet_root::InterfacesMarker>()
                 .expect("connect to protocol");
             let (root_control, server_end) =
-                fidl::endpoints::create_proxy::<finterfaces_admin::ControlMarker>()
-                    .expect("create proxy");
+                fidl::endpoints::create_proxy::<finterfaces_admin::ControlMarker>();
             root_interfaces.get_admin(interface_id, server_end).expect("get admin failed");
             // Wait for the root handle to be fully installed by synchronizing on `get_id`.
             assert_eq!(root_control.get_id().await.expect("get id"), interface_id);
@@ -1897,10 +1951,9 @@ async fn device_control_closes_on_device_close<N: Netstack>(name: &str) {
     let interfaces_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-        &interfaces_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
+    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+        fnet_interfaces_ext::DefaultInterest,
+    >(&interfaces_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
     .expect("create watcher");
     let mut watcher = pin!(watcher);
 
@@ -1910,8 +1963,7 @@ async fn device_control_closes_on_device_close<N: Netstack>(name: &str) {
 
     let (device, port_id) = endpoint.get_netdevice().await.expect("get netdevice");
     let (device_control, device_control_server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>();
     let () = installer.install_device(device, device_control_server_end).expect("install device");
 
     // Create an interface and get its identifier to ensure the device is
@@ -1934,7 +1986,7 @@ async fn device_control_closes_on_device_close<N: Netstack>(name: &str) {
 
     // The channel could've been closed by a Netstack crash, consume from the
     // watcher to ensure that's not the case.
-    let _: fidl_fuchsia_net_interfaces::Event =
+    let _: fnet_interfaces_ext::EventWithInterest<_> =
         watcher.try_next().await.expect("watcher error").expect("watcher ended uexpectedly");
 }
 
@@ -1989,94 +2041,93 @@ async fn installer_creates_datapath<N: Netstack, I: Ip>(test_name: &str) {
             Option<fidl_fuchsia_net_interfaces_admin::AddressStateProviderProxy>,
     }
 
-    let realms_stream =
-        futures::stream::iter([("alice", ALICE_IP_V4, ALICE_MAC), ("bob", BOB_IP_V4, BOB_MAC)])
-            .then(|(name, ipv4_addr, mac)| {
-                let sandbox = &sandbox;
-                let network = &network;
-                async move {
-                    let test_name = format!("{}_{}", test_name, name);
-                    let realm = sandbox
-                        .create_netstack_realm::<N, _>(test_name.clone())
-                        .expect("create realm");
-                    let endpoint = network
-                        .create_endpoint_with(
-                            test_name,
-                            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(mac)),
-                        )
-                        .panic_on_timeout(format!("create {} endpoint", name))
-                        .await
-                        .expect("create endpoint");
-                    let () = endpoint
-                        .set_link_up(true)
-                        .panic_on_timeout(format!("set {} link up", name))
-                        .await
-                        .expect("set link up");
-                    let installer = realm
-                        .connect_to_protocol::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
-                        .expect("connect to protocol");
+    let realms_stream = futures::stream::iter([
+        ("alice", ALICE_IP_V4, ALICE_MAC),
+        ("bob", BOB_IP_V4, BOB_MAC),
+    ])
+    .then(|(name, ipv4_addr, mac)| {
+        let sandbox = &sandbox;
+        let network = &network;
+        async move {
+            let test_name = format!("{}_{}", test_name, name);
+            let realm =
+                sandbox.create_netstack_realm::<N, _>(test_name.clone()).expect("create realm");
+            let endpoint = network
+                .create_endpoint_with(
+                    test_name,
+                    netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(mac)),
+                )
+                .panic_on_timeout(format!("create {} endpoint", name))
+                .await
+                .expect("create endpoint");
+            let () = endpoint
+                .set_link_up(true)
+                .panic_on_timeout(format!("set {} link up", name))
+                .await
+                .expect("set link up");
+            let installer = realm
+                .connect_to_protocol::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
+                .expect("connect to protocol");
 
-                    let (device, port_id) = endpoint
-                        .get_netdevice()
-                        .panic_on_timeout(format!("get {} netdevice", name))
-                        .await
-                        .expect("get netdevice");
-                    let (device_control, device_control_server_end) =
-                        fidl::endpoints::create_proxy::<
-                            fidl_fuchsia_net_interfaces_admin::DeviceControlMarker,
-                        >()
-                        .expect("create proxy");
-                    let () = installer
-                        .install_device(device, device_control_server_end)
-                        .expect("install device");
+            let (device, port_id) = endpoint
+                .get_netdevice()
+                .panic_on_timeout(format!("get {} netdevice", name))
+                .await
+                .expect("get netdevice");
+            let (device_control, device_control_server_end) = fidl::endpoints::create_proxy::<
+                fidl_fuchsia_net_interfaces_admin::DeviceControlMarker,
+            >();
+            let () = installer
+                .install_device(device, device_control_server_end)
+                .expect("install device");
 
-                    let (control, control_server_end) =
-                        fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
-                            .expect("create proxy");
-                    let () = device_control
-                        .create_interface(
-                            &port_id,
-                            control_server_end,
-                            &fidl_fuchsia_net_interfaces_admin::Options {
-                                name: Some(name.to_string()),
-                                metric: None,
-                                ..Default::default()
-                            },
-                        )
-                        .expect("create interface");
-                    let iface_id = control
-                        .get_id()
-                        .panic_on_timeout(format!("get {} interface id", name))
-                        .await
-                        .expect("get id");
+            let (control, control_server_end) =
+                fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
+                    .expect("create proxy");
+            let () = device_control
+                .create_interface(
+                    &port_id,
+                    control_server_end,
+                    &fidl_fuchsia_net_interfaces_admin::Options {
+                        name: Some(name.to_string()),
+                        metric: None,
+                        ..Default::default()
+                    },
+                )
+                .expect("create interface");
+            let iface_id = control
+                .get_id()
+                .panic_on_timeout(format!("get {} interface id", name))
+                .await
+                .expect("get id");
 
-                    let did_enable = control
-                        .enable()
-                        .panic_on_timeout(format!("enable {} interface", name))
-                        .await
-                        .expect("calling enable")
-                        .expect("enable failed");
-                    assert!(did_enable);
+            let did_enable = control
+                .enable()
+                .panic_on_timeout(format!("enable {} interface", name))
+                .await
+                .expect("calling enable")
+                .expect("enable failed");
+            assert!(did_enable);
 
-                    let (addr, address_state_provider) = match I::VERSION {
-                        net_types::ip::IpVersion::V4 => {
-                            let address_state_provider = interfaces::add_address_wait_assigned(
-                                &control,
-                                ipv4_addr,
-                                fidl_fuchsia_net_interfaces_admin::AddressParameters {
-                                    add_subnet_route: Some(true),
-                                    ..Default::default()
-                                },
-                            )
-                            .panic_on_timeout(format!("add {} ipv4 address", name))
-                            .await
-                            .expect("add address");
+            let (addr, address_state_provider) = match I::VERSION {
+                net_types::ip::IpVersion::V4 => {
+                    let address_state_provider = interfaces::add_address_wait_assigned(
+                        &control,
+                        ipv4_addr,
+                        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+                            add_subnet_route: Some(true),
+                            ..Default::default()
+                        },
+                    )
+                    .panic_on_timeout(format!("add {} ipv4 address", name))
+                    .await
+                    .expect("add address");
 
-                            let fidl_fuchsia_net_ext::IpAddress(addr) = ipv4_addr.addr.into();
-                            (addr, Some(address_state_provider))
-                        }
-                        net_types::ip::IpVersion::V6 => {
-                            let ipv6 = netstack_testing_common::interfaces::wait_for_v6_ll(
+                    let fidl_fuchsia_net_ext::IpAddress(addr) = ipv4_addr.addr.into();
+                    (addr, Some(address_state_provider))
+                }
+                net_types::ip::IpVersion::V6 => {
+                    let ipv6 = netstack_testing_common::interfaces::wait_for_v6_ll(
                         &realm
                             .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
                             .expect("connect to protocol"),
@@ -2085,20 +2136,20 @@ async fn installer_creates_datapath<N: Netstack, I: Ip>(test_name: &str) {
                     .panic_on_timeout(format!("wait for {} ipv6 address", name))
                     .await
                     .expect("get ipv6 link local");
-                            (net_types::ip::IpAddr::V6(ipv6).into(), None)
-                        }
-                    };
-                    RealmInfo {
-                        realm,
-                        addr,
-                        iface_id,
-                        endpoint,
-                        device_control,
-                        control,
-                        address_state_provider,
-                    }
+                    (net_types::ip::IpAddr::V6(ipv6).into(), None)
                 }
-            });
+            };
+            RealmInfo {
+                realm,
+                addr,
+                iface_id,
+                endpoint,
+                device_control,
+                control,
+                address_state_provider,
+            }
+        }
+    });
     let mut realms_stream = pin!(realms_stream);
 
     // Can't drop any of the fields of RealmInfo to maintain objects alive.
@@ -2218,8 +2269,7 @@ async fn control_enable_disable<N: Netstack>(name: &str) {
 
     let (device, port_id) = endpoint.get_netdevice().await.expect("get netdevice");
     let (device_control, device_control_server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>();
     let () = installer.install_device(device, device_control_server_end).expect("install device");
 
     let (control, control_server_end) =
@@ -2228,10 +2278,9 @@ async fn control_enable_disable<N: Netstack>(name: &str) {
     let interfaces_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-        &interfaces_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
+    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+        fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+    >(&interfaces_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
     .expect("create event stream")
     .map(|r| r.expect("watcher error"))
     .fuse();
@@ -2240,7 +2289,7 @@ async fn control_enable_disable<N: Netstack>(name: &str) {
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>>::new(),
     )
     .await
     .expect("existing");
@@ -2258,7 +2307,7 @@ async fn control_enable_disable<N: Netstack>(name: &str) {
 
     // Expect the added event.
     let event = watcher.select_next_some().await;
-    assert_matches::assert_matches!(event,
+    assert_matches::assert_matches!(event.into_inner(),
         fidl_fuchsia_net_interfaces::Event::Added(
                 fidl_fuchsia_net_interfaces::Properties {
                     id: Some(id), online: Some(online), ..
@@ -2275,7 +2324,7 @@ async fn control_enable_disable<N: Netstack>(name: &str) {
     assert!(did_enable);
     let () = watcher
         .by_ref()
-        .filter_map(|event| match event {
+        .filter_map(|event| match event.into_inner() {
             fidl_fuchsia_net_interfaces::Event::Changed(
                 fidl_fuchsia_net_interfaces::Properties { id: Some(id), online, .. },
             ) if id == iface_id => {
@@ -2294,7 +2343,7 @@ async fn control_enable_disable<N: Netstack>(name: &str) {
     let did_disable = control.disable().await.expect("calling disable").expect("disable failed");
     assert!(did_disable);
     let () = watcher
-        .filter_map(|event| match event {
+        .filter_map(|event| match event.into_inner() {
             fidl_fuchsia_net_interfaces::Event::Changed(
                 fidl_fuchsia_net_interfaces::Properties { id: Some(id), online, .. },
             ) if id == iface_id => {
@@ -2321,10 +2370,9 @@ async fn link_state_interface_state_interaction<N: Netstack>(name: &str) {
     let interfaces_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-        &interfaces_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
+    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+        fidl_fuchsia_net_interfaces_ext::AllInterest,
+    >(&interfaces_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
     .expect("create event stream")
     .map(|r| r.expect("watcher error"))
     .fuse();
@@ -2332,7 +2380,7 @@ async fn link_state_interface_state_interaction<N: Netstack>(name: &str) {
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>>::new(),
     )
     .await
     .expect("existing");
@@ -2346,7 +2394,7 @@ async fn link_state_interface_state_interaction<N: Netstack>(name: &str) {
 
     // Map the `watcher` to only produce `Events` when `online` changes.
     let watcher =
-        watcher.filter_map(|event| match event {
+        watcher.filter_map(|event| match event.into_inner() {
             fidl_fuchsia_net_interfaces::Event::Changed(
                 fidl_fuchsia_net_interfaces::Properties { id: Some(id), online, .. },
             ) if id == iface_id => futures::future::ready(online),
@@ -2548,8 +2596,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
         interface_state: &fidl_fuchsia_net_interfaces::StateProxy,
     ) -> finterfaces_admin::AddressStateProviderProxy {
         let (address_state_provider, server_end) =
-            fidl::endpoints::create_proxy::<finterfaces_admin::AddressStateProviderMarker>()
-                .expect("create AddressStateProvider proxy");
+            fidl::endpoints::create_proxy::<finterfaces_admin::AddressStateProviderMarker>();
         control
             .add_address(
                 address,
@@ -2716,8 +2763,7 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
 
     let (device, port_id) = endpoint.get_netdevice().await.expect("get netdevice");
     let (device_control, device_control_server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>();
     let () = installer.install_device(device, device_control_server_end).expect("install device");
 
     let (control, control_server_end) =
@@ -2726,10 +2772,9 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
     let interfaces_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-        &interfaces_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
+    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+        fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+    >(&interfaces_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
     .expect("create event stream")
     .map(|r| r.expect("watcher error"))
     .fuse();
@@ -2738,7 +2783,7 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>>::new(),
     )
     .await
     .expect("existing");
@@ -2756,7 +2801,7 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
 
     // Expect the added event.
     let event = watcher.select_next_some().await;
-    assert_matches::assert_matches!(event,
+    assert_matches::assert_matches!(event.into_inner(),
         fidl_fuchsia_net_interfaces::Event::Added(
                 fidl_fuchsia_net_interfaces::Properties {
                     id: Some(id), ..
@@ -2797,7 +2842,7 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
         std::mem::drop(control);
 
         let event = watcher.select_next_some().await;
-        assert_matches::assert_matches!(event,
+        assert_matches::assert_matches!(event.into_inner(),
             fidl_fuchsia_net_interfaces::Event::Removed(id) if id == iface_id
         );
 
@@ -3111,16 +3156,14 @@ async fn reinstall_same_port<N: Netstack>(name: &str) {
     let (tun_dev, device) = create_tun_device();
 
     let (device_control, device_control_server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::DeviceControlMarker>();
     let () = installer.install_device(device, device_control_server_end).expect("install device");
 
     const PORT_ID: u8 = 15;
 
     for index in 0..3 {
         let (tun_port, port_server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::PortMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::PortMarker>();
         let () = tun_dev
             .add_port(
                 &fidl_fuchsia_net_tun::DevicePortConfig {
@@ -3143,8 +3186,7 @@ async fn reinstall_same_port<N: Netstack>(name: &str) {
             .expect("add port");
 
         let (dev_port, port_server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>();
 
         tun_port.get_port(port_server_end).expect("get port");
         let port_id = dev_port.get_info().await.expect("get info").id.expect("missing port id");
@@ -3254,8 +3296,7 @@ async fn epitaph_is_sent_after_interface_removal<N: Netstack>(name: &str) {
         .expect("connect to protocol");
     let device_control = {
         let (control, server_end) =
-            fidl::endpoints::create_proxy::<finterfaces_admin::DeviceControlMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<finterfaces_admin::DeviceControlMarker>();
         installer.install_device(device, server_end).expect("install device");
         control
     };
@@ -3717,12 +3758,11 @@ async fn temporary_address_generation<N: Netstack>(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State");
     fnet_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interface_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::All,
-        )
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::AllInterest,
+        >(&interface_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::All)
         .expect("error getting interface state event stream"),
-        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             // When temporary address assignment is enabled, the expected
             // order of events is the following:
@@ -3781,8 +3821,8 @@ async fn temporary_address_generation<N: Netstack>(name: &str) {
     set_and_assert(true).await;
     send_ra(&fake_ep, PREFIX1).await;
     fnet_interfaces_ext::wait_interface_with_id(
-        iface.get_interface_event_stream().expect("error getting interface state event stream"),
-        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        realm.get_interface_event_stream().expect("error getting interface state event stream"),
+        &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             (iface
                 .properties

@@ -85,7 +85,7 @@ impl PeripheralStateInner {
     }
 
     fn record_power_update(&mut self, id: PeerId, battery: BatteryInfo) {
-        let entry = self.peripherals.entry(id).or_insert(PeripheralData::new(id));
+        let entry = self.peripherals.entry(id).or_insert_with(|| PeripheralData::new(id));
         entry.battery = Some(battery);
     }
 }
@@ -126,7 +126,8 @@ impl TryFrom<fidl_fuchsia_power_battery::BatteryInfo> for BatteryInfo {
 
     fn try_from(src: fidl_fuchsia_power_battery::BatteryInfo) -> Result<BatteryInfo, Self::Error> {
         // The `level_percent` must be specified per the `fidl_fuchsia_bluetooth_power` docs.
-        let level_percent = src.level_percent.ok_or(Error::battery("missing level percent"))?;
+        let level_percent =
+            src.level_percent.ok_or_else(|| Error::battery("missing level percent"))?;
         Ok(BatteryInfo { level_percent, level_status: src.level_status })
     }
 }
@@ -207,7 +208,7 @@ mod tests {
 
     type WatchRequest = QueryResponseFut<Vec<Information>>;
     async fn make_watch_request() -> (WatchRequest, WatcherWatchResponder) {
-        let (c, mut s) = fidl::endpoints::create_proxy_and_stream::<WatcherMarker>().unwrap();
+        let (c, mut s) = fidl::endpoints::create_proxy_and_stream::<WatcherMarker>();
         let watch_fut = c.watch(&[]).check().expect("can make Watch request");
         let (_ids, responder) = s
             .select_next_some()

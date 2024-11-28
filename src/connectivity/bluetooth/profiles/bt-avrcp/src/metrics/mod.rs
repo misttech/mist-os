@@ -421,8 +421,7 @@ mod tests {
         let inspect = inspect::Inspector::default();
 
         let (proxy, mut receiver) =
-            fidl::endpoints::create_proxy_and_stream::<MetricEventLoggerMarker>()
-                .expect("failed to create MetricsEventLogger proxy");
+            fidl::endpoints::create_proxy_and_stream::<MetricEventLoggerMarker>();
 
         let metrics = MetricsNode::default()
             .with_inspect(inspect.root(), "metrics")

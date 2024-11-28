@@ -1633,8 +1633,7 @@ mod tests {
         // Initialize stash proxies such that SavedNetworksManager initialize doesn't wait on
         // and doesn't load anything from the legacy stash.
         let (stash_client, mut request_stream) =
-            create_request_stream::<fidl_stash::SecureStoreMarker>()
-                .expect("create_request_stream failed");
+            create_request_stream::<fidl_stash::SecureStoreMarker>();
 
         let read_from_stash = Arc::new(AtomicBool::new(false));
 
@@ -1649,7 +1648,7 @@ mod tests {
                         } => {
                             let read_from_stash = read_from_stash.clone();
                             fuchsia_async::EHandle::local().spawn_detached(async move {
-                                let mut request_stream = accessor_request.into_stream().unwrap();
+                                let mut request_stream = accessor_request.into_stream();
                                 while let Some(request) = request_stream.next().await {
                                     match request.unwrap() {
                                         fidl_stash::StoreAccessorRequest::ListPrefix { .. } => {
@@ -1668,10 +1667,8 @@ mod tests {
         };
 
         // Use a persistent store with the invalid file name and legacy stash which returns errors.
-        let store = PolicyStorage::new_with_stash_proxy_and_id(
-            stash_client.into_proxy().unwrap(),
-            store_path_str,
-        );
+        let store =
+            PolicyStorage::new_with_stash_proxy_and_id(stash_client.into_proxy(), store_path_str);
 
         // Initialize the saved networks manager with the file that should cause write errors, the
         // legacy stash that will load nothing, and empty legacy known ess store file.

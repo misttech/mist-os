@@ -178,7 +178,7 @@ mod tests {
         {
             pkg_lib = fuchsia_fs::directory::open_directory_async(&pkg_lib, name, rights)?;
         }
-        let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>()?;
+        let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>();
         start(pkg_lib.into(), loader_service.into_channel());
 
         for (obj_name, should_succeed) in vec![
@@ -222,7 +222,7 @@ mod tests {
             "/pkg/lib/config_test/",
             fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_EXECUTABLE,
         )?;
-        let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>()?;
+        let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>();
         start(pkg_lib.into(), loader_service.into_channel());
 
         // Attempt to access things with different configurations
@@ -276,7 +276,7 @@ mod tests {
             fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_EXECUTABLE,
         )?;
 
-        let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>()?;
+        let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>();
         start_with_multiple_dirs(
             vec![pkg_lib_1.into(), pkg_lib_2.into()],
             loader_service.into_channel(),

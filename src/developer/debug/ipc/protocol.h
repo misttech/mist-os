@@ -37,7 +37,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to the numbered API level currently represented by "NEXT".
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 66;
+constexpr uint32_t kCurrentProtocolVersion = 67;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -59,10 +59,10 @@ constexpr uint32_t kCurrentProtocolVersion = 66;
 //   - INITIAL_VERSION_FOR_API_LEVEL_CURRENT = kCurrentProtocolVersion
 //   - CURRENT_SUPPORTED_API_LEVEL = NEXT_STABLE_API_LEVEL
 
-#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 58
-#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_1 60
-#define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 63
-#define CURRENT_SUPPORTED_API_LEVEL 22
+#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 60
+#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_1 63
+#define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 66
+#define CURRENT_SUPPORTED_API_LEVEL 26
 
 constexpr uint32_t kMinimumProtocolVersion = INITIAL_VERSION_FOR_API_LEVEL_MINUS_2;
 
@@ -240,12 +240,7 @@ struct StatusReply {
   // All the installed filters.
   std::vector<Filter> filters;
 
-  void Serialize(Serializer& ser, uint32_t ver) {
-    ser | processes | limbo;
-    if (ver >= 59) {
-      ser | breakpoints | filters;
-    }
-  }
+  void Serialize(Serializer& ser, uint32_t ver) { ser | processes | limbo | breakpoints | filters; }
 };
 
 struct KillRequest {
@@ -846,6 +841,8 @@ struct NotifyLog {
   void Serialize(Serializer& ser, uint32_t ver) { ser | timestamp | severity | location | log; }
 };
 
+// Deprecated in version 67, do not use.
+//
 // When a filter has been installed recursively, we need to let the front end know about it,
 // particularly if it's a weak filter. Otherwise the frontend will take the default approach to not
 // treat a process starting event as a weak attach.
@@ -865,7 +862,16 @@ struct NotifyComponentStarting {
 
   ComponentInfo component;
 
-  void Serialize(Serializer& ser, uint32_t ver) { ser | timestamp | component; }
+  // The filter that the backend installed to match this realm, if the matching filter had the
+  // |recursive| option set..
+  std::optional<Filter> filter;
+
+  void Serialize(Serializer& ser, uint32_t ver) {
+    ser | timestamp | component;
+    if (ver >= 67) {
+      ser | filter;
+    }
+  }
 };
 
 // Notify that a component has exited.

@@ -29,7 +29,7 @@ impl UnifiedCollector {
         self.additional_boot_config.collect(model.clone())?;
         self.static_packages.collect(model.clone())?;
         self.packages.collect(model.clone())?;
-        self.components.collect(model.clone())?;
+        self.components.collect(model)?;
         Ok(())
     }
 }

@@ -59,11 +59,19 @@ pub struct Properties {
     mac: Option<fidl_fuchsia_net_ext::MacAddress>,
 }
 
-impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net::MacAddress>)>
-    for Properties
+impl
+    From<(
+        fidl_fuchsia_net_interfaces_ext::Properties<fidl_fuchsia_net_interfaces_ext::AllInterest>,
+        Option<fidl_fuchsia_net::MacAddress>,
+    )> for Properties
 {
     fn from(
-        t: (fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net::MacAddress>),
+        t: (
+            fidl_fuchsia_net_interfaces_ext::Properties<
+                fidl_fuchsia_net_interfaces_ext::AllInterest,
+            >,
+            Option<fidl_fuchsia_net::MacAddress>,
+        ),
     ) -> Self {
         use itertools::Itertools as _;
 
@@ -389,7 +397,7 @@ impl NetstackFacade {
 
         let interfaces_state = self.get_interfaces_state().await?;
         let (watcher, server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()?;
+            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>();
         let () = interfaces_state
             .get_watcher(&fidl_fuchsia_net_interfaces::WatcherOptions::default(), server)?;
 
@@ -506,11 +514,11 @@ mod tests {
             self,
         ) -> (finterfaces::StateProxy, impl std::future::Future<Output = ()>) {
             let (proxy, mut stream) =
-                fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>();
             let stream_fut = async move {
                 match stream.next().await {
                     Some(Ok(finterfaces::StateRequest::GetWatcher { watcher, .. })) => {
-                        let mut into_stream = watcher.into_stream().unwrap();
+                        let mut into_stream = watcher.into_stream();
                         for expected in self.expected_state {
                             let () = expected(into_stream.next().await.unwrap().unwrap());
                         }

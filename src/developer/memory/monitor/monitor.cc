@@ -346,10 +346,8 @@ void Monitor::CollectJsonStatsWithOptions(zx::socket socket) {
   Printer printer(stream);
   printer.PrintCaptureAndBucketConfig(capture, configuration_str);
   // TODO(b/229972119): avoid a copy by having the stream write directly to the socket.
-  const std::string json_string = stream.str();
-
   // Send string through socket.
-  fsl::BlockingCopyFromString(json_string, socket);
+  fsl::BlockingCopyFromString(stream.view(), socket);
 }
 
 void Monitor::PrintHelp() {

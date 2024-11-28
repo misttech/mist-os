@@ -998,8 +998,7 @@ mod tests {
     async fn configurable_netstack() {
         let (tx, mut rx) = mpsc::unbounded();
         let (controller, server_end) =
-            fidl::endpoints::create_proxy::<fsys2::LifecycleControllerMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fsys2::LifecycleControllerMarker>();
         drop(server_end);
         let configure_environment = async {
             Config {
@@ -1010,10 +1009,8 @@ mod tests {
             .apply(
                 |name| {
                     let (proxy, server_end) =
-                        fidl::endpoints::create_proxy::<fnetemul::ConfigurableNetstackMarker>()
-                            .context("create proxy")?;
-                    let stream =
-                        server_end.into_stream().context("server end into request stream")?;
+                        fidl::endpoints::create_proxy::<fnetemul::ConfigurableNetstackMarker>();
+                    let stream = server_end.into_stream();
                     tx.unbounded_send((name, stream))
                         .expect("request stream receiver should not be closed");
                     Ok(proxy)
@@ -1090,8 +1087,7 @@ mod tests {
     #[fuchsia::test]
     async fn eager_components() {
         let (controller, controller_requests) =
-            fidl::endpoints::create_proxy_and_stream::<fsys2::LifecycleControllerMarker>()
-                .expect("create proxy and stream");
+            fidl::endpoints::create_proxy_and_stream::<fsys2::LifecycleControllerMarker>();
         let configure_environment = async {
             let config = Config {
                 networks: vec![],
@@ -1102,8 +1098,7 @@ mod tests {
                 .apply(
                     |_name| {
                         let (proxy, server_end) =
-                            fidl::endpoints::create_proxy::<fnetemul::ConfigurableNetstackMarker>()
-                                .context("create proxy")?;
+                            fidl::endpoints::create_proxy::<fnetemul::ConfigurableNetstackMarker>();
                         drop(server_end);
                         Ok(proxy)
                     },

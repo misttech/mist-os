@@ -138,7 +138,7 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
 
   // This just rolls in RemoteModule::Create with the Create above.
   template <class Diagnostics>
-  static Ptr Create(Diagnostics& diag, zx::vmo ld_stub_vmo, size_t page_size) {
+  static Ptr Create(Diagnostics& diag, zx::vmo ld_stub_vmo, size_type page_size) {
     Ptr result;
     if (RemoteModulePtr ld_stub = RemoteModule::Create(diag, std::move(ld_stub_vmo), page_size)) {
       result = Create(diag, std::move(ld_stub));
@@ -287,11 +287,12 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
         return false;
       }
       std::optional<elfldltl::dwarf::CfiCie> cie_info =
-          cie->DecodeCie(diag, fde->cie_pointer().value_or(0));
+          cie->DecodeCie<Elf>(diag, fde->cie_pointer().value_or(0));
       if (!cie_info) [[unlikely]] {
         return false;
       }
-      std::optional<elfldltl::dwarf::CfiFde> fde_info = fde->DecodeFde(diag, fde_vaddr, *cie_info);
+      std::optional<elfldltl::dwarf::CfiFde> fde_info =
+          fde->DecodeFde<Elf>(diag, fde_vaddr, *cie_info);
       if (!fde_info) [[unlikely]] {
         return false;
       }

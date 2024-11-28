@@ -80,7 +80,7 @@ impl DiscoveredPeers {
     ) {
         self.stats
             .entry(id)
-            .or_insert({
+            .or_insert_with(|| {
                 let mut new_stats = PeerStats::new(id);
                 let _ = new_stats.iattach(&self.inspect_node, inspect::unique_name("peer_"));
                 new_stats
@@ -237,7 +237,7 @@ impl ConnectedPeers {
         negotiation: CodecNegotiation,
     ) -> Result<(), anyhow::Error> {
         let remote_streams = {
-            let strong = peer.upgrade().ok_or(format_err!("Disconnected"))?;
+            let strong = peer.upgrade().ok_or_else(|| format_err!("Disconnected"))?;
             if strong.streaming_active() {
                 return Ok(());
             }
@@ -245,10 +245,11 @@ impl ConnectedPeers {
         }
         .await?;
 
-        let (negotiated, remote_seid) =
-            negotiation.select(&remote_streams).ok_or(format_err!("No compatible stream found"))?;
+        let (negotiated, remote_seid) = negotiation
+            .select(&remote_streams)
+            .ok_or_else(|| format_err!("No compatible stream found"))?;
 
-        let strong = peer.upgrade().ok_or(format_err!("Disconnected"))?;
+        let strong = peer.upgrade().ok_or_else(|| format_err!("Disconnected"))?;
         if strong.streaming_active() {
             let peer_id = peer.key();
             info!(%peer_id, "Not starting streaming, it's already started");
@@ -321,7 +322,8 @@ impl ConnectedPeers {
         initiator_delay: Option<zx::MonotonicDuration>,
     ) -> Result<DetachableWeak<PeerId, Peer>, Error> {
         if let Some(weak) = self.get_weak(&id) {
-            let peer = weak.upgrade().ok_or(format_err!("Disconnected connecting transport"))?;
+            let peer =
+                weak.upgrade().ok_or_else(|| format_err!("Disconnected connecting transport"))?;
             if let Err(e) = peer.receive_channel(channel) {
                 warn!(%id, %e, "failed to connect channel");
                 return Err(e.into());
@@ -360,7 +362,7 @@ impl ConnectedPeers {
         let peer = match entry.try_insert(peer) {
             Err(_peer) => {
                 warn!(%id, "Peer connected while we were setting up");
-                return self.get_weak(&id).ok_or(format_err!("Peer missing"));
+                return self.get_weak(&id).ok_or_else(|| format_err!("Peer missing"));
             }
             Ok(weak_peer) => weak_peer,
         };
@@ -375,7 +377,7 @@ impl ConnectedPeers {
                 .negotiation(
                     &id,
                     None,
-                    peer_preferred_direction.unwrap_or(self.preferred_peer_direction()),
+                    peer_preferred_direction.unwrap_or_else(|| self.preferred_peer_direction()),
                 )
                 .await?;
             let start_stream_task = fuchsia_async::Task::local(async move {
@@ -400,7 +402,7 @@ impl ConnectedPeers {
         })
         .detach();
 
-        let peer = self.get_weak(&id).ok_or(format_err!("Peer missing"))?;
+        let peer = self.get_weak(&id).ok_or_else(|| format_err!("Peer missing"))?;
         self.notify_connected(&peer);
         Ok(peer)
     }
@@ -503,8 +505,7 @@ mod tests {
     fn setup_connected_peer_test(
     ) -> (fasync::TestExecutor, PeerId, ConnectedPeers, ProfileRequestStream) {
         let exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<ProfileMarker>().expect("Profile proxy should be created");
+        let (proxy, stream) = create_proxy_and_stream::<ProfileMarker>();
         let id = PeerId(1);
 
         let peers = ConnectedPeers::new(
@@ -688,8 +689,7 @@ mod tests {
     ) {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000));
-        let (proxy, stream) =
-            create_proxy_and_stream::<ProfileMarker>().expect("Profile proxy should be created");
+        let (proxy, stream) = create_proxy_and_stream::<ProfileMarker>();
 
         let aac_sink_codec = aac_sink_codec();
         let sbc_sink_codec = sbc_sink_codec();

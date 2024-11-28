@@ -155,8 +155,8 @@ mod test {
     async fn clients_waits_for_new_status() -> Result<()> {
         let (mut status_sink, status_stream) = mpsc::channel(CHANNEL_BUFFER_SIZE);
         let (session_control_proxy, session_control_server) =
-            create_proxy::<SessionControlMarker>()?;
-        let session_control_requests = session_control_server.into_stream()?;
+            create_proxy::<SessionControlMarker>();
+        let session_control_requests = session_control_server.into_stream();
         let responders = session_control_requests
             .filter_map(|r| future::ready(r.ok()))
             .filter_map(|r| future::ready(r.into_watch_status()));
@@ -181,8 +181,8 @@ mod test {
     async fn client_gets_cached_player_status() -> Result<()> {
         let (mut status_sink, status_stream) = mpsc::channel(CHANNEL_BUFFER_SIZE);
         let (session_control_proxy, session_control_server) =
-            create_proxy::<SessionControlMarker>()?;
-        let session_control_requests = session_control_server.into_stream()?;
+            create_proxy::<SessionControlMarker>();
+        let session_control_requests = session_control_server.into_stream();
         let responders = session_control_requests
             .filter_map(|r| future::ready(r.ok()))
             .filter_map(|r| future::ready(r.into_watch_status()));

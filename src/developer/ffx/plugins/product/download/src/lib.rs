@@ -11,6 +11,7 @@ use anyhow::{anyhow, Context};
 use async_fs::rename;
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
+use ffx_core as _;
 use ffx_product::{CommandStatus, MachineOutput, MachineUi};
 use ffx_product_download_args::DownloadCommand;
 use ffx_product_list::pb_list_impl;
@@ -20,6 +21,7 @@ use std::io::{stdin, stdout};
 use std::path::Path;
 
 #[derive(FfxTool)]
+#[no_target]
 pub struct PbDownloadTool {
     #[command]
     cmd: DownloadCommand,

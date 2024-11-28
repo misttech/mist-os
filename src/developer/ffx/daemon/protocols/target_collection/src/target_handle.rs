@@ -33,7 +33,7 @@ impl TargetHandle {
         let reboot_controller = reboot::RebootController::new(target.clone(), cx.overnet_node()?);
         let keep_alive = target.keep_alive();
         let inner = TargetHandleInner { target, reboot_controller };
-        let stream = handle.into_stream()?;
+        let stream = handle.into_stream();
         let fut = Box::pin(async move {
             let _ = stream
                 .map_err(|err| anyhow!("{}", err))
@@ -283,7 +283,7 @@ mod tests {
             .into_iter(),
         );
         target.update_connection_state(|_| TargetConnectionState::Mdns(std::time::Instant::now()));
-        let (proxy, server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();
         let _handle = Task::local(TargetHandle::new(target, cx, server).unwrap());
         let result = proxy.get_ssh_address().await.unwrap();
         if let ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
@@ -305,7 +305,7 @@ mod tests {
             while let Some(chan) = receiver.next().await {
                 let server_end =
                     fidl::endpoints::ServerEnd::<fidl_rcs::RemoteControlMarker>::new(chan);
-                let mut stream = server_end.into_stream().unwrap();
+                let mut stream = server_end.into_stream();
                 let nodename = nodename.clone();
                 Task::local(async move {
                     let mut knock_channels = Vec::new();
@@ -327,7 +327,7 @@ mod tests {
                                     }))
                                     .unwrap();
                             }
-                            fidl_rcs::RemoteControlRequest::OpenCapability {
+                            fidl_rcs::RemoteControlRequest::DeprecatedOpenCapability {
                                 moniker,
                                 capability_set,
                                 capability_name,
@@ -427,10 +427,9 @@ mod tests {
         let target = Target::new();
         target.apply_update(update.build());
 
-        let (target_proxy, server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
+        let (target_proxy, server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();
         let _handle = Task::local(TargetHandle::new(target, cx, server).unwrap());
-        let (rcs, rcs_server) =
-            fidl::endpoints::create_proxy::<fidl_rcs::RemoteControlMarker>().unwrap();
+        let (rcs, rcs_server) = fidl::endpoints::create_proxy::<fidl_rcs::RemoteControlMarker>();
         let res = target_proxy.open_remote_control(rcs_server).await.unwrap();
         assert!(res.is_ok());
         assert_eq!(TEST_NODE_NAME, rcs.identify_host().await.unwrap().unwrap().nodename.unwrap());

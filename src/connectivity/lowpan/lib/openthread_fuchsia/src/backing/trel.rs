@@ -126,7 +126,7 @@ impl TrelInstance {
             instance_name,
             peer_instance_sockaddr_map: HashMap::default(),
             subscriber,
-            subscriber_request_stream: server.into_stream()?,
+            subscriber_request_stream: server.into_stream(),
             counters: RefCell::new(TrelCounters::default()),
         })
     }
@@ -159,25 +159,23 @@ impl TrelInstance {
                 }
             });
 
-        let publish_responder_future =
-            server.into_stream().unwrap().map_err(Into::into).try_for_each(
-                move |ServiceInstancePublicationResponder_Request::OnPublication {
-                          responder,
-                          ..
-                      }| {
-                    let txt = txt.clone();
-                    let _publisher = publisher.clone();
-                    async move {
-                        responder
-                            .send(Ok(&ServiceInstancePublication {
-                                port: Some(port),
-                                text: Some(txt),
-                                ..Default::default()
-                            }))
-                            .map_err(Into::into)
-                    }
-                },
-            );
+        let publish_responder_future = server.into_stream().map_err(Into::into).try_for_each(
+            move |ServiceInstancePublicationResponder_Request::OnPublication {
+                      responder, ..
+                  }| {
+                let txt = txt.clone();
+                let _publisher = publisher.clone();
+                async move {
+                    responder
+                        .send(Ok(&ServiceInstancePublication {
+                            port: Some(port),
+                            text: Some(txt),
+                            ..Default::default()
+                        }))
+                        .map_err(Into::into)
+                }
+            },
+        );
 
         let future =
             futures::future::try_join(publish_init_future, publish_responder_future).map_ok(|_| ());

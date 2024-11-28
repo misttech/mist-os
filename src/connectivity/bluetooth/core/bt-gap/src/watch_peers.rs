@@ -145,8 +145,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_observe() -> Result<(), anyhow::Error> {
-        let (proxy, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<sys::AccessMarker>()?;
+        let (proxy, mut requests) = fidl::endpoints::create_proxy_and_stream::<sys::AccessMarker>();
         let mut result_fut = proxy.watch_peers();
         let responder = requests
             .try_next()

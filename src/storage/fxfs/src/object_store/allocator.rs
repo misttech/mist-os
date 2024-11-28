@@ -673,7 +673,7 @@ impl Inner {
             .checked_sub(
                 (self.unavailable_after_sync_bytes() + Saturating(self.trim_reserved_bytes)).0,
             )
-            .ok_or(anyhow!(FxfsError::Inconsistent))
+            .ok_or_else(|| anyhow!(FxfsError::Inconsistent))
     }
 
     fn add_reservation(&mut self, owner_object_id: Option<u64>, amount: u64) {
@@ -1808,7 +1808,7 @@ impl JournalingObject for Allocator {
                 owner_object_id,
             }) => {
                 let item = AllocatorItem {
-                    key: AllocatorKey { device_range: device_range.clone().into() },
+                    key: AllocatorKey { device_range: device_range.into() },
                     value: AllocatorValue::None,
                     sequence: context.checkpoint.file_offset,
                 };

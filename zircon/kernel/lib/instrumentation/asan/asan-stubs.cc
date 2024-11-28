@@ -28,7 +28,7 @@
 #if __mist_os__
 constexpr size_t kAsanMaxGlobalsRegions = 900;
 #else
-constexpr size_t kAsanMaxGlobalsRegions = 450;
+constexpr size_t kAsanMaxGlobalsRegions = 500;
 #endif
 static ktl::array<ktl::span<const asan_global>, kAsanMaxGlobalsRegions> g_globals_regions;
 static size_t g_total_globals;

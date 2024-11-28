@@ -206,7 +206,7 @@ async fn handle_realm_query(
     instances: Vec<fsys::Instance>,
     server_end: fidl::endpoints::ServerEnd<fsys::RealmQueryMarker>,
 ) {
-    let mut stream = server_end.into_stream().unwrap();
+    let mut stream = server_end.into_stream();
     let mut instance_map = HashMap::new();
     for instance in instances {
         let moniker = Moniker::parse_str(instance.moniker.as_ref().unwrap()).unwrap();
@@ -238,7 +238,7 @@ fn serve_instance_iterator(
     instances: Vec<fsys::Instance>,
 ) -> fidl::endpoints::ClientEnd<fsys::InstanceIteratorMarker> {
     let (client, mut stream) =
-        fidl::endpoints::create_request_stream::<fsys::InstanceIteratorMarker>().unwrap();
+        fidl::endpoints::create_request_stream::<fsys::InstanceIteratorMarker>();
     fasync::Task::local(async move {
         let fsys::InstanceIteratorRequest::Next { responder } =
             stream.next().await.unwrap().unwrap();
@@ -254,8 +254,7 @@ fn serve_instance_iterator(
 }
 
 fn setup_fake_rcs(state: Rc<State>) -> RemoteControlProxy {
-    let (proxy, mut stream) =
-        fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+    let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
     fasync::Task::local(async move {
         let mut task_group = fasync::TaskGroup::new();
         while let Ok(Some(req)) = stream.try_next().await {
@@ -263,7 +262,7 @@ fn setup_fake_rcs(state: Rc<State>) -> RemoteControlProxy {
                 RemoteControlRequest::EchoString { value, responder } => {
                     responder.send(value.as_ref()).expect("should send");
                 }
-                RemoteControlRequest::OpenCapability {
+                RemoteControlRequest::DeprecatedOpenCapability {
                     moniker,
                     capability_set,
                     capability_name,
@@ -316,9 +315,7 @@ async fn handle_open_capability(
         ArchiveAccessorMarker::PROTOCOL_NAME => {
             assert_eq!(moniker, rcs::toolbox::MONIKER);
             handle_archive_accessor(
-                fidl::endpoints::ServerEnd::<ArchiveAccessorMarker>::from(channel)
-                    .into_stream()
-                    .unwrap(),
+                fidl::endpoints::ServerEnd::<ArchiveAccessorMarker>::from(channel).into_stream(),
                 state,
             )
             .await;
@@ -326,9 +323,7 @@ async fn handle_open_capability(
         LogSettingsMarker::PROTOCOL_NAME => {
             assert_eq!(moniker, rcs::toolbox::MONIKER);
             handle_log_settings(
-                fidl::endpoints::ServerEnd::<LogSettingsMarker>::from(channel)
-                    .into_stream()
-                    .unwrap(),
+                fidl::endpoints::ServerEnd::<LogSettingsMarker>::from(channel).into_stream(),
                 state,
             )
             .await;

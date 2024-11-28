@@ -245,6 +245,7 @@ int Dwc3::IrqThread() {
           shutdown_now = true;
           break;
       }
+      // TODO: b/377950112 - Determine whether a Wakeup user packet should lead to shutdown.
       shutdown_now = true;
       continue;
     } else {

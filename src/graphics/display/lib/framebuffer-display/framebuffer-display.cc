@@ -28,11 +28,11 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
-#include "src/graphics/display/lib/api-types-cpp/rectangle.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 
 namespace framebuffer_display {
 
@@ -334,11 +334,12 @@ bool FramebufferDisplay::IsBanjoDisplayConfigSupported(
     return false;
   }
 
-  if (banjo_display_config.layer_list[0].type != LAYER_TYPE_PRIMARY) {
+  const layer_t& banjo_layer = banjo_display_config.layer_list[0];
+  if (banjo_layer.image_source.width == 0 || banjo_layer.image_source.height == 0) {
+    // Solid color fill layers are not supported.
     return false;
   }
 
-  const primary_layer_t& banjo_layer = banjo_display_config.layer_list[0].cfg.primary;
   if (banjo_layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
     return false;
   }

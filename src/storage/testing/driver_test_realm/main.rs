@@ -49,14 +49,11 @@ async fn main() -> Result<()> {
 
     let mut fs = ServiceFs::new();
 
-    let (dir_client, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (dir_client, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     instance
         .root
         .get_exposed_dir()
-        .clone(
-            fio::OpenFlags::CLONE_SAME_RIGHTS,
-            fidl::endpoints::ServerEnd::new(dir_server.into()),
-        )
+        .clone2(fidl::endpoints::ServerEnd::new(dir_server.into_channel()))
         .context("clone failed")?;
     fs.add_remote("realm_builder_exposed_dir", dir_client);
 

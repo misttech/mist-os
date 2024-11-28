@@ -242,7 +242,7 @@ pub async fn serve_controller(
             Some(Ok(fuzz::ControllerRequest::ReadCorpus { corpus, corpus_reader, responder })) => {
                 test.record("fuchsia.fuzzer/Controller.ReadCorpus");
                 fake.set_corpus_type(corpus);
-                let corpus_reader = corpus_reader.into_proxy()?;
+                let corpus_reader = corpus_reader.into_proxy();
                 if let Some(input_to_send) = fake.take_input_to_send() {
                     let input_pair = InputPair::try_from_data(input_to_send)?;
                     let (fidl_input, input) = input_pair.as_tuple();

@@ -492,7 +492,8 @@ impl<'a> CpuManagerMainBuilder<'a> {
 
     pub fn build(self) -> Result<Rc<CpuManagerMain>, Error> {
         // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
 
         let cluster_names = self.cluster_configs.iter().map(|c| c.name.as_str()).collect();
         let inspect = InspectData::new(inspect_root, "CpuManagerMain", cluster_names);

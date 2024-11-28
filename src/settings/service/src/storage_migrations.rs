@@ -52,9 +52,8 @@ mod tests {
         let _ = settings.insert(SettingType::NightMode);
         let _ = settings.insert(SettingType::Privacy);
         let _ = settings.insert(SettingType::Setup);
-        let (directory_proxy, _) = create_proxy::<DirectoryMarker>().unwrap();
-        let (store_proxy, _) =
-            create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
+        let (directory_proxy, _) = create_proxy::<DirectoryMarker>();
+        let (store_proxy, _) = create_proxy::<StoreMarker>();
         if let Err(e) = register_migrations(&settings, directory_proxy, store_proxy) {
             panic!("Unable to register migrations: Err({e:?})");
         }

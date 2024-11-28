@@ -890,18 +890,13 @@ impl Directory for FatDirectory {
                     let () = entry
                         .open_ref(&self.filesystem.lock().unwrap())
                         .expect("entry should already be open");
-                    object_request.spawn_connection(
-                        scope,
-                        entry.clone(),
-                        flags,
-                        MutableConnection::create,
-                    )
+                    object_request.spawn_connection(scope, entry, flags, MutableConnection::create)
                 }
                 FatNode::File(entry) => {
                     let () = entry
                         .open_ref(&self.filesystem.lock().unwrap())
                         .expect("entry should already be open");
-                    entry.clone().create_connection(scope, flags, object_request)
+                    entry.create_connection(scope, flags, object_request)
                 }
             }
         });
@@ -919,21 +914,11 @@ impl Directory for FatDirectory {
         match self.lookup_with_open3_flags(flags, path, &mut closer)? {
             FatNode::Dir(entry) => {
                 let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
-                object_request.spawn_connection(
-                    scope,
-                    entry.clone(),
-                    flags,
-                    MutableConnection::create,
-                )
+                object_request.spawn_connection(scope, entry, flags, MutableConnection::create)
             }
             FatNode::File(entry) => {
                 let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
-                object_request.spawn_connection(
-                    scope,
-                    entry.clone(),
-                    flags,
-                    FidlIoConnection::create,
-                )
+                object_request.spawn_connection(scope, entry, flags, FidlIoConnection::create)
             }
         }
     }
@@ -1001,7 +986,7 @@ impl Directory for FatDirectory {
             match result {
                 AppendResult::Ok(new_sink) => cur_sink = new_sink,
                 AppendResult::Sealed(sealed) => {
-                    return Ok((TraversalPosition::Name(name.clone()), sealed));
+                    return Ok((TraversalPosition::Name(name), sealed));
                 }
             }
         }
@@ -1253,7 +1238,7 @@ mod tests {
         let dir = fs.get_root().expect("get_root OK");
 
         let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         dir.clone().open(scope.clone(), fio::OpenFlags::RIGHT_READABLE, Path::dot(), server_end);
         let scope_clone = scope.clone();
 
@@ -1263,7 +1248,7 @@ mod tests {
             .expect("Send request OK")
             .map_err(Status::from_raw)
             .expect("First close OK");
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         dir.clone().open(
             scope_clone,
             fio::OpenFlags::RIGHT_READABLE,
@@ -1291,7 +1276,7 @@ mod tests {
         let scope = ExecutionScope::new();
 
         // Open and close root.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PERM_READ;
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
             .handle(|request| root.clone().open3(scope.clone(), Path::dot(), flags, request));
@@ -1303,7 +1288,7 @@ mod tests {
             .expect("First close failed");
 
         // Re-open and close root at "test".
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {
             root.clone().open3(
                 scope.clone(),
@@ -1332,7 +1317,7 @@ mod tests {
         let root = fs.get_root().expect("get_root failed");
 
         let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PERM_READ
             | fio::Flags::FLAG_MUST_CREATE
             | fio::Flags::FLAG_SEND_REPRESENTATION;
@@ -1366,7 +1351,7 @@ mod tests {
         let root = fs.get_root().expect("get_root failed");
 
         let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags = fio::Flags::PERM_READ | fio::Flags::PERM_SET_ATTRIBUTES;
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {
             root.clone().open3(
@@ -1416,7 +1401,7 @@ mod tests {
         let root = fs.get_root().expect("get_root failed");
 
         let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
         let flags =
             fio::Flags::PERM_READ | fio::Flags::PERM_SET_ATTRIBUTES | fio::Flags::PROTOCOL_FILE;
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {

@@ -156,13 +156,10 @@ impl RepoKeys {
         let timestamp_key = generate_rolekey(DEFAULT_KEYTYPE_GENERATION).unwrap();
 
         for (rolekeys_filename, rolekeys) in [
-            ("root.json", RoleKeys { encrypted: false, data: json! { [root_key.clone()] } }),
-            ("targets.json", RoleKeys { encrypted: false, data: json! {[targets_key.clone()] } }),
-            ("snapshot.json", RoleKeys { encrypted: false, data: json! {[snapshot_key.clone()] } }),
-            (
-                "timestamp.json",
-                RoleKeys { encrypted: false, data: json! {[timestamp_key.clone()] } },
-            ),
+            ("root.json", RoleKeys { encrypted: false, data: json! { [root_key] } }),
+            ("targets.json", RoleKeys { encrypted: false, data: json! {[targets_key] } }),
+            ("snapshot.json", RoleKeys { encrypted: false, data: json! {[snapshot_key] } }),
+            ("timestamp.json", RoleKeys { encrypted: false, data: json! {[timestamp_key] } }),
         ] {
             write_rolekeys(dir, rolekeys_filename, rolekeys)?;
         }
@@ -418,8 +415,8 @@ mod tests {
     macro_rules! assert_keys {
         ($actual:expr, $expected:expr) => {
             assert_eq!(
-                $actual.iter().map(|key| key.public()).collect::<Vec<_>>(),
-                $expected.iter().collect::<Vec<_>>(),
+                $actual.iter().map(|key| key.public()).collect::<Vec<&PublicKey>>(),
+                $expected.iter().collect::<Vec<&PublicKey>>(),
             )
         };
     }

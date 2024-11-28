@@ -119,11 +119,7 @@ impl RemoteControlService {
                 self.clone().identify_host(responder).await?;
                 Ok(())
             }
-            #[cfg(any(
-                fuchsia_api_level_less_than = "25",
-                fuchsia_api_level_at_least = "PLATFORM"
-            ))]
-            rcs::RemoteControlRequest::OpenCapability {
+            rcs::RemoteControlRequest::DeprecatedOpenCapability {
                 moniker,
                 capability_set,
                 capability_name,
@@ -138,7 +134,6 @@ impl RemoteControlService {
                 )?;
                 Ok(())
             }
-            #[cfg(fuchsia_api_level_at_least = "25")]
             rcs::RemoteControlRequest::ConnectCapability {
                 moniker,
                 capability_set,
@@ -457,7 +452,7 @@ mod tests {
 
     fn setup_fake_device_service() -> hwinfo::DeviceProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<hwinfo::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<hwinfo::DeviceMarker>();
         fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
@@ -477,7 +472,7 @@ mod tests {
 
     fn setup_fake_sysinfo_service(status: zx::Status) -> sysinfo::SysInfoProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<sysinfo::SysInfoMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<sysinfo::SysInfoMarker>();
         fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
@@ -499,7 +494,7 @@ mod tests {
 
     fn setup_fake_build_info_service() -> buildinfo::ProviderProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<buildinfo::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<buildinfo::ProviderMarker>();
         fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
@@ -520,7 +515,7 @@ mod tests {
 
     fn setup_fake_name_provider_service() -> fdevice::NameProviderProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdevice::NameProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fdevice::NameProviderMarker>();
 
         fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
@@ -538,7 +533,7 @@ mod tests {
 
     fn setup_fake_interface_state_service() -> fnet_interfaces::StateProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>();
 
         fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
@@ -548,7 +543,7 @@ mod tests {
                         watcher,
                         control_handle: _,
                     } => {
-                        let mut stream = watcher.into_stream().unwrap();
+                        let mut stream = watcher.into_stream();
                         let mut first = true;
                         while let Ok(Some(req)) = stream.try_next().await {
                             match req {
@@ -580,9 +575,7 @@ mod tests {
                                                     .map(Some)
                                                     .map(|addr| fnet_interfaces::Address {
                                                         addr,
-                                                        valid_until: Some(1),
                                                         assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
-                                                        preferred_lifetime_info: Some(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(1)),
                                                         ..Default::default()
                                                     })
                                                     .collect(),
@@ -655,7 +648,7 @@ mod tests {
         let service = make_rcs_from_env(env);
 
         let (rcs_proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<rcs::RemoteControlMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<rcs::RemoteControlMarker>();
         fasync::Task::local({
             let service = Rc::clone(&service);
             async move {
@@ -664,7 +657,7 @@ mod tests {
         })
         .detach();
         let (connector_proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<connector::ConnectorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<connector::ConnectorMarker>();
         fasync::Task::local(async move {
             service.serve_connector_stream(stream).await;
         })
@@ -693,7 +686,6 @@ mod tests {
                 }
             },
         )
-        .unwrap()
     }
 
     fn setup_exposed_dir(server: ServerEnd<fio::DirectoryMarker>) {
@@ -730,10 +722,15 @@ mod tests {
 
                     responder.send(Ok(())).unwrap()
                 }
+                fsys::RealmQueryRequest::OpenDirectory { moniker, dir_type, object, responder } => {
+                    assert_eq!(moniker, "core/my_component");
+                    assert_eq!(dir_type, capability_set);
+                    setup_exposed_dir(object);
+                    responder.send(Ok(())).unwrap()
+                }
                 _ => panic!("unexpected request: {:?}", request),
             }
         })
-        .unwrap()
     }
 
     #[fuchsia::test]

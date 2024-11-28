@@ -107,11 +107,9 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn try_from_set_handles_missing_params() {
-        let (proxy, server) = fidl::endpoints::create_proxy::<FactoryResetMarker>()
-            .expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<FactoryResetMarker>();
         let _fut = proxy.set(&FactoryResetSettings::default());
-        let mut request_stream: FactoryResetRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: FactoryResetRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await
@@ -123,14 +121,12 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn try_from_set_converts_supplied_params() {
-        let (proxy, server) = fidl::endpoints::create_proxy::<FactoryResetMarker>()
-            .expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<FactoryResetMarker>();
         let _fut = proxy.set(&FactoryResetSettings {
             is_local_reset_allowed: Some(true),
             ..Default::default()
         });
-        let mut request_stream: FactoryResetRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: FactoryResetRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await
@@ -144,11 +140,9 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn try_from_watch_converts_supplied_params() {
-        let (proxy, server) = fidl::endpoints::create_proxy::<FactoryResetMarker>()
-            .expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<FactoryResetMarker>();
         let _fut = proxy.watch();
-        let mut request_stream: FactoryResetRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: FactoryResetRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await

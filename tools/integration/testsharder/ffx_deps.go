@@ -28,12 +28,17 @@ func AddFFXDeps(s *Shard, buildDir string, tools build.Tools, flash bool) error 
 		}
 		s.AddDeps(deps)
 	}
-	s.AddDeps(getSubtoolDeps(s, tools, buildDir, subtools))
+	platform := hostplatform.MakeName(runtime.GOOS, s.HostCPU())
+	s.AddDeps(getSubtoolDeps(s, tools, platform, subtools))
+	ffxTool, err := tools.LookupTool(platform, "ffx")
+	if err != nil {
+		return err
+	}
+	s.AddDeps([]string{ffxTool.Path})
 	return nil
 }
 
-func getSubtoolDeps(s *Shard, tools build.Tools, buildDir string, subtools []string) []string {
-	platform := hostplatform.MakeName(runtime.GOOS, s.HostCPU())
+func getSubtoolDeps(s *Shard, tools build.Tools, platform string, subtools []string) []string {
 	var deps []string
 	for _, s := range subtools {
 		if subtool, err := tools.LookupTool(platform, fmt.Sprintf("ffx-%s", s)); err == nil {

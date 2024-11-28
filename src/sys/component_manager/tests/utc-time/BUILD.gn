@@ -120,9 +120,10 @@ resource("cm_config_resource") {
 }
 
 fuchsia_component("component-manager") {
+  testonly = true
   deps = [
     ":cm_config_resource",
-    "//src/sys/component_manager:bin",
+    "//src/sys/component_manager:bin_eng",
   ]
   component_name = "component_manager"
   manifest = "meta/component_manager.cml"

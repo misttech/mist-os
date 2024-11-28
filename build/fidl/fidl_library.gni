@@ -245,16 +245,6 @@ template("fidl_library") {
     # TODO(https://fxbug.dev/364294648): Resolve heapdump instrumentation dependency on library.
     "fuchsia.memory.heapdump.process",
 
-    # TODO(https://fxbug.dev/365558387): For each of these time-related
-    # libraries and libraries used by time-related tests, either remove the
-    # dependency from the CTF tests or make the library stable then remove
-    # the library from the list below.
-    "fuchsia.metrics.test",
-    "fuchsia.testing",
-    "fuchsia.testing.deadline",
-    "fuchsia.time",
-    "fuchsia.time.external",
-
     # TODO(https://fxbug.dev/365602422): For each of these UI-related libraries,
     # either remove the dependency from the CTF tests or make the library stable
     # then remove the library from the list below.

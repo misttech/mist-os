@@ -348,7 +348,6 @@ where
 #[variant(N, Netstack)]
 async fn serves_update_verify<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let sandbox = &sandbox;
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
     let verifier = realm
         .connect_to_protocol::<fidl_fuchsia_update_verify::NetstackVerifierMarker>()
@@ -359,6 +358,19 @@ async fn serves_update_verify<N: Netstack>(name: &str) {
         .await
         .expect("call succeeded");
     assert_eq!(response, Ok(()));
+}
+
+#[netstack_test]
+#[variant(N, Netstack)]
+async fn serves_ota_health_check<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
+    let health_check = realm
+        .connect_to_protocol::<fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker>()
+        .expect("connect to protocol");
+
+    let response = health_check.get_health_status().await.expect("call succeeded");
+    assert_eq!(response, fidl_fuchsia_update_verify::HealthStatus::Healthy);
 }
 
 #[netstack_test]

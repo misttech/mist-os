@@ -3,5 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/standalone-test/standalone.h>
+#include <zircon/dlfcn.h>
 
 int main() { return standalone::TestMain(); }

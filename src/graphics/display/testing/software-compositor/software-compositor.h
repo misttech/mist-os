@@ -9,9 +9,9 @@
 
 #include <cstdint>
 
-#include "src/graphics/display/lib/api-types-cpp/alpha-mode.h"
-#include "src/graphics/display/lib/api-types-cpp/rectangle.h"
-#include "src/graphics/display/lib/api-types-cpp/transform.h"
+#include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
+#include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
+#include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/graphics/display/testing/software-compositor/pixel.h"
 
 namespace software_compositor {
@@ -84,7 +84,7 @@ class SoftwareCompositor {
     //   Coordinator/SetLayerPrimaryPosition`] method, and
     // - the `transform_mode` field in banjo [`fuchsia.hardware.display.
     //   controller/PrimaryLayer`] struct.
-    ::display::Transform transform;
+    ::display::CoordinateTransformation transform;
 
     // Indicates whether alpha blending will be performed and the type of alpha
     // blending.

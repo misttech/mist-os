@@ -18,6 +18,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
+	fintpb "go.fuchsia.dev/fuchsia/tools/integration/fint/proto"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
@@ -70,6 +71,38 @@ type Shard struct {
 	// ExpectsSSH specifies whether the test is expected to run against
 	// a product bundle that supports SSH.
 	ExpectsSSH bool `json:"expects_ssh,omitempty"`
+
+	// CIPDPackages specifies the CIPD packages to install on the task that runs this shard.
+	CIPDPackages []CIPDPackage `json:"cipd_packages,omitempty"`
+
+	// BuildMetadata provides the fint set artifacts metadata needed to construct
+	// swarming task requests from the shards. This will only be populated if the
+	// `-deps-file` flag is provided meaning that local artifacts will be used and
+	// thus the builder itself won't have the fint set artifacts available.
+	BuildMetadata fintpb.SetArtifacts_Metadata `json:"build_metadata,omitempty"`
+}
+
+// CIPDPackage describes the CIPD package, version and subdir to download the package to
+// within the working directory of the shard.
+//
+// This should only be used instead of regular deps for packages where the required platform
+// differs from the platform of the locally checked-out package, and size constraints make it
+// infeasible to include multiple platforms in the checkout.
+//
+// For example, x64 build hosts may launch arm64 emulator tests that require arm64 emulator
+// prebuilts, but emulator prebuilts are large enough that including multiple versions of
+// them in the checkout would slow down checkout times.
+type CIPDPackage struct {
+	// Name is the name of the package.
+	Name string `json:"name"`
+
+	// Version is the instance_id, ref, or unique tag that describes
+	// the version of the package to use.
+	Version string `json:"version"`
+
+	// Subdir is the directory on the Swarming bot at which the package
+	// should be installed.
+	Subdir string `json:"subdir"`
 }
 
 // TargetCPU returns the CPU architecture of the target this shard will run against.
@@ -400,6 +433,11 @@ func environmentName(env build.Environment) string {
 	}
 	if env.Netboot {
 		addToken("netboot")
+	}
+	if env.VirtualDeviceSpec.EnvName != "" {
+		addToken(env.VirtualDeviceSpec.EnvName)
+	} else if env.VirtualDeviceSpec.Name != "" {
+		addToken(env.VirtualDeviceSpec.Name)
 	}
 	return strings.Join(tokens, "-")
 }

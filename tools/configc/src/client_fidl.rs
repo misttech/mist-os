@@ -66,7 +66,7 @@ fn format_source(fidl_format: PathBuf, contents: String) -> Result<String, Error
     process
         .stdin
         .as_mut()
-        .ok_or(format_err!("could not get stdin for fidl-format process"))?
+        .ok_or_else(|| format_err!("could not get stdin for fidl-format process"))?
         .write_all(contents.as_bytes())
         .context("could not write unformatted source to stdin of fidl-format")?;
     let output =

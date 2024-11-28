@@ -754,7 +754,7 @@ TEST(PtraceTest, PtraceEventStopWithExit) {
   ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
 
   // Wait for the exec
-  ASSERT_EQ(child_pid, waitpid(-1, &status, 0));
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
   ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);

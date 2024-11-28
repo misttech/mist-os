@@ -6,9 +6,9 @@ use argh::{ArgsInfo, FromArgs, SubCommands};
 use async_utils::async_once;
 use errors::ffx_error;
 use ffx_command::{
-    analytics_command, check_strict_constraints, return_bug, return_user_error,
-    send_enhanced_analytics, CliArgsInfo, Error, FfxCommandLine, FfxContext, FfxToolInfo,
-    MetricsSession, Optionality, Result, ToolRunner, ToolSuite,
+    analytics_command, return_bug, return_user_error, send_enhanced_analytics, CliArgsInfo, Error,
+    FfxCommandLine, FfxContext, FfxToolInfo, MetricsSession, Optionality, Result, ToolRunner,
+    ToolSuite,
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
@@ -26,13 +26,6 @@ struct FfxSubCommand {
     app: FfxCommandLine,
     context: EnvironmentContext,
     cmd: FfxBuiltIn,
-}
-
-/// Wrapper around an FfxSubCommand which has stricter checks on it before it is
-/// actually run
-struct FfxStrictSubCommand {
-    /// The command to be invoked and everything it needs to invoke
-    subcommand: FfxSubCommand,
 }
 
 /// The suite of commands FFX supports.
@@ -188,30 +181,10 @@ impl ToolSuite for FfxSuite {
             Some(name) if SubCommand::COMMANDS.iter().any(|c| c.name == name) => {
                 let cmd = FfxBuiltIn::from_args(&Vec::from_iter(ffx_cmd.cmd_iter()), &args)
                     .map_err(|err| Error::from_early_exit(&ffx_cmd.command, err))?;
-                if ffx_cmd.global.strict {
-                    Ok(Some(Box::new(FfxStrictSubCommand {
-                        subcommand: FfxSubCommand { cmd, context, app },
-                    })))
-                } else {
-                    Ok(Some(Box::new(FfxSubCommand { cmd, context, app })))
-                }
+                Ok(Some(Box::new(FfxSubCommand { cmd, context, app })))
             }
             _ => self.get_external_commands().await.try_from_args(ffx_cmd).await,
         }
-    }
-}
-
-#[async_trait::async_trait(?Send)]
-impl ToolRunner for FfxStrictSubCommand {
-    async fn run(self: Box<Self>, metrics: MetricsSession) -> Result<ExitStatus> {
-        if !self.subcommand.app.global.strict {
-            return_bug!(
-                "We are running a Strict SubCommand but the args do not specify we should be strict"
-            );
-        }
-        check_strict_constraints(&self.subcommand.app.global)?;
-
-        Box::new(self.subcommand).run(metrics).await
     }
 }
 

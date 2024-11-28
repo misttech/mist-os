@@ -22,7 +22,7 @@ properties:
     description: List of PHYs for this controller.
 
   phy-names:
-    enum: [xhci-phy, dwc2-phy]
+    enum: [xhci-phy, dwc2-phy, dwc3-phy]
     description: Name specifier for the PHYs. This is used to match the driver bind rules.
 
 additionalProperties: true

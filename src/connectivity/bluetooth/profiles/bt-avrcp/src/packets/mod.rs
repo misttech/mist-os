@@ -789,7 +789,7 @@ impl From<fidl_avrcp::MediaAttributes> for MediaAttributeEntries {
             album_name: src.album_name.clone(),
             total_number_of_tracks: src.total_number_of_tracks.clone(),
             genre: src.genre.clone(),
-            playing_time: src.playing_time.clone(),
+            playing_time: src.playing_time,
             ..Default::default()
         }
     }

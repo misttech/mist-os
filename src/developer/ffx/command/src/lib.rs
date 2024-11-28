@@ -84,11 +84,13 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     ffx_config::init(&context).await?;
 
     // Everything that needs to use the config must be after loading the config.
-    context.env_file_path().map_err(|e| {
-        let output = format!("ffx could not determine the environment configuration path: {}\nEnsure that $HOME is set, or pass the --env option to specify an environment configuration path", e);
-        let code = 1;
-        Error::Help { command: cmd.command.clone(), output, code }
-    })?;
+    if !context.has_no_environment() {
+        context.env_file_path().map_err(|e| {
+            let output = format!("ffx could not determine the environment configuration path: {}\nEnsure that $HOME is set, or pass the --env option to specify an environment configuration path", e);
+            let code = 1;
+            Error::Help { command: cmd.command.clone(), output, code }
+        })?;
+    }
 
     let tools = T::from_env(&context).await?;
 
@@ -178,7 +180,7 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
         app.log_destination.clone()
     };
 
-    ffx_config::logging::init(&context, app.verbose, &log_dest).await?;
+    ffx_config::logging::init(&context, app.verbose, &log_dest)?;
     tracing::info!("starting command: {:?}", Vec::from_iter(cmd.all_iter()));
     tracing::info!("with context: {kind:#?}", kind = context.env_kind());
 

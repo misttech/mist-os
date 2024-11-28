@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{run_component_features, MountAction};
-use anyhow::{anyhow, bail, Error};
+use anyhow::{anyhow, bail, Context, Error};
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl::AsyncChannel;
 use fidl_fuchsia_component_runner::{
@@ -98,23 +98,31 @@ pub async fn start_component(
                     // Mount custom_artifacts and test_data directory at root of container
                     // We may want to transition to have these directories unique per component
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
-                    mount_record.lock().mount_remote(
-                        system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
-                        system_task,
-                        &dir_proxy,
-                        &dir_path,
-                        mount_seclabel,
-                    )?;
+                    mount_record
+                        .lock()
+                        .mount_remote(
+                            system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
+                            system_task,
+                            &dir_proxy,
+                            &dir_path,
+                            mount_seclabel,
+                        )
+                        .with_context(|| format!("failed to mount_remote on path {}", &dir_path))?;
                 }
                 _ => {
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
-                    mount_record.lock().mount_remote(
-                        system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
-                        system_task,
-                        &dir_proxy,
-                        &format!("{component_path}/{dir_path}"),
-                        mount_seclabel,
-                    )?;
+                    mount_record
+                        .lock()
+                        .mount_remote(
+                            system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
+                            system_task,
+                            &dir_proxy,
+                            &format!("{component_path}/{dir_path}"),
+                            mount_seclabel,
+                        )
+                        .with_context(|| {
+                            format!("failed to mount_remote on path {component_path}/{dir_path}")
+                        })?;
                     if dir_path == "/pkg" {
                         maybe_pkg = Some(dir_proxy);
                     }
@@ -256,7 +264,7 @@ pub async fn start_component(
         },
         None,
     )?;
-    let controller = controller.into_stream()?;
+    let controller = controller.into_stream();
     fasync::Task::local(serve_component_controller(controller, weak_task, task_complete)).detach();
 
     Ok(())
@@ -439,7 +447,8 @@ impl MountRecord {
         // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
         // Iterate through each component directory starting from the parent and
         // create it if it doesn't exist.
-        let mut current_node = system_task.lookup_path_from_root(locked, ".".into())?;
+        let mut current_node =
+            system_task.lookup_path_from_root(locked, ".".into()).context("looking up '.'")?;
         let mut context = LookupContext::default();
 
         // Extract each component using Path::new(path).components(). For example,
@@ -448,28 +457,30 @@ impl MountRecord {
         let path = if let Some(path) = path.strip_prefix('/') { path } else { path };
 
         for sub_dir in Path::new(path).components() {
-            let sub_dir = sub_dir.as_os_str().as_bytes();
-
+            let sub_dir_bytes = sub_dir.as_os_str().as_bytes();
             current_node = match current_node.create_node(
                 locked,
                 system_task,
-                sub_dir.into(),
+                sub_dir_bytes.into(),
                 mode!(IFDIR, 0o755),
                 DeviceType::NONE,
             ) {
                 Ok(node) => node,
-                Err(errno) if errno == EEXIST || errno == ENOTDIR => {
-                    current_node.lookup_child(locked, system_task, &mut context, sub_dir.into())?
-                }
+                Err(errno) if errno == EEXIST || errno == ENOTDIR => current_node
+                    .lookup_child(locked, system_task, &mut context, sub_dir_bytes.into())
+                    .with_context(|| format!("looking up {sub_dir:?}"))?,
                 Err(e) => bail!(e),
             };
         }
 
-        let (status, rights) = directory.get_flags(zx::MonotonicInstant::INFINITE)?;
-        zx::Status::ok(status)?;
+        // TODO(https://fxbug.dev/376509077): Migrate this to GetFlags2 when available.
+        let info = directory
+            .get_connection_info(zx::MonotonicInstant::INFINITE)
+            .context("getting directory connection info")?;
+        let rights = fio::Flags::from_bits(info.rights.unwrap().bits()).unwrap();
 
         let (client_end, server_end) = zx::Channel::create();
-        directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
+        directory.clone2(ServerEnd::new(server_end)).context("cloning directory")?;
 
         // If a filesystem security label argument was provided then apply it to all files via
         // mountpoint-labeling, with a "context=..." mount option.
@@ -484,14 +495,16 @@ impl MountRecord {
             client_end,
             FileSystemOptions { source: path.into(), params, ..Default::default() },
             rights,
-        )?;
+        )
+        .context("making remote fs")?;
 
-        security::file_system_resolve_security(locked, system_task, &fs)?;
+        security::file_system_resolve_security(locked, system_task, &fs)
+            .context("resolving security")?;
 
         // Fuchsia doesn't specify mount flags in the incoming namespace, so we need to make
         // up some flags.
         let flags = MountFlags::NOSUID | MountFlags::NODEV | MountFlags::RELATIME;
-        current_node.mount(WhatToMount::Fs(fs), flags)?;
+        current_node.mount(WhatToMount::Fs(fs), flags).context("mounting fs")?;
         self.mounts.push(current_node);
 
         Ok(())

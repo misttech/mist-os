@@ -78,7 +78,7 @@ impl TryFrom<ServerEnd<WatcherMarker>> for MemoryPressureMonitor {
     /// Creates an instance of [`MemoryPressureMonitor`] from the server end of a
     /// `fuchsia.memorypressure.Watcher` connection and starts listening on the current executor.
     fn try_from(watcher_server: ServerEnd<WatcherMarker>) -> Result<Self, Self::Error> {
-        let watcher_requests = watcher_server.into_stream()?;
+        let watcher_requests = watcher_server.into_stream();
 
         let inner = Inner::new();
         let inner_clone = inner.clone();

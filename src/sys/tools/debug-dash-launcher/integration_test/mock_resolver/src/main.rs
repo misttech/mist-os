@@ -41,10 +41,7 @@ async fn main() {
                             if package_url == "fuchsia-pkg://fuchsia.com/foo" {
                                 // Clone the temp directory on the given channel.
                                 let dir = dir.into_channel().into();
-                                temp_dir
-                                    .clone(fuchsia_fs::OpenFlags::CLONE_SAME_RIGHTS, dir)
-                                    .unwrap();
-
+                                temp_dir.clone2(dir).unwrap();
                                 responder.send(Ok(&ResolutionContext { bytes: vec![] })).unwrap();
                             } else {
                                 // The package doesn't exist.

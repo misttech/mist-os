@@ -107,6 +107,11 @@ restricted_return_loop:
 
   // Load the address of the mapped restricted mode register state to x27
   ldr x27, [sp, #8]
+
+  // Load frame pointer from restricted state to connect Starnix stack to Linux's.
+  // This offset matches the offset of x29 in the `zx_restricted_state_t` struct.
+  ldr x29, [x27, 0xE8]
+
   // Emit CFI directives referring to the restricted mode register state
   .cfi_startproc
   .cfi_remember_state
@@ -167,4 +172,3 @@ restricted_return_loop:
 
   // Go back to the loop
   b .restricted_enter_loop_top
-

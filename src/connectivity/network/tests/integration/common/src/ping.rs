@@ -51,7 +51,9 @@ impl<'a> Node<'a> {
     /// addresses for this `Node`.
     pub async fn new_with_wait_addr<
         F: FnMut(
-            &[fidl_fuchsia_net_interfaces_ext::Address],
+            &[fidl_fuchsia_net_interfaces_ext::Address<
+                fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+            >],
         ) -> Option<(Vec<net_types::ip::Ipv4Addr>, Vec<net_types::ip::Ipv6Addr>)>,
     >(
         realm: &'a netemul::TestRealm<'_>,
@@ -59,9 +61,9 @@ impl<'a> Node<'a> {
         mut addr_predicate: F,
     ) -> Result<Node<'a>> {
         let mut state =
-            fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(interface.id());
+            fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(interface.id());
         let (v4_addrs, v6_addrs) = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-            interface.get_interface_event_stream()?,
+            realm.get_interface_event_stream()?,
             &mut state,
             |properties_and_state| addr_predicate(&properties_and_state.properties.addresses),
         )

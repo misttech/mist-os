@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::driver_utils::{connect_proxy, get_driver_alias, map_topo_paths_to_class_paths, Driver};
+use crate::driver_utils::{connect_proxy, list_drivers, Driver};
 use crate::MIN_INTERVAL_FOR_SYSLOG_MS;
 use anyhow::{format_err, Error, Result};
 use async_trait::async_trait;
@@ -44,29 +44,35 @@ const HISTOGRAM_PARAMS: LinearHistogramParams<i64> =
 pub async fn generate_temperature_drivers(
     driver_aliases: HashMap<String, String>,
 ) -> Result<Vec<Driver<ftemperature::DeviceProxy>>> {
-    generate_sensor_drivers::<ftemperature::DeviceMarker>(&TEMPERATURE_SERVICE_DIRS, driver_aliases)
-        .await
+    let mut drivers = Vec::new();
+    // For each driver path, create a proxy for the service.
+    for dir_path in TEMPERATURE_SERVICE_DIRS {
+        let listed_drivers = list_drivers(dir_path).await;
+        for driver in listed_drivers.iter() {
+            let class_path = format!("{}/{}", dir_path, driver);
+            let proxy = connect_proxy::<ftemperature::DeviceMarker>(&class_path)?;
+            let sensor_name = proxy.get_sensor_name().await?;
+            let alias = driver_aliases.get(&sensor_name);
+            drivers.push(Driver { sensor_name, proxy, alias: alias.cloned() });
+        }
+    }
+    Ok(drivers)
 }
 
 pub async fn generate_power_drivers(
     driver_aliases: HashMap<String, String>,
 ) -> Result<Vec<Driver<fpower::DeviceProxy>>> {
-    generate_sensor_drivers::<fpower::DeviceMarker>(&POWER_SERVICE_DIRS, driver_aliases).await
-}
-
-/// Generates a list of `Driver` from driver paths and aliases.
-async fn generate_sensor_drivers<T: fidl::endpoints::ProtocolMarker>(
-    service_dirs: &[&str],
-    driver_aliases: HashMap<String, String>,
-) -> Result<Vec<Driver<T::Proxy>>> {
-    let topo_to_class = map_topo_paths_to_class_paths(service_dirs).await?;
-
-    // For each driver path, create a proxy for the service.
     let mut drivers = Vec::new();
-    for (topological_path, class_path) in topo_to_class {
-        let proxy: T::Proxy = connect_proxy::<T>(&class_path)?;
-        let alias = get_driver_alias(&driver_aliases, &topological_path).map(|c| c.to_string());
-        drivers.push(Driver { alias, topological_path, proxy });
+    // For each driver path, create a proxy for the service.
+    for dir_path in POWER_SERVICE_DIRS {
+        let listed_drivers = list_drivers(dir_path).await;
+        for driver in listed_drivers.iter() {
+            let class_path = format!("{}/{}", dir_path, driver);
+            let proxy = connect_proxy::<fpower::DeviceMarker>(&class_path)?;
+            let sensor_name = proxy.get_sensor_name().await?;
+            let alias = driver_aliases.get(&sensor_name);
+            drivers.push(Driver { sensor_name, proxy, alias: alias.cloned() });
+        }
     }
     Ok(drivers)
 }
@@ -430,11 +436,11 @@ impl<T: Sensor<T>> SensorLogger<T> {
 
         let mut sensor_names = Vec::new();
         for driver in self.drivers.iter() {
-            let topological_path = &driver.topological_path;
-            let sensor_name = driver.alias.as_ref().map_or(topological_path.to_string(), |alias| {
-                format!("{}({})", alias, topological_path)
+            let sensor_name = &driver.sensor_name;
+            let name = driver.alias.as_ref().map_or(sensor_name.to_string(), |alias| {
+                format!("{}(alias:{})", sensor_name, alias)
             });
-            sensor_names.push(sensor_name);
+            sensor_names.push(name);
         }
 
         for (index, result) in results.into_iter() {
@@ -473,7 +479,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
                 // calculating statistics.
                 Err(err) => error!(
                     ?err,
-                    path = self.drivers[index].topological_path.as_str(),
+                    path = self.drivers[index].sensor_name.as_str(),
                     "Error reading sensor",
                 ),
             };
@@ -563,7 +569,7 @@ impl ActivityListener {
     pub fn new(provider: factivity::ProviderProxy) -> Result<Self> {
         let idleness = Rc::new(Cell::new(Idleness::Unknown));
         let (client_end, mut listener_stream) =
-            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>()?;
+            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>();
         provider.watch_state(client_end)?;
 
         let self_idleness = idleness.clone();
@@ -759,7 +765,7 @@ pub mod tests {
         mut get_temperature: impl FnMut() -> f32 + 'static,
     ) -> (ftemperature::DeviceProxy, fasync::Task<()>) {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<ftemperature::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ftemperature::DeviceMarker>();
         let task = fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {
@@ -778,7 +784,7 @@ pub mod tests {
         mut get_power: impl FnMut() -> f32 + 'static,
     ) -> (fpower::DeviceProxy, fasync::Task<()>) {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpower::DeviceMarker>();
         let task = fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {
@@ -815,13 +821,13 @@ pub mod tests {
 
         let temperature_drivers = vec![
             TemperatureDriver {
-                alias: Some("cpu".to_string()),
-                topological_path: "/dev/fake/cpu_temperature".to_string(),
+                alias: None,
+                sensor_name: "cpu".to_string(),
                 proxy: cpu_temperature_proxy,
             },
             TemperatureDriver {
-                alias: None,
-                topological_path: "/dev/fake/gpu_temperature".to_string(),
+                alias: Some("audio_alias".to_string()),
+                sensor_name: "audio".to_string(),
                 proxy: gpu_temperature_proxy,
             },
         ];
@@ -846,14 +852,10 @@ pub mod tests {
         tasks.push(task);
 
         let power_drivers = vec![
+            PowerDriver { alias: None, sensor_name: "power_1".to_string(), proxy: power_1_proxy },
             PowerDriver {
-                alias: Some("power_1".to_string()),
-                topological_path: "/dev/fake/power_1".to_string(),
-                proxy: power_1_proxy,
-            },
-            PowerDriver {
-                alias: None,
-                topological_path: "/dev/fake/power_2".to_string(),
+                alias: Some("power_alias".to_string()),
+                sensor_name: "power_2".to_string(),
                 proxy: power_2_proxy,
             },
         ];
@@ -997,7 +999,7 @@ pub mod tests {
                                 "cpu": {
                                     "data (°C)": runner.cpu_temperature.get() as f64,
                                 },
-                                "/dev/fake/gpu_temperature": {
+                                "audio_alias": {
                                     "data (°C)": runner.gpu_temperature.get() as f64,
                                 }
                             }
@@ -1083,7 +1085,7 @@ pub mod tests {
                                     "median (W)": 2.0,
                                 }
                             },
-                            "/dev/fake/power_2": contains {
+                            "power_alias": contains {
                                 "data (W)": 5.0,
                                 "statistics": {
                                     "(start ms, end ms]": vec![0i64, 100i64],
@@ -1157,7 +1159,7 @@ pub mod tests {
                                     "cpu": {
                                         "data (°C)": runner.cpu_temperature.get() as f64,
                                     },
-                                    "/dev/fake/gpu_temperature": {
+                                    "audio_alias": {
                                         "data (°C)": runner.gpu_temperature.get() as f64,
                                     }
                                 }
@@ -1186,7 +1188,7 @@ pub mod tests {
                                             "median (°C)": (29 + i - (i + 1) % 3) as f64,
                                         }
                                     },
-                                    "/dev/fake/gpu_temperature": contains {
+                                    "audio_alias": contains {
                                         "data (°C)": (40 + i) as f64,
                                         "statistics": {
                                             "(start ms, end ms]":
@@ -1228,7 +1230,7 @@ pub mod tests {
         runner.power_2.set(7.0);
 
         let (provider_proxy, mut provider_stream) =
-            fidl::endpoints::create_proxy_and_stream::<factivity::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<factivity::ProviderMarker>();
         let listener_proxy: Rc<OnceCell<factivity::ListenerProxy>> = Rc::new(OnceCell::new());
         let listener_proxy2 = listener_proxy.clone();
 
@@ -1236,7 +1238,7 @@ pub mod tests {
             while let Some(Ok(req)) = provider_stream.next().await {
                 match req {
                     factivity::ProviderRequest::WatchState { listener, .. } => {
-                        listener_proxy2.set(listener.into_proxy().unwrap()).unwrap();
+                        listener_proxy2.set(listener.into_proxy()).unwrap();
                     }
                 }
             }
@@ -1323,7 +1325,7 @@ pub mod tests {
                                     }
                                 }
                             },
-                            "/dev/fake/power_2": contains {
+                            "power_alias": contains {
                                 "histograms": {
                                     "unit": "mW",
                                     "active": {
@@ -1397,7 +1399,7 @@ pub mod tests {
                                     }
                                 }
                             },
-                            "/dev/fake/power_2": contains {
+                            "power_alias": contains {
                                 "histograms": {
                                     "unit": "mW",
                                     "idle": {
@@ -1470,7 +1472,7 @@ pub mod tests {
                                     }
                                 }
                             },
-                            "/dev/fake/power_2": contains {
+                            "power_alias": contains {
                                 "histograms": {
                                     "unit": "mW",
                                     "active": {

@@ -17,23 +17,20 @@ pub enum FullmacRequest {
     Deauth(fidl_fullmac::WlanFullmacImplDeauthRequest),
     AssocResp(fidl_fullmac::WlanFullmacImplAssocRespRequest),
     Disassoc(fidl_fullmac::WlanFullmacImplDisassocRequest),
-    Reset(fidl_fullmac::WlanFullmacImplResetRequest),
     StartBss(fidl_fullmac::WlanFullmacImplStartBssRequest),
     StopBss(fidl_fullmac::WlanFullmacImplStopBssRequest),
     SetKeys(fidl_fullmac::WlanFullmacImplSetKeysRequest),
-    DelKeys(fidl_fullmac::WlanFullmacImplDelKeysRequest),
     EapolTx(fidl_fullmac::WlanFullmacImplEapolTxRequest),
     GetIfaceCounterStats,
     GetIfaceHistogramStats,
-    SaeHandshakeResp(fidl_fullmac::WlanFullmacSaeHandshakeResp),
+    SaeHandshakeResp(fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest),
     SaeFrameTx(fidl_fullmac::WlanFullmacSaeFrame),
     WmmStatusReq,
-    SetMulticastPromisc(bool),
-    OnLinkStateChanged(bool),
+    OnLinkStateChanged(fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest),
 
     // Note: WlanFullmacImpl::Start has a channel as an argument, but we don't keep the channel
     // here.
-    Start,
+    Init,
 }
 
 /// A wrapper around WlanFullmacImpl_RequestStream that records each handled request in its
@@ -96,9 +93,6 @@ impl RecordedRequestStream {
             WlanFullmacImpl_Request::Disassoc { payload, .. } => {
                 self.history.push(FullmacRequest::Disassoc(payload.clone()))
             }
-            WlanFullmacImpl_Request::Reset { payload, .. } => {
-                self.history.push(FullmacRequest::Reset(payload.clone()))
-            }
             WlanFullmacImpl_Request::StartBss { payload, .. } => {
                 self.history.push(FullmacRequest::StartBss(payload.clone()))
             }
@@ -107,9 +101,6 @@ impl RecordedRequestStream {
             }
             WlanFullmacImpl_Request::SetKeys { payload, .. } => {
                 self.history.push(FullmacRequest::SetKeys(payload.clone()))
-            }
-            WlanFullmacImpl_Request::DelKeys { payload, .. } => {
-                self.history.push(FullmacRequest::DelKeys(payload.clone()))
             }
             WlanFullmacImpl_Request::EapolTx { payload, .. } => {
                 self.history.push(FullmacRequest::EapolTx(payload.clone()))
@@ -120,8 +111,8 @@ impl RecordedRequestStream {
             WlanFullmacImpl_Request::GetIfaceHistogramStats { .. } => {
                 self.history.push(FullmacRequest::GetIfaceHistogramStats)
             }
-            WlanFullmacImpl_Request::SaeHandshakeResp { resp, .. } => {
-                self.history.push(FullmacRequest::SaeHandshakeResp(resp.clone()))
+            WlanFullmacImpl_Request::SaeHandshakeResp { payload, .. } => {
+                self.history.push(FullmacRequest::SaeHandshakeResp(payload.clone()))
             }
             WlanFullmacImpl_Request::SaeFrameTx { frame, .. } => {
                 self.history.push(FullmacRequest::SaeFrameTx(frame.clone()))
@@ -129,13 +120,10 @@ impl RecordedRequestStream {
             WlanFullmacImpl_Request::WmmStatusReq { .. } => {
                 self.history.push(FullmacRequest::WmmStatusReq)
             }
-            WlanFullmacImpl_Request::SetMulticastPromisc { enable, .. } => {
-                self.history.push(FullmacRequest::SetMulticastPromisc(*enable))
+            WlanFullmacImpl_Request::OnLinkStateChanged { payload, .. } => {
+                self.history.push(FullmacRequest::OnLinkStateChanged(payload.clone()))
             }
-            WlanFullmacImpl_Request::OnLinkStateChanged { online, .. } => {
-                self.history.push(FullmacRequest::OnLinkStateChanged(*online))
-            }
-            WlanFullmacImpl_Request::Start { .. } => self.history.push(FullmacRequest::Start),
+            WlanFullmacImpl_Request::Init { .. } => self.history.push(FullmacRequest::Init),
 
             _ => panic!("Unrecognized Fullmac request {:?}", request),
         }

@@ -96,7 +96,11 @@ pub(super) trait Handler {
 
     async fn handle_interface_update_result(
         &mut self,
-        update_result: &fnet_interfaces_ext::UpdateResult<'_, ()>,
+        update_result: &fnet_interfaces_ext::UpdateResult<
+            '_,
+            (),
+            fnet_interfaces_ext::DefaultInterest,
+        >,
     ) -> Result<(), errors::Error>;
 }
 
@@ -158,15 +162,13 @@ impl<'a, B: BridgeHandler> Virtualization<'a, B> {
                 // Get the device this port belongs to, and install it on the netstack.
                 let (device, server_end) =
                     fidl::endpoints::create_endpoints::<fhardware_network::DeviceMarker>();
-                let port = port.into_proxy().expect("client end into proxy");
+                let port = port.into_proxy();
                 port.get_device(server_end)
                     .context("call get device")
                     .map_err(errors::Error::NonFatal)?;
 
                 let (device_control, server_end) =
-                    fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>()
-                        .context("create proxy")
-                        .map_err(errors::Error::NonFatal)?;
+                    fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>();
                 installer
                     .install_device(device, server_end)
                     .unwrap_or_else(|err| exit_with_fidl_error(err));
@@ -223,7 +225,6 @@ impl<'a, B: BridgeHandler> Virtualization<'a, B> {
                 let shutdown_fut = async move {
                     let mut interface_closure = interface
                         .into_stream()
-                        .expect("convert server end into stream")
                         .map(|request| {
                             // `fuchsia.net.virtualization/Interface` is a protocol with no
                             // methods, so `InterfaceRequest` is an uninstantiable enum.
@@ -629,7 +630,6 @@ impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
                 let close_channel_rx = close_channel_rx.shared();
                 let stream = network
                     .into_stream()
-                    .expect("convert server end into stream")
                     .filter_map(move |request| {
                         future::ready(match request {
                             Ok(request) => {
@@ -669,7 +669,11 @@ impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
 
     async fn handle_interface_update_result(
         &mut self,
-        update_result: &fnet_interfaces_ext::UpdateResult<'_, ()>,
+        update_result: &fnet_interfaces_ext::UpdateResult<
+            '_,
+            (),
+            fnet_interfaces_ext::DefaultInterest,
+        >,
     ) -> Result<(), errors::Error> {
         let Self { bridge, installer: _, _allowed_upstream_device_classes } = self;
         match update_result {
@@ -748,7 +752,11 @@ impl Handler for Stub {
 
     async fn handle_interface_update_result(
         &mut self,
-        _update_result: &fnet_interfaces_ext::UpdateResult<'_, ()>,
+        _update_result: &fnet_interfaces_ext::UpdateResult<
+            '_,
+            (),
+            fnet_interfaces_ext::DefaultInterest,
+        >,
     ) -> Result<(), errors::Error> {
         Ok(())
     }
@@ -986,10 +994,7 @@ mod tests {
             const BRIDGE_IF: u64 = 99;
             let (control, server) =
                 fnet_interfaces_ext::admin::Control::create_endpoints().expect("create endpoints");
-            *bridge = Some(BridgeServer {
-                id: BRIDGE_IF,
-                _request_stream: server.into_stream().expect("get request stream"),
-            });
+            *bridge = Some(BridgeServer { id: BRIDGE_IF, _request_stream: server.into_stream() });
             events
                 .send(BridgeEvent::Created { interfaces: interfaces.collect(), upstream_interface })
                 .await

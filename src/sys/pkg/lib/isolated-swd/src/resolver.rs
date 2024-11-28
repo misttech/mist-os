@@ -5,7 +5,7 @@
 #[cfg(test)]
 pub(crate) mod for_tests {
     use crate::cache::for_tests::CacheForTest;
-    use anyhow::{anyhow, Context, Error};
+    use anyhow::{anyhow, Error};
     use blobfs_ramdisk::BlobfsRamdisk;
     use fidl_fuchsia_pkg_ext::RepositoryConfigs;
     use fuchsia_component_test::{
@@ -201,8 +201,7 @@ pub(crate) mod for_tests {
             url: &str,
         ) -> Result<(fio::DirectoryProxy, pkg::ResolutionContext), Error> {
             let proxy = &self.resolver.proxy;
-            let (package, package_remote) =
-                fidl::endpoints::create_proxy().context("creating package directory endpoints")?;
+            let (package, package_remote) = fidl::endpoints::create_proxy();
             let resolved_context = proxy
                 .resolve(url, package_remote)
                 .await

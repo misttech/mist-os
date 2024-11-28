@@ -93,7 +93,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_load_hierarchy() -> Result<(), Error> {
         let (client_proxy, server_stream) =
-            fidl::endpoints::create_proxy_and_stream::<InspectMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<InspectMarker>();
         spawn_server(server_stream, "root".to_string());
         let hierarchy = load_hierarchy(client_proxy).await?;
         assert_data_tree!(hierarchy, root: {
@@ -189,7 +189,7 @@ mod tests {
                             responder.send(&object.children.iter().cloned().collect::<Vec<_>>())?;
                         }
                         InspectRequest::OpenChild { child_name, child_channel, responder } => {
-                            let stream = child_channel.into_stream()?;
+                            let stream = child_channel.into_stream();
                             if object.children.contains(&child_name) {
                                 spawn_server(stream, child_name);
                                 responder.send(true)?;

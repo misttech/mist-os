@@ -10,11 +10,11 @@
 #include <lib/sync/cpp/completion.h>
 #include <zircon/assert.h>
 
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 
-namespace display {
+namespace display_coordinator {
 
 MockCoordinatorListener::MockCoordinatorListener(
     OnDisplaysChangedCallback on_displays_changed_callback, OnVsyncCallback on_vsync_callback,
@@ -52,9 +52,9 @@ void MockCoordinatorListener::Bind(
 void MockCoordinatorListener::OnDisplaysChanged(OnDisplaysChangedRequestView request,
                                                 OnDisplaysChangedCompleter::Sync& completer) {
   std::vector added_display_infos(request->added.begin(), request->added.end());
-  std::vector<DisplayId> removed_display_ids;
+  std::vector<display::DisplayId> removed_display_ids;
   for (fuchsia_hardware_display_types::wire::DisplayId fidl_id : request->removed) {
-    removed_display_ids.push_back(ToDisplayId(fidl_id));
+    removed_display_ids.push_back(display::ToDisplayId(fidl_id));
   }
 
   on_displays_changed_callback_(std::move(added_display_infos), std::move(removed_display_ids));
@@ -62,9 +62,9 @@ void MockCoordinatorListener::OnDisplaysChanged(OnDisplaysChangedRequestView req
 
 void MockCoordinatorListener::OnVsync(OnVsyncRequestView request,
                                       OnVsyncCompleter::Sync& completer) {
-  on_vsync_callback_(ToDisplayId(request->display_id), zx::time(request->timestamp),
-                     ToConfigStamp(request->applied_config_stamp),
-                     ToVsyncAckCookie(request->cookie));
+  on_vsync_callback_(display::ToDisplayId(request->display_id), zx::time(request->timestamp),
+                     display::ToConfigStamp(request->applied_config_stamp),
+                     display::ToVsyncAckCookie(request->cookie));
 }
 
 void MockCoordinatorListener::OnClientOwnershipChange(
@@ -80,4 +80,4 @@ void MockCoordinatorListener::handle_unknown_method(
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-}  // namespace display
+}  // namespace display_coordinator

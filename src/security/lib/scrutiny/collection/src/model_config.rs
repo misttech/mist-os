@@ -57,12 +57,12 @@ impl ModelConfig {
         let repository = product_bundle
             .repositories
             .get(0)
-            .ok_or(anyhow!("The product bundle must have at least one repository"))?;
+            .ok_or_else(|| anyhow!("The product bundle must have at least one repository"))?;
         let blobs_directory = repository.blobs_path.clone().into_std_path_buf();
 
         let update_package_hash = product_bundle
             .update_package_hash
-            .ok_or(anyhow!("An update package must exist inside the product bundle"))?;
+            .ok_or_else(|| anyhow!("An update package must exist inside the product bundle"))?;
         let update_package_path = blobs_directory.join(update_package_hash.to_string());
 
         Ok(ModelConfig {

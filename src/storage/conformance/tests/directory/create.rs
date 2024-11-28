@@ -15,11 +15,10 @@ async fn create_directory_with_create_if_absent_flag() {
         return;
     }
 
-    let root = root_directory(vec![]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
     let mnt_dir = open_dir_with_flags(
-        &root_dir,
+        &dir,
         fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE_IF_ABSENT | fio::OpenFlags::CREATE,
         "mnt",
     )
@@ -31,19 +30,18 @@ async fn create_directory_with_create_if_absent_flag() {
     )
     .await;
 
-    let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+    let (client, server) = create_proxy::<fio::NodeMarker>();
 
-    root_dir
-        .open(
-            fio::OpenFlags::CREATE_IF_ABSENT
-                | fio::OpenFlags::CREATE
-                | fio::OpenFlags::DESCRIBE
-                | fio::OpenFlags::DIRECTORY,
-            fio::ModeType::empty(),
-            "mnt/tmp/foo",
-            server,
-        )
-        .expect("Cannot open file");
+    dir.open(
+        fio::OpenFlags::CREATE_IF_ABSENT
+            | fio::OpenFlags::CREATE
+            | fio::OpenFlags::DESCRIBE
+            | fio::OpenFlags::DIRECTORY,
+        fio::ModeType::empty(),
+        "mnt/tmp/foo",
+        server,
+    )
+    .expect("Cannot open file");
 
     assert_eq!(get_open_status(&client).await, zx::Status::OK);
 }
@@ -55,28 +53,15 @@ async fn create_file_with_sufficient_rights() {
         return;
     }
 
-    for dir_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
-    {
-        let root = root_directory(vec![]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
-        // Re-open directory with the flags being tested.
-        let dir = open_dir_with_flags(&test_dir, dir_flags, ".").await;
-        let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
-
-        dir.open(
-            dir_flags
-                | fio::OpenFlags::CREATE
-                | fio::OpenFlags::DESCRIBE
-                | fio::OpenFlags::NOT_DIRECTORY,
-            fio::ModeType::empty(),
-            TEST_FILE,
-            server,
-        )
-        .expect("Cannot open file");
-
-        assert_eq!(get_open_status(&client).await, zx::Status::OK);
-        assert_eq!(read_file(&test_dir, TEST_FILE).await, &[]);
+    for flags in harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES) {
+        let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
+        // Create a new file inside `dir` with a connection that only has the rights in `flags`.
+        {
+            let dir = open_dir_with_flags(&dir, flags, ".").await;
+            open_node::<fio::FileMarker>(&dir, flags | fio::OpenFlags::CREATE, TEST_FILE).await;
+        }
+        // Ensure that the file was created and is accessible.
+        assert_eq!(read_file(&dir, TEST_FILE).await, &[]);
     }
 }
 
@@ -87,26 +72,20 @@ async fn create_file_with_insufficient_rights() {
         return;
     }
 
-    for dir_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
-        let root = root_directory(vec![]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
-        // Re-open directory with the flags being tested.
-        let dir = open_dir_with_flags(&test_dir, dir_flags, ".").await;
-        let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
-
-        dir.open(
-            dir_flags
-                | fio::OpenFlags::CREATE
-                | fio::OpenFlags::DESCRIBE
-                | fio::OpenFlags::NOT_DIRECTORY,
-            fio::ModeType::empty(),
-            TEST_FILE,
-            server,
-        )
-        .expect("Cannot open file");
-
-        assert_eq!(get_open_status(&client).await, zx::Status::ACCESS_DENIED);
-        assert_file_not_found(&test_dir, TEST_FILE).await;
+    for flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
+        let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
+        // Try to create a new file inside `dir` with a connection that lacks writable rights.
+        {
+            let dir = open_dir_with_flags(&dir, flags, ".").await;
+            let result = open_node_status::<fio::FileMarker>(
+                &dir,
+                flags | fio::OpenFlags::CREATE,
+                TEST_FILE,
+            )
+            .await;
+            assert_matches!(result, Err(zx::Status::ACCESS_DENIED));
+        }
+        assert_file_not_found(&dir, TEST_FILE).await;
     }
 }
 
@@ -117,15 +96,12 @@ async fn create_directory() {
         return;
     }
 
-    let root_dir = harness.get_directory(
-        root_directory(vec![]),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // A request to create a new object requires that the parent connection has the right to modify.
-    let dir_with_sufficient_rights = root_dir
+    let dir_with_sufficient_rights = dir
         .open3_node::<fio::DirectoryMarker>(
-            "test_dir",
+            "dir",
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MUST_CREATE | fio::Flags::PERM_MODIFY,
             None,
         )
@@ -172,15 +148,12 @@ async fn create_directory_with_insufficient_rights() {
         return;
     }
 
-    let root_dir = harness.get_directory(
-        root_directory(vec![]),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // A request to create a new object requires that the parent connection has the right to modify.
-    let dir_with_insufficient_rights = root_dir
+    let dir_with_insufficient_rights = dir
         .open3_node::<fio::DirectoryMarker>(
-            "test_dir",
+            "dir",
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MUST_CREATE,
             None,
         )
@@ -212,16 +185,13 @@ async fn create_directory_with_create_attributes() {
         return;
     }
 
-    let root_dir = harness.get_directory(
-        root_directory(vec![]),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // A request to create create a new object requires that the parent directory has the right to
     // modify directory.
-    let dir_with_sufficient_rights = root_dir
+    let dir_with_sufficient_rights = dir
         .open3_node::<fio::DirectoryMarker>(
-            "test_dir",
+            "dir",
             fio::Flags::PROTOCOL_DIRECTORY
                 | fio::Flags::FLAG_MUST_CREATE
                 | fio::Flags::PERM_MODIFY
@@ -272,15 +242,13 @@ async fn open_directory_with_never_create_and_create_attributes() {
         return;
     }
 
-    let root_dir = harness.get_directory(
-        root_directory(vec![directory("dir", vec![])]),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness
+        .get_directory(vec![directory("dir", vec![])], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // Only open an existing object, never create a new object.
     let flags = fio::Flags::FLAG_SEND_REPRESENTATION;
 
-    let status = root_dir
+    let status = dir
         .open3_node_repr::<fio::DirectoryMarker>(
             "dir",
             flags,
@@ -305,15 +273,12 @@ async fn create_file() {
         return;
     }
 
-    let root_dir = harness.get_directory(
-        root_directory(vec![]),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // A request to create a new object requires that the parent connection has the right to modify.
-    let dir_with_sufficient_rights = root_dir
+    let dir_with_sufficient_rights = dir
         .open3_node::<fio::DirectoryMarker>(
-            "test_dir",
+            "dir",
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MUST_CREATE | fio::Flags::PERM_MODIFY,
             None,
         )
@@ -340,15 +305,12 @@ async fn create_file_with_insufficient_rights_open3() {
         return;
     }
 
-    let root_dir = harness.get_directory(
-        root_directory(vec![]),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // A request to create a new object requires that the parent connection has the right to modify.
-    let dir_with_insufficient_rights = root_dir
+    let dir_with_insufficient_rights = dir
         .open3_node::<fio::DirectoryMarker>(
-            "test_dir",
+            "dir",
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MUST_CREATE,
             None,
         )
@@ -377,16 +339,13 @@ async fn create_file_with_create_attributes() {
     {
         return;
     }
-    let root_dir = harness.get_directory(
-        root_directory(vec![]),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // A request to create create a new object requires that the parent directory has the right to
     // modify directory.
-    let dir_with_sufficient_rights = root_dir
+    let dir_with_sufficient_rights = dir
         .open3_node::<fio::DirectoryMarker>(
-            "test_dir",
+            "dir",
             fio::Flags::PROTOCOL_DIRECTORY
                 | fio::Flags::FLAG_MUST_CREATE
                 | fio::Flags::PERM_MODIFY
@@ -437,15 +396,13 @@ async fn open_file_with_never_create_and_create_attributes() {
         return;
     }
 
-    let root_dir = harness.get_directory(
-        root_directory(vec![file(TEST_FILE, vec![])]),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness
+        .get_directory(vec![file(TEST_FILE, vec![])], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // Only open an existing object, never create a new object.
     let flags = fio::Flags::FLAG_SEND_REPRESENTATION;
 
-    let status = root_dir
+    let status = dir
         .open3_node_repr::<fio::FileMarker>(
             TEST_FILE,
             flags,

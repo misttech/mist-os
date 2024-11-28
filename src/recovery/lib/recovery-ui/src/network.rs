@@ -60,7 +60,7 @@ impl NetworkViewAssistant {
         let icon_file = load_rive(ICONS_PATH).ok();
         let font_face = load_font(PathBuf::from(FONT_PATH)).expect("Font");
         Ok(NetworkViewAssistant {
-            app_sender: app_sender.clone(),
+            app_sender: app_sender,
             scene_details: None,
             view_key,
             icon_file,

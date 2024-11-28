@@ -248,8 +248,7 @@ struct MetricsLogger {
 impl MetricsLogger {
     async fn new() -> Self {
         let (logger, server_end) =
-            fidl::endpoints::create_proxy::<fmetrics::MetricEventLoggerMarker>()
-                .expect("create event logger");
+            fidl::endpoints::create_proxy::<fmetrics::MetricEventLoggerMarker>();
 
         let factory = match fuchsia_component::client::connect_to_protocol::<
             fmetrics::MetricEventLoggerFactoryMarker,
@@ -456,9 +455,9 @@ mod tests {
         fnet_migration::StateProxy,
     ) {
         let (control, control_server) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_migration::ControlMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fnet_migration::ControlMarker>();
         let (state, state_server) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_migration::StateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fnet_migration::StateMarker>();
 
         let fut = {
             let control =
@@ -729,8 +728,7 @@ mod tests {
         let mut m = Migration::new(InMemory::with_persisted(Persisted { user, automated }));
         m.current_boot = current_boot;
         let (logger, mut logger_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fmetrics::MetricEventLoggerMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fmetrics::MetricEventLoggerMarker>();
 
         let metrics_logger = MetricsLogger { logger: Some(logger) };
 

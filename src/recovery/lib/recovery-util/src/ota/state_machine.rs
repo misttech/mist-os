@@ -175,7 +175,7 @@ impl StateMachine {
             (State::EnterWiFi, Event::UserInput(network)) => Some(State::EnterPassword(network)),
 
             (State::EnterPassword(network), Event::UserInput(password)) => {
-                Some(State::Connecting(network.clone(), password.clone()))
+                Some(State::Connecting(network.clone(), password))
             }
 
             (State::Connecting(_, _), Event::WiFiConnected) => {
@@ -195,7 +195,7 @@ impl StateMachine {
                 Event::SystemPrivacySetting(system_setting),
             ) => Some(State::ReinstallConfirm {
                 desired: system_setting.clone(),
-                reported: system_setting.clone(),
+                reported: system_setting,
             }),
 
             (

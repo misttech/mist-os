@@ -513,19 +513,6 @@ cc_test_executable("set_keys_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-cc_test_executable("set_multicast_test") {
-  output_name = "set_multicast_test"
-  testonly = true
-  sources = [ "set_multicast_test.cc" ]
-  deps = [
-    ":sim_test",
-    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
-  ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-}
-
 cc_test_executable("start_ap_while_scanning_test") {
   output_name = "start_ap_while_scanning_test"
   testonly = true
@@ -587,7 +574,6 @@ _tests = [
   "scan_dwell_time_test",
   "scan_while_scanning_test",
   "set_keys_test",
-  "set_multicast_test",
   "start_ap_while_scanning_test",
   "timeout_test",
   "wmm_status_test",

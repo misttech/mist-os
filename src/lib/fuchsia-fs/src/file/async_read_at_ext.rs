@@ -202,7 +202,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn read_at_exact() {
-        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fio::FileMarker>();
 
         let mut reader = AsyncFile::from_proxy(proxy);
 

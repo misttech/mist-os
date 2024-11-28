@@ -99,7 +99,7 @@ impl Controller {
             track_number: response.0.track_number.clone(),
             total_number_of_tracks: response.0.total_number_of_tracks.clone(),
             genre: response.0.genre.clone(),
-            playing_time: response.0.playing_time.clone(),
+            playing_time: response.0.playing_time,
             ..Default::default()
         })
     }
@@ -156,7 +156,7 @@ impl Controller {
         // Get the text information of supported attributes.
         // TODO(https://fxbug.dev/42117316): Get attribute text information for only custom attributes.
         let cmd = GetPlayerApplicationSettingAttributeTextCommand::new(
-            response.player_application_setting_attribute_ids().clone(),
+            response.player_application_setting_attribute_ids(),
         );
         trace!("get_player_application_setting_attribute_text command {:?}", cmd);
         let buf = self.peer.send_vendor_dependent_command(&cmd).await?;
@@ -519,8 +519,7 @@ pub mod tests {
     }
 
     fn set_up() -> (Controller, AvcPeer, AvctpPeer) {
-        let (profile_proxy, mut _profile_requests) =
-            create_proxy_and_stream::<ProfileMarker>().expect("should have initialized");
+        let (profile_proxy, mut _profile_requests) = create_proxy_and_stream::<ProfileMarker>();
         let peer = RemotePeerHandle::spawn_peer(
             PeerId(0x1),
             Arc::new(TargetDelegate::new()),

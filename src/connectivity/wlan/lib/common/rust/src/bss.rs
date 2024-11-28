@@ -371,7 +371,7 @@ impl BssDescription {
     /// Search for WPA Info Element and parse it. If no WPA Info Element is found, or a WPA Info
     /// Element is found but is not valid, return an error.
     pub fn wpa_ie(&self) -> Result<ie::wpa::WpaIe, anyhow::Error> {
-        ie::parse_wpa_ie(self.find_wpa_ie().ok_or(format_err!("no wpa ie found"))?)
+        ie::parse_wpa_ie(self.find_wpa_ie().ok_or_else(|| format_err!("no wpa ie found"))?)
             .map_err(|e| e.into())
     }
 
@@ -391,8 +391,10 @@ impl BssDescription {
     /// Search for WMM Parameter Element and parse it. If no WMM Parameter Element is found,
     /// return an error.
     pub fn wmm_param(&self) -> Result<Ref<&[u8], ie::WmmParam>, anyhow::Error> {
-        ie::parse_wmm_param(self.find_wmm_param().ok_or(format_err!("no wmm parameter found"))?)
-            .map_err(|e| e.into())
+        ie::parse_wmm_param(
+            self.find_wmm_param().ok_or_else(|| format_err!("no wmm parameter found"))?,
+        )
+        .map_err(|e| e.into())
     }
 
     /// Search for the WiFi Simple Configuration Info Element. If found, return the body.

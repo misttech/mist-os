@@ -34,7 +34,7 @@
         ]
     },
     {
-        "node": "pwm-little",
+        "node": "pwm-primary",
         "tests": [
             {
                 "name": "Match",
@@ -42,19 +42,6 @@
                 "device": {
                     "fuchsia.hardware.pwm.Service": "fuchsia.hardware.pwm.Service.ZirconTransport",
                     "fuchsia.amlogic.platform.PWM_ID": "fuchsia.amlogic.platform.PWM_ID.AO_D"
-                }
-            }
-        ]
-    },
-    {
-        "node": "pwm-big",
-        "tests": [
-            {
-                "name": "Match",
-                "expected": "match",
-                "device": {
-                    "fuchsia.hardware.pwm.Service": "fuchsia.hardware.pwm.Service.ZirconTransport",
-                    "fuchsia.amlogic.platform.PWM_ID": "fuchsia.amlogic.platform.PWM_ID.A"
                 }
             }
         ]

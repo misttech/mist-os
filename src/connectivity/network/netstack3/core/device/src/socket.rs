@@ -200,7 +200,7 @@ pub type HeldDeviceSockets<BT> = DeviceSockets<WeakDeviceId<BT>, BT>;
 pub type HeldSockets<BT> = Sockets<WeakDeviceId<BT>, BT>;
 
 /// Core context for accessing socket state.
-pub trait DeviceSocketContext<BT: DeviceSocketTypes>: DeviceSocketAccessor<BT> {
+pub trait DeviceSocketContext<BT: DeviceSocketTypes>: DeviceIdContext<AnyDevice> {
     /// The core context available in callbacks to methods on this context.
     type SocketTablesCoreCtx<'a>: DeviceSocketAccessor<
         BT,
@@ -378,7 +378,8 @@ type ApiSocketId<C> = DeviceSocketId<
 impl<C> DeviceSocketApi<C>
 where
     C: ContextPair,
-    C::CoreContext: DeviceSocketContext<C::BindingsContext>,
+    C::CoreContext:
+        DeviceSocketContext<C::BindingsContext> + SocketStateAccessor<C::BindingsContext>,
     C::BindingsContext: DeviceSocketBindingsContext<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>
         + ReferenceNotifiers
         + 'static,
@@ -690,7 +691,8 @@ impl<'a> ReceivedFrame<&'a [u8]> {
 }
 
 impl<B> Frame<B> {
-    fn protocol(&self) -> Option<u16> {
+    /// Returns ether type for the packet if it's known.
+    pub fn protocol(&self) -> Option<u16> {
         let ethertype = match self {
             Self::Sent(SentFrame::Ethernet(frame))
             | Self::Received(ReceivedFrame::Ethernet { destination: _, frame }) => frame.ethertype,

@@ -264,8 +264,7 @@ async fn test_notify_host_watcher_of_active_hosts() {
 
     // Start HostWatcher client/server.
     let (host_watcher_proxy, host_watcher_stream) =
-        fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_bluetooth_sys::HostWatcherMarker>()
-            .expect("fidl endpoints");
+        fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_bluetooth_sys::HostWatcherMarker>();
     let host_watcher_fut = crate::host_watcher::run(host_dispatcher.clone(), host_watcher_stream);
     let _host_watcher_task = fasync::Task::spawn(host_watcher_fut);
 

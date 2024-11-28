@@ -8,14 +8,12 @@
 
 namespace pressure_signaler {
 
-MemoryDebugger::MemoryDebugger(sys::ComponentContext* context, PressureNotifier* notifier)
-    : notifier_(notifier) {
+MemoryDebugger::MemoryDebugger(PressureNotifier* notifier) : notifier_(notifier) {
   FX_CHECK(notifier_);
-  FX_CHECK(context);
-  zx_status_t status = context->outgoing()->AddPublicService(bindings_.GetHandler(this));
-  FX_CHECK(status == ZX_OK);
 }
 
-void MemoryDebugger::Signal(fuchsia::memorypressure::Level level) { notifier_->DebugNotify(level); }
+void MemoryDebugger::Signal(SignalRequest& request, SignalCompleter::Sync& completer) {
+  notifier_->DebugNotify(request.level());
+}
 
 }  // namespace pressure_signaler

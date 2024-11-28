@@ -695,7 +695,9 @@ zx_status_t Ufs::Init() {
   PopulateCapabilitiesInspect(&inspect_node_);
 
   auto controller_node = inspect_node_.CreateChild("controller");
+  auto wp_node = controller_node.CreateChild("write_protect");
   auto wb_node = controller_node.CreateChild("writebooster");
+  auto bkop_node = controller_node.CreateChild("background_operations");
 
   if (zx::result<> result = InitQuirk(); result.is_error()) {
     FDF_LOG(ERROR, "Failed to initialize quirk: %s", result.status_string());
@@ -713,6 +715,16 @@ zx_status_t Ufs::Init() {
 
   if (zx::result<> result = device_manager_->GetControllerDescriptor(); result.is_error()) {
     FDF_LOG(ERROR, "Failed to get controller descriptor: %s", result.status_string());
+    return result.error_value();
+  }
+
+  if (zx::result<> result = device_manager_->ConfigureWriteProtect(wp_node); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to configure Write Protect %s", result.status_string());
+    return result.error_value();
+  }
+
+  if (zx::result<> result = device_manager_->ConfigureBackgroundOp(bkop_node); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to configure Background Operations %s", result.status_string());
     return result.error_value();
   }
 
@@ -751,7 +763,9 @@ zx_status_t Ufs::Init() {
       /*buckets=*/14);
 
   inspector().inspector().emplace(std::move(controller_node));
+  inspector().inspector().emplace(std::move(wp_node));
   inspector().inspector().emplace(std::move(wb_node));
+  inspector().inspector().emplace(std::move(bkop_node));
   FDF_LOG(INFO, "Bind Success");
 
   return ZX_OK;
@@ -900,6 +914,19 @@ zx::result<> Ufs::InitController() {
       FDF_LOG(ERROR, "Failed to start IO worker loop: %s", zx_status_get_string(status));
       return zx::error(status);
     }
+  }
+
+  // Create Exception Event worker
+  {
+    auto ee_dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "ufs-exception-event-worker",
+        [&](fdf_dispatcher_t*) { exception_event_completion_.Signal(); });
+    if (ee_dispatcher.is_error()) {
+      FDF_LOG(ERROR, "Failed to create Exception Event dispatcher: %s",
+              zx_status_get_string(ee_dispatcher.status_value()));
+      return zx::error(ee_dispatcher.status_value());
+    }
+    exception_event_dispatcher_ = *std::move(ee_dispatcher);
   }
 
   return zx::ok();
@@ -1074,6 +1101,13 @@ zx::result<uint32_t> Ufs::AddLogicalUnits() {
       return zx::error(ZX_ERR_BAD_STATE);
     }
     FDF_LOG(INFO, "LUN-%d block_size=%zu, block_count=%ld", lun, desc_block_size, desc_block_count);
+
+    // Currently, we only support kPowerOnWriteProtect.
+    if (device_manager_->IsPowerOnWritePotectEnabled() &&
+        unit_descriptor->bLUWriteProtect == LUWriteProtect::kPowerOnWriteProtect &&
+        !device_manager_->IsLogicalLunPowerOnWriteProtect()) {
+      device_manager_->SetLogicalLunPowerOnWriteProtect(true);
+    }
 
     return zx::ok();
   };
@@ -1580,6 +1614,11 @@ void Ufs::PrepareStop(fdf::PrepareStopCompleter completer) {
 
   irq_.destroy();  // Make irq_.wait() in IrqLoop() return ZX_ERR_CANCELED.
   // wait for worker loop to finish before removing devices
+  if (exception_event_dispatcher_.get()) {
+    exception_event_dispatcher_.ShutdownAsync();
+    exception_event_completion_.Wait();
+  }
+
   if (irq_worker_dispatcher_.get()) {
     irq_worker_dispatcher_.ShutdownAsync();
     irq_worker_shutdown_completion_.Wait();

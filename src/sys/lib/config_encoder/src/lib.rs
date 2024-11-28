@@ -36,7 +36,7 @@ impl ConfigFields {
         if decl.checksum != base_values.checksum {
             return Err(ResolutionError::ChecksumFailure {
                 expected: decl.checksum.clone(),
-                received: base_values.checksum.clone(),
+                received: base_values.checksum,
             });
         }
 

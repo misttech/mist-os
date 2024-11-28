@@ -43,6 +43,12 @@ impl TestHarness {
         if config.supports_append {
             assert!(config.supports_mutable_file, "Files supporting append must also be mutable.");
         }
+        if config.supports_truncate {
+            assert!(
+                config.supports_mutable_file,
+                "Files supporting truncate must also be mutable."
+            );
+        }
 
         // Generate set of supported open rights for each object type.
         let dir_rights = Rights::new(get_supported_dir_rights(&config));
@@ -55,22 +61,24 @@ impl TestHarness {
     /// Creates a [`fio::DirectoryProxy`] with the given root directory structure.
     pub fn get_directory(
         &self,
-        root: io_test::Directory,
-        flags: fio::OpenFlags,
+        entries: Vec<io_test::DirectoryEntry>,
+        flags: fio::Flags,
     ) -> fio::DirectoryProxy {
-        let (client, server) = create_proxy::<fio::DirectoryMarker>().expect("Cannot create proxy");
+        let contents: Vec<Option<Box<io_test::DirectoryEntry>>> =
+            entries.into_iter().map(|e| Some(Box::new(e))).collect();
+        let (client, server) = create_proxy::<fio::DirectoryMarker>();
         self.proxy
-            .get_directory(root, flags, server)
+            .create_directory(contents, flags, server)
             .expect("Cannot get directory from test harness");
         client
     }
 
     /// Helper function which gets service directory from the harness as a [`fio::DirectoryProxy`].
     /// Requires that the harness supports service directories, otherwise will panic.
-    pub async fn get_service_dir(&self) -> fio::DirectoryProxy {
+    pub async fn open_service_directory(&self) -> fio::DirectoryProxy {
         assert!(self.config.supports_services);
-        let client_end = self.proxy.get_service_dir().await.unwrap();
-        client_end.into_proxy().unwrap()
+        let client_end = self.proxy.open_service_directory().await.unwrap();
+        client_end.into_proxy()
     }
 
     /// Returns the abilities [`io_test::File`] objects should have for the harness.

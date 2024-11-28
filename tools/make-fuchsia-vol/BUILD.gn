@@ -14,7 +14,9 @@ if (is_host) {
 
     deps = [
       "//build/sdk/meta:rust",
+      "//src/lib/assembly/assembly_manifest",
       "//src/lib/assembly/partitions_config",
+      "//src/storage/lib/sparse/rust:lib",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
       "//third_party/rust_crates:byteorder",

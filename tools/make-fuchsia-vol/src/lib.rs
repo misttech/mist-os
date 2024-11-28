@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{bail, ensure, Context, Error};
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use assembly_manifest::Image;
 use assembly_partitions_config::{Partition, PartitionsConfig, Slot};
 use byteorder::{BigEndian, WriteBytesExt};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -14,7 +15,7 @@ use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 use sdk_metadata::{LoadedProductBundle, ProductBundle};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
@@ -41,12 +42,6 @@ const VBMETA_R_GUID: PartType = part_type("6A2460C3-CD11-4E8B-80A8-12CCE268ED0A"
 const MISC_GUID: PartType = part_type("1D75395D-F2C6-476B-A8B7-45CC1C97B476");
 const INSTALLER_GUID: PartType = part_type("4DCE98CE-E77E-45C1-A863-CAF92F1330C1");
 const FVM_GUID: PartType = part_type("41D0E340-57E3-954E-8C1E-17ECAC44CFF5");
-
-const ZBI_ZIRCON_A: &str = "zbi_zircon-a";
-const ZBI_ZIRCON_R: &str = "zbi_zircon-r";
-const BLK_STORAGE_SPARSE: &str = "blk_storage-sparse";
-const FXFS_BLK_STORAGE_FULL: &str = "fxfs-blk_storage-full";
-const BLK_BLOB: &str = "blk_blob";
 
 /// On QEMU, the bootloader will look for an EFI application commandline in this partition, to
 /// allow tests to control the boot mode.
@@ -179,14 +174,6 @@ fn get_vbmeta_partition_name(
     }
 
     bail!("could not find ZBI partition name for slot {partition_slot:?}")
-}
-
-fn get_image(images: &HashMap<String, Utf8PathBuf>, name: &str) -> Result<Utf8PathBuf, Error> {
-    if let Some(name) = images.get(name) {
-        Ok(name.clone())
-    } else {
-        bail!("images missing entry for '{}'", name)
-    }
 }
 
 /// Create a protective MBR
@@ -504,15 +491,110 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
         args.product_bundle = get_build_product_bundle_path(args, &mut dependencies)?;
     };
 
-    let product_bundle_path = if let Some(product_bundle_path) = &args.product_bundle {
-        Some(product_bundle_path.join("product_bundle.json"))
+    let product_bundle_path = if let Some(product_bundle_dir) = &args.product_bundle {
+        Some(product_bundle_dir.join("product_bundle.json"))
     } else {
         None
     };
-
-    if let Some(product_bundle_path) = &product_bundle_path {
-        dependencies.push(product_bundle_path.as_path());
+    // This is a separate statement so that 'product_bundle_path' lives long enough to provide a
+    // value that can be referenced by 'dependencies' until the end of the fn.
+    if let Some(path) = &product_bundle_path {
+        dependencies.push(path.as_path());
     }
+
+    // The order of precedence for file paths is as follows:
+    //
+    //  1) --zircon_[a|b], --vbmeta_[a|b], and fvm/fxfs image args first.
+    //  2) --zbi, for both zircon_a and zircon_b.
+    //  3) the images in the product bundle, and if using fxfs:
+    //      a)  the sparse image
+    //      b)  the full image (as it's being removed as an output)
+
+    // Apply the --zbi argument to the zircon_[a|b] args, if it's been specified.
+    if let Some(path) = &args.zbi {
+        args.zircon_a.get_or_insert_with(|| path.clone());
+        args.zircon_b.get_or_insert_with(|| path.clone());
+    }
+
+    // If there's a product bundle, use that for all remaining, unset, image paths.
+    if let Some(product_bundle_dir) = &args.product_bundle {
+        match LoadedProductBundle::try_load_from(product_bundle_dir)?.into() {
+            ProductBundle::V2(product_bundle) => {
+                // If the bundle contains images for slot b, use them for slot b args that haven't
+                // been provided.
+                if let Some(system_b) = product_bundle.system_b {
+                    for image in &system_b {
+                        match image {
+                            Image::ZBI { path, .. } => {
+                                args.zircon_b.get_or_insert_with(|| path.clone());
+                            }
+                            Image::VBMeta(utf8_path_buf) => {
+                                args.vbmeta_b.get_or_insert_with(|| utf8_path_buf.clone());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                // If the bundle contains images for slot a, use them for for slot a AND slot b args
+                // that haven't been provided.
+                if let Some(system_a) = product_bundle.system_a {
+                    for image in &system_a {
+                        match image {
+                            Image::ZBI { path, .. } => {
+                                args.zbi.get_or_insert_with(|| path.clone());
+                                args.zircon_a.get_or_insert_with(|| path.clone());
+                                args.zircon_b.get_or_insert_with(|| path.clone());
+                            }
+                            Image::VBMeta(utf8_path_buf) => {
+                                args.vbmeta_a.get_or_insert_with(|| utf8_path_buf.clone());
+                                args.vbmeta_b.get_or_insert_with(|| utf8_path_buf.clone());
+                            }
+
+                            // Always set these paths if present in the product bundle, but they
+                            // won't be used if args.ramdisk_only is true.
+                            Image::FVMSparse(utf8_path_buf) => {
+                                args.sparse_fvm.get_or_insert_with(|| utf8_path_buf.clone());
+                            }
+                            Image::BlobFS { path, .. } => {
+                                args.blob.get_or_insert_with(|| path.clone());
+                            }
+                            Image::FxfsSparse { path, .. } => {
+                                if args.use_fxfs {
+                                    args.fxfs.get_or_insert_with(|| path.clone());
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    // fall back to the full (non-sparse) Fxfs image if we didn't find a sparse one.
+                    if args.use_fxfs && args.fxfs.is_none() {
+                        args.fxfs = system_a.iter().find_map(|i| match i {
+                            Image::Fxfs { path, .. } => Some(path.clone()),
+                            _ => None,
+                        });
+                    }
+                }
+
+                // And the recovery zbi
+                if let Some(system_r) = product_bundle.system_r {
+                    for image in &system_r {
+                        match image {
+                            Image::ZBI { path, .. } => {
+                                args.zedboot.get_or_insert_with(|| path.clone());
+                                args.zircon_r.get_or_insert_with(|| path.clone());
+                            }
+                            Image::VBMeta(utf8_path_buf) => {
+                                args.vbmeta_r.get_or_insert_with(|| utf8_path_buf.clone());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+    };
 
     if args.bootloader.is_none() {
         if let Some(build_dir) = &args.fuchsia_build_dir {
@@ -528,77 +610,12 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
 
     dependencies.push(args.bootloader.as_ref().unwrap());
 
-    let images = if let Some(build_dir) = &args.fuchsia_build_dir {
-        dependencies.push("images.json".into());
-
-        #[derive(Deserialize)]
-        struct Image {
-            name: String,
-            path: Utf8PathBuf,
-            #[serde(rename(deserialize = "type"))]
-            image_type: String,
-        }
-        let images: Vec<Image> =
-            serde_json::from_slice(&read_file(build_dir.join("images.json"))?)?;
-        // Maps "<image-type>_<image-name>" => "<image-path>"
-        let images: HashMap<String, Utf8PathBuf> = images
-            .into_iter()
-            .map(|i| (i.image_type + "_" + &i.name, build_dir.join(i.path)))
-            .collect();
-
-        if args.zbi.is_none() {
-            args.zbi = Some(get_image(&images, ZBI_ZIRCON_A)?);
-        }
-        if args.zedboot.is_none() {
-            args.zedboot = Some(get_image(&images, ZBI_ZIRCON_R)?);
-        }
-        if !args.ramdisk_only {
-            if args.use_sparse_fvm {
-                if args.sparse_fvm.is_none() {
-                    args.sparse_fvm = Some(get_image(&images, BLK_STORAGE_SPARSE)?);
-                }
-            } else if args.use_fxfs {
-                if args.fxfs.is_none() {
-                    args.fxfs = Some(get_image(&images, FXFS_BLK_STORAGE_FULL)?);
-                }
-            } else {
-                if args.blob.is_none() {
-                    args.blob = Some(get_image(&images, BLK_BLOB)?);
-                }
-            }
-        }
-        Some(images)
-    } else {
-        None
-    };
-
     ensure!(args.zbi.is_some(), "Missing --zbi");
     dependencies.push(args.zbi.as_ref().unwrap());
     ensure!(args.zedboot.is_some(), "Missing --zedboot");
     dependencies.push(args.zedboot.as_ref().unwrap());
 
     if !args.no_abr {
-        if args.zircon_a.is_none() {
-            args.zircon_a = args.zbi.clone();
-        }
-        if args.zircon_b.is_none() {
-            args.zircon_b = args.zbi.clone();
-        }
-        if let Some(images) = images {
-            if args.vbmeta_a.is_none() {
-                args.vbmeta_a = Some(images["vbmeta_zircon-a"].clone());
-            }
-            if args.vbmeta_b.is_none() {
-                args.vbmeta_b = Some(images["vbmeta_zircon-a"].clone());
-            }
-            if args.zircon_r.is_none() {
-                args.zircon_r = Some(images["zbi_zircon-r"].clone());
-            }
-            if args.vbmeta_r.is_none() {
-                args.vbmeta_r = Some(images["vbmeta_zircon-r"].clone());
-            }
-        }
-
         ensure!(args.zircon_a.is_some(), "Missing --zircon_a");
         dependencies.push(args.zircon_a.as_ref().unwrap());
         ensure!(args.vbmeta_a.is_some(), "Missing --vbmeta_a");
@@ -748,7 +765,20 @@ fn write_esp_content<TP: TimeProvider, OCC: OemCpConverter>(
 
 // Copies the file at `source` path to the disk. `range` is the partition byte range.
 fn copy_partition(disk: &mut File, range: Range<u64>, source: &Utf8Path) -> Result<(), Error> {
-    let contents = read_file(source)?;
+    let source_file = std::fs::File::open(source).context(format!("Failed to read {}", source))?;
+    let mut reader = std::io::BufReader::new(source_file);
+
+    let contents = if sparse::is_sparse_image(&mut reader) {
+        let mut writer = std::io::Cursor::new(Vec::new());
+        sparse::unsparse(&mut reader, &mut writer)
+            .map_err(|e| anyhow!("cannot inflate sparse image: {e}"))?;
+        writer.into_inner()
+    } else {
+        let mut buf = Vec::new();
+        reader.read_to_end(&mut buf).map_err(|e| anyhow!("cannot read image: {e}"))?;
+        buf
+    };
+
     let max_len = (range.end - range.start) as usize;
     let contents = if contents.len() > max_len {
         println!("{} too big", source);

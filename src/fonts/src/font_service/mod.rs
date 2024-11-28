@@ -197,7 +197,7 @@ where
             warn!("Unfulfilled request {:?}", &TypefaceRequestFormatter(&request));
         }
 
-        let typeface_response = typeface_response.unwrap_or(fonts::TypefaceResponse::default());
+        let typeface_response = typeface_response.unwrap_or_else(fonts::TypefaceResponse::default);
 
         debug!("Response: {:?}", &TypefaceResponseFormatter(&typeface_response));
 
@@ -261,8 +261,8 @@ where
     fn get_family_info(&self, family_name: fonts::FamilyName) -> fonts::FontFamilyInfo {
         let family_name = UniCase::new(family_name.name);
         let family = self.match_family(&family_name);
-        family.map_or(
-            fonts::FontFamilyInfo::default(),
+        family.map_or_else(
+            fonts::FontFamilyInfo::default,
             |FontFamilyMatch { family, overrides: _ }| fonts::FontFamilyInfo {
                 name: Some(fonts::FamilyName { name: family.name.clone() }),
                 styles: Some(family.faces.get_styles().collect()),
@@ -301,7 +301,7 @@ where
         family_name: fonts::FamilyName,
     ) -> Result<fonts_exp::TypefaceInfoResponse, fonts_exp::Error> {
         let family = self
-            .match_family(&UniCase::new(family_name.name.clone()))
+            .match_family(&UniCase::new(family_name.name))
             .map(|matched| matched.family)
             .ok_or(fonts_exp::Error::NotFound)?;
         let faces = family.extract_faces().map_into().collect();
@@ -427,7 +427,7 @@ where
 
         fasync::Task::spawn(
             async move {
-                let mut stream = iterator.into_stream()?;
+                let mut stream = iterator.into_stream();
                 while let Some(request) = stream.try_next().await? {
                     match request {
                         fonts_exp::ListTypefacesIteratorRequest::GetNext { responder } => {

@@ -92,6 +92,9 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
             std::optional<ServiceOffersV1> service_offers = std::nullopt,
             std::optional<BanjoConfig> banjo_config = std::nullopt);
 
+  void Initialize(std::string name, std::optional<ServiceOffersV1> service_offers = std::nullopt,
+                  std::optional<BanjoConfig> banjo_config = std::nullopt);
+
   // Functions to implement the DFv1 device API.
   zx_status_t AddMetadata(MetadataKey type, const void* data, size_t size);
   zx_status_t GetMetadata(MetadataKey type, void* buf, size_t buflen, size_t* actual);
@@ -117,9 +120,6 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   void GetMetadata(GetMetadataCompleter::Sync& completer) override;
   void GetBanjoProtocol(GetBanjoProtocolRequestView request,
                         GetBanjoProtocolCompleter::Sync& completer) override;
-  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override {
-    completer.Reply(fidl::StringView::FromExternal("SHOULD_NOT_BE_USED"));
-  }
 
   std::string name_;
   MetadataMap metadata_;

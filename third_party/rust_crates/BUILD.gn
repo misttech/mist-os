@@ -57,6 +57,12 @@ group("ash") {
   public_deps = [ ":ash-v0_37_0+1_3_209" ]
 }
 
+if (!(current_os == "fuchsia")) {
+  group("askama") {
+    public_deps = [ ":askama-v0_12_1" ]
+  }
+}
+
 group("assert_matches") {
   public_deps = [ ":assert_matches-v1_5_0" ]
 }
@@ -1803,6 +1809,145 @@ rust_library("ash-v0_37_0+1_3_209") {
   applicable_licenses = [ ":ash-v0_37_0+1_3_209.license" ]
 }
 
+license("askama-v0_12_1.license") {
+  public_package_name = "askama"
+  license_files = [
+    "//third_party/rust_crates/vendor/askama-0.12.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/askama-0.12.1/LICENSE-MIT",
+  ]
+}
+
+rust_library("askama-v0_12_1") {
+  crate_name = "askama"
+  crate_root = "//third_party/rust_crates/vendor/askama-0.12.1/src/lib.rs"
+  output_name = "askama-3f38ee58767ed948"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":askama_derive-v0_12_5($host_toolchain)" ]
+  deps += [ ":askama_escape-v0_10_3" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=3f38ee58767ed948",
+    "-Cextra-filename=-3f38ee58767ed948",
+    "--cfg=feature=\"config\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":askama-v0_12_1.license" ]
+}
+
+license("askama_derive-v0_12_5.license") {
+  public_package_name = "askama_derive"
+  license_files = [
+    "//third_party/rust_crates/forks/askama_derive/LICENSE-APACHE",
+    "//third_party/rust_crates/forks/askama_derive/LICENSE-MIT",
+  ]
+}
+
+rust_proc_macro("askama_derive-v0_12_5") {
+  crate_name = "askama_derive"
+  crate_root = "//third_party/rust_crates/forks/askama_derive/src/lib.rs"
+  output_name = "askama_derive-e1b0d7c36e373690"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":askama_parser-v0_2_1" ]
+  deps += [ ":basic-toml-v0_1_9" ]
+  deps += [ ":mime-v0_3_17" ]
+  deps += [ ":mime_guess-v2_0_5" ]
+  deps += [ ":proc-macro2-v1_0_86" ]
+  deps += [ ":quote-v1_0_35" ]
+  deps += [ ":serde-v1_0_204" ]
+  deps += [ ":syn-v2_0_69" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=e1b0d7c36e373690",
+    "-Cextra-filename=-e1b0d7c36e373690",
+    "--cfg=feature=\"basic-toml\"",
+    "--cfg=feature=\"config\"",
+    "--cfg=feature=\"serde\"",
+  ]
+
+  aliased_deps = {
+    parser = ":askama_parser-v0_2_1"
+  }
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":askama_derive-v0_12_5.license" ]
+}
+
+license("askama_escape-v0_10_3.license") {
+  public_package_name = "askama_escape"
+  license_files = [
+    "//third_party/rust_crates/vendor/askama_escape-0.10.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/askama_escape-0.10.3/LICENSE-MIT",
+  ]
+}
+
+rust_library("askama_escape-v0_10_3") {
+  crate_name = "askama_escape"
+  crate_root =
+      "//third_party/rust_crates/vendor/askama_escape-0.10.3/src/lib.rs"
+  output_name = "askama_escape-7e697b0cf594c674"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=7e697b0cf594c674",
+    "-Cextra-filename=-7e697b0cf594c674",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":askama_escape-v0_10_3.license" ]
+}
+
+license("askama_parser-v0_2_1.license") {
+  public_package_name = "askama_parser"
+  license_files = [
+    "//third_party/rust_crates/vendor/askama_parser-0.2.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/askama_parser-0.2.1/LICENSE-MIT",
+  ]
+}
+
+rust_library("askama_parser-v0_2_1") {
+  crate_name = "askama_parser"
+  crate_root = "//third_party/rust_crates/vendor/askama_parser-0.2.1/src/lib.rs"
+  output_name = "askama_parser-f52efcbe4b9f233c"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":nom-v7_1_3" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=f52efcbe4b9f233c",
+    "-Cextra-filename=-f52efcbe4b9f233c",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":askama_parser-v0_2_1.license" ]
+}
+
 license("assert_matches-v1_5_0.license") {
   public_package_name = "assert_matches"
   license_files = [
@@ -2460,6 +2605,41 @@ rust_library("base64ct-v1_6_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":base64ct-v1_6_0.license" ]
+}
+
+license("basic-toml-v0_1_9.license") {
+  public_package_name = "basic_toml"
+  license_files = [
+    "//third_party/rust_crates/vendor/basic-toml-0.1.9/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/basic-toml-0.1.9/LICENSE-MIT",
+  ]
+}
+
+rust_library("basic-toml-v0_1_9") {
+  crate_name = "basic_toml"
+  crate_root = "//third_party/rust_crates/vendor/basic-toml-0.1.9/src/lib.rs"
+  output_name = "basic_toml-6f2e3c08991db87a"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":serde-v1_0_204" ]
+
+  rustenv = [
+    "CARGO_PKG_VERSION_MAJOR=0",
+    "CARGO_PKG_VERSION_MINOR=1",
+    "CARGO_PKG_VERSION_PATCH=9",
+  ]
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=6f2e3c08991db87a",
+    "-Cextra-filename=-6f2e3c08991db87a",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":basic-toml-v0_1_9.license" ]
 }
 
 license("bincode-v1_3_3.license") {
@@ -8462,6 +8642,68 @@ rust_library("memoffset-v0_9_1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":memoffset-v0_9_1.license" ]
+}
+
+license("mime-v0_3_17.license") {
+  public_package_name = "mime"
+  license_files = [
+    "//third_party/rust_crates/vendor/mime-0.3.17/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/mime-0.3.17/LICENSE-MIT",
+  ]
+}
+
+rust_library("mime-v0_3_17") {
+  crate_name = "mime"
+  crate_root = "//third_party/rust_crates/vendor/mime-0.3.17/src/lib.rs"
+  output_name = "mime-92cbe2e7490bc2ab"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=92cbe2e7490bc2ab",
+    "-Cextra-filename=-92cbe2e7490bc2ab",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":mime-v0_3_17.license" ]
+}
+
+license("mime_guess-v2_0_5.license") {
+  public_package_name = "mime_guess"
+  license_files =
+      [ "//third_party/rust_crates/vendor/mime_guess-2.0.5/LICENSE" ]
+}
+
+rust_library("mime_guess-v2_0_5") {
+  crate_name = "mime_guess"
+  crate_root = "//third_party/rust_crates/vendor/mime_guess-2.0.5/src/lib.rs"
+  output_name = "mime_guess-ecbb8e03a128505d"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":mime-v0_3_17" ]
+  deps += [ ":unicase-v2_7_0" ]
+
+  rustenv = [ "MIME_TYPES_GENERATED_PATH=../../../compat/mime_guess/mime_types_generated.rs" ]
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=ecbb8e03a128505d",
+    "-Cextra-filename=-ecbb8e03a128505d",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"rev-mappings\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":mime_guess-v2_0_5.license" ]
 }
 
 license("miniz_oxide-v0_3_6.license") {

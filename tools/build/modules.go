@@ -37,6 +37,7 @@ type Modules struct {
 	packageRepositories      []PackageRepo
 	platforms                []DimensionSet
 	prebuiltBinarySets       []PrebuiltBinarySet
+	prebuiltVersionsLocation PrebuiltVersionsLocation
 	productBundles           []ProductBundle
 	productSizeCheckerOutput []ProductSizeCheckerOutput
 	sdkArchives              []SDKArchive
@@ -44,6 +45,7 @@ type Modules struct {
 	testListLocation         []string
 	testSpecs                []TestSpec
 	tools                    Tools
+	triageSources            []string
 	// keep-sorted end
 }
 
@@ -71,6 +73,7 @@ func NewModules(buildDir string) (*Modules, error) {
 		"package-repositories":        &m.packageRepositories,
 		"platforms":                   &m.platforms,
 		"prebuilt_binaries":           &m.prebuiltBinarySets,
+		"prebuilt_versions_location":  &m.prebuiltVersionsLocation,
 		"product_bundles":             &m.productBundles,
 		"product_size_checker_output": &m.productSizeCheckerOutput,
 		"rust_target_mapping":         &m.clippyTargets,
@@ -79,6 +82,7 @@ func NewModules(buildDir string) (*Modules, error) {
 		"test_list_location":          &m.testListLocation,
 		"tests":                       &m.testSpecs,
 		"tool_paths":                  &m.tools,
+		"triage_sources":              &m.triageSources,
 		// keep-sorted end
 	}
 	// Ensure we read the manifests in order, so that if multiple manifests are
@@ -106,6 +110,14 @@ func (m Modules) ImageManifest() string {
 // APIs returns the build API module of available build API modules.
 func (m Modules) APIs() []string {
 	return m.apis
+}
+
+func (m Modules) ModulePaths() ([]string, error) {
+	buildApiClient, err := NewBuildAPIClient(m.buildDir)
+	if err != nil {
+		return nil, err
+	}
+	return buildApiClient.GetModulePaths()
 }
 
 func (m Modules) Archives() []Archive {
@@ -163,6 +175,14 @@ func (m Modules) PrebuiltBinarySets() []PrebuiltBinarySet {
 	return m.prebuiltBinarySets
 }
 
+func (m Modules) PrebuiltVersionsLocation() PrebuiltVersionsLocation {
+	return m.prebuiltVersionsLocation
+}
+
+func (m Modules) PrebuiltVersions() ([]PrebuiltVersion, error) {
+	return LoadPrebuiltVersions(filepath.Join(m.BuildDir(), m.PrebuiltVersionsLocation().Location))
+}
+
 func (m Modules) ProductSizeCheckerOutput() []ProductSizeCheckerOutput {
 	return m.productSizeCheckerOutput
 }
@@ -189,4 +209,8 @@ func (m Modules) TestSpecs() []TestSpec {
 
 func (m Modules) Tools() Tools {
 	return m.tools
+}
+
+func (m Modules) TriageSources() []string {
+	return m.triageSources
 }

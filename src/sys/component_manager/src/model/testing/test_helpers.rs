@@ -336,7 +336,7 @@ impl TestEnvironmentBuilder {
         let builtin_environment = Arc::new(Mutex::new(
             BuiltinEnvironmentBuilder::new()
                 .add_resolver("test".to_string(), mock_resolver.clone())
-                .add_runner(TEST_RUNNER_NAME.parse().unwrap(), mock_runner.clone())
+                .add_runner(TEST_RUNNER_NAME.parse().unwrap(), mock_runner.clone(), true)
                 .set_runtime_config(self.runtime_config)
                 .build()
                 .await
@@ -355,8 +355,7 @@ impl TestEnvironmentBuilder {
                 .await
                 .unwrap_or_else(|e| panic!("could not look up {}: {:?}", moniker, e));
             let host = Realm::new(Arc::downgrade(&model), model.context().runtime_config().clone());
-            let (realm_proxy, server) =
-                endpoints::create_proxy::<fcomponent::RealmMarker>().unwrap();
+            let (realm_proxy, server) = endpoints::create_proxy::<fcomponent::RealmMarker>();
             capability::open_framework(&host, &component, server.into()).await.unwrap();
             Some(realm_proxy)
         } else {
@@ -515,7 +514,7 @@ pub async fn lifecycle_controller(test: &TestModelResult) -> fsys::LifecycleCont
         let env = test.builtin_environment.lock().await;
         env.lifecycle_controller.clone().unwrap()
     };
-    let (proxy, server) = endpoints::create_proxy::<fsys::LifecycleControllerMarker>().unwrap();
+    let (proxy, server) = endpoints::create_proxy::<fsys::LifecycleControllerMarker>();
     capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
     proxy
 }
@@ -525,7 +524,7 @@ pub async fn config_override(test: &TestModelResult) -> fsys::ConfigOverrideProx
         let env = test.builtin_environment.lock().await;
         env.config_override.clone().unwrap()
     };
-    let (proxy, server) = fidl::endpoints::create_proxy::<fsys::ConfigOverrideMarker>().unwrap();
+    let (proxy, server) = fidl::endpoints::create_proxy::<fsys::ConfigOverrideMarker>();
     capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
     proxy
 }

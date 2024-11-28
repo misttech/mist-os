@@ -179,8 +179,7 @@ mod tests {
         assert_eq!(pcm.valid_bits_per_sample.unwrap()[0], 16u8);
         assert_eq!(pcm.frame_rates.unwrap()[0],           44100);
 
-        let (ring_buffer, server) = fidl::endpoints::create_proxy::<RingBufferMarker>()
-            .expect("creating ring buffer endpoint error");
+        let (ring_buffer, server) = fidl::endpoints::create_proxy::<RingBufferMarker>();
 
         let format = Format {
             pcm_format: Some(fidl_fuchsia_hardware_audio::PcmFormat {

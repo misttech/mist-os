@@ -10,6 +10,7 @@
 #include <lib/fdf/cpp/channel.h>
 #include <lib/magma/platform/platform_interrupt.h>
 #include <lib/magma/platform/platform_mmio.h>
+#include <lib/magma/platform/zircon/zircon_platform_device_dfv2.h>
 #include <lib/magma/util/dlog.h>
 #include <lib/magma/util/short_macros.h>
 #include <lib/magma/util/status.h>
@@ -51,7 +52,7 @@ class ParentDeviceDFv2 : public ParentDevice {
 
  private:
   std::shared_ptr<fdf::Namespace> incoming_;
-  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
+  magma::ZirconPlatformDeviceDfv2 pdev_;
   config::Config config_;
 };
 

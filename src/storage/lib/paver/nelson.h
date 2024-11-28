@@ -20,6 +20,12 @@ class NelsonPartitioner : public DevicePartitioner {
       const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       fidl::ClientEnd<fuchsia_device::Controller> block_device);
 
+  zx::result<std::unique_ptr<abr::Client>> CreateAbrClient() const override;
+
+  const paver::BlockDevices& Devices() const override;
+
+  fidl::UnownedClientEnd<fuchsia_io::Directory> SvcRoot() const override;
+
   bool IsFvmWithinFtl() const override { return false; }
 
   bool SupportsPartition(const PartitionSpec& spec) const override;
@@ -56,13 +62,6 @@ class NelsonPartitionerFactory : public DevicePartitionerFactory {
       const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       Arch arch, std::shared_ptr<Context> context,
       fidl::ClientEnd<fuchsia_device::Controller> block_device) final;
-};
-
-class NelsonAbrClientFactory : public abr::ClientFactory {
- public:
-  zx::result<std::unique_ptr<abr::Client>> New(
-      const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-      std::shared_ptr<paver::Context> context) final;
 };
 
 class NelsonBootloaderPartitionClient final : public PartitionClient {

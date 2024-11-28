@@ -13,7 +13,6 @@
 use crate::props::is_propset_pseudo_handle;
 use crate::{mem, props, storage};
 use num_traits::FromPrimitive;
-use std::unimplemented;
 use tee_internal::binding::{
     TEE_Attribute, TEE_BigInt, TEE_BigIntFMM, TEE_BigIntFMMContext, TEE_Identity,
     TEE_ObjectEnumHandle, TEE_ObjectHandle, TEE_ObjectInfo, TEE_OperationHandle, TEE_OperationInfo,
@@ -956,7 +955,7 @@ extern "C" fn TEE_OpenPersistentObject(
 ) -> TEE_Result {
     assert!(!object.is_null());
     to_tee_result(|| -> TeeResult {
-        let storage = Storage::from_u32(storageID).unwrap();
+        let storage = Storage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
         let flags = HandleFlags::from_bits_retain(flags);
         let id = slice_from_raw_parts(objectID, objectIDLen);
         let obj = storage::open_persistent_object(storage, id, flags)?;
@@ -980,13 +979,16 @@ extern "C" fn TEE_CreatePersistentObject(
     object: *mut TEE_ObjectHandle,
 ) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
-        let storage = Storage::from_u32(storageID).unwrap();
+        let storage = Storage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
         let flags = HandleFlags::from_bits_retain(flags);
         let id = slice_from_raw_parts(objectID, objectIDLen);
         let attrs = *ObjectHandle::from_binding(&attributes);
         let initial_data = slice_from_raw_parts(initialData, initialDataLen);
         let obj = storage::create_persistent_object(storage, id, flags, attrs, initial_data)?;
-        if !object.is_null() {
+        if object.is_null() {
+            // The user doesn't want a handle, so just close the newly minted one.
+            storage::close_object(obj);
+        } else {
             // SAFETY: `object` is non-null in this branch.
             unsafe {
                 *object = *obj.to_binding();
@@ -1056,7 +1058,7 @@ extern "C" fn TEE_StartPersistentObjectEnumerator(
 ) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
-        let storage = Storage::from_u32(storageID).unwrap();
+        let storage = Storage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
         storage::start_persistent_object_enumerator(enumerator, storage)
     }())
 }
@@ -1068,17 +1070,21 @@ extern "C" fn TEE_GetNextPersistentObject(
     objectID: *mut ::std::os::raw::c_void,
     objectIDLen: *mut usize,
 ) -> TEE_Result {
-    assert!(!objectInfo.is_null());
     assert!(!objectID.is_null());
     assert!(!objectIDLen.is_null());
     to_tee_result(|| -> TeeResult {
         let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
         let id_buf = slice_from_raw_parts_mut(objectID, OBJECT_ID_MAX_LEN);
         let (info, id) = storage::get_next_persistent_object(enumerator, id_buf)?;
-        // SAFETY: `objectInfo` and `objectIDLen` nullity checked above.
+        // SAFETY: `objectIDLen` nullity checked above.
         unsafe {
-            *objectInfo = *info.to_binding();
             *objectIDLen = id.len();
+        }
+        if !objectInfo.is_null() {
+            // SAFETY" `objectInfo` is non-null in this branch.
+            unsafe {
+                *objectInfo = *info.to_binding();
+            }
         }
         Ok(())
     }())

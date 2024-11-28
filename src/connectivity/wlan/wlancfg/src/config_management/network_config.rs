@@ -203,7 +203,7 @@ where
     pub fn add(&mut self, bssid: client_types::Bssid, data: T) {
         self.0
             .entry(bssid)
-            .or_insert(HistoricalList::new(NUM_CONNECTION_RESULTS_PER_BSS))
+            .or_insert_with(|| HistoricalList::new(NUM_CONNECTION_RESULTS_PER_BSS))
             .add(data);
     }
 
@@ -220,7 +220,10 @@ where
 
     /// Retrieve List for a particular BSS, in order to retrieve BSS specific Data entries.
     pub fn get_list_for_bss(&self, bssid: &client_types::Bssid) -> HistoricalList<T> {
-        self.0.get(bssid).cloned().unwrap_or(HistoricalList::new(NUM_CONNECTION_RESULTS_PER_BSS))
+        self.0
+            .get(bssid)
+            .cloned()
+            .unwrap_or_else(|| HistoricalList::new(NUM_CONNECTION_RESULTS_PER_BSS))
     }
 }
 

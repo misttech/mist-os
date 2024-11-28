@@ -30,7 +30,10 @@ pub use ffx_writer::{
 #[doc(hidden)]
 pub mod macro_deps {
     pub use async_trait::async_trait;
-    pub use ffx_command::{bug, return_bug, return_user_error, Ffx, FfxCommandLine, ToolRunner};
+    pub use ffx_command::{
+        bug, check_strict_constraints, return_bug, return_user_error, Ffx, FfxCommandLine,
+        ToolRunner,
+    };
     pub use ffx_config::{global_env_context, EnvironmentContext};
     pub use ffx_core::Injector;
     pub use {anyhow, argh, async_lock, ffx_writer, futures, serde};

@@ -12,7 +12,7 @@
 #include <fbl/vector.h>
 #include <gtest/gtest.h>
 
-namespace display {
+namespace display_coordinator {
 
 class TestCallback : public FenceCallback {
  public:
@@ -28,7 +28,7 @@ class FenceTest : public testing::Test {
   void SetUp() override {
     zx::event ev;
     zx::event::create(0, &ev);
-    constexpr EventId kEventId(1);
+    constexpr display::EventId kEventId(1);
     fence_ = fbl::AdoptRef(new Fence(&cb_, loop_.dispatcher(), kEventId, std::move(ev)));
   }
 
@@ -75,4 +75,4 @@ TEST_F(FenceTest, MultipleRefs_MultiplePurposes) {
   EXPECT_EQ(cb().fired_[1], one.get());
 }
 
-}  // namespace display
+}  // namespace display_coordinator

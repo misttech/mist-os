@@ -177,9 +177,25 @@ TEST_F(VerbsSettingsTest, GetSet) {
   EXPECT_EQ(
       "Set global source-map = \n"
       "  • gldir2\n"
+      "  • gldir3\n",
+      DoInput("set source-map += gldir3"));
+
+  // source-map specifically will remove internal whitespace.
+  EXPECT_EQ(
+      "Set global source-map = \n"
+      "  • gldir2\n"
       "  • gldir3\n"
-      "  • \"gldir four\"\n",
-      DoInput("set source-map += gldir3 \"gldir four\""));
+      "  • gldirfour\n",
+      DoInput("set source-map += gldir four"));
+
+  // ..unless it's quoted.
+  EXPECT_EQ(
+      "Set global source-map = \n"
+      "  • gldir2\n"
+      "  • gldir3\n"
+      "  • gldirfour\n"
+      "  • \"gldir five\"\n",
+      DoInput("set source-map += \"gldir five\""));
 
   // Create a breakpoint and test scope assignment (this doesn't need to be quoted).
   DoInput("break main");
@@ -189,7 +205,8 @@ TEST_F(VerbsSettingsTest, GetSet) {
   EXPECT_EQ("There are no threads in the process.", DoInput("bp 1 set scope thread 1"));
   EXPECT_EQ("There is no current thread to use for the scope.", DoInput("bp 1 set scope thread"));
 
-  EXPECT_EQ("gldir2 gldir3 \"gldir four\"", DoInput("global get --value-only source-map"));
+  EXPECT_EQ("gldir2 gldir3 gldirfour \"gldir five\"",
+            DoInput("global get --value-only source-map"));
   EXPECT_EQ("prdir", DoInput("get --value-only source-map"));
 
   // Check invalid values.

@@ -20,9 +20,9 @@ use netstack3_core::device::{
 };
 use netstack3_core::error::NotFoundError;
 use netstack3_core::ip::{
-    AddIpAddrSubnetError, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
+    AddIpAddrSubnetError, CommonAddressProperties, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
     Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate, Lifetime,
-    SlaacConfigurationUpdate,
+    PreferredLifetime, SlaacConfigurationUpdate,
 };
 use netstack3_core::testutil::{
     CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
@@ -293,7 +293,12 @@ fn test_add_remove_ip_addresses<I: Ip + TestIpExt + IpExt>(
 
 #[test_case(None; "with no AddressConfig specified")]
 #[test_case(Some(Ipv4AddrConfig {
-        valid_until: Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)))
+        common: CommonAddressProperties {
+            valid_until: Lifetime::Finite(FakeInstant::from(Duration::from_secs(1))),
+            preferred_lifetime: PreferredLifetime::preferred_until(
+                FakeInstant::from(Duration::from_secs(1))
+            )
+        }
     }); "with AddressConfig specified")]
 fn test_add_remove_ipv4_addresses(addr_config: Option<Ipv4AddrConfig<FakeInstant>>) {
     test_add_remove_ip_addresses::<Ipv4>(addr_config);
@@ -301,7 +306,13 @@ fn test_add_remove_ipv4_addresses(addr_config: Option<Ipv4AddrConfig<FakeInstant
 
 #[test_case(None; "with no AddressConfig specified")]
 #[test_case(Some(Ipv6AddrManualConfig {
-        valid_until: Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)))
+        common: CommonAddressProperties {
+            valid_until: Lifetime::Finite(FakeInstant::from(Duration::from_secs(2))),
+            preferred_lifetime: PreferredLifetime::preferred_until(
+                FakeInstant::from(Duration::from_secs(1))
+            )
+        },
+        temporary: false
     }); "with AddressConfig specified")]
 fn test_add_remove_ipv6_addresses(addr_config: Option<Ipv6AddrManualConfig<FakeInstant>>) {
     test_add_remove_ip_addresses::<Ipv6>(addr_config);

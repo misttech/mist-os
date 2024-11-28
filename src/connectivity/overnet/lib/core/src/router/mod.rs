@@ -702,9 +702,8 @@ async fn run_circuits(
                         peer_node_id_num,
                     )?;
 
-                    if let Some(CircuitState::Waiters(waiters)) = peers
-                        .circuit_clients
-                        .insert(peer_node_id_num, CircuitState::Peer(peer.clone()))
+                    if let Some(CircuitState::Waiters(waiters)) =
+                        peers.circuit_clients.insert(peer_node_id_num, CircuitState::Peer(peer))
                     {
                         for waiter in waiters {
                             let _ = waiter.send(());

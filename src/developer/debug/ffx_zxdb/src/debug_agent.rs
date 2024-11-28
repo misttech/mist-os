@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use async_net::unix::UnixListener;
 use fidl_fuchsia_debugger as fdebugger;
 use futures_util::future::FutureExt;
-use futures_util::io::{AsyncReadExt, AsyncWriteExt};
 use std::path::{Path, PathBuf};
 use std::{env, io};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::UnixListener;
 use zx_status::Status;
 
 pub enum DebuggerProxy {
@@ -43,7 +43,7 @@ impl DebugAgentSocket {
     pub async fn forward_one_connection(&self) -> Result<()> {
         // Wait for a connection on the UNIX socket (connection from zxdb).
         // Accept this first, otherwise zxdb will hang forever on connecting.
-        let (unix_conn, _) = self.unix_socket.accept().await?;
+        let (mut unix_conn, _) = self.unix_socket.accept().await?;
 
         // Create a FIDL socket to the debug_agent on the device.
         let (fidl_left, fidl_right) = fidl::Socket::create_stream();
@@ -51,14 +51,14 @@ impl DebugAgentSocket {
         let fidl_conn = fidl::AsyncSocket::from_socket(fidl_left);
 
         let (mut unix_rx, mut unix_tx) = unix_conn.split();
-        let (mut fidl_rx, mut fidl_tx) = fidl_conn.split();
+        let (mut fidl_rx, mut fidl_tx) = futures::io::AsyncReadExt::split(fidl_conn);
 
         let agent = match &self.proxy {
             DebuggerProxy::DebugAgentProxy(agent) => agent.clone(),
             DebuggerProxy::LauncherProxy(launcher) => {
                 // No choice given, launch a new DebugAgent.
                 let (client_proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fdebugger::DebugAgentMarker>()?;
+                    fidl::endpoints::create_proxy::<fdebugger::DebugAgentMarker>();
                 launcher.launch(server_end).await?.map_err(Status::from_raw)?;
                 client_proxy
             }
@@ -76,7 +76,8 @@ impl DebugAgentSocket {
                 }
                 let mut ofs = 0;
                 while ofs != n {
-                    let wrote = fidl_tx.write(&buffer[ofs..n]).await?;
+                    let wrote =
+                        futures::io::AsyncWriteExt::write(&mut fidl_tx, &buffer[ofs..n]).await?;
                     ofs += wrote;
                     if wrote == 0 {
                         return Ok(()) as Result<()>;
@@ -89,7 +90,7 @@ impl DebugAgentSocket {
         let fidl_to_unix = async {
             let mut buffer = [0; 4096];
             loop {
-                let n = fidl_rx.read(&mut buffer).await?;
+                let n = futures::io::AsyncReadExt::read(&mut fidl_rx, &mut buffer).await?;
                 if n == 0 {
                     return Ok(()) as Result<()>;
                 }

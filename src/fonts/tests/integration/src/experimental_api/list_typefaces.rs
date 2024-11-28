@@ -38,7 +38,7 @@ async fn test_list_typefaces_empty_request_gets_all(
     factory: &ProviderFactory,
 ) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = empty_list_typefaces_request();
 
@@ -55,7 +55,7 @@ async fn test_list_typefaces_no_results_after_last_page(
     factory: &ProviderFactory,
 ) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_SMALL_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = empty_list_typefaces_request();
 
@@ -75,7 +75,7 @@ async fn test_list_typefaces_no_results_after_last_page(
 async fn test_list_typefaces_paginates(factory: &ProviderFactory) -> Result<(), Error> {
     // Load all fonts to ensure results must be paginated
     let font_provider = factory.get_provider(FONTS_LARGE_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = empty_list_typefaces_request();
 
@@ -110,7 +110,7 @@ async fn test_list_typefaces_paginates(factory: &ProviderFactory) -> Result<(), 
 
 async fn test_list_typefaces_no_results_found(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = name_query("404FontNotFound");
 
@@ -128,7 +128,7 @@ async fn test_list_typefaces_no_results_found(factory: &ProviderFactory) -> Resu
 
 async fn test_list_typefaces_by_name(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = name_query("Roboto");
 
@@ -149,7 +149,7 @@ async fn test_list_typefaces_by_name(factory: &ProviderFactory) -> Result<(), Er
 
 async fn test_list_typefaces_by_alias(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = name_query("MaterialIcons");
 
@@ -168,7 +168,7 @@ async fn test_list_typefaces_by_alias(factory: &ProviderFactory) -> Result<(), E
 
 async fn test_list_typefaces_by_name_ignores_case(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = name_query("roboto");
 
@@ -189,7 +189,7 @@ async fn test_list_typefaces_by_name_ignores_case(factory: &ProviderFactory) -> 
 
 async fn test_list_typefaces_by_name_substring(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let mut request = name_query("Noto");
     request.flags = Some(fonts_exp::ListTypefacesFlags::MATCH_FAMILY_NAME_SUBSTRING);
@@ -211,7 +211,7 @@ async fn test_list_typefaces_by_name_substring(factory: &ProviderFactory) -> Res
 
 async fn test_list_typefaces_by_slant_range(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_LARGE_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = slant_query(fonts::Slant::Upright, fonts::Slant::Italic);
 
@@ -232,7 +232,7 @@ async fn test_list_typefaces_by_slant_range_is_inclusive(
     factory: &ProviderFactory,
 ) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_LARGE_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = slant_query(fonts::Slant::Italic, fonts::Slant::Italic);
 
@@ -251,7 +251,7 @@ async fn test_list_typefaces_by_slant_range_is_inclusive(
 
 async fn test_list_typefaces_by_weight_range(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = weight_query(200, 300);
 
@@ -272,7 +272,7 @@ async fn test_list_typefaces_by_weight_range_is_inclusive(
     factory: &ProviderFactory,
 ) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = weight_query(300, 300);
 
@@ -291,7 +291,7 @@ async fn test_list_typefaces_by_weight_range_is_inclusive(
 
 async fn test_list_typefaces_by_width_range(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = width_query(fonts::Width::Condensed, fonts::Width::Expanded);
 
@@ -312,7 +312,7 @@ async fn test_list_typefaces_by_width_range_is_inclusive(
     factory: &ProviderFactory,
 ) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = width_query(fonts::Width::Normal, fonts::Width::Normal);
 
@@ -331,7 +331,7 @@ async fn test_list_typefaces_by_width_range_is_inclusive(
 
 async fn test_list_typefaces_by_language(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = lang_query(vec![locale("ja")]);
 
@@ -352,7 +352,7 @@ async fn test_list_typefaces_by_language(factory: &ProviderFactory) -> Result<()
 
 async fn test_list_typefaces_by_code_point(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = code_point_query(vec!['な' as u32]);
 
@@ -373,7 +373,7 @@ async fn test_list_typefaces_by_code_point(factory: &ProviderFactory) -> Result<
 
 async fn test_list_typefaces_by_generic_family(factory: &ProviderFactory) -> Result<(), Error> {
     let font_provider = factory.get_provider(FONTS_MEDIUM_CM).await?;
-    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>()?;
+    let (client, iterator) = create_proxy::<fonts_exp::ListTypefacesIteratorMarker>();
 
     let request = generic_family_query(fonts::GenericFontFamily::SansSerif);
 

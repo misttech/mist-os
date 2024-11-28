@@ -73,7 +73,7 @@ impl FontMetricsViewAssistant {
         let label_face = load_font(PathBuf::from("/pkg/data/fonts/Roboto-Regular.ttf"))?;
         let (title, para) = Self::new_sample_pair();
         Ok(Box::new(Self {
-            app_sender: app_sender.clone(),
+            app_sender: app_sender,
             view_key,
             sample_title: title,
             sample_paragraph: para,
@@ -99,8 +99,8 @@ impl FontMetricsViewAssistant {
     }
 
     fn update_text(&mut self, title: String, para: String) {
-        self.sample_title = title.to_string();
-        self.sample_paragraph = para.to_string();
+        self.sample_title = title;
+        self.sample_paragraph = para;
         if let Some(scene_details) = self.scene_details.as_mut() {
             scene_details.scene.send_message(
                 &scene_details.sample_title.clone(),

@@ -39,7 +39,7 @@ async fn main() {
     {
         let child_ref =
             fdecl::ChildRef { name: "parent".to_string(), collection: Some("coll".to_string()) };
-        let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
         realm
             .open_exposed_dir(&child_ref, server_end)
             .await

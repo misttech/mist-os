@@ -14,7 +14,7 @@ Test suites are available for three versions of the Netstack:
 
 ## Running the tests
 
-1. `fx set core.qemu-x64 --with //third_party/gvisor_syscall_tests:tests`
+1. `fx set core.x64 --with //third_party/gvisor_syscall_tests:tests`
 1. `fx test netstack{3,2-with-fast-udp,2-with-sync-udp}-syscall-tests`
 
 ## Updating the tests

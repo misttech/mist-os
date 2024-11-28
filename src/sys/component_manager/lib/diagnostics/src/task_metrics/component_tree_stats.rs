@@ -150,7 +150,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
             }
             .boxed()
         });
-        let weak_self_for_fut = weak_self.clone();
+        let weak_self_for_fut = weak_self;
         this.node.record_lazy_child("@total", move || {
             let weak_self_clone = weak_self_for_fut.clone();
             async move {
@@ -393,8 +393,9 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
         let mut source = maybe_return!(receiver.await.ok());
         let this = maybe_return!(weak_self.upgrade());
         let mut tree_lock = this.tree.lock().await;
-        let stats =
-            tree_lock.entry(moniker.clone()).or_insert(Arc::new(Mutex::new(ComponentStats::new())));
+        let stats = tree_lock
+            .entry(moniker.clone())
+            .or_insert_with(|| Arc::new(Mutex::new(ComponentStats::new())));
         let histogram = create_cpu_histogram(&this.histograms_node, &moniker);
         let mut task_info =
             maybe_return!(source.take_component_task().and_then(|task| TaskInfo::try_from(

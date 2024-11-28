@@ -45,10 +45,10 @@ mod tests {
         // P <- C
         let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
         let parent_token = zx::Event::create();
-        let (parent_current, parent_current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (parent_required, parent_required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (parent_current, parent_current_server) = create_proxy::<CurrentLevelMarker>();
+        let (parent_required, parent_required_server) = create_proxy::<RequiredLevelMarker>();
         let (parent_element_control, parent_element_control_server) =
-            create_proxy::<ElementControlMarker>()?;
+            create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -73,15 +73,15 @@ mod tests {
                 .is_ok());
         });
         let parent_status = {
-            let (client, server) = create_proxy::<StatusMarker>()?;
+            let (client, server) = create_proxy::<StatusMarker>();
             parent_element_control.open_status_channel(server)?;
             client
         };
-        let (child_current, child_current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (child_required, child_required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (child_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
+        let (child_current, child_current_server) = create_proxy::<CurrentLevelMarker>();
+        let (child_required, child_required_server) = create_proxy::<RequiredLevelMarker>();
+        let (child_lessor, lessor_server) = create_proxy::<LessorMarker>();
         let (child_element_control, child_element_control_server) =
-            create_proxy::<ElementControlMarker>()?;
+            create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -108,7 +108,7 @@ mod tests {
                 .is_ok());
         });
         let child_status = {
-            let (client, server) = create_proxy::<StatusMarker>()?;
+            let (client, server) = create_proxy::<StatusMarker>();
             child_element_control.open_status_channel(server)?;
             client
         };
@@ -164,7 +164,7 @@ mod tests {
                 .unwrap()
                 .expect("Lease response not ok")
                 .into_proxy()
-        })?;
+        });
         executor.run_singlethreaded(async {
             assert_eq!(
                 parent_required_fut.await.unwrap(),
@@ -295,10 +295,10 @@ mod tests {
         // A <- B <- C   D
         let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
         let element_a_token = zx::Event::create();
-        let (element_a_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (element_a_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (element_a_current, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (element_a_required, required_server) = create_proxy::<RequiredLevelMarker>();
         let (element_a_element_control, element_control_server) =
-            create_proxy::<ElementControlMarker>()?;
+            create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -325,13 +325,13 @@ mod tests {
         let element_a_status = {
             let (client, server) = create_endpoints::<StatusMarker>();
             element_a_element_control.open_status_channel(server)?;
-            client.into_proxy()?
+            client.into_proxy()
         };
         let element_b_token = zx::Event::create();
-        let (element_b_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (element_b_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (element_b_current, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (element_b_required, required_server) = create_proxy::<RequiredLevelMarker>();
         let (element_b_element_control, element_control_server) =
-            create_proxy::<ElementControlMarker>()?;
+            create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -366,13 +366,13 @@ mod tests {
         let element_b_status: fpb::StatusProxy = {
             let (client, server) = create_endpoints::<StatusMarker>();
             element_b_element_control.open_status_channel(server)?;
-            client.into_proxy()?
+            client.into_proxy()
         };
-        let (element_c_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (element_c_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (element_c_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
+        let (element_c_current, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (element_c_required, required_server) = create_proxy::<RequiredLevelMarker>();
+        let (element_c_lessor, lessor_server) = create_proxy::<LessorMarker>();
         let (element_c_element_control, element_control_server) =
-            create_proxy::<ElementControlMarker>()?;
+            create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -401,12 +401,12 @@ mod tests {
         let element_c_status: fpb::StatusProxy = {
             let (client, server) = create_endpoints::<StatusMarker>();
             element_c_element_control.open_status_channel(server)?;
-            client.into_proxy()?
+            client.into_proxy()
         };
-        let (element_d_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (element_d_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (element_d_current, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (element_d_required, required_server) = create_proxy::<RequiredLevelMarker>();
         let (element_d_element_control, element_control_server) =
-            create_proxy::<ElementControlMarker>()?;
+            create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -426,7 +426,7 @@ mod tests {
         let element_d_status: fpb::StatusProxy = {
             let (client, server) = create_endpoints::<StatusMarker>();
             element_d_element_control.open_status_channel(server)?;
-            client.into_proxy()?
+            client.into_proxy()
         };
 
         // Initial required level for each element should be OFF.
@@ -470,7 +470,7 @@ mod tests {
                 .unwrap()
                 .expect("Lease response not ok")
                 .into_proxy()
-        })?;
+        });
         executor.run_singlethreaded(async {
             assert_eq!(
                 element_a_required_fut.await.unwrap(),
@@ -650,10 +650,10 @@ mod tests {
         let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
         let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
         let grandparent_token = zx::Event::create();
-        let (grandparent_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (grandparent_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (grandparent_current, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (grandparent_required, required_server) = create_proxy::<RequiredLevelMarker>();
         let (grandparent_element_control, element_control_server) =
-            create_proxy::<ElementControlMarker>()?;
+            create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -680,10 +680,10 @@ mod tests {
                 .is_ok());
         });
         let parent_token = zx::Event::create();
-        let (parent_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (parent_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (parent_current, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (parent_required, required_server) = create_proxy::<RequiredLevelMarker>();
         let (parent_element_control, element_control_server) =
-            create_proxy::<ElementControlMarker>()?;
+            create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -725,11 +725,11 @@ mod tests {
                 .await
                 .is_ok());
         });
-        let (child1_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (child1_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (child1_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
+        let (child1_current, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (child1_required, required_server) = create_proxy::<RequiredLevelMarker>();
+        let (child1_lessor, lessor_server) = create_proxy::<LessorMarker>();
         let (_child1_element_control, element_control_server) =
-            create_proxy::<ElementControlMarker>()?;
+            create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -755,11 +755,11 @@ mod tests {
                 .await
                 .is_ok());
         });
-        let (child2_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (child2_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (child2_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
+        let (child2_current, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (child2_required, required_server) = create_proxy::<RequiredLevelMarker>();
+        let (child2_lessor, lessor_server) = create_proxy::<LessorMarker>();
         let (_child2_element_control, element_control_server) =
-            create_proxy::<ElementControlMarker>()?;
+            create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -820,7 +820,7 @@ mod tests {
         // C2's required level should remain 0.
         let lease_child_1 = executor.run_singlethreaded(async {
             child1_lessor.lease(5).await.unwrap().expect("Lease response not ok").into_proxy()
-        })?;
+        });
         executor.run_singlethreaded(async {
             assert_eq!(grandparent_req_level_fut.await.unwrap(), Ok(200));
         });
@@ -904,13 +904,7 @@ mod tests {
         // C2's required level should become 3 because its dependencies are already satisfied.
         // C1's lease @ 5 is still satisfied.
         let lease_child_2 = executor.run_singlethreaded(async {
-            child2_lessor
-                .lease(3)
-                .await
-                .unwrap()
-                .expect("Lease response not ok")
-                .into_proxy()
-                .unwrap()
+            child2_lessor.lease(3).await.unwrap().expect("Lease response not ok").into_proxy()
         });
         assert!(executor.run_until_stalled(&mut grandparent_req_level_fut).is_pending());
         assert!(executor.run_until_stalled(&mut parent_req_level_fut).is_pending());
@@ -1109,9 +1103,9 @@ mod tests {
             executor.run_singlethreaded(async { build_power_broker_realm().await }).unwrap();
         let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
         let token_a = zx::Event::create();
-        let (current_a, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (required_a, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (element_control_a, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        let (current_a, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (required_a, required_server) = create_proxy::<RequiredLevelMarker>();
+        let (element_control_a, element_control_server) = create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -1137,9 +1131,9 @@ mod tests {
         });
         let token_b_assertive = zx::Event::create();
         let token_b_opportunistic = zx::Event::create();
-        let (current_b, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (required_b, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (element_control_b, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        let (current_b, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (required_b, required_server) = create_proxy::<RequiredLevelMarker>();
+        let (element_control_b, element_control_server) = create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -1181,9 +1175,9 @@ mod tests {
                 .is_ok());
         });
         let token_e_assertive = zx::Event::create();
-        let (current_e, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (required_e, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (element_control_e, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        let (current_e, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (required_e, required_server) = create_proxy::<RequiredLevelMarker>();
+        let (element_control_e, element_control_server) = create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -1209,10 +1203,10 @@ mod tests {
                 .await
                 .is_ok());
         });
-        let (current_c, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (required_c, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (element_c_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
-        let (_element_control_c, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        let (current_c, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (required_c, required_server) = create_proxy::<RequiredLevelMarker>();
+        let (element_c_lessor, lessor_server) = create_proxy::<LessorMarker>();
+        let (_element_control_c, element_control_server) = create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -1252,10 +1246,10 @@ mod tests {
                 .await
                 .is_ok());
         });
-        let (current_d, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (required_d, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (element_d_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
-        let (_element_control_d, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        let (current_d, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (required_d, required_server) = create_proxy::<RequiredLevelMarker>();
+        let (element_d_lessor, lessor_server) = create_proxy::<LessorMarker>();
+        let (_element_control_d, element_control_server) = create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -1322,7 +1316,7 @@ mod tests {
                 .unwrap()
                 .expect("Lease response not ok")
                 .into_proxy()
-        })?;
+        });
         assert!(executor.run_until_stalled(&mut required_a_fut).is_pending());
         assert!(executor.run_until_stalled(&mut required_b_fut).is_pending());
         assert!(executor.run_until_stalled(&mut required_c_fut).is_pending());
@@ -1350,7 +1344,7 @@ mod tests {
                 .unwrap()
                 .expect("Lease response not ok")
                 .into_proxy()
-        })?;
+        });
         executor.run_singlethreaded(async {
             assert_eq!(required_a_fut.await.unwrap(), Ok(BinaryPowerLevel::On.into_primitive()));
         });
@@ -1650,7 +1644,7 @@ mod tests {
 
         // Create a root element
         let earth_token = zx::Event::create();
-        let (element_control, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        let (element_control, element_control_server) = create_proxy::<ElementControlMarker>();
         assert!(topology
             .add_element(ElementSchema {
                 element_name: Some("Earth".into()),
@@ -1736,7 +1730,7 @@ mod tests {
         let realm = build_power_broker_realm().await?;
         let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
 
-        let (element_control, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        let (element_control, element_control_server) = create_proxy::<ElementControlMarker>();
         assert!(topology
             .add_element(ElementSchema {
                 element_name: Some("Fire".into()),
@@ -1751,7 +1745,7 @@ mod tests {
         // Confirm the element has been removed and Status channels have been
         // closed.
         let status_proxy = {
-            let (client, server) = create_proxy::<StatusMarker>()?;
+            let (client, server) = create_proxy::<StatusMarker>();
             element_control.open_status_channel(server)?;
             client
         };
@@ -1768,10 +1762,10 @@ mod tests {
 
         // Create a topology with only one element:
         let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-        let (current, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
-        let (element_control, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        let (current, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (_required, required_server) = create_proxy::<RequiredLevelMarker>();
+        let (_lessor, lessor_server) = create_proxy::<LessorMarker>();
+        let (element_control, element_control_server) = create_proxy::<ElementControlMarker>();
         executor.run_singlethreaded(async {
             assert!(topology
                 .add_element(ElementSchema {
@@ -1790,7 +1784,7 @@ mod tests {
                 .is_ok());
         });
         let status = {
-            let (client, server) = create_proxy::<StatusMarker>()?;
+            let (client, server) = create_proxy::<StatusMarker>();
             element_control.open_status_channel(server)?;
             client
         };

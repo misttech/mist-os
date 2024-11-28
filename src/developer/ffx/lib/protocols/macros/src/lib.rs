@@ -39,6 +39,7 @@ use syn::{Path, Token};
 pub fn ffx_protocol(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item: syn::ItemStruct = syn::parse(item.into()).expect("expected struct");
     let paths = syn::parse_macro_input!(attr with Punctuated::<Path, Token![,]>::parse_terminated);
+    #[allow(clippy::redundant_clone)] // false positive
     let name = item.ident.clone();
     let mut deps = vec![];
     for path in paths.iter() {

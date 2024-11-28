@@ -165,7 +165,6 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         F: FnOnce(IpDeviceAddr<I::Addr>) -> S,
         O: SendOptions<I> + RouteResolutionOptions<I>,
     {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         self.send_oneshot_ip_packet_with_fallible_serializer(
             bindings_ctx,
             device,
@@ -177,7 +176,6 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         )
         .map_err(|err| match err {
             SendOneShotIpPacketError::CreateAndSendError { err } => err,
-            SendOneShotIpPacketError::SerializeError(infallible) => match infallible {},
         })
     }
 }
@@ -205,9 +203,7 @@ pub enum IpSockSendError {
 
 impl From<SerializeError<Infallible>> for IpSockSendError {
     fn from(err: SerializeError<Infallible>) -> IpSockSendError {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match err {
-            SerializeError::Alloc(err) => match err {},
             SerializeError::SizeLimitExceeded => IpSockSendError::Mtu,
         }
     }
@@ -1053,6 +1049,8 @@ pub(crate) mod ipv6_source_address_selection {
         pub assigned: bool,
         /// True if the address is deprecated (i.e. not preferred).
         pub deprecated: bool,
+        /// True if the address is temporary (i.e. not permanent).
+        pub temporary: bool,
         /// The device this address belongs to.
         pub device: D,
     }
@@ -1088,7 +1086,11 @@ pub(crate) mod ipv6_source_address_selection {
         let addr = addresses
             // Tentative addresses are not considered available to the source
             // selection algorithm.
-            .filter(|SasCandidate { addr_sub: _, assigned, deprecated: _, device: _ }| *assigned)
+            .filter(
+                |SasCandidate { addr_sub: _, assigned, deprecated: _, device: _, temporary: _ }| {
+                    *assigned
+                },
+            )
             .max_by(|a, b| select_ipv6_source_address_cmp(remote_ip, outbound_device, a, b))
             .map(|SasCandidate { addr_sub, .. }| addr_sub.addr());
         match addr {
@@ -1104,10 +1106,24 @@ pub(crate) mod ipv6_source_address_selection {
         a: &SasCandidate<D>,
         b: &SasCandidate<D>,
     ) -> Ordering {
-        // TODO(https://fxbug.dev/42123500): Implement rules 4, 5.5, 6, and 7.
+        // TODO(https://fxbug.dev/42123500): Implement rules 4, 5.5, and 6.
+        let SasCandidate {
+            addr_sub: a_addr_sub,
+            assigned: a_assigned,
+            deprecated: a_deprecated,
+            temporary: a_temporary,
+            device: a_device,
+        } = a;
+        let SasCandidate {
+            addr_sub: b_addr_sub,
+            assigned: b_assigned,
+            deprecated: b_deprecated,
+            temporary: b_temporary,
+            device: b_device,
+        } = b;
 
-        let a_addr = a.addr_sub.addr().into_specified();
-        let b_addr = b.addr_sub.addr().into_specified();
+        let a_addr = a_addr_sub.addr().into_specified();
+        let b_addr = b_addr_sub.addr().into_specified();
 
         // Assertions required in order for this implementation to be valid.
 
@@ -1118,14 +1134,15 @@ pub(crate) mod ipv6_source_address_selection {
 
         // Addresses that are not considered assigned are not valid source
         // addresses.
-        debug_assert!(a.assigned);
-        debug_assert!(b.assigned);
+        debug_assert!(a_assigned);
+        debug_assert!(b_assigned);
 
         rule_1(remote_ip, a_addr, b_addr)
             .then_with(|| rule_2(remote_ip, a_addr, b_addr))
-            .then_with(|| rule_3(a.deprecated, b.deprecated))
-            .then_with(|| rule_5(outbound_device, &a.device, &b.device))
-            .then_with(|| rule_8(remote_ip, a.addr_sub, b.addr_sub))
+            .then_with(|| rule_3(*a_deprecated, *b_deprecated))
+            .then_with(|| rule_5(outbound_device, a_device, b_device))
+            .then_with(|| rule_7(*a_temporary, *b_temporary))
+            .then_with(|| rule_8(remote_ip, *a_addr_sub, *b_addr_sub))
     }
 
     // Assumes that `a` and `b` are not both equal to `remote_ip`.
@@ -1208,6 +1225,15 @@ pub(crate) mod ipv6_source_address_selection {
             }
         } else {
             Ordering::Equal
+        }
+    }
+
+    // Prefer temporary addresses following rule 7.
+    fn rule_7(a_temporary: bool, b_temporary: bool) -> Ordering {
+        match (a_temporary, b_temporary) {
+            (true, false) => Ordering::Greater,
+            (true, true) | (false, false) => Ordering::Equal,
+            (false, true) => Ordering::Less,
         }
     }
 
@@ -1297,6 +1323,12 @@ pub(crate) mod ipv6_source_address_selection {
             assert_eq!(rule_5(dev0, dev0, dev0), Ordering::Equal);
             assert_eq!(rule_5(dev0, dev2, dev2), Ordering::Equal);
 
+            // Rule 7: Prefer temporary address.
+            assert_eq!(rule_7(true, false), Ordering::Greater);
+            assert_eq!(rule_7(false, true), Ordering::Less);
+            assert_eq!(rule_7(true, true), Ordering::Equal);
+            assert_eq!(rule_7(false, false), Ordering::Equal);
+
             // Rule 8: Use longest matching prefix.
             {
                 let new_addr_entry = |addr, prefix_len| AddrSubnet::new(addr, prefix_len).unwrap();
@@ -1338,6 +1370,7 @@ pub(crate) mod ipv6_source_address_selection {
                     addr_sub: AddrSubnet::new(addr, 128).unwrap(),
                     deprecated: false,
                     assigned: true,
+                    temporary: false,
                     device,
                 };
 
@@ -1369,6 +1402,7 @@ pub(crate) mod ipv6_source_address_selection {
                 addr_sub: AddrSubnet::new(addr, 128).unwrap(),
                 deprecated,
                 assigned: true,
+                temporary: false,
                 device,
             };
 

@@ -688,8 +688,7 @@ impl Configurator for DefaultConfigurator {
     async fn process_new_dai(&mut self, mut interface: DaiInterface) -> Result<(), Error> {
         let _ = interface.connect().context("Couldn't connect to DAI")?;
         let (client, request_stream) =
-            fidl::endpoints::create_request_stream::<StreamConfigMarker>()
-                .expect("Error creating stream config endpoint");
+            fidl::endpoints::create_request_stream::<StreamConfigMarker>();
         let dai_properties = interface.get_properties().await?;
         let mut inner = self.inner.lock().await;
         // Use an empty string if no manufacturer reported.
@@ -1030,7 +1029,7 @@ mod tests {
         };
         let ring_buffer_format = Format { pcm_format: Some(pcm_format), ..Default::default() };
         let (_client, server) = fidl::endpoints::create_endpoints::<RingBufferMarker>();
-        let proxy = stream_config.client.take().expect("Must have a client").into_proxy()?;
+        let proxy = stream_config.client.take().expect("Must have a client").into_proxy();
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
         proxy.create_ring_buffer(&ring_buffer_format, server)?;
 
@@ -1089,7 +1088,7 @@ mod tests {
         };
         let ring_buffer_format = Format { pcm_format: Some(pcm_format), ..Default::default() };
         let (_client, server) = fidl::endpoints::create_endpoints::<RingBufferMarker>();
-        let proxy = stream_config.client.take().expect("Must have a client").into_proxy()?;
+        let proxy = stream_config.client.take().expect("Must have a client").into_proxy();
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
         proxy.create_ring_buffer(&ring_buffer_format, server)?;
 
@@ -1305,8 +1304,7 @@ mod tests {
     {
         let exec = fasync::TestExecutor::new_with_fake_time();
         let (client, request_stream) =
-            fidl::endpoints::create_request_stream::<StreamConfigMarker>()
-                .expect("Error creating stream config endpoint");
+            fidl::endpoints::create_request_stream::<StreamConfigMarker>();
         let control_handle = request_stream.control_handle().clone();
         let mut stream_config_state: StreamConfigInner = Default::default();
         stream_config_state.dai_state = None;
@@ -1363,7 +1361,7 @@ mod tests {
         mut stream_config: StreamConfig,
     ) {
         let client = stream_config.client.take().expect("Must have client");
-        let proxy = client.into_proxy().expect("Client should be available");
+        let proxy = client.into_proxy();
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
         let properties = match exec.run_until_stalled(&mut proxy.get_properties()) {
             Poll::Ready(Ok(v)) => v,
@@ -1392,7 +1390,7 @@ mod tests {
         mut stream_config: StreamConfig,
     ) {
         let client = stream_config.client.take().expect("Must have client");
-        let proxy = client.into_proxy().expect("Client should be available");
+        let proxy = client.into_proxy();
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
         let gain_state = match exec.run_until_stalled(&mut proxy.watch_gain_state()) {
             Poll::Ready(Ok(v)) => v,
@@ -1410,7 +1408,7 @@ mod tests {
         mut stream_config: StreamConfig,
     ) {
         let client = stream_config.client.take().expect("Must have client");
-        let proxy = client.into_proxy().expect("Client should be available");
+        let proxy = client.into_proxy();
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
         let plug_state = match exec.run_until_stalled(&mut proxy.watch_plug_state()) {
             Poll::Ready(Ok(v)) => v,
@@ -1528,7 +1526,7 @@ mod tests {
                 }
                 CodecRequest::SignalProcessingConnect { protocol, control_handle } => {
                     if with_signal {
-                        self.signal_stream = Some(protocol.into_stream()?);
+                        self.signal_stream = Some(protocol.into_stream());
                     } else {
                         control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
                     }
@@ -1605,11 +1603,9 @@ mod tests {
         mut exec: fasync::TestExecutor,
         mut stream_config: StreamConfig,
     ) {
-        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
-            .expect("Error creating endpoint");
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let (_signal_client, signal_stream) =
-            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
-                .expect("Error creating endpoint");
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>();
         let codec = TestCodec {
             codec_stream: codec_stream,
             signal_stream: Some(signal_stream),
@@ -1619,11 +1615,8 @@ mod tests {
         let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
         let stream_config_inner = stream_config.inner.clone();
         let _codec_plug_detect_task = fasync::Task::spawn(async move {
-            DefaultConfigurator::watch_plug_detect(
-                codec_client.into_proxy().expect("Must have proxy"),
-                stream_config_inner,
-            )
-            .await;
+            DefaultConfigurator::watch_plug_detect(codec_client.into_proxy(), stream_config_inner)
+                .await;
         });
 
         {
@@ -1636,7 +1629,7 @@ mod tests {
         }
 
         let stream_config_client = stream_config.client.take().expect("Must have client");
-        let proxy = stream_config_client.into_proxy().expect("Client should be available");
+        let proxy = stream_config_client.into_proxy();
         let _stream_config_task = fasync::Task::spawn(stream_config.process_stream_requests());
 
         // First get plugged with time 0 since there is no plug state before this first watch.
@@ -1675,11 +1668,9 @@ mod tests {
         let mut configurator = DefaultConfigurator::new(config)?;
         for _ in 0..number_of_codecs {
             let (codec_client, codec_stream) =
-                fidl::endpoints::create_request_stream::<CodecMarker>()
-                    .expect("Error creating endpoint");
+                fidl::endpoints::create_request_stream::<CodecMarker>();
             let (_signal_client, signal_stream) =
-                fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
-                    .expect("Error creating endpoint");
+                fidl::endpoints::create_request_stream::<SignalProcessingMarker>();
             let codec = TestCodec {
                 codec_stream: codec_stream,
                 signal_stream: Some(signal_stream),
@@ -1687,7 +1678,7 @@ mod tests {
                 is_input: false,
             };
             let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
-            let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+            let codec_proxy = codec_client.into_proxy();
             let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
             configurator.process_new_codec(codec_interface).await?;
         }
@@ -1745,11 +1736,9 @@ mod tests {
         let mut configurator = DefaultConfigurator::new(config)?;
 
         // Add output device.
-        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
-            .expect("Error creating endpoint");
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let (_signal_client, signal_stream) =
-            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
-                .expect("Error creating endpoint");
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>();
         let codec = TestCodec {
             codec_stream: codec_stream,
             signal_stream: Some(signal_stream),
@@ -1757,16 +1746,14 @@ mod tests {
             is_input: false, // Make the device to be of type output.
         };
         let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
-        let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+        let codec_proxy = codec_client.into_proxy();
         let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
         configurator.process_new_codec(codec_interface).await?;
 
         // Add input device 1.
-        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
-            .expect("Error creating endpoint");
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let (_signal_client, signal_stream) =
-            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
-                .expect("Error creating endpoint");
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>();
         let codec = TestCodec {
             codec_stream: codec_stream,
             signal_stream: Some(signal_stream),
@@ -1774,16 +1761,14 @@ mod tests {
             is_input: true, // Make the device to be of type input.
         };
         let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
-        let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+        let codec_proxy = codec_client.into_proxy();
         let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
         configurator.process_new_codec(codec_interface).await?;
 
         // Add input device 2.
-        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
-            .expect("Error creating endpoint");
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let (_signal_client, signal_stream) =
-            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
-                .expect("Error creating endpoint");
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>();
         let codec = TestCodec {
             codec_stream: codec_stream,
             signal_stream: Some(signal_stream),
@@ -1791,7 +1776,7 @@ mod tests {
             is_input: true, // Make the device to be of type input.
         };
         let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
-        let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+        let codec_proxy = codec_client.into_proxy();
         let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
         configurator.process_new_codec(codec_interface).await?;
 
@@ -1822,11 +1807,9 @@ mod tests {
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
         let mut configurator = DefaultConfigurator::new(config)?;
-        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
-            .expect("Error creating endpoint");
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let (_signal_client, signal_stream) =
-            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
-                .expect("Error creating endpoint");
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>();
         let codec = TestCodec {
             codec_stream: codec_stream,
             signal_stream: Some(signal_stream),
@@ -1834,7 +1817,7 @@ mod tests {
             is_input: false,
         };
         let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
-        let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+        let codec_proxy = codec_client.into_proxy();
         let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
         let proxy = codec_interface.get_proxy()?.clone();
         configurator.process_new_codec(codec_interface).await?;
@@ -1917,17 +1900,13 @@ mod tests {
         mut exec: fasync::TestExecutor,
         mut stream_config: StreamConfig,
     ) {
-        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
-            .expect("Error creating endpoint");
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let codec = TestCodecBad { codec_stream: codec_stream };
         let _codec_task = fasync::Task::spawn(codec.process_codec_requests());
         let stream_config_inner = stream_config.inner.clone();
         let _codec_plug_detect_task = fasync::Task::spawn(async move {
-            DefaultConfigurator::watch_plug_detect(
-                codec_client.into_proxy().expect("Must have proxy"),
-                stream_config_inner,
-            )
-            .await;
+            DefaultConfigurator::watch_plug_detect(codec_client.into_proxy(), stream_config_inner)
+                .await;
         });
 
         {
@@ -1940,7 +1919,7 @@ mod tests {
         }
 
         let stream_config_client = stream_config.client.take().expect("Must have client");
-        let proxy = stream_config_client.into_proxy().expect("Client should be available");
+        let proxy = stream_config_client.into_proxy();
         let _stream_config_task = fasync::Task::spawn(stream_config.process_stream_requests());
 
         let plug_state = match exec.run_until_stalled(&mut proxy.watch_plug_state()) {

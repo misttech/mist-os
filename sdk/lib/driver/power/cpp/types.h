@@ -72,7 +72,6 @@ enum class RequirementType : uint32_t {
 // by the power support library.
 enum class SagElement : uint32_t {
   kExecutionState = 1,
-  kWakeHandling = 3,
   kApplicationActivity = 4,
 };
 

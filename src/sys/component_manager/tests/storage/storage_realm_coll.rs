@@ -33,7 +33,7 @@ async fn main() {
     // Start child
     let child_ref =
         fdecl::ChildRef { name: "storage_user".to_string(), collection: Some("coll".to_string()) };
-    let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
 
     realm.open_exposed_dir(&child_ref, server_end).await.unwrap().unwrap();
     let _ = fuchsia_component::client::connect_to_protocol_at_dir_root::<fcomponent::BinderMarker>(
@@ -64,7 +64,7 @@ async fn main() {
     // Ensure that memfs does not have a directory for the dynamic child
     let realm_query =
         fuchsia_component::client::connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
-    let (exposed_dir, server_end) = create_proxy().unwrap();
+    let (exposed_dir, server_end) = create_proxy();
     realm_query
         .open(
             "./memfs",

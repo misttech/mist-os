@@ -141,5 +141,6 @@ source_set("parent_device_dfv2") {
     "//src/graphics/drivers/msd-arm-mali:config",
     "//src/graphics/magma/lib/magma/platform:interrupt_header",
     "//src/graphics/magma/lib/magma/platform:mmio_header",
+    "//src/graphics/magma/lib/magma/platform/zircon:device_dfv2",
   ]
 }

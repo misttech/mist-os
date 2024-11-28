@@ -143,9 +143,9 @@ class DataFrameTest : public SimTest {
   void ClientTx(common::MacAddr dstAddr, common::MacAddr srcAddr, std::vector<uint8_t>& ethFrame);
 
   // Fullmac event handlers
-  void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind);
+  void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthIndRequest* ind);
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp);
-  void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
+  void OnDisassocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind);
   void OnEapolConf(const wlan_fullmac_wire::WlanFullmacEapolConfirm* resp);
   void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
   void OnEapolInd(const wlan_fullmac_wire::WlanFullmacEapolIndication* ind);
@@ -237,7 +237,7 @@ class DataFrameTest : public SimTest {
 
 void DataFrameInterface::DeauthInd(DeauthIndRequestView request,
                                    DeauthIndCompleter::Sync& completer) {
-  test_->OnDeauthInd(&request->ind);
+  test_->OnDeauthInd(request);
   completer.Reply();
 }
 void DataFrameInterface::ConnectConf(ConnectConfRequestView request,
@@ -247,7 +247,8 @@ void DataFrameInterface::ConnectConf(ConnectConfRequestView request,
 }
 void DataFrameInterface::DisassocInd(DisassocIndRequestView request,
                                      DisassocIndCompleter::Sync& completer) {
-  test_->OnDisassocInd(&request->ind);
+  auto disassoc_ind = fidl::ToNatural(*request);
+  test_->OnDisassocInd(&disassoc_ind);
   completer.Reply();
 }
 void DataFrameInterface::EapolConf(EapolConfRequestView request,
@@ -293,15 +294,15 @@ void DataFrameTest::Finish() {
   aps_.clear();
 }
 
-void DataFrameTest::OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind) {
+void DataFrameTest::OnDeauthInd(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthIndRequest* ind) {
   if (!testing_driver_triggered_deauth_) {
     // This function is only used driver initiated deauth testing.
     return;
   }
 
   assoc_context_.deauth_ind_count++;
-  assoc_context_.last_deauth_reason_code = ind->reason_code;
-  assoc_context_.locally_initiated = ind->locally_initiated;
+  assoc_context_.last_deauth_reason_code = ind->reason_code();
+  assoc_context_.locally_initiated = ind->locally_initiated();
   assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   // Do a re-association right after deauth.
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(200));
@@ -351,7 +352,8 @@ void DataFrameTest::OnSignalReport(
   }
 }
 
-void DataFrameTest::OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind) {}
+void DataFrameTest::OnDisassocInd(
+    const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind) {}
 
 void DataFrameTest::StartConnect() {
   // Send connect request

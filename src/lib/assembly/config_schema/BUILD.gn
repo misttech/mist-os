@@ -15,7 +15,6 @@ generated_file("git_info_json") {
   outputs = [ "${target_gen_dir}/icu_git_info.json" ]
   contents = icu_git_info
   output_conversion = "json"
-  deps = [ icu_config_validation_target ]
 }
 
 rustc_library("config_schema") {
@@ -33,10 +32,10 @@ rustc_library("config_schema") {
 
   inputs = [ _git_info ]
   deps = [
+    "//src/lib/assembly/constants",
     "//src/lib/assembly/file_relative_path",
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/package_utils",
-    "//src/lib/assembly/util",
     "//src/lib/diagnostics/log/types",
     "//src/lib/fuchsia-url",
     "//src/lib/include_str_from_working_dir",
@@ -51,7 +50,10 @@ rustc_library("config_schema") {
     "//third_party/rust_crates:uuid",
   ]
 
-  test_deps = [ "//third_party/rust_crates:serde_json5" ]
+  test_deps = [
+    "//src/lib/assembly/util",
+    "//third_party/rust_crates:serde_json5",
+  ]
 
   non_rust_deps = [ ":git_info_json" ]
 

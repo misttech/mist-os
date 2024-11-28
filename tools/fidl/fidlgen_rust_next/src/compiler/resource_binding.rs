@@ -18,7 +18,7 @@ impl Default for ResourceBindings {
             handle: ResourceBinding {
                 wire_path: "::fidl_next::WireHandle".to_string(),
                 optional_wire_path: "::fidl_next::WireOptionalHandle".to_string(),
-                natural_path: "::fidl_next::Handle".to_string(),
+                natural_path: "::fidl_next::zx::Handle".to_string(),
             },
         }
     }

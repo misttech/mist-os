@@ -34,7 +34,6 @@ fuchsia_cc_driver("root-driver") {
   sources = [ "root-driver.cc" ]
   deps = [
     ":fuchsia.runtime.test_cpp",
-    ":fuchsia.runtime.test_cpp",
     ":root_bind",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
@@ -42,6 +41,7 @@ fuchsia_cc_driver("root-driver") {
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/storage/lib/vfs/cpp",
@@ -67,7 +67,6 @@ fuchsia_cc_driver("leaf-driver") {
   output_name = "runtime-protocol-leaf"
   sources = [ "leaf-driver.cc" ]
   deps = [
-    ":fuchsia.runtime.test_cpp",
     ":fuchsia.runtime.test_cpp",
     ":runtime-protocol-leaf-bind",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",

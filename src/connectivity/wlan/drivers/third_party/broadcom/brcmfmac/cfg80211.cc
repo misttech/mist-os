@@ -621,7 +621,7 @@ zx_status_t brcmf_cfg80211_add_iface(brcmf_pub* drvr, const char* name, struct v
       brcmf_cfg80211_update_proto_addr_mode(wdev);
       ndev = wdev->netdev;
       wdev->iftype = req->role();
-      ndev->mlme_channel = std::move(req->mlme_channel());
+      ndev->sme_channel = std::move(req->mlme_channel());
 
       break;
     case fuchsia_wlan_common_wire::WlanMacRole::kClient: {
@@ -655,7 +655,7 @@ zx_status_t brcmf_cfg80211_add_iface(brcmf_pub* drvr, const char* name, struct v
       }
       wdev = &drvr->iflist[bsscfgidx]->vif->wdev;
       wdev->iftype = req->role();
-      ndev->mlme_channel = std::move(req->mlme_channel());
+      ndev->sme_channel = std::move(req->mlme_channel());
       ndev->needs_free_net_device = false;
 
       // Use input mac_addr if it's provided. Otherwise, fallback to the bootloader
@@ -1316,12 +1316,14 @@ static void brcmf_notify_disassoc(struct net_device* ndev, zx_status_t status) {
     return;
   }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacDisassocConfirm resp = {};
-  resp.status = status;
+  auto resp = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest::Builder(*arena)
+                  .status(status)
+                  .Build();
+
   BRCMF_IFDBG(WLANIF, ndev, "Sending disassoc confirm to SME. status: %" PRIu32 "", status);
   auto result = ndev->if_proto.buffer(*arena)->DisassocConf(resp);
   if (!result.ok()) {
-    BRCMF_ERR("Failed to send disassoc msg result.status: %s", result.status_string());
+    BRCMF_ERR("Failed to send disassoc conf result.status: %s", result.status_string());
   }
 }
 
@@ -1335,23 +1337,26 @@ static void brcmf_notify_deauth_ind(net_device* ndev, const uint8_t mac_addr[ETH
     return;
   }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacDeauthIndication ind = {};
-
   BRCMF_IFDBG(WLANIF, ndev, "Link Down: Sending deauth ind to SME. reason: %d",
               fidl::ToUnderlying(reason_code));
+  fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  memcpy(peer_sta_address.data(), mac_addr, ETH_ALEN);
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC "", FMT_MAC_ARGS(mac_addr));
 #endif /* !defined(NDEBUG) */
-
-  memcpy(ind.peer_sta_address.data(), mac_addr, ETH_ALEN);
-  ind.reason_code = static_cast<fuchsia_wlan_ieee80211_wire::ReasonCode>(reason_code);
-  ind.locally_initiated = locally_initiated;
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
     return;
   }
-  auto result = ndev->if_proto.buffer(*arena)->DeauthInd(ind);
+  auto deauth_ind_builder =
+      fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDeauthIndRequest::Builder(*arena)
+          .peer_sta_address(peer_sta_address)
+          .reason_code(static_cast<fuchsia_wlan_ieee80211_wire::ReasonCode>(reason_code))
+          .locally_initiated(locally_initiated)
+          .Build();
+
+  auto result = ndev->if_proto.buffer(*arena)->DeauthInd(deauth_ind_builder);
   if (!result.ok()) {
     BRCMF_ERR("Failed to send deauth ind msg status: %s", result.status_string());
     return;
@@ -1368,23 +1373,26 @@ static void brcmf_notify_disassoc_ind(net_device* ndev, const uint8_t mac_addr[E
     return;
   }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacDisassocIndication ind = {};
-
   BRCMF_IFDBG(WLANIF, ndev, "Link Down: Sending disassoc ind to SME. reason: %d",
               fidl::ToUnderlying(reason_code));
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC ", ", FMT_MAC_ARGS(mac_addr));
 #endif /* !defined(NDEBUG) */
 
-  memcpy(ind.peer_sta_address.data(), mac_addr, ETH_ALEN);
-  ind.reason_code = static_cast<fuchsia_wlan_ieee80211_wire::ReasonCode>(reason_code);
-  ind.locally_initiated = locally_initiated;
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
     return;
   }
-  auto result = ndev->if_proto.buffer(*arena)->DisassocInd(ind);
+  auto builder = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDisassocIndRequest::Builder(*arena);
+
+  fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  memcpy(peer_sta_address.data(), mac_addr, ETH_ALEN);
+  auto disassoc_ind = builder.peer_sta_address(peer_sta_address)
+                          .reason_code(reason_code)
+                          .locally_initiated(locally_initiated)
+                          .Build();
+  auto result = ndev->if_proto.buffer(*arena)->DisassocInd(disassoc_ind);
   if (!result.ok()) {
     BRCMF_ERR("Failed to send disassoc ind result.status: %s", result.status_string());
     return;
@@ -3872,8 +3880,8 @@ static zx_status_t brcmf_notify_tdls_peer_event(struct brcmf_if* ifp,
 
 // Country is initialized to US by default. This should be retrieved from location services
 // when available.
-zx_status_t brcmf_if_start(net_device* ndev, zx_handle_t* out_mlme_channel) {
-  if (!ndev->mlme_channel.is_valid()) {
+zx_status_t brcmf_if_start(net_device* ndev, zx_handle_t* out_sme_channel) {
+  if (!ndev->sme_channel.is_valid()) {
     return ZX_ERR_ALREADY_BOUND;
   }
 
@@ -3881,8 +3889,8 @@ zx_status_t brcmf_if_start(net_device* ndev, zx_handle_t* out_mlme_channel) {
   brcmf_netdev_open(ndev);
   ndev->is_up = true;
 
-  ZX_DEBUG_ASSERT(out_mlme_channel != nullptr);
-  *out_mlme_channel = ndev->mlme_channel.release();
+  ZX_DEBUG_ASSERT(out_sme_channel != nullptr);
+  *out_sme_channel = ndev->sme_channel.release();
   return ZX_OK;
 }
 
@@ -4265,21 +4273,6 @@ void brcmf_if_disassoc_req(net_device* ndev,
   }  // else notification will happen asynchronously
 }
 
-void brcmf_if_reset_req(net_device* ndev,
-                        const fuchsia_wlan_fullmac_wire::WlanFullmacImplResetRequest* req) {
-  BRCMF_IFDBG(WLANIF, ndev, "Reset request from SME.");
-  if (!req->has_sta_address() || !req->has_set_default_mib()) {
-    BRCMF_ERR("Reset req does not contain required fields sta addr: %d default mib: %d",
-              req->has_sta_address(), req->has_set_default_mib());
-    return;
-  }
-#if !defined(NDEBUG)
-  BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(req->sta_address().data()));
-#endif /* !defined(NDEBUG) */
-
-  BRCMF_ERR("Unimplemented");
-}
-
 static void brcmf_if_start_conf(net_device* ndev,
                                 fuchsia_wlan_fullmac_wire::WlanStartResult result) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
@@ -4426,13 +4419,6 @@ std::vector<zx_status_t> brcmf_if_set_keys_req(
     statuslist.emplace_back(result);
   }
   return statuslist;
-}
-
-void brcmf_if_del_keys_req(net_device* ndev,
-                           const fuchsia_wlan_fullmac_wire::WlanFullmacImplDelKeysRequest* req) {
-  BRCMF_IFDBG(WLANIF, ndev, "Del keys request from SME. num_keys: %zu", req->keylist().count());
-
-  BRCMF_ERR("Unimplemented");
 }
 
 static void brcmf_send_eapol_confirm(
@@ -4742,10 +4728,10 @@ static void brcmf_dump_80211_vht_caps(fuchsia_wlan_ieee80211_wire::VhtCapabiliti
 static void brcmf_dump_if_band_cap(fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap) {
   char band_str[32];
   switch (band_cap->band) {
-    case fuchsia_wlan_common::WlanBand::kTwoGhz:
+    case fuchsia_wlan_ieee80211::WlanBand::kTwoGhz:
       sprintf(band_str, "2GHz");
       break;
-    case fuchsia_wlan_common::WlanBand::kFiveGhz:
+    case fuchsia_wlan_ieee80211::WlanBand::kFiveGhz:
       sprintf(band_str, "5GHz");
       break;
     default:
@@ -4785,19 +4771,35 @@ static void brcmf_dump_if_band_cap(fuchsia_wlan_fullmac_wire::WlanFullmacBandCap
   }
 }
 
-static void brcmf_dump_if_query_info(fuchsia_wlan_fullmac_wire::WlanFullmacQueryInfo* info) {
+static void brcmf_dump_if_query_info(
+    fuchsia_wlan_fullmac_wire::WlanFullmacImplQueryResponse* info) {
   BRCMF_DBG_UNFILTERED(" Device capabilities as reported to wlanif:");
-  BRCMF_DBG_UNFILTERED("   sta_addr: " FMT_MAC, FMT_MAC_ARGS(info->sta_addr.data()));
-  BRCMF_DBG_UNFILTERED("   role(s): %s%s%s",
-                       info->role == fuchsia_wlan_common::WlanMacRole::kClient ? "client " : "",
-                       info->role == fuchsia_wlan_common::WlanMacRole::kAp ? "ap " : "",
-                       info->role == fuchsia_wlan_common::WlanMacRole::kMesh ? "mesh " : "");
-  for (unsigned i = 0; i < info->band_cap_count; i++) {
-    brcmf_dump_if_band_cap(&info->band_cap_list[i]);
+  if (info->has_sta_addr()) {
+    BRCMF_DBG_UNFILTERED("   sta_addr: " FMT_MAC, FMT_MAC_ARGS(info->sta_addr().data()));
+  } else {
+    BRCMF_DBG_UNFILTERED("   missing sta_addr");
+  }
+
+  if (info->has_role()) {
+    BRCMF_DBG_UNFILTERED("   role(s): %s%s%s",
+                         info->role() == fuchsia_wlan_common::WlanMacRole::kClient ? "client " : "",
+                         info->role() == fuchsia_wlan_common::WlanMacRole::kAp ? "ap " : "",
+                         info->role() == fuchsia_wlan_common::WlanMacRole::kMesh ? "mesh " : "");
+  } else {
+    BRCMF_DBG_UNFILTERED("    missing role");
+  }
+
+  if (info->has_band_caps()) {
+    for (unsigned i = 0; i < info->band_caps().count(); i++) {
+      brcmf_dump_if_band_cap(&info->band_caps()[i]);
+    }
+  } else {
+    BRCMF_DBG_UNFILTERED("    missing band caps");
   }
 }
 
-void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQueryInfo* info,
+void brcmf_if_query(net_device* ndev,
+                    fuchsia_wlan_fullmac_wire::WlanFullmacImplQueryResponse* out_info,
                     fdf::Arena& arena) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct wireless_dev* wdev = ndev_to_wdev(ndev);
@@ -4815,23 +4817,25 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
 
   BRCMF_IFDBG(WLANIF, ndev, "Query request received from SME.");
 
-  memset(info, 0, sizeof(*info));
+  auto builder = fuchsia_wlan_fullmac_wire::WlanFullmacImplQueryResponse::Builder(arena);
 
   // mac_addr
-  memcpy(info->sta_addr.data(), ifp->mac_addr, ETH_ALEN);
+  fidl::Array<uint8_t, ETH_ALEN> address;
+  memcpy(address.data(), ifp->mac_addr, ETH_ALEN);
+  builder.sta_addr(address);
 
   // role
   switch (wdev->iftype) {
     case fuchsia_wlan_common_wire::WlanMacRole::kClient: {
-      info->role = fuchsia_wlan_common::WlanMacRole::kClient;
+      builder.role(fuchsia_wlan_common::WlanMacRole::kClient);
       break;
     }
     case fuchsia_wlan_common_wire::WlanMacRole::kAp: {
-      info->role = fuchsia_wlan_common::WlanMacRole::kAp;
+      builder.role(fuchsia_wlan_common::WlanMacRole::kAp);
       break;
     }
     case fuchsia_wlan_common_wire::WlanMacRole::kMesh: {
-      info->role = fuchsia_wlan_common::WlanMacRole::kMesh;
+      builder.role(fuchsia_wlan_common::WlanMacRole::kMesh);
       break;
     }
     default:
@@ -4850,16 +4854,13 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
   fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap_2ghz = nullptr;
   fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap_5ghz = nullptr;
 
-  /* first entry in bandlist is number of bands */
-  info->band_cap_count = bandlist[0];
-  for (unsigned i = 1; i <= info->band_cap_count && i < std::size(bandlist); i++) {
-    if (i > std::size(info->band_cap_list)) {
-      BRCMF_ERR("insufficient space in query response for all bands, truncating");
-      continue;
-    }
-    fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &info->band_cap_list[i - 1];
+  // Firmware puts the number of bands in the first entry in |bandlist|.
+  builder.band_caps(
+      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability>(arena, bandlist[0]));
+  for (unsigned i = 1; i <= bandlist[0] && i < std::size(bandlist); i++) {
+    fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &builder.band_caps()[i - 1];
     if (bandlist[i] == WLC_BAND_2G) {
-      band_cap->band = fuchsia_wlan_common::WlanBand::kTwoGhz;
+      band_cap->band = fuchsia_wlan_ieee80211::WlanBand::kTwoGhz;
 
       constexpr uint8_t kNumSupported2GRates =
           std::min<size_t>(fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES, wl_g_rates_size);
@@ -4872,7 +4873,7 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
              kNumSupported2GRates * sizeof(band_cap->basic_rates[0]));
       band_cap_2ghz = band_cap;
     } else if (bandlist[i] == WLC_BAND_5G) {
-      band_cap->band = fuchsia_wlan_common::WlanBand::kFiveGhz;
+      band_cap->band = fuchsia_wlan_ieee80211::WlanBand::kFiveGhz;
 
       constexpr uint8_t kNumSupported5GRates =
           std::min<size_t>(fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES, wl_a_rates_size);
@@ -5008,8 +5009,10 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
     brcmf_update_vht_cap(ifp, band_cap_5ghz, bw_cap, nchain, ldpc_cap, max_ampdu_len_exp);
   }
 
+  *out_info = builder.Build();
+
   if (BRCMF_IS_ON(QUERY)) {
-    brcmf_dump_if_query_info(info);
+    brcmf_dump_if_query_info(out_info);
   }
 
 fail_pbuf:
@@ -5745,14 +5748,20 @@ fail:
 }
 
 zx_status_t brcmf_if_sae_handshake_resp(
-    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacSaeHandshakeResp* resp) {
+    net_device* ndev,
+    const fuchsia_wlan_fullmac_wire::WlanFullmacImplSaeHandshakeRespRequest* resp) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   bcme_status_t fw_err = BCME_OK;
   zx_status_t status = ZX_OK;
 
-  if (!resp) {
-    BRCMF_ERR("Invalid arguments, resp is nullptr.");
+  if (!resp || !resp->has_peer_sta_address() || !resp->has_status_code()) {
+    if (!resp) {
+      BRCMF_ERR("Invalid arguments, resp is nullptr");
+    } else {
+      BRCMF_ERR("Invalid arguments, has_peer_sta_address: %u has_status_code: %u.",
+                resp->has_peer_sta_address(), resp->has_status_code());
+    }
     if (brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
       brcmf_bss_roam_done(ifp, brcmf_connect_status_t::AUTHENTICATION_FAILED,
                           fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedExternalReason);
@@ -5763,12 +5772,12 @@ zx_status_t brcmf_if_sae_handshake_resp(
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (memcmp(resp->peer_sta_address.data(), ifp->connect_req.selected_bss()->bssid().data(),
+  if (memcmp(resp->peer_sta_address().data(), ifp->connect_req.selected_bss()->bssid().data(),
              ETH_ALEN)) {
     BRCMF_ERR("Auth MAC != Join MAC");
 #if !defined(NDEBUG)
     const uint8_t* old_mac = ifp->connect_req.selected_bss()->bssid().data();
-    const uint8_t* new_mac = resp->peer_sta_address.data();
+    const uint8_t* new_mac = resp->peer_sta_address().data();
     BRCMF_DBG(CONN, " auth mac: " FMT_MAC ", join mac: " FMT_MAC, FMT_MAC_ARGS(new_mac),
               FMT_MAC_ARGS(old_mac));
 #endif /* !defined(NDEBUG) */
@@ -6370,23 +6379,6 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacAssocInd assoc_ind_params = {};
-  memcpy(assoc_ind_params.peer_sta_address.data(), e->addr, ETH_ALEN);
-
-  // Unfortunately, we have to ask the firmware to provide the associated station's
-  // listen interval.
-  struct brcmf_sta_info_le sta_info;
-  uint8_t mac[ETH_ALEN];
-  memcpy(mac, e->addr, ETH_ALEN);
-  brcmf_cfg80211_get_station(ndev, mac, &sta_info);
-  // convert from ms to beacon periods
-  assoc_ind_params.listen_interval =
-      sta_info.listen_interval_inms / ifp->vif->profile.beacon_period;
-
-  // Extract the SSID from the IEs
-  assoc_ind_params.ssid.len = ssid_ie->len;
-  memcpy(assoc_ind_params.ssid.data.data(), ssid_ie->data, ssid_ie->len);
-
   // Create arena before populating vectors
   zx::result<fdf::Arena> arena_result = fdf::Arena::Create(0, 0);
   if (arena_result.is_error()) {
@@ -6394,22 +6386,41 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
     return ZX_ERR_INTERNAL;
   }
   fdf::Arena& arena = arena_result.value();
+  fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  memcpy(peer_sta_address.data(), e->addr, ETH_ALEN);
+
+  // Unfortunately, we have to ask the firmware to provide the associated station's
+  // listen interval.
+  struct brcmf_sta_info_le sta_info;
+  std::vector<uint8_t> ssid{};
+  if (brcmf_cfg80211_get_station(ndev, peer_sta_address.data(), &sta_info) == ZX_OK) {
+    // Extract the SSID from the IEs
+    ssid.resize(ssid_ie->len);
+    memcpy(ssid.data(), ssid_ie->data, ssid_ie->len);
+  }
 
   // Extract the RSN information from the IEs
+  std::vector<uint8_t> rsne(fuchsia_wlan_ieee80211_wire::kWlanIeBodyMaxLen, 0);
   if (rsn_ie != nullptr) {
     size_t rsn_len = rsn_ie->len + TLV_HDR_LEN;
     const uint8_t* rsn_ie_ptr = reinterpret_cast<const uint8_t*>(rsn_ie);
     cpp20::span<const uint8_t> rsne_span = {rsn_ie_ptr, rsn_len};
-    assoc_ind_params.rsne = fidl::VectorView<uint8_t>(arena, rsne_span.begin(), rsne_span.end());
+    rsne.assign(rsne_span.begin(), rsne_span.end());
   }
+  auto assoc_ind_builder =
+      fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcAssocIndRequest::Builder(arena)
+          .peer_sta_address(peer_sta_address)
+          .listen_interval(sta_info.listen_interval_inms / ifp->vif->profile.beacon_period)
+          .ssid(ssid)
+          .rsne(rsne)
+          .Build();
 
   BRCMF_IFDBG(WLANIF, ndev, "Sending assoc indication to SME.");
 #if !defined(NDEBUG)
-  BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC "",
-              FMT_MAC_ARGS(assoc_ind_params.peer_sta_address));
+  BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC "", FMT_MAC_ARGS(peer_sta_address.data()));
 #endif /* !defined(NDEBUG) */
 
-  auto result = ndev->if_proto.buffer(arena)->AssocInd(assoc_ind_params);
+  auto result = ndev->if_proto.buffer(arena)->AssocInd(assoc_ind_builder);
   if (!result.ok()) {
     BRCMF_ERR("Failed to send assoc ind  result.status: %s", result.status_string());
     return ZX_ERR_INTERNAL;
@@ -6640,40 +6651,26 @@ static zx_status_t brcmf_process_auth_ind_event(struct brcmf_if* ifp,
       BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping auth ind callback");
       return ZX_OK;
     }
-    fuchsia_wlan_fullmac_wire::WlanFullmacAuthInd auth_ind_params = {};
-    const char* auth_type;
-
-    memcpy(auth_ind_params.peer_sta_address.data(), e->addr, ETH_ALEN);
-    // We always authenticate as an open system for WPA
-    auth_ind_params.auth_type = fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem;
-    switch (auth_ind_params.auth_type) {
-      case fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem:
-        auth_type = "open";
-        break;
-      case fuchsia_wlan_fullmac_wire::WlanAuthType::kSharedKey:
-        auth_type = "shared key";
-        break;
-      case fuchsia_wlan_fullmac_wire::WlanAuthType::kFastBssTransition:
-        auth_type = "fast bss transition";
-        break;
-      case fuchsia_wlan_fullmac_wire::WlanAuthType::kSae:
-        auth_type = "SAE";
-        break;
-      default:
-        auth_type = "unknown";
-    }
-    BRCMF_IFDBG(WLANIF, ndev, "Sending auth indication to SME. type: %s", auth_type);
-#if !defined(NDEBUG)
-    BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC,
-                FMT_MAC_ARGS(auth_ind_params.peer_sta_address));
-#endif /* !defined(NDEBUG) */
-
     auto arena = fdf::Arena::Create(0, 0);
     if (arena.is_error()) {
       BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
       return ZX_ERR_INTERNAL;
     }
-    auto result = ndev->if_proto.buffer(*arena)->AuthInd(auth_ind_params);
+    fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+    memcpy(peer_sta_address.data(), e->addr, ETH_ALEN);
+    auto auth_ind_builder =
+        fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcAuthIndRequest::Builder(*arena)
+            // We always authenticate as an open system for WPA
+            .auth_type(fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem)
+            .peer_sta_address(peer_sta_address)
+            .Build();
+
+    BRCMF_IFDBG(WLANIF, ndev, "Sending auth indication to SME. type: open");
+#if !defined(NDEBUG)
+    BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(peer_sta_address.data()));
+#endif /* !defined(NDEBUG) */
+
+    auto result = ndev->if_proto.buffer(*arena)->AuthInd(auth_ind_builder);
     if (!result.ok()) {
       BRCMF_ERR("Failed to send auth ind result.status: %s", result.status_string());
       return ZX_ERR_INTERNAL;
@@ -7800,7 +7797,7 @@ zx_status_t brcmf_cfg80211_del_iface(struct brcmf_cfg80211_info* cfg, struct wir
     case fuchsia_wlan_common_wire::WlanMacRole::kAp:
       // Stop the AP in an attempt to exit gracefully.
       brcmf_cfg80211_stop_ap(ndev);
-      ndev->mlme_channel.reset();
+      ndev->sme_channel.reset();
       return brcmf_cfg80211_del_ap_iface(cfg, wdev);
     case fuchsia_wlan_common_wire::WlanMacRole::kClient:
       // Disconnect the client in an attempt to exit gracefully.
@@ -7808,7 +7805,7 @@ zx_status_t brcmf_cfg80211_del_iface(struct brcmf_cfg80211_info* cfg, struct wir
                       prof->bssid);
       // The default client iface 0 is always assumed to exist by the driver, and is never
       // explicitly deleted.
-      ndev->mlme_channel.reset();
+      ndev->sme_channel.reset();
       ndev->needs_free_net_device = true;
       brcmf_write_net_device_name(ndev, kPrimaryNetworkInterfaceName);
       return ZX_OK;

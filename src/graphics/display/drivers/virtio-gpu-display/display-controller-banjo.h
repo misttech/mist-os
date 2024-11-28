@@ -6,6 +6,8 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_CONTROLLER_BANJO_H_
 
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <lib/driver/compat/cpp/banjo_server.h>
+#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -33,6 +35,15 @@ class DisplayControllerBanjo : public ddk::DisplayEngineProtocol<DisplayControll
 
   ~DisplayControllerBanjo();
 
+  // Serves the Banjo protocol over the DFv2 compatibility server.
+  //
+  // The Banjo protocol implemented by this bridge is
+  // [`fuchsia.hardware.display.controller/Engine`].
+  compat::BanjoServer& banjo_server() { return banjo_server_; }
+
+  // Configuration for the server returned by `banjo_server()`.
+  compat::DeviceServer::BanjoConfig CreateBanjoConfig();
+
   // ddk::DisplayEngineProtocol
   void DisplayEngineRegisterDisplayEngineListener(
       const display_engine_listener_protocol_t* display_engine_listener);
@@ -47,10 +58,10 @@ class DisplayControllerBanjo : public ddk::DisplayEngineProtocol<DisplayControll
                                                  uint32_t index, uint64_t* out_capture_handle);
   void DisplayEngineReleaseImage(uint64_t banjo_image_handle);
   config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* banjo_display_configs, size_t banjo_display_configs_count,
+      const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
       client_composition_opcode_t* out_client_composition_opcodes_list,
       size_t out_client_composition_opcodes_size, size_t* out_client_composition_opcodes_actual);
-  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs,
+  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs_array,
                                        size_t banjo_display_configs_count,
                                        const config_stamp_t* banjo_config_stamp);
   zx_status_t DisplayEngineSetBufferCollectionConstraints(
@@ -70,6 +81,9 @@ class DisplayControllerBanjo : public ddk::DisplayEngineProtocol<DisplayControll
 
   // This data member is thread-safe because it is immutable.
   DisplayCoordinatorEventsBanjo& coordinator_events_;
+
+  // Serves the Banjo protocol over the DFv2 compatibility server.
+  compat::BanjoServer banjo_server_;
 };
 
 }  // namespace virtio_display

@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
+use assembly_constants::FileEntry;
 use assembly_platform_configuration::{DomainConfig, FileOrContents};
-use assembly_util::FileEntry;
 use camino::{Utf8Path, Utf8PathBuf};
 use cml::RelativePath;
 use fidl::persist;
@@ -119,8 +119,9 @@ impl DomainConfigPackage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assembly_constants::{PackageDestination, PackageSetDestination};
     use assembly_platform_configuration::DomainConfigDirectory;
-    use assembly_util::{NamedMap, PackageDestination, PackageSetDestination};
+    use assembly_util::NamedMap;
     use assert_matches::assert_matches;
     use cm_rust::{ComponentDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget};
     use fidl::unpersist;

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use {
     fidl_fuchsia_fshost as ffshost, fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
-    fidl_fuchsia_update_verify as ffuv,
+    fidl_fuchsia_storagehost as fstoragehost, fidl_fuchsia_update_verify as ffuv,
 };
 
 pub trait IntoValueSpec {
@@ -160,16 +160,18 @@ impl FshostBuilder {
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<ffshost::AdminMarker>())
+                    .capability(Capability::protocol::<ffshost::RecoveryMarker>())
                     .capability(Capability::protocol::<ffuv::BlobfsVerifierMarker>())
                     .capability(Capability::protocol::<ffuv::ComponentOtaHealthCheckMarker>())
                     .capability(Capability::protocol::<ffxfs::CryptManagementMarker>())
+                    .capability(Capability::protocol::<fstoragehost::PartitionsManagerMarker>())
                     .capability(Capability::protocol::<BlobCreatorMarker>())
                     .capability(Capability::protocol::<BlobReaderMarker>())
                     .capability(Capability::directory("blob").rights(fio::RW_STAR_DIR))
                     .capability(Capability::directory("data").rights(fio::RW_STAR_DIR))
-                    .capability(Capability::directory("partitions").rights(fio::R_STAR_DIR))
                     .capability(Capability::directory("tmp").rights(fio::RW_STAR_DIR))
                     .capability(Capability::directory("volumes").rights(fio::RW_STAR_DIR))
+                    .capability(Capability::service::<fstoragehost::PartitionServiceMarker>())
                     .from(&fshost)
                     .to(Ref::parent()),
             )

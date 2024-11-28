@@ -115,7 +115,7 @@ impl<S: ServiceConnect> TargetChannelManager<S> {
     pub async fn get_channel_list(&self) -> Result<Vec<String>, anyhow::Error> {
         let repository_manager =
             self.service_connector.connect_to_service::<RepositoryManagerMarker>()?;
-        let (repo_iterator, server_end) = fidl::endpoints::create_proxy()?;
+        let (repo_iterator, server_end) = fidl::endpoints::create_proxy();
         repository_manager.list(server_end)?;
         let mut repo_configs = vec![];
         loop {
@@ -378,7 +378,7 @@ mod tests {
         fn connect_to_service<P: DiscoverableProtocolMarker>(
             &self,
         ) -> Result<P::Proxy, anyhow::Error> {
-            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<P>().unwrap();
+            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<P>();
             match P::PROTOCOL_NAME {
                 ArgumentsMarker::PROTOCOL_NAME => {
                     self.handle_arguments_stream(stream.cast_stream())
@@ -467,7 +467,7 @@ mod tests {
         fn connect_to_service<P: DiscoverableProtocolMarker>(
             &self,
         ) -> Result<P::Proxy, anyhow::Error> {
-            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<P>().unwrap();
+            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<P>();
             assert_eq!(P::PROTOCOL_NAME, RepositoryManagerMarker::PROTOCOL_NAME);
             let mut stream: RepositoryManagerRequestStream = stream.cast_stream();
             let channels = self.channels.clone();
@@ -476,7 +476,7 @@ mod tests {
                 while let Some(req) = stream.try_next().await.unwrap() {
                     match req {
                         RepositoryManagerRequest::List { iterator, control_handle: _ } => {
-                            let mut stream = iterator.into_stream().unwrap();
+                            let mut stream = iterator.into_stream();
                             let repos: Vec<_> = channels
                                 .iter()
                                 .map(|channel| {

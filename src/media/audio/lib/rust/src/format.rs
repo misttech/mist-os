@@ -458,7 +458,7 @@ pub fn parse_duration(value: &str) -> Result<Duration, String> {
     let re = Regex::new(DURATION_REGEX).map_err(|e| format!("Could not create regex: {}", e))?;
     let captures = re
         .captures(&value)
-        .ok_or(format!("Durations must be specified in the form {}.", DURATION_REGEX))?;
+        .ok_or_else(|| format!("Durations must be specified in the form {}.", DURATION_REGEX))?;
     let number: u64 = captures[1].parse().map_err(|e| format!("Could not parse number: {}", e))?;
     let unit = &captures[2];
 

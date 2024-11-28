@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::Context;
 use assembly_config_schema::product_config::ProductInfoConfig;
-use assembly_util::FileEntry;
+use assembly_constants::FileEntry;
 
 pub(crate) struct HwinfoSubsystem;
 impl DefineSubsystemConfiguration<Option<ProductInfoConfig>> for HwinfoSubsystem {
@@ -15,7 +15,7 @@ impl DefineSubsystemConfiguration<Option<ProductInfoConfig>> for HwinfoSubsystem
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         // Set the product information that's returned by the hardware info protocol.
-        let hwinfo = config.clone().unwrap_or(ProductInfoConfig {
+        let hwinfo = config.clone().unwrap_or_else(|| ProductInfoConfig {
             name: "default-fuchsia".into(),
             model: "default-model".into(),
             manufacturer: "default-manufacturer".into(),

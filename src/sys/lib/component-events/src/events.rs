@@ -147,11 +147,12 @@ impl TryFrom<fcomponent::EventHeader> for EventHeader {
     type Error = anyhow::Error;
 
     fn try_from(header: fcomponent::EventHeader) -> Result<Self, Self::Error> {
-        let event_type = header.event_type.ok_or(format_err!("No event type"))?;
-        let component_url = header.component_url.ok_or(format_err!("No component url"))?;
-        let moniker = header.moniker.ok_or(format_err!("No moniker"))?;
-        let timestamp =
-            header.timestamp.ok_or(format_err!("Missing timestamp from the Event object"))?;
+        let event_type = header.event_type.ok_or_else(|| format_err!("No event type"))?;
+        let component_url = header.component_url.ok_or_else(|| format_err!("No component url"))?;
+        let moniker = header.moniker.ok_or_else(|| format_err!("No moniker"))?;
+        let timestamp = header
+            .timestamp
+            .ok_or_else(|| format_err!("Missing timestamp from the Event object"))?;
         Ok(EventHeader { event_type, component_url, moniker, timestamp })
     }
 }
@@ -246,9 +247,9 @@ macro_rules! create_event {
                         self.result.as_mut()
                             .ok()
                             .and_then(|payload| payload.$server_protocol_name.take())
-                            .and_then(|channel| {
+                            .map(|channel| {
                                 let server_end = ServerEnd::<T>::new(channel);
-                                server_end.into_stream().ok()
+                                server_end.into_stream()
                             })
                     }
                 )*
@@ -307,7 +308,7 @@ macro_rules! create_event {
                                 let $client_protocol_name: $client_protocol_ty = payload.$client_protocol_name.ok_or(
                                     format_err!("Missing {} from {} object",
                                         stringify!($client_protocol_name), stringify!($event_type))
-                                )?.into_proxy()?;
+                                )?.into_proxy();
                             )*
                             $(
                                 let $server_protocol_name: Option<zx::Channel> =

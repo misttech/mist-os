@@ -211,7 +211,7 @@ impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
         let entry_type_size: usize = self
             .array_entry_type()?
             .array_element_size()
-            .ok_or(Error::InvalidArrayType(self.index()))?;
+            .ok_or_else(|| Error::InvalidArrayType(self.index()))?;
         let offset = (self.index + 1).offset() + slot_index * entry_type_size;
         let index = self.container.get_value(offset).ok_or(Error::InvalidOffset(offset))?;
         Ok(BlockIndex::new(*index))
@@ -574,7 +574,7 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
         self.check_array_format(entry_type, &format)?;
         let order = self.order();
         let max_capacity = utils::array_capacity(order, entry_type)
-            .ok_or(Error::InvalidArrayType(self.index()))?;
+            .ok_or_else(|| Error::InvalidArrayType(self.index()))?;
 
         if slots > max_capacity {
             return Err(Error::array_capacity_exceeded(slots, order, max_capacity));

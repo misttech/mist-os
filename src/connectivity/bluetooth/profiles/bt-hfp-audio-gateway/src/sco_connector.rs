@@ -171,7 +171,7 @@ impl ScoConnector {
         params: Vec<bredr::ScoConnectionParameters>,
     ) -> Result<ScoConnection, ScoConnectError> {
         let (connection_proxy, server) =
-            fidl::endpoints::create_proxy::<bredr::ScoConnectionMarker>()?;
+            fidl::endpoints::create_proxy::<bredr::ScoConnectionMarker>();
         profile_proxy.connect_sco(bredr::ProfileConnectScoRequest {
             peer_id: Some(peer_id.into()),
             initiator: Some(role == ScoInitiatorRole::Initiate),
@@ -270,8 +270,7 @@ pub(crate) mod tests {
         in_band: bool,
     ) -> (ScoConnection, bredr::ScoConnectionRequestStream) {
         let sco_params = parameter_sets_for_codec(codec_id, in_band).pop().unwrap();
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<ScoConnectionMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ScoConnectionMarker>();
         let connection = ScoConnection::build(peer_id, sco_params, proxy);
         (connection, stream)
     }

@@ -28,10 +28,14 @@
             "dimensions": {
                 "cpu": "x64",
                 "device_type": "AEMU"
+            },
+            "virtual_device_spec": {
+                "name": ""
             }
         },
         "deps": [
             "boot-test_product_bundle/zbi",
+            "host_x64/ffx",
             "images.json",
             "product_bundles.json",
             "sdk/manifest/core"
@@ -41,7 +45,20 @@
             "tests": null
         },
         "product_bundle": "boot-test_product_bundle",
-        "is_boot_test": true
+        "is_boot_test": true,
+        "cipd_packages": [
+            {
+                "name": "fuchsia/third_party/android/aemu/release/${platform}",
+                "version": "aemu_version",
+                "subdir": "aemu/bin"
+            },
+            {
+                "name": "fuchsia/third_party/edk2",
+                "version": "edk2_version",
+                "subdir": "edk2"
+            }
+        ],
+        "build_metadata": {}
     },
     {
         "name": "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_boot-test#meta_boot-test.cm",
@@ -72,10 +89,14 @@
             "dimensions": {
                 "cpu": "x64",
                 "device_type": "AEMU"
+            },
+            "virtual_device_spec": {
+                "name": ""
             }
         },
         "deps": [
             "boot-test_product_bundle/zbi",
+            "host_x64/ffx",
             "images.json",
             "product_bundles.json",
             "sdk/manifest/core"
@@ -85,6 +106,19 @@
             "tests": null
         },
         "product_bundle": "boot-test_product_bundle",
-        "is_boot_test": true
+        "is_boot_test": true,
+        "cipd_packages": [
+            {
+                "name": "fuchsia/third_party/android/aemu/release/${platform}",
+                "version": "aemu_version",
+                "subdir": "aemu/bin"
+            },
+            {
+                "name": "fuchsia/third_party/edk2",
+                "version": "edk2_version",
+                "subdir": "edk2"
+            }
+        ],
+        "build_metadata": {}
     }
 ]

@@ -517,7 +517,7 @@ mod tests {
     async fn add_client(
         handle: &mut ControlHandle<FidlNotifier>,
     ) -> ExampleEventMonitorRequestStream {
-        let (proxy, stream) = create_proxy_and_stream::<ExampleEventMonitorMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<ExampleEventMonitorMarker>();
         handle.add_client(FidlNotifier { proxy }).await.unwrap();
         stream
     }

@@ -39,8 +39,7 @@ async fn handle_force_install_impl(
     };
 
     let (reboot_controller, reboot_controller_server_end) =
-        fidl::endpoints::create_proxy::<RebootControllerMarker>()
-            .context("creating reboot controller")?;
+        fidl::endpoints::create_proxy::<RebootControllerMarker>();
 
     let mut update_attempt =
         start_update(&pkg_url, options, installer, Some(reboot_controller_server_end))

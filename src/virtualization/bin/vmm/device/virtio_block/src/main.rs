@@ -63,9 +63,9 @@ async fn run_virtio_block(
     let (start_info, BlockSpec { id, mode, format }, responder) = virtio_block_fidl
         .try_next()
         .await?
-        .ok_or(anyhow!("Failed to read fidl message from the channel."))?
+        .ok_or_else(|| anyhow!("Failed to read fidl message from the channel."))?
         .into_start()
-        .ok_or(anyhow!("Start should be the first message sent."))?;
+        .ok_or_else(|| anyhow!("Start should be the first message sent."))?;
 
     // Prepare the device builder
     let (device_builder, guest_mem) = machina_virtio_device::from_start_info(start_info)?;

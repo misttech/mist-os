@@ -115,10 +115,12 @@ function diff_file_relpath() {
   # $3 is a relative path under both dirs, and is itself not a directory.
   #   This file name is reported in diagnostics.
   # one could also use an all-inclusive diff tool like https://diffoscope.org/
-  local left="$1/$3"
-  local right="$2/$3"
-  local common_path="$3"
-  filebase="$(basename "$common_path")"
+  local -r left="$1/$3"
+  local -r right="$2/$3"
+  local -r common_path="$3"
+  local -r filebase="${common_path##*/}"  # basename
+  local -r subdir="${common_path%/*}" # dirname
+
 
   # TODO(fangism): Some files are stored as blobs so content differences
   # appear as filename entry differences.  Skip these.  Perhaps silently?
@@ -132,7 +134,7 @@ function diff_file_relpath() {
     return
   }
 
-  expect=""
+  local expect=""
 
   # Classify each category of files with expectations in each case below:
   #   expect={diff,match,unknown,ignore,skip}; diff...
@@ -187,7 +189,7 @@ function diff_file_relpath() {
 
     # The following groups of files have known huge diffs,
     # so omit details from the general report, and diff_binary.
-    meta.far) expect=unknown; diff_binary "$left" "$right" ;;
+    meta.far) expect=match; diff_binary "$left" "$right" ;;
     contents) expect=unknown; diff_binary "$left" "$right" ;;
     all_blobs.json) expect=skip ;;  # too big right now
 
@@ -196,7 +198,7 @@ function diff_file_relpath() {
 
     blob.manifest) expect=diff; diff_binary "$left" "$right" ;;  # many hashes
     blobs.manifest) expect=unknown; diff_binary "$left" "$right" ;;
-    package_manifest.json) expect=unknown; diff_binary "$left" "$right" ;;
+    package_manifest.json) expect=match; diff_binary "$left" "$right" ;;
     targets.json)
       case "$common_path" in
         gen/gopaths/*) expect=match; diff_json "$left" "$right"  ;;
@@ -313,8 +315,8 @@ function diff_file_relpath() {
       esac
       ;;
     uuid)  # uuids are unique and random
-      case "$common_path" in
-        */bazel-out/*.ffx/metrics) expect=ignore ;;
+      case "$subdir" in
+        *.ffx/metrics) expect=ignore ;;
       esac
       ;;
 
@@ -353,47 +355,35 @@ function diff_file_relpath() {
 
     # bazel runfile MANIFESTs contain absolute paths
     MANIFEST)
-      case "$common_path" in
-        */bazel-out/*.runfiles) expect=ignore ;;
+      case "$subdir" in
+        *.runfiles) expect=ignore ;;
       esac
       ;;
 
-    *.runfiles_manifest)
-      case "$common_path" in
-        */bazel-out/*) expect=ignore ;;
-      esac
-      ;;
+    *.runfiles_manifest) expect=ignore ;;  # absolute paths
 
     # bazel repo-mapping files seem to differ:
     # rules_license only appears in remote builds.
     # Don't know why, but these are not important build artifacts.
     _repo_mapping)
-      case "$common_path" in
-        */bazel-out/*.runfiles) expect=ignore ;;
+      case "$subdir" in
+        *.runfiles) expect=ignore ;;
       esac
       ;;
 
-    *.repo_mapping)
-      case "$common_path" in
-        */bazel-out/*) expect=ignore ;;
-      esac
-      ;;
+    *.repo_mapping) expect=ignore ;;
 
       # These list hashes of binaries that are already being
       # compared elsewhere, so this is redundant information.
-    *.ids_txt)
-      case "$common_path" in
-        */bazel-out/*) expect=ignore ;;
-      esac
-      ;;
+    *.ids_txt) expect=ignore ;;
 
     # Various binaries.
     *.blk) expect=unknown; diff_binary "$left" "$right" ;;
     *.vboot) expect=unknown; diff_binary "$left" "$right" ;;
     *.zbi) expect=unknown; diff_binary "$left" "$right" ;;
 
-    # fidldoc.zip bears timestamps of its contents (nondeterministic)
-    fidldoc.zip) expect=diff; diff_zip "$left" "$right" ;;
+    # TODO(b/379173865): fidldoc.zip bears timestamps (nondeterministic)
+    fidldoc.zip) expect=ignore ;;
 
     *.pyz | *.zip) expect=match; diff_zip "$left" "$right" ;;
     # Most archives carry timestamp information of their contents.
@@ -501,7 +491,7 @@ function diff_dir_recursive() {
 
   for f in "$2/$sub"*
   do
-    filebase="$(basename "$f")"
+    filebase="${f##*/}"  # basename
     relpath="$sub$filebase"
     diff_select "$1" "$2" "$relpath"
   done
@@ -527,6 +517,8 @@ then
   echo "end of UNEXPECTED DIFFS"
   echo
   exit_status=1
+else
+  echo "No UNEXPECTED DIFFS found (good)"
 fi
 
 # Good news: these files matched
@@ -539,7 +531,25 @@ then
   echo "end of UNEXPECTED MATCHES"
   echo
   exit_status=1
+else
+  echo "No UNEXPECTED MATCHES found (good)"
 fi
+
+# Make sure all cases are covered.
+if test "${#unspecified_files[@]}" != 0
+then
+  echo "UNSPECIFIED FILES: (action: classify into {match,diff,unknown,ignore,skip})"
+  for path in "${unspecified_files[@]}"
+  do echo "  $path"
+  done
+  echo "end of UNSPECIFIED FILES"
+  echo
+  exit_status=1
+fi
+
+[[ "$exit_status" == 0 ]] ||
+  echo "ACTION: investigate the above, perhaps file a go/fuchsia-build-bug."
+echo "The rest of this report is FYI only, no action is required."
 
 # This group mismatched, but we didn't know what to expect.
 if test "${#unclassified_diffs[@]}" != 0
@@ -577,18 +587,6 @@ then
 fi
 
 # Don't bother reporting "${ignored_files[@]}", the list is long and not useful.
-
-# Make sure all cases are covered.
-if test "${#unspecified_files[@]}" != 0
-then
-  echo "UNSPECIFIED FILES: (action: classify into one of the above categories)"
-  for path in "${unspecified_files[@]}"
-  do echo "  $path"
-  done
-  echo "end of UNSPECIFIED FILES"
-  echo
-  exit_status=1
-fi
 
 echo "Exiting with status $exit_status"
 exit "$exit_status"

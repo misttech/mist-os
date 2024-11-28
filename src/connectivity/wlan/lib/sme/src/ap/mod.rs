@@ -303,7 +303,7 @@ impl ApSme {
 fn send_stop_req(ctx: &mut Context, stop_req: fidl_mlme::StopRequest) -> EventId {
     let event = Event::Sme { event: SmeEvent::StopTimeout };
     let stop_timeout = ctx.timer.schedule(event);
-    ctx.mlme_sink.send(MlmeRequest::Stop(stop_req.clone()));
+    ctx.mlme_sink.send(MlmeRequest::Stop(stop_req));
     stop_timeout
 }
 

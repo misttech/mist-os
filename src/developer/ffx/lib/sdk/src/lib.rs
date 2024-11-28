@@ -214,7 +214,7 @@ impl Sdk {
             module: None,
             parts: manifest.parts,
             real_paths: None,
-            version: SdkVersion::Version(manifest.id.clone()),
+            version: SdkVersion::Version(manifest.id),
         })
     }
 

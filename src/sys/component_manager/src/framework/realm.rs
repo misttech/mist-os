@@ -54,7 +54,7 @@ impl InternalCapabilityProvider for RealmCapabilityProvider {
         drop(model);
         let weak = WeakComponentInstance::new(&component);
         drop(component);
-        let serve_result = self.serve(weak, server_end.into_stream().unwrap()).await;
+        let serve_result = self.serve(weak, server_end.into_stream()).await;
         if let Err(error) = serve_result {
             // TODO: Set an epitaph to indicate this was an unexpected error.
             warn!(%error, "serve failed");
@@ -84,7 +84,7 @@ impl FrameworkCapability for Realm {
         _target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider> {
         Box::new(RealmCapabilityProvider {
-            scope_moniker: scope.moniker.clone(),
+            scope_moniker: scope.moniker,
             model: self.model.clone(),
             config: self.config.clone(),
         })
@@ -184,7 +184,7 @@ impl RealmCapabilityProvider {
             Some(child) => {
                 child.nonblocking_task_group().spawn(framework::controller::run_controller(
                     child.as_weak(),
-                    controller.into_stream().unwrap(),
+                    controller.into_stream(),
                 ));
             }
             None => {
@@ -309,7 +309,7 @@ impl RealmCapabilityProvider {
                 cmp::Ordering::Greater
             }
         });
-        let stream = iter.into_stream().map_err(|_| fcomponent::Error::AccessDenied)?;
+        let stream = iter.into_stream();
         fasync::Task::spawn(async move {
             if let Err(error) = Self::serve_child_iterator(children, stream, batch_size).await {
                 // TODO: Set an epitaph to indicate this was an unexpected error.
@@ -399,8 +399,7 @@ mod tests {
 
             // Host framework service.
             let host = Realm::new(Arc::downgrade(&model), model.context().runtime_config().clone());
-            let (realm_proxy, server) =
-                endpoints::create_proxy::<fcomponent::RealmMarker>().unwrap();
+            let (realm_proxy, server) = endpoints::create_proxy::<fcomponent::RealmMarker>();
             capability::open_framework(&host, &component, server.into()).await.unwrap();
             Self {
                 builtin_environment: Some(builtin_environment),
@@ -917,8 +916,7 @@ mod tests {
                 .unwrap_or_else(|_| panic!("failed to create child {}", name));
             let child_ref =
                 fdecl::ChildRef { name: name.to_string(), collection: Some("coll".to_string()) };
-            let (exposed_dir, server_end) =
-                endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (exposed_dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
             let () = test
                 .realm_proxy
                 .open_exposed_dir(&child_ref, server_end)
@@ -1110,7 +1108,7 @@ mod tests {
         // Collection not found.
         {
             let collection_ref = fdecl::CollectionRef { name: "nonexistent".to_string() };
-            let (_, server_end) = endpoints::create_proxy().unwrap();
+            let (_, server_end) = endpoints::create_proxy();
             let err = test
                 .realm_proxy
                 .list_children(&collection_ref, server_end)
@@ -1151,7 +1149,7 @@ mod tests {
 
         // Open exposed directory of child.
         let child_ref = fdecl::ChildRef { name: "system".to_string(), collection: None };
-        let (dir_proxy, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
         let res = test.realm_proxy.open_exposed_dir(&child_ref, server_end).await;
         res.expect("fidl call failed").expect("open_exposed_dir() failed");
 
@@ -1244,7 +1242,7 @@ mod tests {
         // Open exposed directory of child.
         let child_ref =
             fdecl::ChildRef { name: "system".to_string(), collection: Some("coll".to_owned()) };
-        let (dir_proxy, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
         let res = test.realm_proxy.open_exposed_dir(&child_ref, server_end).await;
         res.expect("fidl call failed").expect("open_exposed_dir() failed");
 
@@ -1303,7 +1301,7 @@ mod tests {
         // Instance not found.
         {
             let child_ref = fdecl::ChildRef { name: "missing".to_string(), collection: None };
-            let (_, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (_, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
             let err = test
                 .realm_proxy
                 .open_exposed_dir(&child_ref, server_end)
@@ -1316,7 +1314,7 @@ mod tests {
         // Instance cannot resolve.
         {
             let child_ref = fdecl::ChildRef { name: "unresolvable".to_string(), collection: None };
-            let (_, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (_, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
             let err = test
                 .realm_proxy
                 .open_exposed_dir(&child_ref, server_end)
@@ -1329,8 +1327,7 @@ mod tests {
         // Instance can't run.
         {
             let child_ref = fdecl::ChildRef { name: "unrunnable".to_string(), collection: None };
-            let (dir_proxy, server_end) =
-                endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (dir_proxy, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
             let res = test.realm_proxy.open_exposed_dir(&child_ref, server_end).await;
             res.expect("fidl call failed").expect("open_exposed_dir() failed");
             let echo_proxy = client::connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(
@@ -1356,8 +1353,7 @@ mod tests {
         // Success.
         {
             let child_ref = fdecl::ChildRef { name: "system".to_string(), collection: None };
-            let (_, server_end) =
-                endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+            let (_, server_end) = endpoints::create_proxy::<fcomponent::ControllerMarker>();
             test.realm_proxy
                 .open_controller(&child_ref, server_end)
                 .await
@@ -1370,8 +1366,7 @@ mod tests {
         // Invalid ref.
         {
             let child_ref = fdecl::ChildRef { name: "-&*:(\\".to_string(), collection: None };
-            let (_, server_end) =
-                endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+            let (_, server_end) = endpoints::create_proxy::<fcomponent::ControllerMarker>();
             let err = test
                 .realm_proxy
                 .open_controller(&child_ref, server_end)
@@ -1384,8 +1379,7 @@ mod tests {
         // Instance not found.
         {
             let child_ref = fdecl::ChildRef { name: "missing".to_string(), collection: None };
-            let (_, server_end) =
-                endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+            let (_, server_end) = endpoints::create_proxy::<fcomponent::ControllerMarker>();
             let err = test
                 .realm_proxy
                 .open_controller(&child_ref, server_end)

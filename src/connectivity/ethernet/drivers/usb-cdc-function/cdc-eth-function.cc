@@ -36,8 +36,7 @@ static void complete_txn(txn_info_t* txn, zx_status_t status) {
   txn->completion_cb(txn->cookie, status, &txn->netbuf);
 }
 
-zx_status_t UsbCdc::insert_usb_request(usb::FidlRequest&& req,
-                                       usb_endpoint::UsbEndpoint<UsbCdc>& ep) {
+zx_status_t UsbCdc::insert_usb_request(usb::FidlRequest&& req, usb::EndpointClient<UsbCdc>& ep) {
   if (suspend_txn_.has_value()) {
     return ZX_OK;
   }
@@ -45,7 +44,7 @@ zx_status_t UsbCdc::insert_usb_request(usb::FidlRequest&& req,
   return ZX_OK;
 }
 
-void UsbCdc::usb_request_queue(usb::FidlRequest&& req, usb_endpoint::UsbEndpoint<UsbCdc>& ep) {
+void UsbCdc::usb_request_queue(usb::FidlRequest&& req, usb::EndpointClient<UsbCdc>& ep) {
   if (suspend_txn_.has_value()) {
     return;
   }

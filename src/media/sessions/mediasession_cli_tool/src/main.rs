@@ -77,7 +77,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let invocation: Invocation = argh::from_env();
     let discovery = client::connect_to_protocol::<DiscoveryMarker>()?;
     let (watcher_client, watcher_server) = create_endpoints();
-    let mut watcher_requests = watcher_server.into_stream()?;
+    let mut watcher_requests = watcher_server.into_stream();
 
     match invocation.command {
         Command::Ls(_) => {
@@ -112,7 +112,7 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         Command::Control(control) => {
             let (session_client, session_request) = create_endpoints();
-            let proxy: SessionControlProxy = session_client.into_proxy()?;
+            let proxy: SessionControlProxy = session_client.into_proxy();
             match control.command {
                 ControlCommand::Play(_) => proxy.play()?,
                 ControlCommand::Pause(_) => proxy.pause()?,

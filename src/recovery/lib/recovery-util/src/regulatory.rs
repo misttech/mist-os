@@ -77,7 +77,7 @@ mod tests {
         mock_info: hwinfo::ProductInfo,
     ) -> Result<hwinfo::ProductProxy, Error> {
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<hwinfo::ProductMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<hwinfo::ProductMarker>();
 
         fasync::Task::local(async move {
             while let Some(request) =
@@ -101,7 +101,7 @@ mod tests {
         let (mut sender, receiver) = mpsc::channel(1);
         let (proxy, mut request_stream) = fidl::endpoints::create_proxy_and_stream::<
             regulatory::RegulatoryRegionConfiguratorMarker,
-        >()?;
+        >();
 
         fasync::Task::local(async move {
             while let Some(request) =

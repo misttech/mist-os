@@ -108,7 +108,12 @@ type Environment struct {
 	Dimensions DimensionSet `json:"dimensions"`
 
 	// EmuDimensions gives the dimensions to configure the emulator with if targeting an emulator.
+	// TODO(https://fxbug.dev/326129848): Remove once we've switched to using the VirtualDeviceSpec
+	// instead.
 	EmuDimensions map[string]any `json:"emu_dimensions,omitempty"`
+
+	// VirtualDeviceSpec specifies the virtual device spec to use if targeting an emulator.
+	VirtualDeviceSpec VirtualDeviceSpecInfo `json:"virtual_device_spec,omitempty"`
 
 	// Tags are keys given to an environment on which the testsharder may filter.
 	Tags []string `json:"tags,omitempty"`
@@ -152,4 +157,9 @@ func (ds DimensionSet) Testbed() string {
 // Pool denotes the swarming pool to run a test in.
 func (ds DimensionSet) Pool() string {
 	return ds["pool"]
+}
+
+type VirtualDeviceSpecInfo struct {
+	Name    string `json:"name"`
+	EnvName string `json:"env_name,omitempty"`
 }

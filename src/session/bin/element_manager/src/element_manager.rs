@@ -196,8 +196,7 @@ impl ElementManager {
             ElementManagerError::not_created(child_name, collection, child_url, err)
         })?;
 
-        let (exposed_directory, exposed_dir_server_end) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (exposed_directory, exposed_dir_server_end) = create_proxy::<fio::DirectoryMarker>();
         match realm_management::open_child_component_exposed_dir(
             child_name,
             collection,
@@ -324,7 +323,7 @@ impl ElementManager {
         };
 
         let (view_controller_proxy, server_end) =
-            fidl::endpoints::create_proxy::<felement::ViewControllerMarker>()?;
+            fidl::endpoints::create_proxy::<felement::ViewControllerMarker>();
 
         if let Some(graphical_presenter_connector) = &self.graphical_presenter_connector {
             graphical_presenter_connector
@@ -493,7 +492,7 @@ impl ElementManager {
             })?;
 
         let (annotation_controller_client_end, annotation_controller_stream) =
-            create_request_stream::<felement::AnnotationControllerMarker>().unwrap();
+            create_request_stream::<felement::AnnotationControllerMarker>();
         let initial_view_annotations = annotation_holder.get_annotations().unwrap();
 
         let view_controller_proxy = match element.use_view_provider() {
@@ -520,12 +519,9 @@ impl ElementManager {
         };
 
         let element_controller_stream = match element_controller {
-            Some(controller) => match controller.into_stream() {
-                Ok(stream) => Ok(Some(stream)),
-                Err(_) => Err(felement::ManagerError::InvalidArgs),
-            },
-            None => Ok(None),
-        }?;
+            Some(controller) => Some(controller.into_stream()),
+            None => None,
+        };
 
         let (sender, receiver) = oneshot::channel();
         self.running_elements.lock().unwrap().insert(child_name.to_string(), sender);
@@ -896,8 +892,7 @@ mod tests {
                     _ => panic!("Realm handler received an unexpected request"),
                 }
             }
-        })
-        .unwrap();
+        });
 
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
@@ -950,8 +945,7 @@ mod tests {
                     _ => panic!("Realm handler received an unexpected request"),
                 }
             }
-        })
-        .unwrap();
+        });
 
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
@@ -984,8 +978,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let result = element_manager.launch_element(component_url, "").await;
@@ -1021,8 +1014,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let result = element_manager.launch_element(component_url, "").await;
@@ -1063,8 +1055,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
 
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
@@ -1104,8 +1095,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let element = element_manager.launch_element(component_url, "").await.unwrap();
@@ -1121,15 +1111,13 @@ mod tests {
     async fn propose_persistent_element_with_bad_storage() {
         let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
 
-        let realm: fcomponent::RealmProxy =
-            spawn_stream_handler(|_| async { unreachable!() }).unwrap();
+        let realm: fcomponent::RealmProxy = spawn_stream_handler(|_| async { unreachable!() });
 
         let mut element_manager: Box<ElementManager> =
             Box::new(ElementManager::new(realm, None, example_collection_config()));
         element_manager.persistent_elements_path = "/does/not/exist/persistent_elements";
 
-        let (manager_proxy, stream) = create_proxy_and_stream::<felement::ManagerMarker>()
-            .expect("Failed to create Manager proxy and stream");
+        let (manager_proxy, stream) = create_proxy_and_stream::<felement::ManagerMarker>();
 
         futures::select! {
             _ = element_manager.handle_requests(stream).fuse() => unreachable!(),

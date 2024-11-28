@@ -66,6 +66,7 @@ static void looper_thread_entry() {
   {
     std::shared_lock lock(connection_create_mutex);
     test = std::make_unique<TestConnection>();
+    ASSERT_NO_FATAL_FAILURE() << "Failed to create test device";
   }
   while (complete_count < kMaxCount) {
     magma_status_t status = test->Test();
@@ -94,7 +95,8 @@ static void test_shutdown(uint32_t iters) {
         // creation is working.
         std::unique_lock lock(connection_create_mutex);
 
-        RestartAndWait("fuchsia-pkg://" MALI_PRODUCTION_DRIVER_PACKAGE "#meta/msd_arm.cm");
+        ASSERT_NO_FATAL_FAILURE(
+            RestartAndWait("fuchsia-pkg://" MALI_PRODUCTION_DRIVER_PACKAGE "#meta/msd_arm.cm"));
         count += kRestartCount;
       }
       std::this_thread::yield();

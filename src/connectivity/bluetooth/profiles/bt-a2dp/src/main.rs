@@ -221,7 +221,7 @@ fn handle_services_found(
     if let Some(initiator_delay) = initiator_delay {
         fasync::Task::local(connect_after_timeout(
             peer_id.clone(),
-            peers.clone(),
+            peers,
             channel_parameters,
             initiator_delay,
         ))
@@ -364,6 +364,7 @@ async fn main() -> Result<(), Error> {
     });
 
     // The AVRCP Target component is needed if it is requested and A2DP Source is requested.
+    #[allow(clippy::collection_is_never_read)]
     let mut _avrcp_target = None;
     if config.source.is_some() && config.enable_avrcp_target {
         match fuchsia_component::client::connect_to_protocol::<BinderMarker>() {
@@ -455,8 +456,7 @@ mod tests {
     }
 
     fn setup_connected_peers() -> (Arc<ConnectedPeers>, ProfileRequestStream) {
-        let (proxy, stream) = create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Profile proxy should be created");
+        let (proxy, stream) = create_proxy_and_stream::<bredr::ProfileMarker>();
         let peers = Arc::new(ConnectedPeers::new(
             stream::StreamsBuilder::default(),
             Permits::new(1),
@@ -693,8 +693,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (peers, _profile_stream) = setup_connected_peers();
 
-        let (proxy, stream) = create_proxy_and_stream::<a2dp::AudioModeMarker>()
-            .expect("AudioMode proxy should be created");
+        let (proxy, stream) = create_proxy_and_stream::<a2dp::AudioModeMarker>();
 
         handle_audio_mode_connection(peers.clone(), stream);
 

@@ -29,7 +29,7 @@ The steps below walk through how to use the input report reader library in an in
      int64_t y;
 
      void ToFidlInputReport(fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>&
-                            input_report, fidl::AnyArena& allocator);
+                            input_report, fidl::AnyArena& allocator) const;
    }
    ```
 
@@ -38,7 +38,7 @@ The steps below walk through how to use the input report reader library in an in
    ```c++ {:.devsite-disable-click-to-copy}
    void MyExampleMouseReport::ToFidlInputReport(
        fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-       fidl::AnyArena& allocator) {
+       fidl::AnyArena& allocator) const {
      auto mouse_input_rpt = fuchsia_input_report::wire::MouseInputReport::Builder(allocator);
      mouse_input_rpt.movement_x(x);
      mouse_input_rpt.movement_y(y);

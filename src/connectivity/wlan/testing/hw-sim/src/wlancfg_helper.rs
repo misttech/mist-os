@@ -98,8 +98,7 @@ pub async fn start_ap_and_wait_for_confirmation(
     let ap_provider =
         connect_to_protocol_at::<fidl_policy::AccessPointProviderMarker>(test_ns_prefix)
             .expect("connecting to AP provider");
-    let (ap_controller, server_end) =
-        create_proxy::<fidl_policy::AccessPointControllerMarker>().expect("creating AP controller");
+    let (ap_controller, server_end) = create_proxy::<fidl_policy::AccessPointControllerMarker>();
     let (update_client_end, update_server_end) =
         create_endpoints::<fidl_policy::AccessPointStateUpdatesMarker>();
     let () =
@@ -107,8 +106,7 @@ pub async fn start_ap_and_wait_for_confirmation(
 
     // Clear the initial update to ensure that the 'Active' update is received once the AP is
     // started.
-    let mut update_stream =
-        update_server_end.into_stream().expect("could not create update stream");
+    let mut update_stream = update_server_end.into_stream();
     let initial_update = update_stream.next().await.expect("AP update stream failed");
 
     // The initial update is empty since no AP ifaces have been created yet.  All that is required
@@ -169,10 +167,10 @@ pub async fn get_client_controller(
 ) -> (fidl_policy::ClientControllerProxy, fidl_policy::ClientStateUpdatesRequestStream) {
     let provider =
         connect_to_protocol_at::<fidl_policy::ClientProviderMarker>(test_ns_prefix).unwrap();
-    let (controller_client_end, controller_server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (controller_client_end, controller_server_end) = fidl::endpoints::create_proxy();
     let (listener_client_end, listener_server_end) = fidl::endpoints::create_endpoints();
     provider.get_controller(controller_server_end, listener_client_end).unwrap();
-    let client_state_update_stream = listener_server_end.into_stream().unwrap();
+    let client_state_update_stream = listener_server_end.into_stream();
 
     (controller_client_end, client_state_update_stream)
 }
@@ -279,8 +277,7 @@ pub async fn remove_all_networks(client_controller: &fidl_policy::ClientControll
 
     // Read all saved networks on the device
     let (iter, server) =
-        fidl::endpoints::create_proxy::<fidl_policy::NetworkConfigIteratorMarker>()
-            .expect("failed to create iterator");
+        fidl::endpoints::create_proxy::<fidl_policy::NetworkConfigIteratorMarker>();
     client_controller.get_saved_networks(server).expect("Failed to call get saved networks");
     loop {
         let additional_saved_networks =

@@ -44,7 +44,7 @@ impl FsContextState {
             .ok_or_else(|| errno!(EINVAL))?;
 
         // Only perform a mutation if the rebased nodes both exist in the target namespace.
-        self.root = new_root.clone().into_active();
+        self.root = new_root.into_active();
         self.cwd = new_cwd.into_active();
         self.namespace = new_ns;
         log_trace!("namespace update succeeded");

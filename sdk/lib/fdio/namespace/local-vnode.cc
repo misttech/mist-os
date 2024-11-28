@@ -22,75 +22,38 @@
 
 namespace fdio_internal {
 
-zx_status_t LocalVnode::AddChild(fbl::RefPtr<LocalVnode> child) {
-  return std::visit(fdio::overloaded{
-                        [](LocalVnode::Local& c) {
-                          // Calling AddChild on a Local node is invalid.
-                          return ZX_ERR_NOT_DIR;
-                        },
-                        [&child](LocalVnode::Intermediate& c) {
-                          c.AddEntry(child);
-                          return ZX_OK;
-                        },
-                        [](LocalVnode::Remote& s) {
-                          // Calling AddChild on a Storage node is invalid, and implies
-                          // a poorly formed path.
-                          return ZX_ERR_BAD_PATH;
-                        },
-                    },
-                    node_type_);
-}
+size_t LocalVnode::Intermediate::num_children() const { return entries_by_id_.size(); }
 
-void LocalVnode::Intermediate::AddEntry(fbl::RefPtr<LocalVnode> vn) {
-  // |fdio_namespace| already checked that the entry does not exist.
-  ZX_DEBUG_ASSERT(entries_by_name_.find(vn->Name()) == entries_by_name_.end());
+zx::result<std::tuple<fbl::RefPtr<LocalVnode>, bool>> LocalVnode::Intermediate::LookupOrInsert(
+    fbl::String name, fit::function<zx::result<fbl::RefPtr<LocalVnode>>(ParentAndId)> builder) {
+  auto it = entries_by_name_.find(name);
+  if (it != entries_by_name_.end()) {
+    return zx::ok(std::make_tuple(it->node(), false));
+  }
+  zx::result vn_res = builder(std::make_tuple(std::reference_wrapper(*this), next_node_id_));
+  if (vn_res.is_error()) {
+    return vn_res.take_error();
+  }
+  auto& vn = vn_res.value();
 
-  auto entry = std::make_unique<Entry>(next_node_id_, std::move(vn));
+  auto entry = std::make_unique<Entry>(next_node_id_, std::move(name), vn);
   entries_by_name_.insert(entry.get());
   entries_by_id_.insert(std::move(entry));
   next_node_id_++;
+
+  return zx::ok(std::make_tuple(std::move(vn), true));
 }
 
-zx_status_t LocalVnode::RemoveChild(LocalVnode* child) {
-  return std::visit(fdio::overloaded{
-                        [](LocalVnode::Local& c) {
-                          // Calling RemoveChild on a Local node fails.
-                          return ZX_ERR_NOT_FOUND;
-                        },
-                        [&child](LocalVnode::Intermediate& c) {
-                          c.RemoveEntry(child);
-                          return ZX_OK;
-                        },
-                        [](LocalVnode::Remote& s) {
-                          // Calling RemoveChild on a Storage node is invalid, and implies
-                          // a poorly formed path.
-                          return ZX_ERR_BAD_PATH;
-                        },
-                    },
-                    node_type_);
-}
-
-void LocalVnode::Intermediate::RemoveEntry(LocalVnode* vn) {
-  auto it = entries_by_name_.find(vn->Name());
-  if (it != entries_by_name_.end() && it->node().get() == vn) {
-    auto id = it->id();
-    entries_by_name_.erase(it);
-    entries_by_id_.erase(id);
+void LocalVnode::Intermediate::RemoveEntry(LocalVnode* vn, uint64_t id) {
+  auto it = entries_by_id_.find(id);
+  if (it != entries_by_id_.end() && it->node().get() == vn) {
+    entries_by_name_.erase(it->name());
+    entries_by_id_.erase(it);
   }
 }
 
-void LocalVnode::Unlink() {
-  std::visit(fdio::overloaded{
-                 [](LocalVnode::Local& c) { c.Unlink(); },
-                 [](LocalVnode::Intermediate& c) { c.UnlinkEntries(); },
-                 [](LocalVnode::Remote& s) {},
-             },
-             node_type_);
-  UnlinkFromParent();
-}
-
-fbl::RefPtr<LocalVnode> LocalVnode::Intermediate::Lookup(std::string_view name) const {
-  auto it = entries_by_name_.find(fbl::String{name});
+fbl::RefPtr<LocalVnode> LocalVnode::Intermediate::Lookup(const fbl::String& name) const {
+  auto it = entries_by_name_.find(name);
   if (it != entries_by_name_.end()) {
     return it->node();
   }
@@ -98,7 +61,7 @@ fbl::RefPtr<LocalVnode> LocalVnode::Intermediate::Lookup(std::string_view name) 
 }
 
 LocalVnode::~LocalVnode() {
-  std::visit(fdio::overloaded{
+  std::visit(fdio_internal::overloaded{
                  [](LocalVnode::Local& c) {},
                  [](LocalVnode::Intermediate& c) {},
                  [](LocalVnode::Remote& s) {
@@ -111,15 +74,9 @@ LocalVnode::~LocalVnode() {
              node_type_);
 }
 
-void LocalVnode::Intermediate::UnlinkEntries() {
-  for (auto& entry : entries_by_name_) {
-    std::visit(fdio::overloaded{
-                   [](LocalVnode::Local& c) {},
-                   [](LocalVnode::Intermediate& c) { c.UnlinkEntries(); },
-                   [](LocalVnode::Remote& s) {},
-               },
-               entry.node()->node_type_);
-    entry.node()->parent_ = nullptr;
+LocalVnode::Intermediate::~Intermediate() {
+  for (auto& entry : entries_by_id_) {
+    entry.node()->parent_and_id_.reset();
   }
   entries_by_name_.clear();
   entries_by_id_.clear();
@@ -129,7 +86,6 @@ LocalVnode::Local::Local(fdio_open_local_func_t on_open, void* context)
     : on_open_(on_open), context_(context) {}
 
 zx::result<fdio_ptr> LocalVnode::Local::Open() {
-  fbl::AutoLock lock(&lock_);
   if (on_open_ == nullptr) {
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
@@ -147,45 +103,40 @@ zx::result<fdio_ptr> LocalVnode::Local::Open() {
   return zx::ok(io);
 }
 
-void LocalVnode::Local::Unlink() {
-  fbl::AutoLock lock(&lock_);
-  on_open_ = nullptr;
-  context_ = nullptr;
-}
-
 void LocalVnode::UnlinkFromParent() {
-  if (parent_) {
-    parent_->RemoveChild(this);
+  if (std::optional opt = std::exchange(parent_and_id_, {}); opt.has_value()) {
+    const auto& [parent, id] = opt.value();
+    parent.get().RemoveEntry(this, id);
   }
-  parent_ = nullptr;
 }
 
-zx_status_t LocalVnode::EnumerateInternal(PathBuffer* path, const EnumerateCallback& func) const {
+zx_status_t LocalVnode::EnumerateInternal(PathBuffer* path, std::string_view name,
+                                          const EnumerateCallback& func) const {
   const size_t original_length = path->length();
 
   // Add this current node to the path, and enumerate it if it has a remote
   // object.
-  path->Append(Name().data(), Name().length());
+  path->Append(name);
 
-  std::visit(fdio::overloaded{
+  std::visit(fdio_internal::overloaded{
                  [](const LocalVnode::Local& c) {
                    // Nothing to do as the node has no children and is not a
                    // remote node.
                  },
-                 [&path, &func, this](const LocalVnode::Intermediate& c) {
+                 [&path, &func, &name](const LocalVnode::Intermediate& c) {
                    // If we added a node with children, add a separator and enumerate all the
                    // children.
-                   if (!Name().empty()) {
+                   if (!name.empty()) {
                      path->Append('/');
                    }
 
-                   c.ForAllEntries([&path, &func](const LocalVnode& child) {
-                     return child.EnumerateInternal(path, func);
+                   c.ForAllEntries([&path, &func](const LocalVnode& child, std::string_view name) {
+                     return child.EnumerateInternal(path, name, func);
                    });
                  },
                  [&path, &func](const LocalVnode::Remote& s) {
                    // If we added a remote node, call the enumeration function on the remote node.
-                   func(std::string_view(path->data(), path->length()), s.Connection());
+                   func(*path, s.Connection());
                  },
              },
              node_type_);
@@ -199,41 +150,40 @@ zx_status_t LocalVnode::EnumerateInternal(PathBuffer* path, const EnumerateCallb
 zx_status_t LocalVnode::EnumerateRemotes(const EnumerateCallback& func) const {
   PathBuffer path;
   path.Append('/');
-  return EnumerateInternal(&path, func);
+  return EnumerateInternal(&path, {}, func);
 }
 
-zx_status_t LocalVnode::Readdir(uint64_t* last_seen, fbl::RefPtr<LocalVnode>* out_vnode) const {
-  return std::visit(fdio::overloaded{
-                        [&](const LocalVnode::Local& c) {
+zx::result<std::string_view> LocalVnode::Readdir(uint64_t* last_seen) const {
+  return std::visit(fdio_internal::overloaded{
+                        [](const LocalVnode::Local&) -> zx::result<std::string_view> {
                           // Calling readdir on a Local node is invalid.
-                          return ZX_ERR_NOT_DIR;
+                          return zx::error(ZX_ERR_NOT_DIR);
                         },
-                        [&](const LocalVnode::Intermediate& c) {
-                          for (auto it = c.GetEntriesById().lower_bound(*last_seen);
-                               it != c.GetEntriesById().end(); ++it) {
-                            if (it->id() <= *last_seen) {
-                              continue;
-                            }
-                            *last_seen = it->id();
-                            *out_vnode = it->node();
-                            return ZX_OK;
-                          }
-                          *out_vnode = nullptr;
-                          return ZX_OK;
-                        },
-                        [](const LocalVnode::Remote& s) {
+                        [&](const LocalVnode::Intermediate& c) { return c.Readdir(last_seen); },
+                        [](const LocalVnode::Remote&) -> zx::result<std::string_view> {
                           // If we've called Readdir on a Remote node, the path
                           // was misconfigured.
-                          return ZX_ERR_BAD_PATH;
+                          return zx::error(ZX_ERR_BAD_PATH);
                         },
                     },
                     node_type_);
 }
 
+zx::result<std::string_view> LocalVnode::Intermediate::Readdir(uint64_t* last_seen) const {
+  for (auto it = entries_by_id_.lower_bound(*last_seen); it != entries_by_id_.end(); ++it) {
+    if (it->id() <= *last_seen) {
+      continue;
+    }
+    *last_seen = it->id();
+    return zx::ok(it->name());
+  }
+  return zx::error(ZX_ERR_NOT_FOUND);
+}
+
 template <typename Fn>
 zx_status_t LocalVnode::Intermediate::ForAllEntries(Fn fn) const {
   for (const Entry& entry : entries_by_id_) {
-    zx_status_t status = fn(*entry.node());
+    zx_status_t status = fn(*entry.node(), entry.name());
     if (status != ZX_OK) {
       return status;
     }

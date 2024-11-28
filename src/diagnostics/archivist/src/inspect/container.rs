@@ -17,6 +17,7 @@ use futures::channel::oneshot;
 use futures::{FutureExt, Stream};
 use selectors::SelectorExt;
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tracing::warn;
@@ -110,7 +111,6 @@ struct StoredInspectHandle {
 pub struct InspectArtifactsContainer {
     /// One or more proxies that this container is configured for.
     inspect_handles: HashMap<zx::Koid, StoredInspectHandle>,
-    on_closed_tasks: fasync::TaskGroup,
 }
 
 impl InspectArtifactsContainer {
@@ -124,7 +124,11 @@ impl InspectArtifactsContainer {
     ///
     /// Returns `None` if the handle is a DirectoryProxy and there is already one tracked,
     /// as only single handles are supported in the DirectoryProxy case.
-    pub fn push_handle(&mut self, handle: InspectHandle) -> Option<oneshot::Receiver<zx::Koid>> {
+    pub fn push_handle(
+        &mut self,
+        handle: InspectHandle,
+        on_closed: impl FnOnce(zx::Koid),
+    ) -> Option<impl Future<Output = ()>> {
         if !self.inspect_handles.is_empty() && matches!(handle, InspectHandle::Directory { .. }) {
             return None;
         }
@@ -133,7 +137,14 @@ impl InspectArtifactsContainer {
         let stored = StoredInspectHandle { _control: control_snd, handle: Arc::clone(&handle) };
         let koid = handle.koid();
         self.inspect_handles.insert(koid, stored);
-        Some(self.spawn_on_closed_task(handle, koid, control_rcv))
+        Some(async move {
+            if !handle.is_closed() {
+                let closed_fut = handle.on_closed();
+                futures::pin_mut!(closed_fut);
+                let _ = futures::future::select(closed_fut, control_rcv).await;
+            }
+            on_closed(koid);
+        })
     }
 
     /// Generate an `UnpopulatedInspectDataContainer` from the proxies managed by `self`.
@@ -203,24 +214,6 @@ impl InspectArtifactsContainer {
                 matches!(s.tree_names.as_ref(), None | Some(fdiagnostics::TreeNames::All(_)))
             }),
         }
-    }
-
-    fn spawn_on_closed_task(
-        &mut self,
-        proxy: Arc<InspectHandle>,
-        koid: zx::Koid,
-        control_rcv: oneshot::Receiver<()>,
-    ) -> oneshot::Receiver<zx::Koid> {
-        let (snd, rcv) = oneshot::channel();
-        self.on_closed_tasks.spawn(async move {
-            if !proxy.is_closed() {
-                let closed_fut = proxy.on_closed();
-                futures::pin_mut!(closed_fut);
-                let _ = futures::future::select(closed_fut, control_rcv).await;
-            }
-            let _ = snd.send(koid);
-        });
-        rcv
     }
 }
 
@@ -562,7 +555,7 @@ mod test {
         // Simulate a directory that hangs indefinitely in any request so that we consistently
         // trigger the 0 timeout.
         let (directory, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
         fasync::Task::spawn(async move {
             while stream.next().await.is_some() {
                 fasync::Timer::new(fasync::MonotonicInstant::after(
@@ -613,21 +606,19 @@ mod test {
     #[fuchsia::test]
     fn only_one_directory_proxy_is_populated() {
         let _executor = fuchsia_async::LocalExecutor::new();
-        let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let mut container = InspectArtifactsContainer::default();
-        let _rx = container.push_handle(InspectHandle::directory(directory));
-        let (directory2, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        assert!(container.push_handle(InspectHandle::directory(directory2)).is_none());
+        let _rx = container.push_handle(InspectHandle::directory(directory), |_| {});
+        let (directory2, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        assert!(container.push_handle(InspectHandle::directory(directory2), |_| {}).is_none());
     }
 
-    fn inspect_artifacts_container_with_one_dir(
-    ) -> (Option<oneshot::Receiver<zx::Koid>>, InspectArtifactsContainer) {
-        let (directory, _) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+    fn inspect_artifacts_container_with_one_dir() -> InspectArtifactsContainer {
+        let (directory, _) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
         let handle = InspectHandle::directory(directory);
         let mut container = InspectArtifactsContainer::default();
-        let rx = container.push_handle(handle);
-        (rx, container)
+        container.push_handle(handle, |_| {});
+        container
     }
 
     #[fuchsia::test]
@@ -651,7 +642,7 @@ mod test {
         };
         let selectors = Some(vec![all_selector]);
 
-        let (_rx, iac) = inspect_artifacts_container_with_one_dir();
+        let iac = inspect_artifacts_container_with_one_dir();
         let container = iac
             .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
             .unwrap();
@@ -676,7 +667,7 @@ mod test {
         };
         let selectors = Some(vec![selector_with_wrong_tree_name]);
 
-        let (_rx, iac) = inspect_artifacts_container_with_one_dir();
+        let iac = inspect_artifacts_container_with_one_dir();
         let container = iac
             .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
             .unwrap();
@@ -702,25 +693,23 @@ mod test {
 
         let selectors = Some(vec![selector_with_no_tree_names]);
 
-        let (_rx, iac) = inspect_artifacts_container_with_one_dir();
+        let iac = inspect_artifacts_container_with_one_dir();
         let container = iac
             .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
             .unwrap();
         assert_eq!(1, container.inspect_handles.len());
     }
 
-    fn inspect_artifacts_container_with_n_trees<const N: usize>(
-        tree_names: [&str; N],
-    ) -> ([Option<oneshot::Receiver<zx::Koid>>; N], InspectArtifactsContainer) {
+    fn inspect_artifacts_container_with_n_trees<'a>(
+        tree_names: impl IntoIterator<Item = &'a str>,
+    ) -> InspectArtifactsContainer {
         let mut container = InspectArtifactsContainer::default();
-        let mut rxs: [Option<oneshot::Receiver<zx::Koid>>; N] = [const { None }; N];
-        for (i, name) in tree_names.into_iter().enumerate() {
-            let (proxy, _) = fidl::endpoints::create_proxy::<finspect::TreeMarker>().unwrap();
+        for name in tree_names {
+            let (proxy, _) = fidl::endpoints::create_proxy::<finspect::TreeMarker>();
             let handle = InspectHandle::tree(proxy, Some(name));
-            rxs[i] = container.push_handle(handle)
+            container.push_handle(handle, |_| {});
         }
-
-        (rxs, container)
+        container
     }
 
     #[fuchsia::test]
@@ -745,7 +734,7 @@ mod test {
         };
         let selectors = Some(vec![b_only]);
 
-        let (_rx, iac) = inspect_artifacts_container_with_n_trees(["a"]);
+        let iac = inspect_artifacts_container_with_n_trees(["a"]);
         let container = iac
             .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
             .unwrap();
@@ -756,7 +745,7 @@ mod test {
     fn all_name_filter_matches_everything() {
         let _executor = fuchsia_async::LocalExecutor::new();
 
-        let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
+        let iac = inspect_artifacts_container_with_n_trees(["a", "b"]);
         let container = iac
             .create_unpopulated(
                 &O_K_IDENTITY,
@@ -784,7 +773,7 @@ mod test {
         };
         let selectors = Some(vec![all_selector]);
 
-        let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
+        let iac = inspect_artifacts_container_with_n_trees(["a", "b"]);
         let container = iac
             .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
             .unwrap();
@@ -815,7 +804,7 @@ mod test {
         };
         let selectors = Some(vec![lists_each_name]);
 
-        let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
+        let iac = inspect_artifacts_container_with_n_trees(["a", "b"]);
         let container = iac
             .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
             .unwrap();
@@ -844,7 +833,7 @@ mod test {
         };
         let selectors = Some(vec![a_only]);
 
-        let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
+        let iac = inspect_artifacts_container_with_n_trees(["a", "b"]);
         let container = iac
             .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
             .unwrap();
@@ -880,7 +869,7 @@ mod test {
         };
         let selectors = Some(vec![a_but_wrong_case]);
 
-        let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
+        let iac = inspect_artifacts_container_with_n_trees(["a", "b"]);
         let container = iac
             .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
             .unwrap();

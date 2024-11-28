@@ -15,7 +15,6 @@
 #define CURRENTEL_EL1           (0b01 << 2)
 #define CURRENTEL_EL2           (0b10 << 2)
 
-#define CPACR_EL1_FPEN          (0b11 << 20)
 #define ID_AA64PFR0_EL1_GIC     (0b1111 << 24)
 
 #define CNTHCTL_EL2_EVNTEN      (1 << 2)
@@ -131,9 +130,15 @@ FUNCTION(arm64_elX_to_el1)
     mov x9, CPTR_EL2_RES1
     msr cptr_el2, x9
 
-    // Disable EL1 FPU traps.
-    mov x9, CPACR_EL1_FPEN
-    msr cpacr_el1, x9
+    // Set EL1 to 64bit.
+    mov x9, HCR_EL2_RW
+    msr hcr_el2, x9
+
+    // Make sure MPIDR_EL1 and MIDR_EL1 are set correctly.
+    mrs x9, mpidr_el1
+    msr vmpidr_el2, x9
+    mrs x9, midr_el1
+    msr vpidr_el2, x9
 
     // Check whether the GIC system registers are supported.
     mrs x9, id_aa64pfr0_el1
@@ -150,10 +155,6 @@ FUNCTION(arm64_elX_to_el1)
     msr ICH_HCR_EL2, xzr
 
 .Lno_gic_sr:
-    // Set EL1 to 64bit.
-    mov x9, HCR_EL2_RW
-    msr hcr_el2, x9
-
     // Set the return address and exception level.
     adr x9, .Ltarget
     msr elr_el2, x9

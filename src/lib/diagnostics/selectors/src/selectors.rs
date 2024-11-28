@@ -3,13 +3,15 @@
 // found in the LICENSE file.
 
 use crate::error::*;
-use crate::parser::{self, ParsingError, RequireEscapedColons, VerboseError};
+use crate::parser::{self, ParsingError, RequireEscaped, VerboseError};
 use crate::validate::*;
 use anyhow::format_err;
 use fidl_fuchsia_diagnostics::{
-    ComponentSelector, Interest, LogInterestSelector, PropertySelector, Selector, SelectorArgument,
-    Severity, StringSelector, SubtreeSelector, TreeNames, TreeSelector,
+    self as fdiagnostics, ComponentSelector, Interest, LogInterestSelector, PropertySelector,
+    Selector, SelectorArgument, Severity, StringSelector, SubtreeSelector, TreeNames, TreeSelector,
 };
+use fidl_fuchsia_inspect::DEFAULT_TREE_NAME;
+use itertools::Itertools;
 use moniker::{ChildName, ExtendedMoniker, Moniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};
 use std::borrow::{Borrow, Cow};
 use std::fs;
@@ -72,7 +74,7 @@ pub fn parse_tree_selector<'a, E>(
 where
     E: ParsingError<'a>,
 {
-    let result = parser::consuming_tree_selector::<E>(unparsed_tree_selector)?;
+    let result = parser::standalone_tree_selector::<E>(unparsed_tree_selector)?;
     Ok(result.into())
 }
 
@@ -85,7 +87,7 @@ where
 {
     let result = parser::consuming_component_selector::<E>(
         unparsed_component_selector,
-        RequireEscapedColons::Yes,
+        RequireEscaped::COLONS,
     )?;
     Ok(result.into())
 }
@@ -98,7 +100,7 @@ where
 {
     let result = parser::consuming_component_selector::<E>(
         unparsed_component_selector,
-        RequireEscapedColons::No,
+        RequireEscaped::empty(),
     )?;
     Ok(result.into())
 }
@@ -332,9 +334,7 @@ pub fn match_tree_name_against_selector(tree_name: &str, selector: &Selector) ->
         // manager) have been updated to specify tree names or [...].
         None => true,
 
-        Some(TreeNames::__SourceBreaking { .. }) => {
-            unreachable!("FIDL convention to ensure exhaustive match")
-        }
+        Some(TreeNames::__SourceBreaking { .. }) => false,
     }
 }
 
@@ -427,6 +427,25 @@ where
         .collect::<Result<Vec<&ComponentSelector>, anyhow::Error>>()
 }
 
+/// Settings for how to constrtuct a displayable string from a
+/// `fidl_fuchsia_diagnostics::Selector`.
+pub struct SelectorDisplayOptions {
+    allow_wrapper_quotes: bool,
+}
+
+impl std::default::Default for SelectorDisplayOptions {
+    fn default() -> Self {
+        Self { allow_wrapper_quotes: true }
+    }
+}
+
+impl SelectorDisplayOptions {
+    /// Causes a selector to never be wrapped in exterior quotes.
+    pub fn never_wrap_in_quotes() -> Self {
+        Self { allow_wrapper_quotes: false }
+    }
+}
+
 /// Format a |Selector| as a string.
 ///
 /// Returns the formatted |Selector|, or an error if the |Selector| is invalid.
@@ -434,13 +453,25 @@ where
 /// Note that the output will always include both a component and tree selector. If your input is
 /// simply "moniker" you will likely see "moniker:root" as many clients implicitly append "root" if
 /// it is not present (e.g. iquery).
-pub fn selector_to_string(selector: Selector) -> Result<String, anyhow::Error> {
+///
+/// Name filter lists will only be shown if they have non-default tree names.
+pub fn selector_to_string(
+    selector: &Selector,
+    opts: SelectorDisplayOptions,
+) -> Result<String, anyhow::Error> {
+    fn contains_chars_requiring_wrapper_quotes(segment: &str) -> bool {
+        segment.contains('/') || segment.contains('*')
+    }
+
     selector.validate()?;
 
-    let component_selector =
-        selector.component_selector.ok_or_else(|| format_err!("component selector missing"))?;
+    let component_selector = selector
+        .component_selector
+        .as_ref()
+        .ok_or_else(|| format_err!("component selector missing"))?;
     let (node_path, maybe_property_selector) = match selector
         .tree_selector
+        .as_ref()
         .ok_or_else(|| format_err!("tree selector missing"))?
     {
         TreeSelector::SubtreeSelector(SubtreeSelector { node_path, .. }) => (node_path, None),
@@ -450,45 +481,114 @@ pub fn selector_to_string(selector: Selector) -> Result<String, anyhow::Error> {
         _ => return Err(format_err!("unknown tree selector type")),
     };
 
-    let mut segments = vec![];
-
-    let escape_special_chars = |val: &str| {
-        let mut ret = String::with_capacity(val.len());
-        for c in val.chars() {
-            if is_special_character(c) {
-                ret.push('\\');
+    let mut needs_to_be_quoted = false;
+    let result = component_selector
+        .moniker_segments
+        .as_ref()
+        .ok_or_else(|| format_err!("moniker segments missing in component selector"))?
+        .iter()
+        .map(|segment| match segment {
+            StringSelector::StringPattern(p) => {
+                needs_to_be_quoted = true;
+                Ok(p)
             }
-            ret.push(c);
-        }
-        ret
-    };
+            StringSelector::ExactMatch(s) => {
+                needs_to_be_quoted |= contains_chars_requiring_wrapper_quotes(s);
+                Ok(s)
+            }
+            fdiagnostics::StringSelectorUnknown!() => {
+                Err(format_err!("uknown StringSelector variant"))
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .join("/");
 
-    let process_string_selector_vector = |v: Vec<StringSelector>| -> Result<String, anyhow::Error> {
-        Ok(v.into_iter()
-            .map(|segment| match segment {
-                StringSelector::StringPattern(s) => Ok(s),
-                StringSelector::ExactMatch(s) => Ok(escape_special_chars(&s)),
-                _ => Err(format_err!("Unknown string selector type")),
+    let mut result = sanitize_moniker_for_selectors(&result);
+
+    let mut tree_selector_str = node_path
+        .iter()
+        .map(|segment| {
+            Ok(match segment {
+                StringSelector::StringPattern(p) => {
+                    needs_to_be_quoted = true;
+                    p.to_string()
+                }
+                StringSelector::ExactMatch(s) => {
+                    needs_to_be_quoted |= contains_chars_requiring_wrapper_quotes(s);
+                    sanitize_string_for_selectors(s).to_string()
+                }
+                fdiagnostics::StringSelectorUnknown!() => {
+                    return Err(format_err!("uknown StringSelector variant"))
+                }
             })
-            .collect::<Result<Vec<_>, anyhow::Error>>()?
-            .join("/"))
-    };
+        })
+        .collect::<Result<Vec<String>, _>>()?
+        .into_iter()
+        .join("/");
 
-    // Create the component moniker
-    segments.push(process_string_selector_vector(
-        component_selector
-            .moniker_segments
-            .ok_or_else(|| format_err!("component selector missing moniker"))?,
-    )?);
-
-    // Create the node selector
-    segments.push(process_string_selector_vector(node_path)?);
-
-    if let Some(property_selector) = maybe_property_selector {
-        segments.push(process_string_selector_vector(vec![property_selector])?);
+    if let Some(target_property) = maybe_property_selector {
+        tree_selector_str.push_str(":");
+        tree_selector_str.push_str(&match target_property {
+            StringSelector::StringPattern(p) => {
+                needs_to_be_quoted = true;
+                p.to_string()
+            }
+            StringSelector::ExactMatch(s) => {
+                needs_to_be_quoted |= contains_chars_requiring_wrapper_quotes(s);
+                sanitize_string_for_selectors(s).to_string()
+            }
+            fdiagnostics::StringSelectorUnknown!() => {
+                return Err(format_err!("uknown StringSelector variant"))
+            }
+        });
     }
 
-    Ok(segments.join(":"))
+    tree_selector_str = match &selector.tree_names {
+        None => tree_selector_str,
+        Some(names) => match names {
+            TreeNames::Some(names) => {
+                let list = names
+                    .into_iter()
+                    .filter_map(|name| {
+                        if name == DEFAULT_TREE_NAME {
+                            return None;
+                        }
+
+                        for c in name.chars() {
+                            if !(c.is_alphanumeric() || c == '-' || c == '_') {
+                                return Some(format!(r#"name="{name}""#));
+                            }
+                        }
+
+                        Some(format!("name={name}"))
+                    })
+                    .join(",");
+
+                if list.is_empty() {
+                    tree_selector_str
+                } else {
+                    needs_to_be_quoted = true;
+                    format!("[{list}]{tree_selector_str}")
+                }
+            }
+            TreeNames::All(_) => {
+                needs_to_be_quoted = true;
+                format!("[...]{tree_selector_str}")
+            }
+            fdiagnostics::TreeNamesUnknown!() => {
+                return Err(format_err!("unknown TreeNames variant"));
+            }
+        },
+    };
+
+    result.push_str(&format!(":{tree_selector_str}"));
+
+    if needs_to_be_quoted && opts.allow_wrapper_quotes {
+        Ok(format!(r#""{result}""#))
+    } else {
+        Ok(result)
+    }
 }
 
 /// Match a selector against a target string.
@@ -598,8 +698,14 @@ impl<'a> TokenBuilder<'a> {
     }
 
     fn turn_into_string(&mut self) {
-        if let Self::Slice { string, start, end: Some(end) } = self {
-            *self = Self::String(string[*start..=*end].to_string())
+        if let Self::Slice { string, start, end } = self {
+            if let Some(end) = end {
+                *self = Self::String(string[*start..=*end].to_string());
+            } else {
+                // if this is called before the first character is pushed (eg for '*abc'),
+                // `end` is None, but the state should still become `Self::String`
+                *self = Self::String(String::new());
+            }
         }
     }
 
@@ -811,8 +917,7 @@ impl SelectorExt for Moniker {
         &self,
         selector: &ComponentSelector,
     ) -> Result<bool, anyhow::Error> {
-        let s = SegmentIterator::from(self).collect::<Vec<_>>();
-        match_moniker_against_component_selector(s.into_iter(), selector)
+        match_moniker_against_component_selector(SegmentIterator::from(self), selector)
     }
 
     fn sanitized(&self) -> String {
@@ -877,6 +982,7 @@ mod tests {
     use std::path::PathBuf;
     use std::str::FromStr;
     use tempfile::TempDir;
+    use test_case::test_case;
 
     /// Loads all the selectors in the given directory.
     pub fn parse_selectors<E>(directory: &Path) -> Result<Vec<Selector>, Error>
@@ -1023,60 +1129,82 @@ a:b:c
         assert_eq!(match_res.unwrap().len(), 2);
     }
 
+    #[test_case("a/b:c:d", "a/b:c:d" ; "no_wrap_with_basic_full_selector")]
+    #[test_case("a/b:c", "a/b:c" ; "no_wrap_with_basic_partial_selector")]
+    #[test_case(r"a/b:c/d\/e:f", r#"a/b:c/d\/e:f"# ; "no_wrap_with_escaped_forward_slash")]
+    #[test_case(r"a/b:[name=root]c:d", "a/b:c:d" ; "no_wrap_with_default_name")]
+    #[test_case(r"a/b:[name=cd-e]f:g", r#"a/b:[name=cd-e]f:g"# ; "no_wrap_with_non_default_name")]
+    #[test_case(
+        r#"a:[name="bc-d"]e:f"#,
+        r"a:[name=bc-d]e:f"
+        ; "no_wrap_with_unneeded_name_quotes"
+    )]
+    #[test_case(
+        r#"a:[name="b[]c"]d:e"#,
+        r#"a:[name="b[]c"]d:e"#
+        ; "no_wrap_with_needed_name_quotes"
+    )]
+    #[test_case("a/b:[...]c:d", r#"a/b:[...]c:d"# ; "no_wrap_with_all_names")]
+    #[test_case(
+        r#"a/b:[name=c, name="d", name="f[]g"]h:i"#,
+        r#"a/b:[name=c,name=d,name="f[]g"]h:i"#
+        ; "no_wrap_with_name_list"
+    )]
+    #[test_case(r"a\:b/c:d:e", r"a\:b/c:d:e" ; "no_wrap_with_collection")]
+    #[test_case(r"a/b/c*d:e:f", r#"a/b/c*d:e:f"# ; "no_wrap_with_wildcard_component")]
+    #[test_case(r"a/b:c*/d:e", r#"a/b:c*/d:e"# ; "no_wrap_with_wildcard_tree")]
+    #[test_case(r"a/b:c\*/d:e", r#"a/b:c\*/d:e"# ; "no_wrap_with_escaped_wildcard_tree")]
+    #[test_case(r"a/b/c/d:e/f:g*", r#"a/b/c/d:e/f:g*"# ; "no_wrap_with_wildcard_property")]
+    #[test_case(r"a/b/c/d:e/f:g*", r#"a/b/c/d:e/f:g*"# ; "no_wrap_with_escaped_wildcard_property")]
+    #[test_case("a/b/c/d:e/f/g/h:k", "a/b/c/d:e/f/g/h:k" ; "no_wrap_with_deep_nesting")]
     #[fuchsia::test]
-    fn selector_to_string_test() {
-        // Check that parsing and formatting these selectors results in output identical to the
-        // original selector.
-        let cases = vec![
-            r#"moniker:root"#,
-            r#"my/component:root"#,
-            r#"my/component:root:a"#,
-            r#"a/b/c*ff:root:a"#,
-            r#"a/child*:root:a"#,
-            r#"a/child:root/a/b/c"#,
-            r#"a/child:root/a/b/c:d"#,
-            r#"a/child:root/a/b/c*/d"#,
-            r#"a/child:root/a/b/c\*/d"#,
-            r#"a/child:root/a/b/c:d*"#,
-            r#"a/child:root/a/b/c:*d*"#,
-            r#"a/child:root/a/b/c:\*d*"#,
-            r#"a/child:root/a/b/c:\*d\:\*\\"#,
-        ];
-
-        for input in cases {
-            let selector = parse_selector::<VerboseError>(input)
-                .unwrap_or_else(|e| panic!("Failed to parse '{}': {}", input, e));
-            let output = selector_to_string(selector).unwrap_or_else(|e| {
-                panic!("Failed to format parsed selector for '{}': {}", input, e)
-            });
-            assert_eq!(output, input);
-        }
+    fn selector_to_string_test_never_wrap(input: &str, expected: &str) {
+        let selector = parse_verbose(input).unwrap();
+        assert_eq!(
+            selector_to_string(&selector, SelectorDisplayOptions::never_wrap_in_quotes()).unwrap(),
+            expected,
+            "left: actual, right: expected"
+        );
     }
 
+    #[test_case("a/b:c:d", "a/b:c:d" ; "with_basic_full_selector")]
+    #[test_case("a/b:c", "a/b:c" ; "with_basic_partial_selector")]
+    #[test_case(r"a/b:c/d\/e:f", r#""a/b:c/d\/e:f""# ; "with_escaped_forward_slash")]
+    #[test_case(r"a/b:[name=root]c:d", "a/b:c:d" ; "with_default_name")]
+    #[test_case(r"a/b:[name=cd-e]f:g", r#""a/b:[name=cd-e]f:g""# ; "with_non_default_name")]
+    #[test_case(r#"a:[name="bc-d"]e:f"#, r#""a:[name=bc-d]e:f""# ; "with_unneeded_name_quotes")]
+    #[test_case(r#"a:[name="b[]c"]d:e"#, r#""a:[name="b[]c"]d:e""# ; "with_needed_name_quotes")]
+    #[test_case("a/b:[...]c:d", r#""a/b:[...]c:d""# ; "with_all_names")]
+    #[test_case(
+        r#"a/b:[name=c, name="d", name="f[]g"]h:i"#,
+        r#""a/b:[name=c,name=d,name="f[]g"]h:i""#
+        ; "with_name_list"
+    )]
+    #[test_case(r"a\:b/c:d:e", r"a\:b/c:d:e" ; "with_collection")]
+    #[test_case(r"a/b/c*d:e:f", r#""a/b/c*d:e:f""# ; "with_wildcard_component")]
+    #[test_case(r"a/b:c*/d:e", r#""a/b:c*/d:e""# ; "with_wildcard_tree")]
+    #[test_case(r"a/b:c\*/d:e", r#""a/b:c\*/d:e""# ; "with_escaped_wildcard_tree")]
+    #[test_case(r"a/b/c/d:e/f:g*", r#""a/b/c/d:e/f:g*""# ; "with_wildcard_property")]
+    #[test_case(r"a/b/c/d:e/f:g*", r#""a/b/c/d:e/f:g*""# ; "with_escaped_wildcard_property")]
+    #[test_case("a/b/c/d:e/f/g/h:k", "a/b/c/d:e/f/g/h:k" ; "with_deep_nesting")]
     #[fuchsia::test]
-    fn exact_match_selector_to_string() {
-        let selector = Selector {
-            component_selector: Some(ComponentSelector {
-                moniker_segments: Some(vec![StringSelector::ExactMatch("a".to_string())]),
-                ..Default::default()
-            }),
-            tree_selector: Some(TreeSelector::SubtreeSelector(SubtreeSelector {
-                node_path: vec![StringSelector::ExactMatch("a*:".to_string())],
-            })),
-            ..Default::default()
-        };
+    fn selector_to_string_test_default(input: &str, expected: &str) {
+        let selector = parse_verbose(input).unwrap();
+        assert_eq!(
+            selector_to_string(&selector, SelectorDisplayOptions::default()).unwrap(),
+            expected,
+            "left: actual, right: expected"
+        );
+    }
 
-        // Check we generate the expected string with escaping.
-        let selector_string = selector_to_string(selector).unwrap();
-        assert_eq!(r#"a:a\*\:"#, selector_string);
-
-        // Parse the resultant selector, and check that it matches a moniker it is supposed to.
-        let parsed = parse_selector::<VerboseError>(&selector_string).unwrap();
-        assert!(match_moniker_against_component_selector(
-            ["a"].into_iter(),
-            parsed.component_selector.as_ref().unwrap()
-        )
-        .unwrap());
+    #[test_case("a*", r"a\*" ; "when_star_not_leading")]
+    #[test_case("a:", r"a\:" ; "when_colon_not_leading")]
+    #[test_case(":", r"\:" ; "when_colon_leading")]
+    #[test_case("*", r"\*" ; "when_star_leading")]
+    #[test_case(r"*:\abc", r"\*\:\\abc" ; "when_mixed_with_leading_special_chars")]
+    #[fuchsia::test]
+    fn sanitize_string_for_selectors_works(input: &str, expected: &str) {
+        assert_eq!(sanitize_string_for_selectors(input), expected);
     }
 
     #[fuchsia::test]

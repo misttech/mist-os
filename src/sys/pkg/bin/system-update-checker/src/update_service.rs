@@ -63,9 +63,7 @@ impl UpdateService {
                     };
 
                     let monitor = if let Some(monitor) = monitor {
-                        Some(RealStateNotifier {
-                            proxy: monitor.into_proxy().context("CheckNow monitor into_proxy")?,
-                        })
+                        Some(RealStateNotifier { proxy: monitor.into_proxy() })
                     } else {
                         None
                     };
@@ -99,7 +97,7 @@ impl UpdateService {
         &mut self,
         attempts_monitor: ClientEnd<AttemptsMonitorMarker>,
     ) -> Result<(), Error> {
-        let proxy = attempts_monitor.into_proxy().context("MonitorAllUpdates into proxy")?;
+        let proxy = attempts_monitor.into_proxy();
         let callback =
             Box::new(move |control_handle| RealAttemptNotifier { proxy, control_handle });
         self.update_manager.handle_all_these_updates(callback).await;
@@ -138,8 +136,7 @@ impl Notify for RealAttemptNotifier {
 
         async move {
             let (monitor_proxy, monitor_server_end) =
-                fidl::endpoints::create_proxy::<fidl_fuchsia_update::MonitorMarker>()
-                    .map_err(|_| ClosedClient)?;
+                fidl::endpoints::create_proxy::<fidl_fuchsia_update::MonitorMarker>();
             update_attempt_event_queue
                 .add_client(RealStateNotifier { proxy: monitor_proxy })
                 .await
@@ -196,8 +193,7 @@ mod tests {
                 .spawn(),
         };
         let update_service_clone = update_service.clone();
-        let (proxy, stream) =
-            create_proxy_and_stream::<ManagerMarker>().expect("create_proxy_and_stream");
+        let (proxy, stream) = create_proxy_and_stream::<ManagerMarker>();
         fasync::Task::spawn(async move {
             update_service.handle_request_stream(stream).map(|_| ()).await
         })
@@ -240,8 +236,7 @@ mod tests {
         )
         .await
         .0;
-        let (client_end, request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end, request_stream) = fidl::endpoints::create_request_stream();
         let expected_update_info = Some(UpdateInfo {
             version_available: Some(LATEST_SYSTEM_IMAGE.to_string()),
             download_size: None,
@@ -281,17 +276,14 @@ mod tests {
             download_size: None,
         });
 
-        let (proxy1, stream1) =
-            create_proxy_and_stream::<ManagerMarker>().expect("create_proxy_and_stream");
+        let (proxy1, stream1) = create_proxy_and_stream::<ManagerMarker>();
         fasync::Task::spawn(
             async move { service.handle_request_stream(stream1).map(|_| ()).await },
         )
         .detach();
 
-        let (client_end0, request_stream0) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
-        let (client_end1, request_stream1) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end0, request_stream0) = fidl::endpoints::create_request_stream();
+        let (client_end1, request_stream1) = fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(true)
@@ -353,8 +345,7 @@ mod tests {
         .await
         .0;
 
-        let (client_end, mut request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end, mut request_stream) = fidl::endpoints::create_request_stream();
         let check_options = CheckOptions::builder().initiator(Initiator::User).build();
 
         assert_matches!(proxy.monitor_all_update_checks(client_end), Ok(()));
@@ -366,7 +357,7 @@ mod tests {
         assert_matches!(responder.send(), Ok(()));
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
-        let (_, events) = next_n_on_state_events(monitor.into_stream().unwrap(), 3).await;
+        let (_, events) = next_n_on_state_events(monitor.into_stream(), 3).await;
 
         assert_eq!(
             events,
@@ -404,9 +395,8 @@ mod tests {
         .0;
 
         let (attempt_client_end, mut attempt_request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
-        let (client_end, request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+            fidl::endpoints::create_request_stream();
+        let (client_end, request_stream) = fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder().initiator(Initiator::User).build();
 
         assert_matches!(proxy.monitor_all_update_checks(attempt_client_end), Ok(()));
@@ -417,8 +407,7 @@ mod tests {
 
         assert_matches!(responder.send(), Ok(()));
 
-        let (_, attempt_monitor_events) =
-            next_n_on_state_events(monitor.into_stream().unwrap(), 2).await;
+        let (_, attempt_monitor_events) = next_n_on_state_events(monitor.into_stream(), 2).await;
         let (_, events) = next_n_on_state_events(request_stream, 2).await;
 
         assert_eq!(events, attempt_monitor_events);
@@ -439,10 +428,8 @@ mod tests {
             version_available: Some(LATEST_SYSTEM_IMAGE.to_string()),
             download_size: None,
         });
-        let (client_end0, request_stream0) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
-        let (client_end1, request_stream1) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end0, request_stream0) = fidl::endpoints::create_request_stream();
+        let (client_end1, request_stream1) = fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(false)
@@ -496,12 +483,9 @@ mod tests {
             download_size: None,
         });
         let (attempt_client_end, mut attempt_request_stream) =
-            fidl::endpoints::create_request_stream::<AttemptsMonitorMarker>()
-                .expect("create_request_stream");
-        let (client_end0, _request_stream0) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
-        let (client_end1, _request_stream1) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+            fidl::endpoints::create_request_stream::<AttemptsMonitorMarker>();
+        let (client_end0, _request_stream0) = fidl::endpoints::create_request_stream();
+        let (client_end1, _request_stream1) = fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(false)
@@ -528,7 +512,7 @@ mod tests {
         // When we resume, attempt_monitor should see the on state events
         assert_matches!(unblocker.send(()), Ok(()));
         assert_eq!(
-            collect_all_on_state_events(monitor.into_stream().unwrap()).await,
+            collect_all_on_state_events(monitor.into_stream()).await,
             vec![
                 State::CheckingForUpdates,
                 State::InstallingUpdate(InstallingData {
@@ -554,10 +538,9 @@ mod tests {
         )
         .await;
 
-        let (monitor_client, monitor_request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (monitor_client, monitor_request_stream) = fidl::endpoints::create_request_stream();
         let (attempt_client_end, mut attempt_request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+            fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(true)
@@ -574,8 +557,7 @@ mod tests {
 
         drop(proxy0);
 
-        let (proxy1, stream1) =
-            create_proxy_and_stream::<ManagerMarker>().expect("create_proxy_and_stream");
+        let (proxy1, stream1) = create_proxy_and_stream::<ManagerMarker>();
         fasync::Task::spawn(
             async move { service.handle_request_stream(stream1).map(|_| ()).await },
         )
@@ -589,7 +571,7 @@ mod tests {
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
         assert_matches!(unblocker.send(()), Ok(()));
-        let (_, events) = next_n_on_state_events(monitor.into_stream().unwrap(), 3).await;
+        let (_, events) = next_n_on_state_events(monitor.into_stream(), 3).await;
         assert_eq!(
             events,
             vec![
@@ -626,7 +608,7 @@ mod tests {
         .0;
 
         let (attempt_client_end, mut attempt_request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+            fidl::endpoints::create_request_stream();
         let check_options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(true)
@@ -644,7 +626,7 @@ mod tests {
         assert_matches!(responder.send(), Ok(()));
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
-        let (_, events) = next_n_on_state_events(monitor.into_stream().unwrap(), 3).await;
+        let (_, events) = next_n_on_state_events(monitor.into_stream(), 3).await;
         assert_eq!(
             events,
             vec![
@@ -674,7 +656,7 @@ mod tests {
         assert_matches!(responder.send(), Ok(()));
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
-        let (_, events) = next_n_on_state_events(monitor.into_stream().unwrap(), 3).await;
+        let (_, events) = next_n_on_state_events(monitor.into_stream(), 3).await;
         assert_eq!(
             events,
             vec![
@@ -707,8 +689,7 @@ mod tests {
         )
         .await
         .0;
-        let (client_end, request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end, request_stream) = fidl::endpoints::create_request_stream();
 
         // Invalid because initiator is a required field.
         let invalid_options = fidl_fuchsia_update::CheckOptions {
@@ -735,10 +716,8 @@ mod tests {
         )
         .await
         .0;
-        let (client_end0, request_stream0) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
-        let (client_end1, request_stream1) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end0, request_stream0) = fidl::endpoints::create_request_stream();
+        let (client_end1, request_stream1) = fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(true)
@@ -791,10 +770,8 @@ mod tests {
             download_size: None,
         });
 
-        let (client_end0, request_stream0) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
-        let (client_end1, request_stream1) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end0, request_stream0) = fidl::endpoints::create_request_stream();
+        let (client_end1, request_stream1) = fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(true)
@@ -810,8 +787,7 @@ mod tests {
 
         drop(proxy0);
 
-        let (proxy1, stream1) =
-            create_proxy_and_stream::<ManagerMarker>().expect("create_proxy_and_stream");
+        let (proxy1, stream1) = create_proxy_and_stream::<ManagerMarker>();
         fasync::Task::spawn(
             async move { service.handle_request_stream(stream1).map(|_| ()).await },
         )

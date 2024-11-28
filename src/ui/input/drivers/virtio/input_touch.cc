@@ -27,7 +27,7 @@ constexpr fuchsia_input_report::wire::Axis CreateNonNegativeAxis(int64_t max_mic
 
 void TouchReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-    fidl::AnyArena& allocator) {
+    fidl::AnyArena& allocator) const {
   size_t count = 0;
   fidl::VectorView<fuchsia_input_report::wire::ContactInputReport> contact_rpt(allocator,
                                                                                kMaxTouchPoints);

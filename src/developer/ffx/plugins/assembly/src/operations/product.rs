@@ -12,10 +12,11 @@ use assembly_config_schema::platform_config::PlatformConfig;
 use assembly_config_schema::{
     AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSupportLevel,
 };
+use assembly_constants::{BlobfsCompiledPackageDestination, CompiledPackageDestination};
 use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_images_config::{FilesystemImageMode, ImagesConfig};
 use assembly_tool::SdkToolProvider;
-use assembly_util::{read_config, BlobfsCompiledPackageDestination, CompiledPackageDestination};
+use assembly_util::read_config;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_assembly_args::{PackageValidationHandling, ProductArgs};
 use tracing::info;

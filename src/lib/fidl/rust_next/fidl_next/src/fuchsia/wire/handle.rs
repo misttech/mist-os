@@ -5,11 +5,8 @@
 use core::fmt;
 use core::mem::replace;
 
-pub use zx::sys::zx_handle_t;
-pub use zx::Handle;
-
-use zx::sys::ZX_HANDLE_INVALID;
-use zx::HandleBased as _;
+use crate::zx::sys::{zx_handle_t, ZX_HANDLE_INVALID};
+use crate::zx::{Handle, HandleBased as _};
 
 use crate::fuchsia::{HandleDecoder, HandleEncoder};
 use crate::{

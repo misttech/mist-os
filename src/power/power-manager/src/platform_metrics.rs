@@ -65,8 +65,7 @@ impl fidl_contrib::protocol_connector::ConnectedProtocol for CobaltConnectedServ
         &'a mut self,
     ) -> future::BoxFuture<'a, Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, Error>> {
         async {
-            let (logger_proxy, server_end) =
-                fidl::endpoints::create_proxy().context("failed to create proxy endpoints")?;
+            let (logger_proxy, server_end) = fidl::endpoints::create_proxy();
             let metric_event_logger_factory = fuchsia_component::client::connect_to_protocol::<
                 fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
             >()
@@ -153,7 +152,8 @@ impl<'a> PlatformMetricsBuilder<'a> {
         });
 
         let inspect_platform_metrics = {
-            let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+            let inspect_root =
+                self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
             let platform_metrics_node = inspect_root.create_child("platform_metrics");
             let historical_max_cpu_temperature =
                 HistoricalMaxCpuTemperature::new(&platform_metrics_node);

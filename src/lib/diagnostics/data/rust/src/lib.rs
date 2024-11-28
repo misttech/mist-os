@@ -56,6 +56,12 @@ pub enum InspectHandleName {
     Filename(FlyStr),
 }
 
+impl std::fmt::Display for InspectHandleName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_ref())
+    }
+}
+
 impl InspectHandleName {
     /// Construct an InspectHandleName::Name
     pub fn name(n: impl Into<FlyStr>) -> Self {

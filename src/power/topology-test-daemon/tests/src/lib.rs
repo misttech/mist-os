@@ -287,9 +287,6 @@ async fn test_system_activity_control() -> Result<()> {
                 application_activity: {
                     power_level: 1u64,
                 },
-                wake_handling: {
-                    power_level: 0u64,
-                },
                 cpu: {
                     power_level: 1u64,
                 },
@@ -322,9 +319,6 @@ async fn test_system_activity_control() -> Result<()> {
                     power_level: 1u64,
                 },
                 application_activity: {
-                    power_level: 0u64,
-                },
-                wake_handling: {
                     power_level: 0u64,
                 },
                 cpu: {
@@ -564,7 +558,7 @@ async fn test_topology_control_and_status() -> Result<()> {
         },
     ];
     let _ = topology_control.create(&element).await.unwrap();
-    let (status_channel, server_channel) = create_proxy::<fbroker::StatusMarker>()?;
+    let (status_channel, server_channel) = create_proxy::<fbroker::StatusMarker>();
     let _ = topology_control.open_status_channel("C", server_channel).await?;
 
     info!("Initial check");

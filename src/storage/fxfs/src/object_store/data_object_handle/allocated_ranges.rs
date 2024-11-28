@@ -129,8 +129,17 @@ impl AllocatedRanges {
 
     /// For when a file is truncated. Drop any ranges past the cutoff point. If a range covers the
     /// cutoff point, it is modified to end at the cutoff.
-    pub fn truncate(&self, cutoff: u64) {
+    ///
+    /// Additionally, this returns true if there were previously tracked ranges but they were all
+    /// completely removed by this truncate call. In this case, metadata for a file will need to be
+    /// updated since there are no longer any overwrite ranges.
+    pub fn truncate(&self, cutoff: u64) -> bool {
         let mut ranges = self.ranges.lock().unwrap();
+        if ranges.is_empty() {
+            // Nothing to do, return early. Since there were no ranges, we didn't _remove_ all the
+            // ranges which is the specific case we want to flag on return.
+            return false;
+        }
         let mut index = match ranges.binary_search_by_key(&cutoff, |r| r.end) {
             // If the cutoff is exactly at the end of a range, that range doesn't change, so start
             // with the next one.
@@ -139,7 +148,7 @@ impl AllocatedRanges {
         };
         // If the index points at the end of the list, the cutoff is after all the ranges.
         if index == ranges.len() {
-            return;
+            return false;
         }
         // Handle the cutoff being partway through a range.
         if ranges[index].start < cutoff {
@@ -148,6 +157,9 @@ impl AllocatedRanges {
         }
 
         ranges.truncate(index);
+        // If at this point our index is zero, then we completely dropped all the ranges, and there
+        // were some ranges, because we would have returned early if it was empty to begin with.
+        index == 0
     }
 }
 
@@ -291,36 +303,69 @@ mod tests {
             applied: Vec<Range<u64>>,
             cutoff: u64,
             expected: Vec<Range<u64>>,
+            dropped_all: bool,
         }
 
         let cases = [
-            Case { applied: vec![], cutoff: 10, expected: vec![] },
-            Case { applied: vec![0..20], cutoff: 0, expected: vec![] },
-            Case { applied: vec![0..20], cutoff: 10, expected: vec![0..10] },
-            Case { applied: vec![0..20], cutoff: 20, expected: vec![0..20] },
-            Case { applied: vec![0..20], cutoff: 30, expected: vec![0..20] },
-            Case { applied: vec![0..20, 30..50], cutoff: 0, expected: vec![] },
-            Case { applied: vec![0..20, 30..50], cutoff: 10, expected: vec![0..10] },
-            Case { applied: vec![0..20, 30..50], cutoff: 30, expected: vec![0..20] },
-            Case { applied: vec![0..20, 30..50], cutoff: 40, expected: vec![0..20, 30..40] },
-            Case { applied: vec![30..50, 60..80, 90..100], cutoff: 29, expected: vec![] },
-            Case { applied: vec![30..50, 60..80, 90..100], cutoff: 30, expected: vec![] },
-            Case { applied: vec![30..50, 60..80, 90..100], cutoff: 31, expected: vec![30..31] },
+            Case { applied: vec![], cutoff: 10, expected: vec![], dropped_all: false },
+            Case { applied: vec![0..20], cutoff: 0, expected: vec![], dropped_all: true },
+            Case { applied: vec![0..20], cutoff: 10, expected: vec![0..10], dropped_all: false },
+            Case { applied: vec![0..20], cutoff: 20, expected: vec![0..20], dropped_all: false },
+            Case { applied: vec![0..20], cutoff: 30, expected: vec![0..20], dropped_all: false },
+            Case { applied: vec![0..20, 30..50], cutoff: 0, expected: vec![], dropped_all: true },
+            Case {
+                applied: vec![0..20, 30..50],
+                cutoff: 10,
+                expected: vec![0..10],
+                dropped_all: false,
+            },
+            Case {
+                applied: vec![0..20, 30..50],
+                cutoff: 30,
+                expected: vec![0..20],
+                dropped_all: false,
+            },
+            Case {
+                applied: vec![0..20, 30..50],
+                cutoff: 40,
+                expected: vec![0..20, 30..40],
+                dropped_all: false,
+            },
+            Case {
+                applied: vec![30..50, 60..80, 90..100],
+                cutoff: 29,
+                expected: vec![],
+                dropped_all: true,
+            },
+            Case {
+                applied: vec![30..50, 60..80, 90..100],
+                cutoff: 30,
+                expected: vec![],
+                dropped_all: true,
+            },
+            Case {
+                applied: vec![30..50, 60..80, 90..100],
+                cutoff: 31,
+                expected: vec![30..31],
+                dropped_all: false,
+            },
             Case {
                 applied: vec![30..50, 60..80, 90..100],
                 cutoff: 70,
                 expected: vec![30..50, 60..70],
+                dropped_all: false,
             },
             Case {
                 applied: vec![30..50, 60..80, 90..100],
                 cutoff: 110,
                 expected: vec![30..50, 60..80, 90..100],
+                dropped_all: false,
             },
         ];
 
         for (i, case) in cases.into_iter().enumerate() {
             let ranges = AllocatedRanges::new(case.applied);
-            ranges.truncate(case.cutoff);
+            assert_eq!(ranges.truncate(case.cutoff), case.dropped_all, "failed case # {}", i);
             assert_eq!(*ranges.ranges.lock().unwrap(), case.expected, "failed case # {}", i);
         }
     }

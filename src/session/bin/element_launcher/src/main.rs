@@ -57,7 +57,7 @@ mod tests {
         let test_url = "test";
         let config = element_launcher_config::Config { main_element_url: test_url.to_string() };
         let (element_manager, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<element::ManagerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<element::ManagerMarker>();
 
         let stream_fut = async move {
             let request = stream.next().await.unwrap().unwrap();

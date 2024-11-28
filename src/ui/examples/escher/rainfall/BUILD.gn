@@ -4,7 +4,7 @@
 
 import("//src/lib/vulkan/build/vulkan_targets.gni")
 
-if (is_host && !has_prebuilt_vulkan_runtime) {
+if (is_linux && !has_prebuilt_vulkan_runtime) {
   # Escher cannot run without prebuilt Vulkan runtime on host for now.
   # Since we may include Escher host tests in the default build,
   # we substitute in a dummy executable in the case of a mac build.
@@ -24,12 +24,6 @@ if (is_host && !has_prebuilt_vulkan_runtime) {
       "//lib",
       "//src/ui/lib/escher",
     ]
-
-    if (is_host) {
-      testonly = true
-      deps +=
-          [ "//src/ui/lib/escher/shaders:host_shader_data($host_toolchain)" ]
-    }
   }
 
   vulkan_executable("rainfall_on_scenic") {
@@ -44,12 +38,6 @@ if (is_host && !has_prebuilt_vulkan_runtime) {
       "//lib",
       "//src/ui/lib/escher",
     ]
-
-    if (is_host) {
-      testonly = true
-      deps +=
-          [ "//src/ui/lib/escher/shaders:host_shader_data($host_toolchain)" ]
-    }
   }
 
   group("rainfall_base") {

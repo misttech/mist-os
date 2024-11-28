@@ -447,7 +447,7 @@ impl PairingManager {
             }
         };
 
-        let (c, s) = fidl::endpoints::create_request_stream::<PairingDelegateMarker>()?;
+        let (c, s) = fidl::endpoints::create_request_stream::<PairingDelegateMarker>();
         self.pairing.set_pairing_delegate(input, output, c)?;
         self.pairing_requests.set(s);
         self.inspect_node.set_owner(&owner);
@@ -893,9 +893,9 @@ pub(crate) mod tests {
         /// upstream & downstream pairing actions.
         pub async fn new_with_manager() -> (PairingManager, Self) {
             let (pairing_svc, mut downstream_pairing_server) =
-                fidl::endpoints::create_proxy_and_stream::<PairingMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<PairingMarker>();
             let (delegate, upstream_delegate_server) =
-                fidl::endpoints::create_proxy_and_stream::<PairingDelegateMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<PairingDelegateMarker>();
             let client = PairingArgs {
                 input: InputCapability::None,
                 output: OutputCapability::None,
@@ -911,7 +911,7 @@ pub(crate) mod tests {
                 .expect("fidl request")
                 .into_set_pairing_delegate()
                 .unwrap();
-            let downstream_delegate_client = delegate.into_proxy().unwrap();
+            let downstream_delegate_client = delegate.into_proxy();
 
             let mock = MockPairing {
                 pairing_svc,
@@ -930,7 +930,7 @@ pub(crate) mod tests {
                 .expect("fidl request")
                 .into_set_pairing_delegate()
                 .unwrap();
-            self.downstream_delegate_client = delegate.into_proxy().unwrap();
+            self.downstream_delegate_client = delegate.into_proxy();
         }
 
         pub async fn expect_on_pairing_complete(&mut self, id: PeerId) {

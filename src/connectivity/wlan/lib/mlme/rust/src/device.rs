@@ -946,9 +946,11 @@ pub mod test_utils {
                 .expect("no mlme event stream available")
                 .try_next()
                 .map_err(|e| anyhow::format_err!("Failed to read mlme event stream: {}", e))
-                .and_then(|opt_next| opt_next.ok_or(anyhow::format_err!("No message available")))
+                .and_then(|opt_next| {
+                    opt_next.ok_or_else(|| anyhow::format_err!("No message available"))
+                })
                 .and_then(|evt| {
-                    T::from_event(evt).ok_or(anyhow::format_err!("Unexpected mlme event"))
+                    T::from_event(evt).ok_or_else(|| anyhow::format_err!("Unexpected mlme event"))
                 })
                 .map_err(|e| e.into())
         }
@@ -1025,7 +1027,7 @@ pub mod test_utils {
                 return mock_start_result;
             }
 
-            state.wlan_softmac_ifc_bridge_proxy = Some(ifc_bridge.into_proxy().unwrap());
+            state.wlan_softmac_ifc_bridge_proxy = Some(ifc_bridge.into_proxy());
             Ok(state.usme_bootstrap_server_end.take().unwrap().into_channel())
         }
 
@@ -1117,7 +1119,7 @@ pub mod test_utils {
             match (request.packet_template, request.tim_ele_offset, request.beacon_interval) {
                 (Some(packet_template), Some(tim_ele_offset), Some(beacon_interval)) => Ok({
                     self.state.lock().beacon_config = Some((
-                        packet_template.mac_frame.clone(),
+                        packet_template.mac_frame,
                         usize::try_from(tim_ele_offset).map_err(|_| zx::Status::INTERNAL)?,
                         TimeUnit(beacon_interval),
                     ));
@@ -1197,7 +1199,7 @@ pub mod test_utils {
     pub fn fake_band_caps() -> Vec<fidl_softmac::WlanSoftmacBandCapability> {
         vec![
             fidl_softmac::WlanSoftmacBandCapability {
-                band: Some(fidl_common::WlanBand::TwoGhz),
+                band: Some(fidl_ieee80211::WlanBand::TwoGhz),
                 basic_rates: Some(vec![
                     0x02, 0x04, 0x0b, 0x16, 0x0c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c,
                 ]),
@@ -1220,7 +1222,7 @@ pub mod test_utils {
                 ..Default::default()
             },
             fidl_softmac::WlanSoftmacBandCapability {
-                band: Some(fidl_common::WlanBand::FiveGhz),
+                band: Some(fidl_ieee80211::WlanBand::FiveGhz),
                 basic_rates: Some(vec![0x02, 0x04, 0x0b, 0x16, 0x30, 0x60, 0x7e, 0x7f]),
                 operating_channels: Some(vec![36, 40, 44, 48, 149, 153, 157, 161]),
                 ht_supported: Some(true),
@@ -1294,7 +1296,7 @@ mod tests {
 
         let expected_band_caps = [
             fidl_softmac::WlanSoftmacBandCapability {
-                band: Some(fidl_common::WlanBand::TwoGhz),
+                band: Some(fidl_ieee80211::WlanBand::TwoGhz),
                 basic_rates: Some(vec![
                     0x02, 0x04, 0x0b, 0x16, 0x0c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c,
                 ]),
@@ -1317,7 +1319,7 @@ mod tests {
                 ..Default::default()
             },
             fidl_softmac::WlanSoftmacBandCapability {
-                band: Some(fidl_common::WlanBand::FiveGhz),
+                band: Some(fidl_ieee80211::WlanBand::FiveGhz),
                 basic_rates: Some(vec![0x02, 0x04, 0x0b, 0x16, 0x30, 0x60, 0x7e, 0x7f]),
                 operating_channels: Some(vec![36, 40, 44, 48, 149, 153, 157, 161]),
                 ht_supported: Some(true),

@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{Context, Result};
 use assembly_config_schema::platform_config::setui_config::{ICUType, SetUiConfig};
-use assembly_util::FileEntry;
+use assembly_constants::FileEntry;
 
 pub(crate) struct SetUiSubsystem;
 impl DefineSubsystemConfiguration<SetUiConfig> for SetUiSubsystem {

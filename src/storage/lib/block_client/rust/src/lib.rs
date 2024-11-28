@@ -618,7 +618,7 @@ impl RemoteBlockClient {
     pub async fn new(remote: impl AsBlockProxy) -> Result<Self, zx::Status> {
         let info =
             remote.get_info().await.map_err(fidl_to_status)?.map_err(zx::Status::from_raw)?;
-        let (session, server) = fidl::endpoints::create_proxy().map_err(fidl_to_status)?;
+        let (session, server) = fidl::endpoints::create_proxy();
         let () = remote.open_session(server).map_err(fidl_to_status)?;
         let fifo =
             session.get_fifo().await.map_err(fidl_to_status)?.map_err(zx::Status::from_raw)?;
@@ -876,11 +876,11 @@ mod tests {
             .await
             .expect("RamdiskClient::create failed");
         let client_end = ramdisk.open().expect("ramdisk.open failed");
-        let proxy = client_end.into_proxy().expect("into_proxy failed");
+        let proxy = client_end.into_proxy();
         let block_client = RemoteBlockClient::new(proxy).await.expect("new failed");
         assert_eq!(block_client.block_size(), 1024);
         let client_end = ramdisk.open().expect("ramdisk.open failed");
-        let proxy = client_end.into_proxy().expect("into_proxy failed");
+        let proxy = client_end.into_proxy();
         (ramdisk, proxy, block_client)
     }
 
@@ -1182,7 +1182,6 @@ mod tests {
             let channel_future = async {
                 server
                     .into_stream()
-                    .expect("into_stream failed")
                     .for_each_concurrent(None, |request| async {
                         let request = request.expect("unexpected fidl error");
 
@@ -1198,7 +1197,7 @@ mod tests {
                                     .expect("send failed");
                             }
                             block::BlockRequest::OpenSession { session, control_handle: _ } => {
-                                let stream = session.into_stream().expect("into_stream failed");
+                                let stream = session.into_stream();
                                 stream
                                     .for_each(|request| async {
                                         let request = request.expect("unexpected fidl error");
@@ -1269,8 +1268,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_block_flush_is_called() {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<block::BlockMarker>()
-            .expect("create_proxy failed");
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<block::BlockMarker>();
 
         struct Interface {
             flush_called: Arc<AtomicBool>,
@@ -1343,7 +1341,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_trace_flow_ids_set() {
-        let (proxy, server) = fidl::endpoints::create_proxy().expect("create_proxy failed");
+        let (proxy, server) = fidl::endpoints::create_proxy();
 
         futures::join!(
             async {

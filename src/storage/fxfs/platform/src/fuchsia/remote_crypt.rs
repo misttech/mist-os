@@ -15,7 +15,7 @@ pub struct RemoteCrypt {
 
 impl RemoteCrypt {
     pub fn new(client: ClientEnd<CryptMarker>) -> Self {
-        Self { client: client.into_proxy().unwrap() }
+        Self { client: client.into_proxy() }
     }
 }
 

@@ -11,7 +11,10 @@ group("tests") {
 
 zx_library("dma-buffer") {
   sdk = "source"
-  sdk_headers = [ "lib/dma-buffer/buffer.h" ]
+  sdk_headers = [
+    "lib/dma-buffer/buffer.h",
+    "lib/dma-buffer/phys-iter.h",
+  ]
 
   sources = [ "dma-buffer.cc" ]
   deps = [

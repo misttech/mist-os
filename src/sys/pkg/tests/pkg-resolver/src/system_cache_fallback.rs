@@ -235,7 +235,7 @@ async fn test_cache_fallback_succeeds_rewrite_rule() {
     // System cache fallback is only triggered for fuchsia.com repos, but
     // a fuchsia.com transformed by a rewrite rule should still work.
     env.register_repo_at_url(&served_repository, "fuchsia-pkg://test").await;
-    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
+    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
     let rule = Rule::new("fuchsia.com", "test", "/", "/").unwrap();
     let () = edit_transaction.add(&rule.clone().into()).await.unwrap().unwrap();

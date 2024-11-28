@@ -40,6 +40,11 @@
             to: "#testing",
         },
         {
+            protocol: "fuchsia.component.Introspector.root",
+            from: "parent",
+            to: "#testing",
+        },
+        {
             protocol: "fuchsia.pkg.PackageResolver",
             from: "#pkg-resolver",
             to: "#testing",

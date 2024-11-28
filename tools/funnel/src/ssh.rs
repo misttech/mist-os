@@ -23,8 +23,15 @@ const CLEANUP_COMMAND: &'static str = include_str!("cleanup_command");
 pub enum TunnelError {
     #[error("Target {target} did not have any valid Ip Addresses associated with it.")]
     NoAddressesError { target: String },
-    #[error("There may be a tunnel already running to {remote_host}. Try running `funnel cleanup-remote-host {remote_host}` to clean it up before retrying")]
-    TunnelAlreadyRunning { remote_host: String },
+    #[error(
+        "Failed to forward a port to remote host {remote_host}.\n\
+        There may already be a tunnel running. You can try:\n\n\
+        `funnel cleanup-remote-host {remote_host}` on local\n\n\
+        If you see `Error: remote port forwarding failed for listen port $PORT` you can try:\n\n\
+        `netstat -tulpne | grep :$PORT` on the remote host to find if a process has already \
+        taken the port."
+    )]
+    PortForwardingFailed { remote_host: String },
     #[error("Ssh was terminated by a signal")]
     SshTerminatedFromSignal,
     #[error("User's home dir is not valid UTF8: {home_dir}")]
@@ -45,7 +52,7 @@ impl IntoExitCode for TunnelError {
     fn exit_code(&self) -> i32 {
         match self {
             Self::NoAddressesError { target: _ } => 31,
-            Self::TunnelAlreadyRunning { remote_host: _ } => 32,
+            Self::PortForwardingFailed { remote_host: _ } => 32,
             Self::SshTerminatedFromSignal => 128,
             Self::InvalidHomeDir { home_dir: _ } => 33,
             Self::NoHomeDir => 34,
@@ -106,7 +113,7 @@ pub(crate) async fn do_ssh<W: Write>(
     match ssh.wait() {
         Ok(e) => match e.code() {
             None => Err(TunnelError::SshTerminatedFromSignal),
-            Some(255) => Err(TunnelError::TunnelAlreadyRunning { remote_host: host.clone() }),
+            Some(255) => Err(TunnelError::PortForwardingFailed { remote_host: host }),
             Some(0) => Ok(()),
             Some(i) => Err(TunnelError::SshError(i)),
         },
@@ -127,13 +134,14 @@ fn build_ssh_args<W: Write>(
     // address, and (generally) Ipv4 addresses from the Target are ephemeral
     addrs.sort_by(|a, b| b.cmp(a));
 
-    let target_ip =
-        addrs.first().ok_or(TunnelError::NoAddressesError { target: target.nodename.clone() })?;
+    let target_ip = addrs
+        .first()
+        .ok_or_else(|| TunnelError::NoAddressesError { target: target.nodename.clone() })?;
 
     if addrs.len() > 1 {
         tracing::warn!(
             "Target: {} has {} addresses associated with it: {:?}. Choosing the first one: {}",
-            target.nodename.clone(),
+            target.nodename,
             addrs.len(),
             addrs,
             target_ip

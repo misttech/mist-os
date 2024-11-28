@@ -49,3 +49,9 @@ type WlanTxStatusEntry = struct {
     /// DDK assumes the number of attempts per packet will not exceed 255. (typically <= 8)
     attempts uint8;
 };
+
+@available(removed=NEXT)
+type WlanBand = flexible enum : uint8 {
+    TWO_GHZ = 0;
+    FIVE_GHZ = 1;
+};

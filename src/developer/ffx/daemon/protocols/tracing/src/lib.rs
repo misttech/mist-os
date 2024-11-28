@@ -58,7 +58,7 @@ impl TriggerSetItem {
 
     /// Convenience constructor for doing a lookup.
     fn lookup(alert: String) -> Self {
-        Self { alert: alert.to_owned(), action: ffx::Action::Terminate }
+        Self { alert: alert, action: ffx::Action::Terminate }
     }
 }
 
@@ -162,8 +162,7 @@ impl TraceTask {
         let (client, server) = fidl::Socket::create_stream();
         let client = fidl::AsyncSocket::from_socket(client);
         let f = File::create(&output_file).await.context("opening file")?;
-        let (client_end, server_end) =
-            fidl::endpoints::create_proxy::<trace::SessionMarker>().unwrap();
+        let (client_end, server_end) = fidl::endpoints::create_proxy::<trace::SessionMarker>();
         provisioner.initialize_tracing(server_end, &config, server)?;
         client_end
             .start_tracing(&trace::StartOptions::default())
@@ -490,15 +489,16 @@ impl FidlProtocol for TracingProtocol {
                 };
                 let output_file = task.output_file.clone();
                 let target_info = task.target_info.clone();
+                let categories = task.config.categories.clone().unwrap_or_default();
                 responder
                     .send(match task.shutdown().await {
-                        Ok(ref result) => Ok((&target_info, &output_file, result)),
+                        Ok(ref result) => Ok((&target_info, &output_file, &categories, result)),
                         Err(e) => Err(e),
                     })
                     .map_err(Into::into)
             }
             ffx::TracingRequest::Status { iterator, responder } => {
-                let mut stream = iterator.into_stream()?;
+                let mut stream = iterator.into_stream();
                 let res = self
                     .tasks
                     .lock()
@@ -569,7 +569,7 @@ mod tests {
             match req {
                 trace::ProvisionerRequest::InitializeTracing { controller, output, .. } => {
                     let start_error = self.start_error;
-                    let mut stream = controller.into_stream().unwrap();
+                    let mut stream = controller.into_stream();
                     while let Ok(Some(req)) = stream.try_next().await {
                         match req {
                             trace::SessionRequest::StartTracing { responder, .. } => {
@@ -818,8 +818,8 @@ mod tests {
     }
 
     fn spawn_fake_alert_watcher(alert: &'static str) -> trace::SessionProxy {
-        let (proxy, server) = fidl::endpoints::create_proxy::<trace::SessionMarker>().unwrap();
-        let mut stream = server.into_stream().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<trace::SessionMarker>();
+        let mut stream = server.into_stream();
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
@@ -852,7 +852,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_triggers_server_dropped() {
-        let (proxy, server) = fidl::endpoints::create_proxy::<trace::SessionMarker>().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<trace::SessionMarker>();
         let (_sender, receiver) = async_channel::bounded::<()>(1);
         drop(server);
         let triggers = Some(vec![

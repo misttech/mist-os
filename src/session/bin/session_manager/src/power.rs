@@ -107,7 +107,7 @@ impl PowerElement {
             .map_err(|e| anyhow!("PowerBroker::LeaseError({e:?})"))?;
 
         // Wait for the lease to be satisfied.
-        let lease = lease.into_proxy()?;
+        let lease = lease.into_proxy();
         let mut status = fbroker::LeaseStatus::Unknown;
         loop {
             match lease.watch_status(status).await? {

@@ -6,6 +6,7 @@ library fuchsia.hardware.display.engine;
 using fuchsia.hardware.display.types;
 using fuchsia.hardware.i2cimpl;
 using fuchsia.images2;
+using fuchsia.math;
 using fuchsia.sysmem2;
 using zx;
 
@@ -43,6 +44,105 @@ type DisplayMode = struct {
     flags ModeFlag;
 };
 
+type Layer = struct {
+    /// The display image (composited output) region occupied by the layer.
+    ///
+    /// The rectangle uses the Vulkan coordinate space. The origin is at the
+    /// display's top-left corner. The X axis points to the right, and the Y axis
+    /// points downwards.
+    ///
+    /// A valid layer definition requires a valid non-empty display destination
+    /// rectangle that is entirely contained within the display. A rectangle is
+    /// empty iff its size is 0x0 (width and height are both zero).
+    display_destination fuchsia.math.RectU;
+
+    /// The associated image region whose pixels are drawn by the layer.
+    ///
+    /// The rectangle uses the Vulkan coordinate space. The origin is at the
+    /// image's top-left corner. The X axis points to the right, and the Y axis
+    /// points downwards.
+    ///
+    /// A valid layer definition requires a valid image source rectangle that is
+    /// entirely contained within the image. If the rectangle is empty, the
+    /// hardware is configured to skip fetching image pixels, and instead fill
+    /// `display_destination` using a constant color, which is `fallback_color`
+    /// defined below.
+    ///
+    /// Hardware image scaling is requested implicitly, when the region's
+    /// dimensions differ from the dimensions of `display_destination`. Some
+    /// display hardware may not support scaling. All display hardware has
+    /// limitations in scaling support.
+    image_source fuchsia.math.RectU;
+
+    /// The image whose pixels are drawn by this layer.
+    ///
+    /// If valid, the image ID must be the result of a successful call to
+    /// [`fuchsia.hardware.display.engine/Engine.ImportImage`].
+    ///
+    /// A valid layer definition requires that the image ID is invalid iff
+    /// `image_source` specifies an empty rectangle.
+    ///
+    /// To allow for future evolution, Layer consumers must ignore the image ID
+    /// if `image_source` specifies an empty rectangle.
+    ///
+    /// Hardware image cropping is requested implicitly, when the source
+    /// region's dimensions differ from the image's dimensions. Some display
+    /// hardware may not support cropping.
+    image_id ImageId;
+
+    /// The arguments used to import `image_id`.
+    ///
+    /// If `image_id` is valid, the metadata must equal the argument passed
+    /// to [`fuchsia.hardware.display.engine/Engine.ImportImage`].
+    ///
+    /// A valid layer definition requires that the metadata is valid. A valid
+    /// layer definition requires that the metadata specifies an empty (0x0)
+    /// image with linear tiling if `image_source` specifies an empty rectangle.
+    image_metadata fuchsia.hardware.display.types.ImageMetadata;
+
+    /// Fallback when the pixel data for the layer's image cannot be retrieved.
+    ///
+    /// A valid layer definition requires that the color is valid.
+    ///
+    /// If `image_source` specifies an empty region, the hardware is configured
+    /// to fill the layer's pixels using this color. Conceptually, the source
+    /// image's pixel data will never be available for the image.
+    ///
+    /// The hardware may also use this color as a last resort for situations
+    /// such as buffer underruns, when the pixel data for the layer's image
+    /// cannot be retrieved fast enough to meet the display connection's timing
+    /// requirements.
+    fallback_color fuchsia.hardware.display.types.Color;
+
+    /// If `alpha_mode` is `AlphaMode.DISABLE`, the layer is opaque and
+    /// `alpha_layer_val` is ignored.
+    ///
+    /// If `alpha_mode` is `AlphaMode.PREMULTIPLIED` or `HW_MULTIPLY`, the
+    /// alpha used when blending is determined by the product of
+    /// `alpha_layer_val` and any per-pixel alpha.
+    ///
+    /// Additionally, if `alpha_mode` is `AlphaMode.PREMULTIPLIED`, then the
+    /// hardware must premultiply the color channel with `alpha_layer_val`
+    /// before blending.
+    ///
+    /// `alpha_layer_val` must be in the range [0, 1].
+    alpha_mode fuchsia.hardware.display.types.AlphaMode;
+    alpha_layer_val float32;
+
+    /// Applied to the input image pixels specified by `image_source`.
+    ///
+    /// `display_destination` must account for image dimensions changes caused
+    /// by rotations. For example, rotating a 600x300 pixel image by 90 degrees
+    /// would specify 300x600 pixel dimensions in `display_destination`.
+    ///
+    /// A valid layer definition requires that the transformation is the
+    /// identity transformation if `image_source` specifies an empty rectangle.
+    ///
+    /// To allow for future evolution, Layer consumers must ignore the
+    /// transformation if `image_source` specifies an empty rectangle.
+    image_source_transformation fuchsia.hardware.display.types.CoordinateTransformation;
+};
+
 type DisplayConfig = struct {
     /// the display id to which the configuration applies
     display_id uint64;
@@ -60,7 +160,7 @@ type DisplayConfig = struct {
     cc_coefficients array<array<float32, 3>, 3>;
     cc_postoffsets array<float32, 3>;
 
-    layer vector<fuchsia.hardware.display.types.Layer>:MAX;
+    layer vector<Layer>:MAX;
 };
 
 // An E-EDID can contain up to 256 data blocks, each of which contains 128

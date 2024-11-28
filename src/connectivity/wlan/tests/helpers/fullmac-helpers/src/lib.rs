@@ -65,8 +65,7 @@ pub async fn create_fullmac_driver(
         .expect("FIDL error on create_fullmac")
         .expect("TestController returned an error on create fullmac");
 
-    let mut fullmac_bridge_stream =
-        fullmac_bridge_server.into_stream().expect("Could not create stream");
+    let mut fullmac_bridge_stream = fullmac_bridge_server.into_stream();
 
     // Fullmac MLME queries driver before starting
     let (fullmac_ifc_proxy, generic_sme_proxy) =
@@ -80,20 +79,22 @@ pub async fn handle_fullmac_startup(
     config: &config::FullmacDriverConfig,
 ) -> (fidl_fullmac::WlanFullmacImplIfcProxy, fidl_sme::GenericSmeProxy) {
     let (usme_bootstrap_proxy, usme_bootstrap_server) =
-        create_proxy::<fidl_sme::UsmeBootstrapMarker>()
-            .expect("Could not craete usme_bootstrap proxy");
+        create_proxy::<fidl_sme::UsmeBootstrapMarker>();
 
     let fullmac_ifc_proxy = assert_variant!(fullmac_bridge_stream.next().await,
-        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::Start { ifc, responder })) => {
+        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::Init { payload, responder })) => {
             responder
-                .send(Ok(usme_bootstrap_server.into_channel()))
-                .expect("Failed to respond to Start");
-            ifc.into_proxy().expect("Could not turn fullmac_ifc_channel into proxy")
+                .send(Ok(fidl_fullmac::WlanFullmacImplInitResponse {
+                    sme_channel: Some(usme_bootstrap_server.into_channel()),
+                    ..Default::default()
+                }))
+                .expect("Failed to respond to Init");
+            let ifc = payload.ifc.expect("Init response missing ifc");
+            ifc.into_proxy()
         }
     );
 
-    let (generic_sme_proxy, generic_sme_server) =
-        create_proxy::<fidl_sme::GenericSmeMarker>().expect("Failed to create generic_sme_proxy");
+    let (generic_sme_proxy, generic_sme_server) = create_proxy::<fidl_sme::GenericSmeMarker>();
 
     let _bootstrap_result = usme_bootstrap_proxy
         .start(generic_sme_server, &config.sme_legacy_privacy_support)

@@ -81,6 +81,31 @@ _COMPOSITE_POLICY_PATHS = (
         ),
         "range_transition_policy.pp",
     ),
+    (
+        (
+            "base_policy.conf",
+            "new_file/minimal_policy.conf",
+            "new_file/allow_fork.conf",
+        ),
+        "allow_fork.pp",
+    ),
+    (
+        (
+            "base_policy.conf",
+            "new_file/minimal_policy.conf",
+            "new_file/with_unlabeled_access_domain_policy.conf",
+        ),
+        "with_unlabeled_access_domain_policy.pp",
+    ),
+    (
+        (
+            "base_policy.conf",
+            "new_file/minimal_policy.conf",
+            "new_file/with_unlabeled_access_domain_policy.conf",
+            "new_file/with_additional_domain_policy.conf",
+        ),
+        "with_additional_domain_policy.pp",
+    ),
 )
 
 

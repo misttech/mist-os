@@ -51,7 +51,7 @@ mod tests {
         let ioport_resource = get_ioport_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::IoportResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::IoportResourceMarker>();
         fasync::Task::local(
             IoportResource::new(ioport_resource)
                 .serve(stream)
@@ -64,7 +64,7 @@ mod tests {
     #[fuchsia::test]
     async fn fail_with_no_ioport_resource() -> Result<(), Error> {
         let (_, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::IoportResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::IoportResourceMarker>();
         IoportResource::new(Resource::from(zx::Handle::invalid()))
             .serve(stream)
             .await

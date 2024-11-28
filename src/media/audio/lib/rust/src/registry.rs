@@ -69,7 +69,7 @@ impl Registry {
             .cloned()
             .ok_or_else(|| anyhow!("Device with ID {} does not exist", token_id))?;
 
-        let (observer_proxy, observer_server) = create_proxy::<fadevice::ObserverMarker>().unwrap();
+        let (observer_proxy, observer_server) = create_proxy::<fadevice::ObserverMarker>();
 
         let _ = self
             .proxy
@@ -442,8 +442,7 @@ mod test {
                     _ => unimplemented!(),
                 }
             }
-        })
-        .unwrap();
+        });
 
         (proxy, added_publisher, removed_publisher)
     }

@@ -5,7 +5,7 @@
 use crate::log_if_err;
 use crate::message::Message;
 use crate::node::Node;
-use anyhow::{format_err, Context, Result};
+use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use fidl::endpoints::Proxy as _;
 use fuchsia_component::client::connect_to_protocol;
@@ -197,8 +197,7 @@ impl ActivityHandler {
             ));
         }
         let (client, stream) =
-            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>()
-                .context("Failed to create request stream")?;
+            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>();
         activity_provider
             .watch_state(client)
             .map_err(|e| format_err!("watch_state failed: {:?}", e))?;
@@ -255,8 +254,7 @@ mod tests {
     impl FakeActivityProvider {
         fn new() -> (factivity::ProviderProxy, Self) {
             let (provider_proxy, provider_stream) =
-                fidl::endpoints::create_proxy_and_stream::<factivity::ProviderMarker>()
-                    .expect("Failed to create ActivityProvider proxy and stream");
+                fidl::endpoints::create_proxy_and_stream::<factivity::ProviderMarker>();
 
             (provider_proxy, Self { provider_stream, listener_proxy: None })
         }
@@ -277,7 +275,7 @@ mod tests {
                     .expect("Provider request stream yielded Some(Err)")
                 {
                     factivity::ProviderRequest::WatchState { listener, .. } => {
-                        listener.into_proxy().expect("Failed to convert ClientEnd into proxy")
+                        listener.into_proxy()
                     }
                 };
 

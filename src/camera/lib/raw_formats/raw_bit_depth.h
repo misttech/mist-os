@@ -4,6 +4,8 @@
 #ifndef SRC_CAMERA_LIB_RAW_FORMATS_RAW_BIT_DEPTH_H_
 #define SRC_CAMERA_LIB_RAW_FORMATS_RAW_BIT_DEPTH_H_
 
+#include <cstddef>
+
 #include "src/camera/lib/raw_formats/pointer_list.h"
 #include "src/camera/lib/raw_formats/raw_hash.h"
 

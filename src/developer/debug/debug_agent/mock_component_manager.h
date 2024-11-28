@@ -13,8 +13,7 @@
 namespace debug_agent {
 
 enum class FakeEventType : uint32_t {
-  kDiscovered = 0,
-  kDebugStarted,
+  kDebugStarted = 0,
   kStopped,
   kLast,
 };
@@ -48,10 +47,6 @@ class MockComponentManager : public ComponentManager {
   void InjectComponentEvent(FakeEventType type, const std::string& moniker,
                             const std::string& url) {
     switch (type) {
-      case FakeEventType::kDiscovered: {
-        debug_agent_->OnComponentDiscovered(moniker, url);
-        break;
-      }
       case FakeEventType::kDebugStarted: {
         debug_agent_->OnComponentStarted(moniker, url);
         break;

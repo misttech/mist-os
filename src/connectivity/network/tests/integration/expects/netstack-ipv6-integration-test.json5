@@ -13,20 +13,11 @@
             type: "expect_failure_with_err_logs",
             matchers: [
                 "sends_mld_reports_ns3*",
-                "slaac_regeneration_after_dad_failure_ns3",
-            ],
-        },
-        {
-            type: "skip",
 
-            // Tests time out because netstack3 doesn't send Router
-            // Solicitations when IPv6 forwarding is enabled.
-            // TODO(https://fxbug.dev/42075425): Add support to netstack3 for
-            // sending router solicitations and handling router advertisements
-            // when acting as a router.
-            matchers: [
-                "sends_router_solicitations_ns3::router",
-                "slaac_with_privacy_extensions_ns3::router",
+                // TODO(https://fxbug.dev/42148800): This test should pass when
+                // we support opaque interface identifiers which then allow
+                // re-generation of stable SLAAC addresses.
+                "slaac_regeneration_after_dad_failure_ns3",
             ],
         },
         {

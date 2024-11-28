@@ -468,7 +468,7 @@ impl Scene {
         self.facets
             .get(target)
             .and_then(|facet_entry| Some(facet_entry.location))
-            .unwrap_or(Point::zero())
+            .unwrap_or_else(Point::zero)
     }
 
     /// Get the size of a facet.
@@ -601,7 +601,7 @@ impl<'a> GroupBuilder<'a> {
     where
         F: FnMut(&mut SceneBuilder),
     {
-        self.builder.start_group(&self.label, self.arranger.unwrap_or(Flex::new_ptr()));
+        self.builder.start_group(&self.label, self.arranger.unwrap_or_else(Flex::new_ptr));
         f(self.builder);
         self.builder.end_group()
     }
@@ -618,7 +618,7 @@ impl<'a> GroupBuilder<'a> {
     {
         self.builder.start_group_with_member_data(
             &self.label,
-            self.arranger.unwrap_or(Flex::new_ptr()),
+            self.arranger.unwrap_or_else(Flex::new_ptr),
             member_data,
         );
         f(self.builder);
@@ -734,7 +734,7 @@ impl SceneBuilder {
     ) -> FacetId {
         self.push_facet(
             RectangleFacet::h_line(width, thickness, color),
-            location.unwrap_or(Point::zero()),
+            location.unwrap_or_else(Point::zero),
             member_data,
         )
     }
@@ -761,7 +761,7 @@ impl SceneBuilder {
     ) -> FacetId {
         self.push_facet(
             RectangleFacet::v_line(height, thickness, color),
-            location.unwrap_or(Point::zero()),
+            location.unwrap_or_else(Point::zero),
             member_data,
         )
     }

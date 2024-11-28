@@ -57,20 +57,18 @@ mod test_snapshot_sanitizing;
 async fn triage_detect_test(test_data: TestData) -> Result<(), Error> {
     info!("running test case {}", test_data.name);
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
-    let (realm_proxy, realm_server) =
-        endpoints::create_proxy::<RealmProxy_Marker>().expect("infallible");
+    let (realm_proxy, realm_server) = endpoints::create_proxy::<RealmProxy_Marker>();
     realm_factory
         .create_realm(test_data.realm_options, realm_server)
         .await?
         .map_err(OperationError)?;
-    let (_proxy, server_end) =
-        endpoints::create_proxy::<fidl_fuchsia_component::BinderMarker>().expect("infallible");
+    let (_proxy, server_end) = endpoints::create_proxy::<fidl_fuchsia_component::BinderMarker>();
     let _result = realm_proxy
         .connect_to_named_protocol("fuchsia.component.DetectBinder", server_end.into_channel())
         .await
         .expect("connection failed");
 
-    let event_proxy = realm_factory.get_triage_detect_events().await?.into_proxy()?;
+    let event_proxy = realm_factory.get_triage_detect_events().await?.into_proxy();
     let mut event_stream = event_proxy.take_event_stream();
     let fake_clock_control_proxy =
         connect_into_realm::<fake_clock_fidl::FakeClockControlMarker>(&realm_proxy).await;
@@ -272,7 +270,7 @@ async fn connect_into_realm<T>(
 where
     T: endpoints::ProtocolMarker,
 {
-    let (proxy, server_end) = endpoints::create_proxy::<T>().expect("infallible");
+    let (proxy, server_end) = endpoints::create_proxy::<T>();
     let _result = realm_proxy
         .connect_to_named_protocol(
             <T as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,

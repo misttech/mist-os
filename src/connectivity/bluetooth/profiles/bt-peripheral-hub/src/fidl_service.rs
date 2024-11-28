@@ -28,7 +28,7 @@ fn handle_reporter_client_connection(
     state: Arc<PeripheralState>,
 ) -> BoxFuture<'static, ()> {
     info!("New power.Reporter client connection");
-    let reporter = Reporter::new(state.clone());
+    let reporter = Reporter::new(state);
     async move {
         let result = reporter.run(stream).await;
         info!("Reporter handler for FIDL client finished with result: {:?}", result);

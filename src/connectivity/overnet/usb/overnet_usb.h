@@ -336,10 +336,10 @@ class OvernetUsb : public fdf::DriverBase,
   fbl::Mutex lock_;
   State state_ __TA_GUARDED(lock_) = Unconfigured();
 
-  usb_endpoint::UsbEndpoint<OvernetUsb> bulk_out_ep_{usb::EndpointType::BULK, this,
-                                                     std::mem_fn(&OvernetUsb::ReadComplete)};
-  usb_endpoint::UsbEndpoint<OvernetUsb> bulk_in_ep_{usb::EndpointType::BULK, this,
-                                                    std::mem_fn(&OvernetUsb::WriteComplete)};
+  usb::EndpointClient<OvernetUsb> bulk_out_ep_{usb::EndpointType::BULK, this,
+                                               std::mem_fn(&OvernetUsb::ReadComplete)};
+  usb::EndpointClient<OvernetUsb> bulk_in_ep_{usb::EndpointType::BULK, this,
+                                              std::mem_fn(&OvernetUsb::WriteComplete)};
 
   struct {
     usb_interface_descriptor_t data_interface;

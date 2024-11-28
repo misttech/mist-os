@@ -120,7 +120,7 @@ impl AddFromPmTool {
         let (client, server) =
             ffx_core::macro_deps::fidl::endpoints::create_endpoints::<RepositoryIteratorMarker>();
         self.repos.list_repositories(server).bug_context("listing repositories")?;
-        let client = client.into_proxy().bug_context("creating repository iterator proxy")?;
+        let client = client.into_proxy();
         let (repo_path, repo_aliases) = match repo_spec {
             RepositorySpec::Pm { path, aliases } => (Some(path.to_string()), aliases),
             _ => return_user_error!("only pm style repositories are supported"),
@@ -191,7 +191,7 @@ mod test {
                             responder.send(Ok(())).unwrap();
                         }
                         RepositoryRegistryRequest::ListRepositories { iterator, .. } => {
-                            let mut iterator = iterator.into_stream().unwrap();
+                            let mut iterator = iterator.into_stream();
                             while let Some(Ok(req)) = iterator.next().await {
                                 match req {
                                     RepositoryIteratorRequest::Next { responder } => {
@@ -222,8 +222,7 @@ mod test {
 
         let (repos, stream) = ffx_core::macro_deps::fidl::endpoints::create_proxy_and_stream::<
             RepositoryRegistryMarker,
-        >()
-        .unwrap();
+        >();
 
         let _ = FakeRepositoryRegistry::new(stream, sender);
 
@@ -293,8 +292,7 @@ mod test {
 
         let (repos, stream) = ffx_core::macro_deps::fidl::endpoints::create_proxy_and_stream::<
             RepositoryRegistryMarker,
-        >()
-        .unwrap();
+        >();
 
         let _ = FakeRepositoryRegistry::new(stream, sender);
 
@@ -378,8 +376,7 @@ mod test {
 
         let (repos, stream) = ffx_core::macro_deps::fidl::endpoints::create_proxy_and_stream::<
             RepositoryRegistryMarker,
-        >()
-        .unwrap();
+        >();
 
         let _ = FakeRepositoryRegistry::new(stream, sender);
 

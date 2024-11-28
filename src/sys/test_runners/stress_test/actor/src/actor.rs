@@ -58,7 +58,7 @@ pub async fn actor_loop<D>(mut data: D, actions: Vec<Action<D>>) -> Result<()> {
     let OutgoingProtocols::Actor(mut stream) = service_fs
         .next()
         .await
-        .ok_or(format_err!("Could not get next connection to Actor protocol"))?;
+        .ok_or_else(|| format_err!("Could not get next connection to Actor protocol"))?;
 
     while let Some(request) = stream
         .try_next()
@@ -67,7 +67,7 @@ pub async fn actor_loop<D>(mut data: D, actions: Vec<Action<D>>) -> Result<()> {
     {
         match request {
             ActorRequest::GetActions { responder } => {
-                let (client_end, mut stream) = create_request_stream::<ActionIteratorMarker>()?;
+                let (client_end, mut stream) = create_request_stream::<ActionIteratorMarker>();
                 responder.send(client_end)?;
 
                 let actions: Vec<_> = actions.iter().map(|c| c.to_fidl()).collect();

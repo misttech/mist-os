@@ -1053,9 +1053,11 @@ void DebugAgent::OnProcessChanged(ProcessChangedHow how,
   }
 }
 
-void DebugAgent::OnComponentDiscovered(const std::string& moniker, const std::string& url) {
+void DebugAgent::OnComponentStarted(const std::string& moniker, const std::string& url) {
   auto matched_filters = GetMatchingFiltersForComponentInfo(moniker, url);
+  debug_ipc::NotifyComponentStarting notify;
 
+  // Install recursive filters.
   for (auto filter : matched_filters) {
     if (filter != nullptr && filter->filter().config.recursive) {
       // When any recursive filter matches here, we install a component moniker prefix filter so
@@ -1074,22 +1076,17 @@ void DebugAgent::OnComponentDiscovered(const std::string& moniker, const std::st
 
       filters_.emplace_back(realm_filter);
 
-      debug_ipc::NotifyComponentDiscovered notify;
       notify.filter = realm_filter;
-
-      SendNotification(notify);
-      return;
     }
   }
-}
 
-void DebugAgent::OnComponentStarted(const std::string& moniker, const std::string& url) {
-  if (!GetMatchingFiltersForComponentInfo(moniker, url).empty()) {
-    debug_ipc::NotifyComponentStarting notify;
+  // And add the component information.
+  if (!matched_filters.empty()) {
     notify.component.moniker = moniker;
     notify.component.url = url;
     notify.timestamp = GetNowTimestamp();
 
+    // Only send the notification if something matched.
     SendNotification(notify);
   }
 }

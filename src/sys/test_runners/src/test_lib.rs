@@ -134,7 +134,7 @@ pub async fn collect_listener_event(
                 let name = invocation.name.unwrap();
                 ret.push(ListenerEvent::StartTest(name.clone()));
                 loggers.push(std_handles);
-                let mut listener = listener.into_stream()?;
+                let mut listener = listener.into_stream();
                 // We want exhaustive match, and if we add more variants in the future we'd need to
                 // handle the requests in a loop, so allow this lint violation.
                 #[allow(clippy::never_loop)]
@@ -283,7 +283,7 @@ pub async fn connect_to_test_manager() -> Result<ftest_manager::RunBuilderProxy,
         .context("could not connect to Realm service")?;
 
     let child_ref = fdecl::ChildRef { name: "test_manager".to_owned(), collection: None };
-    let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
     realm
         .open_exposed_dir(&child_ref, server_end)
         .await

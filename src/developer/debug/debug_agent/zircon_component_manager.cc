@@ -59,11 +59,10 @@ fidl::ServerEnd<Protocol> CreateEndpointsAndBind(fidl::Client<Protocol>& client)
 void ReadElfJobId(fidl::Client<fuchsia_io::Directory> runtime_dir, const std::string& moniker,
                   fit::callback<void(zx_koid_t)> cb) {
   fidl::Client<fuchsia_io::File> job_id_file;
-  auto open_res = runtime_dir->Open(
-      {fuchsia_io::OpenFlags::kRightReadable,
-       {},
-       "elf/job_id",
-       fidl::ServerEnd<fuchsia_io::Node>(CreateEndpointsAndBind(job_id_file).TakeChannel())});
+  auto open_res = runtime_dir->Open3({"elf/job_id",
+                                      fuchsia_io::kPermReadable,
+                                      {},
+                                      CreateEndpointsAndBind(job_id_file).TakeChannel()});
   if (!open_res.is_ok()) {
     LOGS(Error) << "Failed to open elf/job_id for " << moniker;
     return cb(ZX_KOID_INVALID);
@@ -219,13 +218,8 @@ ZirconComponentManager::ZirconComponentManager(SystemInterface* system_interface
       }
       std::string moniker = *instance.moniker();
       fidl::Client<fuchsia_io::Directory> runtime_dir;
-      auto open_res = realm_query->Open(
-          {moniker,
-           fuchsia_sys2::OpenDirType::kRuntimeDir,
-           fuchsia_io::OpenFlags::kRightReadable,
-           {},
-           ".",
-           fidl::ServerEnd<fuchsia_io::Node>(CreateEndpointsAndBind(runtime_dir).TakeChannel())});
+      auto open_res = realm_query->OpenDirectory(
+          {moniker, fuchsia_sys2::OpenDirType::kRuntimeDir, CreateEndpointsAndBind(runtime_dir)});
       if (!open_res.is_ok()) {
         continue;
       }
@@ -264,12 +258,6 @@ void ZirconComponentManager::OnComponentEvent(fuchsia_component::Event event) {
   const auto& moniker = *event.header()->moniker();
   const auto& url = *event.header()->component_url();
   switch (*event.header()->event_type()) {
-    case fuchsia_component::EventType::kDiscovered: {
-      if (debug_agent_) {
-        debug_agent_->OnComponentDiscovered(moniker, url);
-      }
-      break;
-    }
     case fuchsia_component::EventType::kDebugStarted:
       if (debug_agent_) {
         debug_agent_->OnComponentStarted(moniker, url);

@@ -73,7 +73,7 @@ impl Service for HardwareLightService {
             return Err(format_err!("unsupported"));
         }
 
-        let mut request_stream = ServerEnd::<LightMarker>::new(channel).into_stream()?;
+        let mut request_stream = ServerEnd::<LightMarker>::new(channel).into_stream();
 
         let light_info = self.light_info.clone();
         let simple_values = self.simple_values.clone();

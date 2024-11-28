@@ -80,7 +80,7 @@ impl ServerOperation for PutOperation {
                     None => {
                         self.srm = Self::check_headers_for_srm(self.srm_supported, &headers);
                         // If SRM was just negotiated then we need to include it in the response.
-                        self.srm.as_ref().map_or(HeaderSet::new(), |srm| {
+                        self.srm.as_ref().map_or_else(HeaderSet::new, |srm| {
                             HeaderSet::from_header(Header::SingleResponseMode(*srm))
                         })
                     }

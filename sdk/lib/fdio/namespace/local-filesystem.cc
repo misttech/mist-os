@@ -36,16 +36,15 @@ std::pair<std::string_view, bool> FindNextPathSegment(std::string_view path) {
 }
 
 zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
-    fbl::RefPtr<fdio_internal::LocalVnode> parent, fbl::String name,
+    std::optional<fdio_internal::LocalVnode::ParentAndId> parent_and_id,
     fidl::ClientEnd<fio::Directory> remote) {
   zxio_storage_t remote_storage;
   if (zx_status_t status = zxio::CreateDirectory(&remote_storage, std::move(remote));
       status != ZX_OK) {
     return zx::error(status);
   }
-  return fdio_internal::LocalVnode::Create(
-      std::move(parent), std::move(name), std::in_place_type_t<fdio_internal::LocalVnode::Remote>(),
-      remote_storage);
+  return zx::ok(fbl::MakeRefCounted<fdio_internal::LocalVnode>(
+      parent_and_id, std::in_place_type_t<fdio_internal::LocalVnode::Remote>(), remote_storage));
 }
 
 }  // namespace
@@ -53,14 +52,8 @@ zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
 fdio_namespace::fdio_namespace() { ResetRoot(); }
 
 void fdio_namespace::ResetRoot() {
-  zx::result vn_res = LocalVnode::Create({}, {}, std::in_place_type_t<LocalVnode::Intermediate>());
-  ZX_ASSERT_MSG(vn_res.is_ok(), "%s", vn_res.status_string());
-  root_ = std::move(vn_res.value());
-}
-
-fdio_namespace::~fdio_namespace() {
-  fbl::AutoLock lock(&lock_);
-  root_->Unlink();
+  root_ = fbl::MakeRefCounted<LocalVnode>(std::nullopt,
+                                          std::in_place_type_t<LocalVnode::Intermediate>());
 }
 
 zx_status_t fdio_namespace::WalkLocked(fbl::RefPtr<LocalVnode>* in_out_vn,
@@ -87,7 +80,7 @@ zx_status_t fdio_namespace::WalkLocked(fbl::RefPtr<LocalVnode>* in_out_vn,
       // walking a path within the namespace, or a need to continue parsing the path to
       // find the end of the path within the namespace.
       std::optional walk_status_opt =
-          std::visit(fdio::overloaded{
+          std::visit(fdio_internal::overloaded{
                          [](LocalVnode::Local& c) -> std::optional<zx_status_t> {
                            // Local file are never directories.
                            return ZX_ERR_NOT_FOUND;
@@ -153,7 +146,7 @@ zx::result<fdio_ptr> fdio_namespace::OpenAtDeprecated(fbl::RefPtr<LocalVnode> vn
   }
 
   return std::visit(
-      fdio::overloaded{
+      fdio_internal::overloaded{
           [&](LocalVnode::Local& l) -> zx::result<fdio_ptr> { return l.Open(); },
           [&](LocalVnode::Intermediate& c) -> zx::result<fdio_ptr> { return CreateConnection(vn); },
           [&](LocalVnode::Remote& s) -> zx::result<fdio_ptr> {
@@ -182,7 +175,7 @@ zx::result<fdio_ptr> fdio_namespace::OpenAt(fbl::RefPtr<LocalVnode> vn, std::str
   }
 
   return std::visit(
-      fdio::overloaded{
+      fdio_internal::overloaded{
           [&](LocalVnode::Local& l) -> zx::result<fdio_ptr> { return l.Open(); },
           [&](LocalVnode::Intermediate& c) -> zx::result<fdio_ptr> { return CreateConnection(vn); },
           [&](LocalVnode::Remote& s) -> zx::result<fdio_ptr> {
@@ -218,12 +211,11 @@ zx_status_t fdio_namespace::Readdir(const LocalVnode& vn, DirentIteratorState* s
     state->encountered_dot = true;
     return ZX_OK;
   }
-  fbl::RefPtr<LocalVnode> child_vnode;
-  vn.Readdir(&state->last_seen, &child_vnode);
-  if (!child_vnode) {
-    return ZX_ERR_NOT_FOUND;
+  zx::result name = vn.Readdir(&state->last_seen);
+  if (name.is_error()) {
+    return name.error_value();
   }
-  return populate_entry(inout_entry, child_vnode->Name());
+  return populate_entry(inout_entry, name.value());
 }
 
 zx::result<fdio_ptr> fdio_namespace::CreateConnection(fbl::RefPtr<LocalVnode> vn) const {
@@ -249,7 +241,7 @@ zx_status_t fdio_namespace::OpenRemoteDeprecated(std::string_view path, fio::wir
     }
   }
 
-  return std::visit(fdio::overloaded{
+  return std::visit(fdio_internal::overloaded{
                         [](LocalVnode::Local& l) {
                           // Cannot connect to non-mount-points.
                           return ZX_ERR_NOT_SUPPORTED;
@@ -291,7 +283,7 @@ zx_status_t fdio_namespace::OpenRemote(std::string_view path, fio::Flags flags,
     }
   }
 
-  return std::visit(fdio::overloaded{
+  return std::visit(fdio_internal::overloaded{
                         [](LocalVnode::Local& l) {
                           // Cannot connect to non-mount-points.
                           return ZX_ERR_NOT_SUPPORTED;
@@ -324,49 +316,30 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
   fbl::AutoLock lock(&lock_);
   fbl::RefPtr<LocalVnode> vn = root_;
 
+  if (path.empty()) {
+    if (zx_status_t status =
+            std::visit(fdio_internal::overloaded{
+                           [&](LocalVnode::Local&) -> zx_status_t { return ZX_OK; },
+                           [](LocalVnode::Intermediate&) -> zx_status_t {
+                             // The node identified by the path is not a mount point,
+                             // so unbinding makes no sense.
+                             return ZX_ERR_NOT_FOUND;
+                           },
+                           [&](LocalVnode::Remote&) -> zx_status_t { return ZX_OK; },
+                       },
+                       vn->NodeType());
+        status != ZX_OK) {
+      return status;
+    }
+    ResetRoot();
+    return ZX_OK;
+  }
+
   // This node denotes the "highest" node in a lineage of nodes with
   // one or fewer children. It is tracked to ensure that when the target
   // node identified by `path` is identified, we unbind it and all
   // child-less parents that its removal would have created.
   fbl::RefPtr<LocalVnode> removable_origin_vn;
-
-  auto handle_terminal_node = [&removable_origin_vn, &vn](bool is_last_segment) -> zx_status_t {
-    if (!is_last_segment) {
-      // If the non-final segment of a namespace path has a Local node,
-      // then the path is invalid, since this Vnode has no children, and future
-      // segments cannot exist in the namespace.
-      return ZX_ERR_NOT_FOUND;
-    }
-
-    // There is no higher parent to unlink than our target node.
-    if (removable_origin_vn == nullptr) {
-      removable_origin_vn = vn;
-    }
-
-    removable_origin_vn->Unlink();
-    return ZX_OK;
-  };
-
-  if (path.empty()) {
-    auto handle_root_terminal_node = [&]() {
-      return handle_terminal_node(true /* is_last_segment */);
-    };
-    zx_status_t status = std::visit(
-        fdio::overloaded{
-            [&](LocalVnode::Local&) -> zx_status_t { return handle_root_terminal_node(); },
-            [](LocalVnode::Intermediate&) -> zx_status_t {
-              // The node identified by the path is not a mount point,
-              // so unbinding makes no sense.
-              return ZX_ERR_NOT_FOUND;
-            },
-            [&](LocalVnode::Remote&) -> zx_status_t { return handle_root_terminal_node(); },
-        },
-        vn->NodeType());
-    if (status == ZX_OK) {
-      ResetRoot();
-    }
-    return status;
-  }
 
   for (;;) {
     auto [next_path_segment, is_last_segment] = FindNextPathSegment(path);
@@ -377,7 +350,7 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
 
     // Check to see if the working node contains a child identified by the next path segment.
     zx::result next_vn =
-        std::visit(fdio::overloaded{
+        std::visit(fdio_internal::overloaded{
                        [](LocalVnode::Local&) -> zx::result<fbl::RefPtr<LocalVnode>> {
                          // At the end of each iteration, its considered a failure for the "next"
                          // working node to not be intermediate if more segments remain, so the only
@@ -411,14 +384,30 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
 
     vn = std::move(next_vn.value());
 
-    auto handle_nonroot_terminal_node = [&]() { return handle_terminal_node(is_last_segment); };
+    auto handle_terminal_node = [&removable_origin_vn, &vn, &is_last_segment]() -> zx_status_t {
+      if (!is_last_segment) {
+        // If the non-final segment of a namespace path has a Local node,
+        // then the path is invalid, since this Vnode has no children, and future
+        // segments cannot exist in the namespace.
+        return ZX_ERR_NOT_FOUND;
+      }
+
+      // There is no higher parent to unlink than our target node.
+      if (removable_origin_vn == nullptr) {
+        removable_origin_vn = vn;
+      }
+
+      removable_origin_vn->UnlinkFromParent();
+      return ZX_OK;
+    };
 
     // The outcome of this visit is a ternary that either communicates a success/failure in
     // an unbind attempt, or a need to continue parsing the path to find the bind location.
     std::optional status_opt = std::visit(
-        fdio::overloaded{
-            [&handle_nonroot_terminal_node](const LocalVnode::Local&)
-                -> std::optional<zx_status_t> { return handle_nonroot_terminal_node(); },
+        fdio_internal::overloaded{
+            [&handle_terminal_node](const LocalVnode::Local&) -> std::optional<zx_status_t> {
+              return handle_terminal_node();
+            },
             [&, is_last_segment = is_last_segment, next_path_segment = next_path_segment](
                 const LocalVnode::Intermediate& c) -> std::optional<zx_status_t> {
               if (is_last_segment) {
@@ -427,7 +416,7 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
                 return ZX_ERR_NOT_FOUND;
               }
 
-              if (c.GetEntriesById().size() > 1) {
+              if (c.num_children() > 1) {
                 // If this node has multiple children (including something OTHER than the
                 // node we're potentially unbinding), we shouldn't try to remove it while
                 // deleting childless intermediate nodes.
@@ -445,8 +434,9 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
 
               return std::nullopt;
             },
-            [&handle_nonroot_terminal_node](const LocalVnode::Remote&)
-                -> std::optional<zx_status_t> { return handle_nonroot_terminal_node(); },
+            [&handle_terminal_node](const LocalVnode::Remote&) -> std::optional<zx_status_t> {
+              return handle_terminal_node();
+            },
         },
         vn->NodeType());
 
@@ -469,7 +459,7 @@ bool fdio_namespace::IsBound(std::string_view path) {
     return false;
   }
 
-  return std::visit(fdio::overloaded{
+  return std::visit(fdio_internal::overloaded{
                         [&](LocalVnode::Local& l) { return path == "."; },
                         [](LocalVnode::Intermediate& c) { return false; },
                         [&](LocalVnode::Remote& s) { return path == "."; },
@@ -481,23 +471,23 @@ zx_status_t fdio_namespace::Bind(std::string_view path, fidl::ClientEnd<fio::Dir
   if (!remote.is_valid()) {
     return ZX_ERR_BAD_HANDLE;
   }
-  return Bind(
-      path, [remote = std::move(remote)](fbl::RefPtr<LocalVnode> parent, fbl::String name) mutable {
-        return CreateRemoteVnode(std::move(parent), std::move(name), std::move(remote));
-      });
+  return Bind(path, [remote = std::move(remote)](
+                        std::optional<LocalVnode::ParentAndId> parent_and_id) mutable {
+    return CreateRemoteVnode(parent_and_id, std::move(remote));
+  });
 }
 
 zx_status_t fdio_namespace::Bind(std::string_view path, fdio_open_local_func_t on_open,
                                  void* context) {
-  return Bind(path, [on_open, context](fbl::RefPtr<LocalVnode> parent, fbl::String name) {
-    return LocalVnode::Create(std::move(parent), std::move(name),
-                              std::in_place_type_t<LocalVnode::Local>(), on_open, context);
+  return Bind(path, [on_open, context](std::optional<LocalVnode::ParentAndId> parent_and_id) {
+    return zx::ok(fbl::MakeRefCounted<LocalVnode>(
+        parent_and_id, std::in_place_type_t<LocalVnode::Local>(), on_open, context));
   });
 }
 
 zx_status_t fdio_namespace::Bind(
     std::string_view path,
-    fit::function<zx::result<fbl::RefPtr<LocalVnode>>(fbl::RefPtr<LocalVnode>, fbl::String name)>
+    fit::function<zx::result<fbl::RefPtr<LocalVnode>>(std::optional<LocalVnode::ParentAndId>)>
         builder) {
   if (!cpp20::starts_with(path, '/')) {
     return ZX_ERR_INVALID_ARGS;
@@ -512,7 +502,7 @@ zx_status_t fdio_namespace::Bind(
     // bind root if:
     //   A) root was previously an intermediate node, and already has any children.
     //   B) root was previously a remote or local node.
-    return std::visit(fdio::overloaded{
+    return std::visit(fdio_internal::overloaded{
                           [](LocalVnode::Local& l) {
                             // Root is already a local node. Bind must fail.
                             return ZX_ERR_ALREADY_EXISTS;
@@ -526,13 +516,13 @@ zx_status_t fdio_namespace::Bind(
                             // TA_REQ annotations for lock_, and annotating the lambdas with
                             // NO_TA will prevent future internal locks from being scrutinized.
                             []() __TA_ASSERT(lock_) {}();
-                            if (c.has_children()) {
+                            if (c.num_children() != 0) {
                               // Overlay remotes are disallowed.
                               return ZX_ERR_NOT_SUPPORTED;
                             }
 
                             // The path was "/" so we're trying to bind to the root vnode.
-                            zx::result vn_res = builder({}, {});
+                            zx::result vn_res = builder({});
                             if (vn_res.is_error()) {
                               return vn_res.error_value();
                             }
@@ -555,7 +545,7 @@ zx_status_t fdio_namespace::Bind(
   // before unlocking and returning.
   auto cleanup = fit::defer([&first_new_node]() {
     if (first_new_node != nullptr) {
-      first_new_node->Unlink();
+      first_new_node->UnlinkFromParent();
     }
   });
 
@@ -566,56 +556,43 @@ zx_status_t fdio_namespace::Bind(
       return ZX_ERR_BAD_PATH;
     }
 
+    auto next_path_segment_builder =
+        [&](LocalVnode::ParentAndId parent_and_id) -> zx::result<fbl::RefPtr<LocalVnode>> {
+      if (is_last_segment) {
+        return builder(parent_and_id);
+      }
+      return zx::ok(fbl::MakeRefCounted<LocalVnode>(
+          parent_and_id, std::in_place_type_t<LocalVnode::Intermediate>()));
+    };
+
     // The outcome of this visit is a ternary that either communicates a success/failure in
     // a bind attempt, or a need to continue parsing the path to find the bind location.
     std::optional walk_status_opt = std::visit(
-        fdio::overloaded{
+        fdio_internal::overloaded{
             [](LocalVnode::Local& l) -> std::optional<zx_status_t> {
               // Encountering a valid storage end at any point in the bind path
               // implies shadowing, which is not supported.
               return ZX_ERR_NOT_SUPPORTED;
             },
-            [&, is_last_segment = is_last_segment, next_path_segment = next_path_segment](
-                LocalVnode::Intermediate& c) -> std::optional<zx_status_t> {
+            [&](LocalVnode::Intermediate& c) -> std::optional<zx_status_t> {
+              zx::result res = c.LookupOrInsert(next_path_segment, next_path_segment_builder);
+              if (res.is_error()) {
+                return res.error_value();
+              }
+              auto& [child, created] = res.value();
+              vn = std::move(child);
               if (is_last_segment) {
                 // If the final segment already exists as a child on our working node,
                 // we cannot overwrite.
-                if (c.Lookup(next_path_segment) != nullptr) {
+                if (!created) {
                   return ZX_ERR_ALREADY_EXISTS;
                 }
-
-                zx::result vn_res = builder(vn, fbl::String(next_path_segment));
-
-                if (vn_res.is_error()) {
-                  return vn_res.error_value();
-                }
-
-                vn = std::move(vn_res.value());
                 return ZX_OK;
               }
-
-              fbl::RefPtr<LocalVnode> child = c.Lookup(next_path_segment);
-
-              if (child != nullptr) {
-                // Re-use an existing intermediate node, and continue
-                // the search.
-                vn = child;
-                return std::nullopt;
-              }
-
-              // Create a new intermediate node.
-              zx::result vn_res =
-                  LocalVnode::Create(vn, fbl::String(next_path_segment),
-                                     std::in_place_type_t<LocalVnode::Intermediate>());
-              if (vn_res.is_error()) {
-                return vn_res.error_value();
-              }
-              vn = std::move(vn_res.value());
-
               // Keep track of the first node we create. If any subsequent
               // operation fails during bind, we will need to delete all nodes
               // in this subtree.
-              if (first_new_node == nullptr) {
+              if (created && first_new_node == nullptr) {
                 first_new_node = vn;
               }
 
@@ -653,7 +630,7 @@ zx::result<fdio_ptr> fdio_namespace::OpenRoot() const {
   }();
 
   return std::visit(
-      fdio::overloaded{
+      fdio_internal::overloaded{
           [&](LocalVnode::Local&) -> zx::result<fdio_ptr> {
             // The root node should never be a local node.
             return zx::error(ZX_ERR_NOT_SUPPORTED);
@@ -691,7 +668,7 @@ zx_status_t fdio_namespace::SetRoot(fdio_t* io) {
       return status;
     }
 
-    zx::result vn_res = CreateRemoteVnode({}, {}, std::move(client_end));
+    zx::result vn_res = CreateRemoteVnode({}, std::move(client_end));
     if (vn_res.is_error()) {
       return vn_res.error_value();
     }
@@ -707,7 +684,6 @@ zx_status_t fdio_namespace::SetRoot(fdio_t* io) {
 
   vn->UnlinkFromParent();
   std::swap(root_, vn);
-  vn->Unlink();
   return ZX_OK;
 }
 

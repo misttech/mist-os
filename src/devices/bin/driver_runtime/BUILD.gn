@@ -29,9 +29,9 @@ source_set("driver_runtime_impl") {
     "channel.cc",
     "dispatcher.cc",
     "dispatcher_dump.cc",
-    "driver_context.cc",
     "handle.cc",
     "message_packet.cc",
+    "thread_context.cc",
     "token_manager.cc",
   ]
   public_configs = [ ":include" ]
@@ -74,9 +74,9 @@ test("driver_runtime_test") {
     "channel_test.cc",
     "dispatcher_dump_test.cc",
     "dispatcher_test.cc",
-    "driver_context_test.cc",
     "handle_test.cc",
     "runtime_test_case.cc",
+    "thread_context_test.cc",
     "token_test.cc",
   ]
   deps = [

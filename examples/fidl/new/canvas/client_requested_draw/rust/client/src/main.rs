@@ -82,8 +82,8 @@ async fn main() -> Result<(), Error> {
 
         // [START diff_3]
         // Assemble a line from the two points.
-        let from = points.pop().ok_or(format_err!("line requires 2 points, but has 0"))?;
-        let to = points.pop().ok_or(format_err!("line requires 2 points, but has 1"))?;
+        let from = points.pop().ok_or_else(|| format_err!("line requires 2 points, but has 0"))?;
+        let to = points.pop().ok_or_else(|| format_err!("line requires 2 points, but has 1"))?;
         let mut line: [Point; 2] = [from, to];
 
         // Batch a line for drawing to the canvas using the two points provided.

@@ -106,13 +106,13 @@ impl GuestInitiated {
         // transitions are to a clean or forced shutdown.
         match op {
             OpType::Shutdown => VsockConnectionState::GuestInitiatedShutdown(
-                GuestInitiatedShutdown::new(self.key, self.control_packets.clone()),
+                GuestInitiatedShutdown::new(self.key, self.control_packets),
             ),
             op => {
                 tracing::error!("Unsupported GuestInitiated operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
-                    self.control_packets.clone(),
+                    self.control_packets,
                 ))
             }
         }
@@ -397,7 +397,7 @@ impl ReadWrite {
                     // initiated shutdown.
                     VsockConnectionState::GuestInitiatedShutdown(GuestInitiatedShutdown::new(
                         self.key,
-                        self.control_packets.clone(),
+                        self.control_packets,
                     ))
                 } else {
                     VsockConnectionState::ReadWrite(self)
@@ -407,7 +407,7 @@ impl ReadWrite {
                 tracing::error!("Unsupported ReadWrite operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
-                    self.control_packets.clone(),
+                    self.control_packets,
                 ))
             }
         }
@@ -741,7 +741,7 @@ impl GuestInitiatedShutdown {
                 tracing::error!("Unsupported GuestInitiatedShutdown operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
-                    self.control_packets.clone(),
+                    self.control_packets,
                 ))
             }
         }
@@ -788,12 +788,12 @@ impl ClientInitiatedShutdown {
                 tracing::info!("Guest sent shutdown while being asked to shutdown");
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
-                    self.control_packets.clone(),
+                    self.control_packets,
                 ))
             }
             OpType::Reset => VsockConnectionState::ShutdownClean(ShutdownClean::new(
                 self.key,
-                self.control_packets.clone(),
+                self.control_packets,
             )),
             OpType::ReadWrite | OpType::CreditUpdate | OpType::CreditRequest => {
                 // The guest may have already had pending TX packets on the queue when it received
@@ -804,7 +804,7 @@ impl ClientInitiatedShutdown {
                 tracing::error!("Unsupported ClientInitiatedShutdown operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
-                    self.control_packets.clone(),
+                    self.control_packets,
                 ))
             }
         }
@@ -865,10 +865,7 @@ impl ShutdownClean {
             but received operation {:?}",
             op
         );
-        VsockConnectionState::ShutdownForced(ShutdownForced::new(
-            self.key,
-            self.control_packets.clone(),
-        ))
+        VsockConnectionState::ShutdownForced(ShutdownForced::new(self.key, self.control_packets))
     }
 
     async fn do_state_action(&self) -> StateAction {
@@ -1106,8 +1103,7 @@ mod tests {
     async fn guest_initiated_generator() -> VsockConnectionState {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let (proxy, _stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (proxy, _stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>();
 
         let response_fut = proxy.accept(DEFAULT_GUEST_CID, key.guest_port, key.host_port);
         VsockConnectionState::GuestInitiated(GuestInitiated::new(
@@ -1121,8 +1117,7 @@ mod tests {
     async fn client_initiated_generator() -> VsockConnectionState {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
 
         fasync::Task::local(async move {
             let _ = proxy.connect(10).await;
@@ -1375,8 +1370,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let mut executor = fasync::TestExecutor::new();
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>();
 
         let response_fut = proxy.accept(DEFAULT_GUEST_CID, key.guest_port, key.host_port);
         let state =
@@ -1410,8 +1404,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let mut executor = fasync::TestExecutor::new();
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>();
 
         let response_fut = proxy.accept(DEFAULT_GUEST_CID, key.guest_port, key.host_port);
         let state =
@@ -1445,8 +1438,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
         let mut executor = fasync::TestExecutor::new();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
 
         let mut fut = proxy.connect(key.guest_port);
         assert!(executor.run_until_stalled(&mut fut).is_pending());
@@ -1483,8 +1475,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
         let mut executor = fasync::TestExecutor::new();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
 
         let mut fut = proxy.connect(key.guest_port);
         assert!(executor.run_until_stalled(&mut fut).is_pending());

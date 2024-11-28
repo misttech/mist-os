@@ -40,7 +40,7 @@ impl TestPackage {
     fn serve_on(&self, dir_request: ServerEnd<fio::DirectoryMarker>) {
         // Connect to the backing directory which we'll proxy _most_ requests to.
         let (backing_dir_proxy, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         fuchsia_fs::directory::open_channel_in_namespace(
             self.root.to_str().unwrap(),
             fio::PERM_READABLE,
@@ -52,7 +52,7 @@ impl TestPackage {
         // asking to resolve the package, but proxy it through our handler so that we can
         // intercept requests for /meta.
         fasync::Task::spawn(handle_package_directory_stream(
-            dir_request.into_stream().unwrap(),
+            dir_request.into_stream(),
             backing_dir_proxy,
         ))
         .detach();
@@ -78,7 +78,7 @@ pub async fn handle_package_directory_stream(
     backing_dir_proxy: fio::DirectoryProxy,
 ) {
     async move {
-        let (package_contents_dir_proxy, package_contents_dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (package_contents_dir_proxy, package_contents_dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         backing_dir_proxy
             .open3(
                 PACKAGE_CONTENTS_PATH,
@@ -247,8 +247,7 @@ impl MockResolverService {
     }
 
     pub fn spawn_resolver_service(self: Arc<Self>) -> PackageResolverProxy {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PackageResolverMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PackageResolverMarker>();
 
         fasync::Task::spawn(self.run_resolver_service(stream).unwrap_or_else(|e| {
             panic!("error running package resolver service: {:#}", anyhow!(e))
@@ -435,7 +434,7 @@ mod tests {
         url: &str,
     ) -> impl Future<Output = Result<(fio::DirectoryProxy, fpkg::ResolutionContext), ResolveError>>
     {
-        let (package_dir, package_dir_server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (package_dir, package_dir_server_end) = fidl::endpoints::create_proxy();
         let fut = proxy.resolve(url, package_dir_server_end);
 
         async move {

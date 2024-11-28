@@ -201,15 +201,10 @@ impl InputDevice {
             let reader_server_end = input_reports_reader_server_end_stream
                 .next()
                 .await
-                .ok_or(format_err!("stream ended without a call to GetInputReportsReader"))?
+                .ok_or_else(|| format_err!("stream ended without a call to GetInputReportsReader"))?
                 .context("handling InputDeviceRequest")?;
-            InputReportsReader {
-                request_stream: reader_server_end
-                    .into_stream()
-                    .context("converting ServerEnd<InputReportsReader>")?,
-                report_receiver,
-            }
-            .into_future()
+            InputReportsReader { request_stream: reader_server_end.into_stream(), report_receiver }
+                .into_future()
         };
         pin_mut!(input_reports_reader_fut);
 
@@ -357,7 +352,7 @@ impl InputDevice {
             .iter()
             .map(|&usage| {
                 Key::from_primitive(usage)
-                    .ok_or(anyhow::anyhow!("could not convert to input::Key: {}", &usage))
+                    .ok_or_else(|| anyhow::anyhow!("could not convert to input::Key: {}", &usage))
             })
             .collect()
     }
@@ -380,8 +375,7 @@ mod tests {
 
         #[fasync::run_until_stalled(test)]
         async fn single_request_before_call_to_get_feature_report() -> Result<(), Error> {
-            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
-                .context("creating InputDevice proxy and stream")?;
+            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>();
             let input_device_server_fut =
                 Box::new(InputDevice::new(request_stream, DeviceDescriptor::default())).flush();
             let get_feature_report_fut = proxy.get_feature_report();
@@ -405,8 +399,7 @@ mod tests {
 
         #[fasync::run_until_stalled(test)]
         async fn single_request_before_call_to_get_input_reports_reader() -> Result<(), Error> {
-            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
-                .context("creating InputDevice proxy and stream")?;
+            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>();
             let input_device_server_fut =
                 Box::new(InputDevice::new(request_stream, make_keyboard_descriptor(vec![Key::A])))
                     .flush();
@@ -425,8 +418,7 @@ mod tests {
         #[test]
         fn multiple_requests_before_call_to_get_input_reports_reader() -> Result<(), Error> {
             let mut executor = fasync::TestExecutor::new();
-            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
-                .context("creating InputDevice proxy and stream")?;
+            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>();
             let mut input_device_server_fut =
                 Box::new(InputDevice::new(request_stream, make_keyboard_descriptor(vec![Key::A])))
                     .flush();
@@ -460,8 +452,7 @@ mod tests {
             pin_mut!(input_device_server_fut);
 
             let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("internal error creating InputReportsReader proxy and server end")?;
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             input_device_proxy
                 .get_input_reports_reader(input_reports_reader_server_end)
                 .context("sending get_input_reports_reader request")?;
@@ -1223,15 +1214,13 @@ mod tests {
             let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
 
             let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader proxy and server end")?;
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             input_device_proxy
                 .get_input_reports_reader(input_reports_reader_server_end)
                 .expect("sending first get_input_reports_reader request");
 
             let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("internal error creating InputReportsReader proxy and server end")?;
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             input_device_proxy
                 .get_input_reports_reader(input_reports_reader_server_end)
                 .expect("sending second get_input_reports_reader request");
@@ -1270,8 +1259,7 @@ mod tests {
         /// can easily invoke `flush()`.
         pub(super) fn make_input_device_proxy_and_struct() -> (InputDeviceProxy, Box<InputDevice>) {
             let (input_device_proxy, input_device_request_stream) =
-                endpoints::create_proxy_and_stream::<InputDeviceMarker>()
-                    .expect("creating InputDevice proxy and stream");
+                endpoints::create_proxy_and_stream::<InputDeviceMarker>();
             let input_device = Box::new(InputDevice::new(
                 input_device_request_stream,
                 DeviceDescriptor::default(),
@@ -1289,8 +1277,7 @@ mod tests {
             input_device_proxy: &InputDeviceProxy,
         ) -> InputReportsReaderProxy {
             let (input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .expect("internal error creating InputReportsReader proxy and server end");
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             input_device_proxy
                 .get_input_reports_reader(input_reports_reader_server_end)
                 .expect("sending get_input_reports_reader request");

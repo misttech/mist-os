@@ -134,7 +134,7 @@ declare_args() {
   kernel_no_userabi = false
 
   # Build an ELF kernel rather than a ZBI image kernel.
-  use_elf_kernel = current_cpu == "riscv64"
+  use_elf_kernel = current_cpu != "x64"
 
   # Include a mechanism for the kernel to sample threads and write the results to a buffer
   experimental_thread_sampler_enabled = false

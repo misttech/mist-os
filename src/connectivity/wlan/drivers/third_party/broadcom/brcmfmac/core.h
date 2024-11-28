@@ -329,7 +329,7 @@ struct net_device {
     std::vector<fuchsia_wlan_fullmac::wire::WlanFullmacSnrHistogram> snr_histograms;
     brcmf_pktcnt_le fw_pktcnt;
   } stats;
-  zx::channel mlme_channel;
+  zx::channel sme_channel;
   uint32_t features;
   uint32_t needed_headroom;
   void (*priv_destructor)(net_device*);

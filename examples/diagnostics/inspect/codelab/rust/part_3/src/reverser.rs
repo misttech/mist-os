@@ -120,7 +120,7 @@ mod tests {
     }
 
     fn open_reverser() -> Result<ReverserProxy, Error> {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ReverserMarker>()?;
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ReverserMarker>();
         let reverser = ReverserServer::new(ReverserServerMetrics::default());
         reverser.spawn(stream);
         Ok(proxy)

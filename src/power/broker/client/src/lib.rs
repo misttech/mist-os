@@ -94,12 +94,12 @@ impl<'a> PowerElementContextBuilder<'a> {
 
     pub async fn build(self) -> Result<PowerElementContext> {
         let (current_level, current_level_server_end) =
-            create_proxy::<fbroker::CurrentLevelMarker>()?;
+            create_proxy::<fbroker::CurrentLevelMarker>();
         let (required_level, required_level_server_end) =
-            create_proxy::<fbroker::RequiredLevelMarker>()?;
-        let (lessor, lessor_server_end) = create_proxy::<fbroker::LessorMarker>()?;
+            create_proxy::<fbroker::RequiredLevelMarker>();
+        let (lessor, lessor_server_end) = create_proxy::<fbroker::LessorMarker>();
         let (element_control, element_control_server_end) =
-            create_proxy::<fbroker::ElementControlMarker>()?;
+            create_proxy::<fbroker::ElementControlMarker>();
         self.topology
             .add_element(fbroker::ElementSchema {
                 element_name: Some(self.element_name.into()),
@@ -328,7 +328,7 @@ impl LeaseHelper {
             .map_err(|e| anyhow!("PowerBroker::LeaseError({e:?})"))?;
 
         // Wait for the lease to be satisfied.
-        let lease = lease.into_proxy()?;
+        let lease = lease.into_proxy();
         let mut status = fbroker::LeaseStatus::Unknown;
         loop {
             match lease.watch_status(status).await? {
@@ -357,7 +357,7 @@ mod tests {
         mut required_power_levels: Vec<fbroker::PowerLevel>,
     ) -> fbroker::RequiredLevelProxy {
         let (required_level_proxy, mut required_level_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fbroker::RequiredLevelMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fbroker::RequiredLevelMarker>();
 
         fasync::Task::local(async move {
             while let Some(Ok(request)) = required_level_stream.next().await {
@@ -383,13 +383,13 @@ mod tests {
     #[fuchsia::test]
     async fn basic_update_fn_factory_performs_update() -> Result<()> {
         let (element_control, _element_control_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fbroker::ElementControlMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fbroker::ElementControlMarker>();
         let (lessor, _lessor_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fbroker::LessorMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fbroker::LessorMarker>();
         let (required_level, _required_level_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fbroker::RequiredLevelMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fbroker::RequiredLevelMarker>();
         let (current_level, mut current_level_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fbroker::CurrentLevelMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fbroker::CurrentLevelMarker>();
 
         let power_element = PowerElementContext {
             element_control,

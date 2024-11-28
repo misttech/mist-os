@@ -13,7 +13,7 @@
 
 #include <bitset>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "fake-dma-handler.h"
 #include "query-request-processor.h"
@@ -52,12 +52,12 @@ constexpr uint32_t kGranularity = 6;
 class FakeRegisters final {
  public:
   FakeRegisters() {
-    ASSERT_OK(zx::vmo::create(RegisterMap::kRegisterSize, /*options=*/0, &registers_vmo_));
-    ASSERT_OK(registers_vmo_.set_cache_policy(ZX_CACHE_POLICY_UNCACHED));
-    ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
+    ZX_ASSERT(zx::vmo::create(RegisterMap::kRegisterSize, /*options=*/0, &registers_vmo_) == ZX_OK);
+    ZX_ASSERT(registers_vmo_.set_cache_policy(ZX_CACHE_POLICY_UNCACHED) == ZX_OK);
+    ZX_ASSERT(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
                                          /*vmar_offset=*/0, registers_vmo_,
                                          /*vmo_offset=*/0, /*len=*/RegisterMap::kRegisterSize,
-                                         reinterpret_cast<zx_vaddr_t *>(&registers_)));
+                                         reinterpret_cast<zx_vaddr_t *>(&registers_)) == ZX_OK);
   }
 
   template <typename T>
@@ -147,12 +147,14 @@ class UfsMockDevice {
   void SetAttribute(Attributes idn, uint32_t value) {
     attributes_[static_cast<size_t>(idn)] = value;
   }
-  void SetFlag(Flags idn, bool value) { flags_[static_cast<size_t>(idn)] = value; }
   uint32_t GetAttribute(Attributes idn) const { return attributes_[static_cast<size_t>(idn)]; }
+  void SetFlag(Flags idn, bool value) { flags_[static_cast<size_t>(idn)] = value; }
   bool GetFlag(Flags idn) const { return flags_[static_cast<size_t>(idn)]; }
 
   void SetUnitAttention(bool value) { unit_attention_ = value; }
   bool GetUnitAttention() const { return unit_attention_; }
+  void SetExceptionEventAlert(bool value) { exception_event_alert_ = value; }
+  bool GetExceptionEventAlert() const { return exception_event_alert_; }
 
   UfsLogicalUnit &GetLogicalUnit(uint8_t lun) { return logical_units_[lun]; }
   RegisterMmioProcessor &GetRegisterMmioProcessor() { return register_mmio_processor_; }
@@ -183,6 +185,7 @@ class UfsMockDevice {
   ScsiCommandProcessor scsi_command_processor_;
 
   bool unit_attention_ = false;
+  bool exception_event_alert_ = false;
 };
 
 }  // namespace ufs_mock_device

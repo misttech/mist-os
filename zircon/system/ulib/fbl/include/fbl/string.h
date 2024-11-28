@@ -11,7 +11,6 @@
 #include <initializer_list>
 #include <string>
 #include <string_view>
-#include <type_traits>
 
 namespace fbl {
 namespace tests {
@@ -60,9 +59,9 @@ class __OWNER(char) String {
   // Allocates heap memory only if |count| is non-zero.
   String(size_t count, char ch) { Init(count, ch); }
 
-  // Creates a string from the contents of a string piece.
-  // Allocates heap memory only if |piece.length()| is non-zero.
-  String(std::string_view piece) : String(piece.data(), piece.length()) {}
+  // Creates a string from the contents of a string view.
+  // Allocates heap memory only if |view.length()| is non-zero.
+  String(std::string_view view) : String(view.data(), view.length()) {}
 
   // Creates a string from the contents of a string.
   // Allocates heap memory only if |str.length()| is non-zero.
@@ -123,23 +122,25 @@ class __OWNER(char) String {
     return *this;
   }
 
-  // Assigns this string from the contents of a string piece.
-  // Allocates heap memory only if |piece.length()| is non-zero.
-  String& operator=(std::string_view sv) {
-    Set(sv.data(), sv.length());
+  // Assigns this string from the contents of a string view.
+  // Allocates heap memory only if |view.length()| is non-zero.
+  String& operator=(std::string_view view) {
+    Set(view.data(), view.length());
     return *this;
   }
 
-  // Assigns this string from the contents of a string piece.
-  // Allocates heap memory only if |piece.length()| is non-zero.
+  // Assigns this string from the contents of a string.
+  // Allocates heap memory only if |str.length()| is non-zero.
   String& operator=(const std::string& str) {
     Set(str.data(), str.length());
     return *this;
   }
 
-  // Create a std::string_view backed by the string.
+  // Create a string view backed by the string.
   // The view does not take ownership of the data so the string
-  // must outlast the std::string_view.
+  // must outlast the string view.
+  //
+  // NOLINTNEXTLINE(google-explicit-constructor)
   operator std::string_view() const { return {data(), length()}; }
 
   // Concatenates the specified strings.

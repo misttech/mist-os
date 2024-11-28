@@ -2,23 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl::endpoints,
-    fidl_fuchsia_test_manager as ftest_manager,
-    ftest_manager::{CaseStatus, RunOptions, RunSuiteOptions, SuiteStatus},
-    fuchsia_async as fasync,
-    fuchsia_component::client,
-    futures::{channel::mpsc, stream, StreamExt},
-    pretty_assertions::assert_eq,
-    //std::collections::HashMap,
-    test_diagnostics::collect_string_from_socket,
-    test_manager_test_lib::{
-        collect_suite_events, collect_suite_events_with_watch, default_run_option,
-        default_run_suite_options, AttributedLog, GroupRunEventByTestCase, RunEvent, SuiteRunner,
-        TestBuilder, TestRunEventPayload,
-    },
+use anyhow::{Context, Error};
+use fidl::endpoints;
+use ftest_manager::{CaseStatus, RunOptions, RunSuiteOptions, SuiteStatus};
+use fuchsia_component::client;
+use futures::channel::mpsc;
+use futures::{stream, StreamExt};
+use pretty_assertions::assert_eq;
+use test_case::test_case;
+use test_manager_test_lib::{
+    collect_string_from_socket_helper, collect_suite_events, collect_suite_events_with_watch,
+    default_run_option, default_run_suite_options, AttributedLog, GroupRunEventByTestCase,
+    RunEvent, SuiteRunner, TestBuilder, TestRunEventPayload,
 };
+use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
 macro_rules! connect_run_builder {
     () => {
@@ -69,7 +66,7 @@ async fn run_single_test_for_suite(
 ) -> Result<(Vec<RunEvent>, Vec<AttributedLog>), Error> {
     let runner = SuiteRunner::new(connect_suite_runner!()?);
     let suite_instance = runner.start_suite_run(test_url, options).context("Cannot run suite")?;
-    let ret = collect_suite_events_with_watch(suite_instance, false).await;
+    let ret = collect_suite_events_with_watch(suite_instance, false, true).await;
     // Drop the runner here so it stays alive through `collect_suite_events_with_watch`.
     drop(runner);
     ret
@@ -153,7 +150,7 @@ async fn calling_builder_kill_should_kill_test() {
         .unwrap();
     let proxy = builder.take_proxy();
 
-    let (controller_proxy, controller) = endpoints::create_proxy().unwrap();
+    let (controller_proxy, controller) = endpoints::create_proxy();
     proxy.build(controller).unwrap();
     let (sender, mut recv) = mpsc::channel(1024);
     let _task = fasync::Task::spawn(async move { suite.collect_events(sender).await });
@@ -685,8 +682,10 @@ async fn custom_artifact_test() {
     assert_eq!(&expected_events, &events);
 }
 
+#[test_case(true; "compressed debug_data")]
+#[test_case(false; "uncompressed debug_data")]
 #[fuchsia::test]
-async fn debug_data_test() {
+async fn debug_data_test(compressed: bool) {
     let test_url = "fuchsia-pkg://fuchsia.com/test_manager_test#meta/debug_data_write_test.cm";
 
     let builder = TestBuilder::new(connect_run_builder!().unwrap());
@@ -694,8 +693,11 @@ async fn debug_data_test() {
         .add_suite(test_url, default_run_option())
         .await
         .expect("Cannot create suite instance");
-    let (run_events_result, suite_events_result) =
-        futures::future::join(builder.run(), collect_suite_events(suite_instance)).await;
+    let (run_events_result, suite_events_result) = futures::future::join(
+        builder.run_with_option(compressed),
+        collect_suite_events(suite_instance),
+    )
+    .await;
 
     let suite_events = suite_events_result.unwrap().0;
     let expected_events = vec![
@@ -715,7 +717,7 @@ async fn debug_data_test() {
     let num_debug_data_events = stream::iter(run_events_result.unwrap())
         .then(|run_event| async move {
             let TestRunEventPayload::DebugData { socket, .. } = run_event.payload;
-            let content = collect_string_from_socket(socket).await.unwrap();
+            let content = collect_string_from_socket_helper(socket, compressed).await.unwrap();
             content == "Debug data from test\n"
         })
         .filter(|matches_vmo| futures::future::ready(*matches_vmo))
@@ -729,12 +731,12 @@ async fn debug_data_test() {
 async fn early_boot_profile_test() {
     let proxy = client::connect_to_protocol::<ftest_manager::EarlyBootProfileMarker>()
         .expect("cannot connect to run builder proxy");
-    let (debug_data_proxy, iterator) = endpoints::create_proxy().unwrap();
+    let (debug_data_proxy, iterator) = endpoints::create_proxy();
     proxy.register_watcher(iterator).unwrap();
 
     // We cannot check the returned value as it can be empty vector or bunch of socket connections.
     // But we can check that our call to DebugDataIterator goes through.
-    let _ = debug_data_proxy.get_next().await.unwrap();
+    let _ = debug_data_proxy.get_next_compressed().await.unwrap();
 }
 
 #[fuchsia::test]
@@ -753,13 +755,16 @@ async fn debug_data_accumulate_test() {
                 .add_suite(test_url, default_run_option())
                 .await
                 .expect("Cannot create suite instance");
-            let (run_events_result, _) =
-                futures::future::join(builder.run(), collect_suite_events(suite_instance)).await;
+            let (run_events_result, _) = futures::future::join(
+                builder.run_with_option(true),
+                collect_suite_events(suite_instance),
+            )
+            .await;
 
             let num_debug_data_events = stream::iter(run_events_result.unwrap())
                 .then(|run_event| async move {
                     let TestRunEventPayload::DebugData { socket, .. } = run_event.payload;
-                    let content = collect_string_from_socket(socket).await.unwrap();
+                    let content = collect_string_from_socket_helper(socket, true).await.unwrap();
                     content == "Debug data from test\n"
                 })
                 .filter(|matches_vmo| futures::future::ready(*matches_vmo))
@@ -785,14 +790,15 @@ async fn debug_data_accumulate_test() {
                 .context("Cannot run suite")
                 .unwrap();
             let suite_events_result =
-                collect_suite_events_with_watch(suite_run_instance, false).await;
+                collect_suite_events_with_watch(suite_run_instance, false, true).await;
             let suite_events = suite_events_result.unwrap().0;
 
             let debug_event_count = stream::iter(suite_events)
                 .then(|suite_event| async move {
                     if let RunEvent::DebugData { filename, socket } = suite_event {
                         if filename.starts_with("data_sink/data_sink.") {
-                            let content = collect_string_from_socket(socket).await.unwrap();
+                            let content =
+                                collect_string_from_socket_helper(socket, true).await.unwrap();
                             assert_eq!(content, "Debug data from test\n");
                             true
                         } else {
@@ -811,8 +817,10 @@ async fn debug_data_accumulate_test() {
     }
 }
 
+#[test_case(true; "compressed debug_data")]
+#[test_case(false; "uncompressed debug_data")]
 #[fuchsia::test]
-async fn debug_data_isolated_test() {
+async fn debug_data_isolated_test(compressed: bool) {
     let test_url = "fuchsia-pkg://fuchsia.com/test_manager_test#meta/debug_data_write_test.cm";
     // By default, when I run the same test twice, debug data is not accumulated.
     for _ in 0..2 {
@@ -821,13 +829,16 @@ async fn debug_data_isolated_test() {
             .add_suite(test_url, default_run_option())
             .await
             .expect("Cannot create suite instance");
-        let (run_events_result, _) =
-            futures::future::join(builder.run(), collect_suite_events(suite_instance)).await;
+        let (run_events_result, _) = futures::future::join(
+            builder.run_with_option(compressed),
+            collect_suite_events(suite_instance),
+        )
+        .await;
 
         let num_debug_data_events = stream::iter(run_events_result.unwrap())
             .then(|run_event| async move {
                 let TestRunEventPayload::DebugData { socket, .. } = run_event.payload;
-                let content = collect_string_from_socket(socket).await.unwrap();
+                let content = collect_string_from_socket_helper(socket, compressed).await.unwrap();
                 content == "Debug data from test\n"
             })
             .filter(|matches_vmo| futures::future::ready(*matches_vmo))
@@ -862,7 +873,7 @@ async fn custom_artifact_realm_test() {
 #[fuchsia::test]
 async fn enumerate_invalid_test() {
     let proxy = connect_query_server!().unwrap();
-    let (_iterator, server_end) = endpoints::create_proxy().unwrap();
+    let (_iterator, server_end) = endpoints::create_proxy();
     let err = proxy
         .enumerate("fuchsia-pkg://fuchsia.com/test_manager_test#meta/invalid_cml.cm", server_end)
         .await
@@ -874,7 +885,7 @@ async fn enumerate_invalid_test() {
 #[fuchsia::test]
 async fn enumerate_echo_test() {
     let proxy = connect_query_server!().unwrap();
-    let (iterator, server_end) = endpoints::create_proxy().unwrap();
+    let (iterator, server_end) = endpoints::create_proxy();
     proxy
         .enumerate(
             "fuchsia-pkg://fuchsia.com/test_manager_test#meta/echo_test_realm.cm",
@@ -901,7 +912,7 @@ async fn enumerate_echo_test() {
 #[fuchsia::test]
 async fn enumerate_huge_test() {
     let proxy = connect_query_server!().unwrap();
-    let (iterator, server_end) = endpoints::create_proxy().unwrap();
+    let (iterator, server_end) = endpoints::create_proxy();
     proxy
         .enumerate(
             "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/huge_gtest.cm",
@@ -972,7 +983,7 @@ async fn calling_kill_should_kill_test_for_suite() {
 
     let controller = suite_run_instance.controller();
     let task = fasync::Task::spawn(async move {
-        suite_run_instance.collect_events_with_watch(sender, false).await
+        suite_run_instance.collect_events_with_watch(sender, false, false).await
     });
     // let the test start
     let _initial_event = recv.next().await.unwrap();
@@ -1014,7 +1025,7 @@ async fn calling_stop_should_stop_test_for_suite() {
 
     let controller = suite_run_instance.controller();
     let task = fasync::Task::spawn(async move {
-        suite_run_instance.collect_events_with_watch(sender, false).await
+        suite_run_instance.collect_events_with_watch(sender, false, false).await
     });
     // let the test start
     let _initial_event = recv.next().await.unwrap();
@@ -1449,8 +1460,10 @@ async fn custom_artifact_test_for_suite() {
     assert_eq!(&expected_events, &events);
 }
 
+#[test_case(true; "compressed debug_data")]
+#[test_case(false; "uncompressed debug_data")]
 #[fuchsia::test]
-async fn debug_data_test_for_suite() {
+async fn debug_data_test_for_suite(compressed: bool) {
     let test_url = "fuchsia-pkg://fuchsia.com/test_manager_test#meta/debug_data_write_test.cm";
 
     let runner = SuiteRunner::new(connect_suite_runner!().unwrap());
@@ -1458,7 +1471,8 @@ async fn debug_data_test_for_suite() {
         .start_suite_run(test_url, default_run_suite_options())
         .context("Cannot run suite")
         .unwrap();
-    let suite_events_result = collect_suite_events_with_watch(suite_run_instance, false).await;
+    let suite_events_result =
+        collect_suite_events_with_watch(suite_run_instance, false, compressed).await;
     let suite_events = suite_events_result.unwrap().0;
 
     let expected_events = vec![
@@ -1491,11 +1505,11 @@ async fn debug_data_test_for_suite() {
         if let RunEvent::DebugData { filename, socket } = debug_data_event {
             if filename == "summary.json" {
                 assert!(!got_summary, "received summary.json DebugData more than once");
-                let content = collect_string_from_socket(socket).await.unwrap();
+                let content = collect_string_from_socket_helper(socket, compressed).await.unwrap();
                 assert_eq!(content[..150], r#"{"tests":[{"name":"fuchsia-pkg://fuchsia.com/test_manager_test#meta/debug_data_write_test.cm","data_sinks":{"data_sink":[{"file":"data_sink/data_sink."#[..150]);
             } else if filename.starts_with("data_sink/data_sink.") {
                 assert!(!got_data_sink, "received data sink DebugData more than once");
-                let content = collect_string_from_socket(socket).await.unwrap();
+                let content = collect_string_from_socket_helper(socket, compressed).await.unwrap();
                 assert_eq!(content, "Debug data from test\n");
             }
         }
@@ -1513,16 +1527,18 @@ async fn debug_data_test_for_suite() {
 async fn early_boot_profile_test_for_suite() {
     let proxy = client::connect_to_protocol::<ftest_manager::EarlyBootProfileMarker>()
         .expect("cannot connect to run builder proxy");
-    let (debug_data_proxy, iterator) = endpoints::create_proxy().unwrap();
+    let (debug_data_proxy, iterator) = endpoints::create_proxy();
     proxy.register_watcher(iterator).unwrap();
 
     // We cannot check the returned value as it can be empty vector or bunch of socket connections.
     // But we can check that our call to DebugDataIterator goes through.
-    let _ = debug_data_proxy.get_next().await.unwrap();
+    let _ = debug_data_proxy.get_next_compressed().await.unwrap();
 }
 
+#[test_case(true; "compressed debug_data")]
+#[test_case(false; "uncompressed debug_data")]
 #[fuchsia::test]
-async fn debug_data_isolated_test_for_suite() {
+async fn debug_data_isolated_test_for_suite(compressed: bool) {
     let test_url = "fuchsia-pkg://fuchsia.com/test_manager_test#meta/debug_data_write_test.cm";
 
     // By default, when I run the same test twice, debug data is not accumulated.
@@ -1532,14 +1548,16 @@ async fn debug_data_isolated_test_for_suite() {
             .start_suite_run(test_url, default_run_suite_options())
             .context("Cannot run suite")
             .unwrap();
-        let suite_events_result = collect_suite_events_with_watch(suite_run_instance, false).await;
+        let suite_events_result =
+            collect_suite_events_with_watch(suite_run_instance, false, compressed).await;
         let suite_events = suite_events_result.unwrap().0;
 
         let debug_event_count = stream::iter(suite_events)
             .then(|suite_event| async move {
                 if let RunEvent::DebugData { filename, socket } = suite_event {
                     if filename.starts_with("data_sink/data_sink.") {
-                        let content = collect_string_from_socket(socket).await.unwrap();
+                        let content =
+                            collect_string_from_socket_helper(socket, compressed).await.unwrap();
                         assert_eq!(content, "Debug data from test\n");
                         true
                     } else {
@@ -1582,7 +1600,7 @@ async fn custom_artifact_realm_test_for_suite() {
 #[fuchsia::test]
 async fn enumerate_invalid_test_for_suite() {
     let proxy = connect_test_case_enumerator_server!().unwrap();
-    let (_iterator, server_end) = endpoints::create_proxy().unwrap();
+    let (_iterator, server_end) = endpoints::create_proxy();
     let err = proxy
         .enumerate(
             "fuchsia-pkg://fuchsia.com/test_manager_test#meta/invalid_cml.cm",
@@ -1598,7 +1616,7 @@ async fn enumerate_invalid_test_for_suite() {
 #[fuchsia::test]
 async fn enumerate_echo_test_for_suite() {
     let proxy = connect_test_case_enumerator_server!().unwrap();
-    let (iterator, server_end) = endpoints::create_proxy().unwrap();
+    let (iterator, server_end) = endpoints::create_proxy();
     proxy
         .enumerate(
             "fuchsia-pkg://fuchsia.com/test_manager_test#meta/echo_test_realm.cm",
@@ -1626,7 +1644,7 @@ async fn enumerate_echo_test_for_suite() {
 #[fuchsia::test]
 async fn enumerate_huge_test_for_suite() {
     let proxy = connect_test_case_enumerator_server!().unwrap();
-    let (iterator, server_end) = endpoints::create_proxy().unwrap();
+    let (iterator, server_end) = endpoints::create_proxy();
     proxy
         .enumerate(
             "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/huge_gtest.cm",

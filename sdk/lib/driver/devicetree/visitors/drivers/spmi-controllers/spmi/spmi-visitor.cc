@@ -111,6 +111,11 @@ zx::result<> SpmiVisitor::ParseReferenceProperty(fdf_devicetree::Node& node) {
 
     SubTarget& sub_target = sub_targets_[reference->first.id()];
     if (sub_target.has_reference_property) {
+      if (sub_target_references.contains(reference->first.id())) {
+        // Ignore duplicate reference property entries.
+        continue;
+      }
+
       FDF_LOG(ERROR, "Multiple reference properties for SPMI sub-target \"%s\"",
               reference->first.name().c_str());
       return zx::error(ZX_ERR_ALREADY_EXISTS);

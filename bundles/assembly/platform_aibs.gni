@@ -129,6 +129,9 @@ bootstrap_eng_platform_aib_names = [
   "fshost_storage_host",
   "fshost_storage_host_fvm_minfs",
   "partitioning_tools",
+
+  # Testing Support
+  "testing_support_bootstrap",
 ]
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
@@ -288,6 +291,8 @@ user_platform_aib_names =
       "kernel_anonymous_memory_compression_eager_lru",
       "kernel_evict_continuous",
       "kernel_page_scanner_aging_fast",
+      "kernel_page_table_eviction_never",
+      "kernel_page_table_eviction_on_request",
 
       # Recovery
       "factory_reset",

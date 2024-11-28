@@ -77,7 +77,7 @@ async fn handle_host_requests(id: HostId, mut stream: HostRequestStream) {
                 payload: ProtocolRequest::Gatt2Server(server), ..
             } => {
                 info!("RequestGatt2Server request");
-                let mut gatt_server = server.into_stream().unwrap();
+                let mut gatt_server = server.into_stream();
                 match gatt_server.next().await {
                     Some(Ok(Server_Request::PublishService { responder, .. })) => {
                         info!("PublishService request");
@@ -111,12 +111,11 @@ async fn add_component_succeeds() {
     let hd = host_dispatcher::test::make_simple_test_dispatcher();
 
     // Create the receiver server
-    let (receiver_client, receiver_stream) =
-        endpoints::create_proxy_and_stream::<ReceiverMarker>().unwrap();
+    let (receiver_client, receiver_stream) = endpoints::create_proxy_and_stream::<ReceiverMarker>();
     let _receiver_task = fasync::Task::spawn(run_receiver_server(hd.clone(), receiver_stream));
 
     // Mock the host server
-    let (host_client, host_server) = endpoints::create_request_stream::<HostMarker>().unwrap();
+    let (host_client, host_server) = endpoints::create_request_stream::<HostMarker>();
     let _run_host_task = fasync::Task::spawn(handle_host_requests(HostId(1), host_server));
 
     // Add a host to dispatcher using host.Receiver API
@@ -151,18 +150,16 @@ async fn add_multiple_components_succeeds() {
 
     // Start HostWatcher client/server
     let (host_watcher_proxy, host_watcher_stream) =
-        fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_bluetooth_sys::HostWatcherMarker>()
-            .expect("FIDL endpoints");
+        fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_bluetooth_sys::HostWatcherMarker>();
     let host_watcher_fut = crate::host_watcher::run(hd.clone(), host_watcher_stream);
     let _host_watcher_task = fasync::Task::spawn(host_watcher_fut);
 
     // Create Receiver client/server
-    let (receiver_client, receiver_stream) =
-        endpoints::create_proxy_and_stream::<ReceiverMarker>().unwrap();
+    let (receiver_client, receiver_stream) = endpoints::create_proxy_and_stream::<ReceiverMarker>();
     let _receiver_task = fasync::Task::spawn(run_receiver_server(hd.clone(), receiver_stream));
 
     // Create mock Host server
-    let (host_client, host_server) = endpoints::create_request_stream::<HostMarker>().unwrap();
+    let (host_client, host_server) = endpoints::create_request_stream::<HostMarker>();
     let _run_host_task = fasync::Task::spawn(handle_host_requests(HostId(1), host_server));
 
     // Add a host to dispatcher using host.Receiver API
@@ -174,7 +171,7 @@ async fn add_multiple_components_succeeds() {
     assert_matches!(hosts[0].active, Some(true));
 
     // Create second mock Host server
-    let (host_client2, host_server2) = endpoints::create_request_stream::<HostMarker>().unwrap();
+    let (host_client2, host_server2) = endpoints::create_request_stream::<HostMarker>();
     let _run_host_task2 = fasync::Task::spawn(handle_host_requests(HostId(2), host_server2));
 
     // Add another host to dispatcher using host.Receiver API

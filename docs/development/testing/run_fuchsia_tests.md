@@ -285,4 +285,4 @@ saved to the specified directory.
 [resource-path]: /docs/concepts/packages/package_url.md#resource-paths
 [test-manager]: /docs/get-started/learn/components/component-tests.md
 [fx-test-flags]: https://fuchsia.dev/reference/tools/fx/cmd/test
-[ffx-test]: /docs/development/sdk/ffx/run-device-tests.md
+[ffx-test]: /docs/development/tools/ffx/workflows/run-device-tests.md

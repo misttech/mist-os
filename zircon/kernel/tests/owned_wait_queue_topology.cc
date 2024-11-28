@@ -339,6 +339,12 @@ using RequeueAction = OwnedWaitQueueTopologyTests::RequeueAction;
 bool owq_topology_test_simple() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // A basic smoke test.  Simply generate
   //
   // +----+     +----+
@@ -359,6 +365,12 @@ bool owq_topology_test_simple() {
 
 bool owq_topology_test_simple_owner_change() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Change owners, moving from this
   //
@@ -391,6 +403,12 @@ bool owq_topology_test_simple_owner_change() {
 bool owq_topology_test_deny_self_own() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to do this
   //
   //  +----------------------+
@@ -419,6 +437,12 @@ bool owq_topology_test_deny_self_own() {
 
 bool owq_topology_test_owner_becomes_blocked_no_new_owner() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -452,6 +476,12 @@ bool owq_topology_test_owner_becomes_blocked_no_new_owner() {
 bool owq_topology_test_owner_becomes_blocked_yes_new_owner() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //     +----+     +----+     +----+
@@ -482,6 +512,12 @@ bool owq_topology_test_owner_becomes_blocked_yes_new_owner() {
 
 bool owq_topology_test_owner_becomes_blocked_deny_blocked_new_owner() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -527,6 +563,12 @@ bool owq_topology_test_owner_becomes_blocked_deny_blocked_new_owner() {
 bool owq_topology_test_blocked_owners() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //     +----+     +----+     +----+     +----+
@@ -568,6 +610,12 @@ bool owq_topology_test_blocked_owners() {
 
 bool owq_topology_test_blocking_thread_downstream_of_owner_no_owner_change() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -615,6 +663,12 @@ bool owq_topology_test_blocking_thread_downstream_of_owner_no_owner_change() {
 
 bool owq_topology_test_blocking_thread_downstream_of_owner_yes_owner_change() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -677,6 +731,12 @@ bool owq_topology_test_blocking_thread_downstream_of_owner_yes_owner_change() {
 bool owq_topology_test_intersecting_owner_chains() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //     +----+     +----+     +----+     +----+     +----+     +----+     +----+
@@ -719,6 +779,12 @@ bool owq_topology_test_intersecting_owner_chains() {
 bool owq_topology_test_intersecting_owner_chains_old_owner_target_of_new_owner_chain() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //                           +----+     +----+     +----+
@@ -757,6 +823,12 @@ bool owq_topology_test_intersecting_owner_chains_old_owner_target_of_new_owner_c
 
 bool owq_topology_test_basic_requeue() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -807,6 +879,12 @@ bool owq_topology_test_basic_requeue() {
 bool owq_topology_test_requeue_assign_woken_owner() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //     +----+
@@ -852,6 +930,12 @@ bool owq_topology_test_requeue_assign_woken_owner() {
 
 bool owq_topology_test_requeue_assign_both_owners() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -899,6 +983,12 @@ bool owq_topology_test_requeue_assign_both_owners() {
 bool owq_topology_test_requeue_owner_in_wake_queue() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //     +----+
@@ -940,6 +1030,12 @@ bool owq_topology_test_requeue_owner_in_wake_queue() {
 
 bool owq_topology_test_requeue_owner_is_new_wake_owner() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -987,6 +1083,12 @@ bool owq_topology_test_requeue_owner_is_new_wake_owner() {
 
 bool owq_topology_test_requeue_owner_is_in_requeue_target() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -1047,6 +1149,12 @@ bool owq_topology_test_requeue_owner_is_in_requeue_target() {
 bool owq_topology_test_wake_owner_becomes_requeue_owner() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //     +----+
@@ -1092,6 +1200,12 @@ bool owq_topology_test_wake_owner_becomes_requeue_owner() {
 
 bool owq_topology_test_wake_and_requeue_have_same_owner_keep_rq_owner() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -1148,6 +1262,12 @@ bool owq_topology_test_wake_and_requeue_have_same_owner_keep_rq_owner() {
 
 bool owq_topology_test_wake_and_requeue_have_same_owner_lose_rq_owner() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -1208,6 +1328,12 @@ bool owq_topology_test_wake_and_requeue_have_same_owner_lose_rq_owner() {
 
 bool owq_topology_test_requeue_op_intersecting_owner_chains_no_rq_owner_change() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -1271,6 +1397,12 @@ bool owq_topology_test_requeue_op_intersecting_owner_chains_no_rq_owner_change()
 bool owq_topology_test_requeue_op_intersecting_owner_chains_change_rqo_to_none() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //     +----+
@@ -1333,6 +1465,12 @@ bool owq_topology_test_requeue_op_intersecting_owner_chains_change_rqo_to_none()
 bool owq_topology_test_requeue_op_intersecting_owner_chains_change_rqo_to_wq_thread() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //     +----+
@@ -1390,6 +1528,12 @@ bool owq_topology_test_requeue_op_intersecting_owner_chains_change_rqo_to_wq_thr
 bool owq_topology_test_requeue_target_upstream_from_woken_thread() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //    +----+     +----+     +----+
@@ -1441,6 +1585,12 @@ bool owq_topology_test_requeue_target_upstream_from_woken_thread() {
 
 bool owq_topology_test_requeue_target_upstream_from_requeue_thread() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -1494,6 +1644,12 @@ bool owq_topology_test_requeue_target_upstream_from_requeue_thread() {
 bool owq_topology_test_requeue_target_upstream_from_still_blocked_thread() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //                          +----+
@@ -1546,6 +1702,12 @@ bool owq_topology_test_requeue_target_upstream_from_still_blocked_thread() {
 bool owq_topology_test_requeue_target_upstream_from_requeue_thread_stays_upstream() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //                          +----+
@@ -1593,6 +1755,12 @@ bool owq_topology_test_requeue_target_upstream_from_requeue_thread_stays_upstrea
 
 bool owq_topology_test_wake_queue_upstream_from_requeue_target() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -1646,6 +1814,12 @@ bool owq_topology_test_wake_queue_upstream_from_requeue_target() {
 bool owq_topology_test_wake_queue_upstream_from_requeue_target_swaps_position() {
   BEGIN_TEST;
 
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
+
   // Try to go from this:
   //
   //    +----+
@@ -1693,6 +1867,12 @@ bool owq_topology_test_wake_queue_upstream_from_requeue_target_swaps_position() 
 
 bool owq_topology_test_wake_queue_upstream_from_requeue_target_shares_new_wq_owner() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //
@@ -1745,6 +1925,12 @@ bool owq_topology_test_wake_queue_upstream_from_requeue_target_shares_new_wq_own
 
 bool owq_topology_test_wake_queue_upstream_from_requeue_target_rejects_new_rq_thread() {
   BEGIN_TEST;
+
+  // TODO(https://fxbug.dev/378976169): Investigate hang on single-cpu builder.
+  if (arch_max_num_cpus() == 1) {
+    printf("Skipping test that requires more than one cpu.\n");
+    END_TEST;
+  }
 
   // Try to go from this:
   //

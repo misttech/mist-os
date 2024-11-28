@@ -120,7 +120,7 @@ impl AccessPoint {
             fidl_policy::AccessPointProviderRequest::GetController {
                 requests, updates, ..
             } => {
-                self.register_listener(updates.into_proxy()?);
+                self.register_listener(updates.into_proxy());
                 self.handle_ap_requests(internal_msg_sink, ap_provider_guard, requests).await?;
                 Ok(())
             }
@@ -147,7 +147,7 @@ impl AccessPoint {
         ap_provider_guard: MutexGuard<'_, ()>,
         requests: ApRequests,
     ) -> Result<(), fidl::Error> {
-        let mut request_stream = requests.into_stream()?;
+        let mut request_stream = requests.into_stream();
         while let Some(request) = request_stream.try_next().await? {
             log_ap_request(&request);
             match request {
@@ -254,7 +254,7 @@ impl AccessPoint {
     ) -> Result<(), fidl::Error> {
         match req {
             fidl_policy::AccessPointListenerRequest::GetListener { updates, .. } => {
-                self.register_listener(updates.into_proxy()?);
+                self.register_listener(updates.into_proxy());
                 Ok(())
             }
         }
@@ -468,11 +468,9 @@ mod tests {
         provider: &fidl_policy::AccessPointProviderProxy,
     ) -> (fidl_policy::AccessPointControllerProxy, fidl_policy::AccessPointStateUpdatesRequestStream)
     {
-        let (controller, requests) = create_proxy::<fidl_policy::AccessPointControllerMarker>()
-            .expect("failed to create ClientController proxy");
+        let (controller, requests) = create_proxy::<fidl_policy::AccessPointControllerMarker>();
         let (update_sink, update_stream) =
-            create_request_stream::<fidl_policy::AccessPointStateUpdatesMarker>()
-                .expect("failed to create ClientStateUpdates proxy");
+            create_request_stream::<fidl_policy::AccessPointStateUpdatesMarker>();
         provider.get_controller(requests, update_sink).expect("error getting controller");
         (controller, update_stream)
     }
@@ -487,9 +485,8 @@ mod tests {
     /// Setup channels and proxies needed for the tests to use use the AP Provider and
     /// AP Controller APIs in tests.
     fn test_setup() -> TestValues {
-        let (provider, requests) = create_proxy::<fidl_policy::AccessPointProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
+        let (provider, requests) = create_proxy::<fidl_policy::AccessPointProviderMarker>();
+        let requests = requests.into_stream();
 
         let iface_manager = FakeIfaceManager::new();
         let iface_manager = Arc::new(Mutex::new(iface_manager));
@@ -828,9 +825,8 @@ mod tests {
 
         // Create another request stream and begin serving it.  This is equivalent to the behavior
         // that occurs when a second client connects to the AccessPointProvider service.
-        let (provider, requests) = create_proxy::<fidl_policy::AccessPointProviderMarker>()
-            .expect("failed to create AccessPointProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
+        let (provider, requests) = create_proxy::<fidl_policy::AccessPointProviderMarker>();
+        let requests = requests.into_stream();
         let second_serve_fut = test_values.ap.serve_provider_requests(requests);
         let mut second_serve_fut = pin!(second_serve_fut);
 

@@ -33,7 +33,7 @@ struct NamespaceCapabilityProvider {
 impl InternalCapabilityProvider for NamespaceCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fcomponent::NamespaceMarker>::new(server_end);
-        let serve_result = self.serve(server_end.into_stream().unwrap()).await;
+        let serve_result = self.serve(server_end.into_stream()).await;
         if let Err(error) = serve_result {
             // TODO: Set an epitaph to indicate this was an unexpected error.
             warn!(%error, "serve failed");
@@ -53,7 +53,7 @@ impl NamespaceCapabilityProvider {
         mut stream: fcomponent::NamespaceRequestStream,
     ) -> Result<(), fidl::Error> {
         let (store, store_stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _store_task = fasync::Task::spawn(async move {
             let _ = sandbox::serve_capability_store(store_stream).await;
         });
@@ -213,7 +213,7 @@ mod tests {
         instance: &Arc<ComponentInstance>,
     ) -> (fcomponent::NamespaceProxy, Namespace) {
         let host = Namespace::new();
-        let (proxy, server) = endpoints::create_proxy::<fcomponent::NamespaceMarker>().unwrap();
+        let (proxy, server) = endpoints::create_proxy::<fcomponent::NamespaceMarker>();
         capability::open_framework(&host, instance, server.into()).await.unwrap();
         (proxy, host)
     }
@@ -225,7 +225,7 @@ mod tests {
         let (namespace_proxy, _host) = namespace(&root).await;
 
         let (store, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         tasks.spawn(async move { sandbox::serve_capability_store(stream).await.unwrap() });
 
         let mut namespace_pairs = vec![];
@@ -239,7 +239,7 @@ mod tests {
                 loop {
                     let msg = receiver.receive().await.unwrap();
                     let stream: fecho::EchoRequestStream =
-                        ServerEnd::<fecho::EchoMarker>::from(msg.channel).into_stream().unwrap();
+                        ServerEnd::<fecho::EchoMarker>::from(msg.channel).into_stream();
                     handle_echo_request_stream(response, stream).await;
                 }
             });
@@ -271,7 +271,7 @@ mod tests {
         // can access the Echo protocol (served by the Receiver) through this node.
         let entry = namespace_entries.remove(0);
         assert_matches!(entry.path, Some(p) if p == "/svc");
-        let dir = entry.directory.unwrap().into_proxy().unwrap();
+        let dir = entry.directory.unwrap().into_proxy();
         let echo = client::connect_to_protocol_at_dir_root::<fecho::EchoMarker>(&dir).unwrap();
         let response = echo.echo_string(None).await.unwrap();
         assert_matches!(response, Some(m) if m == "first");
@@ -279,7 +279,7 @@ mod tests {
         let entry = namespace_entries.remove(0);
         assert!(namespace_entries.is_empty());
         assert_matches!(entry.path, Some(p) if p == "/zzz/svc");
-        let dir = entry.directory.unwrap().into_proxy().unwrap();
+        let dir = entry.directory.unwrap().into_proxy();
         let echo = client::connect_to_protocol_at_dir_root::<fecho::EchoMarker>(&dir).unwrap();
         let response = echo.echo_string(None).await.unwrap();
         assert_matches!(response, Some(m) if m == "second");
@@ -292,7 +292,7 @@ mod tests {
         let (namespace_proxy, _host) = namespace(&root).await;
 
         let (store, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         tasks.spawn(async move { sandbox::serve_capability_store(stream).await.unwrap() });
 
         // Two entries with a shadowing path.
@@ -306,7 +306,7 @@ mod tests {
             tasks.spawn(async move {
                 while let Some(msg) = receiver.receive().await {
                     let stream: fecho::EchoRequestStream =
-                        ServerEnd::<fecho::EchoMarker>::from(msg.channel).into_stream().unwrap();
+                        ServerEnd::<fecho::EchoMarker>::from(msg.channel).into_stream();
                     handle_echo_request_stream("hello", stream).await;
                 }
             });
@@ -344,7 +344,7 @@ mod tests {
 
         // Create a dictionary and close the server end.
         let (dict_proxy, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>();
         drop(stream);
         let namespace_pairs = vec![fcomponent::NamespaceInputEntry {
             path: "/svc".into(),

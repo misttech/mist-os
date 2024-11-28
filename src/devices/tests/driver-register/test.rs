@@ -53,7 +53,7 @@ fn send_get_driver_info_request(
     driver_filter: &[String],
 ) -> Result<fdd::DriverInfoIteratorProxy> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>();
 
     service
         .get_driver_info(driver_filter, iterator_server)

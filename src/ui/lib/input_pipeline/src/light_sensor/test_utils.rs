@@ -28,18 +28,14 @@ pub(crate) const LED2_NAME: &str = "led2";
 pub(crate) fn setup_proxies_and_data() -> SetupData {
     // Create light proxy and request stream.
     let (proxy, server) = zx::Channel::create();
-    let light_requests = ServerEnd::<LightMarker>::new(server)
-        .into_stream()
-        .expect("Cannot convert channel to Light server end");
+    let light_requests = ServerEnd::<LightMarker>::new(server).into_stream();
 
     let channel = fasync::Channel::from_channel(proxy);
     let light_proxy = LightProxy::from_channel(channel);
 
     // Create control proxy and request stream.
     let (proxy, server) = zx::Channel::create();
-    let brightness_requests = ServerEnd::<ControlMarker>::new(server)
-        .into_stream()
-        .expect("Cannot convert channel to Light server end");
+    let brightness_requests = ServerEnd::<ControlMarker>::new(server).into_stream();
 
     let channel = fasync::Channel::from_channel(proxy);
     let brightness_proxy = ControlProxy::from_channel(channel);

@@ -7,6 +7,7 @@
 #include <lib/arch/cache.h>
 #include <lib/unittest/unittest.h>
 
+#include <arch/interrupt.h>
 #include <fbl/ref_ptr.h>
 
 namespace {
@@ -21,6 +22,7 @@ namespace {
 bool test_clean_cache() {
   BEGIN_TEST;
 
+  InterruptDisableGuard irqd;
   arch::CleanLocalCaches();
 
   END_TEST;
@@ -29,6 +31,7 @@ bool test_clean_cache() {
 bool test_clean_invalidate_cache() {
   BEGIN_TEST;
 
+  InterruptDisableGuard irqd;
   arch::CleanAndInvalidateLocalCaches();
 
   END_TEST;

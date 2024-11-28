@@ -570,23 +570,20 @@ async fn run_micro_benchmark(guest_manager: GuestManagerProxy) -> Result<Measure
         return Err(anyhow!(zx_status::Status::NOT_CONNECTED));
     }
 
-    let (guest_endpoint, guest_server_end) = create_proxy::<GuestMarker>()
-        .map_err(|err| anyhow!("failed to create guest proxy: {}", err))?;
+    let (guest_endpoint, guest_server_end) = create_proxy::<GuestMarker>();
     guest_manager
         .connect(guest_server_end)
         .await
         .map_err(|err| anyhow!("failed to get a connect response: {}", err))?
         .map_err(|err| anyhow!("connect failed with: {:?}", err))?;
 
-    let (vsock_endpoint, vsock_server_end) = create_proxy::<HostVsockEndpointMarker>()
-        .map_err(|err| anyhow!("failed to create vsock proxy: {}", err))?;
+    let (vsock_endpoint, vsock_server_end) = create_proxy::<HostVsockEndpointMarker>();
     guest_endpoint
         .get_host_vsock_endpoint(vsock_server_end)
         .await?
         .map_err(|err| anyhow!("failed to get HostVsockEndpoint: {:?}", err))?;
 
-    let (acceptor, mut client_stream) = create_request_stream::<HostVsockAcceptorMarker>()
-        .map_err(|err| anyhow!("failed to create vsock acceptor: {}", err))?;
+    let (acceptor, mut client_stream) = create_request_stream::<HostVsockAcceptorMarker>();
     vsock_endpoint
         .listen(HOST_PORT, acceptor)
         .await
@@ -636,9 +633,9 @@ async fn run_micro_benchmark(guest_manager: GuestManagerProxy) -> Result<Measure
             request = client_stream.try_next() => {
                 let request = request
                     .map_err(|err| anyhow!("failed to get acceptor request: {}", err))?
-                    .ok_or(anyhow!("unexpected end of Listener stream"))?;
+                    .ok_or_else(|| anyhow!("unexpected end of Listener stream"))?;
                 let (_src_cid, src_port, _port, responder) = request
-                    .into_accept().ok_or(anyhow!("failed to parse message as Accept"))?;
+                    .into_accept().ok_or_else(|| anyhow!("failed to parse message as Accept"))?;
 
                 match expected_connections.contains(&src_port) {
                     false => Err(anyhow!("unexpected connection from guest port: {}", src_port)),

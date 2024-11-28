@@ -22,7 +22,7 @@ source_set("edid") {
   public_deps = [
     "//sdk/lib/driver/logging/cpp",
     "//sdk/lib/stdcompat",
-    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/api-types/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
   ]

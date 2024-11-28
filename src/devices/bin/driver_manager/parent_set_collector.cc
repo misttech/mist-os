@@ -11,7 +11,7 @@
 namespace driver_manager {
 
 zx::result<> ParentSetCollector::AddNode(
-    uint32_t index, const std::vector<fuchsia_driver_framework::NodeProperty>& node_properties,
+    uint32_t index, const std::vector<fuchsia_driver_framework::NodeProperty2>& node_properties,
     std::weak_ptr<Node> node) {
   ZX_ASSERT(index < parents_.size());
 
@@ -21,7 +21,7 @@ zx::result<> ParentSetCollector::AddNode(
   parents_[index] = std::move(node);
 
   parent_properties_[index] =
-      fuchsia_driver_framework::NodePropertyEntry(parent_names_[index], node_properties);
+      fuchsia_driver_framework::NodePropertyEntry2(parent_names_[index], node_properties);
 
   return zx::ok();
 }

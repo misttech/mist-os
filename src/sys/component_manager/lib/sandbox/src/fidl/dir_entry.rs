@@ -119,7 +119,7 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
     use vfs::remote::RemoteLike;
-    use vfs::ToObjectRequest;
+    use vfs::{ObjectRequestRef, ToObjectRequest};
 
     struct MockDir(Counter);
     impl DirectoryEntry for MockDir {
@@ -141,6 +141,17 @@ mod tests {
             _server_end: ServerEnd<fio::NodeMarker>,
         ) {
             self.0.inc();
+        }
+
+        fn open3(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            _relative_path: Path,
+            _flags: fio::Flags,
+            _object_request: ObjectRequestRef<'_>,
+        ) -> Result<(), Status> {
+            self.0.inc();
+            Ok(())
         }
     }
 

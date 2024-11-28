@@ -653,9 +653,7 @@ async fn connected_state(
                                 options.ess_connect_start_time = fasync::MonotonicInstant::now();
                                 options.bss_connect_start_time = fasync::MonotonicInstant::now();
                             }
-
                             notify_when_reconnect_detected(&common_options, &options, result);
-
                             !connected
                         }
                         fidl_sme::ConnectTransactionEvent::OnRoamResult { result } => {
@@ -793,7 +791,6 @@ async fn connected_state(
                     "Roam request to candidate {:?} received, not yet implemented.",
                     roam_request.to_string_without_pii()
                 );
-                common_options.telemetry_sender.send(TelemetryEvent::WouldRoamConnect);
             }
         }
     }
@@ -1143,9 +1140,8 @@ mod tests {
     fn test_setup() -> TestValues {
         let (client_req_sender, client_req_stream) = mpsc::channel(1);
         let (update_sender, update_receiver) = mpsc::unbounded();
-        let (sme_proxy, sme_server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create an sme channel");
-        let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
+        let (sme_proxy, sme_server) = create_proxy::<fidl_sme::ClientSmeMarker>();
+        let sme_req_stream = sme_server.into_stream();
         let saved_networks = FakeSavedNetworksManager::new();
         let saved_networks_manager = Arc::new(saved_networks);
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
@@ -1230,7 +1226,7 @@ mod tests {
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                 // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -1331,7 +1327,7 @@ mod tests {
                 assert_eq!(req.deprecated_scan_type, fidl_fuchsia_wlan_common::ScanType::Active);
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -1411,7 +1407,7 @@ mod tests {
                 // Send connection response.
                 exec.set_fake_time(fasync::MonotonicInstant::after(time_to_connect));
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -1552,7 +1548,7 @@ mod tests {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.to_vec());
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -1618,7 +1614,7 @@ mod tests {
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -1716,7 +1712,7 @@ mod tests {
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 let connect_result = fidl_sme::ConnectResult {
                     code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
                     ..fake_successful_connect_result()
@@ -1810,7 +1806,7 @@ mod tests {
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 let connect_result = fidl_sme::ConnectResult {
                     code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
                     is_credential_rejected: true,
@@ -1922,7 +1918,7 @@ mod tests {
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -1992,8 +1988,7 @@ mod tests {
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         let (connect_txn_proxy, _connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(init_ap_state.clone()),
@@ -2142,8 +2137,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
 
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
@@ -2232,8 +2226,7 @@ mod tests {
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
@@ -2374,7 +2367,7 @@ mod tests {
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req: _, txn, control_handle: _ }) => {
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -2433,8 +2426,7 @@ mod tests {
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         let (connect_txn_proxy, _connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
@@ -2484,8 +2476,7 @@ mod tests {
         };
 
         let (connect_txn_proxy, _connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(first_ap_state.clone()),
@@ -2563,7 +2554,7 @@ mod tests {
                 assert_eq!(req.ssid, second_connect_selection.target.network.ssid.clone().to_vec());
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -2680,8 +2671,7 @@ mod tests {
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
@@ -2743,8 +2733,7 @@ mod tests {
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
@@ -2801,8 +2790,7 @@ mod tests {
         exec.set_fake_time(start_time);
 
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
@@ -2921,8 +2909,7 @@ mod tests {
 
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
@@ -3021,8 +3008,7 @@ mod tests {
 
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
@@ -3105,8 +3091,7 @@ mod tests {
 
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
@@ -3205,8 +3190,7 @@ mod tests {
 
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
@@ -3298,8 +3282,7 @@ mod tests {
 
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
@@ -3513,7 +3496,7 @@ mod tests {
                 assert_eq!(req.multiple_bss_candidates, next_connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
                     .send_on_connect_result(&fake_successful_connect_result())
                     .expect("failed to send connection completion");
@@ -3595,11 +3578,8 @@ mod tests {
         let (_client_req_sender, client_req_stream) = mpsc::channel(1);
 
         // Make our own SME proxy for this test
-        let (sme_proxy, sme_server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create an sme channel");
-        let (sme_req_stream, sme_control_handle) = sme_server
-            .into_stream_and_control_handle()
-            .expect("could not create SME request stream");
+        let (sme_proxy, sme_server) = create_proxy::<fidl_sme::ClientSmeMarker>();
+        let (sme_req_stream, sme_control_handle) = sme_server.into_stream_and_control_handle();
 
         let sme_fut = sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
@@ -3691,7 +3671,7 @@ mod tests {
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req: _, txn, control_handle: _ }) => {
                 // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );

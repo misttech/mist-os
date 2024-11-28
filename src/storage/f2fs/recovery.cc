@@ -161,7 +161,7 @@ void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
   }
   if (i > static_cast<int>(CursegType::kCursegColdData)) {
     LockedPage sum_page;
-    GetSegmentManager().GetSumPage(segno, &sum_page);
+    ZX_ASSERT(GetSegmentManager().GetSumPage(segno, &sum_page) == ZX_OK);
     SummaryBlock *sum_node;
     sum_node = sum_page->GetAddress<SummaryBlock>();
     sum = sum_node->entries[blkoff];

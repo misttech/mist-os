@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fidl") {
   name = "test.time.realm"
+  versioned = "fuchsia:HEAD"
   testonly = true
 
   sources = [

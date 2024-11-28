@@ -5,7 +5,9 @@
 #[cfg(not(feature = "starnix_lite"))]
 use crate::bpf::fs::get_bpf_object;
 #[cfg(not(feature = "starnix_lite"))]
-use crate::bpf::program::{Program, ProgramType};
+use crate::bpf::helpers::{SkBuf, BPF_HELPER_IMPLS_FOR_SOCKET_FILTER, SK_BUF_MAPPING};
+#[cfg(not(feature = "starnix_lite"))]
+use crate::bpf::program::LinkedProgram;
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{
@@ -19,6 +21,7 @@ use crate::vfs::{
     default_ioctl, CheckAccessReason, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr,
     LookupContext, Message,
 };
+use ebpf_api::ProgramType;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffer;
@@ -123,7 +126,7 @@ struct UnixSocketInner {
 
     /// See SO_ATTACH_BPF.
     #[cfg(not(feature = "starnix_lite"))]
-    bpf_program: Option<Arc<Program>>,
+    bpf_program: Option<LinkedProgram>,
 
     /// Unix credentials of the owner of this socket, for SO_PEERCRED.
     credentials: Option<ucred>,
@@ -380,15 +383,9 @@ impl UnixSocket {
     }
 
     #[cfg(not(feature = "starnix_lite"))]
-    fn set_bpf_program(&self, program: Option<Arc<Program>>) -> Result<(), Errno> {
-        if let Some(program) = program.as_ref() {
-            if program.info.program_type != ProgramType::SocketFilter {
-                return error!(EINVAL);
-            }
-        }
+    fn set_bpf_program(&self, program: Option<LinkedProgram>) {
         let mut inner = self.lock();
         inner.bpf_program = program;
-        Ok(())
     }
 
     fn peer_cred(&self) -> Option<ucred> {
@@ -737,7 +734,15 @@ impl SocketOps for UnixSocket {
                     {
                         let fd: FdNumber = task.read_object(user_opt.try_into()?)?;
                         let object = get_bpf_object(task, fd)?;
-                        self.set_bpf_program(Some(object.as_program()?.clone()))?;
+                        let program = object.as_program()?;
+
+                        let linked_program = program.link(
+                            ProgramType::SocketFilter,
+                            &[SK_BUF_MAPPING.clone()],
+                            &BPF_HELPER_IMPLS_FOR_SOCKET_FILTER,
+                        )?;
+
+                        self.set_bpf_program(Some(linked_program));
                     }
 
                     #[cfg(feature = "starnix_lite")]
@@ -921,9 +926,8 @@ impl UnixSocketInner {
             let Some(bpf_program) = self.bpf_program.as_ref() else {
                 return Some(message);
             };
-            let Ok(s) = bpf_program.run(locked, current_task, &mut ()) else {
-                return Some(message);
-            };
+            let mut sk_buf = SkBuf::default();
+            let s = bpf_program.run(locked, current_task, &mut sk_buf);
             if s == 0 {
                 None
             } else {

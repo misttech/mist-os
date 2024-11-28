@@ -104,10 +104,8 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 #endif
-#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_io::File>,
                              fidl::UnknownMethodCompleter::Sync&) override;
-#endif
   //
   // |fuchsia.io/AdvisoryLocking| operations.
   //

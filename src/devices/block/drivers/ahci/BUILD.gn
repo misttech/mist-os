@@ -102,6 +102,7 @@ source_set("shared") {
     "//sdk/lib/inspect/component/cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/lib/dma-buffer",
+    "//src/devices/lib/io-buffer",
     "//src/devices/lib/mmio",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",

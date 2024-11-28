@@ -24,7 +24,7 @@ impl ValidatePackage {
     pub fn validate(self) -> Result<()> {
         let package = PackageManifest::try_load_from(&self.package)
             .with_context(|| format!("reading {}", self.package))?;
-        if let Err(e) = assembly_validate_product::validate_package(&package) {
+        if let Err(e) = assembly_validate_package::validate_package(&package) {
             anyhow::bail!("Failed to validate package `{}`:{}", package.name(), e);
         }
         std::fs::write(&self.stamp, &[])

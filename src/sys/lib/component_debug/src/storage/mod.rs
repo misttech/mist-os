@@ -32,8 +32,7 @@ pub mod test {
     {
         let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<
             <StorageAdminProxy as fidl::endpoints::Proxy>::Protocol,
-        >()
-        .unwrap();
+        >();
         fuchsia_async::Task::local(async move {
             if let Ok(Some(req)) = stream.try_next().await {
                 handle_request(req);

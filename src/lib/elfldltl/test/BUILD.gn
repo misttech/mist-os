@@ -32,6 +32,7 @@ test("elfldltl-unittests") {
     "mapped-fd-file-tests.cc",
     "memory-tests.cc",
     "note-tests.cc",
+    "perfect-symbol-table-tests.cc",
     "phdr-tests.cc",
     "relocation-tests.cc",
     "resolve-tests.cc",

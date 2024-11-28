@@ -92,7 +92,7 @@ impl From<ResolvedComponent> for fresolution::Component {
         let decl_vmo = fidl::Vmo::create(decl_bytes.len() as u64).expect("failed to create VMO");
         decl_vmo.write(&decl_bytes, 0).expect("failed to write to VMO");
         fresolution::Component {
-            url: Some(resolved_url.to_string()),
+            url: Some(resolved_url),
             decl: Some(fidl_fuchsia_mem::Data::Buffer(fidl_fuchsia_mem::Buffer {
                 vmo: decl_vmo,
                 size: decl_bytes.len() as u64,
@@ -304,7 +304,7 @@ async fn get_parent<C: ComponentInstanceInterface>(
             ))
         })?
     {
-        Ok(parent_component.clone())
+        Ok(parent_component)
     } else {
         Err(ResolverError::no_parent_context(anyhow::format_err!(
             "Component {} ({}) has no parent for context.",

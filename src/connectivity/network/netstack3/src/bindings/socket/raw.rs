@@ -576,8 +576,7 @@ fn handle_create_socket(
     protocol: fpraw::ProtocolAssociation,
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
 ) -> Result<fidl::endpoints::ClientEnd<fpraw::SocketMarker>, fposix::Errno> {
-    let (client, request_stream) =
-        fidl::endpoints::create_request_stream().expect("failed to create a new request stream");
+    let (client, request_stream) = fidl::endpoints::create_request_stream();
     match domain {
         fposix_socket::Domain::Ipv4 => {
             let protocol = RawIpSocketProtocol::<Ipv4>::try_from_fidl(protocol)?;

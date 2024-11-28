@@ -41,11 +41,11 @@ impl ScenicFacade {
 
         let image_vmo = screenshot_response
             .vmo
-            .ok_or(format_err!("invalid vmo format in ScreenshotTakeResponse"))?;
+            .ok_or_else(|| format_err!("invalid vmo format in ScreenshotTakeResponse"))?;
 
         let image_size = screenshot_response
             .size
-            .ok_or(format_err!("invalid size format in ScreenshotTakeResponse"))?;
+            .ok_or_else(|| format_err!("invalid size format in ScreenshotTakeResponse"))?;
 
         let image_info = fidl_fuchsia_images::ImageInfo {
             transform: fidl_fuchsia_images::Transform::Normal,

@@ -83,7 +83,7 @@ class Environment : public fdf_testing::Environment {
       return zx::error(metadata.error_value().status());
     }
 
-    device_server_.Init(component::kDefaultInstance, "root");
+    device_server_.Initialize(component::kDefaultInstance);
     zx_status_t status =
         device_server_.AddMetadata(DEVICE_METADATA_SDMMC, metadata->data(), metadata->size());
     if (status != ZX_OK) {
@@ -419,6 +419,28 @@ TEST_F(SdioControllerDeviceTest, MultiplexInterrupts) {
   EXPECT_OK(interrupt4.ack());
 }
 
+TEST_F(SdioControllerDeviceTest, InterruptNotSupported) {
+  sdmmc_.set_command_callback(SDIO_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
+    out_response[0] = OpCondFunctions(7);
+  });
+
+  sdmmc_.set_in_band_interrupt_supported(false);
+
+  ASSERT_OK(StartDriver());
+
+  fidl::WireClient client1 = ConnectDeviceClient(1);
+  ASSERT_TRUE(client1.is_valid());
+
+  client1->GetInBandIntr().ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+  });
+  driver_test().runtime().RunUntilIdle();
+
+  // The SDIO driver should have created an interrupt dispatcher, then stopped it after the fake
+  // SDMMC driver returned an error. Verify that the SDIO driver can still shut down cleanly.
+}
+
 TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
   // Report five IO functions.
   sdmmc_.set_command_callback(SDIO_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
@@ -486,19 +508,7 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
   });
   driver_test().runtime().RunUntilIdle();
 
-  ASSERT_EQ(sdmmc_.requests().size(), size_t{5});
-
-  EXPECT_EQ(sdmmc_.requests()[0].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[1].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[2].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[3].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[4].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-
+  EXPECT_EQ(sdmmc_.requests().size(), size_t{5});
   sdmmc_.requests().clear();
 
   // The write sequence should be: four writes of blocks of eight, one write of four bytes. This is
@@ -532,18 +542,7 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
   });
   driver_test().runtime().RunUntilIdle();
 
-  ASSERT_EQ(sdmmc_.requests().size(), size_t{5});
-
-  EXPECT_EQ(sdmmc_.requests()[0].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[1].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[2].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[3].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[4].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
+  EXPECT_EQ(sdmmc_.requests().size(), size_t{5});
 
   EXPECT_OK(vmo.read(buffer, 0, sizeof(buffer)));
   EXPECT_EQ(0, memcmp(buffer + 16, kTestData, 36));

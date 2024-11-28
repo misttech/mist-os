@@ -9,13 +9,11 @@ use io_conformance_util::*;
 #[fuchsia::test]
 async fn directory_query() {
     let harness = TestHarness::new().await;
-
-    let root = root_directory(vec![]);
-    let test_dir = harness.get_directory(root, fio::OpenFlags::empty());
+    let dir = harness.get_directory(vec![], fio::Flags::empty());
 
     {
         let dir = open_node::<fio::DirectoryMarker>(
-            &test_dir,
+            &dir,
             fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DIRECTORY,
             ".",
         )
@@ -25,8 +23,7 @@ async fn directory_query() {
         assert_eq!(std::str::from_utf8(&protocol), Ok(fio::NODE_PROTOCOL_NAME));
     }
     {
-        let dir =
-            open_node::<fio::DirectoryMarker>(&test_dir, fio::OpenFlags::DIRECTORY, ".").await;
+        let dir = open_node::<fio::DirectoryMarker>(&dir, fio::OpenFlags::DIRECTORY, ".").await;
 
         let protocol = dir.query().await.expect("query failed");
         assert_eq!(std::str::from_utf8(&protocol), Ok(fio::DIRECTORY_PROTOCOL_NAME));
@@ -37,11 +34,11 @@ async fn directory_query() {
 async fn file_query() {
     let harness = TestHarness::new().await;
 
-    let root = root_directory(vec![file(TEST_FILE, vec![])]);
-    let test_dir = harness.get_directory(root, fio::OpenFlags::empty());
+    let entries = vec![file(TEST_FILE, vec![])];
+    let dir = harness.get_directory(entries, fio::Flags::empty());
     {
         let file = open_node::<fio::FileMarker>(
-            &test_dir,
+            &dir,
             fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::NOT_DIRECTORY,
             TEST_FILE,
         )
@@ -52,7 +49,7 @@ async fn file_query() {
     }
     {
         let file =
-            open_node::<fio::FileMarker>(&test_dir, fio::OpenFlags::NOT_DIRECTORY, TEST_FILE).await;
+            open_node::<fio::FileMarker>(&dir, fio::OpenFlags::NOT_DIRECTORY, TEST_FILE).await;
 
         let protocol = file.query().await.expect("query failed");
         assert_eq!(std::str::from_utf8(&protocol), Ok(fio::FILE_PROTOCOL_NAME));

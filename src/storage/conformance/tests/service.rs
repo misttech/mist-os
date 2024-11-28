@@ -27,10 +27,10 @@ async fn open_service() {
     if !harness.config.supports_services {
         return;
     }
-    let svc_dir = harness.get_service_dir().await;
+    let svc_dir = harness.open_service_directory().await;
 
     for flags in [fio::Flags::empty(), fio::Flags::PROTOCOL_SERVICE] {
-        let (echo_proxy, echo_server) = create_proxy::<EchoMarker>().unwrap();
+        let (echo_proxy, echo_server) = create_proxy::<EchoMarker>();
         svc_dir
             .open3(
                 EchoMarker::PROTOCOL_NAME,
@@ -51,7 +51,7 @@ async fn open_service_as_node() {
     if !harness.config.supports_services {
         return;
     }
-    let svc_dir = harness.get_service_dir().await;
+    let svc_dir = harness.open_service_directory().await;
 
     for flags in [
         fio::Flags::PROTOCOL_NODE,
@@ -84,7 +84,7 @@ async fn open_service_with_wrong_protocol() {
     if !harness.config.supports_services {
         return;
     }
-    let svc_dir = harness.get_service_dir().await;
+    let svc_dir = harness.open_service_directory().await;
 
     for (flags, expected_error) in [
         (fio::Flags::PROTOCOL_DIRECTORY, Status::NOT_DIR),
@@ -112,8 +112,8 @@ async fn open_deprecated_service() {
     if !harness.config.supports_services {
         return;
     }
-    let svc_dir = harness.get_service_dir().await;
-    let (echo_proxy, echo_server) = create_proxy::<EchoMarker>().unwrap();
+    let svc_dir = harness.open_service_directory().await;
+    let (echo_proxy, echo_server) = create_proxy::<EchoMarker>();
     svc_dir
         .open(
             fio::OpenFlags::empty(),
@@ -133,8 +133,8 @@ async fn open_deprecated_service_node_reference() {
     if !harness.config.supports_services {
         return;
     }
-    let svc_dir = harness.get_service_dir().await;
-    let (echo_proxy, echo_server) = create_proxy::<fio::NodeMarker>().unwrap();
+    let svc_dir = harness.open_service_directory().await;
+    let (echo_proxy, echo_server) = create_proxy::<fio::NodeMarker>();
     svc_dir
         .open(
             fio::OpenFlags::NODE_REFERENCE,

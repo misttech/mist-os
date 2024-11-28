@@ -292,38 +292,18 @@ pub enum DirOrProxy {
 
 impl DirOrProxy {
     fn to_proxy(&self, rights: fio::Rights) -> fio::DirectoryProxy {
-        match &self {
-            DirOrProxy::Dir(d) => fuchsia_fs::directory::open_in_namespace(
-                d.path().to_str().unwrap(),
-                fio::Flags::from_bits(rights.bits()).unwrap(),
-            )
-            .unwrap(),
-            DirOrProxy::Proxy(p) => {
-                let mut open1_flags = fio::OpenFlags::empty();
-                if rights.contains(fio::R_STAR_DIR) {
-                    open1_flags |= fio::OpenFlags::RIGHT_READABLE;
-                }
-                if rights.contains(fio::W_STAR_DIR) {
-                    open1_flags |= fio::OpenFlags::RIGHT_WRITABLE;
-                }
-                if rights.contains(fio::X_STAR_DIR) {
-                    open1_flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
-                }
-                clone_directory_proxy(p, open1_flags)
+        let flags = fio::Flags::from_bits(rights.bits()).unwrap();
+        match self {
+            DirOrProxy::Dir(temp_dir) => {
+                let path = temp_dir.path().to_str().unwrap();
+                fuchsia_fs::directory::open_in_namespace(path, flags).unwrap()
+            }
+            DirOrProxy::Proxy(proxy) => {
+                fuchsia_fs::directory::open_directory_async(proxy, ".", flags).unwrap()
             }
         }
     }
 }
-
-pub fn clone_directory_proxy(
-    proxy: &fio::DirectoryProxy,
-    rights: fio::OpenFlags,
-) -> fio::DirectoryProxy {
-    let (client, server) = fidl::endpoints::create_endpoints();
-    proxy.clone(rights, server).unwrap();
-    ClientEnd::<fio::DirectoryMarker>::new(client.into_channel()).into_proxy().unwrap()
-}
-
 pub struct TestEnvBuilder<BlobfsAndSystemImageFut, MountsFn> {
     blobfs_and_system_image:
         Box<dyn FnOnce(blobfs_ramdisk::Implementation) -> BlobfsAndSystemImageFut>,
@@ -527,7 +507,7 @@ where
 
         let local_child_out_dir = vfs::pseudo_directory! {
             "blob" => vfs::remote::remote_dir(
-                blobfs.root_dir_handle().into_proxy().unwrap()
+                blobfs.root_dir_handle().into_proxy()
             ),
             "data" => vfs::remote::remote_dir(
                 mounts.pkg_resolver_data.to_proxy(fio::RW_STAR_DIR)
@@ -1160,7 +1140,7 @@ pub fn resolve_package(
 ) -> impl Future<
     Output = Result<(fio::DirectoryProxy, pkg::ResolutionContext), fidl_fuchsia_pkg::ResolveError>,
 > {
-    let (package, package_server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (package, package_server_end) = fidl::endpoints::create_proxy();
     let response_fut = resolver.resolve(url, package_server_end);
     async move {
         let resolved_context = response_fut.await.unwrap()?;
@@ -1175,7 +1155,7 @@ pub fn resolve_with_context(
 ) -> impl Future<
     Output = Result<(fio::DirectoryProxy, pkg::ResolutionContext), fidl_fuchsia_pkg::ResolveError>,
 > {
-    let (package, package_server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (package, package_server_end) = fidl::endpoints::create_proxy();
     let response_fut = resolver.resolve_with_context(url, &context.into(), package_server_end);
     async move {
         let resolved_context = response_fut.await.unwrap()?;
@@ -1192,8 +1172,7 @@ pub fn make_repo() -> RepositoryConfig {
 }
 
 pub async fn get_repos(repository_manager: &RepositoryManagerProxy) -> Vec<RepositoryConfig> {
-    let (repo_iterator, repo_iterator_server) =
-        fidl::endpoints::create_proxy().expect("create repo iterator proxy");
+    let (repo_iterator, repo_iterator_server) = fidl::endpoints::create_proxy();
     repository_manager.list(repo_iterator_server).expect("list repos");
     let mut ret = vec![];
     loop {
@@ -1206,8 +1185,7 @@ pub async fn get_repos(repository_manager: &RepositoryManagerProxy) -> Vec<Repos
 }
 
 pub async fn get_rules(rewrite_engine: &fpkg_rewrite::EngineProxy) -> Vec<Rule> {
-    let (rule_iterator, rule_iterator_server) =
-        fidl::endpoints::create_proxy().expect("create rule iterator proxy");
+    let (rule_iterator, rule_iterator_server) = fidl::endpoints::create_proxy();
     rewrite_engine.list(rule_iterator_server).expect("list rules");
     let mut ret = vec![];
     loop {

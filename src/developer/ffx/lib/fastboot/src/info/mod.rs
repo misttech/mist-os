@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::prepare;
 use anyhow::{anyhow, Result};
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, Variable};
 use futures::prelude::*;
@@ -31,7 +30,6 @@ pub async fn info<W: Write, F: FastbootInterface>(
     writer: &mut W,
     fastboot_interface: &mut F,
 ) -> Result<()> {
-    prepare(writer, fastboot_interface).await?;
     let (var_client, var_server): (Sender<Variable>, Receiver<Variable>) = mpsc::channel(1);
     let _ = try_join!(
         fastboot_interface.get_all_vars(var_client).map_err(|e| {

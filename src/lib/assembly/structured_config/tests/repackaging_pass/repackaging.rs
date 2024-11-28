@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use assembly_structured_config::{validate_component, Repackager, ValidationError};
-use assembly_validate_product::{validate_package, PackageValidationError};
+use assembly_validate_package::{validate_package, PackageValidationError};
 use camino::Utf8Path;
 use fuchsia_archive::Utf8Reader;
 use fuchsia_pkg::{BlobInfo, PackageManifest};

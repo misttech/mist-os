@@ -55,3 +55,23 @@ func (c BuildAPIClient) GetJSON(name string, v interface{}) error {
 	}
 	return json.Unmarshal(content, v)
 }
+
+func (c BuildAPIClient) GetModulePaths() ([]string, error) {
+	var paths []string
+	cmd := exec.Command(c.toolPath, "--build-dir", c.buildDir, "print_all", "--pretty")
+	cmd.Stderr = os.Stderr
+	output, err := cmd.Output()
+	if err != nil {
+		return paths, err
+	}
+	var buildAPIModules map[string]struct {
+		File string `json:"file"`
+	}
+	if err := json.Unmarshal(output, &buildAPIModules); err != nil {
+		return paths, err
+	}
+	for _, module := range buildAPIModules {
+		paths = append(paths, module.File)
+	}
+	return paths, nil
+}

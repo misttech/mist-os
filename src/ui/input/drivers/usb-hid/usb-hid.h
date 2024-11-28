@@ -105,9 +105,9 @@ class UsbHidbus : public DeviceType,
   std::optional<SetReportCompleter::Async> set_report_completer_;
 
   // Interrupt endpoint
-  usb_endpoint::UsbEndpoint<UsbHidbus> ep_in_{usb::EndpointType::INTERRUPT, this,
-                                              std::mem_fn(&UsbHidbus::HandleInterrupt)};
-  std::optional<usb_endpoint::UsbEndpoint<UsbHidbus>> ep_out_;
+  usb::EndpointClient<UsbHidbus> ep_in_{usb::EndpointType::INTERRUPT, this,
+                                        std::mem_fn(&UsbHidbus::HandleInterrupt)};
+  std::optional<usb::EndpointClient<UsbHidbus>> ep_out_;
 };
 
 }  // namespace usb_hid

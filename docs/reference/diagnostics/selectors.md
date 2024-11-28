@@ -274,8 +274,9 @@ If a component doesn't specify a name when publishing Inspect, it will implicitl
 This [bug](https://fxbug.dev/355732696) tracks making an omitted name filter list equivalent to
 `[name=root]`.
 
-There is no character restriction on the values in a name filter list, but `:`, `*`, and spaces
-must be escaped. If the name contains values other than `[a-zA-Z0-9-_]`, the name must be quoted.
+There is no character restriction on the values in a name filter list, but `*` must be escaped.
+If the name contains values other than `[a-zA-Z0-9-_]`, the name must be quoted. In a quoted name,
+internal quotes must be escaped.
 
 Name filters are case-sensitive.
 

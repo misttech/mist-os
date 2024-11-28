@@ -21,8 +21,8 @@ namespace elfldltl {
 // The Module type must have the following methods:
 //
 //  * const SymbolInfo& symbol_info() const
-//    Returns the SymbolInfo type associated with this module. This is used
-//    to call SymbolInfo::Lookup().
+//    Returns the SymbolInfo type associated with this module.
+//    This is used to reify the Sym in the referring module to a name.
 //
 //  * size_type load_bias() const
 //    Returns the load bias for symbol addresses in this module.
@@ -39,11 +39,19 @@ namespace elfldltl {
 //  * size_type static_tls_bias() const
 //    Returns the static TLS layout bias for the defining module.
 //
-//  * fit::result<bool, TlsDescGot> tls_desc(Diagnostics&, const Sym&, Addend addend)
-//  * fit::result<bool, TlsDescGot> tls_desc(Diagnostics&)
+//  * fit::result<bool, TlsDescGot> tls_desc(Diagnostics&, const Sym&, Addend addend) const
+//  * fit::result<bool, TlsDescGot> tls_desc(Diagnostics&) const
 //    See elfldltl::RelocateSymbolic API comments about the two overloads.
 //    This implements that method but for some particular defined symbol in
 //    `.symbols_info().symtab()`.
+//
+//  * fit::result<bool, const Sym*> Lookup(Diagnostics&, SymbolName& name) const
+//    This can usually be just `return fit::ok(name.Lookup(symbol_info()));`.
+//    It's responsible for looking up a symbol name in the module.
+//    It can return failure to declare that resolution has failed entirely.
+//    It returns success with nullptr just to indicate this module does not
+//    define this symbol name.  The returned pointer must be from symbol_info()
+//    so that its string table can be used.
 //
 template <class Module, typename TlsDescResolver>
 struct ResolverDefinition {
@@ -191,7 +199,16 @@ constexpr auto MakeSymbolResolver(const Module& ref_module, ModuleList& modules,
 
     Definition weak_def = Definition::UndefinedWeak(&tlsdesc_resolver);
     for (const auto& module : modules) {
-      if (const auto* sym = name.Lookup(module.symbol_info())) {
+      auto lookup = module.Lookup(diag, name);
+      if (lookup.is_error()) [[unlikely]] {
+        // The module's hook said to fail the whole resolution, which to the
+        // caller likely means the entire relocation of the referring module.
+        // The error value will tell the caller whether to bail out now or
+        // continue at a higher level, such as relocating other modules.
+        return lookup.take_error();
+      }
+
+      if (const auto* sym = lookup.value()) {
         const Definition module_def{sym, &module};
         switch (sym->bind()) {
           case ElfSymBind::kWeak:

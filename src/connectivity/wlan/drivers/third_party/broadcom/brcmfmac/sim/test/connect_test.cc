@@ -26,7 +26,7 @@ namespace wlan_ieee80211 = wlan_ieee80211;
 constexpr wlan_common::WlanChannel kDefaultChannel = {
     .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
-const uint8_t kIes[] = {
+constexpr uint8_t kIes[] = {
     // SSID
     0x00, 0x0f, 'F', 'u', 'c', 'h', 's', 'i', 'a', ' ', 'F', 'a', 'k', 'e', ' ', 'A', 'P',
     // Supported rates
@@ -140,10 +140,10 @@ class ConnectTest : public SimTest {
 
   // Event handlers
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp);
-  void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
-  void OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocConfirm* resp);
+  void OnDisassocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind);
+  void OnDisassocConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest* resp);
   void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
-  void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind);
+  void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthIndRequest* ind);
   void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
 
  protected:
@@ -252,7 +252,8 @@ void ConnectInterface::ConnectConf(ConnectConfRequestView request,
 }
 void ConnectInterface::DisassocConf(DisassocConfRequestView request,
                                     DisassocConfCompleter::Sync& completer) {
-  test_->OnDisassocConf(&request->resp);
+  auto disassoc_conf = fidl::ToNatural(*request);
+  test_->OnDisassocConf(&disassoc_conf);
   completer.Reply();
 }
 void ConnectInterface::DeauthConf(DeauthConfRequestView request,
@@ -262,12 +263,13 @@ void ConnectInterface::DeauthConf(DeauthConfRequestView request,
 }
 void ConnectInterface::DeauthInd(DeauthIndRequestView request,
                                  DeauthIndCompleter::Sync& completer) {
-  test_->OnDeauthInd(&request->ind);
+  test_->OnDeauthInd(request);
   completer.Reply();
 }
 void ConnectInterface::DisassocInd(DisassocIndRequestView request,
                                    DisassocIndCompleter::Sync& completer) {
-  test_->OnDisassocInd(&request->ind);
+  auto disassoc_ind = fidl::ToNatural(*request);
+  test_->OnDisassocInd(&disassoc_ind);
   completer.Reply();
 }
 void ConnectInterface::SignalReport(SignalReportRequestView request,
@@ -378,8 +380,9 @@ void ConnectTest::OnConnectConf(
   }
 }
 
-void ConnectTest::OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocConfirm* resp) {
-  if (resp->status == ZX_OK) {
+void ConnectTest::OnDisassocConf(
+    const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest* resp) {
+  if (resp->status().has_value() && resp->status().value() == ZX_OK) {
     context_.disassoc_conf_count++;
   }
 }
@@ -388,17 +391,19 @@ void ConnectTest::OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauth
   context_.deauth_conf_count++;
 }
 
-void ConnectTest::OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind) {
+void ConnectTest::OnDeauthInd(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthIndRequest* ind) {
   context_.deauth_ind_count++;
-  if (ind->locally_initiated) {
+  if (ind->has_locally_initiated() && ind->locally_initiated()) {
     context_.ind_locally_initiated_count++;
   }
-  client_ifc_.stats_.deauth_indications.push_back(*ind);
+  auto deauth_ind = fidl::ToNatural(*ind);
+  client_ifc_.stats_.deauth_indications.push_back(deauth_ind);
 }
 
-void ConnectTest::OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind) {
+void ConnectTest::OnDisassocInd(
+    const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind) {
   context_.disassoc_ind_count++;
-  if (ind->locally_initiated) {
+  if (ind->locally_initiated().has_value() && ind->locally_initiated().value()) {
     context_.ind_locally_initiated_count++;
   }
   client_ifc_.stats_.disassoc_indications.push_back(*ind);
@@ -1219,10 +1224,10 @@ TEST_F(ConnectTest, DisassocFromAPTest) {
   EXPECT_EQ(context_.disassoc_ind_count, 1U);
   EXPECT_EQ(context_.ind_locally_initiated_count, 0U);
 
-  EXPECT_EQ(client_ifc_.stats_.disassoc_indications.size(), 1U);
-  const wlan_fullmac_wire::WlanFullmacDisassocIndication& disassoc_ind =
-      client_ifc_.stats_.disassoc_indications.front();
-  EXPECT_EQ(disassoc_ind.locally_initiated, false);
+  ASSERT_EQ(client_ifc_.stats_.disassoc_indications.size(), 1U);
+  const auto& disassoc_ind = client_ifc_.stats_.disassoc_indications.front();
+  ASSERT_TRUE(disassoc_ind.locally_initiated().has_value());
+  EXPECT_FALSE(disassoc_ind.locally_initiated().value());
 }
 
 // After assoc & disassoc, send disassoc again to test event handling

@@ -46,13 +46,13 @@ pub fn serve_reboot_server(
                     watcher,
                     control_handle: _,
                 } => {
-                    proxy_sender.send(watcher.into_proxy().unwrap()).await.unwrap();
+                    proxy_sender.send(watcher.into_proxy()).await.unwrap();
                 }
                 reboot::RebootMethodsWatcherRegisterRequest::RegisterWithAck {
                     watcher,
                     responder,
                 } => {
-                    proxy_sender.send(watcher.into_proxy().unwrap()).await.unwrap();
+                    proxy_sender.send(watcher.into_proxy()).await.unwrap();
                     responder.send().unwrap();
                 }
             }

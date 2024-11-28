@@ -16,6 +16,10 @@
                 "*entrypoint*",
                 "*execshare*",
 
+                // TODO(http://b/364568874): `inherit` tests will pass once the `file_security_ops`
+                // hook correctly enforces the `write` permission.
+                "*inherit*",
+
                 // TODO(http://b/330904217): update `execute_no_trans` expectation to pass once filesystems are labeled correctly.
                 // keep-sorted start
                 "*atsecure*",
@@ -30,11 +34,9 @@
                 "*execute_no_trans*",
                 "*fdreceive*",
                 "*inet_socket*",
-                "*inherit*",
                 "*ioctl*",
                 "*key_socket*",
                 "*keys*",
-                "*link*",
                 "*mac_admin*",
                 "*mkdir*",
                 "*mmap*",
@@ -46,7 +48,6 @@
                 "*open*",
                 "*perf_event*",
                 "*readlink*",
-                "*rename*",
                 "*rxdir*",
                 "*sem*",
                 "*setattr*",

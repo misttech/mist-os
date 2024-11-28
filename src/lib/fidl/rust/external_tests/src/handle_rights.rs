@@ -162,7 +162,7 @@ async fn send_handle_receiver_thread(
     server_end: Channel,
     sender_fifo: std::sync::mpsc::SyncSender<()>,
 ) {
-    let stream = ServerEnd::<SendHandleProtocolMarker>::new(server_end).into_stream().unwrap();
+    let stream = ServerEnd::<SendHandleProtocolMarker>::new(server_end).into_stream();
     Box::new(stream)
         .for_each(|request| {
             match request {
@@ -298,7 +298,7 @@ async fn send_handle_async_receive() {
 }
 
 async fn echo_handle_receiver_thread(server_end: Channel) {
-    let stream = ServerEnd::<EchoHandleProtocolMarker>::new(server_end).into_stream().unwrap();
+    let stream = ServerEnd::<EchoHandleProtocolMarker>::new(server_end).into_stream();
     stream
         .for_each(|request| {
             match request {
@@ -576,8 +576,7 @@ async fn push_event_helper<'a>(
         });
     });
     let stream = ServerEnd::<PushEventProtocolMarker>::new(transformable_channel.take_client_end())
-        .into_stream()
-        .unwrap();
+        .into_stream();
     let ev = Event::create();
     send_fn(&fidl::endpoints::RequestStream::control_handle(&stream), ev).unwrap();
     transformable_channel.transform();
@@ -632,7 +631,7 @@ async fn push_event_receive() {
 }
 
 async fn error_syntax_receiver_thread(server_end: Channel) {
-    let stream = ServerEnd::<ErrorSyntaxProtocolMarker>::new(server_end).into_stream().unwrap();
+    let stream = ServerEnd::<ErrorSyntaxProtocolMarker>::new(server_end).into_stream();
     stream
         .for_each(|request| {
             match request {

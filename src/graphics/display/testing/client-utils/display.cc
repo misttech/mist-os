@@ -12,7 +12,7 @@
 #include <cmath>
 #include <cstdio>
 
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
 
 namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;

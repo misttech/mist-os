@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::{is_locked, lock_device, prepare, verify_variable_value};
+use crate::common::{is_locked, lock_device, verify_variable_value};
 use anyhow::Result;
 use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
@@ -18,7 +18,6 @@ pub async fn lock<W: Write, F: FastbootInterface>(
     writer: &mut W,
     fastboot_interface: &mut F,
 ) -> Result<()> {
-    prepare(writer, fastboot_interface).await?;
     if is_locked(fastboot_interface).await? {
         ffx_bail!("{}", LOCKED_ERR);
     }

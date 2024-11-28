@@ -36,11 +36,23 @@ zx::result<std::unique_ptr<DevicePartitioner>> Vim3Partitioner::Initialize(
   if (status_or_gpt.is_error()) {
     return status_or_gpt.take_error();
   }
+  if (status_or_gpt->initialize_partition_tables) {
+    LOG("Found GPT but it was missing expected partitions.  The device should be re-initialized "
+        "via fastboot.\n");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
 
-  auto partitioner = WrapUnique(new Vim3Partitioner(std::move(status_or_gpt->gpt)));
+  auto partitioner =
+      WrapUnique(new Vim3Partitioner(std::move(status_or_gpt->gpt), devices.Duplicate()));
 
   LOG("Successfully initialized Vim3Partitioner Device Partitioner\n");
   return zx::ok(std::move(partitioner));
+}
+
+const paver::BlockDevices& Vim3Partitioner::Devices() const { return gpt_->devices(); }
+
+fidl::UnownedClientEnd<fuchsia_io::Directory> Vim3Partitioner::SvcRoot() const {
+  return gpt_->svc_root();
 }
 
 bool Vim3Partitioner::SupportsPartition(const PartitionSpec& spec) const {
@@ -62,7 +74,7 @@ bool Vim3Partitioner::SupportsPartition(const PartitionSpec& spec) const {
 
 zx::result<std::unique_ptr<PartitionClient>> Vim3Partitioner::GetEmmcBootPartitionClient() const {
   auto boot0_part =
-      OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
+      OpenBlockPartition(devfs_devices_, std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
   if (boot0_part.is_error()) {
     return boot0_part.take_error();
   }
@@ -72,7 +84,7 @@ zx::result<std::unique_ptr<PartitionClient>> Vim3Partitioner::GetEmmcBootPartiti
   }
 
   auto boot1_part =
-      OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));
+      OpenBlockPartition(devfs_devices_, std::nullopt, Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));
   if (boot1_part.is_error()) {
     return boot1_part.take_error();
   }
@@ -162,22 +174,13 @@ zx::result<std::unique_ptr<DevicePartitioner>> Vim3PartitionerFactory::New(
   return Vim3Partitioner::Initialize(devices, svc_root, std::move(block_device));
 }
 
-zx::result<std::unique_ptr<abr::Client>> Vim3AbrClientFactory::New(
-    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-    std::shared_ptr<paver::Context> context) {
-  zx::result partitioner = Vim3Partitioner::Initialize(devices, svc_root, {});
-
-  if (partitioner.is_error()) {
-    return partitioner.take_error();
-  }
-
+zx::result<std::unique_ptr<abr::Client>> Vim3Partitioner::CreateAbrClient() const {
   // ABR metadata has no need of a content type since it's always local rather
   // than provided in an update package, so just use the default content type.
-  auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+  auto partition = FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
   if (partition.is_error()) {
     return partition.take_error();
   }
-  LOG("Found partition\n");
 
   return abr::AbrPartitionClient::Create(std::move(partition.value()));
 }

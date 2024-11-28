@@ -96,7 +96,7 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
             device_information: Some(new_fake_device_info()),
             keyboard: Some(KeyboardDescriptor {
                 input: Some(KeyboardInputDescriptor {
-                    keys3: Some(all_keys.clone()),
+                    keys3: Some(all_keys),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -185,7 +185,7 @@ impl InputDeviceRegistry {
         &self,
         descriptor: DeviceDescriptor,
     ) -> Result<Box<dyn synthesizer::InputDevice>, Error> {
-        let (client_end, request_stream) = endpoints::create_request_stream::<InputDeviceMarker>()?;
+        let (client_end, request_stream) = endpoints::create_request_stream::<InputDeviceMarker>();
         self.proxy.register(client_end)?;
         Ok(Box::new(InputDevice::new(request_stream, descriptor)))
     }
@@ -215,8 +215,7 @@ mod tests {
     ) -> Result<(), Error> {
         let mut executor = fasync::TestExecutor::new();
         let (proxy, request_stream) =
-            endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>()
-                .context("failed to create proxy and stream for InputDeviceRegistry")?;
+            endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>();
         add_device_method(&mut InputDeviceRegistry { proxy }).context("adding device")?;
 
         let requests = match executor.run_until_stalled(&mut request_stream.collect::<Vec<_>>()) {
@@ -261,8 +260,7 @@ mod tests {
         let mut executor = fasync::TestExecutor::new();
         // Create an `InputDeviceRegistry`, and add a keyboard to it.
         let (registry_proxy, mut registry_request_stream) =
-            endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>()
-                .context("failed to create proxy and stream for InputDeviceRegistry")?;
+            endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>();
         let mut input_device_registry = InputDeviceRegistry { proxy: registry_proxy };
         let input_device =
             add_device_method(&mut input_device_registry).context("adding keyboard")?;
@@ -280,8 +278,7 @@ mod tests {
                 InputDeviceRegistryRequest::Register { device, .. } => device,
                 InputDeviceRegistryRequest::RegisterAndGetDeviceInfo { device, .. } => device,
             }
-            .into_proxy()
-            .context("converting client_end to proxy")?;
+            .into_proxy();
 
             // Send a `GetDescriptor` request to `input_device`, and verify that the device
             // is as keyboard.

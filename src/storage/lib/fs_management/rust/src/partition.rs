@@ -113,7 +113,7 @@ pub async fn partition_matches_with_proxy(
     );
 
     let (partition_proxy, partition_server_end) =
-        fidl::endpoints::create_proxy::<PartitionMarker>().context("making partition endpoints")?;
+        fidl::endpoints::create_proxy::<PartitionMarker>();
     controller_proxy
         .connect_to_device_fidl(partition_server_end.into_channel())
         .context("connecting to partition protocol")?;
@@ -122,7 +122,7 @@ pub async fn partition_matches_with_proxy(
         let (status, guid_option) =
             partition_proxy.get_type_guid().await.context("transport error on get_type_guid")?;
         zx::Status::ok(status).context("get_type_guid failed")?;
-        let guid = guid_option.ok_or(anyhow!("Expected type guid"))?;
+        let guid = guid_option.ok_or_else(|| anyhow!("Expected type guid"))?;
         if !matcher_type_guids.into_iter().any(|x| x == &guid.value) {
             return Ok(false);
         }
@@ -134,7 +134,7 @@ pub async fn partition_matches_with_proxy(
             .await
             .context("transport error on get_instance_guid")?;
         zx::Status::ok(status).context("get_instance_guid failed")?;
-        let guid = guid_option.ok_or(anyhow!("Expected instance guid"))?;
+        let guid = guid_option.ok_or_else(|| anyhow!("Expected instance guid"))?;
         if !matcher_instance_guids.into_iter().any(|x| x == &guid.value) {
             return Ok(false);
         }
@@ -144,7 +144,7 @@ pub async fn partition_matches_with_proxy(
         let (status, name) =
             partition_proxy.get_name().await.context("transport error on get_name")?;
         zx::Status::ok(status).context("get_name failed")?;
-        let name = name.ok_or(anyhow!("Expected name"))?;
+        let name = name.ok_or_else(|| anyhow!("Expected name"))?;
         if name.is_empty() {
             return Ok(false);
         }
@@ -255,7 +255,7 @@ mod tests {
     const DEFAULT_PATH: &str = "/fake/block/device/1/partition/001";
 
     async fn check_partition_matches(matcher: &PartitionMatcher) -> bool {
-        let (proxy, mut stream) = create_proxy_and_stream::<ControllerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<ControllerMarker>();
 
         let fake_block_server = Arc::new(FakeServer::new(1000, 512, &constants::FVM_MAGIC));
 

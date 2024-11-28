@@ -458,10 +458,7 @@ mod tests {
             Path::validate_and_split("e/c/d").unwrap(),
             server,
         );
-        assert_read!(
-            ClientEnd::<fio::FileMarker>::from(client.into_channel()).into_proxy().unwrap(),
-            "foo"
-        );
+        assert_read!(ClientEnd::<fio::FileMarker>::from(client.into_channel()).into_proxy(), "foo");
     }
 
     #[fuchsia::test]
@@ -502,7 +499,7 @@ mod tests {
         }
 
         let scope = ExecutionScope::new();
-        let (proxy, server) = create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server) = create_proxy::<fio::NodeMarker>();
         let flags = fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE;
         let mut object_request = flags.to_object_request(server);
 
@@ -534,7 +531,7 @@ mod tests {
                 if status == Status::BAD_STATE
         );
 
-        let (proxy, server) = create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server) = create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::FILE_APPEND;
         let mut object_request =
             ObjectRequest::new3(flags, &Default::default(), server.into_channel());

@@ -6,6 +6,7 @@ use crate::subtool::{FfxTool, ToolCommand};
 use crate::FhoEnvironment;
 use argh::FromArgs;
 use async_trait::async_trait;
+use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy as FRemoteControlProxy;
 use ffx_command::{FfxCommandLine, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::{downcast_injector_error, FfxInjectorError, Injector};
@@ -50,6 +51,7 @@ impl ToolEnv {
     factory_func!(daemon_factory_closure, DaemonProxy);
     factory_func!(try_daemon_closure, Option<DaemonProxy>);
     factory_func!(remote_factory_closure, RemoteControlProxy);
+    factory_func!(remote_factory_closure_f, FRemoteControlProxy);
     factory_func!(target_factory_closure, TargetProxy);
     factory_func!(build_info_closure, VersionInfo);
 
@@ -114,6 +116,8 @@ pub struct FakeInjector {
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<Option<DaemonProxy>>>>>>,
     remote_factory_closure:
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<RemoteControlProxy>>>>>,
+    remote_factory_closure_f:
+        Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<FRemoteControlProxy>>>>>,
     target_factory_closure:
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<TargetProxy>>>>>,
     is_experiment_closure: Box<dyn Fn(&str) -> Pin<Box<dyn Future<Output = bool>>>>,
@@ -129,6 +133,7 @@ impl Default for FakeInjector {
             }),
             try_daemon_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             remote_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
+            remote_factory_closure_f: Box::new(|| Box::pin(async { unimplemented!() })),
             target_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             is_experiment_closure: Box::new(|_| Box::pin(async { unimplemented!() })),
             build_info_closure: Box::new(|| Box::pin(async { unimplemented!() })),
@@ -156,6 +161,10 @@ impl Injector for FakeInjector {
         (self.remote_factory_closure)().await
     }
 
+    async fn remote_factory_fdomain(&self) -> anyhow::Result<FRemoteControlProxy> {
+        (self.remote_factory_closure_f)().await
+    }
+
     async fn target_factory(&self) -> anyhow::Result<TargetProxy> {
         (self.target_factory_closure)().await
     }
@@ -178,8 +187,30 @@ pub fn fake_proxy<T: fidl::endpoints::Proxy>(
     mut handle_request: impl FnMut(fidl::endpoints::Request<T::Protocol>) + 'static,
 ) -> T {
     use futures::TryStreamExt;
-    let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<T::Protocol>().unwrap();
+    let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<T::Protocol>();
     fuchsia_async::Task::local(async move {
+        while let Ok(Some(req)) = stream.try_next().await {
+            handle_request(req);
+        }
+    })
+    .detach();
+    proxy
+}
+
+/// Sets up a fake FDomain proxy of type `T` handing requests to the given
+/// callback and returning their responses.
+///
+/// This is basically the same thing as `ffx_plugin` used to generate for
+/// each proxy argument, but uses a generic instead of text replacement.
+pub async fn fake_proxy_f<T: fdomain_client::fidl::Proxy>(
+    client: Arc<fdomain_client::Client>,
+    mut handle_request: impl FnMut(fdomain_client::fidl::Request<T::Protocol>) + 'static,
+) -> T {
+    use futures::TryStreamExt;
+    let (proxy, mut stream) = client.create_proxy_and_stream::<T::Protocol>().await.unwrap();
+    fuchsia_async::Task::local(async move {
+        // Capture the client so it doesn't go out of scope
+        let _client = client;
         while let Ok(Some(req)) = stream.try_next().await {
             handle_request(req);
         }

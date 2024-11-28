@@ -30,6 +30,8 @@ class SkipBlockDevicePartitioner {
 
   zx::result<> WipeFvm() const;
 
+  const BlockDevices& devices() const { return devices_; }
+
  private:
   BlockDevices devices_;
 };

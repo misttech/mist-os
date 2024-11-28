@@ -73,7 +73,7 @@ fn read_characteristics(
         return Err(format_err!("No battery level characteristic"));
     };
     // TODO(https://fxbug.dev/42074755): `handle` check can be removed when converted to a local type.
-    let handle = chrc.handle.ok_or(format_err!("characteristic missing handle"))?;
+    let handle = chrc.handle.ok_or_else(|| format_err!("characteristic missing handle"))?;
     Ok((handle, is_notifiable(chrc)))
 }
 
@@ -83,7 +83,7 @@ fn read_services(services: Vec<gatt::ServiceInfo>) -> Result<gatt::ServiceHandle
         return Err(format_err!("No compatible Battery service"));
     };
     // TODO(https://fxbug.dev/42074755): `handle` check can be removed when converted to a local type.
-    service.handle.ok_or(format_err!("service missing handle"))
+    service.handle.ok_or_else(|| format_err!("service missing handle"))
 }
 
 /// Monitors GATT notifications received in the `stream` and logs changes in battery level.
@@ -111,9 +111,9 @@ async fn watch_battery_level(id: PeerId, mut stream: gatt::CharacteristicNotifie
 async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient, Error> {
     info!(%id, "Trying to connect");
     // Try to connect and establish a GATT connection.
-    let (le_client, le_server) = fidl::endpoints::create_proxy::<ConnectionMarker>()?;
+    let (le_client, le_server) = fidl::endpoints::create_proxy::<ConnectionMarker>();
     central.connect(&id.into(), &ConnectionOptions::default(), le_server)?;
-    let (gatt_client, gatt_server) = fidl::endpoints::create_proxy::<gatt::ClientMarker>()?;
+    let (gatt_client, gatt_server) = fidl::endpoints::create_proxy::<gatt::ClientMarker>();
     le_client.request_gatt_client(gatt_server)?;
 
     // Read the GATT services offered by the peer.
@@ -121,7 +121,7 @@ async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient
     let (added, _) = gatt_client.watch_services(uuids).await?;
     let service_handle = read_services(added)?;
     let (remote_client, remote_server) =
-        fidl::endpoints::create_proxy::<gatt::RemoteServiceMarker>()?;
+        fidl::endpoints::create_proxy::<gatt::RemoteServiceMarker>();
     gatt_client.connect_to_service(&service_handle, remote_server)?;
 
     // Discover the characteristics provided by the service.
@@ -143,7 +143,7 @@ async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient
 
     let _monitor_task = if notifications {
         let (notification_client, notification_server) =
-            fidl::endpoints::create_request_stream::<gatt::CharacteristicNotifierMarker>()?;
+            fidl::endpoints::create_request_stream::<gatt::CharacteristicNotifierMarker>();
         remote_client
             .register_characteristic_notifier(&battery_level_handle, notification_client)
             .await?
@@ -208,7 +208,7 @@ async fn watch_scan_results(
 async fn main() -> Result<(), Error> {
     info!("Starting LE Battery Monitor");
     let central = connect_to_protocol::<CentralMarker>()?;
-    let (scan_client, scan_server) = fidl::endpoints::create_proxy::<ScanResultWatcherMarker>()?;
+    let (scan_client, scan_server) = fidl::endpoints::create_proxy::<ScanResultWatcherMarker>();
     // Only scan for devices with the Battery Service.
     let options = ScanOptions {
         filters: Some(vec![Filter {
@@ -241,9 +241,9 @@ mod tests {
     fn watch_scan_results_lifetime() {
         let mut exec = fasync::TestExecutor::new();
         let (central, _central_server) =
-            fidl::endpoints::create_proxy_and_stream::<CentralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<CentralMarker>();
         let (watch_client, mut watch_server) =
-            fidl::endpoints::create_proxy_and_stream::<ScanResultWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ScanResultWatcherMarker>();
 
         let watch_fut = pin!(watch_scan_results(central.clone(), watch_client));
         let server_fut = pin!(watch_server.next());
@@ -265,9 +265,9 @@ mod tests {
     fn watch_scan_results_empty_reply_is_ok() {
         let mut exec = fasync::TestExecutor::new();
         let (central, _central_server) =
-            fidl::endpoints::create_proxy_and_stream::<CentralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<CentralMarker>();
         let (watch_client, mut watch_server) =
-            fidl::endpoints::create_proxy_and_stream::<ScanResultWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ScanResultWatcherMarker>();
 
         let watch_fut = pin!(watch_scan_results(central.clone(), watch_client));
         let server_fut = pin!(watch_server.next());
@@ -354,7 +354,7 @@ mod tests {
 
         let id = PeerId(123);
         let (central_client, mut central_server) =
-            fidl::endpoints::create_proxy_and_stream::<CentralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<CentralMarker>();
         let connect_fut = try_connect(id, &central_client);
         let mut connect_fut = pin!(connect_fut);
 
@@ -366,7 +366,7 @@ mod tests {
         let mut gatt_connection_server = match central_result {
             Ok(CentralRequest::Connect { id: received_id, handle, .. }) => {
                 assert_eq!(received_id, id.into());
-                handle.into_stream().expect("valid FIDL server")
+                handle.into_stream()
             }
             x => panic!("Expected Connect got: {x:?}"),
         };
@@ -377,7 +377,7 @@ mod tests {
             run_while(&mut exec, connect_fut, gatt_connect_fut);
         let (gatt_server, _) =
             gatt_connect_result.unwrap().into_request_gatt_client().expect("only request");
-        let mut gatt_server = gatt_server.into_stream().unwrap();
+        let mut gatt_server = gatt_server.into_stream();
 
         // Expect a request to watch GATT services - send back the example service.
         let gatt_fut = gatt_server.select_next_some();
@@ -389,7 +389,7 @@ mod tests {
         let gatt_fut = gatt_server.select_next_some();
         let (gatt_result, connect_fut) = run_while(&mut exec, connect_fut, gatt_fut);
         let (_, remote_service_server, _) = gatt_result.unwrap().into_connect_to_service().unwrap();
-        let mut remote_service_server = remote_service_server.into_stream().unwrap();
+        let mut remote_service_server = remote_service_server.into_stream();
         let discover_fut = remote_service_server.select_next_some();
         let (discover_result, connect_fut) = run_while(&mut exec, connect_fut, discover_fut);
         let responder = discover_result.unwrap().into_discover_characteristics().unwrap();

@@ -547,7 +547,7 @@ impl InputPipeline {
                     ..
                 } => {
                     // Add a binding if the device is a type being tracked
-                    let device_proxy = device.into_proxy().expect("Error getting device proxy.");
+                    let device_proxy = device.into_proxy();
 
                     let device_id = get_next_device_id();
 
@@ -569,7 +569,7 @@ impl InputPipeline {
                     responder,
                     .. } => {
                     // Add a binding if the device is a type being tracked
-                    let device_proxy = device.into_proxy().expect("Error getting device proxy.");
+                    let device_proxy = device.into_proxy();
 
                     let device_id = get_next_device_id();
 
@@ -988,7 +988,7 @@ mod tests {
         // Create a Watcher on the pseudo directory.
         let pseudo_dir_clone = dir.clone();
         let (dir_proxy_for_watcher, dir_server_for_watcher) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+            create_proxy::<fio::DirectoryMarker>();
         let server_end_for_watcher = dir_server_for_watcher.into_channel().into();
         let scope_for_watcher = ExecutionScope::new();
         dir.open(scope_for_watcher, fio::OpenFlags::empty(), Path::dot(), server_end_for_watcher);
@@ -997,7 +997,7 @@ mod tests {
         // Get a proxy to the pseudo directory for the input pipeline. The input pipeline uses this
         // proxy to get connections to input devices.
         let (dir_proxy_for_pipeline, dir_server_for_pipeline) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+            create_proxy::<fio::DirectoryMarker>();
         let server_end_for_pipeline = dir_server_for_pipeline.into_channel().into();
         let scope_for_pipeline = ExecutionScope::new();
         pseudo_dir_clone.open(
@@ -1111,7 +1111,7 @@ mod tests {
         // Create a Watcher on the pseudo directory.
         let pseudo_dir_clone = dir.clone();
         let (dir_proxy_for_watcher, dir_server_for_watcher) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+            create_proxy::<fio::DirectoryMarker>();
         let server_end_for_watcher = dir_server_for_watcher.into_channel().into();
         let scope_for_watcher = ExecutionScope::new();
         dir.open(scope_for_watcher, fio::OpenFlags::empty(), Path::dot(), server_end_for_watcher);
@@ -1120,7 +1120,7 @@ mod tests {
         // Get a proxy to the pseudo directory for the input pipeline. The input pipeline uses this
         // proxy to get connections to input devices.
         let (dir_proxy_for_pipeline, dir_server_for_pipeline) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+            create_proxy::<fio::DirectoryMarker>();
         let server_end_for_pipeline = dir_server_for_pipeline.into_channel().into();
         let scope_for_pipeline = ExecutionScope::new();
         pseudo_dir_clone.open(
@@ -1191,10 +1191,9 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn handle_input_device_registry_request_stream() {
         let (input_device_registry_proxy, input_device_registry_request_stream) =
-            create_proxy_and_stream::<fidl_fuchsia_input_injection::InputDeviceRegistryMarker>()
-                .unwrap();
+            create_proxy_and_stream::<fidl_fuchsia_input_injection::InputDeviceRegistryMarker>();
         let (input_device_client_end, mut input_device_request_stream) =
-            create_request_stream::<fidl_fuchsia_input_report::InputDeviceMarker>().unwrap();
+            create_request_stream::<fidl_fuchsia_input_report::InputDeviceMarker>();
 
         let device_types = vec![input_device::InputDeviceType::Mouse];
         let (input_event_sender, _input_event_receiver) = futures::channel::mpsc::unbounded();

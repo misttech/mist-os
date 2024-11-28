@@ -32,7 +32,7 @@ fn main() {
     info!("Lifecycle channel received.");
     let channel: zx::Channel = lifecycle_handle.into();
     let lifecycle: ServerEnd<LifecycleMarker> = channel.into();
-    let (_stream, control) = lifecycle.into_stream_and_control_handle().unwrap();
+    let (_stream, control) = lifecycle.into_stream_and_control_handle();
     control
         .send_on_escrow(LifecycleOnEscrowRequest {
             outgoing_dir: Some(outgoing_directory.into()),

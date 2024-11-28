@@ -158,7 +158,7 @@ class AmlPwmRegulatorTest : public zxtest::Test {
           incoming->test_env.Initialize(std::move(start_args_result->incoming_directory_server));
       ASSERT_TRUE(init_result.is_ok());
 
-      incoming->compat_server.Init("pdev", "");
+      incoming->compat_server.Initialize("pdev");
 
       // Setup metadata.
       fuchsia_hardware_vreg::VregMetadata metadata_vreg = {};
@@ -195,9 +195,10 @@ class AmlPwmRegulatorTest : public zxtest::Test {
   fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> GetClient(std::string_view name) {
     auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    zx_status_t status = fdio_open_at(outgoing_directory_client_.handle()->get(), "/svc",
-                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      svc_endpoints.server.TakeChannel().release());
+    zx_status_t status =
+        fdio_open3_at(outgoing_directory_client_.handle()->get(), "/svc",
+                      static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
+                      svc_endpoints.server.TakeChannel().release());
     EXPECT_EQ(ZX_OK, status);
 
     auto connect_result = component::ConnectAtMember<fuchsia_hardware_vreg::Service::Vreg>(

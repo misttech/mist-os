@@ -112,7 +112,7 @@ impl GattClientFacade {
             .read()
             .central
             .as_ref()
-            .ok_or(format_err!("No central proxy created."))?
+            .ok_or_else(|| format_err!("No central proxy created."))?
             .proxy
             .clone();
 
@@ -122,7 +122,7 @@ impl GattClientFacade {
         };
 
         let (watcher_proxy, watcher_server) =
-            fidl::endpoints::create_proxy::<ScanResultWatcherMarker>()?;
+            fidl::endpoints::create_proxy::<ScanResultWatcherMarker>();
 
         // Scan doesn't return until scanning has stopped. We don't care when scanning stops, so we
         // can detach a task to run the scan future.
@@ -182,19 +182,11 @@ impl GattClientFacade {
 
     async fn active_remote_service_event_task(
         inner: Arc<RwLock<InnerGattClientFacade>>,
-        mut event_stream: RemoteServiceEventStream,
+        event_stream: RemoteServiceEventStream,
     ) {
         let tag = "GattClientFacade::active_remote_service_event_task";
-        while let Some(event) = event_stream.next().await {
-            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336801)
-            match event {
-                Ok(_) => {} // There are no events
-                Err(e) => {
-                    warn!(tag = &with_line!(tag), "RemoteService error: {:?}", e);
-                    break;
-                }
-            }
-        }
+        // There are no events
+        event_stream.map(|_| ()).collect::<()>().await;
         info!(tag = &with_line!(tag), "RemoteService closed");
         inner.write().active_remote_service = None;
     }
@@ -227,7 +219,7 @@ impl GattClientFacade {
             );
             format_err!("Not connected to peer")
         })?;
-        let (proxy, server) = endpoints::create_proxy()?;
+        let (proxy, server) = endpoints::create_proxy();
         client_proxy.connect_to_service(&ServiceHandle { value: service_id }, server)?;
         let event_stream = proxy.take_event_stream();
         let event_task = fasync::Task::spawn(GattClientFacade::active_remote_service_event_task(
@@ -247,7 +239,7 @@ impl GattClientFacade {
     pub async fn gattc_discover_characteristics(&self) -> Result<Vec<Characteristic>, Error> {
         let discover_characteristics_fut = self
             .get_remote_service_proxy()
-            .ok_or(format_err!("RemoteService proxy not available"))?
+            .ok_or_else(|| format_err!("RemoteService proxy not available"))?
             .discover_characteristics();
         discover_characteristics_fut.await.map_err(|_| format_err!("Failed to send message"))
     }
@@ -264,7 +256,7 @@ impl GattClientFacade {
             WriteOptions { offset: Some(offset), write_mode: Some(mode), ..Default::default() };
         let write_fut = self
             .get_remote_service_proxy()
-            .ok_or(format_err!("No active service"))?
+            .ok_or_else(|| format_err!("No active service"))?
             .write_characteristic(&handle, &write_value, &options);
         write_fut
             .await
@@ -308,7 +300,7 @@ impl GattClientFacade {
         let handle = Handle { value: id };
         let read_fut = self
             .get_remote_service_proxy()
-            .ok_or(format_err!("RemoteService proxy not available"))?
+            .ok_or_else(|| format_err!("RemoteService proxy not available"))?
             .read_characteristic(&handle, &options);
         let read_value = read_fut
             .await
@@ -347,7 +339,7 @@ impl GattClientFacade {
         let fidl_uuid = fidl_fuchsia_bluetooth::Uuid::from(uuid);
         let read_fut = self
             .get_remote_service_proxy()
-            .ok_or(format_err!("RemoteService proxy not available"))?
+            .ok_or_else(|| format_err!("RemoteService proxy not available"))?
             .read_by_type(&fidl_uuid);
         let results = read_fut
             .await
@@ -368,7 +360,7 @@ impl GattClientFacade {
         let handle = Handle { value: id };
         let read_fut = self
             .get_remote_service_proxy()
-            .ok_or(format_err!("RemoteService proxy not available"))?
+            .ok_or_else(|| format_err!("RemoteService proxy not available"))?
             .read_descriptor(&handle, &options);
         let read_value = read_fut
             .await
@@ -412,7 +404,7 @@ impl GattClientFacade {
         let options = WriteOptions { offset: Some(offset), ..Default::default() };
         let write_fut = self
             .get_remote_service_proxy()
-            .ok_or(format_err!("RemoteService proxy not available"))?
+            .ok_or_else(|| format_err!("RemoteService proxy not available"))?
             .write_descriptor(&handle, &write_value, &options);
         write_fut
             .await
@@ -453,7 +445,7 @@ impl GattClientFacade {
             let service = inner
                 .active_remote_service
                 .as_mut()
-                .ok_or(format_err!("Not connected to a service"))?;
+                .ok_or_else(|| format_err!("Not connected to a service"))?;
 
             if !enable {
                 service.notifier_tasks.remove(&id);
@@ -464,7 +456,7 @@ impl GattClientFacade {
             }
 
             let (client_end, request_stream) =
-                fidl::endpoints::create_request_stream::<CharacteristicNotifierMarker>()?;
+                fidl::endpoints::create_request_stream::<CharacteristicNotifierMarker>();
             let register_fut =
                 service.proxy.register_characteristic_notifier(&Handle { value: id }, client_end);
 
@@ -484,7 +476,7 @@ impl GattClientFacade {
             .write()
             .active_remote_service
             .as_mut()
-            .ok_or(format_err!("Not connected to a service"))?
+            .ok_or_else(|| format_err!("Not connected to a service"))?
             .notifier_tasks
             .insert(id, notifier_task);
         Ok(())
@@ -499,7 +491,7 @@ impl GattClientFacade {
             .read()
             .clients
             .get(peer_id)
-            .ok_or(format_err!("Not connected to peer"))?
+            .ok_or_else(|| format_err!("Not connected to peer"))?
             .proxy
             .clone();
         let watch_fut = client_proxy.watch_services(&[]);
@@ -512,7 +504,7 @@ impl GattClientFacade {
         let services = &mut inner
             .clients
             .get_mut(peer_id)
-            .ok_or(format_err!("Not connected to peer"))?
+            .ok_or_else(|| format_err!("Not connected to peer"))?
             .services;
         for handle in removed {
             services.remove(&handle.value);
@@ -540,7 +532,8 @@ impl GattClientFacade {
 
         {
             let inner = self.inner.read();
-            let client = inner.clients.get(&peer_id).ok_or(format_err!("Not connected to peer"))?;
+            let client =
+                inner.clients.get(&peer_id).ok_or_else(|| format_err!("Not connected to peer"))?;
             // If watch_services_task has already been started, then client.services has the latest cached list of services and we can simply return then.
             if client.watch_services_task.is_some() {
                 return Ok(client.services.iter().map(|(_, svc)| svc.clone()).collect());
@@ -552,7 +545,8 @@ impl GattClientFacade {
         let task =
             fasync::Task::spawn(GattClientFacade::watch_services_task(self.inner.clone(), peer_id));
         let mut inner = self.inner.write();
-        let client = inner.clients.get_mut(&peer_id).ok_or(format_err!("Not connected to peer"))?;
+        let client =
+            inner.clients.get_mut(&peer_id).ok_or_else(|| format_err!("Not connected to peer"))?;
         client.watch_services_task = Some(task);
 
         Ok(client.services.iter().map(|(_, svc)| svc.clone()).collect())
@@ -569,7 +563,7 @@ impl GattClientFacade {
             .write()
             .central
             .as_ref()
-            .ok_or(format_err!("Central not set"))?
+            .ok_or_else(|| format_err!("Central not set"))?
             .proxy
             .take_event_stream();
 
@@ -618,7 +612,7 @@ impl GattClientFacade {
 
         GattClientFacade::set_central_proxy(self.inner.clone());
 
-        let (conn_proxy, conn_server_end) = fidl::endpoints::create_proxy()?;
+        let (conn_proxy, conn_server_end) = fidl::endpoints::create_proxy();
         let options = ConnectionOptions { bondable_mode: Some(true), ..Default::default() };
         self.inner
             .read()
@@ -629,7 +623,7 @@ impl GattClientFacade {
             .connect(&peer_id.clone().into(), &options, conn_server_end)
             .map_err(|_| format_err!("FIDL error when trying to connect()"))?;
 
-        let (client_proxy, client_server_end) = fidl::endpoints::create_proxy()?;
+        let (client_proxy, client_server_end) = fidl::endpoints::create_proxy();
         conn_proxy.request_gatt_client(client_server_end)?;
 
         let events_task = fasync::Task::spawn(GattClientFacade::connection_event_task(
@@ -674,7 +668,7 @@ impl GattClientFacade {
         let mut devices = Vec::new();
         for (peer_id, peer) in &self.inner.read().scan_results {
             let id = format!("{}", peer_id);
-            let name = peer.name.clone().unwrap_or(EMPTY_DEVICE.to_string());
+            let name = peer.name.clone().unwrap_or_else(|| EMPTY_DEVICE.to_string());
             let connectable = peer.connectable;
             devices.push(BleScanResponse::new(id, name, connectable));
         }

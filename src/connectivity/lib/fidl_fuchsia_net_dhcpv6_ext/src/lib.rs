@@ -390,8 +390,7 @@ mod tests {
     #[fuchsia::test]
     async fn watch_stream(watch_types: &[WatchType]) {
         let (client_proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcpv6::ClientMarker>()
-                .expect("create fuchsia.net.dhcpv6/Client proxy and stream");
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcpv6::ClientMarker>();
         let mut watch_stream = into_watch_stream(client_proxy);
         let client_fut = watch_stream.by_ref().take(watch_types.len()).try_collect::<Vec<_>>();
         let (r, ()) = futures::future::join(

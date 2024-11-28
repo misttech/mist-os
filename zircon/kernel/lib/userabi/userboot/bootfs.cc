@@ -7,7 +7,11 @@
 #include "bootfs.h"
 
 #include <lib/zbitl/error-stdio.h>
+#include <lib/zircon-internal/align.h>
+#include <lib/zx/vmo.h>
 #include <stdarg.h>
+#include <zircon/rights.h>
+#include <zircon/syscalls.h>
 #include <zircon/syscalls/log.h>
 #include <zircon/types.h>
 
@@ -33,11 +37,28 @@ zx::vmo Bootfs::Open(std::string_view root, std::string_view filename, std::stri
     return {};
   }
 
-  // Clone a private, read-only snapshot of the file's subset of the bootfs VMO.
   zx::vmo file_vmo;
-  zx_status_t status = bootfs_reader_.storage().vmo().create_child(
-      ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_NO_WRITE, it->offset, it->size, &file_vmo);
-  check(log_, status, "zx_vmo_create_child failed");
+  zx_status_t status;
+
+  // When booting multiple programs, for example, in test cases or cuckoo testing, we need to check
+  // if we have already generated a VMO for a given blob. If so, we can just duplicate the handle
+  // and hand it over.
+  if (booting_multiple_programs_) {
+    for (const auto& entry : entries()) {
+      if (entry.offset == it->offset) {
+        status = entry.contents.duplicate(ZX_RIGHT_SAME_RIGHTS, &file_vmo);
+        check(log_, status, "zx_handle_duplicate failed");
+        return file_vmo;
+      }
+    }
+  }
+
+  size_t page_aligned_size = ZX_PAGE_ALIGN(it->size);
+  status = zx::vmo::create(page_aligned_size, 0, &file_vmo);
+  check(log_, status, "zx_vmo_create failed");
+  status = zx_vmo_transfer_data(file_vmo.get(), 0, 0, page_aligned_size,
+                                bootfs_reader_.storage().vmo().get(), it->offset);
+  check(log_, status, "zx_vmo_transfer_data failed");
 
   status = file_vmo.set_property(ZX_PROP_NAME, filename.data(), filename.size());
   check(log_, status, "failed to set ZX_PROP_NAME");
@@ -49,7 +70,16 @@ zx::vmo Bootfs::Open(std::string_view root, std::string_view filename, std::stri
   status = file_vmo.replace_as_executable(vmex_resource_, &file_vmo);
   check(log_, status, "zx_vmo_replace_as_executable failed");
 
-  return file_vmo;
+  // Duplicate `file_vmo` handle to be provided.
+  zx::vmo extra;
+  status = file_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &extra);
+  check(log_, status, "zx_handle_duplicate failed.");
+
+  ZX_ASSERT_MSG(entry_count_ < entries_.size(),
+                "entry_count_=%zu be smaller than entries.size()=%zu for insertion", entry_count_,
+                entries_.size());
+  entries_[entry_count_++] = {.offset = it->offset, .contents = std::move(file_vmo)};
+  return extra;
 }
 
 void Bootfs::Fail(const BootfsView::Error& error) {

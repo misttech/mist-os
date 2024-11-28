@@ -411,7 +411,7 @@ user-visible output as an "event" which is logged to a file during execution.
 
 Log files are compressed using gzip. Each line of the decompressed
 file is a single JSON object representing one event. The event
-schema is currently defined in [this][fxtest-rewrite-event] Python
+schema is currently defined in [this][fxtest-python-event] Python
 file.
 
 When the format is stabilized, it will be possible to build interactive
@@ -486,8 +486,8 @@ export FUCHSIA_DISABLED_legacy_fxtest=0
 
 [fuchsia-source-checkout]: /docs/get-started/get_fuchsia_source.md
 [build-event-protocol]: https://bazel.build/remote/bep
-[fxtest-rewrite-event]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite/event.py
-[fxtest-source]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite
+[fxtest-python-event]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/python/event.py
+[fxtest-source]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/python
 [trf-docs]: /docs/development/testing/components/test_runner_framework.md
 [zxdb-docs]: /docs/development/debugger/commands.md
 [zxdb-testing-docs]: /docs/development/debugger/tests.md

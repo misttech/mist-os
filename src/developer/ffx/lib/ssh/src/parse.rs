@@ -338,9 +338,7 @@ pub async fn write_ssh_log(prefix: &str, line: &String, ctx: &EnvironmentContext
         &ctx,
         &PathBuf::from("ssh.log"),
         LogDirHandling::WithDirWithRotate,
-    )
-    .await
-    {
+    ) {
         Ok((f, _)) => f,
         Err(e) => {
             tracing::warn!("Couldn't open ssh log file: {e:?}");

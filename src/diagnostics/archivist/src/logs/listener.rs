@@ -7,7 +7,6 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_logger::{
     LogFilterOptions, LogListenerSafeMarker, LogListenerSafeProxy, LogMessage,
 };
-use fuchsia_async::Task;
 use futures::prelude::*;
 use logmessage_measure_tape::Measurable as _;
 use std::sync::Arc;
@@ -68,24 +67,18 @@ impl Listener {
         debug!("New listener with options {:?}", &options);
         Ok(Self {
             status: Status::Fine,
-            listener: log_listener
-                .into_proxy()
-                .map_err(|source| ListenerError::CreatingListenerProxy { source })?,
+            listener: log_listener.into_proxy(),
             filter: MessageFilter::new(options)?,
         })
     }
 
-    pub fn spawn(
-        self,
-        logs: impl Stream<Item = Arc<LogsData>> + Send + Unpin + 'static,
-        call_done: bool,
-    ) -> Task<()> {
-        Task::spawn(async move { self.run(logs, call_done).await })
-    }
-
     /// Send messages to the listener. First eagerly collects any backlog and sends it out in
     /// batches before waiting for wakeups.
-    async fn run(mut self, mut logs: impl Stream<Item = Arc<LogsData>> + Unpin, call_done: bool) {
+    pub async fn run(
+        mut self,
+        mut logs: impl Stream<Item = Arc<LogsData>> + Unpin,
+        call_done: bool,
+    ) {
         debug!("Backfilling from cursor until pending.");
         let mut backlog = vec![];
         futures::future::poll_fn(|cx| {
@@ -262,7 +255,7 @@ mod tests {
         let logs = stream::iter(message_vec);
 
         let (client_end, mut requests) =
-            fidl::endpoints::create_request_stream::<LogListenerSafeMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<LogListenerSafeMarker>();
         let mut listener = Listener::new(client_end, None).unwrap();
 
         let listener_task = fasync::Task::spawn(async move {
@@ -284,8 +277,7 @@ mod tests {
     async fn run_and_consume_backfill(message_vec: Vec<Arc<LogsData>>) -> usize {
         let (client, server) = zx::Channel::create();
         let client_end = ClientEnd::<LogListenerSafeMarker>::new(client);
-        let mut listener_server =
-            ServerEnd::<LogListenerSafeMarker>::new(server).into_stream().unwrap();
+        let mut listener_server = ServerEnd::<LogListenerSafeMarker>::new(server).into_stream();
         let mut listener = Listener::new(client_end, None).unwrap();
 
         fasync::Task::spawn(async move {

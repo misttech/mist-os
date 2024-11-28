@@ -122,7 +122,7 @@ class UmsTest : public zxtest::Test {
     // makes this test invalid.
     while (true) {
       fbl::unique_fd fd;
-      EXPECT_OK(fdio_open_fd_at(bus_->GetRootFd(), "class/block", 0, fd.reset_and_get_address()));
+      EXPECT_OK(fdio_open3_fd_at(bus_->GetRootFd(), "class/block", 0, fd.reset_and_get_address()));
       DIR* dir_handle = fdopendir(fd.get());
       auto release_dir = fit::defer([=]() { closedir(dir_handle); });
       for (dirent* ent = readdir(dir_handle); ent; ent = readdir(dir_handle)) {

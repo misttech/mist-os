@@ -36,7 +36,7 @@ node "pdev" {
 
 primary node "power-01" {
   fuchsia.hardware.power.Service == fuchsia.hardware.power.Service.ZirconTransport;
-  fuchsia.power.POWER_DOMAIN == fuchsia.amlogic.platform.POWER_DOMAIN.ARM_CORE_LITTLE;
+  fuchsia.power.POWER_DOMAIN == fuchsia.amlogic.platform.POWER_DOMAIN.ARM_CORE_BIG;
 }
 
 node "clock-pll-div16-01" {
@@ -56,7 +56,7 @@ node "clock-cpu-scaler-01" {
 
 optional node "power-02" {
   fuchsia.hardware.power.Service == fuchsia.hardware.power.Service.ZirconTransport;
-  fuchsia.power.POWER_DOMAIN == fuchsia.amlogic.platform.POWER_DOMAIN.ARM_CORE_BIG;
+  fuchsia.power.POWER_DOMAIN == fuchsia.amlogic.platform.POWER_DOMAIN.ARM_CORE_LITTLE;
 }
 
 optional node "clock-pll-div16-02" {

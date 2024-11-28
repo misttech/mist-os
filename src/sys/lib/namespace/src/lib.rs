@@ -75,7 +75,7 @@ impl Namespace {
 
     /// Get a copy of the paths in the namespace.
     pub fn paths(&self) -> Vec<NamespacePath> {
-        self.tree.map_ref(|_| ()).clone().flatten().into_iter().map(|(path, ())| path).collect()
+        self.tree.map_ref(|_| ()).flatten().into_iter().map(|(path, ())| path).collect()
     }
 }
 
@@ -98,10 +98,11 @@ impl Clone for Namespace {
             unsafe {
                 let borrowed: zx::Channel = zx::Handle::from_raw(raw_handle).into();
                 let borrowed = fio::DirectorySynchronousProxy::new(borrowed);
-                let (client_end, server_end) = fidl::endpoints::create_endpoints();
-                let _ = borrowed.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end);
+                let (client_end, server_end) =
+                    fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
+                let _ = borrowed.clone2(server_end.into_channel().into());
                 std::mem::forget(borrowed.into_channel());
-                client_end.into_channel().into()
+                client_end
             }
         });
         Self { tree }
@@ -144,7 +145,7 @@ impl TryFrom<Namespace> for vfs::tree_builder::TreeBuilder {
         let mut builder = vfs::tree_builder::TreeBuilder::empty_dir();
         for Entry { path, directory } in namespace.flatten().into_iter() {
             let path: Vec<&str> = path.iter_segments().map(|s| s.as_str()).collect();
-            builder.add_entry(path, vfs::remote::remote_dir(directory.into_proxy().unwrap()))?;
+            builder.add_entry(path, vfs::remote::remote_dir(directory.into_proxy()))?;
         }
         Ok(builder)
     }
@@ -390,7 +391,7 @@ mod tests {
 
         async fn verify(entry: Entry) {
             assert_eq!(entry.path.to_string(), "/data");
-            let dir = entry.directory.into_proxy().unwrap();
+            let dir = entry.directory.into_proxy();
             let file = fuchsia_fs::directory::open_file(&dir, "foo/bar", fio::PERM_READABLE)
                 .await
                 .unwrap();

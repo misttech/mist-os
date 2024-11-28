@@ -319,7 +319,7 @@ impl<'a, 'b> Compiler<'a, 'b> {
         let symbol = self
             .symbol_table
             .get(identifier)
-            .ok_or(CompilerError::UnknownKey(identifier.clone()))?;
+            .ok_or_else(|| CompilerError::UnknownKey(identifier.clone()))?;
         Ok(symbol.clone())
     }
 
@@ -331,7 +331,7 @@ impl<'a, 'b> Compiler<'a, 'b> {
             Value::Identifier(ident) => self
                 .symbol_table
                 .get(ident)
-                .ok_or(CompilerError::UnknownKey(ident.clone()))
+                .ok_or_else(|| CompilerError::UnknownKey(ident.clone()))
                 .map(|x| x.clone()),
         }
     }

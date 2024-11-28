@@ -12,8 +12,8 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bin/driver_runtime/dispatcher.h"
-#include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/runtime_test_case.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 
 namespace driver_runtime {
 extern DispatcherCoordinator& GetDispatcherCoordinator();
@@ -44,8 +44,8 @@ void TokenTest::SetUp() {
   ASSERT_EQ(ZX_OK, driver_runtime::GetDispatcherCoordinator().Start());
 
   {
-    driver_context::PushDriver(CreateFakeDriver());
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(CreateFakeDriver());
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     auto dispatcher = fdf::SynchronizedDispatcher::Create(
         {}, "local",
@@ -56,8 +56,8 @@ void TokenTest::SetUp() {
   }
 
   {
-    driver_context::PushDriver(CreateFakeDriver());
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(CreateFakeDriver());
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     auto dispatcher = fdf::SynchronizedDispatcher::Create(
         {}, "remote",

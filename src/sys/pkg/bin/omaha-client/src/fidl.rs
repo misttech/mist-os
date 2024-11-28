@@ -157,8 +157,7 @@ impl Notify for AttemptNotifier {
 
         async move {
             let (monitor_proxy, monitor_server_end) =
-                fidl::endpoints::create_proxy::<fidl_fuchsia_update::MonitorMarker>()
-                    .map_err(|_| ClosedClient)?;
+                fidl::endpoints::create_proxy::<fidl_fuchsia_update::MonitorMarker>();
             update_attempt_event_queue
                 .add_client(StateNotifier { proxy: monitor_proxy })
                 .await
@@ -493,10 +492,7 @@ where
 
         // Attach the monitor if passed for current update.
         if let Some(monitor) = monitor {
-            let monitor_proxy = monitor.into_proxy().map_err(|e| {
-                error!("error getting proxy from monitor: {:?}", e);
-                CheckNotStartedReason::InvalidOptions
-            })?;
+            let monitor_proxy = monitor.into_proxy();
             let mut single_monitor_queue = server.borrow().single_monitor_queue.clone();
             single_monitor_queue.add_client(StateNotifier { proxy: monitor_proxy }).await.map_err(
                 |e| {
@@ -513,7 +509,7 @@ where
         server: Rc<RefCell<Self>>,
         attempts_monitor: ClientEnd<AttemptsMonitorMarker>,
     ) -> Result<(), Error> {
-        let proxy = attempts_monitor.into_proxy()?;
+        let proxy = attempts_monitor.into_proxy();
         let mut attempt_monitor_queue = server.borrow().attempt_monitor_queue.clone();
         let control_handle = server.borrow().single_monitor_queue.clone();
         attempt_monitor_queue.add_client(AttemptNotifier { proxy, control_handle }).await?;
@@ -1022,7 +1018,7 @@ mod tests {
         fidl: Rc<RefCell<stub::StubFidlServer>>,
         service: fn(M::RequestStream) -> IncomingServices,
     ) -> M::Proxy {
-        let (proxy, stream) = create_proxy_and_stream::<M>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<M>();
         fasync::Task::local(
             FidlServer::handle_client(fidl, service(stream)).unwrap_or_else(|e| panic!("{}", e)),
         )
@@ -1080,8 +1076,7 @@ mod tests {
             allow_attaching_to_existing_update_check: Some(false),
             ..Default::default()
         };
-        let (client_end, mut request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end, mut request_stream) = fidl::endpoints::create_request_stream();
         assert_matches!(proxy.monitor_all_update_checks(client_end), Ok(()));
         assert_matches!(proxy.check_now(&options, None).await.unwrap(), Ok(()));
 
@@ -1091,7 +1086,7 @@ mod tests {
         assert_matches!(responder.send(), Ok(()));
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
-        let events = next_n_on_state_events(monitor.into_stream().unwrap(), 2).await;
+        let events = next_n_on_state_events(monitor.into_stream(), 2).await;
         assert_eq!(
             events,
             [
@@ -1105,7 +1100,7 @@ mod tests {
     async fn test_check_now_invalid_options() {
         let fidl = FidlServerBuilder::new().build().await;
         let proxy = spawn_fidl_server::<ManagerMarker>(fidl, IncomingServices::Manager);
-        let (client_end, mut stream) = create_request_stream::<MonitorMarker>().unwrap();
+        let (client_end, mut stream) = create_request_stream::<MonitorMarker>();
         let options = update::CheckOptions {
             initiator: None,
             allow_attaching_to_existing_update_check: None,
@@ -1156,7 +1151,7 @@ mod tests {
     async fn test_check_now_with_monitor() {
         let fidl = FidlServerBuilder::new().build().await;
         let proxy = spawn_fidl_server::<ManagerMarker>(Rc::clone(&fidl), IncomingServices::Manager);
-        let (client_end, mut stream) = create_request_stream::<MonitorMarker>().unwrap();
+        let (client_end, mut stream) = create_request_stream::<MonitorMarker>();
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
             allow_attaching_to_existing_update_check: Some(true),
@@ -1192,7 +1187,7 @@ mod tests {
         };
 
         let (attempt_client_end, mut attempt_request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+            fidl::endpoints::create_request_stream();
         assert_matches!(proxy.monitor_all_update_checks(attempt_client_end), Ok(()));
         assert_matches!(proxy.check_now(&check_options_1, None).await.unwrap(), Ok(()));
 
@@ -1202,7 +1197,7 @@ mod tests {
         assert_matches!(responder.send(), Ok(()));
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
-        let events = next_n_on_state_events(monitor.into_stream().unwrap(), 2).await;
+        let events = next_n_on_state_events(monitor.into_stream(), 2).await;
         assert_eq!(
             events,
             [
@@ -1224,7 +1219,7 @@ mod tests {
         assert_matches!(responder.send(), Ok(()));
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::Service));
 
-        let events = next_n_on_state_events(monitor.into_stream().unwrap(), 2).await;
+        let events = next_n_on_state_events(monitor.into_stream(), 2).await;
         assert_eq!(
             events,
             [
@@ -1238,7 +1233,7 @@ mod tests {
     async fn test_check_now_with_closed_monitor() {
         let fidl = FidlServerBuilder::new().build().await;
         let proxy = spawn_fidl_server::<ManagerMarker>(Rc::clone(&fidl), IncomingServices::Manager);
-        let (client_end, stream) = create_request_stream::<MonitorMarker>().unwrap();
+        let (client_end, stream) = create_request_stream::<MonitorMarker>();
         drop(stream);
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
@@ -1258,7 +1253,7 @@ mod tests {
             .build()
             .await;
         let proxy = spawn_fidl_server::<ManagerMarker>(Rc::clone(&fidl), IncomingServices::Manager);
-        let (client_end, mut stream) = create_request_stream::<MonitorMarker>().unwrap();
+        let (client_end, mut stream) = create_request_stream::<MonitorMarker>();
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
             allow_attaching_to_existing_update_check: Some(true),
@@ -1628,7 +1623,7 @@ mod tests {
             >,
         >,
     ) {
-        let (proxy, stream) = create_proxy_and_stream::<ManagerMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<ManagerMarker>();
         // Handling this request should fail because unit test can't access the Admin FIDL.
         // Don't use spawn_fidl_server to run this task, since that will panic on any errors.
 

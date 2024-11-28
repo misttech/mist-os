@@ -12,7 +12,7 @@ impl Device {
     /// Gets the full moniker name of the device.
     pub fn get_moniker(&self) -> Result<&str> {
         let moniker = self.0.moniker.as_ref();
-        Ok(moniker.ok_or(format_err!("Missing moniker"))?)
+        Ok(moniker.ok_or_else(|| format_err!("Missing moniker"))?)
     }
 
     /// Gets the full identifying path name of the device.
@@ -43,7 +43,7 @@ pub async fn get_device_info(
     exact_match: bool,
 ) -> Result<Vec<fdd::NodeInfo>> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::NodeInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::NodeInfoIteratorMarker>();
 
     service
         .get_node_info(device_filter, iterator_server, exact_match)
@@ -67,7 +67,7 @@ pub async fn get_driver_info(
     driver_filter: &[String],
 ) -> Result<Vec<fdf::DriverInfo>> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>();
 
     service
         .get_driver_info(driver_filter, iterator_server)
@@ -91,7 +91,7 @@ pub async fn get_composite_node_specs(
     name_filter: Option<String>,
 ) -> Result<Vec<fdf::CompositeInfo>> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::CompositeNodeSpecIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::CompositeNodeSpecIteratorMarker>();
 
     service
         .get_composite_node_specs(name_filter.as_deref(), iterator_server)
@@ -174,7 +174,7 @@ pub async fn get_driver_by_device(
                 // We don't appear to have a string builder crate in-tree.
                 builder = format!("{}{}\n", builder, device.get_full_name()?.to_string());
             }
-            return Err(anyhow!(builder.to_string()));
+            return Err(anyhow!(builder));
         }
         device_list = fuzzy_device_list;
     }

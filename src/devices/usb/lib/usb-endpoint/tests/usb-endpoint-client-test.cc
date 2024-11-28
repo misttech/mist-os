@@ -58,7 +58,7 @@ class UsbEndpointClientTest : public zxtest::Test {
   void SetUp() override {
     server_loop_.StartThread("usb-endpoint-client-test-server-thread");
     client_loop_.StartThread("usb-endpoint-client-test-client-thread");
-    client_ = std::make_unique<usb_endpoint::UsbEndpoint<UsbEndpointClientTest>>(
+    client_ = std::make_unique<usb::EndpointClient<UsbEndpointClientTest>>(
         usb::EndpointType::BULK, this, std::mem_fn(&UsbEndpointClientTest::Complete));
 
     auto endpoints = fidl::Endpoints<UsbProtocolType>::Create();
@@ -79,7 +79,7 @@ class UsbEndpointClientTest : public zxtest::Test {
  protected:
   void RequestTest(fuchsia_hardware_usb_request::Buffer::Tag type, size_t req_count);
 
-  std::unique_ptr<usb_endpoint::UsbEndpoint<UsbEndpointClientTest>> client_;
+  std::unique_ptr<usb::EndpointClient<UsbEndpointClientTest>> client_;
   std::unique_ptr<FakeUsbServer> server_;
 
  private:

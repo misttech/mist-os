@@ -411,7 +411,7 @@ impl Attribute {
             .arguments
             .iter()
             .find(|arg| to_lower_snake_case(arg.name.as_str()) == lower_name)
-            .ok_or(anyhow!("argument not found"))?
+            .ok_or_else(|| anyhow!("argument not found"))?
             .value)
     }
 
@@ -646,13 +646,16 @@ impl FidlIr {
     }
 
     pub fn get_declaration(&self, identifier: &CompoundIdentifier) -> Result<&Declaration, Error> {
-        self.declarations.0.get(identifier).ok_or(anyhow!("~~ error never seen ~~~")).or_else(
-            |_| {
+        self.declarations
+            .0
+            .get(identifier)
+            .ok_or_else(|| anyhow!("~~ error never seen ~~~"))
+            .or_else(|_| {
                 self.library_dependencies
                     .iter()
                     .filter_map(|library| library.declarations.0.get(identifier))
                     .next()
-                    .ok_or(anyhow!("Could not find declaration: {:?}", identifier))
+                    .ok_or_else(|| anyhow!("Could not find declaration: {:?}", identifier))
                     .map(|decl| match decl {
                         ExternalDeclaration::Bits => &Declaration::Bits,
                         ExternalDeclaration::Const => &Declaration::Const,
@@ -667,8 +670,7 @@ impl FidlIr {
                         ExternalDeclaration::Union { .. } => &Declaration::Union,
                         ExternalDeclaration::Alias => &Declaration::Alias,
                     })
-            },
-        )
+            })
     }
 
     pub fn get_enum(&self, identifier: &CompoundIdentifier) -> Result<&Enum, Error> {
@@ -727,12 +729,12 @@ impl FidlIr {
             .0
             .get(identifier)
             .map(|_| false)
-            .ok_or(anyhow!("~~ error never seen ~~~"))
+            .ok_or_else(|| anyhow!("~~ error never seen ~~~"))
             .or_else(|_| {
                 self.library_dependencies
                     .iter()
                     .find(|library| library.declarations.0.get(identifier).is_some())
-                    .ok_or(anyhow!("Could not find declaration: {:?}", identifier))
+                    .ok_or_else(|| anyhow!("Could not find declaration: {:?}", identifier))
                     .map(|_| true)
             })
     }

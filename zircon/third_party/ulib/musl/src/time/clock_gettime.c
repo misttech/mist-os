@@ -37,7 +37,8 @@ static int gettime_via_utc(struct timespec* ts) {
 
 int __clock_gettime(clockid_t clk, struct timespec* ts) {
   switch (clk) {
-    case CLOCK_BOOTTIME:  // see https://fxbug.dev/42114315
+    case CLOCK_BOOTTIME:
+      return gettime_finish(ZX_OK, _zx_clock_get_boot(), ts);
     case CLOCK_MONOTONIC:
     case CLOCK_MONOTONIC_RAW:
       return gettime_finish(ZX_OK, _zx_clock_get_monotonic(), ts);

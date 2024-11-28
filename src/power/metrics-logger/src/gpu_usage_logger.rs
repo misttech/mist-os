@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::driver_utils::{connect_proxy, get_driver_alias, map_topo_paths_to_class_paths, Driver};
+use crate::driver_utils::{connect_proxy, get_driver_topological_path, list_drivers, Driver};
 use crate::MIN_INTERVAL_FOR_SYSLOG_MS;
 use anyhow::{format_err, Error, Result};
 use fuchsia_inspect::{self as inspect, Property};
@@ -25,21 +25,25 @@ pub type GpuDriver = Driver<fgpu::DeviceProxy>;
 
 const MAGMA_TOTAL_TIME_QUERY_RESULT_SIZE: usize = mem::size_of::<magma_total_time_query_result>();
 
-/// Generates a list of `GpuDriver` from driver paths and aliases.
+/// Generates a list of `GpuDriver` from driver paths.
 pub async fn generate_gpu_drivers(
     driver_aliases: HashMap<String, String>,
 ) -> Result<Vec<GpuDriver>> {
-    let topo_to_class = map_topo_paths_to_class_paths(&GPU_SERVICE_DIRS).await?;
-
     let mut drivers = Vec::new();
-    for (topological_path, class_path) in topo_to_class {
-        let proxy = connect_proxy::<fgpu::DeviceMarker>(&class_path)?;
-        let alias = get_driver_alias(&driver_aliases, &topological_path).map(|c| c.to_string());
-        // Add driver if querying `MagmaQueryTotalTime` is supported.
-        if is_total_time_supported(&proxy).await? {
-            drivers.push(Driver { alias, topological_path, proxy });
-        } else {
-            info!("GPU driver {:?}: `MagmaQueryTotalTime` is not supported", alias);
+    // For each driver path, create a proxy for the service.
+    for dir_path in GPU_SERVICE_DIRS {
+        let listed_drivers = list_drivers(dir_path).await;
+        for driver in listed_drivers.iter() {
+            let class_path = format!("{}/{}", dir_path, driver);
+            let proxy = connect_proxy::<fgpu::DeviceMarker>(&class_path)?;
+            let sensor_name = get_driver_topological_path(&class_path).await?;
+            let alias = driver_aliases.get(&sensor_name);
+            // Add driver if querying `MagmaQueryTotalTime` is supported.
+            if is_total_time_supported(&proxy).await? {
+                drivers.push(Driver { alias: alias.cloned(), sensor_name, proxy });
+            } else {
+                info!("GPU driver {:?}: `MagmaQueryTotalTime` is not supported", sensor_name);
+            }
         }
     }
     Ok(drivers)
@@ -170,9 +174,9 @@ impl GpuUsageLogger {
         let mut driver_names = Vec::new();
 
         for (index, driver) in self.drivers.iter().enumerate() {
-            let topological_path = &driver.topological_path;
-            let driver_name = driver.alias.as_ref().map_or(topological_path.to_string(), |alias| {
-                format!("{}({})", alias, topological_path)
+            let sensor_name = &driver.sensor_name;
+            let driver_name = driver.alias.as_ref().map_or(sensor_name.to_string(), |alias| {
+                format!("{}(alias:{})", sensor_name, alias)
             });
             driver_names.push(driver_name);
 
@@ -216,7 +220,7 @@ impl GpuUsageLogger {
                 }
                 Err(err) => error!(
                     ?err,
-                    path = self.drivers[index].topological_path.as_str(),
+                    path = self.drivers[index].sensor_name.as_str(),
                     "Error reading GPU stats",
                 ),
             }
@@ -300,8 +304,7 @@ pub mod tests {
     fn setup_fake_gpu_driver(
         mut query: impl FnMut(fgpu::QueryId) -> fgpu::DeviceQueryResult + 'static,
     ) -> (fgpu::DeviceProxy, fasync::Task<()>) {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fgpu::DeviceMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<fgpu::DeviceMarker>();
         let task = fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {
@@ -345,7 +348,7 @@ pub mod tests {
 
         let gpu_drivers = vec![GpuDriver {
             alias: None,
-            topological_path: "/dev/fake/gpu".to_string(),
+            sensor_name: "/dev/fake/gpu".to_string(),
             proxy: gpu_proxy,
         }];
 

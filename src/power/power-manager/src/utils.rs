@@ -169,7 +169,7 @@ async fn get_temperature_driver_proxy_from_dir(
                 .filename
                 .as_path()
                 .to_str()
-                .ok_or(anyhow::anyhow!("Failed to convert filename to string"))?
+                .ok_or_else(|| anyhow::anyhow!("Failed to convert filename to string"))?
                 .to_owned();
             if filename != "." {
                 if watch_msg.event == fuchsia_fs::directory::WatchEvent::ADD_FILE

@@ -525,6 +525,59 @@ class VmCowPages final : public VmHierarchyBase,
   bool DebugValidateHierarchyLocked() const TA_REQ(lock());
   bool DebugValidateZeroIntervalsLocked() const TA_REQ(lock());
 
+  // Walks all the descendants in a preorder traversal. Stops if func returns anything other than
+  // ZX_OK.
+  template <typename T>
+  zx_status_t DebugForEachDescendant(T func) const TA_REQ(lock()) {
+    const VmCowPages* stop = parent_.get();
+    int depth = 0;
+    const VmCowPages* cur = this;
+    const VmCowPages* prev = nullptr;
+    while (cur != stop) {
+      AssertHeld(cur->lock_ref());
+      uint32_t children = cur->children_list_len_;
+      if (!prev || prev == cur->parent_.get()) {
+        // Visit cur
+        zx_status_t s = func(cur, static_cast<uint>(depth));
+        if (s != ZX_OK) {
+          return s;
+        }
+
+        if (!children) {
+          // no children; move to parent (or nullptr)
+          prev = cur;
+          cur = cur->parent_.get();
+          continue;
+        } else {
+          // move to first child
+          prev = cur;
+          cur = &cur->children_list_.front();
+          ++depth;
+          continue;
+        }
+      }
+      // At this point we know we came up from a child, not down from the parent.
+      DEBUG_ASSERT(prev && prev != cur->parent_.get());
+      // The children are linked together, so we can move from one child to the next.
+
+      auto iterator = cur->children_list_.make_iterator(*prev);
+      ++iterator;
+      if (iterator == cur->children_list_.end()) {
+        // no more children; move back to parent
+        prev = cur;
+        cur = cur->parent_.get();
+        --depth;
+        continue;
+      }
+
+      // descend to next child
+      prev = cur;
+      cur = &(*iterator);
+      DEBUG_ASSERT(cur);
+    }
+    return ZX_OK;
+  }
+
   // VMO_FRUGAL_VALIDATION
   bool DebugValidateVmoPageBorrowingLocked() const TA_REQ(lock());
 
@@ -565,8 +618,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Ensures any pages in the specified range are not compressed, but does not otherwise commit any
   // pages. In order to handle delayed memory allocations, |guard| may be dropped one or more times.
-  // TODO(https://fxbug.dev/42052489, https://fxbug.dev/42138396): Determine if this should act on
-  // pages supplied by the parent.
   zx_status_t DecompressInRangeLocked(uint64_t offset, uint64_t len, Guard<CriticalMutex>* guard)
       TA_REQ(lock());
 
@@ -1065,33 +1116,27 @@ class VmCowPages final : public VmHierarchyBase,
                                           uint64_t* owner_offset_out, uint64_t* owner_length)
       TA_REQ(lock());
 
-  // LookupCursor helper function that 'forks' the page at |offset| of the current vmo. If
-  // this function successfully inserts a page into |offset| of the current vmo, it returns ZX_OK
-  // and populates |out_page|. |page_request| must be provided and if ZX_ERR_SHOULD_WAIT is returned
-  // then this indicates a transient allocation failure that should be resolved by waiting on the
-  // page_request and retrying.
+  // Helper function that 'forks' a page into |offset| of the current node, which must be a visible
+  // node. If this function successfully inserts the page, it returns ZX_OK and populates
+  // |out_page|. |page_request| must be provided and if ZX_ERR_SHOULD_WAIT is returned then this
+  // indicates a transient allocation failure that should be resolved by waiting on the page_request
+  // and retrying.
   //
   // The source page that is being forked has already been calculated - it is |page|, which
-  // is currently in |page_owner| at offset |owner_offset|.
+  // is currently in |page_owner| at offset |owner_offset|. |page_owner| must be a hidden node.
   //
   // This function is responsible for ensuring that COW clones never result in worse memory
-  // consumption than simply creating a new vmo and memcpying the content. It does this by
-  // migrating a page from a hidden vmo into one child if that page is not 'accessible' to the
-  // other child (instead of allocating a new page into the child and making the hidden vmo's
-  // page inaccessible).
+  // consumption than simply creating a new VMO and memcpying the content. If |page| is not shared
+  // at all, then this function assumes it is only accessible to this node. In that case |page| is
+  // removed from |page_owner| and migrated into this node. Forking the page in that case would just
+  // make |page| inaccessible, leaving |page| committed for no benefit.
   //
-  // Whether a particular page in a hidden vmo is 'accessible' to a particular child is
-  // determined by a combination of two factors. First, if the page lies outside of the range
-  // in the hidden vmo the child can see (specified by parent_offset_ and parent_limit_), then
-  // the page is not accessible. Second, if the page has already been copied into the child,
-  // then the page in the hidden vmo is not accessible to that child. This is tracked by the
-  // cow_X_split bits in the vm_page_t structure.
+  // To handle memory allocation failure, this function allocates a slot in this node for the page
+  // before modifying the source page or page list in |page_owner|. If that allocation fails, then
+  // these are not altered.
   //
-  // To handle memory allocation failure, this function performs the fork operation from the
-  // root vmo towards the leaf vmo. This allows the COW invariants to always be preserved.
-  //
-  // |page| must not be the zero-page, as there is no need to do the complex page
-  // fork logic to reduce memory consumption in that case.
+  // |page| must not be the zero-page, as there is no need to do the complex page fork logic to
+  // reduce memory consumption in that case.
   zx_status_t CloneCowPageLocked(uint64_t offset, list_node_t* alloc_list, VmCowPages* page_owner,
                                  vm_page_t* page, uint64_t owner_offset,
                                  AnonymousPageRequest* page_request, vm_page_t** out_page)
@@ -1102,13 +1147,27 @@ class VmCowPages final : public VmHierarchyBase,
                                             AnonymousPageRequest* page_request,
                                             vm_page_t** out_page) TA_REQ(lock());
 
-  // This is an optimized wrapper around CloneCowPageLocked for when an initial content page needs
-  // to be forked to preserve the COW invariant, but you know you are immediately going to overwrite
-  // the forked page with zeros.
+  // Helper function that 'forks' the page into |offset| of the current node, which must be a
+  // visible node. This function is similar to |CloneCowPageLocked|, but instead handles the case
+  // where the forked page would be immediately overwritten with zeros after forking. It inserts a
+  // marker into |offset| of the current node rather than actually forking or migrating the page. If
+  // this function successfully inserts the marker, it returns ZX_OK.
   //
-  // The optimization it can make is that it can fork the page up to the parent and then, instead
-  // of forking here and then having to immediately free the page, it can insert a marker here and
-  // set the split bits in the parent page as if it had been forked.
+  // The source page that is being forked has already been calculated - it is |page|, which
+  // is currently in |page_owner| at offset |owner_offset|. |page_owner| must be a hidden node.
+  //
+  // This function is responsible for ensuring that COW clones never result in worse memory
+  // consumption than simply creating a new VMO and memcpying the content. If |page| is not shared
+  // at all, then this function assumes it is only accessible to this node. In that case |page| is
+  // removed from |page_owner| and placed in the |freed_list|. Forking the page in that case would
+  // just make |page| inaccessible, leaving |page| committed for no benefit.
+  //
+  // To handle memory allocation failure, this function allocates a slot in this node for the marker
+  // before modifying the source page or page list in |page_owner|. If that allocation fails, then
+  // these are not altered.
+  //
+  // |page| must not be the zero-page, as there is no need to do the complex page fork logic to
+  // reduce memory consumption in that case.
   zx_status_t CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* freed_list,
                                        VmCowPages* page_owner, vm_page_t* page,
                                        uint64_t owner_offset, AnonymousPageRequest* page_request)
@@ -1153,17 +1212,44 @@ class VmCowPages final : public VmHierarchyBase,
   static ParentAndRange FindParentAndRangeForCloneLocked(VmCowPages* parent, uint64_t offset,
                                                          uint64_t size, bool parent_must_be_hidden);
 
-  // Helper function for CreateCloneLocked. Performs bidirectional clone operation where this VMO
-  // transitions into being a hidden node and two children are created. This VMO is cloned into the
-  // left child and the right child becomes the snapshot.
+  // Helper function for |CreateCloneLocked|.
+  //
+  // Performs a bidirectional clone operation, creating a new child node. The child behaves as if it
+  // was an eager snapshot of the range [|offset|,|offset| + |size|) in this node.
+  //
+  // Writes to an uncommitted page in the child will cause it to snapshot that page from its
+  // ancestors as the page existed at the time of this clone operation. The ancestor page is
+  // guaranteed to never see the writes by the child.
+  //
+  // Unlike a unidirectional clone, the snapshot taken by the child is guaranteed to never contain
+  // any writes or newly committed pages made by ancestor nodes after the clone operation is
+  // performed.
+  //
+  // This node may not end up being the parent of the child, see |FindParentAndRangeForCloneLocked|.
+  // However if this node does end up being the parent, then this method will create a second new
+  // child node with the same properties as this node and this node will become the hidden parent of
+  // both new children.
   zx_status_t CloneBidirectionalLocked(uint64_t offset, uint64_t size,
                                        fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
   zx_status_t CloneBidirectionalUsingSplitsLocked(uint64_t offset, uint64_t size,
                                                   fbl::RefPtr<VmCowPages>* cow_child)
       TA_REQ(lock());
 
-  // Helper function for CreateCloneLocked. Performs unidirectional clone operation where this VMO
-  // is cloned and the child clone is then hung in an appropriate position of the COW pages chain.
+  // Helper function for |CreateCloneLocked|.
+  //
+  // Performs a unidirectional clone operation, creating a new child node. The child behaves as if
+  // it were a lazy snapshot of the range [|offset|,|offset| + |size|) in this node.
+  //
+  // Writes to an uncommitted page in the child will cause it to snapshot that page from its
+  // ancestors *as the page exists at the time of the write*. The ancestor page is guaranteed to
+  // never see the writes by the child.
+  //
+  // The snapshot taken by the child may or may not contain writes made by ancestor nodes after the
+  // clone operation is performed, but this is not guaranteed. This includes pages which ancestors
+  // have newly committed since this clone operation was performed - the clone may see these pages
+  // to snapshot them but it is not guaranteed.
+  //
+  // This node may not end up being the parent of the child, see |FindParentAndRangeForCloneLocked|.
   zx_status_t CloneUnidirectionalLocked(uint64_t offset, uint64_t size,
                                         fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
 
@@ -1171,12 +1257,11 @@ class VmCowPages final : public VmHierarchyBase,
   // child, where 'accessible' is defined by ::CloneCowPageLocked.
   bool IsUniAccessibleLocked(vm_page_t* page, uint64_t offset) const TA_REQ(lock());
 
-  // Releases this vmo's reference to any ancestor vmo's COW pages, for the range [start, end)
-  // in this vmo. This is done by either setting the pages' split bits (if something else
-  // can access the pages) or by freeing the pages using the |page_remover|
+  // Releases this node's references to any ancestor node's COW pages that are accessible from the
+  // range [|start|, |end|) in this node.
   //
-  // This function recursively invokes itself for regions of the parent vmo which are
-  // not accessible by the sibling vmo.
+  // If this function releases the last reference to a page, then it will free the page using the
+  // |page_remover|.
   void ReleaseCowParentPagesLocked(uint64_t start, uint64_t end, BatchPQRemove* page_remover)
       TA_REQ(lock());
 
@@ -1195,7 +1280,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // When cleaning up a hidden vmo, merges the hidden vmo's content (e.g. page list, view
   // of the parent) into the remaining child.
-  void MergeContentWithChildLocked(VmCowPages* removed, bool removed_left) TA_REQ(lock());
+  void MergeContentWithChildLocked(VmCowPages* removed) TA_REQ(lock());
   void MergeContentWithChildUsingSplitsLocked(VmCowPages* removed, bool removed_left)
       TA_REQ(lock());
 

@@ -258,7 +258,7 @@ async fn spawn_local_child_controller_from_open_controller() -> SpawnedChild {
         .root
         .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
         .unwrap();
-    let (controller_proxy, server_end) = create_proxy::<fcomponent::ControllerMarker>().unwrap();
+    let (controller_proxy, server_end) = create_proxy::<fcomponent::ControllerMarker>();
     realm_proxy.open_controller(&child_ref, server_end).await.unwrap().unwrap();
 
     SpawnedChild {
@@ -275,7 +275,7 @@ async fn spawn_local_child_controller_from_open_controller() -> SpawnedChild {
 async fn spawn_child_with_url(
     url: &str,
 ) -> (fcomponent::ControllerProxy, fcdecl::ChildRef, RealmInstance) {
-    let (controller_proxy, server_end) = create_proxy::<fcomponent::ControllerMarker>().unwrap();
+    let (controller_proxy, server_end) = create_proxy::<fcomponent::ControllerMarker>();
     let (child_ref, cm_realm_instance) = spawn_child_with_url_with_args(
         url,
         fcomponent::CreateChildArgs { controller: Some(server_end), ..Default::default() },
@@ -321,7 +321,7 @@ async fn destroy(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
         .root
         .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
         .unwrap();
-    let (_controller, server) = create_proxy::<fcomponent::ControllerMarker>().unwrap();
+    let (_controller, server) = create_proxy::<fcomponent::ControllerMarker>();
     assert_matches!(
         realm_proxy.open_controller(&spawned_child.child_ref, server).await.unwrap(),
         Err(fcomponent::Error::InstanceNotFound)
@@ -336,7 +336,7 @@ async fn destroy_err() {
         .root
         .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
         .unwrap();
-    let (controller, server) = create_proxy::<fcomponent::ControllerMarker>().unwrap();
+    let (controller, server) = create_proxy::<fcomponent::ControllerMarker>();
     let static_child_ref = fcdecl::ChildRef { name: STATIC_CHILD_NAME.into(), collection: None };
     realm_proxy.open_controller(&static_child_ref, server).await.unwrap().unwrap();
     assert_matches!(controller.destroy().await.unwrap(), Err(fcomponent::Error::AccessDenied));
@@ -348,7 +348,7 @@ async fn destroy_err() {
 async fn start(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
     let mut spawned_child = spawn_child_future.await;
     let (_execution_controller_proxy, execution_controller_server_end) =
-        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ExecutionControllerMarker>();
     spawned_child
         .controller_proxy
         .start(Default::default(), execution_controller_server_end)
@@ -367,7 +367,7 @@ async fn start_with_namespace_entries() {
     let mut spawned_child = spawn_local_child_controller_from_create_child().await;
     let (ns_client_end, ns_server_end) = create_endpoints::<fio::DirectoryMarker>();
     let (_execution_controller_proxy, execution_controller_server_end) =
-        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ExecutionControllerMarker>();
     spawned_child
         .controller_proxy
         .start(
@@ -412,7 +412,7 @@ async fn start_with_numbered_handles() {
     let handle_id = HandleInfo::new(HandleType::User0, 0).as_raw();
     let (s1, s2) = zx::Socket::create_stream();
     let (_execution_controller_proxy, execution_controller_server_end) =
-        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ExecutionControllerMarker>();
     spawned_child
         .controller_proxy
         .start(
@@ -447,7 +447,7 @@ async fn start_with_dict() {
         .unwrap();
     // StartChild dictionary entries must be Sender capabilities.
     let (receiver_client, mut receiver_stream) =
-        create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+        create_request_stream::<fsandbox::ReceiverMarker>();
 
     // Serve the `fidl.examples.routing.echo.Echo` protocol on the Sender.
     let task_group = Mutex::new(fasync::TaskGroup::new());
@@ -458,7 +458,7 @@ async fn start_with_dict() {
                     let mut task_group = task_group.lock().unwrap();
                     task_group.spawn(async move {
                         let server_end = ServerEnd::<fecho::EchoMarker>::new(channel);
-                        let mut stream = server_end.into_stream().unwrap();
+                        let mut stream = server_end.into_stream();
                         while let Some(fecho::EchoRequest::EchoString { value, responder }) =
                             stream.try_next().await.unwrap()
                         {
@@ -505,7 +505,7 @@ async fn start_with_dict() {
     };
 
     let (_execution_controller_proxy, execution_controller_server_end) =
-        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ExecutionControllerMarker>();
     spawned_child
         .controller_proxy
         .start(
@@ -533,7 +533,7 @@ async fn start_with_dict() {
 async fn channel_is_closed_on_stop(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
     let mut spawned_child = spawn_child_future.await;
     let (execution_controller_proxy, execution_controller_server_end) =
-        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ExecutionControllerMarker>();
     spawned_child
         .controller_proxy
         .start(Default::default(), execution_controller_server_end)
@@ -559,7 +559,7 @@ async fn channel_is_closed_on_stop(spawn_child_future: BoxFuture<'static, Spawne
 async fn on_stop_is_called(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
     let mut spawned_child = spawn_child_future.await;
     let (execution_controller_proxy, execution_controller_server_end) =
-        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ExecutionControllerMarker>();
     spawned_child
         .controller_proxy
         .start(Default::default(), execution_controller_server_end)
@@ -591,7 +591,7 @@ async fn on_stop_is_called(spawn_child_future: BoxFuture<'static, SpawnedChild>)
 async fn wait_for_exit(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
     let mut spawned_child = spawn_child_future.await;
     let (execution_controller_proxy, execution_controller_server_end) =
-        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ExecutionControllerMarker>();
     spawned_child
         .controller_proxy
         .start(Default::default(), execution_controller_server_end)
@@ -624,7 +624,7 @@ async fn wait_for_exit(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
 async fn start_when_already_started(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
     let mut spawned_child = spawn_child_future.await;
     let (_execution_controller_proxy, execution_controller_server_end) =
-        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ExecutionControllerMarker>();
     spawned_child
         .controller_proxy
         .start(Default::default(), execution_controller_server_end)
@@ -637,7 +637,7 @@ async fn start_when_already_started(spawn_child_future: BoxFuture<'static, Spawn
     );
     assert!(spawned_child.component_status.is_running());
     let (execution_controller_proxy_2, execution_controller_server_end) =
-        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ExecutionControllerMarker>();
     let err = spawned_child
         .controller_proxy
         .start(Default::default(), execution_controller_server_end)

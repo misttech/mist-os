@@ -140,9 +140,8 @@ mod tests {
         let temp_dir = TempDir::new_in("/cache/").expect("failed to create temporary directory");
         let path = temp_dir.path().join("regulatory_region.json");
         let hub = PubSubHub::new(path);
-        let (client, requests) = fidl::endpoints::create_proxy::<RegulatoryRegionWatcherMarker>()
-            .expect("Failed to connect to Watcher protocol");
-        let update_stream = requests.into_stream().expect("Failed to create stream");
+        let (client, requests) = fidl::endpoints::create_proxy::<RegulatoryRegionWatcherMarker>();
+        let update_stream = requests.into_stream();
 
         let watch_fut = process_watch_requests(&hub, update_stream);
         let mut watch_fut = pin!(watch_fut);
@@ -177,9 +176,8 @@ mod tests {
         let temp_dir = TempDir::new_in("/cache/").expect("failed to create temporary directory");
         let path = temp_dir.path().join("regulatory_region.json");
         let hub = PubSubHub::new(path);
-        let (client, requests) = fidl::endpoints::create_proxy::<RegulatoryRegionWatcherMarker>()
-            .expect("Failed to connect to Watcher protocol");
-        let update_stream = requests.into_stream().expect("Failed to create stream");
+        let (client, requests) = fidl::endpoints::create_proxy::<RegulatoryRegionWatcherMarker>();
+        let update_stream = requests.into_stream();
 
         // Start processing update requests.
         let watch_fut = process_watch_requests(&hub, update_stream);

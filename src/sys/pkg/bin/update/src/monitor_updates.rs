@@ -15,7 +15,7 @@ pub async fn handle_monitor_updates_cmd() -> Result<(), anyhow::Error> {
         connect_to_protocol::<ManagerMarker>().context("Failed to connect to update manager")?;
 
     let (client_end, request_stream) =
-        fidl::endpoints::create_request_stream::<AttemptsMonitorMarker>()?;
+        fidl::endpoints::create_request_stream::<AttemptsMonitorMarker>();
 
     if let Err(e) = update_manager.monitor_all_update_checks(client_end) {
         anyhow::bail!("Failed to monitor all update checks: {:?}", e);
@@ -36,7 +36,7 @@ async fn monitor_all(mut stream: AttemptsMonitorRequestStream) -> Result<(), any
                     }
                     None => println!("an update attempt was started"),
                 }
-                if let Err(e) = monitor_state(monitor.into_stream()?).await {
+                if let Err(e) = monitor_state(monitor.into_stream()).await {
                     eprintln!("Error: {e:?}");
                 }
             }

@@ -44,7 +44,7 @@ async fn create_instance(
     );
     let view_ref = clone_view_ref(&view_identity.view_ref);
     let (_, parent_viewport_watcher_request) =
-        create_proxy::<flatland::ParentViewportWatcherMarker>().unwrap();
+        create_proxy::<flatland::ParentViewportWatcherMarker>();
     flatland_instance
         .create_view2(
             token,
@@ -70,8 +70,7 @@ fn create_viewport(
     token: fviews::ViewportCreationToken,
     viewport_id: flatland::ContentId,
 ) {
-    let (_, child_view_watcher) = create_proxy::<flatland::ChildViewWatcherMarker>()
-        .expect("failed to create ChildViewWatcher endpoints");
+    let (_, child_view_watcher) = create_proxy::<flatland::ChildViewWatcherMarker>();
     proxy
         .create_viewport(
             &viewport_id,
@@ -203,8 +202,7 @@ impl FlatlandInstance {
             .expect("Failed to connect Flatland display. Called new_root more than once?");
         {
             // Hook up root view to display.
-            let (_, child_view_watcher) = create_proxy::<flatland::ChildViewWatcherMarker>()
-                .expect("failed to create ChildViewWatcher endpoints");
+            let (_, child_view_watcher) = create_proxy::<flatland::ChildViewWatcherMarker>();
             flatland_display
                 .set_content(root_viewport_creation_token, child_view_watcher)
                 .expect("Failure setting the display");
@@ -268,11 +266,9 @@ impl FlatlandInstance {
         let view_identity = fviews::ViewIdentityOnCreation::from(
             scenic::ViewRefPair::new().expect("failed to create ViewRefPair"),
         );
-        let (_, parent_viewport_watcher) =
-            create_proxy::<flatland::ParentViewportWatcherMarker>().unwrap();
+        let (_, parent_viewport_watcher) = create_proxy::<flatland::ParentViewportWatcherMarker>();
 
-        let (touch_source, touch_source_request) = create_proxy::<fpointer::TouchSourceMarker>()
-            .expect("failed to create TouchSource channels");
+        let (touch_source, touch_source_request) = create_proxy::<fpointer::TouchSourceMarker>();
         let protocols = flatland::ViewBoundProtocols {
             touch_source: Some(touch_source_request),
             ..Default::default()

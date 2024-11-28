@@ -745,7 +745,7 @@ impl<
                 Ok(())
             }
             ffx::RepositoryRegistryRequest::ListRepositories { iterator, .. } => {
-                let mut stream = iterator.into_stream()?;
+                let mut stream = iterator.into_stream();
 
                 let repositories =
                     self.inner.read().await.manager.repositories().collect::<Vec<_>>();
@@ -794,7 +794,7 @@ impl<
                 Ok(())
             }
             ffx::RepositoryRegistryRequest::ListRegisteredTargets { iterator, .. } => {
-                let mut stream = iterator.into_stream()?;
+                let mut stream = iterator.into_stream();
                 let mut values = pkg::config::get_registrations()
                     .await
                     .into_values()
@@ -1462,7 +1462,7 @@ mod tests {
                         let rules = Arc::clone(&rules);
                         let events_closure = Arc::clone(&events_closure);
                         fasync::Task::local(async move {
-                            let mut stream = transaction.into_stream().unwrap();
+                            let mut stream = transaction.into_stream();
                             while let Some(request) = stream.next().await {
                                 let request = request.unwrap();
                                 match request {
@@ -1480,7 +1480,7 @@ mod tests {
                                             .lock()
                                             .unwrap()
                                             .push(RewriteEngineEvent::ListDynamic);
-                                        let mut stream = iterator.into_stream().unwrap();
+                                        let mut stream = iterator.into_stream();
 
                                         let mut rules = rules.lock().unwrap().clone().into_iter();
 
@@ -1576,15 +1576,14 @@ mod tests {
 
     async fn test_socket_provider(channel: fidl::Channel) {
         let channel = fidl::endpoints::ServerEnd::<fsock::ProviderMarker>::from(channel);
-        let mut stream = channel.into_stream().unwrap();
+        let mut stream = channel.into_stream();
 
         while let Some(Ok(request)) = stream.next().await {
             match request {
                 fsock::ProviderRequest::StreamSocket { domain: _, proto, responder } => {
                     assert_eq!(fsock::StreamSocketProtocol::Tcp, proto);
                     let (client, stream) =
-                        fidl::endpoints::create_request_stream::<fsock::StreamSocketMarker>()
-                            .unwrap();
+                        fidl::endpoints::create_request_stream::<fsock::StreamSocketMarker>();
                     fuchsia_async::Task::spawn(test_stream_socket(stream)).detach();
                     responder.send(Ok(client)).unwrap();
                 }
@@ -1607,7 +1606,7 @@ mod tests {
 
                 match (req, target.as_deref()) {
                     (
-                        rcs::RemoteControlRequest::OpenCapability {
+                        rcs::RemoteControlRequest::DeprecatedOpenCapability {
                             moniker: _,
                             capability_set: _,
                             server_channel,
@@ -1838,7 +1837,7 @@ mod tests {
     async fn get_repositories(proxy: &ffx::RepositoryRegistryProxy) -> Vec<ffx::RepositoryConfig> {
         let (client, server) = fidl::endpoints::create_endpoints();
         proxy.list_repositories(server).unwrap();
-        let client = client.into_proxy().unwrap();
+        let client = client.into_proxy();
 
         let mut repositories = vec![];
         loop {
@@ -1857,7 +1856,7 @@ mod tests {
     ) -> Vec<ffx::RepositoryTarget> {
         let (client, server) = fidl::endpoints::create_endpoints();
         proxy.list_registered_targets(server).unwrap();
-        let client = client.into_proxy().unwrap();
+        let client = client.into_proxy();
 
         let mut registrations = vec![];
         loop {

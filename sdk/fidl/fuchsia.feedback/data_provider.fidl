@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 library fuchsia.feedback;
 
+// TODO(https://fxbug.dev/334928618): Remove using declarations for fuchsia.math and fuchsia.mem.
 using fuchsia.math;
 using fuchsia.mem;
 using zx;
 
 /// Provides data useful to attach to feedback reports, e.g., a crash report filed by the system, a
 /// user feedback report filed by a user or a bug report filed by a developer.
-@discoverable
+@discoverable(server="platform")
 closed protocol DataProvider {
     /// Returns a snapshot of the device's state.
     ///
@@ -28,6 +29,7 @@ closed protocol DataProvider {
     /// The screenshot is provided separately from the snapshot as callers might want to block on
     /// this call before changing the view while collecting a snapshot in the background is fine.
     /// There are also a lot of clients that are not interested in the screenshot.
+    @available(removed=NEXT)
     strict GetScreenshot(struct {
         encoding ImageEncoding;
     }) -> (resource struct {
@@ -151,11 +153,13 @@ type Snapshot = resource table {
 ///
 /// Today, only PNG is supported, but in the future the screenshot could be
 /// returned in other encodings if need arises.
+@available(removed=NEXT)
 type ImageEncoding = strict enum {
     PNG = 0;
 };
 
 /// An encoded image of the screen.
+@available(removed=NEXT)
 type Screenshot = resource struct {
     image fuchsia.mem.Buffer;
 

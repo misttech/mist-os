@@ -9,11 +9,11 @@ use fdomain_client::fidl::{
     DiscoverableProtocolMarker as FDiscoverableProtocolMarker, FDomainResourceDialect,
     Proxy as FProxy,
 };
+use ffx_build_version::VersionInfo;
 use ffx_command::{return_bug, return_user_error, FfxCommandLine, FfxContext, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
-use ffx_fidl::VersionInfo;
 use ffx_target::ssh_connector::SshConnector;
 use ffx_target::TargetInfoQuery;
 use fidl::encoding::DefaultFuchsiaResourceDialect;
@@ -185,7 +185,8 @@ impl FhoEnvironment {
             }
 
             // Build the path to the new log file.
-            let dir: PathBuf = self.context.get(ffx_config::logging::LOG_DIR).unwrap_or(".".into());
+            let dir: PathBuf =
+                self.context.get(ffx_config::logging::LOG_DIR).unwrap_or_else(|_| ".".into());
             let mut log_file = dir.join(basename);
             log_file.set_extension("log");
 
@@ -348,8 +349,7 @@ async fn daemon_try_connect<T: TryFromEnv>(
                             continue;
                         };
                         let (tc_proxy, server_end) =
-                            fidl::endpoints::create_proxy::<ffx_fidl::TargetCollectionMarker>()
-                                .expect("Could not create FIDL proxy");
+                            fidl::endpoints::create_proxy::<ffx_fidl::TargetCollectionMarker>();
                         let Ok(Ok(())) = daemon_proxy
                             .connect_to_protocol(
                                 ffx_fidl::TargetCollectionMarker::PROTOCOL_NAME,
@@ -854,8 +854,8 @@ impl TryFromEnv for fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy 
             FhoConnectionBehavior::DirectConnector(dc) => {
                 dc.rcs_proxy_fdomain().await.map_err(Into::into)
             }
-            FhoConnectionBehavior::DaemonConnector(dc) => match dc.remote_factory().await {
-                Ok(_p) => todo!("FDomain with the daemon is unsupported!"),
+            FhoConnectionBehavior::DaemonConnector(dc) => match dc.remote_factory_fdomain().await {
+                Ok(p) => Ok(p),
                 Err(e) => {
                     if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
                         let message = format!("Failed connecting to remote control proxy: {ffx_e}");
@@ -919,6 +919,19 @@ impl TryFromEnv for EnvironmentContext {
     }
 }
 
+// Returns a DirectConnector only if we have a direct connection. Returns None for
+// a daemon connection.
+#[async_trait(?Send)]
+impl TryFromEnv for Option<Rc<dyn DirectConnector>> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        Ok(if let FhoConnectionBehavior::DirectConnector(dc) = &env.behavior {
+            Some(dc.clone())
+        } else {
+            None
+        })
+    }
+}
+
 #[async_trait(?Send)]
 impl<T> TryFromEnv for PhantomData<T> {
     async fn try_from_env(_env: &FhoEnvironment) -> Result<Self> {
@@ -928,10 +941,9 @@ impl<T> TryFromEnv for PhantomData<T> {
 
 #[cfg(test)]
 mod tests {
-    use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy as FRemoteControlProxy;
+    use crate::connector::MockDirectConnector;
     use ffx_command::Error;
     use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
-    use futures::future::LocalBoxFuture;
 
     use super::*;
 
@@ -956,32 +968,12 @@ mod tests {
             .expect_err("Inner AlwaysError should error after second await");
     }
 
-    mockall::mock! {
-        TestConnector {}
-
-        impl DirectConnector for TestConnector {
-           fn connect(&self) -> LocalBoxFuture<'_, Result<()>>;
-           fn rcs_proxy(&self) -> LocalBoxFuture<'_, Result<RemoteControlProxy>>;
-           fn rcs_proxy_fdomain(&self) -> LocalBoxFuture<'_, Result<FRemoteControlProxy>>;
-           fn wrap_connection_errors(&self, e: crate::Error) -> LocalBoxFuture<'_, crate::Error>;
-           fn device_address(&self) -> LocalBoxFuture<'_, Option<std::net::SocketAddr>>;
-           fn target_spec(&self) -> Option<String>;
-           fn host_ssh_address(&self) -> LocalBoxFuture<'_, Option<String>>;
-        }
-    }
-
-    impl std::fmt::Debug for MockTestConnector {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-            f.debug_struct("MockTestConnector").finish()
-        }
-    }
-
     #[fuchsia::test]
     async fn test_connector_try_connect_fail_reconnect_and_rcs_eventual_success() {
         let config_env = ffx_config::test_init().await.unwrap();
         let mut tool_env =
             crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
-        let mut mock_connector = MockTestConnector::new();
+        let mut mock_connector = MockDirectConnector::new();
         mock_connector.expect_device_address().returning(|| Box::pin(async { None }));
         mock_connector.expect_target_spec().returning(|| None);
         let mut seq = mockall::Sequence::new();
@@ -1016,7 +1008,7 @@ mod tests {
             Box::pin(async {
                 // This will return an unusable proxy, but we're not going to use it so it's not
                 // important.
-                let (proxy, _) = fidl::endpoints::create_proxy::<RemoteControlMarker>().unwrap();
+                let (proxy, _) = fidl::endpoints::create_proxy::<RemoteControlMarker>();
                 Ok(proxy)
             })
         });
@@ -1031,7 +1023,7 @@ mod tests {
         let config_env = ffx_config::test_init().await.unwrap();
         let mut tool_env =
             crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
-        let mut mock_connector = MockTestConnector::new();
+        let mut mock_connector = MockDirectConnector::new();
         mock_connector.expect_device_address().returning(|| Box::pin(async { None }));
         mock_connector.expect_target_spec().returning(|| None);
         let mut seq = mockall::Sequence::new();
@@ -1056,7 +1048,7 @@ mod tests {
         let config_env = ffx_config::test_init().await.unwrap();
         let mut tool_env =
             crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
-        let mut mock_connector = MockTestConnector::new();
+        let mut mock_connector = MockDirectConnector::new();
         mock_connector.expect_connect().times(1).returning(|| {
             Box::pin(async {
                 Err(crate::Error::Unexpected(anyhow::anyhow!("we're doomed!").into()))

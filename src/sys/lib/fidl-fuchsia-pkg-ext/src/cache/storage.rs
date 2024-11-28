@@ -13,13 +13,13 @@ pub(super) fn into_blob_writer_and_closer(
     use fpkg::BlobWriter::*;
     match fidl {
         File(file) => {
-            let proxy = file.into_proxy()?;
+            let proxy = file.into_proxy();
             Ok((Box::new(Clone::clone(&proxy)), Box::new(proxy)))
         }
         Writer(writer) => {
             // fuchsia.fxfs/BlobCreator allows concurrent creation attempts, so we don't need to
             // cancel an ongoing attempt before trying again.
-            Ok((Box::new(FxBlob::new(writer.into_proxy()?)), Box::new(())))
+            Ok((Box::new(FxBlob::new(writer.into_proxy())), Box::new(())))
         }
     }
 }
@@ -174,8 +174,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_proxy_chunks_writes() {
-        let (mut proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+        let (mut proxy, mut server) = fidl::endpoints::create_proxy_and_stream::<fio::FileMarker>();
         let bytes = vec![0; fio::MAX_BUF as usize + 1];
 
         let write_fut = async move {
@@ -205,8 +204,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_proxy_handles_short_writes() {
-        let (mut proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+        let (mut proxy, mut server) = fidl::endpoints::create_proxy_and_stream::<fio::FileMarker>();
         let bytes = [0; 10];
 
         let write_fut = async move {

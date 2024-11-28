@@ -341,7 +341,7 @@ impl<'a> Fsck<'a> {
     }
 
     fn warning(&self, error: FsckWarning) -> Result<(), Error> {
-        (self.options.on_error)(&FsckIssue::Warning(error.clone()));
+        (self.options.on_error)(&FsckIssue::Warning(error));
         self.warnings.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }

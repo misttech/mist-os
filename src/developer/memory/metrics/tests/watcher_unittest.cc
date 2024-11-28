@@ -24,7 +24,10 @@ TEST_F(WatcherUnitTest, Initial) {
                       {.kmem = {.free_bytes = 100},
                        .vmos =
                            {
-                               {.koid = 1, .name = "v1", .committed_bytes = 101},
+                               {.koid = 1,
+                                .name = "v1",
+                                .committed_bytes = 101,
+                                .committed_fractional_scaled_bytes = UINT64_MAX},
                            },
                        .processes = {
                            {.koid = 2, .name = "p1", .vmos = {1}},

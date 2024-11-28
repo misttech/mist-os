@@ -272,24 +272,22 @@ group("smart_display_nelson_staging_tests") {
 ############################## Test groups - End ###############################
 
 ############################## WLAN Test groups - Start ###############################
-group("wlan_core_vim3_stable_sl4f_tests") {
+group("wlan_core_vim3_stable_tests") {
   testonly = true
-  public_deps = [ "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests:test_wlan_policy_sl4f" ]
+  public_deps = []
 }
-group("wlan_core_vim3_unstable_sl4f_tests") {
+
+group("wlan_core_vim3_unstable_tests") {
   testonly = true
   public_deps = [
-    "honeydew/honeydew/affordances/connectivity/wlan/wlan/tests/functional_tests:test_wlan_sl4f",
     "honeydew/honeydew/affordances/connectivity/wlan/wlan/tests/functional_tests:wlan_test_fc($host_toolchain)",
     "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests:wlan_policy_test_fc($host_toolchain)",
     "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/functional_tests:wlan_policy_ap_test_fc($host_toolchain)",
   ]
 }
+
 group("wlan_core_vim3_staging_sl4f_tests") {
   testonly = true
-  public_deps = [
-    ":wlan_core_vim3_stable_sl4f_tests",
-    ":wlan_core_vim3_unstable_sl4f_tests",
-  ]
+  public_deps = [ ":wlan_core_vim3_unstable_tests" ]
 }
 ############################## WLAN Test groups - End ###############################

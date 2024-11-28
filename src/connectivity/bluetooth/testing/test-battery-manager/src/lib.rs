@@ -21,15 +21,12 @@ impl TestBatteryManager {
     }
 
     pub async fn make_battery_client_with_test_manager() -> (BatteryClient, TestBatteryManager) {
-        let (c, mut s) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::BatteryManagerMarker>().unwrap();
+        let (c, mut s) = fidl::endpoints::create_proxy_and_stream::<fpower::BatteryManagerMarker>();
 
         let battery_client =
             BatteryClient::register_updates(c).expect("can register battery client");
         let watcher_client = match s.next().await.expect("valid fidl request") {
-            Ok(fpower::BatteryManagerRequest::Watch { watcher, .. }) => {
-                watcher.into_proxy().unwrap()
-            }
+            Ok(fpower::BatteryManagerRequest::Watch { watcher, .. }) => watcher.into_proxy(),
             x => panic!("Expected watch request, got: {:?}", x),
         };
 

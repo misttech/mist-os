@@ -18,7 +18,7 @@ impl DirConnector {
         let (sender, receiver) = mpsc::unbounded();
         let receiver = DirReceiver::new(receiver);
         let receiver_task =
-            fasync::Task::spawn(receiver.handle_receiver(receiver_client.into_proxy().unwrap()));
+            fasync::Task::spawn(receiver.handle_receiver(receiver_client.into_proxy()));
         Self::new_internal(sender, Some(Arc::new(receiver_task)))
     }
 }
@@ -28,6 +28,7 @@ impl crate::RemotableCapability for DirConnector {
         self,
         _scope: ExecutionScope,
     ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+        // We may wish to implement this in the future, but for now nothing needs it.
         Err(ConversionError::NotSupported)
     }
 }

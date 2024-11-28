@@ -79,8 +79,7 @@ impl AvrcpFacade {
         let _status = avrcp_service_proxy
             .get_controller_for_target(&PeerId { value: id }, cont_server)
             .await?;
-        self.inner.write().controller_proxy =
-            Some(cont_client.into_proxy().expect("Error obtaining controller client proxy"));
+        self.inner.write().controller_proxy = Some(cont_client.into_proxy());
         Ok(())
     }
 
@@ -368,7 +367,7 @@ mod tests {
         }
 
         fn build_controller(self) -> (AvrcpFacade, impl Future<Output = ()>) {
-            let (proxy, mut stream) = create_proxy_and_stream::<ControllerMarker>().unwrap();
+            let (proxy, mut stream) = create_proxy_and_stream::<ControllerMarker>();
             let fut = async move {
                 for expected in self.expected_state {
                     expected(stream.next().await.unwrap().unwrap());

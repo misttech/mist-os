@@ -73,8 +73,7 @@ mod tests {
 
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_satisfied() {
-        let (proxy, stream) =
-            create_proxy_and_stream::<AccessMarker>().expect("failed to create proxy");
+        let (proxy, stream) = create_proxy_and_stream::<AccessMarker>();
         let name = "TEST".to_string();
 
         let _ = proxy.set_local_name(&name);
@@ -84,8 +83,7 @@ mod tests {
 
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_unsatisfied_due_to_mismatch() {
-        let (proxy, stream) =
-            create_proxy_and_stream::<AccessMarker>().expect("failed to create proxy");
+        let (proxy, stream) = create_proxy_and_stream::<AccessMarker>();
         let expected_name = "TEST".to_string();
         let wrong_name = "💩".to_string();
 
@@ -96,8 +94,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_timeout_without_any_message() {
-        let (_proxy, stream) =
-            create_proxy_and_stream::<AccessMarker>().expect("failed to create proxy");
+        let (_proxy, stream) = create_proxy_and_stream::<AccessMarker>();
         let expected_name = "TEST".to_string();
         let result = expect_set_local_name(stream, expected_name).await;
         assert!(result.is_err());
@@ -105,8 +102,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_timeout_after_unexpected_message() {
-        let (proxy, stream) =
-            create_proxy_and_stream::<AccessMarker>().expect("failed to create proxy");
+        let (proxy, stream) = create_proxy_and_stream::<AccessMarker>();
         let expected_name = "TEST".to_string();
 
         let _ = proxy.set_device_class(&DeviceClass { value: 0 });
@@ -116,8 +112,7 @@ mod tests {
 
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_error_after_handle_closure() {
-        let (proxy, stream) =
-            create_proxy_and_stream::<AccessMarker>().expect("failed to create proxy");
+        let (proxy, stream) = create_proxy_and_stream::<AccessMarker>();
         let expected_name = "TEST".to_string();
 
         drop(proxy);
@@ -127,8 +122,7 @@ mod tests {
 
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_satisfied_with_expected_message_after_unexpected_message() {
-        let (proxy, stream) =
-            create_proxy_and_stream::<AccessMarker>().expect("failed to create proxy");
+        let (proxy, stream) = create_proxy_and_stream::<AccessMarker>();
         let expected_name = "TEST".to_string();
 
         let _ = proxy.set_device_class(&DeviceClass { value: 0 });

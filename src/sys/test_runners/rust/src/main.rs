@@ -15,6 +15,9 @@ use {fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync};
 #[fuchsia::main(logging_tags=["rust_test_runner"])]
 async fn main() -> Result<(), anyhow::Error> {
     info!("started");
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
+    fuchsia_trace_provider::trace_provider_wait_for_init();
+
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(move |stream| {
         fasync::Task::local(

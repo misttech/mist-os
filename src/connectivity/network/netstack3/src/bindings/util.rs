@@ -20,7 +20,9 @@ use net_types::ip::{
 use net_types::{AddrAndZone, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr};
 use netstack3_core::device::{ArpConfiguration, ArpConfigurationUpdate, DeviceId, WeakDeviceId};
 use netstack3_core::error::{ExistsError, NotFoundError};
-use netstack3_core::ip::{SlaacConfiguration, SlaacConfigurationUpdate};
+use netstack3_core::ip::{
+    Lifetime, PreferredLifetime, SlaacConfiguration, SlaacConfigurationUpdate,
+};
 use netstack3_core::neighbor::{NudUserConfig, NudUserConfigUpdate};
 use netstack3_core::routes::{
     AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric,
@@ -34,14 +36,14 @@ use packet_formats::utils::NonZeroDuration;
 use {
     fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    fidl_fuchsia_net_stack as fidl_net_stack, fidl_fuchsia_posix as fposix,
-    fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_net_stack as fidl_net_stack,
+    fidl_fuchsia_posix as fposix, fidl_fuchsia_posix_socket as fposix_socket,
 };
 
 use crate::bindings::devices::BindingId;
 use crate::bindings::socket::{IntoErrno, IpSockAddrExt, SockAddr};
-use crate::bindings::{routes, BindingsCtx};
+use crate::bindings::{routes, BindingsCtx, LifetimeExt as _};
 
 mod result_ext;
 pub(crate) use result_ext::*;
@@ -301,10 +303,8 @@ pub(crate) trait IntoFidl<F> {
 
 impl<C: TryIntoFidl<F, Error = Never>, F> IntoFidl<F> for C {
     fn into_fidl(self) -> F {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match self.try_into_fidl() {
             Ok(f) => f,
-            Err(never) => match never {},
         }
     }
 }
@@ -348,10 +348,8 @@ pub(crate) trait IntoCore<C> {
 
 impl<F, C: TryFromFidl<F, Error = Never>> IntoCore<C> for F {
     fn into_core(self) -> C {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match self.try_into_core() {
             Ok(c) => c,
-            Err(never) => match never {},
         }
     }
 }
@@ -735,10 +733,8 @@ pub(crate) trait IntoFidlWithContext<F> {
 
 impl<C: TryIntoFidlWithContext<F, Error = Never>, F> IntoFidlWithContext<F> for C {
     fn into_fidl_with_ctx<X: ConversionContext>(self, ctx: &X) -> F {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match self.try_into_fidl_with_ctx(ctx) {
             Ok(f) => f,
-            Err(never) => match never {},
         }
     }
 }
@@ -1402,6 +1398,42 @@ impl IntoFidl<fnet_interfaces_admin::SlaacConfiguration> for SlaacConfiguration 
             temporary_address: Some(temporary_address_configuration.is_enabled()),
             __source_breaking: fidl::marker::SourceBreaking,
         }
+    }
+}
+
+impl TryIntoFidl<fnet_interfaces_ext::PreferredLifetimeInfo>
+    for PreferredLifetime<zx::MonotonicInstant>
+{
+    type Error = fnet_interfaces_ext::NotPositiveMonotonicInstantError;
+
+    fn try_into_fidl(self) -> Result<fnet_interfaces_ext::PreferredLifetimeInfo, Self::Error> {
+        match self {
+            PreferredLifetime::Deprecated => {
+                Ok(fnet_interfaces_ext::PreferredLifetimeInfo::Deprecated)
+            }
+            PreferredLifetime::Preferred(p) => {
+                Ok(fnet_interfaces_ext::PreferredLifetimeInfo::PreferredUntil(
+                    p.into_zx_time().try_into()?,
+                ))
+            }
+        }
+    }
+}
+
+impl TryFromFidl<fnet_interfaces_ext::PreferredLifetimeInfo>
+    for PreferredLifetime<zx::MonotonicInstant>
+{
+    type Error = Never;
+
+    fn try_from_fidl(
+        fidl: fnet_interfaces_ext::PreferredLifetimeInfo,
+    ) -> Result<Self, Self::Error> {
+        Ok(match fidl {
+            fnet_interfaces_ext::PreferredLifetimeInfo::Deprecated => Self::Deprecated,
+            fnet_interfaces_ext::PreferredLifetimeInfo::PreferredUntil(i) => {
+                Self::Preferred(Lifetime::from_zx_time(i.into()))
+            }
+        })
     }
 }
 

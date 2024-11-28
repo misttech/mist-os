@@ -212,6 +212,7 @@ impl PolicyConfigNode {
         node.record_uint("startup_delay", policy_config.startup_delay.as_secs());
         node.record_uint("retry_delay", policy_config.retry_delay.as_secs());
         node.record_bool("allow_reboot_when_idle", policy_config.allow_reboot_when_idle);
+        node.record_uint("fuzz_percentage_range", policy_config.fuzz_percentage_range.into());
         PolicyConfigNode { _node: node }
     }
 }

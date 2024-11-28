@@ -100,7 +100,7 @@ fn parse_bootfs<'a>(vmo: zx::Vmo) -> Arc<directory::immutable::Simple> {
 async fn fetch_new_factory_item() -> Result<zx::Vmo, Error> {
     let factory_items = fuchsia_component::client::connect_to_protocol::<FactoryItemsMarker>()?;
     let (vmo_opt, _) = factory_items.get(DEFAULT_BOOTFS_FACTORY_ITEM_EXTRA).await?;
-    vmo_opt.ok_or(format_err!("Failed to get a valid VMO from service"))
+    vmo_opt.ok_or_else(|| format_err!("Failed to get a valid VMO from service"))
 }
 
 async fn read_file_from_proxy<'a>(
@@ -161,7 +161,7 @@ async fn create_dir_from_context<'a>(
 }
 
 async fn apply_config(config: Config, dir: Arc<Mutex<fio::DirectoryProxy>>) -> fio::DirectoryProxy {
-    let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>();
 
     let dir_mtx = dir.clone();
 
@@ -192,11 +192,9 @@ where
     G: FnMut(Request<RS::Protocol>) -> Option<fidl::endpoints::ServerEnd<fio::DirectoryMarker>>,
 {
     while let Some(request) = stream.try_next().await? {
-        if let Some(directory_request) = get_directory_request_fn(request) {
-            if let Err(err) = directory_mutex.lock().await.clone(
-                fio::OpenFlags::RIGHT_READABLE,
-                ServerEnd::<fio::NodeMarker>::new(directory_request.into_channel()),
-            ) {
+        if let Some(server_end) = get_directory_request_fn(request) {
+            if let Err(err) = directory_mutex.lock().await.clone2(server_end.into_channel().into())
+            {
                 tracing::error!(
                     "Failed to clone directory connection for {}: {:?}",
                     RS::Protocol::DEBUG_NAME,
@@ -209,7 +207,7 @@ where
 }
 
 async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::DirectoryProxy, Error> {
-    let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>()?;
+    let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>();
     match factory_config {
         FactoryConfig::FactoryItems => {
             tracing::info!("{}", "Reading from FactoryItems service");
@@ -273,11 +271,7 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
         }
         FactoryConfig::FactoryVerity => {
             tracing::info!("reading from factory verity");
-            fdio::open_deprecated(
-                "/factory",
-                fio::OpenFlags::RIGHT_READABLE,
-                directory_server_end.into_channel(),
-            )?;
+            fdio::open("/factory", fio::PERM_READABLE, directory_server_end.into_channel())?;
             Ok(directory_proxy)
         }
     }

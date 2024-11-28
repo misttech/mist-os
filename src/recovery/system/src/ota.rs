@@ -108,7 +108,7 @@ impl OtaEnvBuilder {
                 };
                 let build_info =
                     proxy.get_build_info().await.context("Failed to read build info")?;
-                build_info.board_config.ok_or(format_err!("No board name provided"))
+                build_info.board_config.ok_or_else(|| format_err!("No board name provided"))
             }
             BoardName::Override { name } => Ok(name.to_owned()),
         }
@@ -182,7 +182,8 @@ impl OtaEnvBuilder {
 
         let board_name = self.get_board_name().await.context("Could not get board name")?;
 
-        let blobfs_proxy = self.blobfs_proxy.ok_or(format_err!("Blobfs proxy not found"))?;
+        let blobfs_proxy =
+            self.blobfs_proxy.ok_or_else(|| format_err!("Blobfs proxy not found"))?;
 
         Ok(OtaEnv {
             blobfs_proxy,

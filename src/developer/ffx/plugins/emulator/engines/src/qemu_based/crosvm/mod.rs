@@ -72,11 +72,12 @@ impl EmulatorEngine for CrosvmEngine {
                 // Fall back to 4 core is cpu_count isn't specified.
                 let cpu_count = emu_config.device.cpu.count;
                 let cpu_count = if cpu_count > 0 { cpu_count } else { 4 };
-                // TODO(http://fxbug.dev/371614411): Move these into a template.
+                // TODO(https://fxbug.dev/371614411): Move these into a template.
                 let mut args = vec![
                     "--extended-status".to_string(),
                     "--log-level=debug".to_string(),
                     "run".to_string(),
+                    "--disable-sandbox".to_string(),
                     "-s".to_string(),
                     format!(
                         "{}/control.sock",
@@ -88,10 +89,11 @@ impl EmulatorEngine for CrosvmEngine {
                     cpu_count.to_string(),
                     "--serial".to_string(),
                     "type=stdout,stdin,hardware=serial,earlycon".to_string(),
-                    "--initrd".to_string(),
-                    emu_config.guest.zbi_image.clone().unwrap().to_str().unwrap().into(),
                     emu_config.guest.kernel_image.clone().unwrap().to_str().unwrap().into(),
                 ];
+                if let Some(zbi_image) = &emu_config.guest.zbi_image {
+                    args.extend(vec!["--initrd".to_string(), zbi_image.to_str().unwrap().into()]);
+                }
                 if let Some(vsock) = &emu_config.device.vsock {
                     if vsock.enabled {
                         args.extend(vec!["--vsock".to_string(), format!("cid={}", vsock.cid)]);

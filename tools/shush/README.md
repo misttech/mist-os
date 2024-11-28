@@ -2,27 +2,35 @@
 
 This tool consumes json diagnostics emitted by the rust compiler (and clippy), and tries to address them by either inserting `#[allow(...)]` annotations or applying compiler-suggested fixes to the code automatically. It can be used to make large scale changes to roll out new clippy lints, perform edition migration, and address new compiler warnings from upstream.
 
-# Usage:
+## Usage:
+
+First, ensure the tool is included in your build:
+
+```sh
+fx set ... --with-host //tools/shush:install
+```
+
+Then you can use `fx shush`:
 
 ``` sh
 # Allow a specific lint or category (skip generating bugs)
-fx clippy -f <source file> --raw | shush --api $API_PATH --mock lint --lint clippy::suspicious_splitn allow
+fx clippy -f <source file> --raw | fx shush --api $API_PATH --mock lint --lint clippy::suspicious_splitn allow
 
 # See all clippy lints in our tree
-fx clippy --all --raw | shush --api $API_PATH --mock lint --lint clippy::all --dryrun --mock allow
+fx clippy --all --raw | fx shush --api $API_PATH --mock lint --lint clippy::all --dryrun --mock allow
 
 # Manually specify a fuchsia checkout to run on
-shush lint lint_file.json --lint clippy::style --fuchsia-dir ~/myfuchsia fix
+fx shush lint lint_file.json --lint clippy::style --fuchsia-dir ~/myfuchsia fix
 
 # Run shush on itself
 fx clippy '//tools/shush(//build/toolchain:host_x64)' --raw |
-    shush lint --force --lint clippy::needless_borrow fix
+    fx shush lint --force --lint clippy::needless_borrow fix
 
 # Automatically generate bugs while allowing
-shush --api $API_PATH lint lint_file.json --lint clippy::absurd_extreme_comparisons allow
+fx shush --api $API_PATH lint lint_file.json --lint clippy::absurd_extreme_comparisons allow
 
 # Roll out generated bugs (do this after checking in allows)
-shush --api $API_PATH rollout
+fx shush --api $API_PATH rollout
 ```
 
 Run `fx shush --help` for details.

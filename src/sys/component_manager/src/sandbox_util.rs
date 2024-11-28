@@ -342,7 +342,7 @@ pub mod tests {
     use fuchsia_async::TestExecutor;
     use moniker::Moniker;
     use router_error::DowncastErrorForTest;
-    use routing::availability::AvailabilityMetadata;
+    use routing::bedrock::request_metadata::Metadata;
     use routing::bedrock::structured_dict::ComponentInput;
     use routing::{test_invalid_instance_token, DictExt, GenericRouterResponse, LazyGet};
     use sandbox::{Capability, Data, Dict, RemotableCapability};
@@ -422,7 +422,7 @@ pub mod tests {
             .is_ok());
 
         let metadata = Dict::new();
-        metadata.set_availability(Availability::Required);
+        metadata.set_metadata(Availability::Required);
         let cap = dict
             .get_with_request(
                 &Moniker::root().into(),
@@ -449,7 +449,7 @@ pub mod tests {
         });
         assert!(dict.insert_capability(&RelativePath::new("foo").unwrap(), foo.into()).is_ok());
         let metadata = Dict::new();
-        metadata.set_availability(Availability::Required);
+        metadata.set_metadata(Availability::Required);
         let cap = dict
             .get_with_request(
                 &Moniker::root().into(),
@@ -475,7 +475,7 @@ pub mod tests {
     async fn get_with_request_missing() {
         let dict = Dict::new();
         let metadata = Dict::new();
-        metadata.set_availability(Availability::Required);
+        metadata.set_metadata(Availability::Required);
         let cap = dict
             .get_with_request(
                 &Moniker::root().into(),
@@ -499,7 +499,7 @@ pub mod tests {
         assert!(dict.insert_capability(&RelativePath::new("foo").unwrap(), foo.into()).is_ok());
 
         let metadata = Dict::new();
-        metadata.set_availability(Availability::Required);
+        metadata.set_metadata(Availability::Required);
         let cap = dict
             .get_with_request(
                 &Moniker::root().into(),
@@ -517,7 +517,7 @@ pub mod tests {
         );
 
         let metadata = Dict::new();
-        metadata.set_availability(Availability::Required);
+        metadata.set_metadata(Availability::Required);
         let cap = dict
             .get_with_request(
                 &Moniker::root().into(),
@@ -581,7 +581,7 @@ pub mod tests {
         )
         .await;
         let metadata = Dict::new();
-        metadata.set_availability(Availability::Required);
+        metadata.set_metadata(Availability::Required);
         let RouterResponse::<Connector>::Capability(conn) = router
             .route(Some(Request { target: component.as_weak().into(), metadata }), false)
             .await
@@ -634,7 +634,7 @@ pub mod tests {
         )
         .await;
         let metadata = Dict::new();
-        metadata.set_availability(Availability::Required);
+        metadata.set_metadata(Availability::Required);
         let RouterResponse::<Connector>::Capability(conn) = router
             .route(Some(Request { target: component.as_weak().into(), metadata }), false)
             .await
@@ -694,7 +694,7 @@ pub mod tests {
         )
         .await;
         let metadata = Dict::new();
-        metadata.set_availability(Availability::Required);
+        metadata.set_metadata(Availability::Required);
         let resp = router
             .route(Some(Request { target: target.as_weak().into(), metadata }), true)
             .await
@@ -718,7 +718,7 @@ pub mod tests {
         );
 
         let metadata = Dict::new();
-        metadata.set_availability(Availability::Optional);
+        metadata.set_metadata(Availability::Optional);
         let capability = downscoped_router
             .route(
                 Some(Request {
@@ -761,7 +761,7 @@ pub mod tests {
         );
 
         let metadata = Dict::new();
-        metadata.set_availability(Availability::Optional);
+        metadata.set_metadata(Availability::Optional);
         let capability = downscoped_router
             .route(
                 Some(Request {
@@ -791,7 +791,7 @@ pub mod tests {
         );
 
         let metadata = Dict::new();
-        metadata.set_availability(Availability::Optional);
+        metadata.set_metadata(Availability::Optional);
         let capability = router.route(None, false).await.unwrap();
         let capability = match capability {
             RouterResponse::<Data>::Capability(d) => d,
@@ -824,7 +824,7 @@ pub mod tests {
         );
 
         let metadata = Dict::new();
-        metadata.set_availability(Availability::Optional);
+        metadata.set_metadata(Availability::Optional);
         let capability = router.route(None, false).await.unwrap();
         let capability = match capability {
             RouterResponse::<Data>::Capability(d) => d,

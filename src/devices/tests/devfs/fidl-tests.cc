@@ -68,8 +68,8 @@ void FidlOpenValidator(const fidl::ClientEnd<fio::Directory>& directory, const c
 // for open event messages (on both success and error).
 TEST(FidlTestCase, OpenDev) {
   auto endpoints = fidl::Endpoints<fio::Directory>::Create();
-  ASSERT_OK(fdio_open("/dev", static_cast<uint32_t>(fio::OpenFlags::kRightReadable),
-                      endpoints.server.channel().release()));
+  ASSERT_OK(fdio_open3("/dev", static_cast<uint64_t>(fio::wire::kPermReadable),
+                       endpoints.server.channel().release()));
 
   FidlOpenValidator(endpoints.client, "zero", zx::ok(fio::wire::NodeInfoDeprecated::Tag::kFile));
   FidlOpenValidator(endpoints.client, "this-path-better-not-actually-exist",
@@ -80,8 +80,8 @@ TEST(FidlTestCase, OpenDev) {
 
 TEST(FidlTestCase, OpenPkg) {
   auto endpoints = fidl::Endpoints<fio::Directory>::Create();
-  ASSERT_OK(fdio_open("/pkg", static_cast<uint32_t>(fio::OpenFlags::kRightReadable),
-                      endpoints.server.channel().release()));
+  ASSERT_OK(fdio_open3("/pkg", static_cast<uint64_t>(fio::wire::kPermReadable),
+                       endpoints.server.channel().release()));
 
   FidlOpenValidator(endpoints.client, "bin",
                     zx::ok(fio::wire::NodeInfoDeprecated::Tag::kDirectory));

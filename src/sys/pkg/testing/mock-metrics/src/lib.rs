@@ -70,8 +70,7 @@ impl MockMetricEventLoggerFactory {
                     assert_eq!(project_spec.project_id, Some(self.project_id));
                     let mock_logger = Arc::new(MockMetricEventLogger::new());
                     self.loggers.lock().push(mock_logger.clone());
-                    fasync::Task::spawn(mock_logger.run_logger(logger.into_stream().unwrap()))
-                        .detach();
+                    fasync::Task::spawn(mock_logger.run_logger(logger.into_stream())).detach();
                     let _ = responder.send(Ok(()));
                 }
                 _ => {
@@ -111,12 +110,11 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_metrics() {
         let mock = Arc::new(MockMetricEventLoggerFactory::new());
-        let (factory, stream) =
-            create_proxy_and_stream::<fidl::MetricEventLoggerFactoryMarker>().unwrap();
+        let (factory, stream) = create_proxy_and_stream::<fidl::MetricEventLoggerFactoryMarker>();
 
         let task = fasync::Task::spawn(Arc::clone(&mock).run_logger_factory(stream));
 
-        let (logger, server_end) = ::fidl::endpoints::create_proxy().unwrap();
+        let (logger, server_end) = ::fidl::endpoints::create_proxy();
         factory
             .create_metric_event_logger(
                 &ProjectSpec {

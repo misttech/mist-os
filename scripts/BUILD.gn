@@ -23,8 +23,6 @@ group("tests") {
   deps = [
     ":build_id_conv_test($host_toolchain)",
     "ffx_complete:tests",
-    "fxtest:tests",
-    "fxutils:tests",
     "lib:tests",
     "memory:tests",
     "versioning:tests($host_toolchain)",

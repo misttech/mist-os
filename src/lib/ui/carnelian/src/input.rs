@@ -414,7 +414,7 @@ async fn listen_to_path(device_path: &Path, internal_sender: &InternalSender) ->
         .unbounded_send(MessageInternal::RegisterDevice(DeviceId(device_id.clone()), descriptor))
         .expect("unbounded_send");
     let input_report_sender = internal_sender.clone();
-    let (input_reports_reader_proxy, input_reports_reader_request) = create_proxy()?;
+    let (input_reports_reader_proxy, input_reports_reader_request) = create_proxy();
     device.get_input_reports_reader(input_reports_reader_request)?;
     fasync::Task::local(async move {
         let _device = device;

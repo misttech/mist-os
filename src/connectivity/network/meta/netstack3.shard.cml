@@ -9,6 +9,15 @@
             on_terminate: "reboot",
         },
     ],
+    offer: [
+        {
+            // NS3 does not implement fuchsia.net.filter.deprecated.
+            protocol: "fuchsia.net.filter.deprecated.Filter",
+            from: "void",
+            to: "#netcfg",
+            availability: "optional",
+        },
+    ],
     expose: [
         {
             protocol: [
@@ -16,6 +25,14 @@
                 "fuchsia.net.stackmigrationdeprecated.State",
             ],
             from: "void",
+            availability: "optional",
+        },
+
+        // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
+        {
+            directory: "diagnostics",
+            from: "void",
+            as: "netstack-diagnostics",
             availability: "optional",
         },
     ],

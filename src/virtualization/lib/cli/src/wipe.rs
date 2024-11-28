@@ -71,8 +71,7 @@ mod test {
     use futures::StreamExt;
 
     fn serve_mock_manager(response: zx_status::Status) -> LinuxManagerProxy {
-        let (proxy, mut stream) = create_proxy_and_stream::<LinuxManagerMarker>()
-            .expect("failed to create LinuxManager proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<LinuxManagerMarker>();
         fasync::Task::local(async move {
             let responder = stream
                 .next()

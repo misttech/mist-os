@@ -514,7 +514,7 @@ impl Visitor {
         self.binop(a, b, |a, b| {
             try_numeric_math(a, b, |a, b| {
                 a.checked_div(&b)
-                    .ok_or(Exception::DivisionByZero.into())
+                    .ok_or_else(|| Exception::DivisionByZero.into())
                     .map(|x| Value::OutOfLine(PlaygroundValue::Num(x)))
             })
             .unwrap_or_else(|| Err(Exception::BadNumericOperands("//").into()))
@@ -984,7 +984,7 @@ impl Visitor {
                         s.into_iter()
                             .find(|(k, _)| *k == key)
                             .map(|(_, x)| x)
-                            .ok_or(Exception::NoSuchObjectKey(key).into_err())
+                            .ok_or_else(|| Exception::NoSuchObjectKey(key).into_err())
                     }
                     Value::Union(_ty, field, v) => {
                         if let Value::String(key) = key {

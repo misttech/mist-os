@@ -74,7 +74,7 @@ impl GasProxy {
         gas_task_channel: mpsc::Sender<gatt::LocalServiceRequest>,
     ) -> Result<GasProxy, Error> {
         let (service_client, service_request_stream) =
-            create_request_stream::<gatt::LocalServiceMarker>()?;
+            create_request_stream::<gatt::LocalServiceMarker>();
         let service_info = build_generic_access_service_info();
         gatt_server.publish_service(&service_info, service_client).await?.map_err(|e| {
             format_err!("Failed to publish Generic Access Service to GATT server: {:?}", e)
@@ -177,11 +177,10 @@ mod tests {
     // LocalServiceProxy and HostDispatcher.
     fn setup_generic_access_service() -> (gatt::LocalServiceProxy, HostDispatcher) {
         let (service_client, service_request_stream) =
-            create_proxy_and_stream::<gatt::LocalServiceMarker>().unwrap();
+            create_proxy_and_stream::<gatt::LocalServiceMarker>();
         let (gas_task_channel, generic_access_req_stream) =
             mpsc::channel::<gatt::LocalServiceRequest>(0);
-        let (gatt_server, _gatt_server_remote) =
-            create_proxy_and_stream::<gatt::Server_Marker>().unwrap();
+        let (gatt_server, _gatt_server_remote) = create_proxy_and_stream::<gatt::Server_Marker>();
         let gas_proxy = GasProxy {
             service_request_stream,
             gas_task_channel: gas_task_channel.clone(),
@@ -290,11 +289,10 @@ mod tests {
     #[fuchsia::test]
     async fn test_gas_proxy() {
         let (service_client, service_request_stream) =
-            create_proxy_and_stream::<gatt::LocalServiceMarker>().unwrap();
+            create_proxy_and_stream::<gatt::LocalServiceMarker>();
         let (gas_task_channel, mut generic_access_req_stream) =
             mpsc::channel::<gatt::LocalServiceRequest>(0);
-        let (gatt_server, _gatt_server_remote) =
-            create_proxy_and_stream::<gatt::Server_Marker>().unwrap();
+        let (gatt_server, _gatt_server_remote) = create_proxy_and_stream::<gatt::Server_Marker>();
         let gas_proxy =
             GasProxy { service_request_stream, gas_task_channel, _gatt_server: gatt_server };
         fasync::Task::spawn(gas_proxy.run().map(|r| {

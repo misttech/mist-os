@@ -23,56 +23,21 @@ void UfsTest::InitMockDevice() {
 }
 
 void UfsTest::StartDriver(bool supply_power_framework) {
-  // Initialize driver test environment.
-  fuchsia_driver_framework::DriverStartArgs start_args;
-  fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
-  incoming_.SyncCall([&](IncomingNamespace *incoming) mutable {
-    auto start_args_result = incoming->node.CreateStartArgsAndServe();
-    ASSERT_TRUE(start_args_result.is_ok());
-    start_args = std::move(start_args_result->start_args);
-    outgoing_directory_client = std::move(start_args_result->outgoing_directory_client);
-
-    ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
-
-    // Serve (fake) pci_server.
-    {
-      auto result = incoming->env.incoming_directory().AddService<fuchsia_hardware_pci::Service>(
-          std::move(incoming->pci_server.GetInstanceHandler()), "pci");
-      ASSERT_TRUE(result.is_ok());
-    }
-    incoming->pci_server.SetMockDevice(&mock_device_);
-
-    // Server Power Framework
-    if (supply_power_framework) {
-      // Serve (fake) system_activity_governor.
-      {
-        auto result = incoming->env.incoming_directory()
-                          .component()
-                          .AddUnmanagedProtocol<fuchsia_power_system::ActivityGovernor>(
-                              incoming->system_activity_governor->CreateHandler());
-        ASSERT_TRUE(result.is_ok());
-      }
-
-      // Serve (fake) power_broker.
-      {
-        auto result = incoming->env.incoming_directory()
-                          .component()
-                          .AddUnmanagedProtocol<fuchsia_power_broker::Topology>(
-                              incoming->power_broker.CreateHandler());
-        ASSERT_TRUE(result.is_ok());
-      }
-    }
+  driver_test().RunInEnvironmentTypeContext([&](Environment &env) {
+    // Device parameters for physical (parent) device
+    env.pci_server().SetMockDevice(&mock_device_);
   });
 
-  {
+  TestUfs::SetMockDevice(&mock_device_);
+
+  zx::result result = driver_test().StartDriverWithCustomStartArgs([&](fdf::DriverStartArgs &args) {
     ufs_config::Config fake_config;
     fake_config.enable_suspend() = supply_power_framework;
-    start_args.config(fake_config.ToVmo());
-  }
+    args.config(fake_config.ToVmo());
+  });
+  ASSERT_OK(result);
 
-  // Start dut_.
-  TestUfs::SetMockDevice(&mock_device_);
-  ASSERT_OK(runtime_.RunToCompletion(dut_.Start(std::move(start_args))));
+  dut_ = driver_test().driver();
 }
 
 void UfsTest::SetUp() {
@@ -81,13 +46,8 @@ void UfsTest::SetUp() {
 }
 
 void UfsTest::TearDown() {
-  zx::result prepare_stop_result = runtime_.RunToCompletion(dut_.PrepareStop());
-  EXPECT_OK(prepare_stop_result.status_value());
-
-  incoming_.reset();
-  runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
-
-  EXPECT_OK(dut_.Stop());
+  zx::result<> result = driver_test().StopDriver();
+  ASSERT_OK(result);
 }
 
 zx_status_t UfsTest::DisableController() { return dut_->DisableHostController(); }

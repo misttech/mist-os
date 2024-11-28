@@ -74,9 +74,9 @@ async fn test_service_driver_interaction() -> Result<(), Error> {
         .context("Failed to connect to DeviceTestConnector")?
         .connect(IFACE_NAME, server_test)?;
 
-    let device = client.into_proxy()?;
-    let device_extra = client_extra.into_proxy()?;
-    let device_test = client_test.into_proxy()?;
+    let device = client.into_proxy();
+    let device_extra = client_extra.into_proxy();
+    let device_test = client_test.into_proxy();
 
     // Step 5: Interact with the device to make sure it is responsive.
     let ncp_version = device_test

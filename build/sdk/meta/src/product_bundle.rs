@@ -51,11 +51,11 @@ impl ZipLoadedProductBundle {
         let product_bundle_manifest_name = zip
             .file_names()
             .find(|x| x == &"product_bundle.json" || x.ends_with("/product_bundle.json"))
-            .ok_or(anyhow!("finding file 'product_bundle.json' in zip archive"))?
+            .ok_or_else(|| anyhow!("finding file 'product_bundle.json' in zip archive"))?
             .to_owned();
 
         let product_bundle_parent_path =
-            product_bundle_manifest_name.strip_suffix("product_bundle.json").ok_or(anyhow!("despite the product_bundle.json being found, it's path did not include it as a suffix"))?;
+            product_bundle_manifest_name.strip_suffix("product_bundle.json").ok_or_else(|| anyhow!("despite the product_bundle.json being found, it's path did not include it as a suffix"))?;
 
         let product_bundle_manifest = zip
             .by_name(&product_bundle_manifest_name)
@@ -65,7 +65,7 @@ impl ZipLoadedProductBundle {
         // parent directory may be arbitrarily deep in the zip file
         match try_load_product_bundle(product_bundle_manifest)? {
             ProductBundle::V2(data) => {
-                let mut data = data.clone();
+                let mut data = data;
                 let mut canonicalizer = ZipCanonicalizer::new(product_bundle_parent_path);
                 data.canonicalize_paths_with(product_bundle_parent_path, &mut canonicalizer)
                     .with_context(|| {
@@ -108,7 +108,7 @@ impl Canonicalizer for ZipCanonicalizer {
         path: impl AsRef<Utf8Path>,
         _image_types: Vec<Type>,
     ) -> Utf8PathBuf {
-        self.root_path().join(path).to_owned()
+        self.root_path().join(path)
     }
 }
 
@@ -147,7 +147,7 @@ impl LoadedProductBundle {
 
         match try_load_product_bundle(file)? {
             ProductBundle::V2(data) => {
-                let mut data = data.clone();
+                let mut data = data;
                 data.canonicalize_paths(path.as_ref())
                     .with_context(|| format!("Canonicalizing paths from {:?}", path.as_ref()))?;
                 Ok(LoadedProductBundle::new(ProductBundle::V2(data), path))

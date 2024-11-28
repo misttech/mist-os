@@ -150,8 +150,7 @@ impl TestFixture {
 
             (filesystem, vol, volumes_directory)
         };
-        let (root, server_end) =
-            create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+        let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
         volume.root().clone().as_directory().open(
             volume.volume().scope().clone(),
             fio::OpenFlags::DIRECTORY
@@ -162,8 +161,7 @@ impl TestFixture {
         );
 
         let volume_out_dir = if options.serve_volume {
-            let (out_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                .expect("create_proxy failed");
+            let (out_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             volumes_directory
                 .serve_volume(&volume, server_end, options.as_blob)
                 .expect("serve_volume failed");
@@ -299,7 +297,7 @@ pub async fn open_file(
     flags: fio::OpenFlags,
     path: &str,
 ) -> Result<fio::FileProxy, Error> {
-    let (proxy, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
+    let (proxy, server_end) = create_proxy::<fio::FileMarker>();
     dir.open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))?;
     let _: Vec<_> = proxy.query().await?;
     Ok(proxy)
@@ -320,7 +318,7 @@ pub async fn open_dir(
     flags: fio::OpenFlags,
     path: &str,
 ) -> Result<fio::DirectoryProxy, Error> {
-    let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+    let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
     dir.open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))?;
     let _: Vec<_> = proxy.query().await?;
     Ok(proxy)
@@ -341,7 +339,7 @@ pub async fn open3_dir(
     options: &fio::Options,
     path: &str,
 ) -> Result<fio::DirectoryProxy, Error> {
-    let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+    let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
     dir.open3(path, flags, options, server_end.into_channel())?;
     let _: Vec<_> = proxy.query().await?;
     Ok(proxy)

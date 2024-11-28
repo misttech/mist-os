@@ -52,9 +52,7 @@ pub async fn fake_watcher_impl<I: FidlRouteIpExt>(
     events: impl Stream<Item = Vec<I::WatchEvent>>,
     server_end: fidl::endpoints::ServerEnd<I::WatcherMarker>,
 ) {
-    let (request_stream, _control_handle) = server_end
-        .into_stream_and_control_handle()
-        .expect("failed to get `Watcher` request stream");
+    let (request_stream, _control_handle) = server_end.into_stream_and_control_handle();
     request_stream
         .zip(events)
         .for_each(|(request, event_batch)| {
@@ -167,7 +165,7 @@ pub mod admin {
         #[generic_over_ip(I, Ip)]
         struct Out<I: FidlRouteAdminIpExt>(fidl::endpoints::ServerEnd<I::RouteSetMarker>);
 
-        let stream = server_end.into_stream().expect("into stream");
+        let stream = server_end.into_stream();
         stream
             .scan(false, |responded, item| {
                 let responded = std::mem::replace(responded, true);
@@ -195,7 +193,7 @@ pub mod admin {
                         req => unreachable!("unexpected request: {:?}", req),
                     },
                 );
-                route_set_server_end.into_stream().expect("into stream")
+                route_set_server_end.into_stream()
             })
             .fuse()
             .flatten_unordered(None)
@@ -228,7 +226,7 @@ pub mod admin {
         #[generic_over_ip(I, Ip)]
         struct Out<I: FidlRouteAdminIpExt>(Option<fidl::endpoints::ServerEnd<I::RouteSetMarker>>);
 
-        let stream = server_end.into_stream().expect("into stream");
+        let stream = server_end.into_stream();
         stream
             .map(move |item| {
                 let Out(route_set_server_end) = I::map_ip(
@@ -270,9 +268,7 @@ pub mod admin {
                 );
                 match route_set_server_end {
                     None => futures::stream::empty().left_stream(),
-                    Some(route_set_server_end) => {
-                        route_set_server_end.into_stream().expect("into stream").right_stream()
-                    }
+                    Some(route_set_server_end) => route_set_server_end.into_stream().right_stream(),
                 }
             })
             .fuse()
@@ -285,7 +281,7 @@ pub mod admin {
         server_end: fidl::endpoints::ServerEnd<I::RouteTableMarker>,
         table_id: crate::TableId,
     ) {
-        let stream = server_end.into_stream().expect("into stream");
+        let stream = server_end.into_stream();
         stream
             .try_for_each_concurrent(None, |item| async move {
                 let request = I::into_route_table_request(item);
@@ -323,7 +319,7 @@ pub mod admin {
             >::Item,
         );
 
-        let stream = server_end.into_stream().expect("into stream");
+        let stream = server_end.into_stream();
         stream
             .for_each(|item| async move {
                 let request: RouteSetRequest<I> = I::map_ip(
@@ -460,11 +456,9 @@ mod tests {
         }
 
         // Instantiate the fake Watcher implementation.
-        let (state, state_server_end) =
-            fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
-        let (mut state_request_stream, _control_handle) = state_server_end
-            .into_stream_and_control_handle()
-            .expect("failed to get `State` request stream");
+        let (state, state_server_end) = fidl::endpoints::create_proxy::<I::StateMarker>();
+        let (mut state_request_stream, _control_handle) =
+            state_server_end.into_stream_and_control_handle();
         let watcher_fut = state_request_stream
             .next()
             .then(|req| {
@@ -505,7 +499,7 @@ mod tests {
     #[should_panic(expected = "received multiple RouteTable requests")]
     async fn test_serve_one_route_set_panic<I: FidlRouteAdminIpExt>() {
         let (routes_set_provider_proxy, routes_set_provider_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
         let mut provider = admin::serve_one_route_set::<I>(routes_set_provider_server_end);
         let _rs1 = crate::admin::new_route_set::<I>(&routes_set_provider_proxy)
             .expect("created first RouteSet");

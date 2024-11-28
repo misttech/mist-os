@@ -1236,14 +1236,14 @@ async fn dictionary_from_program() {
     let test = RoutingTestBuilder::new("root", components).build().await;
 
     let host = CapabilityStore::new();
-    let (store, server) = endpoints::create_proxy::<fsandbox::CapabilityStoreMarker>().unwrap();
+    let (store, server) = endpoints::create_proxy::<fsandbox::CapabilityStoreMarker>();
     capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
 
     // Create a dictionary with a Sender at "A" for the Echo protocol.
     let dict_id = 1;
     store.dictionary_create(dict_id).await.unwrap().unwrap();
     let (receiver_client, mut receiver_stream) =
-        endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+        endpoints::create_request_stream::<fsandbox::ReceiverMarker>();
     let connector_id = 10;
     store.connector_create(connector_id, receiver_client).await.unwrap().unwrap();
     store
@@ -1262,7 +1262,7 @@ async fn dictionary_from_program() {
             match request {
                 fsandbox::ReceiverRequest::Receive { channel, control_handle: _ } => {
                     let channel: ServerEnd<EchoMarker> = channel.into();
-                    task_group.spawn(OutDir::echo_protocol_fn(channel.into_stream().unwrap()));
+                    task_group.spawn(OutDir::echo_protocol_fn(channel.into_stream()));
                 }
                 fsandbox::ReceiverRequest::_UnknownMethod { .. } => {
                     unimplemented!()
@@ -1280,7 +1280,7 @@ async fn dictionary_from_program() {
         vfs::service::endpoint(move |scope, channel| {
             let server_end: ServerEnd<fsandbox::DictionaryRouterMarker> =
                 channel.into_zx_channel().into();
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             let store = dict_store2.clone();
             scope.spawn(async move {
                 while let Ok(Some(request)) = stream.try_next().await {

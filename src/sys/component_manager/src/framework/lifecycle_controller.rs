@@ -291,7 +291,7 @@ impl FrameworkCapability for LifecycleController {
     ) -> Box<dyn CapabilityProvider> {
         Box::new(LifecycleControllerCapabilityProvider {
             model: self.model.clone(),
-            scope_moniker: scope.moniker.clone(),
+            scope_moniker: scope.moniker,
         })
     }
 }
@@ -300,7 +300,7 @@ impl FrameworkCapability for LifecycleController {
 impl InternalCapabilityProvider for LifecycleControllerCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fsys::LifecycleControllerMarker>::new(server_end);
-        self.serve(self.scope_moniker.clone(), server_end.into_stream().unwrap()).await;
+        self.serve(self.scope_moniker.clone(), server_end.into_stream()).await;
     }
 }
 

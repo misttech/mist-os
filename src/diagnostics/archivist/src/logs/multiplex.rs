@@ -3,20 +3,22 @@
 // found in the LICENSE file.
 
 use crate::identity::ComponentIdentity;
-use fidl_fuchsia_diagnostics::Selector;
+use crate::logs::container::{CursorItem, LogsArtifactsContainer};
+use derivative::Derivative;
+use diagnostics_data::{Data, Logs};
+use fidl_fuchsia_diagnostics::{Selector, StreamMode};
 use fuchsia_trace as ftrace;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::{Stream, StreamExt};
 use selectors::SelectorExt;
 use std::cmp::Ordering;
-use std::fmt::Debug;
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tracing::trace;
 
-pub type PinStream<I> = Pin<Box<dyn DebugStream<Item = I> + Send + 'static>>;
+pub type PinStream<I> = Pin<Box<dyn Stream<Item = I> + Send + 'static>>;
 
 static MULTIPLEXER_ID: std::sync::atomic::AtomicUsize = AtomicUsize::new(0);
 
@@ -156,31 +158,11 @@ impl<I: Ord + Unpin> Stream for Multiplexer<I> {
     }
 }
 
-/// A handle to a running multiplexer. Can be used to add new sub-streams to the multiplexer.
-pub struct MultiplexerHandle<I> {
-    sender: UnboundedSender<IncomingStream<PinStream<I>>>,
-    id: usize,
-    pub trace_id: ftrace::Id,
-}
-
-impl<I> MultiplexerHandle<I> {
-    /// Send a new substream to the multiplexer. Returns `true` if it is still listening.
-    pub fn send(&self, identity: Arc<ComponentIdentity>, stream: PinStream<I>) -> bool {
-        self.sender.unbounded_send(IncomingStream::Next { identity, stream }).is_ok()
-    }
-
-    pub fn multiplexer_id(&self) -> usize {
-        self.id
-    }
-
-    pub fn parent_trace_id(&self) -> ftrace::Id {
-        self.trace_id
-    }
-
+pub trait MultiplexerHandleAction {
+    fn send_cursor_from(&self, mode: StreamMode, container: &Arc<LogsArtifactsContainer>) -> bool;
     /// Notify the multiplexer that no new sub-streams will be arriving.
-    pub fn close(&self) {
-        self.sender.unbounded_send(IncomingStream::Done).ok();
-    }
+    fn close(&self);
+    fn multiplexer_id(&self) -> usize;
 }
 
 enum IncomingStream<S> {
@@ -188,13 +170,76 @@ enum IncomingStream<S> {
     Done,
 }
 
+pub struct MultiplexerHandle<I> {
+    id: usize,
+    trace_id: ftrace::Id,
+    sender: UnboundedSender<IncomingStream<PinStream<I>>>,
+}
+
+impl<I> MultiplexerHandle<I> {
+    fn send(&self, identity: Arc<ComponentIdentity>, stream: PinStream<I>) -> bool {
+        self.sender.unbounded_send(IncomingStream::Next { identity, stream }).is_ok()
+    }
+}
+
+impl MultiplexerHandleAction for MultiplexerHandle<Arc<Data<Logs>>> {
+    fn send_cursor_from(&self, mode: StreamMode, container: &Arc<LogsArtifactsContainer>) -> bool {
+        let stream = container.cursor(mode, self.trace_id);
+        self.send(Arc::clone(&container.identity), stream)
+    }
+
+    fn multiplexer_id(&self) -> usize {
+        self.id
+    }
+
+    fn close(&self) {
+        self.sender.unbounded_send(IncomingStream::Done).ok();
+    }
+}
+
+impl MultiplexerHandleAction for MultiplexerHandle<CursorItem> {
+    fn send_cursor_from(&self, mode: StreamMode, container: &Arc<LogsArtifactsContainer>) -> bool {
+        let stream = container.cursor_raw(mode);
+        self.send(Arc::clone(&container.identity), stream)
+    }
+
+    fn multiplexer_id(&self) -> usize {
+        self.id
+    }
+
+    fn close(&self) {
+        self.sender.unbounded_send(IncomingStream::Done).ok();
+    }
+}
+
+#[cfg(test)]
+impl MultiplexerHandleAction for MultiplexerHandle<i32> {
+    fn send_cursor_from(
+        &self,
+        _mode: StreamMode,
+        _container: &Arc<LogsArtifactsContainer>,
+    ) -> bool {
+        unreachable!("Not used in the tests");
+    }
+
+    fn multiplexer_id(&self) -> usize {
+        self.id
+    }
+
+    fn close(&self) {
+        self.sender.unbounded_send(IncomingStream::Done).ok();
+    }
+}
+
 /// A `SubStream` wraps an inner stream and keeps its latest value cached inline for comparison
 /// with the cached values of other `SubStream`s, allowing for semi-ordered merging of streams.
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct SubStream<I> {
     identity: Arc<ComponentIdentity>,
     cached: Option<I>,
     inner_is_live: bool,
+    #[derivative(Debug = "ignore")]
     inner: PinStream<I>,
 }
 
@@ -235,21 +280,6 @@ fn compare_sub_streams<I: Ord>(a: &SubStream<I>, b: &SubStream<I>) -> Ordering {
         (None, Some(_)) => Ordering::Greater,
         (Some(_), None) => Ordering::Less,
         (None, None) => Ordering::Equal,
-    }
-}
-
-pub trait DebugStream: Debug {
-    type Item;
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>>;
-}
-
-impl<I, T> DebugStream for T
-where
-    T: Debug + Stream<Item = I>,
-{
-    type Item = I;
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Stream::poll_next(self, cx)
     }
 }
 

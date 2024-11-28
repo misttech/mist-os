@@ -265,15 +265,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.feedback/DataProvider.GetScreenshot",
-        "strictness": "strict",
-        "ordinal": "304213256359974785",
-        "direction": "two_way",
-        "request": "fuchsia.feedback/DataProviderGetScreenshotRequest",
-        "response": "fuchsia.feedback/DataProviderGetScreenshotResponse"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.feedback/DataProvider.GetSnapshot",
         "strictness": "strict",
         "ordinal": "8446019104038259648",
@@ -306,27 +297,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.feedback/DataProviderGetAnnotationsResponse"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.feedback/DataProviderGetScreenshotRequest.encoding",
-        "ordinal": "1",
-        "type": "fuchsia.feedback/ImageEncoding"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.feedback/DataProviderGetScreenshotRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.feedback/DataProviderGetScreenshotResponse.screenshot",
-        "ordinal": "1",
-        "type": "box<fuchsia.feedback/Screenshot>"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.feedback/DataProviderGetScreenshotResponse",
-        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -478,17 +448,6 @@
         "kind": "table",
         "name": "fuchsia.feedback/GetSnapshotParameters",
         "resourceness": "resource"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.feedback/ImageEncoding.PNG",
-        "value": "0"
-    },
-    {
-        "kind": "enum",
-        "name": "fuchsia.feedback/ImageEncoding",
-        "strictness": "strict",
-        "type": "uint32"
     },
     {
         "kind": "table/member",
@@ -784,23 +743,6 @@
     {
         "kind": "table",
         "name": "fuchsia.feedback/RuntimeCrashReport",
-        "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.feedback/Screenshot.dimensions_in_px",
-        "ordinal": "2",
-        "type": "fuchsia.math/Size"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.feedback/Screenshot.image",
-        "ordinal": "1",
-        "type": "fuchsia.mem/Buffer"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.feedback/Screenshot",
         "resourceness": "resource"
     },
     {

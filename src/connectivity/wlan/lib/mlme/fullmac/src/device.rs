@@ -14,11 +14,11 @@ use {
 /// can then implement trait methods instead of mocking an underlying DeviceInterface
 /// and FIDL proxy.
 pub trait DeviceOps {
-    fn start(
+    fn init(
         &mut self,
         fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
     ) -> Result<fidl::Channel, zx::Status>;
-    fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacQueryInfo>;
+    fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacImplQueryResponse>;
     fn query_mac_sublayer_support(&self) -> anyhow::Result<fidl_common::MacSublayerSupport>;
     fn query_security_support(&self) -> anyhow::Result<fidl_common::SecuritySupport>;
     fn query_spectrum_management_support(
@@ -33,14 +33,12 @@ pub trait DeviceOps {
     fn assoc_resp(&self, resp: fidl_fullmac::WlanFullmacImplAssocRespRequest)
         -> anyhow::Result<()>;
     fn disassoc(&self, req: fidl_fullmac::WlanFullmacImplDisassocRequest) -> anyhow::Result<()>;
-    fn reset(&self, req: fidl_fullmac::WlanFullmacImplResetRequest) -> anyhow::Result<()>;
     fn start_bss(&self, req: fidl_fullmac::WlanFullmacImplStartBssRequest) -> anyhow::Result<()>;
     fn stop_bss(&self, req: fidl_fullmac::WlanFullmacImplStopBssRequest) -> anyhow::Result<()>;
     fn set_keys(
         &self,
         req: fidl_fullmac::WlanFullmacImplSetKeysRequest,
     ) -> anyhow::Result<fidl_fullmac::WlanFullmacSetKeysResp>;
-    fn del_keys(&self, req: fidl_fullmac::WlanFullmacImplDelKeysRequest) -> anyhow::Result<()>;
     fn eapol_tx(&self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()>;
     fn get_iface_counter_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse>;
     fn get_iface_histogram_stats(
@@ -48,11 +46,14 @@ pub trait DeviceOps {
     ) -> anyhow::Result<fidl_mlme::GetIfaceHistogramStatsResponse>;
     fn sae_handshake_resp(
         &self,
-        resp: fidl_fullmac::WlanFullmacSaeHandshakeResp,
+        resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest,
     ) -> anyhow::Result<()>;
     fn sae_frame_tx(&self, frame: fidl_fullmac::WlanFullmacSaeFrame) -> anyhow::Result<()>;
     fn wmm_status_req(&self) -> anyhow::Result<()>;
-    fn on_link_state_changed(&self, online: bool) -> anyhow::Result<()>;
+    fn on_link_state_changed(
+        &self,
+        req: fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest,
+    ) -> anyhow::Result<()>;
 }
 
 pub struct FullmacDevice {
@@ -70,20 +71,27 @@ impl FullmacDevice {
 }
 
 impl DeviceOps for FullmacDevice {
-    fn start(
+    fn init(
         &mut self,
         fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
     ) -> Result<fidl::Channel, zx::Status> {
-        self.fullmac_impl_sync_proxy
-            .start(fullmac_ifc_client_end, zx::MonotonicInstant::INFINITE)
+        let req = fidl_fullmac::WlanFullmacImplInitRequest {
+            ifc: Some(fullmac_ifc_client_end),
+            ..Default::default()
+        };
+        let resp = self
+            .fullmac_impl_sync_proxy
+            .init(req, zx::MonotonicInstant::INFINITE)
             .map_err(|e| {
                 tracing::error!("FIDL error on Start: {}", e);
                 zx::Status::INTERNAL
             })?
-            .map_err(|e| zx::Status::from_raw(e))
+            .map_err(|e| zx::Status::from_raw(e))?;
+
+        resp.sme_channel.ok_or(zx::Status::INVALID_ARGS)
     }
 
-    fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacQueryInfo> {
+    fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacImplQueryResponse> {
         self.fullmac_impl_sync_proxy
             .query(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on QueryDeviceInfo")?
@@ -158,11 +166,6 @@ impl DeviceOps for FullmacDevice {
             .disassoc(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on Disassoc")
     }
-    fn reset(&self, req: fidl_fullmac::WlanFullmacImplResetRequest) -> anyhow::Result<()> {
-        self.fullmac_impl_sync_proxy
-            .reset(&req, zx::MonotonicInstant::INFINITE)
-            .context("FIDL error on Reset")
-    }
     fn start_bss(&self, req: fidl_fullmac::WlanFullmacImplStartBssRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
             .start_bss(&req, zx::MonotonicInstant::INFINITE)
@@ -180,11 +183,6 @@ impl DeviceOps for FullmacDevice {
         self.fullmac_impl_sync_proxy
             .set_keys(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on SetKeysReq")
-    }
-    fn del_keys(&self, req: fidl_fullmac::WlanFullmacImplDelKeysRequest) -> anyhow::Result<()> {
-        self.fullmac_impl_sync_proxy
-            .del_keys(&req, zx::MonotonicInstant::INFINITE)
-            .context("FIDL Error on DelKeysReq")
     }
     fn eapol_tx(&self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
@@ -219,7 +217,7 @@ impl DeviceOps for FullmacDevice {
     }
     fn sae_handshake_resp(
         &self,
-        resp: fidl_fullmac::WlanFullmacSaeHandshakeResp,
+        resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest,
     ) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
             .sae_handshake_resp(&resp, zx::MonotonicInstant::INFINITE)
@@ -235,9 +233,12 @@ impl DeviceOps for FullmacDevice {
             .wmm_status_req(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on WmmStatusReq")
     }
-    fn on_link_state_changed(&self, online: bool) -> anyhow::Result<()> {
+    fn on_link_state_changed(
+        &self,
+        req: fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest,
+    ) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .on_link_state_changed(online, zx::MonotonicInstant::INFINITE)
+            .on_link_state_changed(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on OnLinkStateChanged")
     }
 }
@@ -245,10 +246,10 @@ impl DeviceOps for FullmacDevice {
 #[cfg(test)]
 pub mod test_utils {
     use super::*;
+    use fidl_fuchsia_wlan_sme as fidl_sme;
     use futures::channel::mpsc;
     use std::sync::{Arc, Mutex};
     use wlan_common::sink::UnboundedSink;
-    use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme};
 
     #[derive(Debug)]
     pub enum DriverCall {
@@ -260,18 +261,16 @@ pub mod test_utils {
         DeauthReq { req: fidl_fullmac::WlanFullmacImplDeauthRequest },
         AssocResp { resp: fidl_fullmac::WlanFullmacImplAssocRespRequest },
         Disassoc { req: fidl_fullmac::WlanFullmacImplDisassocRequest },
-        Reset { req: fidl_fullmac::WlanFullmacImplResetRequest },
         StartBss { req: fidl_fullmac::WlanFullmacImplStartBssRequest },
         StopBss { req: fidl_fullmac::WlanFullmacImplStopBssRequest },
         SetKeys { req: fidl_fullmac::WlanFullmacImplSetKeysRequest },
-        DelKeys { req: fidl_fullmac::WlanFullmacImplDelKeysRequest },
         EapolTx { req: fidl_fullmac::WlanFullmacImplEapolTxRequest },
         GetIfaceCounterStats,
         GetIfaceHistogramStats,
-        SaeHandshakeResp { resp: fidl_fullmac::WlanFullmacSaeHandshakeResp },
+        SaeHandshakeResp { resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest },
         SaeFrameTx { frame: fidl_fullmac::WlanFullmacSaeFrame },
         WmmStatusReq,
-        OnLinkStateChanged { online: bool },
+        OnLinkStateChanged { req: fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest },
     }
 
     pub struct FakeFullmacDeviceMocks {
@@ -282,7 +281,7 @@ pub mod test_utils {
         //
         // If any of the query mocks are None, then an Err is returned from DeviceOps with an empty
         // error message.
-        pub query_device_info_mock: Option<fidl_fullmac::WlanFullmacQueryInfo>,
+        pub query_device_info_mock: Option<fidl_fullmac::WlanFullmacImplQueryResponse>,
         pub query_mac_sublayer_support_mock: Option<fidl_common::MacSublayerSupport>,
         pub query_security_support_mock: Option<fidl_common::SecuritySupport>,
         pub query_spectrum_management_support_mock: Option<fidl_common::SpectrumManagementSupport>,
@@ -308,22 +307,9 @@ pub mod test_utils {
         pub mocks: Arc<Mutex<FakeFullmacDeviceMocks>>,
     }
 
-    const fn dummy_band_cap() -> fidl_fullmac::WlanFullmacBandCapability {
-        fidl_fullmac::WlanFullmacBandCapability {
-            band: fidl_common::WlanBand::TwoGhz,
-            basic_rates: vec![],
-            ht_supported: false,
-            ht_caps: fidl_ieee80211::HtCapabilities { bytes: [0u8; 26] },
-            vht_supported: false,
-            vht_caps: fidl_ieee80211::VhtCapabilities { bytes: [0u8; 12] },
-            operating_channel_count: 0,
-            operating_channel_list: [0u8; 256],
-        }
-    }
-
     impl FakeFullmacDevice {
         pub fn new() -> (Self, mpsc::UnboundedReceiver<DriverCall>) {
-            // Create a channel for SME requests, to be surfaced by start().
+            // Create a channel for SME requests, to be surfaced by init().
             let (usme_bootstrap_client_end, usme_bootstrap_server_end) =
                 fidl::endpoints::create_endpoints::<fidl_sme::UsmeBootstrapMarker>();
 
@@ -336,11 +322,11 @@ pub mod test_utils {
                 mocks: Arc::new(Mutex::new(FakeFullmacDeviceMocks {
                     fullmac_ifc_client_end: None,
                     start_fn_status_mock: None,
-                    query_device_info_mock: Some(fidl_fullmac::WlanFullmacQueryInfo {
-                        sta_addr: [0u8; 6],
-                        role: fidl_common::WlanMacRole::Client,
-                        band_cap_list: std::array::from_fn(|_| dummy_band_cap()),
-                        band_cap_count: 0,
+                    query_device_info_mock: Some(fidl_fullmac::WlanFullmacImplQueryResponse {
+                        sta_addr: Some([0u8; 6]),
+                        role: Some(fidl_common::WlanMacRole::Client),
+                        band_caps: Some(vec![]),
+                        ..Default::default()
                     }),
                     query_mac_sublayer_support_mock: Some(fidl_common::MacSublayerSupport {
                         rate_selection_offload: fidl_common::RateSelectionOffloadExtension {
@@ -378,7 +364,7 @@ pub mod test_utils {
     }
 
     impl DeviceOps for FakeFullmacDevice {
-        fn start(
+        fn init(
             &mut self,
             fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
         ) -> Result<fidl::Channel, zx::Status> {
@@ -393,7 +379,7 @@ pub mod test_utils {
             }
         }
 
-        fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacQueryInfo> {
+        fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacImplQueryResponse> {
             self.mocks.lock().unwrap().query_device_info_mock.clone().ok_or(format_err!(""))
         }
 
@@ -470,10 +456,6 @@ pub mod test_utils {
             self.driver_call_sender.send(DriverCall::Disassoc { req });
             Ok(())
         }
-        fn reset(&self, req: fidl_fullmac::WlanFullmacImplResetRequest) -> anyhow::Result<()> {
-            self.driver_call_sender.send(DriverCall::Reset { req });
-            Ok(())
-        }
         fn start_bss(
             &self,
             req: fidl_fullmac::WlanFullmacImplStartBssRequest,
@@ -497,10 +479,6 @@ pub mod test_utils {
                     Ok(fidl_fullmac::WlanFullmacSetKeysResp { statuslist: vec![0i32; num_keys] })
                 }
             }
-        }
-        fn del_keys(&self, req: fidl_fullmac::WlanFullmacImplDelKeysRequest) -> anyhow::Result<()> {
-            self.driver_call_sender.send(DriverCall::DelKeys { req });
-            Ok(())
         }
         fn eapol_tx(&self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()> {
             self.driver_call_sender.send(DriverCall::EapolTx { req });
@@ -526,7 +504,7 @@ pub mod test_utils {
         }
         fn sae_handshake_resp(
             &self,
-            resp: fidl_fullmac::WlanFullmacSaeHandshakeResp,
+            resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest,
         ) -> anyhow::Result<()> {
             self.driver_call_sender.send(DriverCall::SaeHandshakeResp { resp });
             Ok(())
@@ -539,8 +517,11 @@ pub mod test_utils {
             self.driver_call_sender.send(DriverCall::WmmStatusReq);
             Ok(())
         }
-        fn on_link_state_changed(&self, online: bool) -> anyhow::Result<()> {
-            self.driver_call_sender.send(DriverCall::OnLinkStateChanged { online });
+        fn on_link_state_changed(
+            &self,
+            req: fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest,
+        ) -> anyhow::Result<()> {
+            self.driver_call_sender.send(DriverCall::OnLinkStateChanged { req });
             Ok(())
         }
     }

@@ -90,7 +90,7 @@ async fn repo_incremental_publish(cmd: &mut RepoPublishCommand) -> Result<()> {
 pub async fn cmd_repo_package_manifest_list(cmd: RepoPMListCommand) -> Result<()> {
     let src_trusted_root_path = cmd
         .src_trusted_root_path
-        .unwrap_or(cmd.src_repo_path.join("repository").join("1.root.json"));
+        .unwrap_or_else(|| cmd.src_repo_path.join("repository").join("1.root.json"));
 
     repo_package_manifest_list(cmd.src_repo_path, Some(src_trusted_root_path), cmd.manifest_dir)
         .await

@@ -319,13 +319,13 @@ where
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (permission_bitset, tail) = PS::parse::<le::U32>(tail).ok_or(
+        let (permission_bitset, tail) = PS::parse::<le::U32>(tail).ok_or_else(|| {
             Into::<anyhow::Error>::into(ParseError::MissingData {
                 type_name: "PermissionBitset",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
-            }),
-        )?;
+            })
+        })?;
         let (constraints, tail) = ConstraintList::parse(tail)
             .map_err(|error| error.into() as anyhow::Error)
             .context("parsing constraint list in constraints list")?;
@@ -459,13 +459,13 @@ where
             .context("parsing type set negative set")?;
 
         let num_bytes = tail.len();
-        let (flags, tail) = PS::parse::<le::U32>(tail).ok_or(Into::<anyhow::Error>::into(
-            ParseError::MissingData {
+        let (flags, tail) = PS::parse::<le::U32>(tail).ok_or_else(|| {
+            Into::<anyhow::Error>::into(ParseError::MissingData {
                 type_name: "TypeSetFlags",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
-            },
-        ))?;
+            })
+        })?;
 
         Ok((Self { types, negative_set, flags }, tail))
     }

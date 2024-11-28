@@ -58,6 +58,8 @@ rustc_library("lib") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:zstd",
+    "//third_party/zstd",
   ]
 
   if (!is_host) {
@@ -99,6 +101,8 @@ rustc_binary("bin") {
   output_name = "run-test-suite"
   with_unit_tests = true
   edition = "2021"
+
+  configs += [ "//build/config/rust:bootfs" ]
 
   deps = [
     ":lib",
@@ -162,4 +166,9 @@ group("tests") {
     "directory:tests",
     "tests",
   ]
+}
+
+fuchsia_package("package") {
+  package_name = "run-test-suite"
+  deps = [ ":bin" ]
 }

@@ -136,3 +136,7 @@ group("bench") {
     ":diagnostics-log-rust-encoding-benchmark",
   ]
 }
+
+group("build-only") {
+  deps = [ ":diagnostics-log-rust-benchmarks" ]
+}

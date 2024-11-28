@@ -189,13 +189,13 @@ mod tests {
     #[fuchsia::test]
     async fn message_stream_receives_data() {
         let (profile, mut profile_server) =
-            fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ProfileMarker>();
         let mut message_stream = MessageStream::new(profile);
 
         // Expect the RFCOMM advertisement.
         let profile_event = profile_server.select_next_some().await.expect("FIDL response");
         let (request, _responder) = profile_event.into_advertise().expect("Advertise request");
-        let connect_proxy = request.receiver.unwrap().into_proxy().unwrap();
+        let connect_proxy = request.receiver.unwrap().into_proxy();
 
         // Remote peer connection.
         let id = PeerId(123);

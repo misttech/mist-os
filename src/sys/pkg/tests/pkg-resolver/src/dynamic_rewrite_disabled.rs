@@ -61,7 +61,7 @@ async fn no_load_dynamic_rules_if_disabled() {
 async fn commit_transaction_succeeds() {
     let env = TestEnvBuilder::new().build().await;
 
-    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
+    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
     let rule = make_rule();
     let () = edit_transaction.add(&rule.clone().into()).await.unwrap().unwrap();
@@ -83,7 +83,7 @@ async fn commit_transaction_fails_if_disabled() {
         .build()
         .await;
 
-    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
+    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
     let () = edit_transaction.add(&make_rule().into()).await.unwrap().unwrap();
 
@@ -142,7 +142,7 @@ async fn no_attempt_to_open_persisted_dynamic_rules_if_disabled() {
 async fn dynamic_rewrites_disabled_if_missing_config() {
     let env = TestEnvBuilder::new().mounts(MountsBuilder::new().build()).build().await;
 
-    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
+    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
     let () = edit_transaction.add(&make_rule().into()).await.unwrap().unwrap();
 

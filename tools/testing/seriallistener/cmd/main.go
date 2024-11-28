@@ -25,6 +25,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
+	"go.fuchsia.dev/fuchsia/tools/testing/testrunner"
 	testrunnerconstants "go.fuchsia.dev/fuchsia/tools/testing/testrunner/constants"
 )
 
@@ -43,7 +44,7 @@ func init() {
 }
 
 func execute(ctx context.Context, serialLogPath string, stdout io.Writer) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, testrunner.ScaleTestTimeout(timeout))
 	defer cancel()
 
 	if successString == "" {

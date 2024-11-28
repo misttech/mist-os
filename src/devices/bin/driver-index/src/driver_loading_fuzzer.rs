@@ -23,7 +23,7 @@ impl Session {
         max_delay: zx::MonotonicDuration,
         seed: Option<u64>,
     ) -> Session {
-        let seed_val = seed.unwrap_or(rand::random::<u64>());
+        let seed_val = seed.unwrap_or_else(rand::random::<u64>);
         tracing::info!("Driver loading fuzzer enabled with RNG seed: {}", seed_val);
 
         let mut rng = SmallRng::seed_from_u64(seed_val);

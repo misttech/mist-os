@@ -252,7 +252,7 @@ pub(crate) mod testing {
 
     fn spawn_stash_proxy() -> (StoreAccessorProxy, Rc<Mutex<StashStats>>) {
         let (stash_proxy, mut stash_stream) =
-            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>();
         let stats = Rc::new(Mutex::new(StashStats::new()));
         let stats_clone = stats.clone();
         fasync::Task::local(async move {

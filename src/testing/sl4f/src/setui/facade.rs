@@ -320,7 +320,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_set_brightness() {
         let brightness = 0.5f32;
-        let (proxy, mut stream) = create_proxy_and_stream::<DisplayMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<DisplayMarker>();
 
         // Create a facade future that sends a request to `proxy`.
         let facade =
@@ -357,7 +357,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_set_media_volume() {
         let volume = 0.5f32;
-        let (proxy, mut stream) = create_proxy_and_stream::<AudioMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<AudioMarker>();
 
         // Create a facade future that sends a request to `proxy`.
         let facade =
@@ -402,7 +402,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_set_mic_mute() {
         let mic_state: MicStates = Muted;
-        let (proxy, mut stream) = create_proxy_and_stream::<InputMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<InputMarker>();
 
         // Create a facade future that sends a request to `proxy`.
         let facade =
@@ -464,7 +464,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_set_mic_mute_in_desired_state() {
         let mic_state: MicStates = Muted;
-        let (proxy, mut stream) = create_proxy_and_stream::<InputMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<InputMarker>();
 
         // Create a facade future that sends a request to `proxy`.
         let facade =
@@ -514,7 +514,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_is_mic_muted() {
         let is_muted = true;
-        let (proxy, mut stream) = create_proxy_and_stream::<InputMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<InputMarker>();
 
         // Create a facade future that sends a request to `proxy`.
         let facade =

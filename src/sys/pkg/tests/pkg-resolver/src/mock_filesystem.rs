@@ -28,9 +28,6 @@ fn handle_directory_request_stream(
 
 async fn handle_directory_request(req: fio::DirectoryRequest, open_counts: OpenCounter) {
     match req {
-        fio::DirectoryRequest::Clone { flags, object, control_handle: _control_handle } => {
-            reopen_self_deprecated(object, flags, Arc::clone(&open_counts));
-        }
         fio::DirectoryRequest::Open {
             flags,
             mode: _mode,
@@ -58,7 +55,7 @@ async fn handle_directory_request(req: fio::DirectoryRequest, open_counts: OpenC
                 Ok(())
             });
         }
-        other => panic!("unhandled request type: {other:?}"),
+        request => panic!("Unhandled fuchsia.io/Directory request: {request:?}"),
     }
 }
 
@@ -67,7 +64,7 @@ fn reopen_self_deprecated(
     flags: fio::OpenFlags,
     open_counts: OpenCounter,
 ) {
-    let stream = node.into_stream().unwrap().cast_stream();
+    let stream = node.into_stream().cast_stream();
     describe_dir(flags, &stream);
     fasync::Task::spawn(handle_directory_request_stream(stream, Arc::clone(&open_counts))).detach();
 }
@@ -111,8 +108,7 @@ pub fn send_directory_representation(
 }
 
 pub fn spawn_directory_handler() -> (fio::DirectoryProxy, OpenCounter) {
-    let (proxy, stream) =
-        fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+    let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
     let open_counts = Arc::new(Mutex::new(HashMap::<String, u64>::new()));
     fasync::Task::spawn(handle_directory_request_stream(stream, Arc::clone(&open_counts))).detach();
     (proxy, open_counts)

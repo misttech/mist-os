@@ -45,6 +45,7 @@ zx_status_t PowerSourceProtocolServer::SignalClient() {
 
 // TODO(https://fxbug.dev/42081644): when a cli is being developed, this will be made adjustable.
 void PowerSourceProtocolServer::GetPowerInfo(GetPowerInfoCompleter::Sync& completer) {
+  ClearSignal();
   completer.Reply({ZX_OK, state_->source_info()});
 }
 
@@ -59,6 +60,7 @@ void PowerSourceProtocolServer::GetStateChangeEvent(GetStateChangeEventCompleter
 }
 
 void PowerSourceProtocolServer::GetBatteryInfo(GetBatteryInfoCompleter::Sync& completer) {
+  ClearSignal();
   if (state_->source_info().type() == fuchsia_hardware_powersource::PowerType::kBattery) {
     completer.Reply({ZX_OK, state_->battery_info()});
   } else {

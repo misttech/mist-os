@@ -16,7 +16,7 @@
 
 #include <fbl/vector.h>
 
-namespace display {
+namespace display_coordinator {
 
 // Pixel format that the display coordinator can use internally.
 struct CoordinatorPixelFormat {
@@ -49,6 +49,6 @@ constexpr bool operator!=(const CoordinatorPixelFormat& lhs, const CoordinatorPi
   return !(lhs == rhs);
 }
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_MIGRATION_UTIL_H_

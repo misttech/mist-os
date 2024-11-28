@@ -264,9 +264,9 @@ root hash and put in a directory at the root of the TUF file tree called `blobs`
 [fx-serve]: https://fuchsia.dev/reference/tools/fx/cmd/serve
 [fx-ota]: https://fuchsia.dev/reference/tools/fx/cmd/ota
 [fx-test]: https://fuchsia.dev/reference/tools/fx/cmd/test
-[start-package-servers]: /docs/development/sdk/ffx/start-package-servers.md
-[list-package-servers]: /docs/development/sdk/ffx/list-package-servers.md
-[stop-package-servers]: /docs/development/sdk/ffx/stop-package-servers.md
+[start-package-servers]: /docs/development/tools/ffx/workflows/start-package-servers.md
+[list-package-servers]: /docs/development/tools/ffx/workflows/list-package-servers.md
+[stop-package-servers]: /docs/development/tools/ffx/workflows/stop-package-servers.md
 [fuchsia-source]: /docs/get-started/get_fuchsia_source.md
 [gc]: /docs/concepts/packages/garbage_collection.md
-[ffx-component-stop]: /docs/development/sdk/ffx/start-a-component-during-development.md#stop-a-component
+[ffx-component-stop]: /docs/development/tools/ffx/workflows/start-a-component-during-development.md#stop-a-component

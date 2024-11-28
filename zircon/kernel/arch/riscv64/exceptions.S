@@ -392,8 +392,12 @@ FUNCTION(riscv64_syscall_dispatcher)
     // table is an array of offsets to trampoline entry points defined by the
     // `syscall_dispatcher` macro (see below).
     lla    t2, syscall_dispatcher_table
+#ifdef __riscv_zba
+    sh2add t0, t0, t2  // Index into the table. (t0 = t0 * 4 + t2)
+#else
     sll    t0, t0, 2   // Scale to 4 bytes per entry.
     add    t0, t2, t0  // Index into the table.
+#endif
     lw     t2, (t0)    // Load 32-bit offset and sign-extend it.
     add    t2, t2, t0  // Materialize the full trampoline PC.
     jalr   t2

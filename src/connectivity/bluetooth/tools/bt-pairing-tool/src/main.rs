@@ -38,8 +38,7 @@ fn run(opt: Opt) -> Result<(), Error> {
 
     // Setup pairing delegate
     let (pairing_delegate_client, pairing_delegate_server_stream) =
-        fidl::endpoints::create_request_stream::<PairingDelegateMarker>()
-            .expect("cannot create request stream");
+        fidl::endpoints::create_request_stream::<PairingDelegateMarker>();
     let (sig_sender, _sig_receiver) = channel(0);
     let pairing_delegate_server =
         pairing_delegate::handle_requests(pairing_delegate_server_stream, sig_sender);

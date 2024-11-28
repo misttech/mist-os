@@ -86,7 +86,7 @@ constexpr std::optional<ModulePhdrInfo<Elf>> DecodeModulePhdrs(
     PhdrObservers&&... phdr_observers) {
   ModulePhdrInfo<Elf> result;
   if (!elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(result.dyn_phdr),
-                             elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(result.relro_phdr),
+                             elfldltl::PhdrRelroObserver<Elf>(result.relro_phdr),
                              elfldltl::PhdrTlsObserver<Elf>(result.tls_phdr),
                              elfldltl::PhdrStackObserver<Elf>(result.stack_size),
                              std::forward<PhdrObservers>(phdr_observers)...)) [[unlikely]] {

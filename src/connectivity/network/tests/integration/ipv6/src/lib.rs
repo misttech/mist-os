@@ -4,22 +4,21 @@
 
 #![cfg(test)]
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::mem::size_of;
 use std::pin::pin;
 
 use assert_matches::assert_matches;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use {
-    fidl_fuchsia_net as net, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net as net, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_posix_socket as fposix_socket,
 };
 
 use anyhow::Context as _;
-use futures::{
-    future, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
-};
+use futures::{future, Future, FutureExt as _, StreamExt, TryFutureExt as _, TryStreamExt as _};
 use net_declare::net_ip_v6;
 use net_types::ethernet::Mac;
 use net_types::ip::{self as net_types_ip, Ip, Ipv6};
@@ -97,11 +96,12 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State service");
-    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(id.into());
+    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(id.into());
     let ipv6_addresses = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interface_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(
+            &interface_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
         )
         .expect("creating interface event stream"),
         &mut state,
@@ -341,7 +341,7 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_network, _realm, iface, fake_ep) =
+    let (_network, realm, iface, fake_ep) =
         setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
     if forwarding {
@@ -372,8 +372,8 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
     // netstack should generate both a stable and temporary SLAAC address.
     let expected_addrs = 2;
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        iface.get_interface_event_stream().expect("error getting interface state event stream"),
-        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        realm.get_interface_event_stream().expect("error getting interface state event stream"),
+        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             (iface
                 .properties
@@ -436,8 +436,7 @@ async fn add_address_for_dad<
 ) -> impl futures::stream::Stream<Item = DadState> {
     let (address_state_provider, server) = fidl::endpoints::create_proxy::<
         fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-    >()
-    .expect("create AddressStateProvider proxy");
+    >();
     // Create the state stream before adding the address to observe all events.
     let state_stream =
         fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(address_state_provider);
@@ -983,12 +982,13 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State");
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interface_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(
+            &interface_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
         )
         .expect("error getting interfaces state event stream"),
-        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             // We have to make sure 2 things:
             // 1. We have `expected_addrs` addrs which have the advertised prefix for the
@@ -1332,12 +1332,13 @@ async fn sending_ra_with_autoconf_flag_triggers_slaac<N: Netstack>(name: &str) {
     send_ra(&fake_router, ra, &options, src_ip).await.expect("RA sent");
 
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interfaces_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(
+            &interfaces_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
         )
         .expect("creating interface event stream"),
-        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             iface.properties.addresses.iter().find_map(
                 |fidl_fuchsia_net_interfaces_ext::Address {
@@ -1436,4 +1437,294 @@ async fn add_device_adds_link_local_subnet_route<N: Netstack>(name: &str) {
         link_local_subnet_route_events.next().await.expect("stream unexpectedly ended"),
         fnet_routes_ext::Event::Removed(_)
     );
+}
+
+/// Tests that temporary IPv6 addresses are preferred.
+#[netstack_test]
+#[variant(N, Netstack)]
+async fn prefers_temporary<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let endpoint = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let iface = realm
+        .install_endpoint(endpoint, InterfaceConfig::default())
+        .await
+        .expect("install interface");
+
+    const ADDR1: net::Subnet = net_declare::fidl_subnet!("2001:db8::1/64");
+    const ADDR2: net::Subnet = net_declare::fidl_subnet!("2001:db8::2/64");
+    const ADDR3: std::net::SocketAddr = net_declare::std_socket_addr!("[2001:db8::3]:1234");
+
+    // Do everything twice so we show we're not relying on some other property
+    // of address selection.
+    let control = iface.control();
+    for temp in [ADDR1, ADDR2] {
+        let asp = futures::stream::iter([ADDR1, ADDR2])
+            .map(|addr| async move {
+                interfaces::add_address_wait_assigned(
+                    control,
+                    addr,
+                    fnet_interfaces_admin::AddressParameters {
+                        add_subnet_route: Some(true),
+                        temporary: Some(addr == temp),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .expect("add_address_wait_assigned failed")
+            })
+            .buffer_unordered(usize::MAX)
+            .collect::<Vec<_>>()
+            .await;
+
+        let sock = realm
+            .datagram_socket(
+                fposix_socket::Domain::Ipv6,
+                fposix_socket::DatagramSocketProtocol::Udp,
+            )
+            .await
+            .expect("udp socket");
+        sock.connect(&ADDR3.into()).expect("connect UDP");
+        let addr = sock.local_addr().expect("get local addr").as_socket().expect("network socket");
+        let ip: net::IpAddress = fidl_fuchsia_net_ext::IpAddress(addr.ip()).into();
+        assert_eq!(ip, temp.addr);
+
+        // Remove the addresses cleanly so we can add them again switching which
+        // one is the temporary addr.
+        futures::stream::iter(asp)
+            .for_each_concurrent(None, |asp| async move {
+                asp.remove().expect("remove addr");
+                assert_matches!(
+                    asp.take_event_stream().next().await,
+                    Some(Ok(fnet_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
+                        error: fnet_interfaces_admin::AddressRemovalReason::UserRemoved
+                    }))
+                );
+            })
+            .await;
+    }
+}
+
+/// Tests that addresses generated by SLAAC report new lifetimes over the
+/// watcher API appropriately.
+#[netstack_test]
+#[variant(N, Netstack)]
+async fn slaac_addrs_report_lifetimes<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let (_network, realm, iface, fake_ep) =
+        setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
+
+    const INITIAL_VALID_LIFETIME_SECS: u32 = 100_000;
+    const INITIAL_PREFERRED_LIFETIME_SECS: u32 = 100_00;
+    const UPDATED_LIFETIME_SECS: u32 = 1;
+
+    // Send a Router Advertisement with information for a SLAAC prefix.
+    let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
+        ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
+        false,                                /* on_link_flag */
+        true,                                 /* autonomous_address_configuration_flag */
+        INITIAL_VALID_LIFETIME_SECS,          /* valid_lifetime */
+        INITIAL_PREFERRED_LIFETIME_SECS,      /* preferred_lifetime */
+        ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
+    ))];
+    send_ra_with_router_lifetime(&fake_ep, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
+        .await
+        .expect("failed to send router advertisement");
+
+    let mut watcher = pin!(realm
+        .get_interface_event_stream_with_interest::<fnet_interfaces_ext::AllInterest>()
+        .expect("error getting interface state event stream"));
+    let mut watcher_state = &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id());
+
+    #[derive(Debug, Eq, PartialEq)]
+    struct Lifetimes {
+        valid_until: fnet_interfaces_ext::PositiveMonotonicInstant,
+        preferred_lifetime_info: fnet_interfaces_ext::PositiveMonotonicInstant,
+        updated_valid_until: Option<fnet_interfaces_ext::PositiveMonotonicInstant>,
+        updated_preferred_lifetime: Option<fnet_interfaces_ext::PositiveMonotonicInstant>,
+        seen_deprecation: bool,
+    }
+
+    impl Lifetimes {
+        fn update(
+            &mut self,
+            addr: &fnet_interfaces_ext::Address<fnet_interfaces_ext::AllInterest>,
+        ) {
+            let fnet_interfaces_ext::Address {
+                valid_until: cur_valid_until,
+                preferred_lifetime_info: cur_preferred,
+                ..
+            } = addr;
+
+            let Lifetimes {
+                valid_until,
+                preferred_lifetime_info,
+                updated_valid_until,
+                updated_preferred_lifetime,
+                seen_deprecation,
+            } = self;
+
+            match (updated_preferred_lifetime.as_ref(), *seen_deprecation) {
+                (Some(_), true) => assert_eq!(
+                    cur_preferred,
+                    &fnet_interfaces_ext::PreferredLifetimeInfo::Deprecated,
+                    "deprecated changed"
+                ),
+                (Some(i), false) => match cur_preferred {
+                    fnet_interfaces_ext::PreferredLifetimeInfo::PreferredUntil(cur) => {
+                        assert_eq!(cur, i, "preferred lifetime changed");
+                    }
+                    fnet_interfaces_ext::PreferredLifetimeInfo::Deprecated => {
+                        *seen_deprecation = true;
+                    }
+                },
+                (None, false) => {
+                    let preferred = assert_matches!(cur_preferred,
+                         fnet_interfaces_ext::PreferredLifetimeInfo::PreferredUntil(v) => *v);
+                    if preferred != *preferred_lifetime_info {
+                        // Must have decreased, we changed the preferred
+                        // lifetime to earlier.
+                        assert!(preferred < *preferred_lifetime_info);
+                        *updated_preferred_lifetime = Some(preferred);
+                    }
+                }
+                // Can't mark deprecation without having seen updated lifetime.
+                (None, true) => unreachable!(),
+            }
+
+            match updated_valid_until.as_ref() {
+                Some(u) => {
+                    assert_eq!(cur_valid_until, u);
+                }
+                None => {
+                    if cur_valid_until != valid_until {
+                        *updated_valid_until = Some(*cur_valid_until);
+                    }
+                }
+            }
+        }
+    }
+
+    // Extract the initial addresses. We expect one static and one temporary
+    // address.
+    const EXPECTED_ADDRS: usize = 2;
+    let mut addrs = fnet_interfaces_ext::wait_interface_with_id(
+        watcher.by_ref(),
+        &mut watcher_state,
+        |iface| {
+            let addrs = iface
+                .properties
+                .addresses
+                .iter()
+                .filter_map(
+                    |&fnet_interfaces_ext::Address {
+                         addr: net::Subnet { addr, prefix_len: _ },
+                         valid_until,
+                         preferred_lifetime_info,
+                         assignment_state,
+                     }| {
+                        assert_eq!(
+                            assignment_state,
+                            fnet_interfaces::AddressAssignmentState::Assigned
+                        );
+                        // Must not yet be deprecated.
+                        let preferred_lifetime_info = assert_matches!(preferred_lifetime_info,
+                            fnet_interfaces_ext::PreferredLifetimeInfo::PreferredUntil(v) => v);
+                        match addr {
+                            net::IpAddress::Ipv4(net::Ipv4Address { .. }) => None,
+                            v6 @ net::IpAddress::Ipv6(net::Ipv6Address { addr }) => {
+                                ipv6_consts::GLOBAL_PREFIX
+                                    .contains(&net_types_ip::Ipv6Addr::from_bytes(addr))
+                                    .then_some((
+                                        v6,
+                                        Lifetimes {
+                                            valid_until,
+                                            preferred_lifetime_info,
+                                            updated_preferred_lifetime: None,
+                                            updated_valid_until: None,
+                                            seen_deprecation: false,
+                                        },
+                                    ))
+                            }
+                        }
+                    },
+                )
+                .collect::<HashMap<_, _>>();
+            match addrs.len() {
+                EXPECTED_ADDRS => Some(addrs),
+                x if x < EXPECTED_ADDRS => None,
+                _ => panic!("collected more addrs than expected: {addrs:?}"),
+            }
+        },
+    )
+    .map(|r| r.expect("watcher error"))
+    .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || panic!("timed out waiting for addresses"))
+    .await;
+
+    // Send a router advertisement with an updated preferred lifetime.
+    let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
+        ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
+        false,                                /* on_link_flag */
+        true,                                 /* autonomous_address_configuration_flag */
+        INITIAL_VALID_LIFETIME_SECS,          /* valid_lifetime */
+        UPDATED_LIFETIME_SECS,                /* preferred_lifetime */
+        ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
+    ))];
+    send_ra_with_router_lifetime(&fake_ep, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
+        .await
+        .expect("failed to send router advertisement");
+
+    // Wait until we see both addresses deprecate. The updated preferred
+    // lifetime is short enough that deprecation should happen soon after.
+    fnet_interfaces_ext::wait_interface_with_id(watcher.by_ref(), &mut watcher_state, |iface| {
+        // Update state.
+        for addr in iface.properties.addresses.iter() {
+            let Some(entry) = addrs.get_mut(&addr.addr.addr) else { continue };
+            entry.update(addr)
+        }
+        // Exit when we've observed all addresses being deprecated.
+        addrs.values().all(|a| a.seen_deprecation).then_some(())
+    })
+    .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || panic!("timed out waiting for deprecation"))
+    .await
+    .expect("watcher error");
+
+    // All addresses are now deprecated, check that updating valid until with a
+    // zero preferred lifetime will update only valid and then eventually remove
+    // the addresses.
+    for addr in addrs.values_mut() {
+        addr.valid_until = addr.updated_valid_until.take().unwrap();
+    }
+
+    // Send a router advertisement with an updated preferred lifetime.
+    let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
+        ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
+        false,                                /* on_link_flag */
+        true,                                 /* autonomous_address_configuration_flag */
+        UPDATED_LIFETIME_SECS,                /* valid_lifetime */
+        0,                                    /* preferred_lifetime */
+        ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
+    ))];
+    send_ra_with_router_lifetime(&fake_ep, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
+        .await
+        .expect("failed to send router advertisement");
+
+    // Wait until we see both addresses update valid_until. Note that there's a
+    // guard against very short valid until times so we can't observe removal
+    // without faking the clock which is more than this test is attempting to
+    // do.
+    fnet_interfaces_ext::wait_interface_with_id(watcher.by_ref(), &mut watcher_state, |iface| {
+        // Update state.
+        for addr in iface.properties.addresses.iter() {
+            let Some(entry) = addrs.get_mut(&addr.addr.addr) else { continue };
+            entry.update(addr)
+        }
+        // Exit when we've observed all `valid_until`s be updated.
+        addrs.values().all(|a| a.updated_valid_until.is_some()).then_some(())
+    })
+    .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || {
+        panic!("timed out waiting for valid until update")
+    })
+    .await
+    .expect("watcher error");
 }

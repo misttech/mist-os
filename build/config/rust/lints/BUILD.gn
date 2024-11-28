@@ -7,6 +7,16 @@ config("clippy_warn_production") {
   # Use -W instead of -D to treat as a warning while iterating.
   rustflags = [
     # go/keep-sorted start
+
+    "-Wclippy::clear_with_drain",
+    "-Wclippy::collection_is_never_read",
+    "-Wclippy::needless_collect",
+    "-Wclippy::or_fun_call",
+    "-Wclippy::perf",
+    "-Wclippy::redundant_clone",
+    "-Wclippy::set_contains_or_insert",
+    "-Wclippy::unnecessary_lazy_evaluation",
+
     # go/keep-sorted end
   ]
 }

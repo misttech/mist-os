@@ -213,11 +213,9 @@ zx_status_t SegmentManager::DoGarbageCollect(uint32_t start_segno, GcType gc_typ
       continue;
     }
 
-    fbl::RefPtr<Page> sum_page;
-    {
-      LockedPage locked_sum_page;
-      GetSumPage(segno, &locked_sum_page);
-      sum_page = locked_sum_page.release();
+    LockedPage sum_page;
+    if (zx_status_t ret = GetSumPage(segno, &sum_page); ret != ZX_OK) {
+      return ret;
     }
 
     SummaryBlock *sum_blk = sum_page->GetAddress<SummaryBlock>();

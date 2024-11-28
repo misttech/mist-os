@@ -297,7 +297,7 @@ mod test {
                 fidl::AsyncChannel::from_channel(server.into_channel()),
             )
             .await?;
-        Ok((noop_proxy.into_proxy()?, register))
+        Ok((noop_proxy.into_proxy(), register))
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -321,7 +321,7 @@ mod test {
                 fidl::AsyncChannel::from_channel(server.into_channel()),
             )
             .await;
-        let noop_proxy = noop_proxy.into_proxy()?;
+        let noop_proxy = noop_proxy.into_proxy();
         assert!(res.is_err());
         assert!(noop_proxy.do_noop().await.is_err());
         Ok(())

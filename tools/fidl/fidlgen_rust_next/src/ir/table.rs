@@ -6,7 +6,7 @@ use core::num::NonZeroI64;
 
 use serde::Deserialize;
 
-use super::{Attributes, CompIdent, Type, TypeShape};
+use super::{Attributes, CompIdent, Ident, Type, TypeShape};
 use crate::de::Index;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -34,7 +34,7 @@ pub struct TableMember {
     #[expect(dead_code)]
     #[serde(flatten)]
     pub attributes: Attributes,
-    pub name: String,
+    pub name: Ident,
     #[serde(rename = "type")]
     pub ty: Type,
     pub ordinal: NonZeroI64,

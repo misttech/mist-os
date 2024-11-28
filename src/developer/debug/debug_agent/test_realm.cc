@@ -171,10 +171,10 @@ fit::result<debug::Status, TestRealmAndOffers> GetTestRealmAndOffers(
     const std::string& realm_arg,
     fidl::SyncClient<fuchsia_sys2::LifecycleController> lifecycle_controller,
     fidl::SyncClient<fuchsia_sys2::RealmQuery> realm_query) {
-  size_t separator_position = realm_arg.rfind(':');
-  if (separator_position == std::string::npos) {
+  size_t separator_position = realm_arg.rfind('/');
+  if (separator_position == std::string::npos || separator_position == 0) {
     return fit::error(
-        debug::Status("Realm parameter must take the form <realm>:<test collection>"));
+        debug::Status("Realm parameter must take the form <realm>/<test collection>"));
   }
 
   std::string realm_moniker = realm_arg.substr(0, separator_position);
@@ -199,24 +199,27 @@ fit::result<debug::Status, TestRealmAndOffers> GetTestRealmAndOffers(
   fidl::SyncClient<fuchsia_io::Directory> directory;
   fidl::ServerEnd directory_server_end = CreateEndpointsAndBind(directory);
   auto exposed_dir_open_res =
-      realm_query->Open({std::move(realm_moniker), fuchsia_sys2::OpenDirType::kExposedDir,
-                         fuchsia_io::OpenFlags::kRightReadable, fuchsia_io::ModeType(0), ".",
-                         fidl::ServerEnd<fuchsia_io::Node>(directory_server_end.TakeChannel())});
+      realm_query->OpenDirectory({std::move(realm_moniker), fuchsia_sys2::OpenDirType::kExposedDir,
+                                  std::move(directory_server_end)});
   if (exposed_dir_open_res.is_error()) {
     return fit::error(ErrorToStatus(exposed_dir_open_res.error_value()));
   }
 
   auto [realm_client_end, realm_server_end] = fidl::Endpoints<fuchsia_component::Realm>::Create();
-  auto realm_open_res =
-      directory->Open({fuchsia_io::OpenFlags(0), fuchsia_io::ModeType(0),
-                       fidl::DiscoverableProtocolName<fuchsia_component::Realm>,
-                       fidl::ServerEnd<fuchsia_io::Node>(realm_server_end.TakeChannel())});
-  if (realm_open_res.is_error()) {
-    return fit::error(debug::ZxStatus(realm_open_res.error_value().status()));
+  auto realm_connect_result =
+      directory->Open3({fidl::DiscoverableProtocolName<fuchsia_component::Realm>,
+                        fuchsia_io::Flags::kProtocolService,
+                        {},
+                        realm_server_end.TakeChannel()});
+  if (realm_connect_result.is_error()) {
+    return fit::error(debug::ZxStatus(realm_connect_result.error_value().status()));
   }
 
-  return fit::ok(TestRealmAndOffers{std::move(realm_client_end), std::move(offers),
-                                    std::move(test_collection)});
+  return fit::ok(TestRealmAndOffers{
+      .realm = std::move(realm_client_end),
+      .offers = std::move(offers),
+      .test_collection = std::move(test_collection),
+  });
 }
 
 fit::result<debug::Status, TestRealmAndOffers> GetTestRealmAndOffers(const std::string& realm_arg) {

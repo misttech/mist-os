@@ -15,7 +15,7 @@
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller.h"
 #include "src/lib/testing/predicates/status.h"
 

@@ -47,22 +47,16 @@ impl ClientIfaceCountersLogger {
     }
 
     pub async fn handle_iface_created(&self, iface_id: u16) {
-        let telemetry_proxy = match fidl::endpoints::create_proxy() {
-            Ok((proxy, server)) => {
-                match self.monitor_svc_proxy.get_sme_telemetry(iface_id, server).await {
-                    Ok(Ok(())) => Some(proxy),
-                    Ok(Err(e)) => {
-                        error!("Request for SME telemetry for iface {} completed with error {}. No telemetry will be captured.", iface_id, e);
-                        None
-                    }
-                    Err(e) => {
-                        error!("Failed to request SME telemetry for iface {} with error {}. No telemetry will be captured.", iface_id, e);
-                        None
-                    }
-                }
+        let (proxy, server) = fidl::endpoints::create_proxy();
+        let telemetry_proxy = match self.monitor_svc_proxy.get_sme_telemetry(iface_id, server).await
+        {
+            Ok(Ok(())) => Some(proxy),
+            Ok(Err(e)) => {
+                error!("Request for SME telemetry for iface {} completed with error {}. No telemetry will be captured.", iface_id, e);
+                None
             }
             Err(e) => {
-                error!("Failed to create SME telemetry channel with error {}. No telemetry will be captured.", e);
+                error!("Failed to request SME telemetry for iface {} with error {}. No telemetry will be captured.", iface_id, e);
                 None
             }
         };

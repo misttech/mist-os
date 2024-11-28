@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
+#include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -20,7 +21,15 @@
 #include <ramdevice-client/ramnand.h>
 #include <zxtest/zxtest.h>
 
+#include "src/storage/lib/paver/abr-client.h"
+#include "src/storage/lib/paver/astro.h"
 #include "src/storage/lib/paver/device-partitioner.h"
+#include "src/storage/lib/paver/kola.h"
+#include "src/storage/lib/paver/luis.h"
+#include "src/storage/lib/paver/nelson.h"
+#include "src/storage/lib/paver/sherlock.h"
+#include "src/storage/lib/paver/vim3.h"
+#include "src/storage/lib/paver/x64.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/service.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
@@ -35,6 +44,28 @@ constexpr uint32_t kPagesPerBlock = 128;
 constexpr uint32_t kSkipBlockSize = kPageSize * kPagesPerBlock;
 constexpr uint32_t kNumBlocks = 400;
 
+class PaverTest : public zxtest::Test {
+ protected:
+  void SetUp() override {
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
+    paver::DevicePartitionerFactory::Register(
+        std::make_unique<paver::SherlockPartitionerFactory>());
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::KolaPartitionerFactory>());
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
+
+    // X64PartitionerFactory must be placed last if test will be run on x64 devices.
+    // This is because X64PartitionerFactory determines whether itself is suitable to be used for
+    // the device based on arch hardcoded at compile time. It will always be the case for x64
+    // devices. The initialization will update to x64 GPT table, which can confuse paver test for
+    // other boards.
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
+
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
+  }
+};
+
 struct DeviceAndController {
   zx::channel device;
   fidl::ClientEnd<fuchsia_device::Controller> controller;
@@ -42,6 +73,15 @@ struct DeviceAndController {
 
 zx::result<DeviceAndController> GetNewConnections(
     fidl::UnownedClientEnd<fuchsia_device::Controller> controller);
+
+struct PartitionDescription {
+  std::string name;
+  uuid::Uuid type;
+  uint64_t start;
+  uint64_t length;
+  // Instance is last since it is often elided.  If unset, a generated instance is used.
+  std::optional<uuid::Uuid> instance;
+};
 
 class BlockDevice {
  public:
@@ -56,6 +96,11 @@ class BlockDevice {
 
   static void CreateFromVmo(const fbl::unique_fd& devfs_root, const uint8_t* guid, zx::vmo vmo,
                             uint32_t block_size, std::unique_ptr<BlockDevice>* device);
+
+  static void CreateWithGpt(const fbl::unique_fd& devfs_root, uint64_t block_count,
+                            uint32_t block_size,
+                            const std::vector<PartitionDescription>& init_partitions,
+                            std::unique_ptr<BlockDevice>* device);
 
   ~BlockDevice() { ramdisk_destroy(client_); }
 
@@ -88,7 +133,7 @@ class BlockDevice {
   uint64_t block_count() const { return block_count_; }
   uint32_t block_size() const { return block_size_; }
 
-  void Read(const zx::vmo& vmo, size_t blk_cnt, size_t blk_offset);
+  void Read(const zx::vmo& vmo, size_t size, size_t dev_offset, size_t vmo_offset) const;
 
  private:
   BlockDevice(ramdisk_client_t* client, uint64_t block_count, uint32_t block_size)
@@ -101,7 +146,7 @@ class BlockDevice {
 
 class SkipBlockDevice {
  public:
-  static void Create(fuchsia_hardware_nand::wire::RamNandInfo nand_info,
+  static void Create(fbl::unique_fd devfs_root, fuchsia_hardware_nand::wire::RamNandInfo nand_info,
                      std::unique_ptr<SkipBlockDevice>* device);
 
   fbl::unique_fd devfs_root() { return ctl_->devfs_root().duplicate(); }
@@ -126,6 +171,12 @@ class SkipBlockDevice {
 // DevicePartitioner which is an abstract class.
 class FakeDevicePartitioner : public paver::DevicePartitioner {
  public:
+  zx::result<std::unique_ptr<abr::Client>> CreateAbrClient() const override { ZX_ASSERT(false); }
+
+  const paver::BlockDevices& Devices() const override { ZX_ASSERT(false); }
+
+  fidl::UnownedClientEnd<fuchsia_io::Directory> SvcRoot() const override { ZX_ASSERT(false); }
+
   bool IsFvmWithinFtl() const override { return false; }
 
   bool SupportsPartition(const paver::PartitionSpec& spec) const override { return true; }
@@ -169,42 +220,26 @@ class FakePartitionClient : public paver::PartitionClient {
   size_t partition_size_;
 };
 
-template <typename T>
-class FakeSvc {
+class FakeBootArgs : public fidl::WireServer<fuchsia_boot::Arguments> {
  public:
-  explicit FakeSvc(async_dispatcher_t* dispatcher, T args)
-      : dispatcher_(dispatcher), vfs_(dispatcher), fake_boot_args_(std::move(args)) {
-    root_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
-    root_dir_->AddEntry(
-        fidl::DiscoverableProtocolName<fuchsia_boot::Arguments>,
-        fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fuchsia_boot::Arguments> request) {
-          fidl::BindServer(dispatcher_, std::move(request), &fake_boot_args_);
-          return ZX_OK;
-        }));
+  explicit FakeBootArgs(std::string slot_suffix = "-a");
 
-    auto svc_remote = fidl::CreateEndpoints(&svc_local_);
-    ASSERT_OK(svc_remote.status_value());
+  void GetString(GetStringRequestView request, GetStringCompleter::Sync& completer) override;
+  void GetStrings(GetStringsRequestView request, GetStringsCompleter::Sync& completer) override;
+  void GetBool(GetBoolRequestView request, GetBoolCompleter::Sync& completer) override;
+  void GetBools(GetBoolsRequestView request, GetBoolsCompleter::Sync& completer) override;
+  void Collect(CollectRequestView request, CollectCompleter::Sync& completer) override;
 
-    vfs_.ServeDirectory(root_dir_, std::move(*svc_remote));
+  void SetAstroSysConfigAbrWearLeveling(bool value) { astro_sysconfig_abr_wear_leveling_ = value; }
+  void AddStringArgs(std::string key, std::string value) {
+    string_args_[std::move(key)] = std::move(value);
   }
-
-  void ForwardServiceTo(const char* name, fidl::ClientEnd<fuchsia_io::Directory> svc) {
-    root_dir_->AddEntry(
-        name, fbl::MakeRefCounted<fs::Service>([name, svc = std::move(svc)](zx::channel request) {
-          return fdio_service_connect_at(svc.channel().get(), fbl::StringPrintf("%s", name).data(),
-                                         request.release());
-        }));
-  }
-
-  T& fake_boot_args() { return fake_boot_args_; }
-  fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() { return svc_local_; }
 
  private:
-  async_dispatcher_t* dispatcher_;
-  fbl::RefPtr<fs::PseudoDir> root_dir_;
-  fs::SynchronousVfs vfs_;
-  T fake_boot_args_;
-  fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
+  fidl::ServerBindingGroup<fuchsia_boot::Arguments> bindings_;
+
+  bool astro_sysconfig_abr_wear_leveling_ = false;
+  std::unordered_map<std::string, std::string> string_args_;
 };
 
 #endif  // SRC_STORAGE_LIB_PAVER_TEST_TEST_UTILS_H_

@@ -32,7 +32,6 @@
                 "fuchsia.diagnostics.ExceptionHandlerAvailable",
                 "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
                 "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
-                "fuchsia.diagnostics.NumThreads",
                 "fuchsia.driver.BaseDrivers",
                 "fuchsia.driver.BindEager",
                 "fuchsia.driver.BootDrivers",
@@ -344,6 +343,14 @@
             from: "framework",
             as: "fuchsia.sys2.RouteValidator.root",
             to: "#toolbox",
+        },
+        {
+            runner: [
+                "builtin_devfs",
+                "builtin_shutdown_shim",
+            ],
+            from: "parent",
+            to: "#bootstrap",
         },
 
         // Offer boot resolver to `bootstrap` for driver usage.

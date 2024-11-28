@@ -19,7 +19,6 @@ if (!is_host) {
   group("fx") {
     deps = [
       "//src/developer/ffx:ffx_tool",
-      "//src/sys/pkg/bin/pm:host",
       "//tools/bootserver_old:host",
       "//tools/net/device-finder:host",
       "//tools/symbolizer",
@@ -42,17 +41,14 @@ if (!is_host) {
       # For 'fx create'.
       "//tools/create",
 
-      # For compiled dart commands.
-      "//scripts/fxtest:fxtest",
-
       # For `fx bindc`.
       "//tools/bindc:host",
 
       # For `fx update-rustc-third-party`.
       "//tools/cargo-gnaw:install-cargo-gnaw",
 
-      # For `fx test2`.
-      "//scripts/fxtest/rewrite:install($host_toolchain)",
+      # For `fx test`.
+      "//scripts/fxtest/python:install($host_toolchain)",
 
       # For Python devshell tools
       "//tools/devshell/python:install($host_toolchain)",
@@ -60,8 +56,8 @@ if (!is_host) {
       # For `fx power-digest`
       "//src/power/tools:install($host_toolchain)",
 
-      # For `fx gnerate`
-      "//build/tools/gnerator:host($host_toolchain)",
+      # For `fx bazel2gn`
+      "//build/tools/bazel2gn:host($host_toolchain)",
     ]
   }
 }
@@ -111,7 +107,6 @@ test_scripts = [
 
   # tests that currently can't be included in automation.
   # use 'fx self-test' to run them manually:
-  # "tests/subcommands/fx_serve_update_test",  # disabled because it depends on pm
   # "tests/subcommands/fx_test_test",  # disabled because it depends on dart prebuilt
 ]
 

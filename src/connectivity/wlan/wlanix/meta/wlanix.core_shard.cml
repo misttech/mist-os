@@ -26,5 +26,15 @@
             from: "#diagnostics",
             to: "#wlanix",
         },
+        {
+            protocol: [
+                "fuchsia.power.broker.ElementInfoProviderService",
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "parent",
+            to: "#wlanix",
+            availability: "same_as_target",
+        },
     ],
 }

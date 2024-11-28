@@ -238,8 +238,7 @@ pub fn init_viewport_scene(
     server: Arc<FramebufferServer>,
     viewport_token: fuiviews::ViewportCreationToken,
 ) {
-    let (_, child_view_watcher_request) = create_proxy::<fuicomposition::ChildViewWatcherMarker>()
-        .expect("failed to create child view watcher channel");
+    let (_, child_view_watcher_request) = create_proxy::<fuicomposition::ChildViewWatcherMarker>();
     let viewport_properties = fuicomposition::ViewportProperties {
         logical_size: Some(fmath::SizeU { width: server.image_width, height: server.image_height }),
         ..Default::default()
@@ -304,8 +303,7 @@ pub fn start_presentation_loop(
                 ViewCreationTokenPair::new().expect("failed to create ViewCreationTokenPair");
             // We don't actually care about the parent viewport at the moment, because we don't resize.
             let (_parent_viewport_watcher, parent_viewport_watcher_request) =
-                create_proxy::<fuicomposition::ParentViewportWatcherMarker>()
-                    .expect("failed to create ParentViewportWatcherProxy");
+                create_proxy::<fuicomposition::ParentViewportWatcherMarker>();
             server
                 .flatland
                 .create_view2(
@@ -355,13 +353,12 @@ pub fn start_presentation_loop(
                 felement::GraphicalPresenterMarker,
             >()
             .map_err(|_| errno!(ENOENT))
-            .expect("Failed to connect to GraphicalPresenter").into_proxy().expect("Failed to convert GraphicalPresenter to proxy")
+            .expect("Failed to connect to GraphicalPresenter").into_proxy()
             };
 
 
             let (view_controller_proxy, view_controller_server_end) =
-                fidl::endpoints::create_proxy::<felement::ViewControllerMarker>()
-                    .expect("failed to create ViewControllerProxy");
+                fidl::endpoints::create_proxy::<felement::ViewControllerMarker>();
             let _ = maybe_view_controller_proxy.insert(view_controller_proxy);
 
             let view_spec = felement::ViewSpec {
@@ -378,7 +375,7 @@ pub fn start_presentation_loop(
 
             // TODO: b/307790211 - Service annotation controller stream.
             let (annotation_controller_client_end, _annotation_controller_stream) =
-                create_request_stream::<felement::AnnotationControllerMarker>().unwrap();
+                create_request_stream::<felement::AnnotationControllerMarker>();
 
             // Wait for present_view before processing Flatland events.
             graphical_presenter

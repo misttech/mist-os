@@ -8,6 +8,7 @@ use crate::model::component::{
 };
 use ::runner::component::StopInfo;
 use fidl::endpoints::{ProtocolMarker, RequestStream};
+use fuchsia_trace::{self as trace, duration, instant};
 use futures::prelude::*;
 use tracing::{error, warn};
 use {fidl_fuchsia_component as fcomponent, fuchsia_async as fasync};
@@ -28,42 +29,47 @@ pub async fn serve_controller(
     while let Some(request) = stream.try_next().await? {
         match request {
             fcomponent::ControllerRequest::Start { args, execution_controller, responder } => {
-                let component = weak_component_instance.upgrade();
-                let Ok(component) = component else {
-                    responder.send(Err(fcomponent::Error::InstanceNotFound))?;
-                    continue;
-                };
-                if component.is_started().await {
-                    responder.send(Err(fcomponent::Error::InstanceAlreadyStarted))?;
-                    continue;
-                }
-                let execution_controller_stream = execution_controller.into_stream()?;
-                let control_handle = execution_controller_stream.control_handle();
-                let execution_controller = ExecutionControllerTask {
-                    _task: fasync::Task::spawn(execution_controller_task(
-                        weak_component_instance.clone(),
-                        execution_controller_stream,
-                    )),
-                    control_handle,
-                    stop_payload: None,
-                };
-                let incoming: IncomingCapabilities = match args.try_into() {
-                    Ok(incoming) => incoming,
-                    Err(e) => {
-                        responder.send(Err(e))?;
-                        continue;
+                duration!(c"component_manager", c"Controller.Start");
+                let res: Result<(), fcomponent::Error> = async {
+                    let component = weak_component_instance.upgrade();
+                    let Ok(component) = component else {
+                        return Err(fcomponent::Error::InstanceNotFound);
+                    };
+                    if component.is_started().await {
+                        return Err(fcomponent::Error::InstanceAlreadyStarted);
                     }
-                };
+                    let execution_controller_stream = execution_controller.into_stream();
+                    let control_handle = execution_controller_stream.control_handle();
+                    let execution_controller = ExecutionControllerTask {
+                        _task: fasync::Task::spawn(execution_controller_task(
+                            weak_component_instance.clone(),
+                            execution_controller_stream,
+                        )),
+                        control_handle,
+                        stop_payload: None,
+                    };
+                    let incoming: IncomingCapabilities = match args.try_into() {
+                        Ok(incoming) => incoming,
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    };
 
-                if let Err(err) = component
-                    .start(&StartReason::Controller, Some(execution_controller), incoming)
-                    .await
-                {
-                    warn!(%err, "failed to start component");
-                    responder.send(Err(err.into()))?;
-                    continue;
+                    if let Err(err) = component
+                        .start(&StartReason::Controller, Some(execution_controller), incoming)
+                        .await
+                    {
+                        warn!(%err, "failed to start component");
+                        return Err(err.into());
+                    }
+                    Ok(())
                 }
-                responder.send(Ok(()))?;
+                .await;
+                let result = format!("{res:?}");
+                responder.send(res)?;
+                instant!(
+                    c"component_manager", c"Controller.Start/Result", trace::Scope::Process,
+                    "result" => result.as_str());
             }
             fcomponent::ControllerRequest::IsStarted { responder } => {
                 let component = weak_component_instance.upgrade();

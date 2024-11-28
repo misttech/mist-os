@@ -147,7 +147,7 @@ async fn handle_client_request(
         })) => {
             info!("Start request from client: {follow:?}, {host_device:?}");
 
-            let Some(client) = client.map(|client| client.into_proxy().unwrap()) else {
+            let Some(client) = client.map(|client| client.into_proxy()) else {
                 warn!("No client delivered, skipping");
                 return Ok(true);
             };
@@ -275,7 +275,7 @@ impl SnoopConfig {
             .truncate_payload
             .as_ref()
             .map(|n| format!("{} bytes", n))
-            .unwrap_or("No Truncation".to_string());
+            .unwrap_or_else(|| "No Truncation".to_string());
         let _truncate_payload_property =
             config_inspect.create_string("truncate_payload", &truncate);
         let _hci_dir_property = config_inspect.create_string("hci_dir", HCI_DEVICE_CLASS_PATH);
@@ -355,7 +355,7 @@ async fn run(
             // A new filesystem event in the hci device watch directory has been received.
             event = hci_device_events.next() => {
                 let message = event
-                    .ok_or(format_err!("Cannot reach watch server"))
+                    .ok_or_else(|| format_err!("Cannot reach watch server"))
                     .and_then(|r| Ok(r?));
                 match message {
                     Ok(message) => {

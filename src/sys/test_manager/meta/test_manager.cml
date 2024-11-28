@@ -25,11 +25,6 @@
                     from: "#elf_test_create_raw_processes_ambient_exec_runner",
                 },
                 {
-                    runner: "dart_jit_product_runner",
-                    from: "#g3_dart_jit_product_runner",
-                    as: "g3_dart_jit_product_runner",
-                },
-                {
                     runner: "fuzz_test_runner",
                     from: "#fuzz_test_runner",
                 },

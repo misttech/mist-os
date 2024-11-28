@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn test_mlme_band_cap_from_softmac() {
         let softmac_band_cap = fidl_softmac::WlanSoftmacBandCapability {
-            band: Some(fidl_common::WlanBand::TwoGhz),
+            band: Some(fidl_ieee80211::WlanBand::TwoGhz),
             basic_rates: Some(vec![
                 0x02, 0x04, 0x0b, 0x16, 0x0c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c,
             ]),
@@ -200,7 +200,7 @@ mod tests {
         };
         let mlme_band_cap = mlme_band_cap_from_softmac(softmac_band_cap)
             .expect("failed to convert band capability");
-        assert_eq!(mlme_band_cap.band, fidl_common::WlanBand::TwoGhz);
+        assert_eq!(mlme_band_cap.band, fidl_ieee80211::WlanBand::TwoGhz);
         assert_eq!(
             mlme_band_cap.basic_rates,
             vec![0x02, 0x04, 0x0b, 0x16, 0x0c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c]

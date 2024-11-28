@@ -33,13 +33,15 @@ zx::result<fuchsia_paver::wire::Configuration> CurrentSlotToConfiguration(std::s
 zx::result<fuchsia_paver::wire::Configuration> QueryBootConfig(
     const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root);
 
+/// Ensures the system supports verified boot.
+/// This should be called prior to creating a DevicePartitioner and its corresponding abr::Client
+/// (via DevicePartitioner::CreateAbrClient), as otherwise unexpected errors may be returned.
+zx::result<bool> SupportsVerifiedBoot(const paver::BlockDevices& devices,
+                                      fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root);
+
 // Interface for interacting with ABR data.
 class Client {
  public:
-  // Factory create method.
-  static zx::result<std::unique_ptr<abr::Client>> Create(
-      paver::BlockDevices devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-      std::shared_ptr<paver::Context> context);
   virtual ~Client() = default;
 
   AbrSlotIndex GetBootSlot(bool update_metadata, bool* is_slot_marked_successful) const {
@@ -142,25 +144,6 @@ class Client {
 
   virtual zx::result<> WriteCustom(const AbrSlotData* a, const AbrSlotData* b,
                                    uint8_t one_shot_recovery) = 0;
-};
-
-class ClientFactory {
- public:
-  // Factory create method.
-  static zx::result<std::unique_ptr<abr::Client>> Create(
-      const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-      std::shared_ptr<paver::Context> context);
-
-  static void Register(std::unique_ptr<ClientFactory> factory);
-
-  virtual ~ClientFactory() = default;
-
- private:
-  virtual zx::result<std::unique_ptr<abr::Client>> New(
-      const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-      std::shared_ptr<paver::Context> context) = 0;
-
-  static std::vector<std::unique_ptr<ClientFactory>>* registered_factory_list();
 };
 
 // Implementation of abr::Client which works with a contiguous partition storing AbrData.

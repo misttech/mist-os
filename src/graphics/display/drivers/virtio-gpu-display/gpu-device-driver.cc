@@ -89,18 +89,11 @@ zx::result<> GpuDeviceDriver::InitResources() {
 zx::result<> GpuDeviceDriver::InitDisplayNode() {
   // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
   // over the compatibility server.
-  const display_engine_protocol_t protocol = display_controller_banjo_->GetProtocol();
-  display_banjo_server_ =
-      compat::BanjoServer(ZX_PROTOCOL_DISPLAY_ENGINE, protocol.ctx, protocol.ops);
-
-  compat::DeviceServer::BanjoConfig banjo_config;
-  banjo_config.callbacks[ZX_PROTOCOL_DISPLAY_ENGINE] = display_banjo_server_->callback();
-
   static constexpr std::string_view kDisplayChildNodeName = "virtio-gpu-display";
   zx::result<> compat_server_init_result =
       display_compat_server_.Initialize(incoming(), outgoing(), node_name(), kDisplayChildNodeName,
                                         /*forward_metadata=*/compat::ForwardMetadata::None(),
-                                        /*banjo_config=*/std::move(banjo_config));
+                                        display_controller_banjo_->CreateBanjoConfig());
   if (compat_server_init_result.is_error()) {
     FDF_LOG(ERROR, "Failed to initialize the compatibility server: %s",
             compat_server_init_result.status_string());

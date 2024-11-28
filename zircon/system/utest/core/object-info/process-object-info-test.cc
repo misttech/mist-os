@@ -41,19 +41,18 @@ TEST_F(ProcessGetInfoTest, InfoProcessMapsUnstartedSucceeds) {
   EXPECT_OK(process.get_info(ZX_INFO_PROCESS_MAPS, &maps, 0, &actual, &avail));
 }
 
-TEST_F(ProcessGetInfoTest, InfoProcessMapsSmokeTest) {
-  const MappingInfo& test_info = GetInfo();
-  const zx::process& process = GetProcess();
-
+template <typename InfoT>
+void TestInfoProcessMapsSmokeTest(const MappingInfo& test_info, const zx::process& process,
+                                  const uint32_t topic) {
   // Buffer big enough to read all of the test process's map entries.
   const size_t entry_count = 4 * test_info.num_mappings;
-  std::unique_ptr<zx_info_maps_t[]> maps(new zx_info_maps_t[entry_count]);
+  std::unique_ptr<InfoT[]> maps(new InfoT[entry_count]);
 
   // Read the map entries.
   size_t actual;
   size_t avail;
-  ASSERT_OK(process.get_info(ZX_INFO_PROCESS_MAPS, static_cast<void*>(maps.get()),
-                             entry_count * sizeof(zx_info_maps_t), &actual, &avail));
+  ASSERT_OK(process.get_info(topic, static_cast<void*>(maps.get()), entry_count * sizeof(InfoT),
+                             &actual, &avail));
   EXPECT_EQ(actual, avail, "Should have read all entries");
 
   // The first two entries should always be the ASpace and root VMAR.
@@ -83,7 +82,7 @@ TEST_F(ProcessGetInfoTest, InfoProcessMapsSmokeTest) {
 
   // LTRACEF("\n");
   for (size_t i = 2; i < actual; i++) {
-    const zx_info_maps_t& entry = maps[i];
+    const InfoT& entry = maps[i];
     char msg[128];
     snprintf(msg, sizeof(msg), "[%2zd] %*stype:%u base:0x%" PRIx64 " size:%" PRIu64, i,
              (int)(entry.depth - 2) * 2, "", entry.type, entry.base, entry.size);
@@ -132,22 +131,21 @@ TEST_F(ProcessGetInfoTest, InfoProcessMapsSmokeTest) {
   EXPECT_EQ((uint32_t)(1 << test_info.num_mappings) - 1, saw_mapping);
 
   // Do one more read with a short buffer to test actual < avail.
-  const size_t bufsize2 = actual * 3 / 4 * sizeof(zx_info_maps_t);
-  std::unique_ptr<zx_info_maps_t[]> maps2(new zx_info_maps_t[bufsize2]);
+  const size_t bufsize2 = actual * 3 / 4 * sizeof(InfoT);
+  std::unique_ptr<InfoT[]> maps2(new InfoT[bufsize2]);
   size_t actual2;
   size_t avail2;
-  ASSERT_OK(process.get_info(ZX_INFO_PROCESS_MAPS, static_cast<void*>(maps2.get()), bufsize2,
-                             &actual2, &avail2));
+  ASSERT_OK(process.get_info(topic, static_cast<void*>(maps2.get()), bufsize2, &actual2, &avail2));
   EXPECT_LT(actual2, avail2);
   // mini-process is very simple, and won't have modified its own memory
-  // maps since the previous dump. Its "committed_pages" values could be
+  // maps since the previous dump. Its "committed_bytes" values could be
   // different, though.
   EXPECT_EQ(avail, avail2);
   //    LTRACEF("\n");
   EXPECT_GT(actual2, 3u);  // Make sure we're looking at something.
   for (size_t i = 0; i < actual2; i++) {
-    const zx_info_maps_t& e1 = maps[i];
-    const zx_info_maps_t& e2 = maps2[i];
+    const InfoT& e1 = maps[i];
+    const InfoT& e2 = maps2[i];
 
     char msg[128];
     snprintf(msg, sizeof(msg),
@@ -162,6 +160,18 @@ TEST_F(ProcessGetInfoTest, InfoProcessMapsSmokeTest) {
       EXPECT_EQ(e1.u.mapping.mmu_flags, e2.u.mapping.mmu_flags, "%s", msg);
     }
   }
+}
+
+TEST_F(ProcessGetInfoTest, InfoProcessMapsSmokeTest) {
+  TestInfoProcessMapsSmokeTest<zx_info_maps_t>(GetInfo(), GetProcess(), ZX_INFO_PROCESS_MAPS);
+}
+
+TEST_F(ProcessGetInfoTest, InfoProcessMapsSmokeTestV1) {
+  TestInfoProcessMapsSmokeTest<zx_info_maps_v1_t>(GetInfo(), GetProcess(), ZX_INFO_PROCESS_MAPS_V1);
+}
+
+TEST_F(ProcessGetInfoTest, InfoProcessMapsSmokeTestV2) {
+  TestInfoProcessMapsSmokeTest<zx_info_maps_v2_t>(GetInfo(), GetProcess(), ZX_INFO_PROCESS_MAPS_V2);
 }
 
 TEST_F(ProcessGetInfoTest, InfoProcessHandleStats) {
@@ -386,21 +396,19 @@ TEST_F(ProcessGetInfoTest, InfoProcessMapsThreadHandleIsBadHandle) {
 }
 
 // Tests that ZX_INFO_PROCESS_VMOS seems to work.
-TEST_F(ProcessGetInfoTest, InfoProcessVmosSmokeTest) {
-  const MappingInfo& test_info = GetInfo();
-  const zx::process& process = GetProcess();
-
+template <typename InfoT>
+void TestInfoProcessVmosSmokeTest(const MappingInfo& test_info, const zx::process& process,
+                                  const uint32_t topic) {
   // Buffer big enough to read all of the test process's VMO entries.
   // There'll be one per mapping, one for the unmapped VMO, plus some
   // extras (at least the vDSO and the mini-process stack).
   const size_t entry_count = (test_info.num_mappings + 1 + 8);
-  std::unique_ptr<zx_info_vmo_t[]> vmos(new zx_info_vmo_t[entry_count]);
+  std::unique_ptr<InfoT[]> vmos(new InfoT[entry_count]);
 
   // Read the VMO entries.
   size_t actual;
   size_t available;
-  ASSERT_OK(process.get_info(ZX_INFO_PROCESS_VMOS, vmos.get(), entry_count * sizeof(zx_info_vmo_t),
-                             &actual, &available));
+  ASSERT_OK(process.get_info(topic, vmos.get(), entry_count * sizeof(InfoT), &actual, &available));
   EXPECT_EQ(actual, available, "Should have read all entries");
 
   // Look for the expected VMOs.
@@ -409,13 +417,12 @@ TEST_F(ProcessGetInfoTest, InfoProcessVmosSmokeTest) {
 
   // LTRACEF("\n");
   for (size_t i = 0; i < actual; i++) {
-    const zx_info_vmo_t& entry = vmos[i];
+    const InfoT& entry = vmos[i];
     char msg[128];
     snprintf(msg, sizeof(msg),
              "[%2zd] koid:%" PRIu64 " name:'%s' size:%" PRIu64 " flags:0x%" PRIx32, i, entry.koid,
              entry.name, entry.size_bytes, entry.flags);
     //      LTRACEF("%s\n", msg);
-
     // Look for it in the expected VMOs. We won't find all VMOs here,
     // since we don't track the vDSO or mini-process stack.
     for (size_t j = 0; j < test_info.num_vmos; j++) {
@@ -462,12 +469,12 @@ TEST_F(ProcessGetInfoTest, InfoProcessVmosSmokeTest) {
 
   // Do one more read with a short buffer to test actual < avail.
   const size_t entry_count_2 = actual * 3 / 4;
-  std::unique_ptr<zx_info_vmo_t[]> vmos_2(new zx_info_vmo_t[entry_count_2]);
+  std::unique_ptr<InfoT[]> vmos_2(new InfoT[entry_count_2]);
   size_t actual_2;
   size_t available_2;
 
-  ASSERT_OK(process.get_info(ZX_INFO_PROCESS_VMOS, vmos_2.get(),
-                             entry_count_2 * sizeof(zx_info_vmo_t), &actual_2, &available_2));
+  ASSERT_OK(process.get_info(topic, vmos_2.get(), entry_count_2 * sizeof(InfoT), &actual_2,
+                             &available_2));
   EXPECT_LT(actual_2, available_2);
 
   // mini-process is very simple, and won't have modified its own set of VMOs
@@ -477,8 +484,8 @@ TEST_F(ProcessGetInfoTest, InfoProcessVmosSmokeTest) {
   // Make sure we're looking at something.
   EXPECT_GT(actual_2, 3u);
   for (size_t i = 0; i < actual_2; i++) {
-    const zx_info_vmo_t& e1 = vmos[i];
-    const zx_info_vmo_t& e2 = vmos_2[i];
+    const InfoT& e1 = vmos[i];
+    const InfoT& e2 = vmos_2[i];
     char msg[128];
     snprintf(msg, sizeof(msg),
              "[%2zd] koid:%" PRIu64 "/%" PRIu64
@@ -494,6 +501,22 @@ TEST_F(ProcessGetInfoTest, InfoProcessVmosSmokeTest) {
       EXPECT_EQ(e1.handle_rights, e2.handle_rights, "%s", msg);
     }
   }
+}
+
+TEST_F(ProcessGetInfoTest, InfoProcessVmosSmokeTest) {
+  TestInfoProcessVmosSmokeTest<zx_info_vmo_t>(GetInfo(), GetProcess(), ZX_INFO_PROCESS_VMOS);
+}
+
+TEST_F(ProcessGetInfoTest, InfoProcessVmosSmokeTestV1) {
+  TestInfoProcessVmosSmokeTest<zx_info_vmo_v1_t>(GetInfo(), GetProcess(), ZX_INFO_PROCESS_VMOS_V1);
+}
+
+TEST_F(ProcessGetInfoTest, InfoProcessVmosSmokeTestV2) {
+  TestInfoProcessVmosSmokeTest<zx_info_vmo_v2_t>(GetInfo(), GetProcess(), ZX_INFO_PROCESS_VMOS_V2);
+}
+
+TEST_F(ProcessGetInfoTest, InfoProcessVmosSmokeTestV3) {
+  TestInfoProcessVmosSmokeTest<zx_info_vmo_v3_t>(GetInfo(), GetProcess(), ZX_INFO_PROCESS_VMOS_V3);
 }
 
 TEST_F(ProcessGetInfoTest, InfoProcessVmosOnSelfSucceeds) {

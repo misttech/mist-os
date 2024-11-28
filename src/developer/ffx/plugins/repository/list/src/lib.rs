@@ -35,8 +35,7 @@ async fn list_impl(
 ) -> Result<()> {
     let (client, server) = fidl::endpoints::create_endpoints::<RepositoryIteratorMarker>();
     repos_proxy.list_repositories(server).map_err(|e| bug!("error listing repositories: {e}"))?;
-    let client =
-        client.into_proxy().map_err(|e| bug!("error creating repository iterator proxy: {e}"))?;
+    let client = client.into_proxy();
 
     let default_repo = pkg::config::get_default_repository()
         .await
@@ -170,7 +169,7 @@ mod test {
                 let mut sent = false;
                 match req {
                     RepositoryRegistryRequest::ListRepositories { iterator, .. } => {
-                        let mut iterator = iterator.into_stream().unwrap();
+                        let mut iterator = iterator.into_stream();
                         while let Some(Ok(req)) = iterator.next().await {
                             match req {
                                 RepositoryIteratorRequest::Next { responder } => {

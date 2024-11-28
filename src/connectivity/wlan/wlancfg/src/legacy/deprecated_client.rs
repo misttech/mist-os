@@ -102,17 +102,13 @@ mod tests {
     }
 
     fn test_setup() -> TestValues {
-        let (sme, server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create ClientSmeProxy");
+        let (sme, server) = create_proxy::<fidl_sme::ClientSmeMarker>();
 
         let iface = Iface { sme, iface_id: 0 };
         let iface_ref = IfaceRef::new();
         iface_ref.set_if_empty(iface);
 
-        TestValues {
-            iface: iface_ref,
-            sme_stream: server.into_stream().expect("failed to create ClientSmeRequestStream"),
-        }
+        TestValues { iface: iface_ref, sme_stream: server.into_stream() }
     }
 
     #[fuchsia::test]

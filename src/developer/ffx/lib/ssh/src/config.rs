@@ -112,7 +112,7 @@ impl SshConfig {
             .iter()
             .map(|(k, v)| vec!["-o".to_string(), format!("{k}={v}")])
             .flatten()
-            .map(|s| s.to_string())
+            .map(|s| s)
             .collect();
         args
     }

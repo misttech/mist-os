@@ -409,12 +409,10 @@ fn default_base_port_config() -> tun::BasePortConfig {
 async fn create_tun_device_and_port() -> (tun::DeviceProxy, tun::PortProxy, Port) {
     let ctrl =
         connect_to_protocol::<tun::ControlMarker>().expect("failed to connect to tun.Control");
-    let (device, server) = endpoints::create_proxy::<tun::DeviceMarker>()
-        .expect("failed to create proxy for tun::Device");
+    let (device, server) = endpoints::create_proxy::<tun::DeviceMarker>();
     ctrl.create_device(&tun::DeviceConfig { blocking: Some(true), ..Default::default() }, server)
         .expect("failed to create device");
-    let (port, server) =
-        endpoints::create_proxy::<tun::PortMarker>().expect("failed to create proxy for tun::Port");
+    let (port, server) = endpoints::create_proxy::<tun::PortMarker>();
     device
         .add_port(
             &tun::DevicePortConfig {
@@ -426,8 +424,7 @@ async fn create_tun_device_and_port() -> (tun::DeviceProxy, tun::PortProxy, Port
         )
         .expect("failed to add port to device");
 
-    let (device_port, server) =
-        endpoints::create_proxy::<netdev::PortMarker>().expect("failed to create endpoints");
+    let (device_port, server) = endpoints::create_proxy::<netdev::PortMarker>();
     port.get_port(server).expect("get device port");
 
     let id = device_port.get_info().await.expect("getting port info").id.expect("missing port id");
@@ -438,15 +435,13 @@ async fn create_tun_device_and_port() -> (tun::DeviceProxy, tun::PortProxy, Port
 fn create_tun_device_pair() -> tun::DevicePairProxy {
     let ctrl =
         connect_to_protocol::<tun::ControlMarker>().expect("failed to connect to tun.Control");
-    let (pair, server) = endpoints::create_proxy::<tun::DevicePairMarker>()
-        .expect("failed to create proxy for tun::DevicePair");
+    let (pair, server) = endpoints::create_proxy::<tun::DevicePairMarker>();
     ctrl.create_pair(&tun::DevicePairConfig::default(), server).expect("create device pair");
     pair
 }
 
 fn create_netdev_client_and_server() -> (Client, endpoints::ServerEnd<netdev::DeviceMarker>) {
-    let (device, server) =
-        endpoints::create_proxy::<netdev::DeviceMarker>().expect("failed to create proxy");
+    let (device, server) = endpoints::create_proxy::<netdev::DeviceMarker>();
     (Client::new(device), server)
 }
 
@@ -457,10 +452,8 @@ fn create_netdev_client(tun: &tun::DeviceProxy) -> Client {
 }
 
 async fn create_netdev_client_pair(pair: &tun::DevicePairProxy) -> (Client, Port, Client, Port) {
-    let (device_left, left) = endpoints::create_proxy::<netdev::DeviceMarker>()
-        .expect("failed to create left device proxy");
-    let (device_right, right) = endpoints::create_proxy::<netdev::DeviceMarker>()
-        .expect("failed to create right device proxy");
+    let (device_left, left) = endpoints::create_proxy::<netdev::DeviceMarker>();
+    let (device_right, right) = endpoints::create_proxy::<netdev::DeviceMarker>();
     pair.get_left(left).expect("failed to connect left");
     pair.get_right(right).expect("failed to connect right");
     pair.add_port(&tun::DevicePairPortConfig {
@@ -472,8 +465,7 @@ async fn create_netdev_client_pair(pair: &tun::DevicePairProxy) -> (Client, Port
     .expect("failed to create the default logical port");
 
     async fn get_port_id<F: FnOnce(fidl::endpoints::ServerEnd<netdev::PortMarker>)>(f: F) -> Port {
-        let (port, server) =
-            fidl::endpoints::create_proxy::<netdev::PortMarker>().expect("create endpoints");
+        let (port, server) = fidl::endpoints::create_proxy::<netdev::PortMarker>();
         f(server);
         port.get_info()
             .await

@@ -58,8 +58,7 @@ impl Cobalt for CobaltImpl {
 fn get_logger_from_factory(
     factory_proxy: MetricEventLoggerFactoryProxy,
 ) -> Result<MetricEventLoggerProxy, Error> {
-    let (logger_proxy, server_end) =
-        fidl::endpoints::create_proxy().context("Failed to create endpoints")?;
+    let (logger_proxy, server_end) = fidl::endpoints::create_proxy();
     fasync::Task::spawn(async move {
         if let Err(err) = factory_proxy
             .create_metric_event_logger(
@@ -163,8 +162,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_get_logger_from_factory() {
         let mock = Arc::new(MockMetricEventLoggerFactory::with_id(metrics::PROJECT_ID));
-        let (factory, stream) =
-            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>().unwrap();
+        let (factory, stream) = create_proxy_and_stream::<MetricEventLoggerFactoryMarker>();
         let task = fasync::Task::spawn(mock.clone().run_logger_factory(stream));
         let logger = get_logger_from_factory(factory).unwrap();
         task.await;
@@ -183,8 +181,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_log_ota_duration() {
         let (logger_proxy, mut logger_server) =
-            create_proxy_and_stream::<MetricEventLoggerMarker>()
-                .expect("Failed to create Logger FIDL.");
+            create_proxy_and_stream::<MetricEventLoggerMarker>();
         let duration = 255;
 
         fasync::Task::spawn(async move {
@@ -214,8 +211,7 @@ mod tests {
     /// Tests that an error is raised if duration < 0.
     #[fasync::run_singlethreaded(test)]
     async fn test_log_ota_negative_duration() {
-        let (logger_proxy, _logger_server) = create_proxy_and_stream::<MetricEventLoggerMarker>()
-            .expect("Failed to create Logger FIDL.");
+        let (logger_proxy, _logger_server) = create_proxy_and_stream::<MetricEventLoggerMarker>();
 
         let result = log_ota_duration(&logger_proxy, -5).await;
         assert!(result.is_err());
@@ -226,8 +222,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_log_recovery_stage() {
         let (logger_proxy, mut logger_server) =
-            create_proxy_and_stream::<MetricEventLoggerMarker>()
-                .expect("Failed to create Logger FIDL.");
+            create_proxy_and_stream::<MetricEventLoggerMarker>();
         let status = metrics::RecoveryEventMetricDimensionResult::OtaStarted;
 
         fasync::Task::spawn(async move {

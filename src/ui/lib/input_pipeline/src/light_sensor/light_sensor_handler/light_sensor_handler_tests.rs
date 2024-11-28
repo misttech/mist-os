@@ -134,8 +134,7 @@ fn get_mock_device_proxy_with_response(
     get_response: Option<InputDeviceGetFeatureReportResult>,
     response: InputDeviceSetFeatureReportResult,
 ) -> (InputDeviceProxy, Rc<RefCell<Option<FeatureReport>>>, fasync::Task<()>) {
-    let (device_proxy, mut stream) =
-        create_proxy_and_stream::<InputDeviceMarker>().expect("proxy created");
+    let (device_proxy, mut stream) = create_proxy_and_stream::<InputDeviceMarker>();
     let called = Rc::new(RefCell::new(Option::<FeatureReport>::None));
     let task = fasync::Task::local({
         let called = Rc::clone(&called);
@@ -724,7 +723,7 @@ async fn light_sensor_handler_input_event_handler() {
     let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, inspect_status);
 
     let (sensor_proxy, stream): (SensorProxy, SensorRequestStream) =
-        create_proxy_and_stream::<SensorMarker>().expect("should get proxy and streamns");
+        create_proxy_and_stream::<SensorMarker>();
     // Register stream so subscriber is created.
     let request_task = Task::local({
         let handler = Rc::clone(&handler);
@@ -805,7 +804,7 @@ async fn light_sensor_handler_subscriber_queue() {
     let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, inspect_status);
 
     let (sensor_proxy, stream): (SensorProxy, SensorRequestStream) =
-        create_proxy_and_stream::<SensorMarker>().expect("should get proxy and streamns");
+        create_proxy_and_stream::<SensorMarker>();
     // Register stream so subscriber is created.
     let request_task = Task::local({
         let handler = Rc::clone(&handler);
@@ -920,7 +919,7 @@ async fn light_sensor_handler_inspect_counts_events() {
     let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, inspect_status);
 
     let (sensor_proxy, stream): (SensorProxy, SensorRequestStream) =
-        create_proxy_and_stream::<SensorMarker>().expect("should get proxy and streamns");
+        create_proxy_and_stream::<SensorMarker>();
     // Register stream so subscriber is created.
     let request_task = Task::local({
         let handler = Rc::clone(&handler);

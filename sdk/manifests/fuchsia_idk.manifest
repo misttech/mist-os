@@ -17,6 +17,7 @@ bind_library://bind/fuchsia.google.platform
 bind_library://bind/fuchsia.gpio
 bind_library://bind/fuchsia.i2c
 bind_library://bind/fuchsia.khadas.platform
+bind_library://bind/fuchsia.mailbox
 bind_library://bind/fuchsia.nxp.platform
 bind_library://bind/fuchsia.pci
 bind_library://bind/fuchsia.platform
@@ -353,6 +354,7 @@ fidl_library://fidl/fuchsia.system.state (unstable)
 fidl_library://fidl/fuchsia.test
 fidl_library://fidl/fuchsia.thermal
 fidl_library://fidl/fuchsia.tracing
+fidl_library://fidl/fuchsia.tracing.controller
 fidl_library://fidl/fuchsia.tracing.perfetto
 fidl_library://fidl/fuchsia.tracing.provider
 fidl_library://fidl/fuchsia.ui.activity

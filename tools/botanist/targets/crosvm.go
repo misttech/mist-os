@@ -75,10 +75,15 @@ func (b *crosvmCommandBuilder) AddKernelArg(arg string) {
 	b.kernelArgs = append(b.kernelArgs, arg)
 }
 
-func (b *crosvmCommandBuilder) HasFFXSupport() bool { return false }
-
 func (b *crosvmCommandBuilder) BuildFFXConfig() (*qemu.Config, error) {
-	return nil, nil
+	cmd := append([]string{"run", "--disable-sandbox"}, b.cmd...)
+	return &qemu.Config{
+		Args:       append(cmd, b.kernel),
+		Envs:       make(map[string]string),
+		Features:   []string{},
+		KernelArgs: b.kernelArgs,
+		Options:    []string{},
+	}, nil
 }
 
 func (b *crosvmCommandBuilder) BuildInvocation() ([]string, error) {

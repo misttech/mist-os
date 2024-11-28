@@ -1,0 +1,33 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+fuchsia_package_with_single_component("sockettunnel") {
+  manifest = "meta/sockettunnel.cml"
+}
+
+rustc_library("nanohub") {
+  name = "starnix-modules-nanohub"
+  edition = "2021"
+  version = "0.1.0"
+  source_root = "lib.rs"
+
+  sources = [
+    "lib.rs",
+    "nanohub.rs",
+    "nanohub_comms_directory.rs",
+    "socket_tunnel_file.rs",
+  ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.sockettunnel:fuchsia.hardware.sockettunnel_rust",
+    "//sdk/rust/zx",
+    "//src/lib/fuchsia-component",
+    "//src/starnix/kernel:starnix_core",
+    "//src/starnix/lib/starnix-sync",
+    "//src/starnix/lib/starnix-uapi",
+  ]
+}

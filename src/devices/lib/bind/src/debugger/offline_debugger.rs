@@ -408,7 +408,7 @@ impl<'a> Debugger<'a> {
         let key_symbol = self
             .symbol_table
             .get(identifier)
-            .ok_or(DebuggerError::UnknownKey(identifier.clone()))?;
+            .ok_or_else(|| DebuggerError::UnknownKey(identifier.clone()))?;
         let DeviceValue { symbol: _, identifier: value_identifier_device } = self
             .device_properties
             .get(key_symbol)
@@ -474,7 +474,7 @@ impl<'a> Debugger<'a> {
         let key_symbol = self
             .symbol_table
             .get(key_identifier)
-            .ok_or(DebuggerError::UnknownKey(key_identifier.clone()))?;
+            .ok_or_else(|| DebuggerError::UnknownKey(key_identifier.clone()))?;
         let DeviceValue { symbol: value_symbol, identifier: value_identifier } = self
             .device_properties
             .get(key_symbol)

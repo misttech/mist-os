@@ -39,11 +39,9 @@ python_library("honeydew_no_testonly") {
     "affordances/connectivity/wlan/wlan/__init__.py",
     "affordances/connectivity/wlan/wlan/wlan.py",
     "affordances/connectivity/wlan/wlan/wlan_using_fc.py",
-    "affordances/connectivity/wlan/wlan/wlan_using_sl4f.py",
     "affordances/connectivity/wlan/wlan_policy/__init__.py",
     "affordances/connectivity/wlan/wlan_policy/wlan_policy.py",
     "affordances/connectivity/wlan/wlan_policy/wlan_policy_using_fc.py",
-    "affordances/connectivity/wlan/wlan_policy/wlan_policy_using_sl4f.py",
     "affordances/connectivity/wlan/wlan_policy_ap/__init__.py",
     "affordances/connectivity/wlan/wlan_policy_ap/wlan_policy_ap.py",
     "affordances/connectivity/wlan/wlan_policy_ap/wlan_policy_ap_using_fc.py",
@@ -137,7 +135,11 @@ python_library("honeydew_no_testonly") {
   data_package_name = "data"
   data_sources = [ "${prebuilt_fastboot}" ]
 
-  # Ensure FIDL-IR dependencies used in Honeydew are supported in SDK.
+  # Ensure all FIDL dependencies are available and stable. Use the
+  # "partner_internal" SDK category and greater as an approximation of this.
+  # However, note that not everything in those categories is stable.
+  # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
+  # Also, there are exceptions for host tests - see https://fxbug.dev/326090508.
   assert_no_deps = [
     "//sdk:marker-cts",
     "//sdk:marker-excluded",

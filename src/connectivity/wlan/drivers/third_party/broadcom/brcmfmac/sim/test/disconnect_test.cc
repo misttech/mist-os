@@ -48,9 +48,10 @@ TEST_F(SimTest, DisassocFromApResultsInDisassocInd) {
   ASSERT_EQ(client_ifc.stats_.disassoc_indications.size(), 1U);
   const auto& disassoc_ind = client_ifc.stats_.disassoc_indications.front();
   // Verify reason code is propagated
-  EXPECT_EQ(disassoc_ind.reason_code, static_cast<wlan_ieee80211::ReasonCode>(kDisassocReason));
+  EXPECT_EQ(disassoc_ind.reason_code(), static_cast<wlan_ieee80211::ReasonCode>(kDisassocReason));
   // Disassociated by AP so not locally initiated
-  EXPECT_EQ(disassoc_ind.locally_initiated, false);
+  ASSERT_TRUE(disassoc_ind.locally_initiated().has_value());
+  EXPECT_FALSE(disassoc_ind.locally_initiated().value());
   // And we should see no other disconnects.
   EXPECT_EQ(client_ifc.stats_.disassoc_results.size(), 0U);
   EXPECT_EQ(client_ifc.stats_.deauth_results.size(), 0U);
@@ -84,9 +85,9 @@ TEST_F(SimTest, DeauthFromApResultsInDeauthInd) {
   ASSERT_EQ(client_ifc.stats_.deauth_indications.size(), 1U);
   const auto& deauth_ind = client_ifc.stats_.deauth_indications.front();
   // Verify reason code is propagated
-  EXPECT_EQ(deauth_ind.reason_code, static_cast<wlan_ieee80211::ReasonCode>(kDeauthReason));
+  EXPECT_EQ(deauth_ind.reason_code(), static_cast<wlan_ieee80211::ReasonCode>(kDeauthReason));
   // Deauthenticated by AP so not locally initiated
-  EXPECT_EQ(deauth_ind.locally_initiated, false);
+  EXPECT_EQ(deauth_ind.locally_initiated(), false);
   // And we should see no other disconnects.
   EXPECT_EQ(client_ifc.stats_.disassoc_results.size(), 0U);
   EXPECT_EQ(client_ifc.stats_.deauth_results.size(), 0U);
@@ -240,10 +241,10 @@ TEST_F(SimTest, DeauthFromSmeWhileNotConnectedResultsInDeauthConf) {
 
   // Verify that we got the deauth confirmation
   ASSERT_EQ(client_ifc.stats_.deauth_results.size(), 1U);
-  const auto& deauth_confirm = client_ifc.stats_.deauth_results.front();
-  ASSERT_TRUE(client_ifc.stats_.deauth_results.front().has_peer_sta_address());
-  ASSERT_EQ(ETH_ALEN, deauth_confirm.peer_sta_address().size());
-  ASSERT_BYTES_EQ(deauth_confirm.peer_sta_address().data(), kApBssid.byte, ETH_ALEN);
+  const auto& deauth_conf = client_ifc.stats_.deauth_results.front();
+  ASSERT_TRUE(deauth_conf.peer_sta_address().has_value());
+  ASSERT_EQ(ETH_ALEN, deauth_conf.peer_sta_address()->size());
+  EXPECT_BYTES_EQ(deauth_conf.peer_sta_address()->data(), kApBssid.byte, ETH_ALEN);
 
   // And we should see no other disconnects.
   EXPECT_EQ(client_ifc.stats_.disassoc_results.size(), 0U);
@@ -293,17 +294,19 @@ TEST_F(SimTest, SmeDeauthThenConnectThenFwDisassoc) {
 
   // Verify that we got the deauth confirmation
   ASSERT_EQ(client_ifc.stats_.deauth_results.size(), 1U);
-  const auto& deauth_confirm = client_ifc.stats_.deauth_results.front();
-  ASSERT_TRUE(client_ifc.stats_.deauth_results.front().has_peer_sta_address());
-  ASSERT_EQ(ETH_ALEN, deauth_confirm.peer_sta_address().size());
-  ASSERT_BYTES_EQ(deauth_confirm.peer_sta_address().data(), kApBssid.byte, ETH_ALEN);
+  const auto& deauth_conf = client_ifc.stats_.deauth_results.front();
+  ASSERT_TRUE(deauth_conf.peer_sta_address().has_value());
+  ASSERT_EQ(ETH_ALEN, deauth_conf.peer_sta_address()->size());
+  EXPECT_BYTES_EQ(deauth_conf.peer_sta_address()->data(), kApBssid.byte, ETH_ALEN);
 
   // Verify that we got the disassociation indication, not a confirmation or anything else
   ASSERT_EQ(client_ifc.stats_.disassoc_indications.size(), 1U);
   const auto& disassoc_ind = client_ifc.stats_.disassoc_indications.front();
-  EXPECT_EQ(disassoc_ind.reason_code, static_cast<wlan_ieee80211::ReasonCode>(disassoc_reason));
+  ASSERT_TRUE(disassoc_ind.reason_code().has_value());
+  EXPECT_EQ(disassoc_ind.reason_code(), static_cast<wlan_ieee80211::ReasonCode>(disassoc_reason));
   // Disassoc came from firmware, not AP/SME, so it is locally initiated.
-  EXPECT_EQ(disassoc_ind.locally_initiated, true);
+  ASSERT_TRUE(disassoc_ind.locally_initiated().has_value());
+  EXPECT_TRUE(disassoc_ind.locally_initiated().value());
 
   // And we should see no other disconnects.
   EXPECT_EQ(client_ifc.stats_.disassoc_results.size(), 0U);
@@ -353,10 +356,12 @@ TEST_F(SimTest, SmeDisassocThenConnectThenFwDisassoc) {
   // second disconnect because of the reason code.
   ASSERT_EQ(client_ifc.stats_.disassoc_indications.size(), 1U);
   const auto& disassoc_ind = client_ifc.stats_.disassoc_indications.front();
-  EXPECT_EQ(disassoc_ind.reason_code, disassoc_reason);
+  ASSERT_TRUE(disassoc_ind.reason_code().has_value());
+  EXPECT_EQ(disassoc_ind.reason_code().value(), disassoc_reason);
   // Firmware-initiated disconnect with no SME-requested disconnect means
   // locally initiated.
-  EXPECT_EQ(disassoc_ind.locally_initiated, true);
+  ASSERT_TRUE(disassoc_ind.locally_initiated().has_value());
+  EXPECT_TRUE(disassoc_ind.locally_initiated().value());
 
   // And we should see no other disconnects.
   EXPECT_EQ(client_ifc.stats_.deauth_results.size(), 0U);
@@ -406,9 +411,9 @@ TEST_F(SimTest, SmeDisassocThenConnectThenFwDeauth) {
   // second disconnect because of the reason code.
   ASSERT_EQ(client_ifc.stats_.deauth_indications.size(), 1U);
   const auto& deauth_ind = client_ifc.stats_.deauth_indications.front();
-  EXPECT_TRUE(deauth_ind.locally_initiated);
-  ASSERT_EQ(deauth_ind.peer_sta_address.size(), ETH_ALEN);
-  ASSERT_BYTES_EQ(deauth_ind.peer_sta_address.data(), kApBssid.byte, ETH_ALEN);
+  EXPECT_TRUE(deauth_ind.locally_initiated());
+  ASSERT_EQ(deauth_ind.peer_sta_address()->size(), ETH_ALEN);
+  ASSERT_BYTES_EQ(deauth_ind.peer_sta_address()->data(), kApBssid.byte, ETH_ALEN);
 
   // And we should see no other disconnects.
   EXPECT_EQ(client_ifc.stats_.disassoc_indications.size(), 0U);

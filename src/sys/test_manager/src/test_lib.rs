@@ -15,7 +15,8 @@ use linked_hash_map::LinkedHashMap;
 use moniker::ExtendedMoniker;
 use std::collections::HashMap;
 use std::sync::Arc;
-use test_diagnostics::{collect_and_send_string_output, LogStream};
+use test_diagnostics::zstd_compress::Decoder;
+use test_diagnostics::{collect_and_send_string_output, collect_string_from_socket, LogStream};
 use tracing::*;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -105,10 +106,13 @@ pub async fn collect_suite_events(
 pub async fn collect_suite_events_with_watch(
     suite_instance: SuiteRunInstance,
     filter_debug_data: bool,
+    compressed_debug_data: bool,
 ) -> Result<(Vec<RunEvent>, Vec<AttributedLog>), Error> {
     let (sender, mut recv) = mpsc::channel(1);
     let execution_task = fasync::Task::spawn(async move {
-        suite_instance.collect_events_with_watch(sender, filter_debug_data).await
+        suite_instance
+            .collect_events_with_watch(sender, filter_debug_data, compressed_debug_data)
+            .await
     });
     let mut events = vec![];
     let mut log_tasks = vec![];
@@ -165,6 +169,41 @@ pub async fn collect_suite_events_with_watch(
     Ok((events, collected_logs))
 }
 
+/// Collect bytes from the socket, decompress if required and return the string
+pub async fn collect_string_from_socket_helper(
+    socket: fidl::Socket,
+    compressed_debug_data: bool,
+) -> Result<String, anyhow::Error> {
+    if !compressed_debug_data {
+        return collect_string_from_socket(socket).await;
+    }
+    let mut async_socket = fidl::AsyncSocket::from_socket(socket);
+    let mut buf = vec![0u8; 1024 * 32];
+
+    let (mut decoder, mut receiver) = Decoder::new();
+    let task: fasync::Task<Result<(), anyhow::Error>> = fasync::Task::spawn(async move {
+        loop {
+            let l = async_socket.read(&mut buf).await?;
+            match l {
+                0 => {
+                    decoder.finish().await?;
+                    break;
+                }
+                _ => {
+                    decoder.decompress(&buf[..l]).await?;
+                }
+            }
+        }
+        Ok(())
+    });
+
+    let mut decompressed_data = Vec::new();
+    while let Some(chunk) = receiver.next().await {
+        decompressed_data.extend_from_slice(&chunk);
+    }
+    task.await?;
+    Ok(String::from_utf8_lossy(decompressed_data.as_slice()).into())
+}
 /// Runs a test suite.
 pub struct SuiteRunner {
     proxy: ftest_manager::SuiteRunnerProxy,
@@ -186,8 +225,7 @@ impl SuiteRunner {
         test_url: &str,
         options: ftest_manager::RunSuiteOptions,
     ) -> Result<SuiteRunInstance, Error> {
-        let (controller_proxy, controller) =
-            fidl::endpoints::create_proxy().context("Cannot create proxy")?;
+        let (controller_proxy, controller) = fidl::endpoints::create_proxy();
         self.proxy.run(test_url, options, controller).context("Error starting tests")?;
 
         return Ok(SuiteRunInstance { controller_proxy: controller_proxy.into() });
@@ -234,8 +272,7 @@ impl TestBuilder {
         test_url: &str,
         run_options: ftest_manager::RunOptions,
     ) -> Result<SuiteRunInstance, Error> {
-        let (controller_proxy, controller) =
-            fidl::endpoints::create_proxy().context("Cannot create proxy")?;
+        let (controller_proxy, controller) = fidl::endpoints::create_proxy();
         self.proxy.add_suite(test_url, &run_options, controller)?;
         Ok(SuiteRunInstance { controller_proxy: controller_proxy.into() })
     }
@@ -249,8 +286,7 @@ impl TestBuilder {
         test_url: &str,
         run_options: ftest_manager::RunOptions,
     ) -> Result<SuiteRunInstance, Error> {
-        let (controller_proxy, controller) =
-            fidl::endpoints::create_proxy().context("Cannot create proxy")?;
+        let (controller_proxy, controller) = fidl::endpoints::create_proxy();
         self.proxy.add_suite_in_realm(
             realm,
             offers,
@@ -262,10 +298,21 @@ impl TestBuilder {
         Ok(SuiteRunInstance { controller_proxy: controller_proxy.into() })
     }
 
-    /// Runs all tests to completion and collects events.
+    /// Runs all tests to completion and collects events alongside uncompressed debug_data.
+    /// We will remove this function and merge it with run_with_option function once we remove open to get uncompressed
+    /// debug_data.
     pub async fn run(self) -> Result<Vec<TestRunEvent>, Error> {
-        let (controller_proxy, controller) =
-            fidl::endpoints::create_proxy().context("Cannot create proxy")?;
+        self.run_with_option(false).await
+    }
+
+    /// Runs all tests to completion and collects events alongside compressed debug_data.
+    /// We will remove this function and merge it with run once we remove open to get uncompressed
+    /// debug_data.
+    pub async fn run_with_option(
+        self,
+        get_compressed_debug_data: bool,
+    ) -> Result<Vec<TestRunEvent>, Error> {
+        let (controller_proxy, controller) = fidl::endpoints::create_proxy();
         self.proxy.build(controller).context("Error starting tests")?;
         // wait for test to end
         let mut events = vec![];
@@ -280,9 +327,12 @@ impl TestBuilder {
                         ftest_manager::Artifact::DebugData(iterator),
                     ) => {
                         if !self.filter_debug_data {
-                            let proxy = iterator.into_proxy().context("Create proxy")?;
+                            let proxy = iterator.into_proxy();
                             loop {
-                                let data = proxy.get_next().await?;
+                                let data = match get_compressed_debug_data {
+                                    true => proxy.get_next_compressed().await?,
+                                    false => proxy.get_next().await?,
+                                };
                                 if data.is_empty() {
                                     break;
                                 }
@@ -801,7 +851,7 @@ impl FidlSuiteEventProcessor {
                     let component_moniker = custom_artifact.component_moniker.unwrap();
                     let mut sender_clone = sender.clone();
                     fasync::Task::spawn(async move {
-                        let directory = directory.into_proxy().unwrap();
+                        let directory = directory.into_proxy();
                         let entries: Vec<_> =
                             fuchsia_fs::directory::readdir_recursive(&directory, None)
                                 .try_collect()
@@ -861,6 +911,7 @@ impl FidlSuiteEventProcessor {
         event: ftest_manager::Event,
         mut sender: mpsc::Sender<SuiteEvent>,
         filter_debug_data: bool,
+        compressed_debug_data: bool,
     ) -> Result<(), Error> {
         let timestamp = event.timestamp;
         let e = match event.details.expect("Details cannot be null, please file bug.") {
@@ -1010,7 +1061,7 @@ impl FidlSuiteEventProcessor {
                         let component_moniker = custom_artifact.component_moniker.unwrap();
                         let mut sender_clone = sender.clone();
                         fasync::Task::spawn(async move {
-                            let directory = directory.into_proxy().unwrap();
+                            let directory = directory.into_proxy();
                             let entries: Vec<_> =
                                 fuchsia_fs::directory::readdir_recursive(&directory, None)
                                     .try_collect()
@@ -1045,10 +1096,13 @@ impl FidlSuiteEventProcessor {
                     ftest_manager::Artifact::DebugData(iterator) => {
                         if !filter_debug_data {
                             let mut sender_clone = sender.clone();
-                            let proxy = iterator.into_proxy().context("Create proxy")?;
+                            let proxy = iterator.into_proxy();
                             fasync::Task::spawn(async move {
                                 loop {
-                                    let data = proxy.get_next().await.unwrap();
+                                    let data = match compressed_debug_data {
+                                        true => proxy.get_next_compressed().await.unwrap(),
+                                        false => proxy.get_next().await.unwrap(),
+                                    };
                                     if data.is_empty() {
                                         break;
                                     }
@@ -1180,6 +1234,7 @@ impl SuiteRunInstance {
         &self,
         sender: mpsc::Sender<SuiteEvent>,
         filter_debug_data: bool,
+        compressed_debug_data: bool,
     ) -> Result<(), Error> {
         let controller_proxy = self.controller_proxy.clone();
         let mut processor = FidlSuiteEventProcessor::new();
@@ -1191,8 +1246,14 @@ impl SuiteRunInstance {
                         break;
                     }
                     for event in events {
-                        if let Err(e) =
-                            processor.process_event(event, sender.clone(), filter_debug_data).await
+                        if let Err(e) = processor
+                            .process_event(
+                                event,
+                                sender.clone(),
+                                filter_debug_data,
+                                compressed_debug_data,
+                            )
+                            .await
                         {
                             warn!("error running test suite: {:?}", e);
                             let _ = controller_proxy.kill();

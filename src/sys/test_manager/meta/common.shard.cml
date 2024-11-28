@@ -42,10 +42,6 @@
             url: "fuzz-test-runner#meta/fuzz-starnix-test-runner.cm",
         },
         {
-            name: "g3_dart_jit_product_runner",
-            url: "fuchsia-pkg://fuchsia.com/g3_dart_jit_product_runner#meta/g3_dart_jit_product_runner.cm",
-        },
-        {
             name: "gtest_runner",
             url: "gtest-runner#meta/gtest-runner.cm",
         },
@@ -230,6 +226,11 @@
             ],
         },
         {
+            protocol: [ "fuchsia.component.Introspector" ],
+            from: "parent",
+            to: [ "#rust_test_runner" ],
+        },
+        {
             event_stream: [
                 "capability_requested",
                 "debug_started",
@@ -252,17 +253,6 @@
             from: "parent",
             to: "#tests",
             scope: "#tests",
-        },
-        {
-            protocol: [
-                "fuchsia.device.NameProvider",
-                "fuchsia.feedback.CrashReporter",
-                "fuchsia.intl.PropertyProvider",
-                "fuchsia.net.name.Lookup",
-                "fuchsia.posix.socket.Provider",
-            ],
-            from: "parent",
-            to: [ "#g3_dart_jit_product_runner" ],
         },
 
         // These capabilities are offered for use by certain non-hermetic tests.
@@ -428,16 +418,12 @@
         {
             directory: "config-data",
             from: "parent",
-            to: [
-                "#g3_dart_jit_product_runner",
-                "#system-tests",
-            ],
+            to: [ "#system-tests" ],
         },
         {
             storage: "tmp",
             from: "self",
             to: [
-                "#g3_dart_jit_product_runner",
                 "#system-tests",
                 "#tests",
             ],

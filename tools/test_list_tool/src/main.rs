@@ -183,7 +183,7 @@ fn update_tags_from_facets(
             let val = facet
                 .value
                 .as_ref()
-                .ok_or(error::TestListToolError::NullFacet(facet.key.clone()))?;
+                .ok_or_else(|| error::TestListToolError::NullFacet(facet.key.clone()))?;
             match &**val {
                 fdata::DictionaryValue::Str(s) => {
                     test_tags.realm = Some(s.to_string());
@@ -201,7 +201,7 @@ fn update_tags_from_facets(
             let val = facet
                 .value
                 .as_ref()
-                .ok_or(error::TestListToolError::NullFacet(facet.key.clone()))?;
+                .ok_or_else(|| error::TestListToolError::NullFacet(facet.key.clone()))?;
             match &**val {
                 fdata::DictionaryValue::StrVec(s) => {
                     depends_on_system_packages = !s.is_empty();
@@ -410,7 +410,7 @@ fn run_tool() -> Result<(), Error> {
                 // Find additional tags. Note that this can override existing tags (e.g. to set the test type based on realm)
                 if let Err(e) = update_tags_from_facets(
                     &mut test_tags,
-                    &decl.facets.unwrap_or(fdata::Dictionary::default()),
+                    &decl.facets.unwrap_or_else(fdata::Dictionary::default),
                 ) {
                     return Err(format_err!(
                         "error processing manifest for package URL {}: {:?}",

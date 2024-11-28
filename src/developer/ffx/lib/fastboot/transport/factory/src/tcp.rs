@@ -4,7 +4,6 @@
 
 use crate::helpers::rediscover_helper;
 use anyhow::{Context as _, Result};
-use async_net::TcpStream;
 use async_trait::async_trait;
 use discovery::{FastbootConnectionState, TargetFilter, TargetHandle, TargetState};
 use ffx_fastboot_interface::interface_factory::{
@@ -12,9 +11,11 @@ use ffx_fastboot_interface::interface_factory::{
 };
 use ffx_fastboot_transport_interface::tcp::{open_once, TcpNetworkInterface};
 use fuchsia_async::Timer;
+use netext::TokioAsyncWrapper;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
+use tokio::net::TcpStream;
 
 ///////////////////////////////////////////////////////////////////////////////
 // TcpFactory
@@ -50,8 +51,10 @@ impl Drop for TcpFactory {
 }
 
 #[async_trait(?Send)]
-impl InterfaceFactoryBase<TcpNetworkInterface<TcpStream>> for TcpFactory {
-    async fn open(&mut self) -> Result<TcpNetworkInterface<TcpStream>, InterfaceFactoryError> {
+impl InterfaceFactoryBase<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>> for TcpFactory {
+    async fn open(
+        &mut self,
+    ) -> Result<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>, InterfaceFactoryError> {
         let wait_duration = Duration::from_secs(self.retry_wait_seconds);
         for i in 1..self.open_retries {
             match open_once(&self.addr, Duration::from_secs(1)).await.with_context(|| {
@@ -103,7 +106,7 @@ impl InterfaceFactoryBase<TcpNetworkInterface<TcpStream>> for TcpFactory {
     }
 }
 
-impl InterfaceFactory<TcpNetworkInterface<TcpStream>> for TcpFactory {}
+impl InterfaceFactory<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>> for TcpFactory {}
 
 pub struct TcpTargetFilter {
     node_name: String,

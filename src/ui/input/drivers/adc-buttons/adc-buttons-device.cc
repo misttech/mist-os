@@ -11,7 +11,7 @@ namespace adc_buttons_device {
 
 void AdcButtonsDevice::AdcButtonInputReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-    fidl::AnyArena& allocator) {
+    fidl::AnyArena& allocator) const {
   fidl::VectorView<fuchsia_input_report::wire::ConsumerControlButton> pressed_buttons_rpt(
       allocator, buttons.size());
   std::copy(buttons.begin(), buttons.end(), pressed_buttons_rpt.begin());

@@ -119,7 +119,7 @@ async fn cobalt_impl(handles: LocalComponentHandles) -> Result<(), Error> {
                 })) = stream.try_next().await
                 {
                     fasync::Task::spawn(async move {
-                        let mut stream = logger.into_stream().unwrap();
+                        let mut stream = logger.into_stream();
                         while let Some(Ok(request)) = stream.next().await {
                             match request {
                                 MetricEventLoggerRequest::LogOccurrence { responder, .. } => {

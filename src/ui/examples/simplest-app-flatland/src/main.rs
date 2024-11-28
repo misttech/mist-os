@@ -68,12 +68,10 @@ impl<'a> AppModel<'a> {
     async fn create_view(&mut self) {
         // Set up the channel to listen for layout changes.
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
-            create_proxy::<fland::ParentViewportWatcherMarker>()
-                .expect("failed to create ParentViewportWatcherProxy");
+            create_proxy::<fland::ParentViewportWatcherMarker>();
 
         // Set up the protocols we care about (currently just touch).
-        let (touch, touch_request) =
-            create_proxy::<fptr::TouchSourceMarker>().expect("failed to create TouchSource");
+        let (touch, touch_request) = create_proxy::<fptr::TouchSourceMarker>();
         let view_bound_protocols =
             fland::ViewBoundProtocols { touch_source: Some(touch_request), ..Default::default() };
 
@@ -100,7 +98,7 @@ impl<'a> AppModel<'a> {
 
         // Connect to graphical presenter to get the view displayed.
         let (view_controller_proxy, view_controller_request) =
-            create_proxy::<ViewControllerMarker>().unwrap();
+            create_proxy::<ViewControllerMarker>();
         self.view_controller = Some(view_controller_proxy);
         let view_spec = ViewSpec {
             viewport_creation_token: Some(viewport_creation_token),
@@ -127,12 +125,10 @@ impl<'a> AppModel<'a> {
     ) {
         // Set up the channel to listen for layout changes.
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
-            create_proxy::<fland::ParentViewportWatcherMarker>()
-                .expect("failed to create ParentViewportWatcherProxy");
+            create_proxy::<fland::ParentViewportWatcherMarker>();
 
         // Set up the protocols we care about (currently just touch).
-        let (touch, touch_request) =
-            create_proxy::<fptr::TouchSourceMarker>().expect("failed to create TouchSource");
+        let (touch, touch_request) = create_proxy::<fptr::TouchSourceMarker>();
         let view_bound_protocols =
             fland::ViewBoundProtocols { touch_source: Some(touch_request), ..Default::default() };
 

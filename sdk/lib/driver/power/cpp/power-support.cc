@@ -254,17 +254,6 @@ fit::result<Error> GetTokensFromSag(ElementDependencyMap& dependencies, TokenMap
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
         }
         break;
-      case SagElement::kWakeHandling:
-        if (elements->has_wake_handling() &&
-            elements->wake_handling().has_assertive_dependency_token()) {
-          zx::event copy;
-          elements->wake_handling().assertive_dependency_token().duplicate(ZX_RIGHT_SAME_RIGHTS,
-                                                                           &copy);
-          tokens.emplace(std::make_pair(parent, std::move(copy)));
-        } else {
-          return fit::error(Error::DEPENDENCY_NOT_FOUND);
-        }
-        break;
       case SagElement::kApplicationActivity:
         if (elements->has_application_activity() &&
             elements->application_activity().has_assertive_dependency_token()) {
@@ -426,9 +415,10 @@ std::vector<fuchsia_power_broker::PowerLevel> PowerLevelsFromConfig(
 fit::result<Error, TokenMap> GetDependencyTokens(const fdf::Namespace& ns,
                                                  const PowerElementConfiguration& element_config) {
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  zx_status_t result = fdio_open_at(ns.svc_dir().channel()->get(), ".",
-                                    static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory),
-                                    server_end.channel().release());
+  zx_status_t result =
+      fdio_open3_at(ns.svc_dir().channel()->get(), ".",
+                    static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
+                    server_end.channel().release());
   if (result != ZX_OK) {
     return fit::error(Error::IO);
   }

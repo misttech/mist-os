@@ -4,12 +4,15 @@
 
 use fidl_fuchsia_bluetooth::{Appearance, DeviceClass};
 use fidl_fuchsia_bluetooth_sys as fsys;
+#[cfg(target_os = "fuchsia")]
 use fuchsia_inspect::Node;
+#[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_contrib::log::WriteInspect;
 use std::fmt;
 
 use crate::assigned_numbers::find_service_uuid;
 use crate::error::Error;
+#[cfg(target_os = "fuchsia")]
 use crate::inspect::*;
 use crate::types::{Address, PeerId, Uuid};
 
@@ -57,6 +60,7 @@ pub struct Peer {
     pub bredr_services: Vec<Uuid>,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl Peer {
     /// Records the immutable properties of this peer to the Node given.
     fn record_inspect(&self, node: &Node) {
@@ -108,6 +112,7 @@ pub fn peer_audio_stream_id(peer_id: PeerId, uuid: Uuid) -> [u8; 16] {
     unique_id
 }
 
+#[cfg(target_os = "fuchsia")]
 impl ImmutableDataInspect<Peer> for ImmutableDataInspectManager {
     fn new(data: &Peer, manager: Node) -> ImmutableDataInspectManager {
         data.record_inspect(&manager);
@@ -115,10 +120,12 @@ impl ImmutableDataInspect<Peer> for ImmutableDataInspectManager {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl IsInspectable for Peer {
     type I = ImmutableDataInspectManager;
 }
 
+#[cfg(target_os = "fuchsia")]
 impl WriteInspect for Peer {
     fn write_inspect(&self, writer: &Node, key: impl Into<fuchsia_inspect::StringReference>) {
         writer.record_child(key, |node| {
@@ -167,9 +174,9 @@ impl TryFrom<fsys::Peer> for Peer {
     type Error = Error;
     fn try_from(src: fsys::Peer) -> Result<Peer, Self::Error> {
         Ok(Peer {
-            id: src.id.ok_or(Error::missing("sys.Peer.id"))?.into(),
-            address: src.address.ok_or(Error::missing("sys.Peer.address"))?.into(),
-            technology: src.technology.ok_or(Error::missing("sys.Peer.technology"))?,
+            id: src.id.ok_or_else(|| Error::missing("sys.Peer.id"))?.into(),
+            address: src.address.ok_or_else(|| Error::missing("sys.Peer.address"))?.into(),
+            technology: src.technology.ok_or_else(|| Error::missing("sys.Peer.technology"))?,
             connected: src.connected.unwrap_or(false),
             bonded: src.bonded.unwrap_or(false),
             name: src.name.clone(),

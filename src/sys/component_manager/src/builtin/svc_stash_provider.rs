@@ -52,7 +52,7 @@ mod tests {
     #[fuchsia::test]
     async fn second_call_fails() -> Result<(), Error> {
         let svc_stash_provider = SvcStashCapability::new(get_svc_stash_handle().await?);
-        let (proxy, stream) = create_proxy_and_stream::<fuchsia_boot::SvcStashProviderMarker>()?;
+        let (proxy, stream) = create_proxy_and_stream::<fuchsia_boot::SvcStashProviderMarker>();
         let _task = fasync::Task::spawn(svc_stash_provider.serve(stream));
         let svc_stash = proxy.get().await?;
         assert_ne!(svc_stash.unwrap().raw_handle(), sys::ZX_HANDLE_INVALID);

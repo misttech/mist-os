@@ -48,11 +48,11 @@ class LdLoadZirconLdsvcTestsBase : public LdLoadTestsBase {
 
   void VerifyAndClearNeeded() { mock_.VerifyAndClearExpectations(); }
 
- protected:
   void LdsvcPathPrefix(std::string_view executable) {
     mock_.set_path_prefix(std::filesystem::path("test") / executable / "lib");
   }
 
+ protected:
   void LdsvcExpectNeeded() {
     for (const auto& [name, found] : TakeNeededLibs()) {
       if (found) {

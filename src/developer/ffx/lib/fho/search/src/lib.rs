@@ -121,7 +121,6 @@ impl ExternalSubToolSuite {
             Some(FfxToolInfo { path: Some(path), .. }) => {
                 let context = self.context.clone();
                 let cmd_line = ffx_cmd.clone();
-                let path = path.clone();
                 ExternalSubTool { cmd_line, context, path }
             }
             _ => return None,

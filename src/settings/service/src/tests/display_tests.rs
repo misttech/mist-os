@@ -211,15 +211,10 @@ async fn test_display_failure() {
             match service_name {
                 fidl_fuchsia_ui_brightness::ControlMarker::PROTOCOL_NAME => {
                     // This stream is closed immediately
-                    let manager_stream_result =
+                    let _manager_stream_result =
                         ServerEnd::<fidl_fuchsia_ui_brightness::ControlMarker>::new(channel)
                             .into_stream();
 
-                    if manager_stream_result.is_err() {
-                        return Box::pin(async {
-                            Err(anyhow!("could not move brightness channel into stream"))
-                        });
-                    }
                     Box::pin(async { Ok(()) })
                 }
                 _ => Box::pin(async { Err(anyhow!("unsupported")) }),

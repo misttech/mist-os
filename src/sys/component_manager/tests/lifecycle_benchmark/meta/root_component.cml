@@ -8,6 +8,10 @@
             name: "elf_runner",
             url: "fuchsia-builtin://#elf_runner.cm",
         },
+
+        // We'd like this test to use the real package resolver. RealmBuilder's resolver is the
+        // only one installed in the parent environment, so we need to create our own instance
+        // of the fuchsia-pkg component resolver.
         {
             name: "full-resolver",
             url: "#meta/full-resolver.cm",

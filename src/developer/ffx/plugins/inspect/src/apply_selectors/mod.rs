@@ -42,7 +42,7 @@ pub async fn execute(
         .context(format!("Unable to deserialize {}.", snapshot_file.display()))?
     } else {
         let provider = HostArchiveReader::new(diagnostics_proxy, rcs_proxy);
-        provider.snapshot::<Inspect>(&cmd.accessor_path, std::iter::empty()).await?
+        provider.snapshot::<Inspect>(cmd.accessor_path.as_deref(), std::iter::empty()).await?
     };
     let moniker = match cmd.moniker {
         Some(m) => Some(ExtendedMoniker::parse_str(&m)?),

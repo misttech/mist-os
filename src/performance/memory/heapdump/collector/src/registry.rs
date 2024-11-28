@@ -79,7 +79,7 @@ impl Registry {
                 fheapdump_client::CollectorRequest::TakeLiveSnapshot { payload, .. } => {
                     let process_selector = payload.process_selector;
                     let receiver =
-                        payload.receiver.context("missing required receiver")?.into_proxy()?;
+                        payload.receiver.context("missing required receiver")?.into_proxy();
                     let with_contents = payload.with_contents.unwrap_or(false);
 
                     let process = match process_selector {
@@ -120,7 +120,7 @@ impl Registry {
                 }
                 fheapdump_client::CollectorRequest::ListStoredSnapshots { payload, .. } => {
                     let mut iterator =
-                        payload.iterator.context("missing required iterator")?.into_stream()?;
+                        payload.iterator.context("missing required iterator")?.into_stream();
                     let process_selector = payload.process_selector.as_ref();
 
                     let filter: Result<Box<dyn Fn(Koid, &str) -> bool>, _> = match process_selector
@@ -172,7 +172,7 @@ impl Registry {
                     let snapshot_id =
                         payload.snapshot_id.context("missing required snapshot_id")?;
                     let receiver =
-                        payload.receiver.context("missing required receiver")?.into_proxy()?;
+                        payload.receiver.context("missing required receiver")?.into_proxy();
 
                     let snapshot = self.snapshot_storage.lock().await.get_snapshot(snapshot_id);
                     start_detached_task(async move {
@@ -306,8 +306,7 @@ mod tests {
         // Create a client and start serving its stream from a detached task.
         let proxy = {
             let registry = registry.clone();
-            let (proxy, stream) =
-                create_proxy_and_stream::<fheapdump_client::CollectorMarker>().unwrap();
+            let (proxy, stream) = create_proxy_and_stream::<fheapdump_client::CollectorMarker>();
 
             let worker_fn = async move { registry.serve_client_stream(stream).await.unwrap() };
             fasync::Task::local(worker_fn).detach();
@@ -566,7 +565,7 @@ mod tests {
         let (_registry, proxy) = create_registry_and_proxy([process1, process2, process3]);
 
         // Execute the request.
-        let (receiver_client, receiver_stream) = create_request_stream().unwrap();
+        let (receiver_client, receiver_stream) = create_request_stream();
         let request = fheapdump_client::CollectorTakeLiveSnapshotRequest {
             process_selector,
             receiver: Some(receiver_client),
@@ -632,7 +631,7 @@ mod tests {
         }
 
         // Get the unfiltered list of snapshots.
-        let (iterator, server_end) = create_proxy().unwrap();
+        let (iterator, server_end) = create_proxy();
         proxy
             .list_stored_snapshots(fheapdump_client::CollectorListStoredSnapshotsRequest {
                 iterator: Some(server_end),
@@ -669,7 +668,7 @@ mod tests {
         );
 
         // Verify filtering by koid.
-        let (iterator, server_end) = create_proxy().unwrap();
+        let (iterator, server_end) = create_proxy();
         proxy
             .list_stored_snapshots(fheapdump_client::CollectorListStoredSnapshotsRequest {
                 iterator: Some(server_end),
@@ -685,7 +684,7 @@ mod tests {
         );
 
         // Verify filtering by name.
-        let (iterator, server_end) = create_proxy().unwrap();
+        let (iterator, server_end) = create_proxy();
         proxy
             .list_stored_snapshots(fheapdump_client::CollectorListStoredSnapshotsRequest {
                 iterator: Some(server_end),
@@ -715,7 +714,7 @@ mod tests {
             "foobaz".to_string(),
             Box::new(FakeSnapshot { with_contents: false }),
         );
-        let (receiver_client, receiver_stream) = create_request_stream().unwrap();
+        let (receiver_client, receiver_stream) = create_request_stream();
         let request = fheapdump_client::CollectorDownloadStoredSnapshotRequest {
             snapshot_id: Some(snapshot_id),
             receiver: Some(receiver_client),
@@ -725,7 +724,7 @@ mod tests {
         FakeSnapshot::receive_and_assert_match(receiver_stream, false).await;
 
         // Attempt to request a non-existing snapshot and verify the returned error.
-        let (receiver_client, receiver_stream) = create_request_stream().unwrap();
+        let (receiver_client, receiver_stream) = create_request_stream();
         let request = fheapdump_client::CollectorDownloadStoredSnapshotRequest {
             snapshot_id: Some(snapshot_id + 1), // bad snapshot ID
             receiver: Some(receiver_client),

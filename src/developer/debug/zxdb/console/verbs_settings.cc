@@ -742,8 +742,18 @@ ErrOr<ParsedSetCommand> ParseSetCommand(const std::string& input) {
   if (result.op != ParsedSetCommand::kAssign && value_tokens.empty())
     return Err("Expected a value to add/remove.");
 
-  for (const auto& token : value_tokens)
-    result.values.push_back(std::move(token.str));
+  if (result.name == ClientSettings::Target::kSourceMap) {
+    // source-map expects strings of the format <find>=<replace>, which imposes additional
+    // restrictions on the above grammar. To avoid making it extremely easy to hold this wrong,
+    // special case this and squash all of the tokens together for the user.
+    auto& value = result.values.emplace_back();
+    for (const auto& token : value_tokens) {
+      value.append(token.str);
+    }
+  } else {
+    for (const auto& token : value_tokens)
+      result.values.push_back(std::move(token.str));
+  }
   return result;
 }
 

@@ -59,7 +59,7 @@ pub async fn main() -> Result<(), Error> {
         Ok(sampler_config) => {
             // Create endpoint for the reboot watcher register.
             let (reboot_watcher_client, reboot_watcher_request_stream) =
-                fidl::endpoints::create_request_stream::<reboot::RebootMethodsWatcherMarker>()?;
+                fidl::endpoints::create_request_stream::<reboot::RebootMethodsWatcherMarker>();
 
             {
                 // Let the transient connection fall out of scope once we've passed the client

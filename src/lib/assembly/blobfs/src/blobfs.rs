@@ -91,7 +91,7 @@ impl BlobFSBuilder {
         // Run the blobfs tool.
         let result = self.tool.run(&blobfs_args);
         match result {
-            Ok(_) => Ok(blobs_json_path.clone()),
+            Ok(_) => Ok(blobs_json_path),
             Err(e) => Err(e),
         }
     }

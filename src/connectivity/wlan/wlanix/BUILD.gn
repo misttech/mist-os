@@ -22,6 +22,7 @@ rustc_binary("wlanix_bin") {
 
   deps = [
     ":fuchsia.wlan.wlanix_rust",
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
     "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_rust",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
@@ -38,6 +39,7 @@ rustc_binary("wlanix_bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-sync",
+    "//src/power/broker/client",
     "//src/starnix/lib/third_party/rust_netlink/netlink_packet_core",
     "//src/starnix/lib/third_party/rust_netlink/netlink_packet_generic",
     "//src/starnix/lib/third_party/rust_netlink/netlink_packet_utils",
@@ -47,6 +49,8 @@ rustc_binary("wlanix_bin") {
     "//third_party/rust_crates:num",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
+    "//third_party/rust_crates:strum",
+    "//third_party/rust_crates:strum_macros",
     "//third_party/rust_crates:tracing",
   ]
 

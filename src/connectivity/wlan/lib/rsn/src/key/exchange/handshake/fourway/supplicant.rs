@@ -124,6 +124,7 @@ fn handle_message_3<B: SplitByteSlice>(
     let mut gtk: Option<key_data::kde::Gtk> = None;
     let mut igtk: Option<Igtk> = None;
     let mut protection: Option<ProtectionInfo> = None;
+    #[allow(clippy::collection_is_never_read)]
     let mut _second_protection: Option<ProtectionInfo> = None;
     for element in key_data_elements {
         match (element, &protection) {

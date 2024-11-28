@@ -176,6 +176,12 @@
             from: "parent",
             to: "#starnix_runner",
         },
+        {
+            config: "fuchsia.ui.VisualDebuggingLevel",
+            from: "parent",
+            to: "#starnix_runner",
+            availability: "transitional",
+        },
     ],
     expose: [
         {

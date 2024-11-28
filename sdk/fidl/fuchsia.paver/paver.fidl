@@ -4,8 +4,6 @@
 @available(added=HEAD)
 library fuchsia.paver;
 
-using fuchsia.hardware.block;
-using fuchsia.device;
 using fuchsia.mem;
 using zx;
 
@@ -119,15 +117,11 @@ closed protocol Paver {
         data_sink server_end:DataSink;
     });
 
-    /// Provide a block device to use as a data sink. Assets and volumes will be paved to
-    /// partitions within this block device.
-    ///
-    /// It assumes that channel backing `block_device` also implements `fuchsia.io.Node` for now.
+    /// Like `FindDataSink`, but the returned block device will be dynamic, supporting partition
+    /// table manipulation.
     ///
     /// `data_sink` will be closed on error, with an epitaph provided on failure reason.
-    strict UseBlockDevice(resource struct {
-        block_device client_end:fuchsia.hardware.block.Block;
-        block_controller client_end:fuchsia.device.Controller;
+    strict FindPartitionTableManager(resource struct {
         data_sink server_end:DynamicDataSink;
     });
 

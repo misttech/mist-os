@@ -3,17 +3,18 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Result};
-use async_net::TcpListener;
 use async_trait::async_trait;
 use ffx_config::ConfigLevel;
 use fidl_fuchsia_net::SocketAddress;
 use fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt;
 use futures::future::join;
 use futures::{AsyncReadExt as _, AsyncWriteExt as _, StreamExt as _};
+use netext::{TcpListenerStream, TokioAsyncReadExt};
 use protocols::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
+use tokio::net::TcpListener;
 use {::rcs as rcs_lib, fidl_fuchsia_developer_ffx as ffx};
 
 const REVERSE_BACKLOG: u16 = 128;
@@ -47,7 +48,7 @@ impl Forward {
         listener: TcpListener,
         tasks: Arc<tasks::TaskManager>,
     ) {
-        let mut incoming = listener.incoming();
+        let mut incoming = TcpListenerStream(listener);
         while let Some(conn) = incoming.next().await {
             let conn = match conn {
                 Ok(conn) => conn,
@@ -94,13 +95,13 @@ impl Forward {
     }
 
     fn establish_tcp_forward(
-        conn: async_net::TcpStream,
+        conn: tokio::net::TcpStream,
         socket: fuchsia_async::Socket,
         keep_alive: rcs::port_forward::SocketKeepAliveToken,
         tasks: Arc<tasks::TaskManager>,
     ) {
-        let (mut socket_read, mut socket_write) = socket.split();
-        let (mut conn_read, mut conn_write) = conn.split();
+        let (mut socket_read, mut socket_write) = socket.into_futures_stream().split();
+        let (mut conn_read, mut conn_write) = conn.into_futures_stream().split();
 
         let write_read = async move {
             let mut buf = [0; 4096];
@@ -227,7 +228,7 @@ impl FidlProtocol for Forward {
                             addr,
                             host_address
                         );
-                        let tcp_stream = match async_net::TcpStream::connect(&host_address).await {
+                        let tcp_stream = match tokio::net::TcpStream::connect(&host_address).await {
                             Ok(stream) => stream,
                             Err(e) => {
                                 tracing::error!("Could not connect to {:?}: {:?}", host_address, e);
@@ -351,7 +352,7 @@ mod tests {
     async fn test_socket_provider(channel: fidl::Channel) {
         println!("Spawning test provider");
         let channel = fidl::endpoints::ServerEnd::<fsock::ProviderMarker>::from(channel);
-        let mut stream = channel.into_stream().unwrap();
+        let mut stream = channel.into_stream();
 
         while let Some(Ok(request)) = stream.next().await {
             match request {
@@ -359,8 +360,7 @@ mod tests {
                     assert_eq!(fsock::Domain::Ipv4, domain);
                     assert_eq!(fsock::StreamSocketProtocol::Tcp, proto);
                     let (client, stream) =
-                        fidl::endpoints::create_request_stream::<fsock::StreamSocketMarker>()
-                            .unwrap();
+                        fidl::endpoints::create_request_stream::<fsock::StreamSocketMarker>();
                     fuchsia_async::Task::spawn(test_stream_socket(stream)).detach();
                     responder.send(Ok(client)).unwrap();
                 }
@@ -382,10 +382,10 @@ mod tests {
             assert_eq!(target_identifier, Some("dummy_target".to_owned()));
 
             fuchsia_async::Task::local(async move {
-                let mut server = server.into_stream().unwrap();
+                let mut server = server.into_stream();
                 while let Some(request) = server.next().await {
                     match request.unwrap() {
-                        rcs::RemoteControlRequest::OpenCapability {
+                        rcs::RemoteControlRequest::DeprecatedOpenCapability {
                             moniker: _,
                             capability_set,
                             capability_name,
@@ -405,7 +405,7 @@ mod tests {
             })
             .detach();
 
-            Ok(client.into_proxy().unwrap())
+            Ok(client.into_proxy())
         }
 
         async fn open_protocol(&self, _name: String) -> Result<fidl::Channel> {
@@ -445,7 +445,7 @@ mod tests {
         let (client, server) = fidl::endpoints::create_endpoints::<ffx::TunnelMarker>();
 
         fuchsia_async::Task::local(async move {
-            let mut server = server.into_stream().unwrap();
+            let mut server = server.into_stream();
             while let Some(request) = server.next().await {
                 let request = request.unwrap();
                 forward.handle(&context, request).await.unwrap();
@@ -455,7 +455,6 @@ mod tests {
 
         client
             .into_proxy()
-            .unwrap()
             .forward_port("dummy_target", &host_address(), &target_address())
             .await
             .unwrap()
@@ -469,7 +468,7 @@ mod tests {
         let (client, server) = fidl::endpoints::create_endpoints::<ffx::TunnelMarker>();
 
         fuchsia_async::Task::local(async move {
-            let mut server = server.into_stream().unwrap();
+            let mut server = server.into_stream();
             while let Some(request) = server.next().await {
                 let request = request.unwrap();
                 forward.handle(&context, request).await.unwrap();
@@ -479,7 +478,6 @@ mod tests {
 
         client
             .into_proxy()
-            .unwrap()
             .reverse_port("dummy_target", &host_address(), &target_address())
             .await
             .unwrap()

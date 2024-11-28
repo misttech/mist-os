@@ -6,7 +6,7 @@ use crate::fuchsia::pager::{
     MarkDirtyRange, Pager, PagerBacked, PagerVmoStatsOptions, VmoDirtyRange,
 };
 use crate::fuchsia::volume::FxVolume;
-use anyhow::{ensure, Context, Error};
+use anyhow::{anyhow, ensure, Context, Error};
 use fidl_fuchsia_io as fio;
 use fxfs::errors::FxfsError;
 use fxfs::filesystem::MAX_FILE_SIZE;
@@ -148,8 +148,22 @@ fn reservation_needed(page_count: u64) -> u64 {
 fn page_count(range: Range<u64>) -> u64 {
     let page_size = zx::system_get_page_size() as u64;
     debug_assert!(range.start <= range.end);
-    debug_assert!(range.start % page_size == 0);
-    debug_assert!(range.end % page_size == 0);
+    debug_assert_eq!(
+        range.start % page_size,
+        0,
+        "range start not page aligned (page size: {}, range: {}..{})",
+        page_size,
+        range.start,
+        range.end
+    );
+    debug_assert_eq!(
+        range.end % page_size,
+        0,
+        "range end not page aligned (page size: {}, range: {}..{})",
+        page_size,
+        range.start,
+        range.end
+    );
     (range.end - range.start) / page_size
 }
 
@@ -238,6 +252,8 @@ impl PagedObjectHandle {
         self.vmo.get_stream_size().unwrap()
     }
 
+    // If there are keys to fetch, a future is returned that will prefetch them into the cache.
+    // The caller must ensure that the object exists until this future is complete.
     pub fn pre_fetch_keys(&self) -> Option<impl Future<Output = ()>> {
         self.handle.pre_fetch_keys()
     }
@@ -450,7 +466,7 @@ impl PagedObjectHandle {
         ctime: Option<Timestamp>,
     ) -> Result<(), Error> {
         if let Some(content_size) = content_size {
-            self.handle.txn_update_size(transaction, content_size).await?;
+            self.handle.txn_update_size(transaction, content_size, None).await?;
         }
         let attributes = fio::MutableNodeAttributes {
             creation_time: crtime.map(|t| t.as_nanos()),
@@ -872,8 +888,10 @@ impl PagedObjectHandle {
     }
 
     /// Pre-allocate a region of this file on-disk.
-    #[cfg(test)]
     pub async fn allocate(&self, range: Range<u64>) -> Result<(), Error> {
+        if range.start == range.end {
+            return Err(anyhow!(FxfsError::InvalidArgs));
+        }
         // Flushing relies on the allocated ranges to determine flush batching, so we grab the same
         // lock as flushing to make sure they are mutually exclusive.
         let store = self.store();
@@ -1230,8 +1248,7 @@ mod tests {
     }
 
     fn open_volume(volume: &FxVolumeAndRoot) -> fio::DirectoryProxy {
-        let (root, server_end) =
-            create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+        let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
         volume.root().clone().as_directory().open(
             volume.volume().scope().clone(),
             fio::OpenFlags::DIRECTORY
@@ -2740,6 +2757,224 @@ mod tests {
         file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
 
         file.resize(page_size).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        assert_eq!(
+            file.write_at(&write_data, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            page_size
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        assert_eq!(
+            file.read_at(page_size, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            write_data,
+        );
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_allocate_unaligned() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        file.allocate(20, 100, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+
+        let (_, attrs) = file
+            .get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        assert_eq!(attrs.content_size, Some(120));
+
+        let page_size = zx::system_get_page_size() as u64;
+        let write_data = (0..20).cycle().take(page_size as usize).collect::<Vec<_>>();
+        assert_eq!(
+            file.write_at(&write_data, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            page_size
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        let (_, attrs) = file
+            .get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        assert_eq!(attrs.content_size, Some(page_size));
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_allocate_unaligned_prewritten_data() {
+        // Test to confirm that 1. unaligned allocate works on existing extents, and 2. if the size
+        // is updated, any data between the old and new size is properly zeroed.
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let write_data = (0..20).cycle().take(100).collect::<Vec<_>>();
+        assert_eq!(
+            file.write_at(&write_data, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            100,
+        );
+        assert_eq!(
+            file.write_at(&write_data, 100).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            100,
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.resize(100).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let (_, attrs) = file
+            .get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        assert_eq!(attrs.content_size, Some(100));
+
+        file.allocate(0, 150, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        let (_, attrs) = file
+            .get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        assert_eq!(attrs.content_size, Some(150));
+
+        assert_eq!(
+            file.read_at(100, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            write_data,
+        );
+        assert_eq!(
+            file.read_at(50, 100).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            vec![0; 50],
+        );
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_truncate_allocated_file_unaligned() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let page_size = zx::system_get_page_size() as u64;
+        file.allocate(0, page_size * 2, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        let write_data = (0..20).cycle().take(page_size as usize).collect::<Vec<_>>();
+        assert_eq!(
+            file.write_at(&write_data, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            page_size
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        file.resize(page_size + 100).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        assert_eq!(
+            file.write_at(&write_data, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            page_size
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        assert_eq!(
+            file.read_at(page_size, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            write_data,
+        );
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_complete_truncate_allocated_file() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let page_size = zx::system_get_page_size() as u64;
+        file.allocate(0, page_size * 2, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        let write_data = (0..20).cycle().take(page_size as usize).collect::<Vec<_>>();
+        assert_eq!(
+            file.write_at(&write_data, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            page_size
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        file.resize(0).await.unwrap().map_err(zx::Status::from_raw).unwrap();
         file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
 
         assert_eq!(

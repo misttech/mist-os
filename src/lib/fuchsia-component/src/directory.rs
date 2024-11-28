@@ -99,8 +99,7 @@ pub fn open_directory_async(
     path: &str,
     rights: fio::Rights,
 ) -> Result<fio::DirectoryProxy, Error> {
-    let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-        .context("creating directory proxy")?;
+    let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::from_bits_truncate(rights.bits());
     let () = parent
@@ -117,8 +116,7 @@ pub fn open_file_async(
     path: &str,
     rights: fio::Rights,
 ) -> Result<fio::FileProxy, Error> {
-    let (file, server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().context("creating file proxy")?;
+    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
     let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::from_bits_truncate(rights.bits());
     let () = parent

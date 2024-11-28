@@ -91,7 +91,6 @@ rustc_test("offered-cap-passthrough-test") {
     "..:fuchsia-component-test",
     "//examples/components/routing/fidl:echo_rust",
     "//src/lib/fuchsia",
-    "//src/sys/lib/cm_types",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]

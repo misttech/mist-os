@@ -1140,6 +1140,22 @@
         "type": "uint32"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.ieee80211/WlanBand.FIVE_GHZ",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.ieee80211/WlanBand.TWO_GHZ",
+        "value": "0"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.wlan.ieee80211/WlanBand",
+        "strictness": "flexible",
+        "type": "uint8"
+    },
+    {
         "kind": "library",
         "name": "fuchsia.wlan.ieee80211"
     }

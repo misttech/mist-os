@@ -145,7 +145,7 @@ impl ProfileClient {
         if services.is_empty() {
             return Ok(Self::new(proxy));
         }
-        let (connect_client, connection_receiver) = create_request_stream()?;
+        let (connect_client, connection_receiver) = create_request_stream();
         let advertisement = proxy
             .advertise(bredr::ProfileAdvertiseRequest {
                 services: Some(services),
@@ -170,7 +170,7 @@ impl ProfileClient {
             return Err(Error::AlreadyTerminated);
         }
 
-        let (results_client, results_stream) = create_request_stream()?;
+        let (results_client, results_stream) = create_request_stream();
         self.proxy.search(bredr::ProfileSearchRequest {
             service_uuid: Some(service_uuid),
             attr_ids: attributes,
@@ -281,8 +281,7 @@ mod tests {
     #[test]
     fn service_advertisement_result_is_no_op() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Profile proxy should be created");
+        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>();
 
         let source_uuid =
             Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource.into_primitive());
@@ -325,8 +324,7 @@ mod tests {
     #[test]
     fn connection_request_relayed_to_stream() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Profile proxy should be created");
+        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>();
 
         let source_uuid =
             Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource.into_primitive());
@@ -389,10 +387,7 @@ mod tests {
                 assert_eq!(payload.services.unwrap(), expected_defs);
                 assert_eq!(payload.parameters, expected_params);
                 assert!(payload.receiver.is_some());
-                (
-                    payload.receiver.unwrap().into_proxy().expect("proxy for connection receiver"),
-                    responder,
-                )
+                (payload.receiver.unwrap().into_proxy(), responder)
             }
             x => panic!("Expected ready advertisement request, got {:?}", x),
         }
@@ -419,7 +414,7 @@ mod tests {
                 let attr_ids = attr_ids.unwrap_or_default();
                 assert_eq!(&attr_ids[..], search_attrs);
                 assert_eq!(service_uuid, search_uuid);
-                results.into_proxy().expect("proxy from client end")
+                results.into_proxy()
             }
             x => panic!("Expected ready request for a search, got: {:?}", x),
         }
@@ -428,8 +423,7 @@ mod tests {
     #[test]
     fn responds_to_search_results() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Profile proxy should be created");
+        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>();
 
         let mut profile = ProfileClient::new(proxy);
 
@@ -510,8 +504,7 @@ mod tests {
     #[test]
     fn waker_gets_awoken_when_search_added() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Profile proxy should be created");
+        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>();
 
         let mut profile = ProfileClient::new(proxy);
 

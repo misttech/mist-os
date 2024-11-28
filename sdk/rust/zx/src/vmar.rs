@@ -65,18 +65,30 @@ impl MapInfo {
                 // type corresponds to this layout.
                 let &sys::zx_info_maps_mapping_t {
                     mmu_flags,
-                    padding1: _,
                     vmo_koid,
                     vmo_offset,
-                    committed_pages,
-                    populated_pages,
+                    committed_bytes,
+                    populated_bytes,
+                    committed_private_bytes,
+                    populated_private_bytes,
+                    committed_scaled_bytes,
+                    populated_scaled_bytes,
+                    committed_fractional_scaled_bytes,
+                    populated_fractional_scaled_bytes,
+                    ..
                 } = unsafe { &u.mapping };
                 MapDetails::Mapping(MappingDetails {
                     mmu_flags: VmarFlagsExtended::from_bits_retain(mmu_flags),
                     vmo_koid: Koid::from_raw(vmo_koid),
                     vmo_offset,
-                    committed_pages,
-                    populated_pages,
+                    committed_bytes,
+                    populated_bytes,
+                    committed_private_bytes,
+                    populated_private_bytes,
+                    committed_scaled_bytes,
+                    populated_scaled_bytes,
+                    committed_fractional_scaled_bytes,
+                    populated_fractional_scaled_bytes,
                 })
             }
             _ => return Err(Status::INTERNAL),
@@ -119,8 +131,14 @@ pub struct MappingDetails {
     pub mmu_flags: VmarFlagsExtended,
     pub vmo_koid: Koid,
     pub vmo_offset: u64,
-    pub committed_pages: usize,
-    pub populated_pages: usize,
+    pub committed_bytes: usize,
+    pub populated_bytes: usize,
+    pub committed_private_bytes: usize,
+    pub populated_private_bytes: usize,
+    pub committed_scaled_bytes: usize,
+    pub populated_scaled_bytes: usize,
+    pub committed_fractional_scaled_bytes: u64,
+    pub populated_fractional_scaled_bytes: u64,
 }
 
 impl Vmar {

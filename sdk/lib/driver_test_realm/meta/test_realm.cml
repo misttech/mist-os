@@ -194,9 +194,16 @@
             protocol: [
                 "fuchsia.component.resolution.Resolver-hermetic",
                 "fuchsia.driver.test.Internal",
+                "fuchsia.pkg.PackageResolver-hermetic",
             ],
             from: "parent",
             to: [ "#fake-resolver" ],
+        },
+        {
+            protocol: "fuchsia.driver.test.DriverLists",
+            from: "#fake-resolver",
+            to: "#driver-index",
+            availability: "optional",
         },
         {
             protocol: [
@@ -218,28 +225,6 @@
                 "#driver-index",
                 "#driver_manager",
             ],
-        },
-        {
-            directory: "boot",
-            from: "parent",
-            to: [
-                "#driver-index",
-                "#driver_manager",
-                "#fake-resolver",
-            ],
-            rights: [ "rx*" ],
-        },
-        {
-            directory: "config",
-            from: "parent",
-            to: "#driver-index",
-            rights: [ "r*" ],
-        },
-        {
-            directory: "base_drivers",
-            from: "parent",
-            to: [ "#fake-resolver" ],
-            rights: [ "rx*" ],
         },
     ],
     expose: [

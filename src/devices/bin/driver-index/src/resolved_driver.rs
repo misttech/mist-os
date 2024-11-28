@@ -28,6 +28,21 @@ pub enum DriverPackageType {
     Universe = 3,
 }
 
+impl From<fdf::DriverPackageType> for DriverPackageType {
+    fn from(value: fdf::DriverPackageType) -> DriverPackageType {
+        match value {
+            fdf::DriverPackageType::Boot => DriverPackageType::Boot,
+            fdf::DriverPackageType::Base => DriverPackageType::Base,
+            fdf::DriverPackageType::Cached => DriverPackageType::Cached,
+            fdf::DriverPackageType::Universe => DriverPackageType::Universe,
+            _ => {
+                tracing::warn!("Unknown driver package type {:?}, defaulting to boot.", value);
+                DriverPackageType::Boot
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct DeviceCategoryDef {
     pub category: Option<String>,
@@ -87,10 +102,7 @@ impl ResolvedDriver {
             tracing::warn!("{}: Missing package directory", component_url);
             zx::Status::NOT_FOUND
         })?;
-        let proxy = package.into_proxy().map_err(|e| {
-            tracing::warn!("Failed to create package proxy: {:?}", e);
-            zx::Status::INTERNAL
-        })?;
+        let proxy = package.into_proxy();
         let package_dir = PackageDirectory::from_proxy(proxy);
         #[cfg(not(mistos))]
         let package_hash = package_dir.merkle_root().await.map_err(|e| {
@@ -180,7 +192,7 @@ pub async fn load_driver(
     let component: cm_rust::ComponentDecl = component.fidl_into_native();
 
     let bind_path = get_rules_string_value(&component, "bind")
-        .ok_or(anyhow!("{}: Missing bind path", component_url))?;
+        .ok_or_else(|| anyhow!("{}: Missing bind path", component_url))?;
     let bind = package_dir.read_file(&bind_path).await.with_context(|| {
         format!("{}: Failed to read bind file '{}'", component_url.as_str(), bind_path)
     })?;

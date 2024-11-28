@@ -25,7 +25,7 @@ struct MouseReport {
 
   void ToFidlInputReport(
       fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-      fidl::AnyArena& allocator);
+      fidl::AnyArena& allocator) const;
 };
 
 class HidMouse : public HidDevice<MouseReport> {

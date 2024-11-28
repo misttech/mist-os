@@ -2,63 +2,95 @@
 
 ## Commandline options {#options}
 
-Kernel commandline options are declared using the
-[`kernel_cmdline`](/build/zbi/kernel_cmdline.gni) template:
-
-```gn
-import("//build/zbi/kernel_cmdline.gni")
-
-kernel_cmdline("foobar") {
-  args = [ "foobar=true" ]
-}
-```
-
-A single target may include multiple options:
-
-```gn
-import("//build/zbi/kernel_cmdline.gni")
-
-kernel_cmdline("debug") {
-  args = [
-    "debug.this=true",
-    "debug.that=false",
-  ]
-}
-```
-
-The resulting GN labels should then be inserted into the build graph via a GN
-argument. Note that options will be taken into account if they are within the
-dependency tree defined by such a GN argument.
+Kernel commandline options can be added to a product assembly either indirectly
+(as a platform implementation detail), or directly by a developer for local
+debug and testing.
 
 ### Specifying options in board or product files
 
-In the [board](/boards) or [product](/products) file, add the label(s) for the
-desired cmdline option(s) to [`board_bootfs_labels`](/build/board.gni) and
-[`product_bootfs_labels`](/build/product.gni) respectively.
-
-To alter kernel options for the zedboot or recovery build, add the labels
-respectively to [`board_zedboot_bootfs_labels`](/build/board.gni) and
-[`board_recovery_bootfs_labels`](/build/board.gni).
+Products and boards can only add kernel commandline options indirectly, via
+product assembly:
+- As part of an [Assembly Input Bundle](/bundles/assembly/BUILD.gn).
+- As part of the [platform configuration rules](/src/lib/assembly/platform_configuration/src/subsystems/)
+  in assembly.
 
 ### Specifying options locally
 
 For local development, a list of strings that should be appended to the kernel
-command line can be specified in the `dev_kernel_cmdline` GN variable, as
-follows:
+command line can be specified as part of [assembly developer overrides](https://go/fuchsia-assembly-overrides).
+
+This takes two steps:
+
+#### 1. Define an assembly overrides target
+
+Define an assembly overrides target in `//local/BUILD.gn` or other `BUILD.gn`
+file under `//local/*`.
+
+```gn
+import("//build/assembly/developer_overrides.gni")
+
+assembly_developer_overrides("custom_kernel_args") {
+  kernel = {
+    command_line_args = [ "foo" ]
+  }
+}
+```
+
+This only needs to be done once per set of overrides, and can then be re-used
+with any product assembly or any outdir in your build.
+
+The next step is to tell GN which developer overrides target to use for your
+product.
+
+#### 2a. Use that target with the "main" product assembly
+
+For the "main" product assembly (the one named in your `fx set` command), you
+tell GN to use the above-defined product assembly target with the following:
 
 ```posix-terminal
-fx set ... --args='dev_kernel_cmdline=["my_option=value"]'
+fx set ... --assembly-override //local:custom_kernel_args
 ```
 
 Alternatively, an existing `args.gn` file can be modified by running `fx args`
 and adding or modifying a line as follows:
 
 ```gn
-dev_kernel_cmdline = [
-  "my_option=value"
+product_assembly_overrides_label = "//local:custom_kernel_args"
+```
+
+#### 2b. Product assemblies other than the "main" assembly
+
+A slightly more verbose mechanism is required for assemblies other than the
+"main" product assembly, such as the zedboot or recovery assemblies.  This is
+done using a wildcard-based pattern-match:
+
+```posix-terminal
+fx set ... --assembly-override '//build/images/zedboot/*=//local:custom_kernel_args'
+```
+or
+```posix-terminal
+fx set ... --assembly-override '//products/microfuchsia/*=//local:custom_kernel_args'
+
+When dealing with multiple product assemblies, it's easier to specify this
+directly in `args.gn`:
+
+```gn
+product_assembly_overrides = [
+  {
+    # core products:
+    assembly = "//build/images/fuchsia/*"
+    overrides = "//local:custom_kernel_args"
+  },
+  {
+    assembly = "//build/images/zedboot/*"
+    overrides = "//local:zedboot_overrides"
+  },
+  {
+    assembly = "//products/microfuchsia/*"
+    overrides = "//local:zedboot_overrides"
+  }
 ]
 ```
 
-To locally alter kernel options for the zedboot or recovery build, the
-variables `dev_zedboot_kernel_cmdline` and `dev_recovery_kernel_cmdline` can
-be used, respectively.
+Note that when using a `//vendor/*` board, the product assembly target will also
+be in the `//vendor` repo (e.g `//vendor/<foo>/products/minimal`).

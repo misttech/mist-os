@@ -35,9 +35,9 @@ use crate::internal::device::{
     IpAddressId, IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceAddr, Ipv4DeviceTimerId,
     Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
 };
-use crate::internal::gmp::igmp::{IgmpGroupState, IgmpState, IgmpTimerId};
-use crate::internal::gmp::mld::{MldGroupState, MldTimerId};
-use crate::internal::gmp::{GmpDelayedReportTimerId, GmpState, MulticastGroupSet};
+use crate::internal::gmp::igmp::{IgmpConfig, IgmpState, IgmpTimerId};
+use crate::internal::gmp::mld::{MldConfig, MldTimerId};
+use crate::internal::gmp::{GmpDelayedReportTimerId, GmpGroupState, GmpState, MulticastGroupSet};
 use crate::internal::types::RawMetric;
 
 use super::dad::NonceCollection;
@@ -56,16 +56,10 @@ const DEFAULT_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
 pub trait IpDeviceStateIpExt: BroadcastIpExt {
     /// The information stored about an IP address assigned to an interface.
     type AssignedAddress<BT: IpDeviceStateBindingsTypes>: AssignedAddress<Self::Addr> + Debug;
-    /// The per-group state kept by the Group Messaging Protocol (GMP) used to announce
-    /// membership in an IP multicast group for this version of IP.
-    ///
-    /// Note that a GMP is only used when membership must be explicitly
-    /// announced. For example, a GMP is not used in the context of a loopback
-    /// device (because there are no remote hosts) or in the context of an IPsec
-    /// device (because multicast is not supported).
-    type GmpGroupState<I: Instant>;
     /// The GMP protocol-specific state.
     type GmpProtoState<BT: IpDeviceStateBindingsTypes>;
+    /// The GMP protocol-specific configuration.
+    type GmpProtoConfig: Default;
     /// The timer id for GMP timers.
     type GmpTimerId<D: WeakDeviceIdentifier>: From<GmpDelayedReportTimerId<Self, D>>;
 
@@ -83,8 +77,8 @@ pub trait IpDeviceStateIpExt: BroadcastIpExt {
 impl IpDeviceStateIpExt for Ipv4 {
     type AssignedAddress<BT: IpDeviceStateBindingsTypes> = Ipv4AddressEntry<BT>;
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = IgmpState<BT>;
-    type GmpGroupState<I: Instant> = IgmpGroupState<I>;
     type GmpTimerId<D: WeakDeviceIdentifier> = IgmpTimerId<D>;
+    type GmpProtoConfig = IgmpConfig;
 
     fn new_gmp_state<
         D: WeakDeviceIdentifier,
@@ -147,8 +141,8 @@ impl<BT: IpDeviceStateBindingsTypes> WeakIpAddressId<Ipv6Addr> for WeakRc<Ipv6Ad
 impl IpDeviceStateIpExt for Ipv6 {
     type AssignedAddress<BT: IpDeviceStateBindingsTypes> = Ipv6AddressEntry<BT>;
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = ();
-    type GmpGroupState<I: Instant> = MldGroupState<I>;
     type GmpTimerId<D: WeakDeviceIdentifier> = MldTimerId<D>;
+    type GmpProtoConfig = MldConfig;
 
     fn new_gmp_state<
         D: WeakDeviceIdentifier,
@@ -190,11 +184,13 @@ pub struct IpDeviceFlags {
 /// The state kept for each device to handle multicast group membership.
 pub struct IpDeviceMulticastGroups<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> {
     /// Multicast groups this device has joined.
-    pub groups: MulticastGroupSet<I::Addr, I::GmpGroupState<BT::Instant>>,
+    pub groups: MulticastGroupSet<I::Addr, GmpGroupState<BT>>,
     /// Protocol-specific GMP state.
     pub gmp_proto: I::GmpProtoState<BT>,
     /// GMP state.
     pub gmp: GmpState<I, BT>,
+    /// GMP protocol-specific configuration.
+    pub gmp_config: I::GmpProtoConfig,
 }
 
 /// A container for the default hop limit kept by [`IpDeviceState`].
@@ -312,6 +308,7 @@ impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext> IpDev
                 groups: Default::default(),
                 gmp_proto: I::new_gmp_state::<_, CC, _>(bindings_ctx, device_id.clone()),
                 gmp: GmpState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx, device_id),
+                gmp_config: Default::default(),
             }),
             default_hop_limit: Default::default(),
             flags: Default::default(),
@@ -867,6 +864,16 @@ impl<I: Instant> Lifetime<I> {
     }
 }
 
+impl<Instant> Lifetime<Instant> {
+    /// Maps the instant value in this `Lifetime` with `f`.
+    pub fn map_instant<N, F: FnOnce(Instant) -> N>(self, f: F) -> Lifetime<N> {
+        match self {
+            Self::Infinite => Lifetime::Infinite,
+            Self::Finite(i) => Lifetime::Finite(f(i)),
+        }
+    }
+}
+
 /// An address' preferred lifetime information.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PreferredLifetime<Instant> {
@@ -896,6 +903,14 @@ impl<Instant> PreferredLifetime<Instant> {
         match self {
             Self::Preferred(_) => false,
             Self::Deprecated => true,
+        }
+    }
+
+    /// Maps the instant value in this `PreferredLifetime` with `f`.
+    pub fn map_instant<N, F: FnOnce(Instant) -> N>(self, f: F) -> PreferredLifetime<N> {
+        match self {
+            Self::Deprecated => PreferredLifetime::Deprecated,
+            Self::Preferred(l) => PreferredLifetime::Preferred(l.map_instant(f)),
         }
     }
 }
@@ -932,16 +947,48 @@ impl<I: Instant> InspectableValue for PreferredLifetime<I> {
     }
 }
 
+/// Address properties common to IPv4 and IPv6.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CommonAddressProperties<Instant> {
+    /// The lifetime for which the address is valid.
+    pub valid_until: Lifetime<Instant>,
+    /// The address' preferred lifetime.
+    ///
+    /// Address preferred status is used in IPv6 source address selection. IPv4
+    /// addresses simply keep this information on behalf of bindings.
+    ///
+    /// Note that core does not deprecate manual addresses automatically. Manual
+    /// addresses are fully handled outside of core.
+    pub preferred_lifetime: PreferredLifetime<Instant>,
+}
+
+impl<I> Default for CommonAddressProperties<I> {
+    fn default() -> Self {
+        Self {
+            valid_until: Lifetime::Infinite,
+            preferred_lifetime: PreferredLifetime::preferred_forever(),
+        }
+    }
+}
+
+impl<Inst: Instant> Inspectable for CommonAddressProperties<Inst> {
+    fn record<I: Inspector>(&self, inspector: &mut I) {
+        let Self { valid_until, preferred_lifetime } = self;
+        inspector.record_inspectable_value("ValidUntil", valid_until);
+        inspector.record_inspectable_value("PreferredLifetime", preferred_lifetime);
+    }
+}
+
 /// The configuration for an IPv4 address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Ipv4AddrConfig<Instant> {
-    /// The lifetime for which the address is valid.
-    pub valid_until: Lifetime<Instant>,
+    /// IP version agnostic properties.
+    pub common: CommonAddressProperties<Instant>,
 }
 
 impl<I> Default for Ipv4AddrConfig<I> {
     fn default() -> Self {
-        Self { valid_until: Lifetime::Infinite }
+        Self { common: Default::default() }
     }
 }
 
@@ -986,8 +1033,8 @@ pub struct Ipv4AddressState<Instant> {
 impl<Inst: Instant> Inspectable for Ipv4AddressState<Inst> {
     fn record<I: Inspector>(&self, inspector: &mut I) {
         let Self { config } = self;
-        if let Some(Ipv4AddrConfig { valid_until }) = config {
-            inspector.record_inspectable_value("ValidUntil", valid_until)
+        if let Some(Ipv4AddrConfig { common }) = config {
+            inspector.delegate_inspectable(common);
         }
     }
 }
@@ -1005,6 +1052,21 @@ pub enum SlaacConfig<Instant> {
     ///
     /// [RFC 8981]: https://tools.ietf.org/html/rfc8981
     Temporary(TemporarySlaacConfig<Instant>),
+}
+
+impl<Instant: Copy> SlaacConfig<Instant> {
+    /// The lifetime for which the address is valid.
+    pub fn valid_until(&self) -> Lifetime<Instant> {
+        match self {
+            SlaacConfig::Static { valid_until } => *valid_until,
+            SlaacConfig::Temporary(TemporarySlaacConfig {
+                valid_until,
+                desync_factor: _,
+                creation_time: _,
+                dad_counter: _,
+            }) => Lifetime::Finite(*valid_until),
+        }
+    }
 }
 
 /// The configuration for an IPv6 address.
@@ -1035,13 +1097,17 @@ pub struct Ipv6AddrSlaacConfig<Instant> {
 /// The configuration for a manually-assigned IPv6 address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Ipv6AddrManualConfig<Instant> {
-    /// The lifetime for which the address is valid.
-    pub valid_until: Lifetime<Instant>,
+    /// IP version agnostic properties.
+    pub common: CommonAddressProperties<Instant>,
+    /// True if the address is temporary.
+    ///
+    /// Used in source address selection.
+    pub temporary: bool,
 }
 
 impl<Instant> Default for Ipv6AddrManualConfig<Instant> {
     fn default() -> Self {
-        Self { valid_until: Lifetime::Infinite }
+        Self { common: Default::default(), temporary: false }
     }
 }
 
@@ -1066,25 +1132,17 @@ impl<Instant: Copy> Ipv6AddrConfig<Instant> {
     /// The lifetime for which the address is valid.
     pub fn valid_until(&self) -> Lifetime<Instant> {
         match self {
-            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => match inner {
-                SlaacConfig::Static { valid_until } => *valid_until,
-                SlaacConfig::Temporary(TemporarySlaacConfig {
-                    valid_until,
-                    desync_factor: _,
-                    creation_time: _,
-                    dad_counter: _,
-                }) => Lifetime::Finite(*valid_until),
-            },
-            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => *valid_until,
+            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => inner.valid_until(),
+            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { common, .. }) => common.valid_until,
         }
     }
 
     /// Returns the preferred lifetime for this address.
     pub fn preferred_lifetime(&self) -> PreferredLifetime<Instant> {
         match self {
-            // TODO(https://fxbug.dev/42056881): Allow manual addresses to
-            // carry lifetime.
-            Ipv6AddrConfig::Manual(_) => PreferredLifetime::preferred_forever(),
+            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { common, .. }) => {
+                common.preferred_lifetime
+            }
             Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { preferred_lifetime, .. }) => {
                 *preferred_lifetime
             }
@@ -1094,6 +1152,17 @@ impl<Instant: Copy> Ipv6AddrConfig<Instant> {
     /// Returns true if the address is deprecated.
     pub fn is_deprecated(&self) -> bool {
         self.preferred_lifetime().is_deprecated()
+    }
+
+    /// Returns true if the address is temporary.
+    pub fn is_temporary(&self) -> bool {
+        match self {
+            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => match inner {
+                SlaacConfig::Static { .. } => false,
+                SlaacConfig::Temporary(_) => true,
+            },
+            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { temporary, .. }) => *temporary,
+        }
     }
 }
 
@@ -1120,7 +1189,7 @@ impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
 
         if let Some(config) = config {
             let is_slaac = match config {
-                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until: _ }) => false,
+                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { .. }) => false,
                 Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
                     match inner {
                         SlaacConfig::Static { valid_until: _ } => {}
@@ -1144,6 +1213,7 @@ impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
             inspector.record_bool("IsSlaac", is_slaac);
             inspector.record_inspectable_value("ValidUntil", &config.valid_until());
             inspector.record_inspectable_value("PreferredLifetime", &config.preferred_lifetime());
+            inspector.record_bool("Temporary", config.is_temporary());
         }
     }
 }
@@ -1218,18 +1288,18 @@ mod tests {
         const PREFIX_LEN: u8 = 8;
 
         let mut ipv4 = IpDeviceAddresses::<Ipv4, FakeBindingsCtxImpl>::default();
+        let config = Ipv4AddrConfig {
+            common: CommonAddressProperties { valid_until, ..Default::default() },
+        };
 
         let _: StrongRc<_> = ipv4
-            .add(Ipv4AddressEntry::new(
-                AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(),
-                Ipv4AddrConfig { valid_until },
-            ))
+            .add(Ipv4AddressEntry::new(AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(), config))
             .unwrap();
         // Adding the same address with different prefix should fail.
         assert_eq!(
             ipv4.add(Ipv4AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
-                Ipv4AddrConfig { valid_until },
+                config,
             ))
             .unwrap_err(),
             ExistsError
@@ -1268,7 +1338,10 @@ mod tests {
             ipv6.add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
                 Ipv6DadState::Assigned,
-                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }),
+                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
+                    common: CommonAddressProperties { valid_until, ..Default::default() },
+                    ..Default::default()
+                }),
             ))
             .unwrap_err(),
             ExistsError,

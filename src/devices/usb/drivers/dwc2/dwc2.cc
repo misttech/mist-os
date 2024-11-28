@@ -931,7 +931,7 @@ void Dwc2::SetConnected(bool connected) {
     for (size_t i = 0; i < std::size(endpoints_); i++) {
       auto& ep = endpoints_[i];
 
-      std::queue<usb_endpoint::RequestVariant> complete_reqs;
+      std::queue<usb::RequestVariant> complete_reqs;
       {
         fbl::AutoLock lock(&ep->lock);
         complete_reqs.swap(ep->queued_reqs);
@@ -1504,7 +1504,7 @@ void Dwc2::Endpoint::QueueRequests(QueueRequestsRequest& request,
   }
 }
 
-void Dwc2::Endpoint::QueueRequest(usb_endpoint::RequestVariant request) {
+void Dwc2::Endpoint::QueueRequest(usb::RequestVariant request) {
   {
     fbl::AutoLock l(&dwc2_->lock_);
     if (dwc2_->shutting_down_) {
@@ -1545,7 +1545,7 @@ void Dwc2::Endpoint::QueueRequest(usb_endpoint::RequestVariant request) {
 }
 
 void Dwc2::Endpoint::CancelAll() {
-  std::queue<usb_endpoint::RequestVariant> queue;
+  std::queue<usb::RequestVariant> queue;
   {
     fbl::AutoLock _(&lock);
     if (DWC_EP_IS_OUT(ep_addr())) {

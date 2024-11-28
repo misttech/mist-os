@@ -480,8 +480,8 @@ mod test {
         lock.unlock().expect("Unlock should have succeeded even though lock file was already gone");
     }
 
-    #[test]
-    fn unlock_does_not_cause_a_race() {
+    #[fuchsia::test]
+    async fn unlock_does_not_cause_a_race() {
         let dir = tempfile::TempDir::new().unwrap();
         let lockfile_path = dir.path().join("lock");
         let counter_path = dir.path().join("counter");
@@ -515,7 +515,8 @@ mod test {
                     // until we get our lock.
                     let mut attempt = 0;
                     let lockfile = loop {
-                        let lockfile = futures::executor::block_on(async {
+                        let mut executor = fuchsia_async::LocalExecutor::new();
+                        let lockfile = executor.run_singlethreaded(async {
                             Lockfile::lock_for(&lockfile_path, Duration::from_secs(10)).await
                         });
 

@@ -155,7 +155,7 @@ impl FileOps for DevFuse {
                         id = new_id;
                         entry = connection.registered_passthrough.entry(id);
                     }
-                    entry.or_insert(Arc::downgrade(&fd));
+                    entry.or_insert_with(|| Arc::downgrade(&fd));
                     connection.last_passthrough_id = id;
                     id
                 };
@@ -1506,7 +1506,10 @@ impl FsNodeOps for FuseNode {
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        self.fetch_and_refresh_info_impl(locked, current_task, info)
+        // NOTE: Do not be tempted to always refresh information here; sadly, there are CTS tests
+        // that rely on this only updating attributes if they have expired, and this matches what
+        // Linux appears to do.
+        self.refresh_expired_node_attributes(locked, current_task, info)
     }
 
     fn get_xattr(
@@ -2014,7 +2017,7 @@ impl FuseMutableState {
         let is_async = operation.is_async();
         if header.error < 0 {
             log_trace!("Fuse: {operation:?} -> {header:?}");
-            let code = i16::try_from(-header.error).unwrap_or(EINVAL.error_code() as i16);
+            let code = i16::try_from(-header.error).unwrap_or_else(|_| EINVAL.error_code() as i16);
             let errno = errno_from_code!(code);
             let response = operation.handle_error(&mut self.operations_state, errno);
             if is_async {

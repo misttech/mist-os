@@ -222,8 +222,8 @@ impl LegacyIme {
 
     /// Updates currently pressed keys.
     async fn update_keys_pressed(&self, event: &ui_input3::KeyEvent) -> Result<(), Error> {
-        let type_ = event.type_.ok_or(format_err!("Expected type to be populated."))?;
-        let key = event.key.ok_or(format_err!("Expected key to be populated."))?;
+        let type_ = event.type_.ok_or_else(|| format_err!("Expected type to be populated."))?;
+        let key = event.key.ok_or_else(|| format_err!("Expected key to be populated."))?;
         let keys_pressed = &mut self.0.lock().await.keys_pressed;
         match type_ {
             ui_input3::KeyEventType::Sync | ui_input3::KeyEventType::Pressed => {

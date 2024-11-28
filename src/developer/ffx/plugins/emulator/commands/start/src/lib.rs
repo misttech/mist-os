@@ -166,7 +166,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
         mut self,
         writer: &mut <EmuStartTool<T> as fho::FfxMain>::Writer,
     ) -> Result<Vec<String>> {
-        let loaded_product_bundle = self.finalize_start_command().await?;
+        let loaded_product_bundle = self.finalize_start_command(writer).await?;
 
         let product_bundle: Option<pbms::ProductBundle> = loaded_product_bundle.map(|b| b.into());
 
@@ -189,8 +189,9 @@ impl<T: EngineOperations> EmuStartTool<T> {
             &self.engine_operations.get_emu_instances(),
         )
         .await?;
-        let engine_type = EngineType::from_str(&self.cmd.engine().unwrap_or("femu".to_string()))
-            .context("Reading engine type from ffx config.")?;
+        let engine_type =
+            EngineType::from_str(&self.cmd.engine().unwrap_or_else(|_| "femu".to_string()))
+                .context("Reading engine type from ffx config.")?;
 
         // Get the staged instance, if any
         let mut existing = self.engine_operations.get_engine_by_name(&mut self.cmd.name).await?;
@@ -265,6 +266,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
             Ok(messages)
         }
     }
+
     async fn get_engine(
         &mut self,
         writer: &mut <EmuStartTool<T> as fho::FfxMain>::Writer,
@@ -356,7 +358,10 @@ impl<T: EngineOperations> EmuStartTool<T> {
         Ok(engine)
     }
 
-    async fn finalize_start_command(&mut self) -> Result<Option<LoadedProductBundle>> {
+    async fn finalize_start_command(
+        &mut self,
+        writer: &mut <EmuStartTool<T> as fho::FfxMain>::Writer,
+    ) -> Result<Option<LoadedProductBundle>> {
         // name is important to not be empty since it is used to
         // create a directory path.
         let mut name = self.cmd.name()?;
@@ -437,6 +442,23 @@ impl<T: EngineOperations> EmuStartTool<T> {
                     }
                 }
             }
+            if self.cmd.uefi {
+                if (*loaded_product_bundle).get_product_bundle_name().ends_with("x64")
+                    || (*loaded_product_bundle).get_product_bundle_name().ends_with("arm64")
+                {
+                    let name = self.cmd.engine.clone().unwrap_or_else(|| "qemu".into());
+                    if name != "qemu" {
+                        let msg = "[emulator] engine {name} is not supported with the --uefi flag. Using `qemu`.";
+                        tracing::info!(msg);
+                        writer.line(msg)?;
+                        self.cmd.engine = Some("qemu".into());
+                    }
+                } else {
+                    return_user_error!(
+                        "The --uefi flag is currently only supported for x64 and arm64."
+                    )
+                }
+            }
             return Ok(Some(loaded_product_bundle));
         }
         Ok(None)
@@ -489,7 +511,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
             return Ok((true, engine));
         } else {
             let engine_type =
-                EngineType::from_str(&self.cmd.engine().unwrap_or("femu".to_string()))
+                EngineType::from_str(&self.cmd.engine().unwrap_or_else(|_| "femu".to_string()))
                     .context("Reading engine type from ffx config.")?;
             engine = self.engine_operations.new_engine(&new_config, engine_type).await?;
             let config = engine.emu_config_mut();
@@ -513,6 +535,7 @@ mod tests {
     use camino::Utf8PathBuf;
     use emulator_instance::{LogLevel, RuntimeConfig};
     use ffx_config::{ConfigLevel, TestEnv};
+    use ffx_writer::TestBuffers;
     use pbms::ProductBundle;
     use sdk_metadata::ProductBundleV2;
     use std::fs;
@@ -1553,6 +1576,9 @@ mod tests {
     async fn test_finalize_start_command_named() {
         let env = ffx_config::test_init().await.unwrap();
 
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+
         let pb = ProductBundle::V2(
             make_test_product_bundle(env.isolate_root.path()).expect("test product bundle"),
         );
@@ -1568,14 +1594,149 @@ mod tests {
             .times(1);
         tool.engine_operations.expect_context().times(0);
 
-        tool.finalize_start_command().await.unwrap();
+        tool.finalize_start_command(&mut writer).await.unwrap();
 
         assert_eq!(tool.cmd.name, Some("test-instance-name".into()));
     }
 
     #[fuchsia::test]
+    async fn test_finalize_start_command_uefi_unsupported_arch() {
+        let env = ffx_config::test_init().await.unwrap();
+
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+
+        let pb = ProductBundle::V2(
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle"),
+        );
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        let cmd = StartCommand { uefi: true, ..Default::default() };
+
+        let mut tool = make_test_emu_start_tool(cmd).await;
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_| Ok(loaded_pb.clone()))
+            .times(1);
+        tool.engine_operations.expect_context().times(0);
+
+        assert_eq!(
+            tool.finalize_start_command(&mut writer)
+                .await
+                .err()
+                .expect("non-x64/arm64 product bundle is expected to fail")
+                .to_string(),
+            "The --uefi flag is currently only supported for x64 and arm64."
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_finalize_start_command_uefi_x64_pb() {
+        let env = ffx_config::test_init().await.unwrap();
+
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+
+        let mut pb =
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle");
+        pb.product_name = "pb.x64".into();
+        let pb = ProductBundle::V2(pb);
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        let cmd = StartCommand {
+            uefi: true,
+            name: Some("test-instance-name".into()),
+            ..Default::default()
+        };
+
+        let mut tool = make_test_emu_start_tool(cmd).await;
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_| Ok(loaded_pb.clone()))
+            .times(1);
+        tool.engine_operations.expect_context().times(0);
+
+        tool.finalize_start_command(&mut writer).await.unwrap();
+
+        assert_eq!(tool.cmd.name, Some("test-instance-name".into()));
+        assert_eq!(tool.cmd.engine, Some("qemu".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_finalize_start_command_uefi_x64_pb_femu() {
+        let env = ffx_config::test_init().await.unwrap();
+
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+
+        let mut pb =
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle");
+        pb.product_name = "pb.x64".into();
+        let pb = ProductBundle::V2(pb);
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        let cmd = StartCommand {
+            uefi: true,
+            engine: Some("femu".into()),
+            name: Some("test-instance-name".into()),
+            ..Default::default()
+        };
+
+        let mut tool = make_test_emu_start_tool(cmd).await;
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_| Ok(loaded_pb.clone()))
+            .times(1);
+        tool.engine_operations.expect_context().times(0);
+
+        tool.finalize_start_command(&mut writer).await.unwrap();
+
+        assert_eq!(tool.cmd.name, Some("test-instance-name".into()));
+        assert_eq!(tool.cmd.engine, Some("qemu".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_finalize_start_command_uefi_arm64_pb() {
+        let env = ffx_config::test_init().await.unwrap();
+
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+
+        let mut pb =
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle");
+        pb.product_name = "pb.arm64".into();
+        let pb = ProductBundle::V2(pb);
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        let cmd = StartCommand {
+            uefi: true,
+            name: Some("test-instance-name".into()),
+            ..Default::default()
+        };
+
+        let mut tool = make_test_emu_start_tool(cmd).await;
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_| Ok(loaded_pb.clone()))
+            .times(1);
+        tool.engine_operations.expect_context().times(0);
+
+        tool.finalize_start_command(&mut writer).await.unwrap();
+
+        assert_eq!(tool.cmd.name, Some("test-instance-name".into()));
+        assert_eq!(tool.cmd.engine, Some("qemu".into()));
+    }
+
+    #[fuchsia::test]
     async fn test_finalize_start_command_noname() {
         let env = ffx_config::test_init().await.unwrap();
+
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
 
         let pb = ProductBundle::V2(
             make_test_product_bundle(env.isolate_root.path()).expect("test product bundle"),
@@ -1592,7 +1753,7 @@ mod tests {
             .times(1);
         tool.engine_operations.expect_context().times(0);
 
-        tool.finalize_start_command().await.unwrap();
+        tool.finalize_start_command(&mut writer).await.unwrap();
 
         assert_eq!(tool.cmd.name, Some(DEFAULT_NAME.into()));
     }
@@ -1600,6 +1761,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_finalize_start_command_nodevice() {
         let env = ffx_config::test_init().await.unwrap();
+
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
 
         let pb = ProductBundle::V2(
             make_test_product_bundle(env.isolate_root.path()).expect("test product bundle"),
@@ -1617,7 +1781,7 @@ mod tests {
 
         tool.engine_operations.expect_context().times(0);
 
-        tool.finalize_start_command().await.unwrap();
+        tool.finalize_start_command(&mut writer).await.unwrap();
 
         // This is set as the recommended device in the product bundle.
         assert_eq!(tool.cmd.device, Some("virtual_device_1".into()));

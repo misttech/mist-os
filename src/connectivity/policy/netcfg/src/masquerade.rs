@@ -316,9 +316,7 @@ impl MasqueradeHandler {
                 control,
                 responder,
             }) => {
-                let (stream, control) = control
-                    .into_stream_and_control_handle()
-                    .expect("convert server end into stream");
+                let (stream, control) = control.into_stream_and_control_handle();
                 let config = match ValidatedConfig::try_from(config) {
                     Ok(config) => config,
                     Err(e) => {
@@ -691,10 +689,9 @@ pub mod test {
                     let (client, server) = fidl::endpoints::create_endpoints::<
                         fidl_fuchsia_net_filter_deprecated::FilterMarker,
                     >();
-                    let client = client.into_proxy().expect("failed to convert client to proxy");
+                    let client = client.into_proxy();
                     let server_fut = server
                         .into_stream()
-                        .expect("failed to get request stream")
                         .fold(state, |state, req| {
                             state
                                 .lock()
@@ -712,24 +709,17 @@ pub mod test {
                     let (control_client, control_server) = fidl::endpoints::create_endpoints::<
                         fidl_fuchsia_net_filter::ControlMarker,
                     >();
-                    let client_fut = FilterControl::new(
-                        None,
-                        Some(
-                            control_client.into_proxy().expect("failed to convert client to proxy"),
-                        ),
-                    )
-                    .map(|result| result.expect("error creating controller"));
-                    let mut control_stream =
-                        control_server.into_stream().expect("failed to get request stream");
+                    let client_fut = FilterControl::new(None, Some(control_client.into_proxy()))
+                        .map(|result| result.expect("error creating controller"));
+                    let mut control_stream = control_server.into_stream();
                     let control_server_fut = control_stream.next().map(|req| {
                         match req
                             .expect("stream shouldn't close")
                             .expect("stream shouldn't have an error")
                         {
                             ControlRequest::OpenController { id, request, control_handle: _ } => {
-                                let (request_stream, control_handle) = request
-                                    .into_stream_and_control_handle()
-                                    .expect("failed to get stream + control handle");
+                                let (request_stream, control_handle) =
+                                    request.into_stream_and_control_handle();
                                 control_handle
                                     .send_on_id_assigned(id.as_str())
                                     .expect("failed to respond");
@@ -792,8 +782,7 @@ pub mod test {
         let mut masq = MasqueradeHandler::default();
         let (_client, server) =
             fidl::endpoints::create_endpoints::<fidl_fuchsia_net_masquerade::ControlMarker>();
-        let (_request_stream, control) =
-            server.into_stream_and_control_handle().expect("failed to extract control handle");
+        let (_request_stream, control) = server.into_stream_and_control_handle();
 
         assert_matches!(masq.create_control(config, control), Ok(()));
 
@@ -862,8 +851,7 @@ pub mod test {
 
         let (_client, server) =
             fidl::endpoints::create_endpoints::<fidl_fuchsia_net_masquerade::ControlMarker>();
-        let (_request_stream, control) =
-            server.into_stream_and_control_handle().expect("failed to extract control handle");
+        let (_request_stream, control) = server.into_stream_and_control_handle();
         let mut masq = MasqueradeHandler::default();
         pretty_assertions::assert_eq!(
             masq.create_control(config.clone(), control).map_err(|(e, _control)| e),

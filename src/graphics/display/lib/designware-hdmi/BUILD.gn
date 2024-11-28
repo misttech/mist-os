@@ -11,7 +11,7 @@ source_set("hdmi-transmitter-controller") {
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//src/devices/lib/mmio",
-    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/api-types/cpp",
   ]
 }
 

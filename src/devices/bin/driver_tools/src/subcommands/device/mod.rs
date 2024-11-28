@@ -39,5 +39,5 @@ fn connect_to_device(dev: fio::DirectoryProxy, device_path: &str) -> Result<fdev
     let (client, server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
     let () = dev.open(fio::OpenFlags::empty(), fio::ModeType::empty(), device_path, server)?;
     let client: fidl::endpoints::ClientEnd<fdev::ControllerMarker> = client.into_channel().into();
-    client.into_proxy().map_err(Into::into)
+    Ok(client.into_proxy())
 }

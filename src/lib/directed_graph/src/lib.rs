@@ -20,8 +20,8 @@ impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> DirectedGraph<T> {
 
     /// Add an edge to the graph, adding nodes if necessary.
     pub fn add_edge(&mut self, source: T, target: T) {
-        self.0.entry(source).or_insert(DirectedNode::new()).add_target(target);
-        self.0.entry(target).or_insert(DirectedNode::new());
+        self.0.entry(source).or_insert_with(DirectedNode::new).add_target(target);
+        self.0.entry(target).or_insert_with(DirectedNode::new);
     }
 
     /// Get targets of all edges from this node.

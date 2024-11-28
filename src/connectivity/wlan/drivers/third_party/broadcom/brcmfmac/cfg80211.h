@@ -616,9 +616,12 @@ zx_status_t brcmf_netdev_open(struct net_device* ndev);
 
 // Protocol ops implementations.
 
-zx_status_t brcmf_if_start(net_device* ndev, zx_handle_t* out_mlme_channel);
+zx_status_t brcmf_if_start(net_device* ndev, zx_handle_t* out_sme_channel);
 void brcmf_if_stop(net_device* ndev);
-void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQueryInfo* info,
+
+// Returns the query response in |out_info|, which is allocated on |arena|.
+void brcmf_if_query(net_device* ndev,
+                    fuchsia_wlan_fullmac_wire::WlanFullmacImplQueryResponse* out_info,
                     fdf::Arena& arena);
 void brcmf_if_query_mac_sublayer_support(net_device* ndev,
                                          fuchsia_wlan_common::wire::MacSublayerSupport* resp);
@@ -642,16 +645,12 @@ void brcmf_if_assoc_resp(net_device* ndev,
                          const fuchsia_wlan_fullmac_wire::WlanFullmacImplAssocRespRequest* ind);
 void brcmf_if_disassoc_req(net_device* ndev,
                            const fuchsia_wlan_fullmac_wire::WlanFullmacImplDisassocRequest* req);
-void brcmf_if_reset_req(net_device* ndev,
-                        const fuchsia_wlan_fullmac_wire::WlanFullmacImplResetRequest* req);
 void brcmf_if_start_req(net_device* ndev,
                         const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartBssRequest* req);
 void brcmf_if_stop_req(net_device* ndev,
                        const fuchsia_wlan_fullmac_wire::WlanFullmacImplStopBssRequest* req);
 std::vector<zx_status_t> brcmf_if_set_keys_req(
     net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplSetKeysRequest* req);
-void brcmf_if_del_keys_req(net_device* ndev,
-                           const fuchsia_wlan_fullmac_wire::WlanFullmacImplDelKeysRequest* req);
 void brcmf_if_eapol_req(net_device* ndev,
                         const fuchsia_wlan_fullmac_wire::WlanFullmacImplEapolTxRequest* req);
 void brcmf_if_stats_query_req(net_device* ndev);
@@ -662,7 +661,8 @@ zx_status_t brcmf_if_get_iface_histogram_stats(
     fidl::AnyArena& arena);
 zx_status_t brcmf_if_set_multicast_promisc(net_device* ndev, bool enable);
 zx_status_t brcmf_if_sae_handshake_resp(
-    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacSaeHandshakeResp* resp);
+    net_device* ndev,
+    const fuchsia_wlan_fullmac_wire::WlanFullmacImplSaeHandshakeRespRequest* resp);
 zx_status_t brcmf_if_sae_frame_tx(net_device* ndev,
                                   const fuchsia_wlan_fullmac_wire::WlanFullmacSaeFrame* frame);
 void brcmf_if_wmm_status_req(net_device* ndev);

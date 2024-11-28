@@ -1226,9 +1226,9 @@ TEST_F(DisplayCompositorTest, DISABLED_HardwareFrameCorrectnessTest) {
 
     EXPECT_CALL(
         *mock_display_coordinator_,
-        SetLayerImage(
-            testing::AllOf(MatchRequestField(SetLayerImage, layer_id, Eq(layers[i])),
-                           MatchRequestField(SetLayerImage, image_id, Eq(fidl_image_ids[i]))),
+        SetLayerImage2(
+            testing::AllOf(MatchRequestField(SetLayerImage2, layer_id, Eq(layers[i])),
+                           MatchRequestField(SetLayerImage2, image_id, Eq(fidl_image_ids[i]))),
             _))
         .Times(1)
         .WillOnce(Return());
@@ -1447,9 +1447,9 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
       .WillOnce(Return());
   EXPECT_CALL(
       *mock_display_coordinator_,
-      SetLayerImage(
-          testing::AllOf(MatchRequestField(SetLayerImage, layer_id, Eq(layers[0])),
-                         MatchRequestField(SetLayerImage, image_id, Eq(fidl_collection_image_id))),
+      SetLayerImage2(
+          testing::AllOf(MatchRequestField(SetLayerImage2, layer_id, Eq(layers[0])),
+                         MatchRequestField(SetLayerImage2, image_id, Eq(fidl_collection_image_id))),
           _))
       .Times(1)
       .WillOnce(Return());
@@ -1856,7 +1856,7 @@ TEST_F(DisplayCompositorTest, DISABLED_ChecksDisplayImageSignalFences) {
       .WillOnce(Return());
 
   EXPECT_CALL(*mock_display_coordinator_,
-              SetLayerImage(MatchRequestField(SetLayerImage, layer_id, Eq(active_layers[0])), _))
+              SetLayerImage2(MatchRequestField(SetLayerImage2, layer_id, Eq(active_layers[0])), _))
       .Times(1)
       .WillOnce(Return());
   EXPECT_CALL(*mock_display_coordinator_,

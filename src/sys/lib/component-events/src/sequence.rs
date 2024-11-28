@@ -203,7 +203,6 @@ impl EventGroup {
 mod tests {
     use super::*;
     use crate::events::{Event, Started};
-    use anyhow::Context;
     use fidl_fuchsia_component as fcomponent;
     use futures::StreamExt;
 
@@ -238,11 +237,10 @@ mod tests {
     async fn make_event_stream(
         events: Vec<fcomponent::Event>,
     ) -> Result<(EventStream, fuchsia_async::Task<()>), Error> {
-        let (proxy, server) = fidl::endpoints::create_proxy::<fcomponent::EventStreamMarker>()
-            .context("failed to make EventStream proxy")?;
+        let (proxy, server) = fidl::endpoints::create_proxy::<fcomponent::EventStreamMarker>();
         Ok((
             EventStream::new(proxy),
-            fuchsia_async::Task::spawn(run_server(events, server.into_stream()?)),
+            fuchsia_async::Task::spawn(run_server(events, server.into_stream())),
         ))
     }
 

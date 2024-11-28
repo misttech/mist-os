@@ -18,6 +18,7 @@ library_headers("driver-integration-test-shim-headers") {
   visibility = [
     ":*",
     "//src/devices/block/drivers/block-verity:*",
+    "//src/devices/block/drivers/ftl/tests:*",
     "//src/devices/block/drivers/zxcrypt:*",
     "//src/devices/bus/drivers/pci/test:*",
     "//src/devices/tests/ddk-fallback-test:*",
@@ -31,10 +32,12 @@ library_headers("driver-integration-test-shim-headers") {
     "//src/storage/fvm:*",
     "//src/storage/fvm/driver/test:*",
     "//src/storage/lib/ramdevice_client/cpp:*",
+    "//zircon/system/ulib/sysconfig-client/test:*",
   ]
   testonly = true
   headers = [ "lib/driver-integration-test/fixture.h" ]
   public_deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
@@ -63,6 +66,7 @@ source_set("driver-integration-test-shim") {
   visibility = [
     ":*",
     "//src/devices/block/drivers/block-verity:*",
+    "//src/devices/block/drivers/ftl/tests:*",
     "//src/devices/block/drivers/zxcrypt:*",
     "//src/devices/bus/drivers/pci/test:*",
     "//src/devices/tests/ddk-fallback-test:*",
@@ -76,6 +80,7 @@ source_set("driver-integration-test-shim") {
     "//src/storage/fvm:*",
     "//src/storage/fvm/driver/test:*",
     "//src/storage/lib/ramdevice_client/cpp:*",
+    "//zircon/system/ulib/sysconfig-client/test:*",
   ]
   testonly = true
 

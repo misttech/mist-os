@@ -280,7 +280,7 @@ async fn inner_main() -> Result<(), Error> {
         ColorTransformManager::new(color_converter, Arc::clone(&scene_manager));
 
     let (color_transform_handler_client, color_transform_handler_server) =
-        fidl::endpoints::create_request_stream::<ColorTransformHandlerMarker>()?;
+        fidl::endpoints::create_request_stream::<ColorTransformHandlerMarker>();
     match connect_to_protocol::<ColorTransformMarker>() {
         Err(e) => {
             error!("Failed to connect to fuchsia.accessibility.color_transform: {:?}", e);
@@ -467,16 +467,15 @@ pub async fn handle_scene_manager_request_stream(
         match request {
             SceneManagerRequest::SetRootView { view_provider, responder } => {
                 info!("Processing SceneManagerRequest::SetRootView().");
-                if let Ok(proxy) = view_provider.into_proxy() {
-                    let mut scene_manager = scene_manager.lock().await;
-                    let set_root_view_result =
-                        scene_manager.set_root_view_deprecated(proxy).await.map_err(|e| {
-                            error!("Failed to obtain ViewRef from SetRootView(): {}", e);
-                            PresentRootViewError::InternalError
-                        });
-                    if let Err(e) = responder.send(set_root_view_result) {
-                        error!("Error responding to SetRootView(): {}", e);
-                    }
+                let proxy = view_provider.into_proxy();
+                let mut scene_manager = scene_manager.lock().await;
+                let set_root_view_result =
+                    scene_manager.set_root_view_deprecated(proxy).await.map_err(|e| {
+                        error!("Failed to obtain ViewRef from SetRootView(): {}", e);
+                        PresentRootViewError::InternalError
+                    });
+                if let Err(e) = responder.send(set_root_view_result) {
+                    error!("Error responding to SetRootView(): {}", e);
                 }
             }
             SceneManagerRequest::PresentRootViewLegacy {
@@ -570,7 +569,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn handle_graphical_presenter_request_stream_present_view_gfx_errors() -> Result<(), Error>
     {
-        let (proxy, stream) = create_proxy_and_stream::<GraphicalPresenterMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<GraphicalPresenterMarker>();
         let scene_manager = Arc::new(Mutex::new(MockSceneManager::new()));
         let mock_scene_manager = Arc::clone(&scene_manager);
         fasync::Task::local(handle_graphical_presenter_request_stream(stream, mock_scene_manager))
@@ -602,7 +601,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn handle_graphical_presenter_request_stream_presents_view_flatland() -> Result<(), Error>
     {
-        let (proxy, stream) = create_proxy_and_stream::<GraphicalPresenterMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<GraphicalPresenterMarker>();
         let scene_manager = Arc::new(Mutex::new(MockSceneManager::new()));
         let mock_scene_manager = Arc::clone(&scene_manager);
         fasync::Task::local(handle_graphical_presenter_request_stream(stream, mock_scene_manager))

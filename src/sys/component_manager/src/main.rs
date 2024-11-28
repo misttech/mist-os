@@ -12,6 +12,7 @@
 #![cfg_attr(not(test), deny(clippy::print_stdout, clippy::print_stderr,))]
 
 use crate::bootfs::BootfsSvc;
+use crate::builtin::builtin_runner::BuiltinRunner;
 use crate::builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder};
 use ::cm_logger::klog;
 use anyhow::Error;
@@ -74,6 +75,12 @@ fn main() {
     info!("Component manager is starting up...");
     if args.boot {
         info!("Component manager was started with boot defaults");
+    }
+
+    #[cfg(eng)]
+    {
+        fuchsia_trace_provider::trace_provider_create_with_fdio();
+        info!("Component manager tracing is on");
     }
 
     let run_root_fut = async move {
@@ -144,11 +151,18 @@ async fn build_environment(
     config: RuntimeConfig,
     bootfs_svc: Option<BootfsSvc>,
 ) -> Result<BuiltinEnvironment, Error> {
+    let service_broker = BuiltinRunner::get_service_broker_program();
+    let devfs = BuiltinRunner::get_devfs_program();
+    let shutdown_shim = BuiltinRunner::get_shutdown_shim_program();
+    let add_to_env = true;
     let mut builder = BuiltinEnvironmentBuilder::new()
         .set_runtime_config(config)
         .create_utc_clock(&bootfs_svc)
         .await?
-        .add_builtin_runner()?
+        .add_builtin_elf_runner(add_to_env)?
+        .add_builtin_runner("builtin_service_broker", service_broker, add_to_env)?
+        .add_builtin_runner("builtin_devfs", devfs, !add_to_env)?
+        .add_builtin_runner("builtin_shutdown_shim", shutdown_shim, !add_to_env)?
         .include_namespace_resolvers();
 
     if let Some(bootfs_svc) = bootfs_svc {

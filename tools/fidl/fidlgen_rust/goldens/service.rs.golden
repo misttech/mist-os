@@ -762,7 +762,7 @@ impl fidl::endpoints::ServiceProxy for MultiHeterogeneousMemberServiceProxy {
 #[cfg(target_os = "fuchsia")]
 impl MultiHeterogeneousMemberServiceProxy {
     pub fn connect_to_first_member(&self) -> Result<FirstProtocolProxy, fidl::Error> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<FirstProtocolMarker>()?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<FirstProtocolMarker>();
         self.connect_channel_to_first_member(server_end)?;
         Ok(proxy)
     }
@@ -786,7 +786,7 @@ impl MultiHeterogeneousMemberServiceProxy {
         self.0.open_member("first_member", server_end.into_channel())
     }
     pub fn connect_to_second_member(&self) -> Result<SecondProtocolProxy, fidl::Error> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<SecondProtocolMarker>()?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<SecondProtocolMarker>();
         self.connect_channel_to_second_member(server_end)?;
         Ok(proxy)
     }
@@ -870,7 +870,7 @@ impl fidl::endpoints::ServiceProxy for MultiHomogeneousMemberServiceProxy {
 #[cfg(target_os = "fuchsia")]
 impl MultiHomogeneousMemberServiceProxy {
     pub fn connect_to_first_member(&self) -> Result<FirstProtocolProxy, fidl::Error> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<FirstProtocolMarker>()?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<FirstProtocolMarker>();
         self.connect_channel_to_first_member(server_end)?;
         Ok(proxy)
     }
@@ -894,7 +894,7 @@ impl MultiHomogeneousMemberServiceProxy {
         self.0.open_member("first_member", server_end.into_channel())
     }
     pub fn connect_to_second_member(&self) -> Result<FirstProtocolProxy, fidl::Error> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<FirstProtocolMarker>()?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<FirstProtocolMarker>();
         self.connect_channel_to_second_member(server_end)?;
         Ok(proxy)
     }
@@ -970,7 +970,7 @@ impl fidl::endpoints::ServiceProxy for SingleMemberServiceProxy {
 #[cfg(target_os = "fuchsia")]
 impl SingleMemberServiceProxy {
     pub fn connect_to_single_member(&self) -> Result<FirstProtocolProxy, fidl::Error> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<FirstProtocolMarker>()?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<FirstProtocolMarker>();
         self.connect_channel_to_single_member(server_end)?;
         Ok(proxy)
     }

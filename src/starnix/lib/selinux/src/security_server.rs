@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::access_vector_cache::{Manager as AvcManager, Query, QueryMut};
+use crate::access_vector_cache::{
+    CacheStats, HasCacheStats, Manager as AvcManager, Query, QueryMut, Reset,
+};
 use crate::permission_check::PermissionCheck;
 use crate::policy::metadata::HandleUnknown;
 use crate::policy::parser::ByValue;
@@ -155,13 +157,15 @@ impl SecurityServer {
         security_context: NullessByteStr<'_>,
     ) -> Result<SecurityId, anyhow::Error> {
         let mut locked_state = self.state.lock();
-        let active_policy =
-            locked_state.active_policy.as_mut().ok_or(anyhow::anyhow!("no policy loaded"))?;
+        let active_policy = locked_state
+            .active_policy
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("no policy loaded"))?;
         let context = active_policy
             .parsed
             .parse_security_context(security_context)
             .map_err(anyhow::Error::from)?;
-        Ok(active_policy.sid_table.security_context_to_sid(&context))
+        active_policy.sid_table.security_context_to_sid(&context).map_err(anyhow::Error::from)
     }
 
     /// Returns the Security Context string for the requested `sid`.
@@ -204,6 +208,10 @@ impl SecurityServer {
             state.active_policy = Some(ActivePolicy { parsed, binary, sid_table });
             state.policy_change_count += 1;
         });
+
+        // TODO: https://fxbug.dev/367585803 - move this cache-resetting into the
+        // closure passed to self.with_state_and_update_status.
+        self.avc_manager.reset();
 
         Ok(())
     }
@@ -264,6 +272,11 @@ impl SecurityServer {
         });
     }
 
+    /// Returns a snapshot of the AVC usage statistics.
+    pub fn avc_cache_stats(&self) -> CacheStats {
+        self.avc_manager.get_shared_cache().cache_stats()
+    }
+
     /// Returns the list of all class names.
     pub fn class_names(&self) -> Result<Vec<Vec<u8>>, ()> {
         let locked_state = self.state.lock();
@@ -317,21 +330,26 @@ impl SecurityServer {
             sid_from_mount_option(active_policy, &mount_options.root_context);
 
         if let Some(mountpoint_sid) = mountpoint_sid_from_mount_option {
-            // `mount_options.context` is set, so the file-system and the nodes it contains
-            // have the specified read-only security label set.
-            FileSystemLabel { sid: mountpoint_sid, scheme: FileSystemLabelingScheme::Mountpoint }
+            // `mount_options` has `context` set, so the file-system and the nodes it contains are
+            // labeled with that value, which is not modifiable. The `fs_context` option, if set,
+            // overrides the file-system label.
+            FileSystemLabel {
+                sid: fs_sid_from_mount_option.unwrap_or(mountpoint_sid),
+                scheme: FileSystemLabelingScheme::Mountpoint { sid: mountpoint_sid },
+            }
         } else if let Some(FsUseLabelAndType { context, use_type }) =
             active_policy.parsed.fs_use_label_and_type(fs_type)
         {
             // There is an `fs_use` statement for this file-system type in the policy.
-            let fs_sid_from_policy = active_policy.sid_table.security_context_to_sid(&context);
+            let fs_sid_from_policy =
+                active_policy.sid_table.security_context_to_sid(&context).unwrap();
             let fs_sid = fs_sid_from_mount_option.unwrap_or(fs_sid_from_policy);
             FileSystemLabel {
                 sid: fs_sid,
                 scheme: FileSystemLabelingScheme::FsUse {
                     fs_use_type: use_type,
                     def_sid: def_sid_from_mount_option
-                        .unwrap_or(SecurityId::initial(InitialSid::File)),
+                        .unwrap_or_else(|| SecurityId::initial(InitialSid::File)),
                     root_sid: root_sid_from_mount_option.unwrap_or(fs_sid),
                 },
             }
@@ -339,7 +357,7 @@ impl SecurityServer {
             active_policy.parsed.genfscon_label_for_fs_and_path(fs_type, ROOT_PATH.into(), None)
         {
             // There is a `genfscon` statement for this file-system type in the policy.
-            let genfscon_sid = active_policy.sid_table.security_context_to_sid(&context);
+            let genfscon_sid = active_policy.sid_table.security_context_to_sid(&context).unwrap();
             let fs_sid = fs_sid_from_mount_option.unwrap_or(genfscon_sid);
             FileSystemLabel { sid: fs_sid, scheme: FileSystemLabelingScheme::GenFsCon }
         } else {
@@ -377,12 +395,12 @@ impl SecurityServer {
             node_path.into(),
             class_id,
         )?;
-        Some(active_policy.sid_table.security_context_to_sid(&security_context))
+        Some(active_policy.sid_table.security_context_to_sid(&security_context).unwrap())
     }
 
     /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
     /// `target_class`.
-    pub fn compute_access_vector(
+    fn compute_access_vector(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
@@ -396,7 +414,6 @@ impl SecurityServer {
             None => return AccessDecision::allow(AccessVector::ALL),
         };
 
-        // Policy is loaded, so `sid_to_security_context()` will not panic.
         let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
@@ -445,10 +462,14 @@ impl SecurityServer {
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
         active_policy
-            .parsed
-            .new_file_security_context(source_context, target_context, &file_class)
-            // TODO(http://b/334968228): check that transitions are allowed.
-            .map(|sc| active_policy.sid_table.security_context_to_sid(&sc))
+            .sid_table
+            .security_context_to_sid(
+                &active_policy.parsed.new_file_security_context(
+                    source_context,
+                    target_context,
+                    &file_class,
+                ), // TODO(http://b/334968228): check that transitions are allowed.
+            )
             .map_err(anyhow::Error::from)
             .context("computing new file security context from policy")
     }
@@ -467,9 +488,12 @@ impl SecurityServer {
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
         active_policy
-            .parsed
-            .new_security_context(source_context, target_context, &target_class)
-            .map(|sc| active_policy.sid_table.security_context_to_sid(&sc))
+            .sid_table
+            .security_context_to_sid(&active_policy.parsed.new_security_context(
+                source_context,
+                target_context,
+                &target_class,
+            ))
             .map_err(anyhow::Error::from)
             .context("computing new security context from policy")
     }
@@ -559,7 +583,7 @@ fn sid_from_mount_option(
     if let Some(label) = mount_option.as_ref() {
         Some(
             if let Some(context) = active_policy.parsed.parse_security_context(label.into()).ok() {
-                active_policy.sid_table.security_context_to_sid(&context)
+                active_policy.sid_table.security_context_to_sid(&context).unwrap()
             } else {
                 // The mount option is present-but-not-valid: we use `Unlabeled`.
                 SecurityId::initial(InitialSid::Unlabeled)
@@ -575,12 +599,13 @@ mod tests {
     use super::*;
 
     use crate::permission_check::PermissionCheckResult;
-    use crate::sid_table::testing::allocate_sid;
     use crate::{CommonFilePermission, ProcessPermission};
 
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
     const TESTS_BINARY_POLICY: &[u8] =
         include_bytes!("../testdata/micro_policies/security_server_tests_policy.pp");
+    const MINIMAL_BINARY_POLICY: &[u8] =
+        include_bytes!("../testdata/composite_policies/compiled/minimal_policy.pp");
 
     fn security_server_with_tests_policy() -> Arc<SecurityServer> {
         let policy_bytes = TESTS_BINARY_POLICY.to_vec();
@@ -928,42 +953,157 @@ mod tests {
     }
 
     #[test]
-    fn unknown_sids_are_effectively_unlabeled() {
-        let security_server = security_server_with_tests_policy();
+    fn permissions_are_fresh_after_different_policy_load() {
+        let minimal_bytes = MINIMAL_BINARY_POLICY.to_vec();
+        let allow_fork_bytes =
+            include_bytes!("../testdata/composite_policies/compiled/allow_fork.pp").to_vec();
+        let context = b"source_u:object_r:source_t:s0:c0";
+
+        let security_server = SecurityServer::new();
         security_server.set_enforcing(true);
-
-        let valid_sid =
-            security_server.security_context_to_sid(b"user1:object_r:type0:s0:c0".into()).unwrap();
-
-        // Synthesize a SID with no Security Context in the SID table, which would be the case if the
-        // SID had been allocated, but then removed because a policy load invalidated the Context.
-        let unlabeled_sid =
-            allocate_sid(&mut security_server.state.lock().expect_active_policy_mut().sid_table);
 
         let permission_check = security_server.as_permission_check();
 
-        // Test policy allows "type0" the process getsched capability to "unlabeled_t".
+        // Load the minimal policy and get a SID for the context.
+        assert_eq!(
+            Ok(()),
+            security_server.load_policy(minimal_bytes).map_err(|e| format!("{:?}", e))
+        );
+        let sid = security_server.security_context_to_sid(context.into()).unwrap();
+
+        // The minimal policy does not grant fork allowance.
+        assert!(!permission_check.has_permission(sid, sid, ProcessPermission::Fork).permit);
+
+        // Load a policy that does grant fork allowance.
+        assert_eq!(
+            Ok(()),
+            security_server.load_policy(allow_fork_bytes).map_err(|e| format!("{:?}", e))
+        );
+
+        // The now-loaded "allow_fork" policy allows the context represented by `sid` to fork.
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork).permit);
+    }
+
+    #[test]
+    fn unknown_sids_are_effectively_unlabeled() {
+        let with_unlabeled_access_domain_policy_bytes = include_bytes!(
+            "../testdata/composite_policies/compiled/with_unlabeled_access_domain_policy.pp"
+        )
+        .to_vec();
+        let with_additional_domain_policy_bytes = include_bytes!(
+            "../testdata/composite_policies/compiled/with_additional_domain_policy.pp"
+        )
+        .to_vec();
+        let allowed_type_context = b"source_u:object_r:allowed_t:s0:c0";
+        let additional_type_context = b"source_u:object_r:additional_t:s0:c0";
+
+        let security_server = SecurityServer::new();
+        security_server.set_enforcing(true);
+
+        // Load a policy, get a SID for a context that is valid for that policy, and verify
+        // that a context that is not valid for that policy is not issued a SID.
+        assert_eq!(
+            Ok(()),
+            security_server
+                .load_policy(with_unlabeled_access_domain_policy_bytes.clone())
+                .map_err(|e| format!("{:?}", e))
+        );
+        let allowed_type_sid =
+            security_server.security_context_to_sid(allowed_type_context.into()).unwrap();
+        assert!(security_server.security_context_to_sid(additional_type_context.into()).is_err());
+
+        // Load the policy that makes the second context valid, and verify that it is valid, and
+        // verify that the first context remains valid (and unchanged).
+        assert_eq!(
+            Ok(()),
+            security_server
+                .load_policy(with_additional_domain_policy_bytes.clone())
+                .map_err(|e| format!("{:?}", e))
+        );
+        let additional_type_sid =
+            security_server.security_context_to_sid(additional_type_context.into()).unwrap();
+        assert_eq!(
+            allowed_type_sid,
+            security_server.security_context_to_sid(allowed_type_context.into()).unwrap()
+        );
+
+        let permission_check = security_server.as_permission_check();
+
+        // "allowed_t" is allowed the process getsched capability to "unlabeled_t" - but since
+        // the currently-loaded policy defines "additional_t", the SID for "additional_t" does
+        // not get treated as effectively unlabeled, and these permission checks are denied.
         assert!(
-            permission_check
-                .has_permission(valid_sid, unlabeled_sid, ProcessPermission::GetSched)
+            !permission_check
+                .has_permission(additional_type_sid, allowed_type_sid, ProcessPermission::GetSched)
                 .permit
         );
         assert!(
             !permission_check
-                .has_permission(valid_sid, unlabeled_sid, ProcessPermission::SetSched)
+                .has_permission(additional_type_sid, allowed_type_sid, ProcessPermission::SetSched)
+                .permit
+        );
+        assert!(
+            !permission_check
+                .has_permission(allowed_type_sid, additional_type_sid, ProcessPermission::GetSched)
+                .permit
+        );
+        assert!(
+            !permission_check
+                .has_permission(allowed_type_sid, additional_type_sid, ProcessPermission::SetSched)
                 .permit
         );
 
-        // Test policy allows "unlabeled_t" the process setsched capability to "type0".
+        // We now flip back to the policy that does not recognize "additional_t"...
+        assert_eq!(
+            Ok(()),
+            security_server
+                .load_policy(with_unlabeled_access_domain_policy_bytes)
+                .map_err(|e| format!("{:?}", e))
+        );
+
+        // The now-loaded policy allows "allowed_t" the process getsched capability
+        // to "unlabeled_t" and since the now-loaded policy does not recognize "additional_t",
+        // "allowed_t" is now allowed the process getsched capability to "additional_t".
+        assert!(
+            permission_check
+                .has_permission(allowed_type_sid, additional_type_sid, ProcessPermission::GetSched)
+                .permit
+        );
         assert!(
             !permission_check
-                .has_permission(unlabeled_sid, valid_sid, ProcessPermission::GetSched)
+                .has_permission(allowed_type_sid, additional_type_sid, ProcessPermission::SetSched)
+                .permit
+        );
+
+        // ... and the now-loaded policy also allows "unlabeled_t" the process
+        // setsched capability to "allowed_t" and since the now-loaded policy does not recognize
+        // "additional_t", "unlabeled_t" is now allowed the process setsched capability to
+        // "allowed_t".
+        assert!(
+            !permission_check
+                .has_permission(additional_type_sid, allowed_type_sid, ProcessPermission::GetSched)
                 .permit
         );
         assert!(
             permission_check
-                .has_permission(unlabeled_sid, valid_sid, ProcessPermission::SetSched)
+                .has_permission(additional_type_sid, allowed_type_sid, ProcessPermission::SetSched)
                 .permit
+        );
+
+        // We also verify that we do not get a serialization for unrecognized "additional_t"...
+        assert!(security_server.sid_to_security_context(additional_type_sid).is_none());
+
+        // ... but if we flip forward to the policy that recognizes "additional_t", then we see
+        // the serialization succeed and return the original context string.
+        assert_eq!(
+            Ok(()),
+            security_server
+                .load_policy(with_additional_domain_policy_bytes)
+                .map_err(|e| format!("{:?}", e))
+        );
+        assert_eq!(
+            additional_type_context.to_vec(),
+            security_server.sid_to_security_context(additional_type_sid).unwrap()
         );
     }
 
@@ -1110,6 +1250,43 @@ mod tests {
                 non_permissive_sid,
                 CommonFilePermission::GetAttr.for_class(FileClass::Block)
             ),
+            PermissionCheckResult { permit: false, audit: true }
+        );
+    }
+
+    #[test]
+    fn auditallow_and_dontaudit() {
+        let security_server = security_server_with_tests_policy();
+        security_server.set_enforcing(true);
+        assert!(security_server.is_enforcing());
+
+        let audit_sid = security_server
+            .security_context_to_sid("user0:object_r:test_audit_t:s0".into())
+            .unwrap();
+
+        let permission_check = security_server.as_permission_check();
+
+        // Test policy grants the domain self-fork permission, and marks it audit-allow.
+        assert_eq!(
+            permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::Fork),
+            PermissionCheckResult { permit: true, audit: true }
+        );
+
+        // Self-setsched permission is granted, and marked dont-audit, which takes no effect.
+        assert_eq!(
+            permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::SetSched),
+            PermissionCheckResult { permit: true, audit: false }
+        );
+
+        // Self-getsched permission is denied, but marked dont-audit.
+        assert_eq!(
+            permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::GetSched),
+            PermissionCheckResult { permit: false, audit: false }
+        );
+
+        // Self-getpgid permission is denied, with neither audit-allow nor dont-audit.
+        assert_eq!(
+            permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::GetPgid),
             PermissionCheckResult { permit: false, audit: true }
         );
     }

@@ -178,7 +178,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
             }
-        })?;
+        });
 
         let session_restarter = spawn_stream_handler(move |restarter_request| async move {
             match restarter_request {
@@ -187,7 +187,7 @@ mod tests {
                     let _ = responder.send(Ok(()));
                 }
             }
-        })?;
+        });
 
         let lifecycle_controller = spawn_stream_handler(|lifecycle_controller_request| async {
             match lifecycle_controller_request {
@@ -207,7 +207,7 @@ mod tests {
                     panic!("didn't expect request: {:?}", r)
                 }
             }
-        })?;
+        });
 
         let realm_query = spawn_stream_handler(move |realm_query_request| async move {
             match realm_query_request {
@@ -243,7 +243,7 @@ mod tests {
                     panic!("didn't expect request: {:?}", r)
                 }
             }
-        })?;
+        });
 
         let facade = ModularFacade::new_with_proxies(
             session_launcher,

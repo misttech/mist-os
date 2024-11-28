@@ -154,7 +154,7 @@ impl FolderListingAttribute {
         let v = a.value.clone();
         // For now ignore all attributes that aren't recognized.
         Ok(match a.name.local_name.as_str() {
-            NAME_ATTR => Self::Name(v.to_string()),
+            NAME_ATTR => Self::Name(v),
             SIZE_ATTR => Self::Size(v),
             MODIFIED_ATTR => Self::Modified(FormattedDateTimeObj::parse_datetime(v)?),
             CREATED_ATTR => Self::Created(FormattedDateTimeObj::parse_datetime(v)?),

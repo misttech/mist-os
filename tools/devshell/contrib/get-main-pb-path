@@ -1,0 +1,33 @@
+#!/bin/bash
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+#### CATEGORY=Build
+### get the output path to the provided product bundle
+
+## usage: fx get-main-pb-path //products/minimal:product_bundle.x64
+
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+source "$SCRIPT_DIR/../lib/vars.sh" || exit $?
+
+fx-config-read
+
+if [[ ! -d "${FUCHSIA_BUILD_DIR}" ]]; then
+  fx-error "Build directory ${FUCHSIA_BUILD_DIR} does not exist, run \"fx set\" first."
+  exit 1
+fi
+
+set -e
+
+# Find the product bundle path that matches the label provided. The label can be provided with or
+# without a toolchain suffix.
+JQ_FILTER="first(.[] | select(((.label | split(\"(\"))[0] == \"$1\") or .label == \"$1\") | .path)"
+BUILD_RELATIVE_PATH=$(fx-command-run jq -r "$JQ_FILTER" "$FUCHSIA_BUILD_DIR/product_bundles.json")
+
+if [[ -z $BUILD_RELATIVE_PATH ]]; then
+    echo "No matching product found!"
+    exit 1
+fi
+
+echo $BUILD_RELATIVE_PATH

@@ -180,14 +180,7 @@ impl Indexer {
     }
 
     pub fn set_notifier(&self, notifier: fidl::endpoints::ClientEnd<fdi::DriverNotifierMarker>) {
-        match notifier.into_proxy() {
-            Ok(proxy) => {
-                *self.driver_notifier.borrow_mut() = Some(proxy);
-            }
-            Err(e) => {
-                tracing::warn!("Could not set the driver notifier {:?}", e)
-            }
-        }
+        *self.driver_notifier.borrow_mut() = Some(notifier.into_proxy());
     }
 
     pub fn take_notifier(&self) -> Option<fidl::endpoints::ClientEnd<fdi::DriverNotifierMarker>> {
@@ -412,7 +405,6 @@ impl Indexer {
             tracing::error!("Couldn't parse driver url: {}: error: {}", &driver_url, e);
             Status::ADDRESS_UNREACHABLE.into_raw()
         })?;
-
         for boot_driver in self.boot_repo.borrow().iter() {
             if boot_driver.component_url == component_url {
                 tracing::warn!("Driver being registered already exists in boot list.");

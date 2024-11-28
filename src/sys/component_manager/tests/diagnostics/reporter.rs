@@ -8,7 +8,7 @@ use fidl::endpoints::create_proxy;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 async fn get_job_koid(moniker: &str, realm_query: &fsys::RealmQueryProxy) -> u64 {
-    let (runtime_dir, server_end) = create_proxy().unwrap();
+    let (runtime_dir, server_end) = create_proxy();
     realm_query
         .open_directory(moniker, fsys::OpenDirType::RuntimeDir, server_end)
         .await

@@ -739,7 +739,7 @@ impl Decodable for Header {
                     elapsed_time_seconds.into(),
                     /*nsecs= */ 0,
                 )
-                .ok_or(PacketError::external(anyhow::format_err!("invalid timestamp")))?;
+                .ok_or_else(|| PacketError::external(anyhow::format_err!("invalid timestamp")))?;
                 Ok(Header::Time4Byte(parsed))
             }
             HeaderIdentifier::Description => Ok(Header::Description(ObexString::try_from(data)?)),

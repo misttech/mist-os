@@ -30,6 +30,14 @@
       "short": "v",
       "description": "increase verbosity of command output. Defaults to false. Enabling this prints stats from trace providers including the number of records dropped, wrapped buffers count, % of durable buffer used and non durable bytes written.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--no-symbolize",
+      "short": null,
+      "description": "prevent symbolization of the trace file. Defaults to false. If the 'kernel:ipc' category is not included in tracing, this flag does nothing. Otherwise this flag will prevent the symbolization of the kernel IPC traces, leaving only the ordinals in the trace.",
+      "hidden": false
     }
   ],
   "notes": [],

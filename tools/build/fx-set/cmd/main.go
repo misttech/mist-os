@@ -186,7 +186,7 @@ type setArgs struct {
 
 	buildEventService string
 
-	mainProductLabel string
+	mainPbLabel string
 
 	includeClippy bool
 
@@ -248,7 +248,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 
 	flagSet.StringVar(&cmd.buildEventService, "bes", "", "")
 
-	flagSet.StringVar(&cmd.mainProductLabel, "main-product", "", "")
+	flagSet.StringVar(&cmd.mainPbLabel, "main-pb", "", "")
 
 	flagSet.BoolVar(&cmd.isRelease, "release", false, "")
 	flagSet.BoolVar(&cmd.netboot, "netboot", false, "")
@@ -271,6 +271,18 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 
 	if err := flagSet.Parse(args); err != nil {
 		return nil, err
+	}
+
+	if len(cmd.basePackages) != 0 || len(cmd.cachePackages) != 0 {
+		fmt.Fprintln(os.Stderr, "WARNING:  The --with-base and --with-cache arguments have been deprecated.")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Please switch to one of the following:")
+		fmt.Fprintln(os.Stderr, "  - Use --with-test for tests.")
+		fmt.Fprintln(os.Stderr, "  - Use developer overrides for assembly (go/fuchsia-assembly-overrides) for")
+		fmt.Fprintln(os.Stderr, "    anything that needs to be added to the base/cache package set for a product.")
+		fmt.Fprintln(os.Stderr, "  - Use --with for adding other targets to the build (such as tools not in")
+		fmt.Fprintln(os.Stderr, "    //bundles/tools).")
+		fmt.Fprintln(os.Stderr)
 	}
 
 	if cmd.buildDir == "" {
@@ -363,7 +375,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 	rbeMode := args.rbeMode
 	if rbeMode == "auto" {
 		if rbeSupported && canUseRbe {
-			rbeMode = "legacy_default" // subject to change
+			rbeMode = "cloudtop"
 		} else {
 			rbeMode = "off"
 		}
@@ -449,7 +461,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 	return &fintpb.Static{
 		Board:               boardPath,
 		Product:             productPath,
-		MainProductLabel:    args.mainProductLabel,
+		MainPbLabel:         args.mainPbLabel,
 		Optimize:            optimize,
 		BasePackages:        args.basePackages,
 		CachePackages:       args.cachePackages,

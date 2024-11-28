@@ -12,21 +12,20 @@
 #include <lib/zx/event.h>
 #include <zircon/types.h>
 
-#include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types-cpp/event-id.h"
-#include "src/graphics/display/lib/api-types-cpp/image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/image-id.h"
 
 // Indicies into event and event_ids
 #define WAIT_EVENT 0
-#define SIGNAL_EVENT 1
 
 namespace display_test {
 
-typedef struct image_import {
+using image_import_t = struct image_import {
   display::ImageId id;
-  zx::event events[2];
-  display::EventId event_ids[2];
-} image_import_t;
+  zx::event events[1];
+  display::EventId event_ids[1];
+};
 
 class Image {
  public:

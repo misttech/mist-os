@@ -86,7 +86,10 @@ zx_status_t SimInterface::Connect(fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFull
 
   create_binding_completion.Wait();
 
-  auto result = client.buffer(test_arena_)->Start(std::move(endpoints->client));
+  auto req = fuchsia_wlan_fullmac::wire::WlanFullmacImplInitRequest::Builder(test_arena_)
+                 .ifc(std::move(endpoints->client))
+                 .Build();
+  auto result = client.buffer(test_arena_)->Init(req);
   if (!result.ok()) {
     BRCMF_ERR("Failed to start wlanfullmac interface: %s", result.FormatDescription().c_str());
     return result.status();
@@ -101,9 +104,9 @@ zx_status_t SimInterface::Connect(fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFull
   client_ = std::move(client);
 
   // Verify that the channel passed back from start() is the same one we gave to create_iface()
-  if (result->value()->sme_channel.get() != ch_mlme_) {
+  if (result->value()->sme_channel().get() != ch_mlme_) {
     BRCMF_ERR("Channels don't match, sme_channel: %zu, ch_mlme_: %zu",
-              result->value()->sme_channel.get(), ch_mlme_);
+              result.value()->sme_channel().get(), ch_mlme_);
     return ZX_ERR_INTERNAL;
   }
 
@@ -196,26 +199,26 @@ void SimInterface::RoamResultInd(RoamResultIndRequestView request,
 
 void SimInterface::AuthInd(AuthIndRequestView request, AuthIndCompleter::Sync& completer) {
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
-  stats_.auth_indications.push_back(request->resp);
+  auto auth_ind = fidl::ToNatural(*request);
+  stats_.auth_indications.push_back(auth_ind);
   completer.Reply();
 }
 
 void SimInterface::DeauthConf(DeauthConfRequestView request, DeauthConfCompleter::Sync& completer) {
-  auto builder = wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(test_arena_);
-  if (request->has_peer_sta_address()) {
-    builder.peer_sta_address(request->peer_sta_address());
-    const auto& peer_sta_address = request->peer_sta_address().data();
-    if (memcmp(assoc_ctx_.bssid.byte, peer_sta_address, ETH_ALEN) == 0) {
+  const auto deauth_conf = fidl::ToNatural(*request);
+  if (deauth_conf.peer_sta_address().has_value()) {
+    if (memcmp(assoc_ctx_.bssid.byte, deauth_conf.peer_sta_address()->data(), ETH_ALEN) == 0) {
       assoc_ctx_.state = AssocContext::kNone;
     }
   }
-  stats_.deauth_results.emplace_back(builder.Build());
+  stats_.deauth_results.emplace_back(deauth_conf);
   completer.Reply();
 }
 
 void SimInterface::DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) {
-  stats_.deauth_indications.push_back(request->ind);
-  const auto& peer_sta_address = request->ind.peer_sta_address.data();
+  auto deauth_ind = fidl::ToNatural(*request);
+  stats_.deauth_indications.push_back(deauth_ind);
+  const auto& peer_sta_address = request->peer_sta_address().data();
   if (memcmp(assoc_ctx_.bssid.byte, peer_sta_address, ETH_ALEN) == 0) {
     assoc_ctx_.state = AssocContext::kNone;
   }
@@ -225,22 +228,21 @@ void SimInterface::DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::S
 
 void SimInterface::AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& completer) {
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
-  stats_.assoc_indications.push_back(request->resp);
+  auto assoc_ind = fidl::ToNatural(*request);
+  stats_.assoc_indications.push_back(assoc_ind);
   completer.Reply();
 }
 
 void SimInterface::DisassocConf(DisassocConfRequestView request,
                                 DisassocConfCompleter::Sync& completer) {
-  const auto disassoc_conf = wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest{
-      .resp = {.status = request->resp.status}};
-  stats_.disassoc_results.emplace_back(disassoc_conf);
+  stats_.disassoc_results.emplace_back(fidl::ToNatural(*request));
   assoc_ctx_.state = AssocContext::kNone;
   completer.Reply();
 }
 
 void SimInterface::DisassocInd(DisassocIndRequestView request,
                                DisassocIndCompleter::Sync& completer) {
-  stats_.disassoc_indications.push_back(request->ind);
+  stats_.disassoc_indications.push_back(fidl::ToNatural(*request));
   assoc_ctx_.state = AssocContext::kNone;
   completer.Reply();
 }
@@ -293,12 +295,12 @@ void SimInterface::OnWmmStatusResp(OnWmmStatusRespRequestView request,
   completer.Reply();
 }
 
-void SimInterface::Query(wlan_fullmac_wire::WlanFullmacQueryInfo* out_info) {
+void SimInterface::Query(wlan_fullmac_wire::WlanFullmacImplQueryResponse* out_info) {
   auto result = client_.buffer(test_arena_)->Query();
   ZX_ASSERT(result.ok());
   ZX_ASSERT(!result->is_error());
 
-  *out_info = result->value()->info;
+  *out_info = *result->value();
 }
 
 void SimInterface::QueryMacSublayerSupport(wlan_common::MacSublayerSupport* out_resp) {
@@ -327,9 +329,10 @@ void SimInterface::QuerySpectrumManagementSupport(
 }
 
 void SimInterface::GetMacAddr(common::MacAddr* out_macaddr) {
-  wlan_fullmac_wire::WlanFullmacQueryInfo info;
+  wlan_fullmac_wire::WlanFullmacImplQueryResponse info;
   Query(&info);
-  memcpy(out_macaddr->byte, info.sta_addr.data(), ETH_ALEN);
+  ZX_ASSERT(info.has_sta_addr());
+  memcpy(out_macaddr->byte, info.sta_addr().data(), ETH_ALEN);
 }
 
 void SimInterface::StartConnect(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
@@ -512,15 +515,6 @@ void SimInterface::StopSoftAp() {
   // Send request to driver
   auto result = client_.buffer(test_arena_)->StopBss(builder.Build());
   ZX_ASSERT(result.ok());
-}
-
-zx_status_t SimInterface::SetMulticastPromisc(bool enable) {
-  auto result = client_.buffer(test_arena_)->SetMulticastPromisc(enable);
-  ZX_ASSERT(result.ok());
-  if (result->is_error()) {
-    return result->error_value();
-  }
-  return ZX_OK;
 }
 
 SimTest::SimTest() : test_arena_(fdf::Arena('T')) {
@@ -786,9 +780,9 @@ fidl::ClientEnd<fuchsia_io::Directory> SimTest::CreateDriverSvcClient() {
   // Open the svc directory in the driver's outgoing, and store a client to it.
   auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-  zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
-                                    static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                    svc_endpoints.server.TakeChannel().release());
+  zx_status_t status = fdio_open3_at(driver_outgoing_.handle()->get(), "/svc",
+                                     static_cast<uint64_t>(fuchsia_io::Flags::kProtocolDirectory),
+                                     svc_endpoints.server.TakeChannel().release());
   EXPECT_EQ(ZX_OK, status);
   return std::move(svc_endpoints.client);
 }

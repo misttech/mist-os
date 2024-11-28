@@ -780,9 +780,7 @@ pub(crate) async fn serve_client(
                 .context("closing request channel with epitaph")
         }
     };
-    let (request_stream, control_handle) = request
-        .into_stream_and_control_handle()
-        .context("getting new client request stream from channel")?;
+    let (request_stream, control_handle) = request.into_stream_and_control_handle();
     let mut client = match Client::<fasync::net::UdpSocket>::start(
         duid,
         dhcpv6_core::client::transaction_id(),
@@ -956,8 +954,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_client_stops_on_channel_close() {
-        let (client_proxy, server_end) =
-            create_proxy::<ClientMarker>().expect("failed to create test client proxy");
+        let (client_proxy, server_end) = create_proxy::<ClientMarker>();
 
         let ((), client_res) = join!(
             async { drop(client_proxy) },
@@ -1009,8 +1006,7 @@ mod tests {
         Fut: Future<Output = Result<(), fidl::Error>>,
         F: Fn(&fnet_dhcpv6::ClientProxy) -> Fut,
     {
-        let (client_proxy, server_end) =
-            create_proxy::<ClientMarker>().expect("failed to create test client proxy");
+        let (client_proxy, server_end) = create_proxy::<ClientMarker>();
 
         let (caller1_res, caller2_res, client_res) = join!(
             watch(&client_proxy),
@@ -1074,8 +1070,7 @@ mod tests {
                 for prefix_delegation_config in VALID_DELEGATED_PREFIX_CONFIGS {
                     let mut exec = fasync::TestExecutor::new();
 
-                    let (client_proxy, server_end) =
-                        create_proxy::<ClientMarker>().expect("failed to create test client proxy");
+                    let (client_proxy, server_end) = create_proxy::<ClientMarker>();
 
                     let test_fut = async {
                         join!(
@@ -1137,8 +1132,7 @@ mod tests {
                         };
 
                     let (_, client_stream): (ClientEnd<ClientMarker>, _) =
-                        create_request_stream::<ClientMarker>()
-                            .expect("failed to create test fidl channel");
+                        create_request_stream::<ClientMarker>();
 
                     let (client_socket, client_addr) = create_test_socket();
                     let (server_socket, server_addr) = create_test_socket();
@@ -1223,8 +1217,7 @@ mod tests {
                 duid: None,
             },
         ] {
-            let (client_proxy, server_end) =
-                create_proxy::<ClientMarker>().expect("failed to create test client proxy");
+            let (client_proxy, server_end) = create_proxy::<ClientMarker>();
             let () =
                 serve_client(params, server_end).await.expect("start server failed unexpectedly");
             // Calling any function on the client proxy should fail due to channel closed with
@@ -1284,8 +1277,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let transaction_id = [1, 2, 3];
 
-        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>()
-            .expect("failed to create test proxy and stream");
+        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>();
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
@@ -1520,8 +1512,7 @@ mod tests {
     async fn test_client_should_respond_with_dns_servers_on_first_watch_if_non_empty() {
         let transaction_id = [1, 2, 3];
 
-        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>()
-            .expect("failed to create test proxy and stream");
+        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>();
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
@@ -1590,8 +1581,7 @@ mod tests {
         const T1: u32 = 1;
         const T2: u32 = 2000;
 
-        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>()
-            .expect("failed to create test proxy and stream");
+        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>();
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
@@ -1843,8 +1833,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_client_schedule_and_cancel_timers() {
-        let (_client_end, client_stream) =
-            create_request_stream::<ClientMarker>().expect("failed to create test request stream");
+        let (_client_end, client_stream) = create_request_stream::<ClientMarker>();
 
         let (client_socket, _client_addr) = create_test_socket();
         let (_server_socket, server_addr) = create_test_socket();
@@ -1926,8 +1915,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_handle_next_event_on_stateless_client() {
-        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>()
-            .expect("failed to create test proxy and stream");
+        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>();
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
@@ -2079,8 +2067,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_handle_next_event_on_stateful_client() {
-        let (client_proxy, client_stream) =
-            create_proxy_and_stream::<ClientMarker>().expect("failed to create test fidl channel");
+        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>();
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
@@ -2120,8 +2107,7 @@ mod tests {
     #[fuchsia::test]
     #[should_panic]
     async fn test_handle_next_event_respects_timer_order() {
-        let (_client_end, client_stream) =
-            create_request_stream::<ClientMarker>().expect("failed to create test request stream");
+        let (_client_end, client_stream) = create_request_stream::<ClientMarker>();
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
@@ -2212,8 +2198,7 @@ mod tests {
             }
         }
 
-        let (_client_end, client_stream) =
-            create_request_stream::<ClientMarker>().expect("failed to create test request stream");
+        let (_client_end, client_stream) = create_request_stream::<ClientMarker>();
 
         let mut client = Client::<StubSocket>::start(
             None,

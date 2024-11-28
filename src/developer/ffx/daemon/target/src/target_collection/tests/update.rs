@@ -48,8 +48,7 @@ async fn test_update_single() {
 
     let local_node = overnet_core::Router::new(None).unwrap();
 
-    let (proxy, _stream) =
-        fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+    let (proxy, _stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
 
     let conn = RcsConnection::new_with_proxy(local_node, proxy, &NodeId { id: 1234 });
 

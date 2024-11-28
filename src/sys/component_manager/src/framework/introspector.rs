@@ -94,7 +94,7 @@ impl IntrospectorCapability {
 impl InternalCapabilityProvider for IntrospectorCapability {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fcomponent::IntrospectorMarker>::new(server_end);
-        let serve_result = self.serve(server_end.into_stream().unwrap()).await;
+        let serve_result = self.serve(server_end.into_stream()).await;
         if let Err(error) = serve_result {
             warn!(%error, "Error serving Introspector");
         }
@@ -121,6 +121,8 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
             /// Moniker for integration tests.
             static ref RECEIVER: Moniker =
                 Moniker::parse_str("/receiver").unwrap();
+            static ref RUST_TEST_RUNNER: Moniker =
+                Moniker::parse_str("/core/testing/rust_test_runner").unwrap();
             static ref TEST_REALMS: Moniker =
                 Moniker::parse_str("/core/testing").unwrap();
             static ref STARNIX_TESTS: Name = "starnix-tests".parse().unwrap();
@@ -147,6 +149,7 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
         };
         if target.moniker != *MEMORY_MONITOR
             && target.moniker != *RECEIVER
+            && target.moniker != *RUST_TEST_RUNNER
             && !target.moniker.is_root()
             && !(is_starnix_test_realm(&target.moniker) && is_starnix_test_realm(&scope.moniker))
         {
@@ -155,7 +158,7 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
                 source_moniker: scope.moniker,
             });
         }
-        Box::new(IntrospectorCapability::new(scope.moniker.clone(), self.instance_registry.clone()))
+        Box::new(IntrospectorCapability::new(scope.moniker, self.instance_registry.clone()))
     }
 }
 

@@ -34,8 +34,7 @@ async fn read_components_recursive_glob() {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer_a.set_health_ok().await.unwrap();
 
@@ -44,8 +43,7 @@ async fn read_components_recursive_glob() {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer_b.set_health_ok().await.unwrap();
 
@@ -95,8 +93,7 @@ async fn read_components_subtree_with_recursive_glob() {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer_a.set_health_ok().await.unwrap();
 
@@ -105,8 +102,7 @@ async fn read_components_subtree_with_recursive_glob() {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer_b.set_health_ok().await.unwrap();
 
@@ -166,8 +162,7 @@ async fn expose_nested_inspect(
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer.set_health_ok().await.unwrap();
     writer

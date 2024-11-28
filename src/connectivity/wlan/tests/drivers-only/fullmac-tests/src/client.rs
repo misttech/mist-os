@@ -35,7 +35,7 @@ async fn setup_connected_to_open_bss(
 
         let client_fut = async {
             let (connect_txn, connect_txn_server) =
-                fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>();
 
             let connect_req = fidl_sme::ConnectRequest {
                 ssid: COMPATIBLE_OPEN_BSS.ssid.clone().into(),
@@ -76,7 +76,7 @@ async fn setup_connected_to_open_bss(
                 .expect("Failed to send ConnectConf");
 
             assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online: _, responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload: _, responder } => {
                 responder
                     .send()
                     .expect("Failed to respond to OnLinkStateChanged");
@@ -219,7 +219,7 @@ async fn test_open_connect_request_success() {
 
     let client_fut = async {
         let (connect_txn, connect_txn_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>();
         let mut connect_txn_event_stream = connect_txn.take_event_stream();
 
         let connect_req = fidl_sme::ConnectRequest {
@@ -274,7 +274,7 @@ async fn test_open_connect_request_success() {
             .expect("Failed to send ConnectConf");
 
         assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online: _, responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload: _, responder } => {
                 responder
                     .send()
                     .expect("Failed to respond to OnLinkStateChanged");
@@ -299,7 +299,15 @@ async fn test_open_connect_request_success() {
     assert_eq!(driver_connect_req.sae_password.unwrap(), vec![]);
     assert_eq!(driver_connect_req.security_ie.unwrap(), vec![]);
 
-    assert_eq!(fullmac_request_history[1], FullmacRequest::OnLinkStateChanged(true));
+    assert_eq!(
+        fullmac_request_history[1],
+        FullmacRequest::OnLinkStateChanged(
+            fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest {
+                online: Some(true),
+                ..Default::default()
+            }
+        )
+    );
 }
 
 #[fuchsia::test]
@@ -310,7 +318,7 @@ async fn test_open_connect_request_error() {
 
     let client_fut = async {
         let (connect_txn, connect_txn_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>();
         let mut connect_txn_event_stream = connect_txn.take_event_stream();
 
         let connect_req = fidl_sme::ConnectRequest {
@@ -411,7 +419,7 @@ async fn test_wpa2_connect_request_success() {
 
     let client_fut = async {
         let (connect_txn, connect_txn_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>();
         let mut connect_txn_event_stream = connect_txn.take_event_stream();
 
         let connect_req = fidl_sme::ConnectRequest {
@@ -503,7 +511,7 @@ async fn test_wpa2_connect_request_success() {
         }
 
         assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online: _, responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload: _, responder } => {
                 responder
                     .send()
                     .expect("Failed to respond to OnLinkStateChanged");
@@ -586,7 +594,15 @@ async fn test_wpa2_connect_request_success() {
         }
     );
 
-    assert_eq!(fullmac_request_history[5], FullmacRequest::OnLinkStateChanged(true));
+    assert_eq!(
+        fullmac_request_history[5],
+        FullmacRequest::OnLinkStateChanged(
+            fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest {
+                online: Some(true),
+                ..Default::default()
+            }
+        )
+    );
 }
 
 #[fuchsia::test]
@@ -599,7 +615,7 @@ async fn test_wpa3_connect_success() {
 
     let client_fut = async {
         let (connect_txn, connect_txn_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>();
         let mut connect_txn_event_stream = connect_txn.take_event_stream();
 
         let connect_req = fidl_sme::ConnectRequest {
@@ -684,7 +700,7 @@ async fn test_wpa3_connect_success() {
         assert_eq!(update_sink.len(), 0);
 
         assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImpl_Request::SaeHandshakeResp { resp: _, responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::SaeHandshakeResp { payload: _, responder } => {
                 responder
                     .send()
                     .expect("Failed to respond to SaeHandshakeResp");
@@ -723,7 +739,7 @@ async fn test_wpa3_connect_success() {
         }
 
         assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online: _, responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload: _, responder } => {
                 responder
                     .send()
                     .expect("Failed to respond to OnLinkStateChanged");
@@ -764,9 +780,10 @@ async fn test_wpa3_connect_success() {
 
     assert_eq!(
         fullmac_request_history[3],
-        FullmacRequest::SaeHandshakeResp(fidl_fullmac::WlanFullmacSaeHandshakeResp {
-            peer_sta_address: fullmac_driver.sta_addr(),
-            status_code: fidl_ieee80211::StatusCode::Success,
+        FullmacRequest::SaeHandshakeResp(fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest {
+            peer_sta_address: Some(fullmac_driver.sta_addr()),
+            status_code: Some(fidl_ieee80211::StatusCode::Success),
+            ..Default::default()
         })
     );
 
@@ -848,7 +865,15 @@ async fn test_wpa3_connect_success() {
         }
     );
 
-    assert_eq!(fullmac_request_history[9], FullmacRequest::OnLinkStateChanged(true));
+    assert_eq!(
+        fullmac_request_history[9],
+        FullmacRequest::OnLinkStateChanged(
+            fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest {
+                online: Some(true),
+                ..Default::default()
+            }
+        )
+    );
 }
 
 #[fuchsia::test]
@@ -861,7 +886,7 @@ async fn test_sme_disconnect() {
 
     let driver_fut = async {
         assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online: _, responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload: _, responder } => {
                 responder
                     .send()
                     .expect("Failed to respond to OnLinkStateChanged");
@@ -888,7 +913,15 @@ async fn test_sme_disconnect() {
 
     let fullmac_request_history = fullmac_driver.request_stream.history();
 
-    assert_eq!(fullmac_request_history[0], FullmacRequest::OnLinkStateChanged(false));
+    assert_eq!(
+        fullmac_request_history[0],
+        FullmacRequest::OnLinkStateChanged(
+            fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest {
+                online: Some(false),
+                ..Default::default()
+            }
+        )
+    );
     assert_eq!(
         fullmac_request_history[1],
         FullmacRequest::Deauth(fidl_fullmac::WlanFullmacImplDeauthRequest {
@@ -914,16 +947,18 @@ async fn test_remote_deauth() {
 
     fullmac_driver
         .ifc_proxy
-        .deauth_ind(&fidl_fullmac::WlanFullmacDeauthIndication {
-            peer_sta_address: COMPATIBLE_OPEN_BSS.bssid.to_array(),
-            reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
-            locally_initiated: false,
+        .deauth_ind(&fidl_fullmac::WlanFullmacImplIfcDeauthIndRequest {
+            peer_sta_address: Some(COMPATIBLE_OPEN_BSS.bssid.to_array()),
+            reason_code: Some(fidl_ieee80211::ReasonCode::UnspecifiedReason),
+            locally_initiated: Some(false),
+            ..Default::default()
         })
         .await
         .expect("Could not send deauth ind");
 
     assert_variant!(fullmac_driver.request_stream.next().await,
-        fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online: false, responder } => {
+        fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload, responder } => {
+          assert_eq!(payload.online, Some(false));
             responder
                 .send()
                 .expect("Failed to respond to OnLinkStateChanged");
@@ -950,17 +985,19 @@ async fn test_remote_disassoc_then_reconnect() {
 
     fullmac_driver
         .ifc_proxy
-        .disassoc_ind(&fidl_fullmac::WlanFullmacDisassocIndication {
-            peer_sta_address: COMPATIBLE_OPEN_BSS.bssid.to_array(),
-            reason_code: fidl_ieee80211::ReasonCode::ReasonInactivity,
-            locally_initiated: false,
+        .disassoc_ind(&fidl_fullmac::WlanFullmacImplIfcDisassocIndRequest {
+            peer_sta_address: Some(COMPATIBLE_OPEN_BSS.bssid.to_array()),
+            reason_code: Some(fidl_ieee80211::ReasonCode::ReasonInactivity),
+            locally_initiated: Some(false),
+            ..Default::default()
         })
         .await
-        .expect("Could not send DissasocInd");
+        .expect("Could not send DisassocInd");
 
     assert_variant!(
         fullmac_driver.request_stream.next().await,
-        fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online: false, responder } => {
+        fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload, responder } => {
+          assert_eq!(payload.online, Some(false));
             responder
                 .send()
                 .expect("Failed to respond to OnLinkStateChanged");
@@ -1002,7 +1039,8 @@ async fn test_remote_disassoc_then_reconnect() {
 
     assert_variant!(
         fullmac_driver.request_stream.next().await,
-        fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online: true, responder } => {
+        fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload, responder } => {
+          assert_eq!(payload.online, Some(true));
             responder
                 .send()
                 .expect("Failed to respond to OnLinkStateChanged");

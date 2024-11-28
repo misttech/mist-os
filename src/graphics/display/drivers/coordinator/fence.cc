@@ -23,9 +23,9 @@
 #include <fbl/intrusive_single_list.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/event-id.h"
 
-namespace display {
+namespace display_coordinator {
 
 bool Fence::CreateRef() {
   ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
@@ -96,7 +96,7 @@ void Fence::OnReady(async_dispatcher_t* dispatcher, async::WaitBase* self, zx_st
   }
 }
 
-Fence::Fence(FenceCallback* cb, async_dispatcher_t* event_dispatcher, EventId fence_id,
+Fence::Fence(FenceCallback* cb, async_dispatcher_t* event_dispatcher, display::EventId fence_id,
              zx::event event)
     : cb_(cb),
       event_dispatcher_(*event_dispatcher),
@@ -127,10 +127,6 @@ zx_status_t FenceReference::StartReadyWait() {
 void FenceReference::ResetReadyWait() {
   ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
   fence_->OnRefDisarmed(this);
-}
-
-void FenceReference::SetImmediateRelease(fbl::RefPtr<FenceReference>&& fence) {
-  release_fence_ = std::move(fence);
 }
 
 void FenceReference::OnReady() {
@@ -175,7 +171,7 @@ void FenceCollection::Clear() {
   }
 }
 
-zx_status_t FenceCollection::ImportEvent(zx::event event, EventId id) {
+zx_status_t FenceCollection::ImportEvent(zx::event event, display::EventId id) {
   fbl::AutoLock lock(&mtx_);
   auto fence = fences_.find(id);
   // Create and ref a new fence.
@@ -203,7 +199,7 @@ zx_status_t FenceCollection::ImportEvent(zx::event event, EventId id) {
   return ZX_OK;
 }
 
-void FenceCollection::ReleaseEvent(EventId id) {
+void FenceCollection::ReleaseEvent(display::EventId id) {
   // Hold a ref to prevent double locking if this destroys the fence.
   auto fence_ref = GetFence(id);
   if (fence_ref) {
@@ -212,8 +208,8 @@ void FenceCollection::ReleaseEvent(EventId id) {
   }
 }
 
-fbl::RefPtr<FenceReference> FenceCollection::GetFence(EventId id) {
-  if (id == kInvalidEventId) {
+fbl::RefPtr<FenceReference> FenceCollection::GetFence(display::EventId id) {
+  if (id == display::kInvalidEventId) {
     return nullptr;
   }
   fbl::AutoLock l(&mtx_);
@@ -230,4 +226,4 @@ void FenceCollection::OnRefForFenceDead(Fence* fence) {
   }
 }
 
-}  // namespace display
+}  // namespace display_coordinator

@@ -75,8 +75,7 @@ impl ExpectationsComparer {
         CaseStart { invocation, std_handles }: CaseStart,
         end_stream: impl futures::TryStream<Ok = CaseEnd, Error = anyhow::Error>,
     ) -> Result<Option<(fidl_fuchsia_test::Invocation, ExpectationError)>, anyhow::Error> {
-        let (case_listener_proxy, case_listener) =
-            fidl::endpoints::create_proxy().context("error creating CaseListenerProxy")?;
+        let (case_listener_proxy, case_listener) = fidl::endpoints::create_proxy();
         run_listener_proxy
             .on_test_case_started(&invocation, std_handles, case_listener)
             .context("error calling run_listener_proxy.on_test_case_started(...)")?;
@@ -156,11 +155,9 @@ impl ExpectationsComparer {
         let (skipped, not_skipped): (Vec<_>, Vec<_>) = tests_and_expects
             .partition(|(_invocation, outcome)| matches!(outcome, Some(Outcome::Skip)));
 
-        let listener_proxy =
-            listener.into_proxy().context("error turning RunListener client end into proxy")?;
+        let listener_proxy = listener.into_proxy();
         for (invocation, _) in skipped {
-            let (case_listener_proxy, case_listener_server_end) =
-                fidl::endpoints::create_proxy().context("error creating case listener proxy")?;
+            let (case_listener_proxy, case_listener_server_end) = fidl::endpoints::create_proxy();
             let name = invocation.name.as_ref().expect("fuchsia.test/Invocation had no name");
             tracing::info!("{name} skip is expected.");
             listener_proxy
@@ -184,8 +181,7 @@ impl ExpectationsComparer {
 
         if !not_skipped.is_empty() {
             let case_stream = {
-                let (listener, listener_request_stream) = fidl::endpoints::create_request_stream()
-                    .context("error creating run listener request stream")?;
+                let (listener, listener_request_stream) = fidl::endpoints::create_request_stream();
                 suite_proxy
                     .run(
                         &not_skipped
@@ -219,7 +215,6 @@ impl ExpectationsComparer {
                                     CaseStart { invocation, std_handles },
                                     listener
                                         .into_stream()
-                                        .context("error getting CaseListener request stream")?
                                         .map_ok(
                                             |fidl_fuchsia_test::CaseListenerRequest::Finished {
                                                  result,

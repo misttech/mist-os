@@ -516,8 +516,7 @@ impl AnonymizedAggregateServiceDir {
                 let mut cur_path = RelativePath::dot();
                 for segment in capability.source_path().unwrap().iter_segments() {
                     let (proxy, server_end) =
-                        fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                            .expect("failed to create proxy");
+                        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                     let flags = fio::OpenFlags::DIRECTORY;
                     let mut object_request = flags.to_object_request(server_end);
                     source_component
@@ -652,7 +651,7 @@ impl AnonymizedAggregateServiceDir {
             self.parent.upgrade().map_err(|err| ModelError::ComponentInstanceError { err })?;
 
         let scope = ExecutionScope::new();
-        let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let mut object_request = fio::OpenFlags::DIRECTORY.to_object_request(server);
         CapabilityOpenRequest::new_from_route_source(
             RouteSource { source: source.clone(), relative_path: Default::default() },
@@ -1117,8 +1116,7 @@ mod tests {
     }
 
     fn open_dir(execution_scope: ExecutionScope, dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
-        let (dir_proxy, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         dir.open(
             execution_scope,

@@ -188,8 +188,7 @@ async fn latest_update_package_attempt(
     package_resolver: &impl PackageResolverProxyInterface,
     channel_manager: &dyn TargetChannelUpdater,
 ) -> Result<update_package::UpdatePackage, errors::UpdatePackage> {
-    let (dir_proxy, dir_server_end) =
-        fidl::endpoints::create_proxy().map_err(errors::UpdatePackage::CreateDirectoryProxy)?;
+    let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy();
     let update_package = channel_manager
         .get_target_channel_update_url()
         .unwrap_or_else(|| default_update_url.to_owned());
@@ -216,7 +215,7 @@ async fn latest_system_image_merkle(
 async fn get_asset_reader(
     paver: &fpaver::PaverProxy,
 ) -> Result<(fpaver::DataSinkProxy, fpaver::Configuration), anyhow::Error> {
-    let (boot_manager, server_end) = fidl::endpoints::create_proxy::<BootManagerMarker>()?;
+    let (boot_manager, server_end) = fidl::endpoints::create_proxy::<BootManagerMarker>();
     let () = paver.find_boot_manager(server_end).context("connect to fuchsia.paver.BootManager")?;
     let configuration = match boot_manager.query_current_configuration().await {
         Ok(res) => res.map_err(zx::Status::from_raw).context("querying current configuration")?,
@@ -227,7 +226,7 @@ async fn get_asset_reader(
         Err(err) => return Err(err).context("querying current configuration"),
     };
 
-    let (data_sink, server_end) = fidl::endpoints::create_proxy::<DataSinkMarker>()?;
+    let (data_sink, server_end) = fidl::endpoints::create_proxy::<DataSinkMarker>();
     let () = paver.find_data_sink(server_end).context("connect to fuchsia.paver.DataSink")?;
     Ok((data_sink, configuration))
 }
@@ -474,9 +473,9 @@ pub mod test_check_for_system_update_impl {
             dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
         ) -> Self::ResolveResponseFut {
             assert_eq!(package_url, self.expected_package_url);
-            fdio::open_deprecated(
+            fdio::open(
                 self.temp_dir.path().to_str().expect("path is utf8"),
-                fio::OpenFlags::RIGHT_READABLE,
+                fio::PERM_READABLE,
                 dir.into_channel(),
             )
             .unwrap();
@@ -512,7 +511,7 @@ pub mod test_check_for_system_update_impl {
         /// Spawns a new task to serve the space manager protocol.
         pub fn spawn_gc_service(self: &Arc<Self>) -> fspace::ManagerProxy {
             let (proxy, server_end) =
-                fidl::endpoints::create_proxy_and_stream::<fspace::ManagerMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fspace::ManagerMarker>();
 
             fasync::Task::spawn(Arc::clone(self).run_gc_service(server_end).unwrap_or_else(|e| {
                 panic!("error running space manager service: {:#}", anyhow!(e))
@@ -678,9 +677,9 @@ pub mod test_check_for_system_update_impl {
                 }
 
                 assert_eq!(package_url, TEST_UPDATE_PACKAGE_URL);
-                fdio::open_deprecated(
+                fdio::open(
                     self.temp_dir.path().to_str().expect("path is utf8"),
-                    fio::OpenFlags::RIGHT_READABLE,
+                    fio::PERM_READABLE,
                     dir.into_channel(),
                 )
                 .unwrap();

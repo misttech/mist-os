@@ -4,7 +4,6 @@
 
 use fidl_fuchsia_io as fio;
 use io_conformance_util::test_harness::TestHarness;
-use io_conformance_util::*;
 
 #[fuchsia::test]
 async fn get_token_with_sufficient_rights() {
@@ -12,14 +11,14 @@ async fn get_token_with_sufficient_rights() {
     if !harness.config.supports_get_token {
         return;
     }
-
-    for dir_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
+    // TODO(https://fxbug.dev/346585458): This should only require the MODIFY_DIRECTORY right
+    // however the C++ VFS incorrectly checks for WRITE_BYTES instead.
+    for dir_flags in harness
+        .dir_rights
+        .combinations_containing(fio::Rights::WRITE_BYTES | fio::Rights::MODIFY_DIRECTORY)
     {
-        let root = root_directory(vec![]);
-        let test_dir = harness.get_directory(root, dir_flags);
-
-        let (status, _handle) = test_dir.get_token().await.expect("get_token failed");
+        let dir = harness.get_directory(vec![], dir_flags);
+        let (status, _handle) = dir.get_token().await.expect("get_token failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         // Handle is tested in other test cases.
     }
@@ -31,12 +30,14 @@ async fn get_token_with_insufficient_rights() {
     if !harness.config.supports_get_token {
         return;
     }
-
-    for dir_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
-        let root = root_directory(vec![]);
-        let test_dir = harness.get_directory(root, dir_flags);
-
-        let (status, _handle) = test_dir.get_token().await.expect("get_token failed");
+    // TODO(https://fxbug.dev/346585458): This should only require the MODIFY_DIRECTORY right
+    // however the C++ VFS incorrectly checks for WRITE_BYTES instead.
+    for dir_flags in harness
+        .dir_rights
+        .combinations_without(fio::Rights::WRITE_BYTES | fio::Rights::MODIFY_DIRECTORY)
+    {
+        let dir = harness.get_directory(vec![], dir_flags);
+        let (status, _handle) = dir.get_token().await.expect("get_token failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::BAD_HANDLE);
     }
 }

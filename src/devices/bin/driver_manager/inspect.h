@@ -75,7 +75,7 @@ class DeviceInspect {
   // This should only be called once, calling it more than once will create duplicate entries.
   void SetStaticValues(
       const std::string& topological_path, uint32_t protocol_id, const std::string& type,
-      const cpp20::span<const fuchsia_driver_framework::wire::NodeProperty>& properties,
+      const cpp20::span<const fuchsia_driver_framework::wire::NodeProperty2>& properties,
       const std::string& driver_url);
 
   void set_state(const std::string& state) { state_.Set(state); }

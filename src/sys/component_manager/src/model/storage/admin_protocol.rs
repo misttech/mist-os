@@ -198,7 +198,7 @@ impl StorageAdmin {
                         .await
                         .map_err(|_| fcomponent::Error::Internal)?;
                         directory
-                            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, object)
+                            .clone2(object.into_channel().into())
                             .map_err(|_| fcomponent::Error::Internal)?;
                         Ok(())
                     };
@@ -255,7 +255,7 @@ impl StorageAdmin {
                     .await
                     {
                         Ok(dir) => responder.send(
-                            dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, object)
+                            dir.clone2(object.into_channel().into())
                                 .map_err(|_| fcomponent::Error::Internal),
                         )?,
                         Err(_) => responder.send(Err(fcomponent::Error::Internal))?,
@@ -666,7 +666,7 @@ impl StorageAdmin {
         }
 
         const MAX_MONIKERS_RETURNED: usize = 10;
-        let mut iterator_stream = iterator.into_stream()?;
+        let mut iterator_stream = iterator.into_stream();
         // TODO(https://fxbug.dev/42157052): This currently returns monikers with instance ids, even though
         // the ListStorageUsers method takes monikers without instance id as arguments. This is done
         // as the Open and Delete methods take monikers with instance id. Once these are updated,
@@ -1115,7 +1115,7 @@ mod tests {
             fidl::endpoints::ServerEnd::new(server.into_channel()),
         );
 
-        let storage_admin = client.into_proxy().unwrap();
+        let storage_admin = client.into_proxy();
         let status = StorageAdmin::get_storage_status(&storage_admin).await.unwrap();
 
         assert_eq!(status.used_size.unwrap(), used);

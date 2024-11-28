@@ -128,11 +128,6 @@ template("icu_rustc_staticlib") {
           non_rust_deps += [ "${_relabel}.icu_${icu_flavor.name}_${icu_flavor.commit_id}(${current_toolchain})" ]
         }
       }
-
-      if (!defined(data_deps)) {
-        data_deps = []
-      }
-      data_deps += [ icu_config_validation_target ]
     }
   }
 

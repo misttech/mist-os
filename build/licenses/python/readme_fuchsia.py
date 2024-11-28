@@ -22,11 +22,13 @@ class Readme:
         readme_label: GnLabel, applicable_target: GnLabel, file_text: str
     ) -> "Readme":
         package_name = None
+        last_license_file_path = ""
+        last_license_file_url = ""
         license_files: List[GnLabel] = []
         lines = file_text.split("\n")
         for l in lines:
             if ":" in l:
-                splitted_line = [s.strip() for s in l.split(":")]
+                splitted_line = [s.strip() for s in l.split(":", 1)]
                 key = splitted_line[0].upper()
                 value = splitted_line[1]
                 if not value:
@@ -34,10 +36,22 @@ class Readme:
                 if key == "NAME":
                     package_name = value
                 elif key == "LICENSE FILE":
-                    license_file = applicable_target.create_child_from_str(
-                        value
-                    )
-                    license_files.append(license_file)
+                    if last_license_file_path:
+                        license_file = applicable_target.create_child_from_str(
+                            last_license_file_path, url=last_license_file_url
+                        )
+                        license_files.append(license_file)
+                        last_license_file_path = ""
+                        last_license_file_url = ""
+                    last_license_file_path = value
+                elif key == "LICENSE FILE URL" and last_license_file_path:
+                    last_license_file_url = value
+
+        if last_license_file_path:
+            license_file = applicable_target.create_child_from_str(
+                last_license_file_path, url=last_license_file_url
+            )
+            license_files.append(license_file)
 
         return Readme(
             readme_label=readme_label,

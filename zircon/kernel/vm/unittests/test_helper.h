@@ -135,6 +135,11 @@ bool verify_mapping_memory_attribution(VmMapping* mapping, uint64_t mapping_gen,
 // expected_mapped_page_count) and that remaining pages are unmapped.
 bool verify_mapped_page_range(vaddr_t base, size_t mapping_size, size_t expected_mapped_page_count);
 
+// Helper function that produces a filled out AttributionCounts for testing simple VMOs that just
+// have private and no shared content.
+VmObject::AttributionCounts make_private_attribution_counts(uint64_t uncompressed,
+                                                            uint64_t compressed);
+
 // Use the function name as the test name
 #define VM_UNITTEST(fname) UNITTEST(#fname, fname)
 

@@ -116,8 +116,7 @@ mod tests {
     fn spawn_manager_server(
         element_manager: Box<ElementManager>,
     ) -> (felement::ManagerProxy, fasync::Task<()>) {
-        let (proxy, stream) = create_proxy_and_stream::<felement::ManagerMarker>()
-            .expect("Failed to create Manager proxy and stream");
+        let (proxy, stream) = create_proxy_and_stream::<felement::ManagerMarker>();
 
         (
             proxy,
@@ -193,8 +192,7 @@ mod tests {
                     panic!("Realm handler received unexpected request");
                 }
             }
-        })
-        .unwrap();
+        });
 
         let graphical_presenter =
             spawn_stream_handler(move |graphical_presenter_request| async move {
@@ -208,8 +206,7 @@ mod tests {
                         let _ = responder.send(Ok(()));
                     }
                 }
-            })
-            .unwrap();
+            });
         let graphical_presenter_connector = Box::new(MockConnector::new(graphical_presenter));
 
         let element_manager: Box<ElementManager> = Box::new(ElementManager::new(
@@ -292,8 +289,7 @@ mod tests {
                     }
                 }
             }
-        })
-        .unwrap();
+        });
 
         let graphical_presenter: felement::GraphicalPresenterProxy =
             spawn_stream_handler(move |graphical_presenter_request| async move {
@@ -307,8 +303,7 @@ mod tests {
                         let _ = responder.send(Ok(()));
                     }
                 }
-            })
-            .unwrap();
+            });
 
         {
             let element_manager: Box<ElementManager> = Box::new(ElementManager::new(

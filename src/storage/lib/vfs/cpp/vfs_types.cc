@@ -143,14 +143,6 @@ fio::OpenFlags RightsToOpenFlags(fio::Rights rights) {
 fio::wire::NodeAttributes VnodeAttributes::ToIoV1NodeAttributes(const fs::Vnode& vnode) const {
   // Filesystems that don't support hard links typically report a value of 1 for the link count.
   constexpr uint64_t kDefaultLinkCount = 1;
-  // TODO(https://fxbug.dev/324112857): Some filesystems now support POSIX attributes, which means
-  // that they won't have any hard-coded values. However, some tests still rely on the previous
-  // mode bits which were reported. For the time being, we pass in |vnode| to this function so that
-  // we can attempt to synthesize a valid set of mode bits for callers that rely on them in io1.
-  //
-  // This isn't an issue for the ongoing io2 migration as filesystems which do support the POSIX
-  // mode attributes will correctly handle them. In the long term, we should ensure that nothing
-  // load-bearing relies on these synthesized mode bits by migrating to io2's GetAttributes.
   return fio::wire::NodeAttributes{
       .mode = mode.has_value() ? *mode
                                : internal::GetPosixMode(vnode.GetProtocols(), vnode.GetAbilities()),

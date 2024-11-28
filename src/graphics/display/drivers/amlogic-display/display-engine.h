@@ -32,8 +32,8 @@
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
 #include "src/graphics/display/drivers/amlogic-display/vsync-receiver.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 
 namespace amlogic_display {
 

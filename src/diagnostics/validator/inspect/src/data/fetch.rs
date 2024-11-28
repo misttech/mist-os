@@ -67,7 +67,7 @@ impl LazyNodeFetcher {
     }
 
     async fn get_child_names(&self) -> Result<Vec<String>, Error> {
-        let (name_iterator, server_end) = create_proxy::<TreeNameIteratorMarker>()?;
+        let (name_iterator, server_end) = create_proxy::<TreeNameIteratorMarker>();
         self.channel.list_child_names(server_end)?;
         let mut names = vec![];
         loop {
@@ -80,7 +80,7 @@ impl LazyNodeFetcher {
     }
 
     async fn get_child_tree_channel(&self, name: &str) -> Result<TreeProxy, Error> {
-        let (child_channel, server_end) = create_proxy::<TreeMarker>()?;
+        let (child_channel, server_end) = create_proxy::<TreeMarker>();
         self.channel.open_child(name, server_end)?;
         Ok(child_channel)
     }
@@ -148,7 +148,7 @@ mod tests {
     }
 
     fn spawn_root_tree_server(tree_name: &str, vmos: Arc<TestVmos>) -> Result<TreeProxy, Error> {
-        let (tree, request_stream) = fidl::endpoints::create_proxy_and_stream::<TreeMarker>()?;
+        let (tree, request_stream) = fidl::endpoints::create_proxy_and_stream::<TreeMarker>();
         spawn_tree_server(tree_name.to_string(), vmos, request_stream);
         Ok(tree)
     }
@@ -177,11 +177,11 @@ mod tests {
                     responder.send(content)?;
                 }
                 TreeRequest::ListChildNames { tree_iterator, .. } => {
-                    let request_stream = tree_iterator.into_stream()?;
+                    let request_stream = tree_iterator.into_stream();
                     spawn_tree_name_iterator_server(child_names(&name), request_stream)
                 }
                 TreeRequest::OpenChild { child_name, tree, .. } => {
-                    spawn_tree_server(child_name, Arc::clone(&vmos), tree.into_stream()?)
+                    spawn_tree_server(child_name, Arc::clone(&vmos), tree.into_stream())
                 }
                 TreeRequest::_UnknownMethod { ordinal, method_type, .. } => {
                     warn!(ordinal, ?method_type, "Unknown request");

@@ -80,9 +80,8 @@ impl DiagnosticsInner {
                     };
                     match result {
                         Some(rs) => {
-                            futures.push(DiagnosticsHandler::serve_request_stream(
-                                rs.into_stream().expect("failed to create request stream"),
-                            ));
+                            futures
+                                .push(DiagnosticsHandler::serve_request_stream(rs.into_stream()));
                         }
                         None => {
                             // When the receiver ends we want to stop

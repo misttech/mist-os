@@ -61,7 +61,7 @@ async fn list_realm_children(test_realm: &RealmInstance) -> Result<Vec<cdecl::Ch
     let realm = test_realm.root.connect_to_protocol_at_exposed_dir::<RealmMarker>()?;
     let collection_ref = cdecl::CollectionRef { name: "virtual_machine_managers".to_string() };
     let (child_iterator, child_iterator_server_end) =
-        fidl::endpoints::create_proxy::<ChildIteratorMarker>().unwrap();
+        fidl::endpoints::create_proxy::<ChildIteratorMarker>();
     realm.list_children(&collection_ref, child_iterator_server_end).await.unwrap().unwrap();
 
     let mut result: Vec<cdecl::ChildRef> = Vec::new();

@@ -656,43 +656,43 @@ impl PlaygroundValue {
             (LookupResultOrType::Type(lib::Type::U8), PlaygroundValue::Num(x)) => x
                 .to_u8()
                 .map(FidlValue::U8)
-                .ok_or(ValueError::ConversionOverflow(lib::Type::U8).into()),
+                .ok_or_else(|| ValueError::ConversionOverflow(lib::Type::U8).into()),
             (LookupResultOrType::Type(lib::Type::U16), PlaygroundValue::Num(x)) => x
                 .to_u16()
                 .map(FidlValue::U16)
-                .ok_or(ValueError::ConversionOverflow(lib::Type::U16).into()),
+                .ok_or_else(|| ValueError::ConversionOverflow(lib::Type::U16).into()),
             (LookupResultOrType::Type(lib::Type::U32), PlaygroundValue::Num(x)) => x
                 .to_u32()
                 .map(FidlValue::U32)
-                .ok_or(ValueError::ConversionOverflow(lib::Type::U32).into()),
+                .ok_or_else(|| ValueError::ConversionOverflow(lib::Type::U32).into()),
             (LookupResultOrType::Type(lib::Type::U64), PlaygroundValue::Num(x)) => x
                 .to_u64()
                 .map(FidlValue::U64)
-                .ok_or(ValueError::ConversionOverflow(lib::Type::U64).into()),
+                .ok_or_else(|| ValueError::ConversionOverflow(lib::Type::U64).into()),
             (LookupResultOrType::Type(lib::Type::I8), PlaygroundValue::Num(x)) => x
                 .to_i8()
                 .map(FidlValue::I8)
-                .ok_or(ValueError::ConversionOverflow(lib::Type::I8).into()),
+                .ok_or_else(|| ValueError::ConversionOverflow(lib::Type::I8).into()),
             (LookupResultOrType::Type(lib::Type::I16), PlaygroundValue::Num(x)) => x
                 .to_i16()
                 .map(FidlValue::I16)
-                .ok_or(ValueError::ConversionOverflow(lib::Type::I16).into()),
+                .ok_or_else(|| ValueError::ConversionOverflow(lib::Type::I16).into()),
             (LookupResultOrType::Type(lib::Type::I32), PlaygroundValue::Num(x)) => x
                 .to_i32()
                 .map(FidlValue::I32)
-                .ok_or(ValueError::ConversionOverflow(lib::Type::I32).into()),
+                .ok_or_else(|| ValueError::ConversionOverflow(lib::Type::I32).into()),
             (LookupResultOrType::Type(lib::Type::I64), PlaygroundValue::Num(x)) => x
                 .to_i64()
                 .map(FidlValue::I64)
-                .ok_or(ValueError::ConversionOverflow(lib::Type::I64).into()),
+                .ok_or_else(|| ValueError::ConversionOverflow(lib::Type::I64).into()),
             (LookupResultOrType::Type(lib::Type::F32), PlaygroundValue::Num(x)) => x
                 .to_f32()
                 .map(FidlValue::F32)
-                .ok_or(ValueError::ConversionOverflow(lib::Type::F32).into()),
+                .ok_or_else(|| ValueError::ConversionOverflow(lib::Type::F32).into()),
             (LookupResultOrType::Type(lib::Type::F64), PlaygroundValue::Num(x)) => x
                 .to_f64()
                 .map(FidlValue::F64)
-                .ok_or(ValueError::ConversionOverflow(lib::Type::F64).into()),
+                .ok_or_else(|| ValueError::ConversionOverflow(lib::Type::F64).into()),
             (LookupResultOrType::Type(lib::Type::Identifier { name, .. }), v) => v
                 .to_fidl_value_by_type_or_lookup(
                     ns,
@@ -880,7 +880,7 @@ pub fn playground_semantic_compare(this: &Value, other: &Value) -> Option<Orderi
             .zip(b.iter())
             .map(|(a, b)| playground_semantic_compare(a, b))
             .find(|x| *x != Some(Ordering::Equal))
-            .unwrap_or(PartialOrd::partial_cmp(&a.len(), &b.len())),
+            .unwrap_or_else(|| PartialOrd::partial_cmp(&a.len(), &b.len())),
         (a, b) => {
             if let (Some(a), Some(b)) = (try_promote(a), try_promote(b)) {
                 PartialOrd::partial_cmp(&a, &b)

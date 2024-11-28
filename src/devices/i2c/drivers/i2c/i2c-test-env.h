@@ -21,7 +21,7 @@ class TestEnvironment : public fdf_testing::Environment {
 
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
     // Set up and add the compat device server.
-    device_server_.Init("default", "");
+    device_server_.Initialize("default");
     ZX_ASSERT(device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                    &to_driver_vfs) == ZX_OK);
 

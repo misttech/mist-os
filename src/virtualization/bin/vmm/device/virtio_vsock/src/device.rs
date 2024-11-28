@@ -583,7 +583,7 @@ mod tests {
     ) {
         match request {
             HostVsockEndpointRequest::Listen { port, acceptor, responder } => {
-                let result = device.listen(port, acceptor.into_proxy().unwrap());
+                let result = device.listen(port, acceptor.into_proxy());
                 responder
                     .send(result.map_err(|err| err.into_raw()))
                     .expect("failed to send listen response");
@@ -596,8 +596,7 @@ mod tests {
     }
 
     fn serve_host_vsock_endpoints(device: Rc<VsockDevice>) -> HostVsockEndpointProxy {
-        let (proxy, stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
         fasync::Task::local(async move {
             stream
                 .for_each_concurrent(None, |request| {
@@ -697,8 +696,7 @@ mod tests {
         let guest_port = 123;
         let header_size = mem::size_of::<VirtioVsockHeader>() as u32;
         let mut executor = fasync::TestExecutor::new();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
 
         let device = VsockDevice::new();
 
@@ -833,8 +831,7 @@ mod tests {
         let guest_port = 12345;
         let header_size = mem::size_of::<VirtioVsockHeader>() as u32;
         let mut executor = fasync::TestExecutor::new();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
 
         let device = VsockDevice::new();
 
@@ -979,8 +976,7 @@ mod tests {
         let device = VsockDevice::new();
         let device_proxy = serve_host_vsock_endpoints(device.clone());
 
-        let (client_end, mut client_stream) = create_request_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (client_end, mut client_stream) = create_request_stream::<HostVsockAcceptorMarker>();
 
         device_proxy
             .listen(host_port, client_end)
@@ -1085,8 +1081,7 @@ mod tests {
         let device = VsockDevice::new();
         let device_proxy = serve_host_vsock_endpoints(device.clone());
 
-        let (client_end1, client_stream1) = create_request_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (client_end1, client_stream1) = create_request_stream::<HostVsockAcceptorMarker>();
 
         let result = device_proxy
             .listen(12345, client_end1)
@@ -1095,8 +1090,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Already listening on port 12345.
-        let (client_end2, _client_stream2) = create_request_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (client_end2, _client_stream2) = create_request_stream::<HostVsockAcceptorMarker>();
         let result = device_proxy
             .listen(12345, client_end2)
             .await
@@ -1108,8 +1102,7 @@ mod tests {
 
         // Now that the first client has stopped listening on the port, another client can register
         // as a listener.
-        let (client_end3, _client_stream3) = create_request_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (client_end3, _client_stream3) = create_request_stream::<HostVsockAcceptorMarker>();
         let result = device_proxy
             .listen(12345, client_end3)
             .await

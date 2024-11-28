@@ -25,7 +25,7 @@ impl FileSystemOps for SocketFs {
         Ok(default_statfs(SOCKFS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
-        "socket".into()
+        "sockfs".into()
     }
 }
 

@@ -48,6 +48,38 @@ enum class Attributes {
   kAttributeCount = 0x30,
 };
 
+// UFS Specification Version 3.1, section 14.3 "Attributes".
+enum BackgroundOpStatus {
+  kNotRequired = 0x00,
+  kRequiredNotCritical = 0x01,
+  kRequiredPerformanceImpact = 0x02,
+  kCritical = 0x03,
+};
+
+struct ExceptionEventControl {
+  uint16_t value;
+
+  DEF_SUBBIT(value, 0, dyncap_event_en);
+  DEF_SUBBIT(value, 1, syspool_event_en);
+  DEF_SUBBIT(value, 2, urgent_bkops_en);
+  DEF_SUBBIT(value, 3, too_high_temp_en);
+  DEF_SUBBIT(value, 4, too_low_temp_en);
+  DEF_SUBBIT(value, 5, writebooster_event_en);
+  DEF_SUBBIT(value, 6, performance_throttling_en);
+};
+
+struct ExceptionEventStatus {
+  uint16_t value;
+
+  DEF_SUBBIT(value, 0, dyncap_needed);
+  DEF_SUBBIT(value, 1, syspool_exhausted);
+  DEF_SUBBIT(value, 2, urgent_bkops);
+  DEF_SUBBIT(value, 3, too_high_temp);
+  DEF_SUBBIT(value, 4, too_low_temp);
+  DEF_SUBBIT(value, 5, writebooster_flush_needed);
+  DEF_SUBBIT(value, 6, performance_throttling_support);
+};
+
 constexpr uint8_t kExceededWriteBoosterBufferLifeTime = 0x0b;
 
 // UFS Specification Version 3.1, section 6.4 "Reference Clock".

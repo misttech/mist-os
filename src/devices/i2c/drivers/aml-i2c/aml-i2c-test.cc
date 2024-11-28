@@ -244,7 +244,7 @@ class Environment {
                 pdev_server_.GetInstanceHandler(dispatcher), instance_name);
     ZX_ASSERT(add_service_result.is_ok());
 
-    compat_server_.Init("default", "topo");
+    compat_server_.Initialize("default");
     if (metadata.has_value()) {
       compat_server_.AddMetadata(DEVICE_METADATA_PRIVATE, &metadata.value(),
                                  sizeof(metadata.value()));
@@ -310,9 +310,10 @@ class AmlI2cTest : public testing::Test {
   void ConnectToI2cImpl(fidl::ClientEnd<fuchsia_io::Directory>& outgoing_directory_client) {
     auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    zx_status_t status = fdio_open_at(outgoing_directory_client.handle()->get(), "/svc",
-                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      svc_endpoints.server.TakeChannel().release());
+    zx_status_t status =
+        fdio_open3_at(outgoing_directory_client.handle()->get(), "/svc",
+                      static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
+                      svc_endpoints.server.TakeChannel().release());
     ASSERT_EQ(ZX_OK, status);
 
     auto connect_result =

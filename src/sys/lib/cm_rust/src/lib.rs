@@ -1902,7 +1902,7 @@ pub struct ProgramDecl {
 
 impl Default for ProgramDecl {
     fn default() -> Self {
-        Self { runner: None, info: fdata::Dictionary::default().clone() }
+        Self { runner: None, info: fdata::Dictionary::default() }
     }
 }
 

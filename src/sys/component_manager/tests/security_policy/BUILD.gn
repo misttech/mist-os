@@ -6,7 +6,7 @@ import("//build/components.gni")
 
 fuchsia_component("cm_for_test") {
   testonly = true
-  deps = [ "//src/sys/component_manager:bin" ]
+  deps = [ "//src/sys/component_manager:bin_eng" ]
   manifest = "meta/cm_for_test.cml"
 }
 

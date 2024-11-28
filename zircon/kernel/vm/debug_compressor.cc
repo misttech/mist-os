@@ -59,7 +59,7 @@ void VmDebugCompressor::Add(vm_page_t* page, VmCowPages* object, uint64_t offset
 }
 
 void VmDebugCompressor::CompressThread() {
-  VmCompression* compression = pmm_page_compression();
+  VmCompression* compression = Pmm::Node().GetPageCompression();
   // It is an error to attempt to be using the debug compressor if compression isn't available.
   ASSERT(compression);
   do {

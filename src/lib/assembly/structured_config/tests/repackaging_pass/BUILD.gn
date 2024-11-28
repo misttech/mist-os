@@ -82,7 +82,7 @@ if (is_host) {
     source_root = "repackaging.rs"
     deps = [
       "//src/lib/assembly/structured_config",
-      "//src/lib/assembly/validate_product",
+      "//src/lib/assembly/validate_package",
       "//src/sys/pkg/lib/far/rust:fuchsia-archive",
       "//src/sys/pkg/lib/fuchsia-pkg",
       "//third_party/rust_crates:camino",

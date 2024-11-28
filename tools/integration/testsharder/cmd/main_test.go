@@ -20,10 +20,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
+	fintpb "go.fuchsia.dev/fuchsia/tools/integration/fint/proto"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/proto"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
+	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
 
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -515,6 +517,17 @@ func TestExecute(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "deps file",
+			flags: testsharderFlags{
+				depsFile: "deps-file.json",
+			},
+			testSpecs: []build.TestSpec{
+				fuchsiaTestSpec("foo"),
+				fuchsiaTestSpec("bar"),
+				fuchsiaTestSpec("baz"),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -522,17 +535,29 @@ func TestExecute(t *testing.T) {
 			goldenBasename := strings.ReplaceAll(tc.name, " ", "_") + ".golden.json"
 			goldenFile := filepath.Join(*goldensDir, goldenBasename)
 
-			if *updateGoldens {
-				tc.flags.outputFile = goldenFile
-			} else {
-				tc.flags.outputFile = filepath.Join(t.TempDir(), goldenBasename)
-			}
-
 			if tc.params == nil {
 				tc.params = &proto.Params{}
 			}
 
-			tc.flags.buildDir = t.TempDir()
+			// testsharder assumes the build dir is two subdirectories down from the checkout root.
+			checkoutRoot := t.TempDir()
+			tc.flags.buildDir = filepath.Join(checkoutRoot, "out", "temp")
+			if tc.flags.depsFile != "" {
+				tc.flags.depsFile = filepath.Join(t.TempDir(), tc.flags.depsFile)
+				// When using depsFile, the outputFile must be within the checkoutRoot.
+				tc.flags.outputFile = filepath.Join(checkoutRoot, goldenBasename)
+			} else {
+				tc.flags.outputFile = filepath.Join(t.TempDir(), goldenBasename)
+			}
+
+			if *updateGoldens {
+				defer func() {
+					if err := osmisc.CopyFile(tc.flags.outputFile, goldenFile); err != nil {
+						t.Fatal(err)
+					}
+				}()
+			}
+
 			tc.params.ProductBundleName = "core.x64"
 			tc.params.Pave = true
 			if len(tc.modifiers) > 0 {
@@ -595,7 +620,9 @@ func TestExecute(t *testing.T) {
 			if !*updateGoldens {
 				want := readShards(t, goldenFile)
 				got := readShards(t, tc.flags.outputFile)
-				if diff := cmp.Diff(want, got); diff != "" {
+				if diff := cmp.Diff(want, got, cmp.FilterValues(func(s1, s2 fintpb.SetArtifacts_Metadata) bool {
+					return true
+				}, cmp.Ignore())); diff != "" {
 					t.Errorf(strings.Join([]string{
 						"Golden file mismatch!",
 						"To fix, run `tools/integration/testsharder/update_goldens.sh",
@@ -649,23 +676,53 @@ func (m *fakeModules) Images() []build.Image {
 }
 
 func (m *fakeModules) Args() build.Args {
-	return build.Args{"target_cpu": json.RawMessage(`"x64"`)}
+	return build.Args{
+		"build_info_product": json.RawMessage(`"core"`),
+		"build_info_board":   json.RawMessage(`"x64"`),
+		"target_cpu":         json.RawMessage(`"x64"`),
+		"is_debug":           json.RawMessage(`true`),
+		"select_variant":     json.RawMessage(`["coverage"]`),
+	}
 }
 
+func (m *fakeModules) ModulePaths() ([]string, error)           { return []string{}, nil }
 func (m *fakeModules) TestListLocation() []string               { return []string{testListPath} }
 func (m *fakeModules) TestSpecs() []build.TestSpec              { return m.testSpecs }
 func (m *fakeModules) TestDurations() []build.TestDuration      { return m.testDurations }
 func (m *fakeModules) PackageRepositories() []build.PackageRepo { return m.packageRepositories }
-func (m *fakeModules) ProductBundles() []build.ProductBundle    { return m.productBundles }
-func (m *fakeModules) Tools() build.Tools {
-	return build.Tools{
+func (m *fakeModules) PrebuiltVersions() ([]build.PrebuiltVersion, error) {
+	return []build.PrebuiltVersion{
 		{
-			Name: "ffx",
-			Path: "host_x64/ffx",
+			Name:    "fuchsia/third_party/android/aemu/release/${platform}",
+			Version: "aemu_version",
+		}, {
+			Name:    "fuchsia/third_party/qemu/${platform}",
+			Version: "qemu_version",
+		}, {
+			Name:    "fuchsia/third_party/crosvm/${platform}",
+			Version: "crosvm_version",
+		}, {
+			Name:    "fuchsia/third_party/edk2",
+			Version: "edk2_version",
+		},
+	}, nil
+}
+func (m *fakeModules) ProductBundles() []build.ProductBundle { return m.productBundles }
+func (m *fakeModules) Tools() build.Tools {
+	var tools build.Tools
+	for _, tool := range []string{
+		"ffx", "botanist", "bootserver_new", "ssh", "llvm-profdata", "fvm", "zbi", "llvm-symbolizer", "symbolizer", "tefmocheck", "triage", "resultdb", "perfcompare",
+	} {
+		tools = append(tools, build.Tool{
+			Name: tool,
+			Path: fmt.Sprintf("host_x64/%s", tool),
 			OS:   "linux",
 			CPU:  "x64",
-		}}
+		})
+	}
+	return tools
 }
+func (m *fakeModules) TriageSources() []string { return []string{} }
 
 func packageURL(basename string) string {
 	return fmt.Sprintf("fuchsia-pkg://fuchsia.com/%s#meta/%s.cm", basename, basename)

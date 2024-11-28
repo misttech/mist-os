@@ -225,7 +225,7 @@ The final tool will be constructed from:
 - A Rust library containing the majority of the implementation and unit-tests.
 - GN template for correctly using the tool in the fuchsia.git build.
 - The existing tools, packaged for its use:
-  - [`pm`](/src/sys/pkg/bin/pm)
+  - [`pm`](https://fuchsia.googlesource.com/fuchsia/+/7461d8882167e7a9d1b494e3b1734d2c063830fc/src/sys/pkg/bin/pm/)
   - [`zbi`](/zircon/tools/zbi)
   - [`avbtool`](/third_party/android/platform/external/avb/avbtool.py)
   - [`blobfs`](/src/storage/blobfs/tools)

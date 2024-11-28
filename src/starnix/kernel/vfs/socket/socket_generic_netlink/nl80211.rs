@@ -28,7 +28,7 @@ impl Nl80211Family {
         let wlanix_svc =
             fuchsia_component::client::connect_to_protocol::<fidl_wlanix::WlanixMarker>()
                 .context("failed to connect to wlanix")?;
-        let (nl80211_proxy, nl80211_server) = fidl::endpoints::create_proxy()?;
+        let (nl80211_proxy, nl80211_server) = fidl::endpoints::create_proxy();
         wlanix_svc
             .get_nl80211(fidl_wlanix::WlanixGetNl80211Request {
                 nl80211: Some(nl80211_server),
@@ -94,8 +94,7 @@ impl<S: Sender<GenericMessage>> GenericNetlinkFamily<S> for Nl80211Family {
         assigned_family_id: u16,
         message_sink: mpsc::UnboundedSender<NetlinkMessage<GenericMessage>>,
     ) {
-        let (client_end, mut stream) =
-            fidl::endpoints::create_request_stream().expect("Failed to create multicast stream");
+        let (client_end, mut stream) = fidl::endpoints::create_request_stream();
         if let Err(e) = self.nl80211_proxy.get_multicast(fidl_wlanix::Nl80211GetMulticastRequest {
             group: Some(group.clone()),
             multicast: Some(client_end),
@@ -263,8 +262,7 @@ mod tests {
     fn test_get_multicast() {
         let mut exec = TestExecutor::new();
         let (nl80211_proxy, mut nl80211_stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>()
-                .expect("Failed to create client and proxy");
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
         let family = Nl80211Family { nl80211_proxy };
         let (sender, mut receiver) = mpsc::unbounded();
         let mcast_fut =
@@ -284,11 +282,8 @@ mod tests {
             exec.run_until_stalled(&mut nl80211_stream.select_next_some()),
             Poll::Ready(Ok(fidl_wlanix::Nl80211Request::GetMulticast { payload, ..})) => payload);
         assert_eq!(multicast_req.group, Some("test_group".to_string()));
-        let client_proxy: fidl_wlanix::Nl80211MulticastProxy = multicast_req
-            .multicast
-            .expect("No client endpoint")
-            .into_proxy()
-            .expect("Failed to create multicast client proxy");
+        let client_proxy: fidl_wlanix::Nl80211MulticastProxy =
+            multicast_req.multicast.expect("No client endpoint").into_proxy();
         assert_matches!(exec.run_until_stalled(&mut next_mcast_recv), Poll::Pending);
 
         let message = fidl_wlanix::Nl80211Message {

@@ -603,7 +603,7 @@ Or for out-of-tree developers
 ffx test run --realm <realm_moniker> <test_url>
 ```
 
-where `realm_moniker` should be replaced with `/core/testing:system-tests` for
+where `realm_moniker` should be replaced with `/core/testing/system-tests` for
 above example.
 
 Possible values of `test_type`:

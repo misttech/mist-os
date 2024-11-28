@@ -35,7 +35,6 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
     "//src/developer/sshd-host:sshd_constants",
-    "//src/storage/lib/paver:gpt",
     "//third_party/android/platform/system:sparse_format",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
@@ -47,7 +46,6 @@ source_set("lib") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
-    "//src/storage/lib/paver",
     "//zircon/system/ulib/zx",
   ]
 }

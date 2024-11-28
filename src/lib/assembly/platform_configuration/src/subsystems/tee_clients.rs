@@ -8,7 +8,7 @@ use assembly_config_schema::assembly_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_config_schema::product_config::TeeClient as ProductTeeClient;
-use assembly_util::{BlobfsCompiledPackageDestination, CompiledPackageDestination, FileEntry};
+use assembly_constants::{BlobfsCompiledPackageDestination, CompiledPackageDestination, FileEntry};
 use fuchsia_url::AbsoluteComponentUrl;
 use std::io::Write;
 

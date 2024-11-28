@@ -5,6 +5,8 @@
 #ifndef SRC_GRAPHICS_EXAMPLES_VKPROTO_COMMON_COMMAND_POOL_H_
 #define SRC_GRAPHICS_EXAMPLES_VKPROTO_COMMON_COMMAND_POOL_H_
 
+#include <memory>
+
 #include "src/graphics/examples/vkproto/common/device.h"
 
 #include <vulkan/vulkan.hpp>

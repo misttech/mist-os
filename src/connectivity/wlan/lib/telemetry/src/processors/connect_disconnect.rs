@@ -196,7 +196,7 @@ impl ConnectDisconnectLogger {
             disconnect_events_node: Mutex::new(AutoPersist::new(
                 BoundedListNode::new(disconnect_events, INSPECT_DISCONNECT_EVENTS_LIMIT),
                 "wlan-disconnect-events",
-                persistence_req_sender.clone(),
+                persistence_req_sender,
             )),
             inspect_metadata_node: Mutex::new(InspectMetadataNode::new(inspect_metadata_node)),
             time_series_stats,

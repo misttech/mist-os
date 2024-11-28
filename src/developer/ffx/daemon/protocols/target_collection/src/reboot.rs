@@ -72,11 +72,10 @@ impl RebootController {
     }
 
     async fn init_admin_proxy(&self) -> Result<AdminProxy> {
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy::<AdminMarker>().map_err(|e| anyhow!(e))?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<AdminMarker>();
         self.get_remote_proxy()
             .await?
-            .open_capability(
+            .deprecated_open_capability(
                 ADMIN_MONIKER,
                 fsys::OpenDirType::ExposedDir,
                 AdminMarker::PROTOCOL_NAME,
@@ -100,7 +99,7 @@ impl RebootController {
                     let mut fastboot_interface = match self
                         .target
                         .fastboot_interface()
-                        .ok_or(anyhow!("No fastboot interface"))?
+                        .ok_or_else(|| anyhow!("No fastboot interface"))?
                     {
                         FastbootInterface::Tcp => {
                             let address: SocketAddr = self
@@ -154,7 +153,7 @@ impl RebootController {
                     let mut fastboot_interface = match self
                         .target
                         .fastboot_interface()
-                        .ok_or(anyhow!("No fastboot interface"))?
+                        .ok_or_else(|| anyhow!("No fastboot interface"))?
                     {
                         FastbootInterface::Tcp => {
                             let address: SocketAddr = self
@@ -321,8 +320,9 @@ pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootRespon
 
 #[tracing::instrument]
 async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Result<()> {
-    let t = target.upgrade().ok_or(anyhow!("Could not upgrade Target to build ssh command"))?;
-    let addr = t.ssh_address().ok_or(anyhow!("Could not get ssh address for target"))?;
+    let t =
+        target.upgrade().ok_or_else(|| anyhow!("Could not upgrade Target to build ssh command"))?;
+    let addr = t.ssh_address().ok_or_else(|| anyhow!("Could not get ssh address for target"))?;
     let mut cmd = build_ssh_command_local(addr.into(), state).await?;
     tracing::debug!("About to run command on target to reboot: {:?}", cmd);
     let ssh = cmd.spawn()?;
@@ -397,12 +397,15 @@ mod tests {
     }
 
     async fn setup_remote() -> RemoteControlProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
-                    RemoteControlRequest::OpenCapability { server_channel, responder, .. } => {
+                    RemoteControlRequest::DeprecatedOpenCapability {
+                        server_channel,
+                        responder,
+                        ..
+                    } => {
                         setup_admin(server_channel).unwrap();
                         responder.send(Ok(())).unwrap();
                     }
@@ -427,7 +430,7 @@ mod tests {
             overnet_node,
             fastboot_connection_builder: Box::new(connection_builder),
         };
-        let (proxy, mut stream) = create_proxy_and_stream::<TargetMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<TargetMarker>();
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {

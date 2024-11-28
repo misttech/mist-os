@@ -6,9 +6,10 @@ use crate::test_topology;
 use diagnostics_data::Logs;
 use diagnostics_reader::{ArchiveReader, RetryConfig};
 use futures::StreamExt;
+use std::collections::VecDeque;
 use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
 
-const SPAM_COUNT: usize = 9001;
+const SPAM_COUNT: usize = 1001;
 
 #[fuchsia::test]
 async fn test_budget() {
@@ -18,7 +19,7 @@ async fn test_budget() {
             test_topology::PuppetDeclBuilder::new("victim").into(),
         ]),
         archivist_config: Some(ftest::ArchivistConfig {
-            logs_max_cached_original_bytes: Some(65536),
+            logs_max_cached_original_bytes: Some(98304),
             ..Default::default()
         }),
         ..Default::default()
@@ -62,7 +63,8 @@ async fn test_budget() {
     assert_eq!(expected, msg_a_2.msg().unwrap());
 
     // Spam many logs.
-    for _ in 0..SPAM_COUNT {
+    let mut expected = VecDeque::new();
+    for i in 0..SPAM_COUNT {
         let message = letters_iter.next().unwrap().repeat(50);
         spammer_puppet
             .log(&ftest::LogPuppetLogRequest {
@@ -72,12 +74,25 @@ async fn test_budget() {
             })
             .await
             .expect("emitted log");
+        expected.push_back(message);
+
+        // Each message is about 136 bytes.  We always keep 32 KiB free in the buffer, so we can
+        // hold nearly 500 messages before messages get rolled out.  Archivist delays processing
+        // sockets so that it's not constantly waking up, so we process the observer in batches.
+        if i % 400 == 0 {
+            while let Some(message) = expected.pop_front() {
+                assert_eq!(message, observed_logs.next().await.unwrap().msg().unwrap());
+            }
+        }
+    }
+
+    while let Some(message) = expected.pop_front() {
         assert_eq!(message, observed_logs.next().await.unwrap().msg().unwrap());
     }
 
     // We observe some logs were rolled out.
-    let log = observed_logs_2.skip(33).next().await.unwrap();
-    assert_eq!(log.rolled_out_logs(), Some(8513));
+    while observed_logs_2.next().await.unwrap().rolled_out_logs().is_none() {}
+
     let mut observed_logs = log_reader.snapshot::<Logs>().await.unwrap().into_iter();
     let msg_b = observed_logs.next().unwrap();
     assert!(!msg_b.moniker.to_string().contains("puppet-victim"));

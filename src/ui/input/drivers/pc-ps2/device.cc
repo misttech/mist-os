@@ -69,7 +69,7 @@ struct PortInfo {
 
 void PS2InputReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-    fidl::AnyArena& allocator) {
+    fidl::AnyArena& allocator) const {
   if (type == fhidbus::HidBootProtocol::kKbd) {
     ZX_ASSERT(std::holds_alternative<PS2KbdInputReport>(report));
     auto kbd = std::get<PS2KbdInputReport>(report);

@@ -103,7 +103,7 @@ mod tests {
         };
 
         // Invoke the echo server
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<EchoMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<EchoMarker>();
         fuchsia_async::Task::spawn(async move {
             handle_echo_request(stream, &stats).await;
         })

@@ -61,8 +61,7 @@ async fn test_setup(
         })
         .context("/svc directory not in namespace")?
         .context("directory field not set for /svc namespace entry")?
-        .into_proxy()
-        .context("client end into proxy")?;
+        .into_proxy();
 
     let lifecycle_controller =
         connect_to_protocol_at_dir_root::<fsys2::LifecycleControllerMarker>(&svc_dir)
@@ -175,8 +174,7 @@ async fn handle_runner_request(
                 .context("serve connection on test component's outgoing dir")?
                 .collect::<()>();
 
-            let mut request_stream =
-                controller.into_stream().context("server end into request stream")?;
+            let mut request_stream = controller.into_stream();
 
             let request = futures::select! {
                 () = serve_test_suite.fuse() => panic!("service fs closed unexpectedly"),

@@ -140,7 +140,7 @@ class Gt92xxDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_IN
 
     void ToFidlInputReport(
         fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-        fidl::AnyArena& allocator);
+        fidl::AnyArena& allocator) const;
   };
 
   static constexpr int kI2cRetries = 5;

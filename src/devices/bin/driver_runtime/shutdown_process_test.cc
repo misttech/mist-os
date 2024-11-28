@@ -17,8 +17,8 @@
 
 #include "lib/fdf/dispatcher.h"
 #include "src/devices/bin/driver_runtime/dispatcher.h"
-#include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/runtime_test_case.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 
 namespace driver_runtime {
 extern DispatcherCoordinator& GetDispatcherCoordinator();

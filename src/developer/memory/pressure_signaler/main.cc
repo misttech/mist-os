@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <filesystem>
@@ -21,15 +22,47 @@ bool SendCriticalMemoryPressureCrashReports() {
 }  // namespace
 
 int main(int argc, const char** argv) {
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  std::unique_ptr<sys::ComponentContext> context =
-      sys::ComponentContext::CreateAndServeOutgoingDirectory();
-
   FX_LOGS(DEBUG) << argv[0] << ": starting";
-  pressure_signaler::PressureNotifier notifier{/* watch_for_changes = */ true,
-                                               SendCriticalMemoryPressureCrashReports(),
-                                               context.get(), loop.dispatcher()};
-  pressure_signaler::MemoryDebugger debugger{context.get(), &notifier};
+
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  async_dispatcher_t* dispatcher = loop.dispatcher();
+
+  component::OutgoingDirectory outgoing = component::OutgoingDirectory(dispatcher);
+  zx::result result = outgoing.ServeFromStartupInfo();
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve the outgoing directory from startup info: "
+                   << result.status_string();
+    return -1;
+  }
+
+  auto client_end = component::Connect<fuchsia_feedback::CrashReporter>();
+  if (!client_end.is_ok()) {
+    FX_LOGS(ERROR) << "Failed to connect to fuchsia.feedback::CrashReporter: "
+                   << client_end.status_string();
+    return -1;
+  }
+  auto crash_reporter =
+      fidl::Client<fuchsia_feedback::CrashReporter>(std::move(client_end.value()), dispatcher);
+  auto notifier = std::make_unique<pressure_signaler::PressureNotifier>(
+      /* watch_for_changes = */ true, SendCriticalMemoryPressureCrashReports(),
+      std::move(crash_reporter), dispatcher);
+  auto debugger = std::make_unique<pressure_signaler::MemoryDebugger>(notifier.get());
+
+  result = outgoing.AddProtocol<fuchsia_memorypressure::Provider>(std::move(notifier));
+
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve the fuchsia.memorypressure::Provider protocol: "
+                   << result.status_string();
+    return -1;
+  }
+
+  result = outgoing.AddProtocol<fuchsia_memory_debug::MemoryPressure>(std::move(debugger));
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve the fuchsia.memory.debug::MemoryPressure protocol: "
+                   << result.status_string();
+    return -1;
+  }
+
   loop.Run();
   FX_LOGS(DEBUG) << argv[0] << ": exiting";
 

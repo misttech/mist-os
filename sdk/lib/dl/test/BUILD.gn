@@ -31,6 +31,7 @@ test("dl-unittests") {
   ]
   if (is_elf) {
     sources += [
+      "dl-impl-tests.cc",
       "dl-impl-tests.h",
       "dl-load-tests-base.cc",
       "dl-load-tests-base.h",

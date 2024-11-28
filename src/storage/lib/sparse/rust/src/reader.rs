@@ -136,11 +136,11 @@ impl Seek for SparseReader {
             SeekFrom::Current(delta) => self
                 .offset
                 .checked_add_signed(delta)
-                .ok_or(std::io::Error::from(std::io::ErrorKind::InvalidInput))?,
+                .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::InvalidInput))?,
             SeekFrom::End(delta) => self
                 .size
                 .checked_add_signed(delta)
-                .ok_or(std::io::Error::from(std::io::ErrorKind::InvalidInput))?,
+                .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::InvalidInput))?,
         };
         Ok(self.offset)
     }

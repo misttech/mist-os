@@ -5,8 +5,8 @@
 use crate::subsystems::prelude::*;
 use anyhow::{Context, Result};
 use assembly_config_schema::product_config::TrustedApp as ProductTrustedApp;
+use assembly_constants::{BootfsPackageDestination, PackageSetDestination};
 use assembly_images_config::FilesystemImageMode;
-use assembly_util::{BootfsPackageDestination, PackageSetDestination};
 use fuchsia_tee_manager_config::TAConfig;
 use fuchsia_url::boot_url::BootUrl;
 use fuchsia_url::AbsoluteComponentUrl;

@@ -307,10 +307,10 @@ TEST(ProcessShared, InfoTaskStats) {
     size_t actual{};
     size_t avail{};
     ASSERT_OK(proc.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
-    ASSERT_EQ(0, stats.mem_mapped_bytes);
-    ASSERT_EQ(0, stats.mem_private_bytes);
-    ASSERT_EQ(0, stats.mem_shared_bytes);
-    ASSERT_EQ(0, stats.mem_scaled_shared_bytes);
+    EXPECT_EQ(0, stats.mem_mapped_bytes);
+    EXPECT_EQ(0, stats.mem_private_bytes);
+    EXPECT_EQ(0, stats.mem_shared_bytes);
+    EXPECT_EQ(0, stats.mem_scaled_shared_bytes);
   };
   zx::process* procs[] = {&proc1, &proc2, &proc3};
   for (zx::process* p : procs) {
@@ -328,10 +328,10 @@ TEST(ProcessShared, InfoTaskStats) {
   size_t avail{};
   ASSERT_OK(proc1.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
   ASSERT_EQ(1, actual);
-  ASSERT_EQ(2 * kSize, stats.mem_mapped_bytes);
-  ASSERT_EQ(2 * kSize, stats.mem_private_bytes);
-  ASSERT_EQ(0, stats.mem_shared_bytes);
-  ASSERT_EQ(0, stats.mem_scaled_shared_bytes);
+  EXPECT_EQ(2 * kSize, stats.mem_mapped_bytes);
+  EXPECT_EQ(2 * kSize, stats.mem_private_bytes);
+  EXPECT_EQ(0, stats.mem_shared_bytes);
+  EXPECT_EQ(0, stats.mem_scaled_shared_bytes);
   ASSERT_NO_FAILURES(assertProcStatsAreZero(proc2));
   ASSERT_NO_FAILURES(assertProcStatsAreZero(proc3));
 
@@ -343,16 +343,16 @@ TEST(ProcessShared, InfoTaskStats) {
   // and proc2 each being fractionally-responsible for 1 of the 2 shared pages.
 
   ASSERT_OK(proc1.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
-  ASSERT_EQ(4 * kSize, stats.mem_mapped_bytes);
-  ASSERT_EQ(2 * kSize, stats.mem_private_bytes);
-  ASSERT_EQ(2 * kSize, stats.mem_shared_bytes);
-  ASSERT_EQ(kSize, stats.mem_scaled_shared_bytes);
+  EXPECT_EQ(4 * kSize, stats.mem_mapped_bytes);
+  EXPECT_EQ(2 * kSize, stats.mem_private_bytes);
+  EXPECT_EQ(2 * kSize, stats.mem_shared_bytes);
+  EXPECT_EQ(kSize, stats.mem_scaled_shared_bytes);
 
   ASSERT_OK(proc2.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
-  ASSERT_EQ(2 * kSize, stats.mem_mapped_bytes);
-  ASSERT_EQ(0, stats.mem_private_bytes);
-  ASSERT_EQ(2 * kSize, stats.mem_shared_bytes);
-  ASSERT_EQ(kSize, stats.mem_scaled_shared_bytes);
+  EXPECT_EQ(2 * kSize, stats.mem_mapped_bytes);
+  EXPECT_EQ(0, stats.mem_private_bytes);
+  EXPECT_EQ(2 * kSize, stats.mem_shared_bytes);
+  EXPECT_EQ(kSize, stats.mem_scaled_shared_bytes);
 
   // vmar2 will get m[4] and m[5].
   ASSERT_OK(vmar2.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, m[4], 0, kSize, &vaddr));
@@ -362,10 +362,10 @@ TEST(ProcessShared, InfoTaskStats) {
   // between them.  Each is fractionally responsible for 1 of the shared pages.
 
   ASSERT_OK(proc2.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
-  ASSERT_EQ(4 * kSize, stats.mem_mapped_bytes);
-  ASSERT_EQ(2 * kSize, stats.mem_private_bytes);
-  ASSERT_EQ(2 * kSize, stats.mem_shared_bytes);
-  ASSERT_EQ(kSize, stats.mem_scaled_shared_bytes);
+  EXPECT_EQ(4 * kSize, stats.mem_mapped_bytes);
+  EXPECT_EQ(2 * kSize, stats.mem_private_bytes);
+  EXPECT_EQ(2 * kSize, stats.mem_shared_bytes);
+  EXPECT_EQ(kSize, stats.mem_scaled_shared_bytes);
 
   // Now bring proc3 into the mix.
 
@@ -383,38 +383,38 @@ TEST(ProcessShared, InfoTaskStats) {
   //
   // 2 + 2 * 1.25 + 1.5 == 6
   ASSERT_OK(proc1.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
-  ASSERT_EQ(4 * kSize, stats.mem_mapped_bytes);
-  ASSERT_EQ(1 * kSize, stats.mem_private_bytes);
-  ASSERT_EQ(3 * kSize, stats.mem_shared_bytes);
-  ASSERT_EQ((kSize / 2) + (kSize / 2) + (kSize / 4), stats.mem_scaled_shared_bytes);
+  EXPECT_EQ(4 * kSize, stats.mem_mapped_bytes);
+  EXPECT_EQ(1 * kSize, stats.mem_private_bytes);
+  EXPECT_EQ(3 * kSize, stats.mem_shared_bytes);
+  EXPECT_EQ((kSize / 2) + (kSize / 2) + (kSize / 4), stats.mem_scaled_shared_bytes);
 
   ASSERT_OK(proc2.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
-  ASSERT_EQ(4 * kSize, stats.mem_mapped_bytes);
-  ASSERT_EQ(1 * kSize, stats.mem_private_bytes);
-  ASSERT_EQ(3 * kSize, stats.mem_shared_bytes);
-  ASSERT_EQ((kSize / 2) + (kSize / 2) + (kSize / 4), stats.mem_scaled_shared_bytes);
+  EXPECT_EQ(4 * kSize, stats.mem_mapped_bytes);
+  EXPECT_EQ(1 * kSize, stats.mem_private_bytes);
+  EXPECT_EQ(3 * kSize, stats.mem_shared_bytes);
+  EXPECT_EQ((kSize / 2) + (kSize / 2) + (kSize / 4), stats.mem_scaled_shared_bytes);
 
   ASSERT_OK(proc3.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
-  ASSERT_EQ(3 * kSize, stats.mem_mapped_bytes);
-  ASSERT_EQ(0, stats.mem_private_bytes);
-  ASSERT_EQ(3 * kSize, stats.mem_shared_bytes);
-  ASSERT_EQ((kSize / 2) + (kSize / 2) + (kSize / 2), stats.mem_scaled_shared_bytes);
+  EXPECT_EQ(3 * kSize, stats.mem_mapped_bytes);
+  EXPECT_EQ(0, stats.mem_private_bytes);
+  EXPECT_EQ(3 * kSize, stats.mem_shared_bytes);
+  EXPECT_EQ((kSize / 2) + (kSize / 2) + (kSize / 2), stats.mem_scaled_shared_bytes);
 
   // Kill off proc2.  We're now down to 5 pages.  See that it sums up properly.
   //
   // 2 + 1 + (0.5 + 0.5) + (0.5 + 0.5) == 5
   proc2.reset();
   ASSERT_OK(proc1.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
-  ASSERT_EQ(4 * kSize, stats.mem_mapped_bytes);
-  ASSERT_EQ(2 * kSize, stats.mem_private_bytes);
-  ASSERT_EQ(2 * kSize, stats.mem_shared_bytes);
-  ASSERT_EQ((kSize / 2) + (kSize / 2), stats.mem_scaled_shared_bytes);
+  EXPECT_EQ(4 * kSize, stats.mem_mapped_bytes);
+  EXPECT_EQ(2 * kSize, stats.mem_private_bytes);
+  EXPECT_EQ(2 * kSize, stats.mem_shared_bytes);
+  EXPECT_EQ((kSize / 2) + (kSize / 2), stats.mem_scaled_shared_bytes);
 
   ASSERT_OK(proc3.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
-  ASSERT_EQ(3 * kSize, stats.mem_mapped_bytes);
-  ASSERT_EQ(1 * kSize, stats.mem_private_bytes);
-  ASSERT_EQ(2 * kSize, stats.mem_shared_bytes);
-  ASSERT_EQ((kSize / 2) + (kSize / 2), stats.mem_scaled_shared_bytes);
+  EXPECT_EQ(3 * kSize, stats.mem_mapped_bytes);
+  EXPECT_EQ(1 * kSize, stats.mem_private_bytes);
+  EXPECT_EQ(2 * kSize, stats.mem_shared_bytes);
+  EXPECT_EQ((kSize / 2) + (kSize / 2), stats.mem_scaled_shared_bytes);
 }
 
 TEST(ProcessShared, InfoProcessMaps) {

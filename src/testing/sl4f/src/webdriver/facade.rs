@@ -129,7 +129,7 @@ impl WebdriverFacadeInternal {
 
         // Create a DevToolsListener and channel, and enable DevTools.
         let (dev_tools_client, dev_tools_stream) =
-            create_request_stream::<DevToolsListenerMarker>()?;
+            create_request_stream::<DevToolsListenerMarker>();
         debug_proxy.enable_dev_tools(dev_tools_client).await?;
 
         // Spawn a task to process the DevToolsListener updates asynchronously.
@@ -188,7 +188,7 @@ impl DevToolsListener {
         listener: ServerEnd<DevToolsPerContextListenerMarker>,
     ) -> Result<(), Error> {
         info!("Chrome context created");
-        let listener_request_stream = listener.into_stream()?;
+        let listener_request_stream = listener.into_stream();
         let port_update_sender = mpsc::UnboundedSender::clone(&self.port_update_sender);
         fasync::Task::spawn(async move {
             let mut per_context_listener = DevToolsPerContextListener::new(port_update_sender);

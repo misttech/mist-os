@@ -11,6 +11,7 @@
 #[cfg(test)]
 mod integration_tests;
 
+mod bpf;
 mod counters;
 mod debug_fidl_worker;
 mod devices;
@@ -29,6 +30,7 @@ mod routes;
 mod socket;
 mod stack_fidl_worker;
 
+mod health_check_worker;
 mod time;
 mod timers;
 mod util;
@@ -278,13 +280,33 @@ impl DeviceIdExt for PureIpDeviceId<BindingsCtx> {
 trait LifetimeExt {
     /// Converts `self` to `zx::MonotonicInstant`.
     fn into_zx_time(self) -> zx::MonotonicInstant;
+    /// Converts from `zx::MonotonicInstant` to `Self`.
+    fn from_zx_time(t: zx::MonotonicInstant) -> Self;
 }
 
 impl LifetimeExt for Lifetime<StackTime> {
     fn into_zx_time(self) -> zx::MonotonicInstant {
+        self.map_instant(|i| i.into_zx()).into_zx_time()
+    }
+
+    fn from_zx_time(t: zx::MonotonicInstant) -> Self {
+        Lifetime::<zx::MonotonicInstant>::from_zx_time(t).map_instant(StackTime::from_zx)
+    }
+}
+
+impl LifetimeExt for Lifetime<zx::MonotonicInstant> {
+    fn into_zx_time(self) -> zx::MonotonicInstant {
         match self {
-            Lifetime::Finite(time) => time.into_zx(),
+            Lifetime::Finite(time) => time,
             Lifetime::Infinite => zx::MonotonicInstant::INFINITE,
+        }
+    }
+
+    fn from_zx_time(t: zx::MonotonicInstant) -> Self {
+        if t == zx::MonotonicInstant::INFINITE {
+            Self::Infinite
+        } else {
+            Self::Finite(t)
         }
     }
 }
@@ -622,7 +644,13 @@ impl UdpBindingsTypes for BindingsCtx {
 impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for BindingsCtx {
     fn on_event(&mut self, event: IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>) {
         match event {
-            IpDeviceEvent::AddressAdded { device, addr, state, valid_until } => {
+            IpDeviceEvent::AddressAdded {
+                device,
+                addr,
+                state,
+                valid_until,
+                preferred_lifetime,
+            } => {
                 let valid_until = valid_until.into_zx_time();
 
                 self.notify_interface_update(
@@ -631,6 +659,7 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for
                         addr: addr.into(),
                         assignment_state: state,
                         valid_until,
+                        preferred_lifetime: preferred_lifetime.map_instant(|i| i.into_zx()),
                     },
                 );
                 self.notify_address_update(&device, addr.addr().into(), state);
@@ -659,14 +688,21 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for
                 &device,
                 InterfaceUpdate::IpEnabledChanged { version: I::VERSION, enabled: ip_enabled },
             ),
-            IpDeviceEvent::AddressPropertiesChanged { device, addr, valid_until } => self
-                .notify_interface_update(
-                    &device,
-                    InterfaceUpdate::AddressPropertiesChanged {
-                        addr: addr.to_ip_addr(),
-                        update: AddressPropertiesUpdate { valid_until: valid_until.into_zx_time() },
+            IpDeviceEvent::AddressPropertiesChanged {
+                device,
+                addr,
+                valid_until,
+                preferred_lifetime,
+            } => self.notify_interface_update(
+                &device,
+                InterfaceUpdate::AddressPropertiesChanged {
+                    addr: addr.to_ip_addr(),
+                    update: AddressPropertiesUpdate {
+                        valid_until: valid_until.into_zx_time(),
+                        preferred_lifetime: preferred_lifetime.map_instant(|i| i.into_zx()),
                     },
-                ),
+                },
+            ),
         };
     }
 }
@@ -1117,6 +1153,7 @@ pub(crate) enum Service {
     DebugInterfaces(fidl_fuchsia_net_debug::InterfacesRequestStream),
     FilterControl(fidl_fuchsia_net_filter::ControlRequestStream),
     FilterState(fidl_fuchsia_net_filter::StateRequestStream),
+    HealthCheck(fidl_fuchsia_update_verify::ComponentOtaHealthCheckRequestStream),
     Interfaces(fidl_fuchsia_net_interfaces::StateRequestStream),
     InterfacesAdmin(fidl_fuchsia_net_interfaces_admin::InstallerRequestStream),
     MulticastAdminV4(fidl_fuchsia_net_multicast_admin::Ipv4RoutingTableControllerRequestStream),
@@ -1458,7 +1495,6 @@ impl NetstackSeed {
                         Service::RoutesAdminV4(rs) => routes::admin::serve_route_table::<
                             Ipv4,
                             routes::admin::MainRouteTable,
-                            _,
                         >(
                             rs,
                             route_spawner.clone(),
@@ -1468,7 +1504,6 @@ impl NetstackSeed {
                         Service::RoutesAdminV6(rs) => routes::admin::serve_route_table::<
                             Ipv6,
                             routes::admin::MainRouteTable,
-                            _,
                         >(
                             rs,
                             route_spawner.clone(),
@@ -1641,6 +1676,9 @@ impl NetstackSeed {
                         }
                         Service::Verifier(verifier) => {
                             verifier.serve_with(|rs| verifier_worker::serve(rs)).await
+                        }
+                        Service::HealthCheck(health_check) => {
+                            health_check.serve_with(|rs| health_check_worker::serve(rs)).await
                         }
                     }
                 })

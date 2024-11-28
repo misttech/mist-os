@@ -267,7 +267,7 @@ impl TryFrom<fcdecl::ResolvedConfigField> for ConfigField {
                 })
             }
         };
-        Ok(ConfigField { key: field.key.clone(), value })
+        Ok(ConfigField { key: field.key, value })
     }
 }
 
@@ -321,7 +321,7 @@ pub async fn get_all_instances(
         Err(_) => return Err(GetAllInstancesError::UnknownError),
     };
 
-    let iterator = iterator.into_proxy().unwrap();
+    let iterator = iterator.into_proxy();
     let mut instances = vec![];
 
     loop {
@@ -358,7 +358,7 @@ pub async fn get_resolved_declaration(
         Err(_) => Err(GetDeclarationError::UnknownError),
     }?;
 
-    let bytes = drain_manifest_bytes_iterator(iterator.into_proxy().unwrap()).await?;
+    let bytes = drain_manifest_bytes_iterator(iterator.into_proxy()).await?;
     let manifest = fidl::unpersist::<fcdecl::Component>(&bytes)?;
     let manifest = manifest.fidl_into_native();
     Ok(manifest)
@@ -407,7 +407,7 @@ pub async fn resolve_declaration(
             _ => GetDeclarationError::UnknownError,
         })?;
 
-    let bytes = drain_manifest_bytes_iterator(iterator.into_proxy().unwrap()).await?;
+    let bytes = drain_manifest_bytes_iterator(iterator.into_proxy()).await?;
     let manifest = fidl::unpersist::<fcdecl::Component>(&bytes)?;
     cm_fidl_validator::validate(&manifest)?;
     let manifest = manifest.fidl_into_native();
@@ -447,7 +447,7 @@ pub async fn get_runtime(
 ) -> Result<Runtime, GetRuntimeError> {
     // Parse the runtime directory and add it into the State object
     let moniker_str = moniker.to_string();
-    let (runtime_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (runtime_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     let runtime_dir = RemoteDirectory::from_proxy(runtime_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
@@ -523,7 +523,7 @@ pub async fn get_outgoing_capabilities(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Vec<String>, GetOutgoingCapabilitiesError> {
     let moniker_str = moniker.to_string();
-    let (out_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (out_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     let out_dir = RemoteDirectory::from_proxy(out_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
@@ -548,7 +548,7 @@ pub async fn get_merkle_root(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<String, GetMerkleRootError> {
     let moniker_str = moniker.to_string();
-    let (meta_file, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+    let (meta_file, server_end) = create_proxy::<fio::FileMarker>();
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
         .open(

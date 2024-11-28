@@ -45,7 +45,9 @@ pub trait WritablePackageList {
             .blobs()
             .into_iter()
             .find(|blob| blob.path == "meta/")
-            .ok_or(anyhow!("Failed to add package {} to the list, unable to find meta blob", path))
+            .ok_or_else(|| {
+                anyhow!("Failed to add package {} to the list, unable to find meta blob", path)
+            })
             .and_then(|meta_blob| self.insert(package_repository, path, meta_blob.merkle))
     }
 
@@ -65,9 +67,9 @@ pub trait WritablePackageList {
         // For a file of destination "data/foo.txt", and a gendir of "assembly/gendir",
         //   this creates "assembly/gendir/data/foo.txt".
         let path = gendir.as_ref().join(destination.as_ref());
-        let path_str = path
-            .to_str()
-            .ok_or(anyhow!(format!("package index path is not valid UTF-8: {}", path.display())))?;
+        let path_str = path.to_str().ok_or_else(|| {
+            anyhow!(format!("package index path is not valid UTF-8: {}", path.display()))
+        })?;
 
         // Create any parent dirs necessary.
         if let Some(parent) = path.parent() {
@@ -148,8 +150,8 @@ impl WritablePackageList for PackageUrlList {
         name: impl AsRef<str>,
         merkle: Hash,
     ) -> Result<()> {
-        let repository =
-            repository.ok_or(anyhow!("Unable to create package url: empty repository field."))?;
+        let repository = repository
+            .ok_or_else(|| anyhow!("Unable to create package url: empty repository field."))?;
         let path = PackagePath::from_str(name.as_ref())
             .map_err(|e| anyhow!("Failed to parse package path: {}", e))?;
         let url = PinnedAbsolutePackageUrl::new_with_path(

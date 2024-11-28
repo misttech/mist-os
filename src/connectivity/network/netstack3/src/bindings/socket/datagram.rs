@@ -3160,7 +3160,7 @@ mod tests {
             }
         };
         let fposix_socket::SynchronousDatagramSocketDescribeResponse { event, .. } =
-            socket.into_proxy().unwrap().describe().await.expect("Describe call succeeds");
+            socket.into_proxy().describe().await.expect("Describe call succeeds");
         let _: zx::EventPair = event.expect("Describe call returns event");
         t
     }
@@ -3197,7 +3197,7 @@ mod tests {
                 panic!("expected SynchronousDatagramSocket, found DatagramSocket")
             }
         };
-        let info = socket.into_proxy().unwrap().get_info().await.expect("get_info call succeeds");
+        let info = socket.into_proxy().get_info().await.expect("get_info call succeeds");
         assert_eq!(info, Ok((domain, proto)));
 
         t
@@ -3207,8 +3207,7 @@ mod tests {
         socket: &fposix_socket::SynchronousDatagramSocketProxy,
     ) -> fposix_socket::SynchronousDatagramSocketProxy {
         let (client, server) =
-            fidl::endpoints::create_proxy::<fposix_socket::SynchronousDatagramSocketMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fposix_socket::SynchronousDatagramSocketMarker>();
         let server = ServerEnd::new(server.into_channel());
         let () = socket.clone2(server).expect("socket clone");
         client

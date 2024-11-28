@@ -140,9 +140,7 @@ pub struct FactoryFileLoader {
 
 impl FactoryFileLoader {
     pub fn new(factory_store_proxy: MiscFactoryStoreProviderProxy) -> Result<Self, Error> {
-        let (directory_proxy, directory_server_end) = create_proxy::<DirectoryMarker>()
-            .map_err(|e| format_err!("{:?}", e))
-            .context("Failed to create directory proxy")?;
+        let (directory_proxy, directory_server_end) = create_proxy::<DirectoryMarker>();
         factory_store_proxy
             .get_factory_store(directory_server_end)
             .map_err(|e| format_err!("{:?}", e))

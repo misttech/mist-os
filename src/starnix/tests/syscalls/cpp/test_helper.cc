@@ -148,6 +148,14 @@ void SignalMaskHelper::waitForSignal(int signal) {
   ASSERT_EQ(sig, signal);
 }
 
+int SignalMaskHelper::timedWaitForSignal(int signal, time_t sec) {
+  siginfo_t siginfo;
+  struct timespec ts;
+  ts.tv_sec = sec;
+  ts.tv_nsec = 0;
+  return sigtimedwait(&this->_sigset, &siginfo, &ts);
+}
+
 void SignalMaskHelper::restoreSigmask() { sigprocmask(SIG_SETMASK, &this->_sigmaskCopy, NULL); }
 
 ScopedTempFD::ScopedTempFD() : name_("/tmp/proc_test_file_XXXXXX") {

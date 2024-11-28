@@ -9,6 +9,7 @@
 use bitfield::bitfield;
 use std::borrow::{Borrow, Cow};
 use tracing::{Level, Metadata};
+use zerocopy::{FromBytes, IntoBytes, KnownLayout};
 
 pub use fidl_fuchsia_diagnostics::Severity;
 
@@ -16,11 +17,13 @@ mod constants;
 pub mod encode;
 pub mod parse;
 
+pub use constants::*;
+
 /// A raw severity.
 pub type RawSeverity = u8;
 
 /// A log record.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Record<'a> {
     /// Time at which the log was emitted.
     pub timestamp: zx::BootInstant,
@@ -125,10 +128,9 @@ impl<'a> Argument<'a> {
         Argument::Line(value)
     }
 
-    // We keep this private for the places where we know we don't need to interpret as a known
-    // field.
     #[inline]
-    pub(crate) fn other(name: impl Into<Cow<'a, str>>, value: impl Into<Value<'a>>) -> Self {
+    /// Creates a new key-value argument.
+    pub fn other(name: impl Into<Cow<'a, str>>, value: impl Into<Value<'a>>) -> Self {
         Argument::Other { name: name.into(), value: value.into() }
     }
 
@@ -274,9 +276,6 @@ impl From<bool> for Value<'static> {
     }
 }
 
-/// The tracing format supports many types of records, we're sneaking in as a log message.
-pub const TRACING_FORMAT_LOG_RECORD_TYPE: u8 = 9;
-
 bitfield! {
     /// A header in the tracing format. Expected to precede every Record and Argument.
     ///
@@ -286,6 +285,7 @@ bitfield! {
     ///
     /// [Record headers]: https://fuchsia.dev/fuchsia-src/development/tracing/trace-format#record_header
     /// [Argument headers]: https://fuchsia.dev/fuchsia-src/development/tracing/trace-format#argument_header
+    #[derive(IntoBytes, FromBytes, KnownLayout)]
     pub struct Header(u64);
     impl Debug;
 
@@ -310,7 +310,7 @@ bitfield! {
 
 impl Header {
     /// Sets the length of the item the header refers to. Panics if not 8-byte aligned.
-    fn set_len(&mut self, new_len: usize) {
+    pub fn set_len(&mut self, new_len: usize) {
         assert_eq!(new_len % 8, 0, "encoded message must be 8-byte aligned");
         self.set_size_words((new_len / 8) as u16 + u16::from(new_len % 8 > 0))
     }
@@ -436,19 +436,16 @@ impl FromSeverity for log::LevelFilter {
 mod tests {
     use super::*;
     use crate::encode::{Encoder, EncoderOpts, EncodingError, MutableBuffer};
-    use crate::parse::try_parse_record;
     use std::fmt::Debug;
     use std::io::Cursor;
 
     fn parse_argument(bytes: &[u8]) -> (&[u8], Argument<'static>) {
-        let (remaining, decoded_from_full) =
-            nom::error::dbg_dmp(&crate::parse::parse_argument, "roundtrip")(bytes).unwrap();
+        let (decoded_from_full, remaining) = crate::parse::parse_argument(bytes).unwrap();
         (remaining, decoded_from_full.into_owned())
     }
 
     fn parse_record(bytes: &[u8]) -> (&[u8], Record<'static>) {
-        let (remaining, decoded_from_full) =
-            nom::error::dbg_dmp(&crate::parse::try_parse_record, "roundtrip")(bytes).unwrap();
+        let (decoded_from_full, remaining) = crate::parse::parse_record(bytes).unwrap();
         (remaining, decoded_from_full.into_owned())
     }
 
@@ -609,6 +606,6 @@ mod tests {
         encoder.buf.put_u64_le(header.0).unwrap();
         encoder.buf.put_i64_le(zx::BootInstant::get().into_nanos()).unwrap();
         encoder.write_argument(Argument::other("msg", "test message one")).unwrap();
-        assert!(try_parse_record(encoder.buf.get_ref()).is_err());
+        assert!(crate::parse::parse_record(encoder.buf.get_ref()).is_err());
     }
 }

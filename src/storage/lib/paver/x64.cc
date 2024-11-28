@@ -79,6 +79,12 @@ zx::result<std::unique_ptr<DevicePartitioner>> EfiDevicePartitioner::Initialize(
   return zx::ok(std::move(partitioner));
 }
 
+const paver::BlockDevices& EfiDevicePartitioner::Devices() const { return gpt_->devices(); }
+
+fidl::UnownedClientEnd<fuchsia_io::Directory> EfiDevicePartitioner::SvcRoot() const {
+  return gpt_->svc_root();
+}
+
 bool EfiDevicePartitioner::SupportsPartition(const PartitionSpec& spec) const {
   const PartitionSpec supported_specs[] = {
       PartitionSpec(paver::Partition::kBootloaderA),
@@ -305,19 +311,10 @@ zx::result<std::unique_ptr<DevicePartitioner>> X64PartitionerFactory::New(
                                           std::move(context));
 }
 
-zx::result<std::unique_ptr<abr::Client>> X64AbrClientFactory::New(
-    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-    std::shared_ptr<paver::Context> context) {
-  auto partitioner =
-      EfiDevicePartitioner::Initialize(devices, svc_root, GetCurrentArch(), {}, std::move(context));
-
-  if (partitioner.is_error()) {
-    return partitioner.take_error();
-  }
-
+zx::result<std::unique_ptr<abr::Client>> EfiDevicePartitioner::CreateAbrClient() const {
   // ABR metadata has no need of a content type since it's always local rather
   // than provided in an update package, so just use the default content type.
-  auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+  auto partition = FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
   if (partition.is_error()) {
     ERROR("Failed to find abr partition\n");
     return partition.take_error();

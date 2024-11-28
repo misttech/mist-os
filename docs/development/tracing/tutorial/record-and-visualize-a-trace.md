@@ -112,7 +112,7 @@ Perfetto Viewer"){: width="600"}
 [fuchsia-trace-system]: /docs/concepts/kernel/tracing-system.md
 [register-a-trace-provider]: /docs/development/tracing/tutorial/register-a-trace-provider.md
 [add-tracing-in-your-code]: /docs/development/tracing/tutorial/add-tracing-in-code.md
-[record-traces]: /docs/development/sdk/ffx/record-traces.md
+[record-traces]: /docs/development/tools/ffx/workflows/record-traces.md
 [fuchsia-trace-format]: /docs/reference/tracing/trace-format.md
 [perfetto-viewer]: https://ui.perfetto.dev
 [perfetto-trace-processor]: https://www.perfetto.dev/#/trace-processor.md

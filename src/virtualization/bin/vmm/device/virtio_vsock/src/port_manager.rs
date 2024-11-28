@@ -69,7 +69,7 @@ impl PortManager {
     // Attempts to listen on a port. If a client is already listening on this port, returns
     // zx::Status::ALREADY_BOUND.
     pub fn add_listener(&mut self, port: HostPort) -> Result<(), zx::Status> {
-        let entry = self.active_ports.entry(port).or_insert(HostPortInfo::new());
+        let entry = self.active_ports.entry(port).or_insert_with(HostPortInfo::new);
         if entry.has_listener {
             Err(zx::Status::ALREADY_BOUND)
         } else {
@@ -107,7 +107,7 @@ impl PortManager {
     // connection is quarantined), returns zx::Status::ALREADY_EXISTS.
     pub fn add_connection(&mut self, connection: VsockConnectionKey) -> Result<(), zx::Status> {
         self.check_quarantined_connections();
-        let entry = self.active_ports.entry(connection.host_port).or_insert(HostPortInfo::new());
+        let entry = self.active_ports.entry(connection.host_port).or_insert_with(HostPortInfo::new);
         if entry.guest_ports.contains(&connection.guest_port) {
             Err(zx::Status::ALREADY_EXISTS)
         } else {

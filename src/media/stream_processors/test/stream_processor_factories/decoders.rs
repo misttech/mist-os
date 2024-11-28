@@ -21,7 +21,7 @@ impl StreamProcessorFactory for DecoderFactory {
         let get_decoder = || {
             let factory = client::connect_to_protocol::<CodecFactoryMarker>()?;
             let (decoder_client_end, decoder_request) = create_endpoints();
-            let decoder = decoder_client_end.into_proxy()?;
+            let decoder = decoder_client_end.into_proxy();
             // TODO(turnage): Account for all error reporting methods in the
             // runner options and output.
             factory.create_decoder(

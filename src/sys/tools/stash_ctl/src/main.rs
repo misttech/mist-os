@@ -28,7 +28,7 @@ fn main() -> Result<(), Error> {
         stashserver.identify("stash_ctl")?;
 
         // Create an accessor
-        let (acc, server_end) = create_proxy()?;
+        let (acc, server_end) = create_proxy();
         stashserver.create_accessor(false, server_end)?;
 
         acc
@@ -39,7 +39,7 @@ fn main() -> Result<(), Error> {
         stashserver.identify("stash_ctl")?;
 
         // Create an accessor
-        let (acc, server_end) = create_proxy()?;
+        let (acc, server_end) = create_proxy();
         stashserver.create_accessor(false, server_end)?;
 
         acc
@@ -66,7 +66,7 @@ fn main() -> Result<(), Error> {
             println!("{} deleted successfully", k);
         }
         StashOperation::ListPrefix(k) => {
-            let (list_iterator, server_end) = create_proxy()?;
+            let (list_iterator, server_end) = create_proxy();
             acc.list_prefix(&k, server_end)?;
 
             let resp: Result<(), Error> = executor.run_singlethreaded(async {
@@ -81,7 +81,7 @@ fn main() -> Result<(), Error> {
             resp?;
         }
         StashOperation::GetPrefix(k) => {
-            let (get_iterator, server_end) = create_proxy()?;
+            let (get_iterator, server_end) = create_proxy();
             acc.get_prefix(&k, server_end)?;
 
             let resp: Result<(), Error> = executor.run_singlethreaded(async {

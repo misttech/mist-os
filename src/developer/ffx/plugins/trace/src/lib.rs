@@ -73,7 +73,7 @@ impl From<ProviderInfo> for TraceProviderInfo {
         Self {
             id: info.id,
             pid: info.pid,
-            name: info.name.as_ref().cloned().unwrap_or("unknown".to_string()),
+            name: info.name.as_ref().cloned().unwrap_or_else(|| "unknown".to_string()),
         }
     }
 }
@@ -256,7 +256,7 @@ fn map_categories_to_providers(categories: &Vec<String>) -> TraceConfig {
             provider_specific_categories
                 .entry(provider_name)
                 .and_modify(|categories| categories.push(category.to_string()))
-                .or_insert(vec![category.to_string()]);
+                .or_insert_with(|| vec![category.to_string()]);
         } else {
             umbrella_categories.push(category.clone());
         }
@@ -283,6 +283,7 @@ fn map_categories_to_providers(categories: &Vec<String>) -> TraceConfig {
 
 fn ir_files_list(env_ctx: &EnvironmentContext) -> Option<Vec<String>> {
     let mut ir_files = Vec::new();
+    #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379717780)
     let build_dir = env_ctx.build_dir().unwrap_or(&std::path::Path::new(""));
     let all_fidl_json_path = build_dir.join("all_fidl_json.txt");
     match std::fs::read_to_string(all_fidl_json_path) {
@@ -404,7 +405,7 @@ fn symbolize_trace_file(
 ) -> Result<()> {
     let content = std::fs::read(trace_file)?;
     let mut parser = SessionParser::new(std::io::Cursor::new(content));
-    let output = std::fs::File::create(outfile.clone())?;
+    let output = std::fs::File::create(outfile)?;
     let mut output = LineWriter::new(output);
 
     let (ord_map, _) = generate_symbolization_map(ir_files_list(ctx).unwrap_or_default());
@@ -565,19 +566,19 @@ pub async fn trace(
                 waiter.wait().await;
             }
             writer.line(format!("Shutting down recording and writing to file."))?;
-            stop_tracing(&context, &proxy, output, writer, opts.verbose).await?;
+            stop_tracing(&context, &proxy, output, writer, opts.verbose, opts.no_symbolize).await?;
         }
         TraceSubCommand::Stop(opts) => {
             let output = match opts.output {
                 Some(o) => canonical_path(o)?,
-                None => target_spec.unwrap_or("".to_owned()),
+                None => target_spec.unwrap_or_else(|| "".to_owned()),
             };
-            stop_tracing(&context, &proxy, output, writer, opts.verbose).await?;
+            stop_tracing(&context, &proxy, output, writer, opts.verbose, opts.no_symbolize).await?;
         }
         TraceSubCommand::Status(_opts) => status(&proxy, writer).await?,
         TraceSubCommand::Symbolize(opts) => {
             if let Some(trace_file) = opts.fxt {
-                let outfile = opts.outfile.unwrap_or(trace_file.clone());
+                let outfile = opts.outfile.unwrap_or_else(|| trace_file.clone());
                 symbolize_trace_file(trace_file, outfile.clone(), &context)?;
                 writer.line(format!("Symbolized traces written to {outfile}"))?;
             } else if let Some(ordinal) = opts.ordinal {
@@ -601,7 +602,7 @@ pub async fn trace(
 }
 
 async fn status(proxy: &TracingProxy, mut writer: Writer) -> Result<()> {
-    let (iter_proxy, server) = fidl::endpoints::create_proxy::<ffx::TracingStatusIteratorMarker>()?;
+    let (iter_proxy, server) = fidl::endpoints::create_proxy::<ffx::TracingStatusIteratorMarker>();
     proxy.status(server).await?;
     let mut res = Vec::new();
     loop {
@@ -630,13 +631,13 @@ async fn status(proxy: &TracingProxy, mut writer: Writer) -> Result<()> {
                 "  - Output file: {}",
                 trace
                     .output_file
-                    .ok_or(anyhow!("Trace status response contained no output file"))?,
+                    .ok_or_else(|| anyhow!("Trace status response contained no output file"))?,
             ))?;
             if let Some(duration) = trace.duration {
                 writer.line(format!("  - Duration:  {} seconds", duration))?;
                 writer.line(format!(
                     "  - Remaining: {} seconds",
-                    trace.remaining_runtime.ok_or(anyhow!(
+                    trace.remaining_runtime.ok_or_else(|| anyhow!(
                         "Malformed status. Contained duration but not remaining runtime"
                     ))?
                 ))?;
@@ -673,15 +674,21 @@ async fn stop_tracing(
     output: String,
     mut writer: Writer,
     verbose: bool,
+    skip_symbolization: bool,
 ) -> Result<()> {
     let res = proxy.stop_recording(&output).await?;
     let (target, output_file) = match res {
-        Ok((target, output_file, stop_result)) => {
+        Ok((target, output_file, categories, stop_result)) => {
             for stat in stop_result.provider_stats.unwrap_or_default() {
                 for stat_output in stats_to_print(stat, verbose) {
                     writer.line(stat_output)?;
                 }
             }
+
+            if !skip_symbolization && categories.contains(&"kernel:ipc".to_string()) {
+                symbolize_trace_file(output_file.clone(), output_file.clone(), &context)?;
+            }
+
             (target, output_file)
         }
         Err(e) => ffx_bail!("{}", handle_recording_error(context, e, &output).await),
@@ -717,7 +724,10 @@ https://fuchsia.dev/fuchsia-src/development/sdk/ffx/record-traces"
         }
         RecordingError::RecordingAlreadyStarted => {
             // TODO(85098): Also return file info (which output file is being written to).
-            format!("Trace already started for target {}", target_spec.unwrap_or("".to_owned()))
+            format!(
+                "Trace already started for target {}",
+                target_spec.unwrap_or_else(|| "".to_owned())
+            )
         }
         RecordingError::DuplicateTraceFile => {
             // TODO(85098): Also return target info.
@@ -893,11 +903,12 @@ mod tests {
                 .send(Ok((
                     &ffx::TargetInfo { nodename: Some("foo".to_owned()), ..Default::default() },
                     &if name.is_empty() { "foo".to_owned() } else { name },
+                    &vec!["platypus".to_string(), "beaver".to_string()],
                     &generate_stop_result(),
                 )))
                 .expect("responder err"),
             ffx::TracingRequest::Status { responder, iterator } => {
-                let mut stream = iterator.into_stream().unwrap();
+                let mut stream = iterator.into_stream();
                 fuchsia_async::Task::local(async move {
                     let ffx::TracingStatusIteratorRequest::GetNext { responder, .. } =
                         stream.try_next().await.unwrap().unwrap();
@@ -1203,6 +1214,7 @@ mod tests {
                     background: true,
                     verbose: false,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1247,6 +1259,7 @@ Current tracing status:
                     background: true,
                     verbose: false,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1312,6 +1325,7 @@ Current tracing status:
                 sub_cmd: TraceSubCommand::Stop(Stop {
                     output: Some("foo.txt".to_string()),
                     verbose: false,
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1334,6 +1348,7 @@ Current tracing status:
                 sub_cmd: TraceSubCommand::Stop(Stop {
                     output: Some("long_directory_name_0123456789abcdef_1123456789abcdef_2123456789abcdef_3123456789abcdef_4123456789abcdef_5123456789abcdef_6123456789abcdef_7123456789abcdef_8123456789abcdef_9123456789abcdef_a123456789abcdef_b123456789abcdef_c123456789abcdef_d123456789abcdef_e123456789abcdef_f123456789abcdef/trace.fxt".to_string()),
                     verbose: false,
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1362,6 +1377,7 @@ Current tracing status:
                     background: true,
                     verbose: true,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1400,6 +1416,7 @@ Current tracing status:
                 sub_cmd: TraceSubCommand::Stop(Stop {
                     output: Some("foo.txt".to_string()),
                     verbose: true,
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1435,6 +1452,7 @@ Current tracing status:
                     background: true,
                     verbose: false,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1464,6 +1482,7 @@ Current tracing status:
                     background: false,
                     verbose: false,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1497,6 +1516,7 @@ Current tracing status:
                     background: false,
                     verbose: false,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1530,6 +1550,7 @@ Current tracing status:
                     background: false,
                     verbose: false,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,

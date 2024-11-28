@@ -346,8 +346,7 @@ impl Cr50 {
         cmd: CcdCommand,
     ) -> Result<fidl::endpoints::ClientEnd<PhysicalPresenceNotifierMarker>, anyhow::Error> {
         let (client, server) =
-            fidl::endpoints::create_request_stream::<PhysicalPresenceNotifierMarker>()
-                .context("Creating request stream")?;
+            fidl::endpoints::create_request_stream::<PhysicalPresenceNotifierMarker>();
         let proxy = self.proxy.clone();
         let inhibitor =
             if let Some(power_button) = self.power_button.as_ref().map(|v| Arc::clone(v)) {
@@ -476,15 +475,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_get_version() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<TpmDeviceMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<TpmDeviceMarker>();
         let tpm = FakeTpm::new();
         fasync::Task::spawn(tpm.serve(stream)).detach();
 
         let cr50 = Cr50::new(proxy, None);
 
-        let (pinweaver, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PinWeaverMarker>().unwrap();
+        let (pinweaver, stream) = fidl::endpoints::create_proxy_and_stream::<PinWeaverMarker>();
         fasync::Task::spawn(async move {
             cr50.handle_pinweaver_stream(stream).await.expect("Handle pinweaver stream ok");
         })

@@ -189,9 +189,7 @@ async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverP
                 interfaces_handler,
             };
 
-            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336606)
             match event_loop.run().await {
-                Ok(never) => match never {},
                 Err(e) => panic!("error running event loop: {e:?}"),
             }
         }

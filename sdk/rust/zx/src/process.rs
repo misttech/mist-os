@@ -84,6 +84,7 @@ impl From<sys::zx_info_task_stats_t> for TaskStatsInfo {
             mem_private_bytes,
             mem_shared_bytes,
             mem_scaled_shared_bytes,
+            mem_fractional_scaled_shared_bytes,
         }: sys::zx_info_task_stats_t,
     ) -> TaskStatsInfo {
         TaskStatsInfo {
@@ -91,6 +92,7 @@ impl From<sys::zx_info_task_stats_t> for TaskStatsInfo {
             mem_private_bytes,
             mem_shared_bytes,
             mem_scaled_shared_bytes,
+            mem_fractional_scaled_shared_bytes,
         }
     }
 }
@@ -364,7 +366,8 @@ mod tests {
                 mem_mapped_bytes,
                 mem_private_bytes,
                 mem_shared_bytes,
-                mem_scaled_shared_bytes
+                mem_scaled_shared_bytes,
+                mem_fractional_scaled_shared_bytes: _
             }
             if mem_mapped_bytes > 0
                 && mem_private_bytes > 0

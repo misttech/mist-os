@@ -377,7 +377,7 @@ pub async fn configure_launcher(
         .to_path_buf()
         .join(&config_args.bin_path)
         .to_str()
-        .ok_or(LaunchError::InvalidBinaryPath(config_args.bin_path.to_string()))?
+        .ok_or_else(|| LaunchError::InvalidBinaryPath(config_args.bin_path.to_string()))?
         .as_bytes()
         .to_vec();
     let mut all_args = vec![bin_arg];
@@ -468,7 +468,7 @@ pub fn report_start_error(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{Context, Error};
+    use anyhow::Error;
     use assert_matches::assert_matches;
     use async_trait::async_trait;
     use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd};
@@ -713,12 +713,10 @@ mod tests {
             create_endpoints::<fcrunner::ComponentControllerMarker>();
 
         // Get a proxy to the ComponentController channel.
-        let (controller_stream, control) = server_endpoint
-            .into_stream_and_control_handle()
-            .context("failed to convert server end to controller")?;
+        let (controller_stream, control) = server_endpoint.into_stream_and_control_handle();
         Ok((
             Controller::new(fake_component, controller_stream, control),
-            client_endpoint.into_proxy().expect("conversion to proxy failed."),
+            client_endpoint.into_proxy(),
         ))
     }
 
@@ -781,10 +779,10 @@ mod tests {
         fn start_launcher(
         ) -> Result<(fproc::LauncherProxy, oneshot::Receiver<FakeLauncherServiceResults>), Error>
         {
-            let (launcher_proxy, server_end) = create_proxy::<fproc::LauncherMarker>()?;
+            let (launcher_proxy, server_end) = create_proxy::<fproc::LauncherMarker>();
             let (sender, receiver) = oneshot::channel();
             fasync::Task::local(async move {
-                let stream = server_end.into_stream().expect("error making stream");
+                let stream = server_end.into_stream();
                 run_launcher_service(stream, sender)
                     .await
                     .expect("error running fake launcher service");
@@ -832,7 +830,7 @@ mod tests {
 
         #[fuchsia::test]
         async fn missing_pkg() -> Result<(), Error> {
-            let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>()?;
+            let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>();
             let ns = setup_empty_namespace()?;
 
             assert_eq!(
@@ -860,7 +858,7 @@ mod tests {
 
         #[fuchsia::test]
         async fn invalid_executable() -> Result<(), Error> {
-            let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>()?;
+            let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>();
             let ns = setup_namespace(true, vec![])?;
 
             match configure_launcher(LauncherConfigArgs {
@@ -888,7 +886,7 @@ mod tests {
 
         #[fuchsia::test]
         async fn invalid_pkg() -> Result<(), Error> {
-            let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>()?;
+            let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>();
             let ns = setup_namespace(false, vec!["/pkg"])?;
 
             match configure_launcher(LauncherConfigArgs {

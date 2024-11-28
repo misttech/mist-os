@@ -5,18 +5,18 @@
 use std::io::{Error, Write};
 
 use crate::compiler::natural::emit_type;
-use crate::compiler::util::{emit_doc_string, snake_to_camel};
+use crate::compiler::util::{emit_doc_string, IdExt as _};
 use crate::compiler::Compiler;
-use crate::ir::CompIdent;
+use crate::ir::CompId;
 
 pub fn emit_union<W: Write>(
     compiler: &mut Compiler<'_>,
     out: &mut W,
-    ident: &CompIdent,
+    ident: &CompId,
 ) -> Result<(), Error> {
     let u = &compiler.schema.union_declarations[ident];
 
-    let name = &u.name.type_name();
+    let name = u.name.decl_name().camel();
     let is_static = u.shape.max_out_of_line == 0;
 
     let params = if is_static { "" } else { "<'buf>" };
@@ -38,7 +38,7 @@ pub fn emit_union<W: Write>(
     )?;
 
     for member in &u.members {
-        let member_name = snake_to_camel(&member.name);
+        let member_name = member.name.camel();
 
         writeln!(out, "{member_name}(")?;
         emit_type(compiler, out, &member.ty)?;
@@ -87,7 +87,7 @@ pub fn emit_union<W: Write>(
     )?;
 
     for member in &u.members {
-        let member_name = snake_to_camel(&member.name);
+        let member_name = member.name.camel();
         let ord = member.ordinal;
 
         writeln!(
@@ -167,7 +167,7 @@ pub fn emit_union<W: Write>(
     )?;
 
     for member in &u.members {
-        let member_name = snake_to_camel(&member.name);
+        let member_name = member.name.camel();
         let ord = member.ordinal;
 
         writeln!(

@@ -4,6 +4,7 @@
 
 use crate::filesystems::FsManagementFilesystemInstance;
 use async_trait::async_trait;
+use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol_at_dir_root};
 
@@ -41,8 +42,9 @@ impl FilesystemConfig for Fxfs {
             .await;
         FxfsInstance {
             fxfs: FsManagementFilesystemInstance::new(
-                fs_management::Fxfs::with_crypt_client(Arc::new(get_crypt_client)),
+                fs_management::Fxfs::default(),
                 block_device,
+                Some(Arc::new(get_crypt_client)),
                 /*as_blob=*/ false,
             )
             .await,
@@ -54,7 +56,7 @@ impl FilesystemConfig for Fxfs {
     }
 }
 
-fn get_crypt_client() -> zx::Channel {
+fn get_crypt_client() -> ClientEnd<CryptMarker> {
     static CRYPT_CLIENT_INITIALIZER: Once = Once::new();
     CRYPT_CLIENT_INITIALIZER.call_once(|| {
         let (client_end, server_end) = zx::Channel::create();
@@ -102,8 +104,8 @@ fn get_crypt_client() -> zx::Channel {
             .map_err(zx::Status::from_raw)
             .expect("set_active_key failed");
     });
-    let (client_end, server_end) = zx::Channel::create();
-    connect_channel_to_protocol::<CryptMarker>(server_end)
+    let (client_end, server_end) = fidl::endpoints::create_endpoints();
+    connect_channel_to_protocol::<CryptMarker>(server_end.into())
         .expect("Failed to connect to crypt service");
     client_end
 }

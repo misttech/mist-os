@@ -13,7 +13,7 @@ per-file             pave,pave-remote,pave-zedboot,pave-zedboot-remote = joshuas
 per-file             args,build,clean,clean-build,gen,get-build-artifacts   = file: /build/OWNERS
 per-file             get-build-dir,get-flash-source,get-src-dir,list-boards = file: /build/OWNERS
 per-file             list-build-artifacts,list-products,ninjatrace2json     = file: /build/OWNERS
-per-file             set-build-dir,use                                      = file: /build/OWNERS
+per-file             rbe,set-build-dir,use                                  = file: /build/OWNERS
 
 per-file             format-code = olivernewman@google.com
 

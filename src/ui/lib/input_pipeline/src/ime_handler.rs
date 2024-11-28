@@ -167,9 +167,9 @@ fn create_key_event(
     device_id: u32,
 ) -> fidl_ui_input3::KeyEvent {
     let modifier_state: FrozenModifierState =
-        event.get_modifiers().unwrap_or(Modifiers::from_bits_allow_unknown(0)).into();
+        event.get_modifiers().unwrap_or_else(|| Modifiers::from_bits_allow_unknown(0)).into();
     let lock_state: FrozenLockState =
-        event.get_lock_state().unwrap_or(LockState::from_bits_allow_unknown(0)).into();
+        event.get_lock_state().unwrap_or_else(|| LockState::from_bits_allow_unknown(0)).into();
     tracing::debug!(
         "ImeHandler::create_key_event: key:{:?}, modifier_state: {:?}, lock_state: {:?}, event_type: {:?}",
         event.get_key(),
@@ -178,11 +178,9 @@ fn create_key_event(
         event.get_event_type(),
     );
     // Don't override the key meaning if already set, e.g. by prior stage.
-    let key_meaning = event.get_key_meaning().or(keymaps::US_QWERTY.apply(
-        event.get_key(),
-        &modifier_state,
-        &lock_state,
-    ));
+    let key_meaning = event
+        .get_key_meaning()
+        .or_else(|| keymaps::US_QWERTY.apply(event.get_key(), &modifier_state, &lock_state));
 
     // Don't insert a spurious Some(0).
     let repeat_sequence = match event.get_repeat_sequence() {
@@ -266,7 +264,6 @@ mod tests {
     ) -> (fidl_ui_input3::KeyEventInjectorProxy, fidl_ui_input3::KeyEventInjectorRequestStream)
     {
         fidl::endpoints::create_proxy_and_stream::<fidl_ui_input3::KeyEventInjectorMarker>()
-            .expect("Failed to create proxy and stream for fuchsia.ui.input3.KeyEventInjector")
     }
 
     fn create_unhandled_keyboard_event(

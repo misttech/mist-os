@@ -46,7 +46,7 @@ async fn main() -> Result<(), Error> {
     system_image_package.write_to_blobfs(&blobfs).await;
 
     let blobfs_client = blobfs.client();
-    let (client, server) = endpoints::create_proxy()?;
+    let (client, server) = endpoints::create_proxy();
 
     package_directory::serve(
         vfs::execution_scope::ExecutionScope::new(),
@@ -95,7 +95,7 @@ async fn serve_factory(
                     }
                 };
                 if let Err(e) =
-                    directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, pkg_directory_server_end)
+                    directory.clone2(ServerEnd::new(pkg_directory_server_end.into_channel()))
                 {
                     error!("failed to clone: {:?}", e);
                     responder.send(Err(OperationError::Failed)).ok();
@@ -222,7 +222,7 @@ impl realm_proxy::service::RealmProxy for PkgdirTestRealmProxy {
             error!("this test realm proxy only serves the fuchsia.io.Directory protocol");
             return Err(OperationError::Unsupported);
         }
-        self.directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end.into()).map_err(|e| {
+        self.directory.clone2(server_end.into()).map_err(|e| {
             error!("{:?}", e);
             OperationError::Failed
         })

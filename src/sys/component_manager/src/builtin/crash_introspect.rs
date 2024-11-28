@@ -48,7 +48,7 @@ mod tests {
         let crash_records_svc = CrashIntrospectSvc::new(crash_records.clone());
 
         let (crash_records_proxy, crash_records_stream) =
-            create_proxy_and_stream::<fsys::CrashIntrospectMarker>()?;
+            create_proxy_and_stream::<fsys::CrashIntrospectMarker>();
         let _task = fasync::Task::local(crash_records_svc.serve(crash_records_stream));
 
         let koid_raw = 123;

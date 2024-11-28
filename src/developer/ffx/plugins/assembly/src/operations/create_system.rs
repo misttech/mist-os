@@ -9,12 +9,12 @@ use crate::{vbmeta, zbi};
 
 use anyhow::{anyhow, Context, Result};
 use assembly_config_schema::ImageAssemblyConfig;
+use assembly_constants::PackageDestination;
 use assembly_images_config::{FilesystemImageMode, Fvm, Fxfs, Image, VBMeta, Zbi};
 use assembly_manifest::AssemblyManifest;
 use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use assembly_util as util;
-use assembly_util::PackageDestination;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_assembly_args::CreateSystemArgs;
 use fuchsia_pkg::{PackageManifest, PackagePath};

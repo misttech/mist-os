@@ -148,7 +148,7 @@ impl Isolate {
         {
             // When run in infra, disable mdns discovery.
             // TODO(https://fxbug.dev/42121155): Remove when we have proper network isolation.
-            target_addr = Option::Some(Cow::Owned(addr.to_string() + &":0".to_string()));
+            target_addr = Option::Some(Cow::Owned(addr + &":0".to_string()));
             mdns_discovery = false;
         }
         let user_config = UserConfig::for_test(
@@ -210,7 +210,7 @@ impl Isolate {
             tmpdir.path().to_owned(),
             env_vars,
             ffx_config::ConfigMap::new(),
-            Some(tmpdir.path().join(".ffx_env").to_owned()),
+            Some(tmpdir.path().join(".ffx_env")),
             None,
             env_context.has_no_environment(),
         )?;

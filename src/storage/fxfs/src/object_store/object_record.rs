@@ -52,13 +52,13 @@ pub enum ProjectPropertyV32 {
     Usage,
 }
 
-pub type ObjectKeyData = ObjectKeyDataV40;
+pub type ObjectKeyData = ObjectKeyDataV43;
 
 #[derive(
     Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize, Deserialize, TypeFingerprint,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectKeyDataV40 {
+pub enum ObjectKeyDataV43 {
     /// A generic, untyped object.  This must come first and sort before all other keys for a given
     /// object because it's also used as a tombstone and it needs to merge with all following keys.
     Object,
@@ -81,13 +81,55 @@ pub enum ObjectKeyDataV40 {
     GraveyardAttributeEntry { object_id: u64, attribute_id: u64 },
     /// A child of an encrypted directory.
     /// We store the filename in its encrypted form.
-    EncryptedChild { name: Vec<u8> },
+    /// casefold_hash is the hash of the casefolded human-readable name if a directory is
+    /// also casefolded, otherwise 0.
+    /// Legacy records may have a casefold_hash of 0 indicating "unknown".
+    EncryptedChild { casefold_hash: u32, name: Vec<u8> },
     /// A child of a directory that uses the casefold feature.
     /// (i.e. case insensitive, case preserving names)
     CasefoldChild { name: CasefoldString },
 }
 
-#[derive(Debug, Migrate, Serialize, Deserialize, TypeFingerprint)]
+impl From<ObjectKeyDataV40> for ObjectKeyDataV43 {
+    fn from(item: ObjectKeyDataV40) -> Self {
+        match item {
+            ObjectKeyDataV40::Object => Self::Object,
+            ObjectKeyDataV40::Keys => Self::Keys,
+            ObjectKeyDataV40::Attribute(a, b) => Self::Attribute(a, b),
+            ObjectKeyDataV40::Child { name } => Self::Child { name },
+            ObjectKeyDataV40::GraveyardEntry { object_id } => Self::GraveyardEntry { object_id },
+            ObjectKeyDataV40::Project { project_id, property } => {
+                Self::Project { project_id, property }
+            }
+            ObjectKeyDataV40::ExtendedAttribute { name } => Self::ExtendedAttribute { name },
+            ObjectKeyDataV40::GraveyardAttributeEntry { object_id, attribute_id } => {
+                Self::GraveyardAttributeEntry { object_id, attribute_id }
+            }
+            ObjectKeyDataV40::EncryptedChild { name } => {
+                Self::EncryptedChild { casefold_hash: 0, name }
+            }
+            ObjectKeyDataV40::CasefoldChild { name } => Self::CasefoldChild { name },
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, TypeFingerprint)]
+#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub enum ObjectKeyDataV40 {
+    Object,
+    Keys,
+    Attribute(u64, AttributeKeyV32),
+    Child { name: String },
+    GraveyardEntry { object_id: u64 },
+    Project { project_id: u64, property: ProjectPropertyV32 },
+    ExtendedAttribute { name: Vec<u8> },
+    GraveyardAttributeEntry { object_id: u64, attribute_id: u64 },
+    EncryptedChild { name: Vec<u8> },
+    CasefoldChild { name: CasefoldString },
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint)]
+#[migrate_to_version(ObjectKeyDataV40)]
 pub enum ObjectKeyDataV32 {
     Object,
     Keys,
@@ -112,7 +154,7 @@ pub enum AttributeKeyV32 {
 }
 
 /// ObjectKey is a key in the object store.
-pub type ObjectKey = ObjectKeyV40;
+pub type ObjectKey = ObjectKeyV43;
 
 #[derive(
     Clone,
@@ -128,13 +170,22 @@ pub type ObjectKey = ObjectKeyV40;
     Versioned,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct ObjectKeyV40 {
+pub struct ObjectKeyV43 {
     /// The ID of the object referred to.
     pub object_id: u64,
     /// The type and data of the key.
+    pub data: ObjectKeyDataV43,
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(ObjectKeyV43)]
+#[migrate_nodefault]
+pub struct ObjectKeyV40 {
+    pub object_id: u64,
     pub data: ObjectKeyDataV40,
 }
-#[derive(Debug, Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(ObjectKeyV40)]
 #[migrate_nodefault]
 pub struct ObjectKeyV32 {
     pub object_id: u64,
@@ -192,8 +243,8 @@ impl ObjectKey {
     }
 
     /// Creates an ObjectKey for an encrypted child.
-    pub fn encrypted_child(object_id: u64, name: Vec<u8>) -> Self {
-        Self { object_id, data: ObjectKeyData::EncryptedChild { name } }
+    pub fn encrypted_child(object_id: u64, name: Vec<u8>, casefold_hash: u32) -> Self {
+        Self { object_id, data: ObjectKeyData::EncryptedChild { casefold_hash, name } }
     }
 
     /// Creates a graveyard entry for an object.
@@ -884,7 +935,8 @@ impl ObjectValue {
     }
 }
 
-pub type ObjectItem = ObjectItemV41;
+pub type ObjectItem = ObjectItemV43;
+pub type ObjectItemV43 = Item<ObjectKeyV43, ObjectValueV41>;
 pub type ObjectItemV41 = Item<ObjectKeyV40, ObjectValueV41>;
 pub type ObjectItemV40 = Item<ObjectKeyV40, ObjectValueV40>;
 pub type ObjectItemV38 = Item<ObjectKeyV32, ObjectValueV38>;
@@ -892,6 +944,11 @@ pub type ObjectItemV37 = Item<ObjectKeyV32, ObjectValueV37>;
 pub type ObjectItemV33 = Item<ObjectKeyV32, ObjectValueV33>;
 pub type ObjectItemV32 = Item<ObjectKeyV32, ObjectValueV32>;
 
+impl From<ObjectItemV41> for ObjectItemV43 {
+    fn from(item: ObjectItemV41) -> Self {
+        Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
+    }
+}
 impl From<ObjectItemV40> for ObjectItemV41 {
     fn from(item: ObjectItemV40) -> Self {
         Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }

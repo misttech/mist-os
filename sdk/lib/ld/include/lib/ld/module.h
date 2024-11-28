@@ -13,7 +13,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <ranges>
-#include <span>
 #include <type_traits>
 
 #include "abi.h"
@@ -46,10 +45,11 @@ namespace abi {
 
 template <class Elf, class AbiTraits>
 struct Abi<Elf, AbiTraits>::Module {
-  constexpr Module() = default;
-
-  constexpr explicit Module(elfldltl::LinkerZeroInitialized)
-      : symbols(elfldltl::kLinkerZeroInitialized) {}
+  // This can be used in an initializer to allow the variable to go into bss.
+  // InitLinkerZeroInitialized() must be called before the variable is used.
+  static constexpr Module LinkerZeroInitialized() {
+    return Module{.symbols{elfldltl::kLinkerZeroInitialized}};
+  }
 
   constexpr void InitLinkerZeroInitialized() { symbols.InitLinkerZeroInitialized(); }
 
@@ -147,7 +147,8 @@ struct Abi<Elf, AbiTraits>::Module {
   // It can be reduced to introduce new flags or small integers without risk of
   // backward ABI incompatibility if zero is the safe default for new consumers
   // of old passive ABI data from an older producer.
-  std::array<typename Elf::Byte, sizeof(Addr) - (sizeof(Word) + sizeof(bool))> reserved_zero{};
+  std::array<typename Elf::Byte, sizeof(Addr) - ((sizeof(Word) + sizeof(bool)) % sizeof(Addr))>
+      reserved_zero{};
 
   // <lib/ld/remote-abi-transcriber.h> introspection API.
 

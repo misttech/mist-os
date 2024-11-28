@@ -148,7 +148,7 @@ class AmlUsbPhyTest : public testing::Test {
           incoming->env_.Initialize(std::move(start_args_result->incoming_directory_server));
       ASSERT_TRUE(init_result.is_ok());
 
-      incoming->device_server_.Init("pdev", "");
+      incoming->device_server_.Initialize("pdev");
 
       // Serve metadata.
       auto status = incoming->device_server_.AddMetadata(DEVICE_METADATA_PRIVATE, &kMagicNumbers,
@@ -297,9 +297,9 @@ TEST_F(AmlUsbPhyTest, ConnectStatusChanged) {
   CheckDevices(phy, {"xhci"});
 
   auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  auto status = fdio_open_at(outgoing_.handle()->get(), "/svc",
-                             static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                             endpoints.server.TakeChannel().release());
+  auto status = fdio_open3_at(outgoing_.handle()->get(), "/svc",
+                              static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
+                              endpoints.server.TakeChannel().release());
   EXPECT_EQ(ZX_OK, status);
 
   auto result = fdf::internal::DriverTransportConnect<fuchsia_hardware_usb_phy::Service::Device>(

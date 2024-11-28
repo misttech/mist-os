@@ -16,10 +16,7 @@ driver_bind_rules("coordinator_bind") {
 
 fuchsia_cc_driver("coordinator-driver") {
   output_name = "display-coordinator"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+  configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   sources = [
     "coordinator-driver.cc",
     "coordinator-driver.h",
@@ -46,7 +43,6 @@ source_set("shared") {
     "../fake:fake-display-stack",
     "./*",
   ]
-  configs += [ "//build/config:all_source" ]
   sources = [
     "capture-image.cc",
     "capture-image.h",
@@ -92,7 +88,7 @@ source_set("shared") {
     "//sdk/lib/zbi-format",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
-    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/api-types/cpp",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//src/graphics/display/lib/driver-utils",
     "//src/graphics/display/lib/edid",
@@ -116,7 +112,6 @@ source_set("preferred-scanout-image-type") {
 }
 
 test("display-coordinator-unittests") {
-  configs += [ "//build/config:all_source" ]
   sources = [
     "display-info-test.cc",
     "display-test.cc",
@@ -147,7 +142,6 @@ test("display-coordinator-unittests") {
 }
 
 static_library("testing") {
-  configs += [ "//build/config:all_source" ]
   testonly = true
   sources = [
     "testing/base.cc",

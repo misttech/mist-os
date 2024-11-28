@@ -214,7 +214,7 @@ impl Player {
         let inspect_state = inspect_handle.create_child("state");
         Ok(Player {
             id,
-            inner: client_end.into_proxy()?,
+            inner: client_end.into_proxy(),
             state: ValidPlayerInfoDelta::default(),
             registration: ValidPlayerRegistration::try_from(registration)?,
             hanging_get: None,
@@ -504,7 +504,7 @@ mod test {
         let (_inspector, mut player, _player_server) = test_player();
 
         let (session_control_fidl_proxy, session_control_request_stream) =
-            create_proxy_and_stream::<SessionControlMarker>()?;
+            create_proxy_and_stream::<SessionControlMarker>();
         let control_request_stream = session_control_request_stream
             .filter_map(|r| future::ready(r.ok()))
             .map(ForwardControlRequest::try_from)
@@ -524,7 +524,7 @@ mod test {
     #[fuchsia::test]
     async fn update_stream_relays_player_state() -> Result<()> {
         let (_inspector, mut player, player_server) = test_player();
-        let mut requests = player_server.into_stream()?;
+        let mut requests = player_server.into_stream();
 
         let waker = noop_waker();
         let mut ctx = Context::from_waker(&waker);
@@ -573,7 +573,7 @@ mod test {
     #[fuchsia::test]
     async fn update_stream_terminates_on_invalid_delta() -> Result<()> {
         let (_inspector, mut player, player_server) = test_player();
-        let mut requests = player_server.into_stream()?;
+        let mut requests = player_server.into_stream();
 
         let waker = noop_waker();
         let mut ctx = Context::from_waker(&waker);
@@ -604,7 +604,7 @@ mod test {
     #[fuchsia::test]
     async fn inspect_node() -> Result<()> {
         let (inspector, mut player, player_server) = test_player();
-        let mut requests = player_server.into_stream()?;
+        let mut requests = player_server.into_stream();
 
         assert_data_tree!(inspector, root: {
             test_player: {state: {}},

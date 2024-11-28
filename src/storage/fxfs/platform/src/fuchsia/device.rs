@@ -284,7 +284,7 @@ impl BlockServer {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             VolumeRequest::OpenSession { session, control_handle: _ } => {
-                let stream = session.into_stream()?;
+                let stream = session.into_stream();
                 let () = stream
                     .try_for_each(|request| async {
                         let () = match request {
@@ -413,7 +413,7 @@ impl BlockServer {
         server: fidl::endpoints::ServerEnd<VolumeMarker>,
     ) -> Result<(), Error> {
         server
-            .into_stream()?
+            .into_stream()
             .map_err(|e| e.into())
             .try_for_each_concurrent(None, |request| self.handle_request(request))
             .await?;
@@ -509,9 +509,8 @@ mod tests {
             .await;
             file.resize(2 * 1024 * 1024).await.expect("FIDL error").expect("resize error");
             let () = file.close().await.expect("FIDL error").expect("close error");
-            let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            root.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())
-                .expect("clone error");
+            let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            root.clone2(server.into_channel().into()).expect("clone error");
             BlockConnector(client, "block_device")
         };
 
@@ -530,9 +529,7 @@ mod tests {
         join!(
             async {
                 let block_client = RemoteBlockClient::new(
-                    ClientEnd::<BlockMarker>::new(client_channel)
-                        .into_proxy()
-                        .expect("create proxy"),
+                    ClientEnd::<BlockMarker>::new(client_channel).into_proxy(),
                 )
                 .await
                 .expect("RemoteBlockClient::new failed");
@@ -575,9 +572,7 @@ mod tests {
         join!(
             async {
                 let block_client = RemoteBlockClient::new(
-                    ClientEnd::<BlockMarker>::new(client_channel)
-                        .into_proxy()
-                        .expect("create proxy"),
+                    ClientEnd::<BlockMarker>::new(client_channel).into_proxy(),
                 )
                 .await
                 .expect("RemoteBlockClient::new failed");
@@ -611,9 +606,7 @@ mod tests {
         join!(
             async {
                 let block_client = RemoteBlockClient::new(
-                    ClientEnd::<BlockMarker>::new(client_channel)
-                        .into_proxy()
-                        .expect("create proxy"),
+                    ClientEnd::<BlockMarker>::new(client_channel).into_proxy(),
                 )
                 .await
                 .expect("RemoteBlockClient::new failed");
@@ -673,9 +666,7 @@ mod tests {
         join!(
             async {
                 let block_client = RemoteBlockClient::new(
-                    ClientEnd::<BlockMarker>::new(client_channel)
-                        .into_proxy()
-                        .expect("create proxy"),
+                    ClientEnd::<BlockMarker>::new(client_channel).into_proxy(),
                 )
                 .await
                 .expect("RemoteBlockClient::new failed");
@@ -705,9 +696,8 @@ mod tests {
         let file_size = 2 * 1024 * 1024;
         join!(
             async {
-                let original_block_device = ClientEnd::<VolumeMarker>::new(client_channel)
-                    .into_proxy()
-                    .expect("convert into proxy failed");
+                let original_block_device =
+                    ClientEnd::<VolumeMarker>::new(client_channel).into_proxy();
                 let info = original_block_device
                     .get_info()
                     .await
@@ -770,9 +760,8 @@ mod tests {
             .await;
             file.resize(5 * 1024 * 1024).await.expect("FIDL error").expect("resize error");
             let () = file.close().await.expect("FIDL error").expect("close error");
-            let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            root.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())
-                .expect("clone error");
+            let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            root.clone2(server.into_channel().into()).expect("clone error");
             BlockConnector(client, "block_device")
         };
 

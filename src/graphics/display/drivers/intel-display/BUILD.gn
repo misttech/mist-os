@@ -19,7 +19,6 @@ driver_bind_rules("intel-display-bind") {
 }
 
 source_set("common_srcs") {
-  configs += [ "//build/config:all_source" ]
   public_configs = [ "//build/config/fuchsia:enable_zircon_asserts" ]
 
   sources = [
@@ -115,7 +114,7 @@ source_set("common_srcs") {
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
-    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/api-types/cpp",
     "//src/graphics/display/lib/driver-utils",
     "//src/lib/ddk:ddk-hw-headers",
     "//src/lib/fxl",
@@ -149,7 +148,6 @@ fuchsia_driver_package("package") {
 }
 
 test("intel-display-tests") {
-  configs += [ "//build/config:all_source" ]
   sources = [
     "acpi-memory-region-unittest.cc",
     "acpi-memory-region-util-unittest.cc",
@@ -216,7 +214,7 @@ test("intel-display-tests") {
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/fake-resource",
     "//src/devices/testing/mock-mmio-range",
-    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/api-types/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",

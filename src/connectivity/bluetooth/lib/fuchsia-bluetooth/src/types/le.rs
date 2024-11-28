@@ -86,7 +86,7 @@ impl TryFrom<fidl::Peer> for Peer {
     type Error = Error;
     fn try_from(src: fidl::Peer) -> Result<Peer, Error> {
         Ok(Peer {
-            id: src.id.map(PeerId::from).ok_or(Error::missing("le.Peer.id"))?,
+            id: src.id.map(PeerId::from).ok_or_else(|| Error::missing("le.Peer.id"))?,
             name: src.name,
             connectable: src.connectable.unwrap_or(false),
             rssi: src.rssi,
@@ -133,8 +133,9 @@ impl TryFrom<fidl::AdvertisingDataDeprecated> for AdvertisingData {
             appearance: src
                 .appearance
                 .map(|v| {
-                    Appearance::from_primitive(v.value)
-                        .ok_or(Error::conversion("invalid AdvertisingDataDeprecated.appearance"))
+                    Appearance::from_primitive(v.value).ok_or_else(|| {
+                        Error::conversion("invalid AdvertisingDataDeprecated.appearance")
+                    })
                 })
                 .map_or(Ok(None), |v| v.map(Some))?,
             service_uuids: src

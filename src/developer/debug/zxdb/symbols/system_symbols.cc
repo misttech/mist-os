@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
 #include "src/developer/debug/zxdb/common/host_util.h"
 #include "src/developer/debug/zxdb/common/ref_ptr_to.h"
@@ -27,15 +28,24 @@ BuildIDIndex::Entry LoadLocalModuleSymbols(const std::string& name, const std::s
   if (name.empty())
     return result;
 
-  auto elf = elflib::ElfLib::Create(name);
-  if (!elf)
+  auto file = fopen(name.c_str(), "r");
+  if (!file) {
+    DEBUG_LOG(BuildIDIndex) << "Couldn't open " << name << ": " << strerror(errno);
     return result;
+  }
+  auto elf = elflib::ElfLib::Create(file, elflib::ElfLib::Ownership::kTakeOwnership);
+  if (!elf) {
+    DEBUG_LOG(SystemSymbols) << name << " is not an ELF file.";
+    return result;
+  }
 
   std::string file_build_id = elf->GetGNUBuildID();
   if (file_build_id == build_id) {
     // Matches, declare this local file contains both code and symbols.
     result.debug_info = name;
     result.binary = name;
+  } else {
+    DEBUG_LOG(SystemSymbols) << name << "'s build ID does not match " << build_id;
   }
   return result;
 }
@@ -64,6 +74,7 @@ Err SystemSymbols::GetModule(const std::string& name, const std::string& build_i
       modules_.erase(found_existing);
     } else {
       // Use cached.
+      DEBUG_LOG(SystemSymbols) << "Found cached symbols for " << build_id;
       *module = RefPtrTo(found_existing->second);
       return Err();
     }
@@ -79,6 +90,7 @@ Err SystemSymbols::GetModule(const std::string& name, const std::string& build_i
 
   if (entry.debug_info.empty() && download_type == SystemSymbols::DownloadType::kSymbols &&
       request_download_) {
+    DEBUG_LOG(SystemSymbols) << "Requesting debuginfo download for " << build_id;
     request_download_(build_id, DebugSymbolFileType::kDebugInfo);
   }
 
@@ -86,12 +98,15 @@ Err SystemSymbols::GetModule(const std::string& name, const std::string& build_i
     if (!debug->ProbeHasProgramBits() && entry.binary.empty() &&
         download_type == SystemSymbols::DownloadType::kBinary && request_download_) {
       // File doesn't exist or has no symbols, schedule a download.
+      DEBUG_LOG(SystemSymbols) << "Requesting binary download for " << build_id;
       request_download_(build_id, DebugSymbolFileType::kBinary);
     }
   }
 
-  if (entry.debug_info.empty())
+  if (entry.debug_info.empty()) {
+    DEBUG_LOG(SystemSymbols) << "Symbols not synchronously available for " << build_id;
     return Err();  // No symbols synchronously available.
+  }
 
   auto binary = std::make_unique<DwarfBinaryImpl>(entry.debug_info, entry.binary, build_id);
   auto module_impl = fxl::MakeRefCounted<ModuleSymbolsImpl>(std::move(binary), entry.build_dir);

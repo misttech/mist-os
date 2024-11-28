@@ -37,9 +37,6 @@ class LoadModuleRef;
 // ld::DecodedModule.  The ld::LoadModule object itself holds little more than
 // the module name.  A mutable decoded module object can be modified via the
 // `decoded()` accessor.
-//
-// TODO(https://fxbug.dev/326524302): Flesh out the indirect case with a
-// read-only decoded().
 template <typename DecodedStorage>
 class LoadModule {
  private:
@@ -84,6 +81,7 @@ class LoadModule {
   using LoadInfo = typename Decoded::LoadInfo;
   using RelocationInfo = typename Decoded::RelocationInfo;
   using Soname = typename Decoded::Soname;
+  using LookupResult = typename Decoded::LookupResult;
 
   static constexpr bool kMutableDecoded = !std::is_const_v<Decoded>;
 
@@ -144,7 +142,7 @@ class LoadModule {
   // This returns the offset from the thread pointer to this module's static
   // TLS block if it has one.  The value is assigned by AssignStaticTls, below.
   // This method should not be called unless AssignStaticTls has been called.
-  constexpr size_t static_tls_bias() const { return static_tls_bias_; }
+  constexpr size_type static_tls_bias() const { return static_tls_bias_; }
 
   // Use ths TlsLayout object to assign a static TLS offset for this module's
   // PT_TLS segment, if it has one.  SetTls() has already been called if it
@@ -259,6 +257,11 @@ class LoadModule {
   template <bool M = kMutableDecoded, typename = std::enable_if_t<M>>
   constexpr size_type tls_module_id() const {
     return module().tls_modid;
+  }
+
+  // This can be overridden in a subclass for custom semantics.
+  constexpr LookupResult Lookup(auto& diag, elfldltl::SymbolName& name) const {
+    return decoded().Lookup(diag, name);
   }
 
  protected:
