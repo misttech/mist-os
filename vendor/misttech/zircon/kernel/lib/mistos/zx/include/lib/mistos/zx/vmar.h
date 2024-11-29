@@ -6,6 +6,7 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_VMAR_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_VMAR_H_
 
+#include <lib/mistos/zx/executor.h>
 #include <lib/mistos/zx/object.h>
 #include <lib/mistos/zx/vmo.h>
 
@@ -45,7 +46,13 @@ class vmar final : public object<vmar> {
   zx_status_t allocate(uint32_t options, size_t offset, size_t size, vmar* child,
                        uintptr_t* child_addr) const;
 
-  static inline unowned<vmar> root_self() { return unowned<vmar>(); }
+  static inline unowned<vmar> kernel_vmar() {
+    Handle* kernel_vmar = GetKernelVmarHandle();
+    fbl::AllocChecker ac;
+    auto value = fbl::MakeRefCountedChecked<zx::Value>(&ac, kernel_vmar);
+    ZX_ASSERT(ac.check());
+    return unowned<vmar>(value);
+  }
 };
 
 using unowned_vmar = unowned<vmar>;

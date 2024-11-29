@@ -8,6 +8,7 @@ zx_library("zx") {
   sources = [
     #"debuglog.cc",
     "event.cc",
+    "executor.cc",
 
     #"job.cc",
     "object.cc",
@@ -26,6 +27,7 @@ zx_library("zx") {
 
   deps = [
     "//zircon/kernel/lib/debuglog",
+    "//zircon/kernel/lib/init",
     "//zircon/kernel/vm",
   ]
 }

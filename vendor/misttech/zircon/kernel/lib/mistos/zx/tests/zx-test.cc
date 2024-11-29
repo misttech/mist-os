@@ -148,19 +148,19 @@ bool event_duplicate() {
   END_TEST;
 }
 
-#if 0
 bool vmar() {
   BEGIN_TEST;
   zx::vmar vmar;
   const size_t size = PAGE_SIZE;
   uintptr_t addr;
-  ASSERT_OK(zx::vmar::root_self()->allocate(ZX_VM_CAN_MAP_READ, 0u, size, &vmar, &addr));
+  ASSERT_OK(zx::vmar::kernel_vmar()->allocate(ZX_VM_CAN_MAP_READ, 0u, size, &vmar, &addr));
   ASSERT_OK(validate_handle(vmar.get()));
   ASSERT_OK(vmar.destroy());
   // TODO(teisenbe): test more.
   END_TEST;
 }
 
+#if 0
 TEST(ZxTestCase, TimeConstruction) {
   // time construction
   ASSERT_EQ(zx::time().get(), 0);
@@ -637,7 +637,7 @@ UNITTEST("get info", unit_testing::get_info)
 UNITTEST("set get property", unit_testing::set_get_property)
 UNITTEST("event", unit_testing::event)
 UNITTEST("event duplicate", unit_testing::event_duplicate)
-// UNITTEST("vmar", unit_testing::vmar)
+UNITTEST("vmar", unit_testing::vmar)
 UNITTEST("unowned", unit_testing::unowned)
 UNITTEST("unowned2", unit_testing::unowned2)
 UNITTEST("vmo content size", unit_testing::vmo_content_size)
