@@ -52,6 +52,7 @@
                 "fuchsia.audio.device.Provider",
                 "fuchsia.audio.device.Registry",
                 "fuchsia.buildinfo.Provider",
+                "fuchsia.feedback.CrashReporter",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
