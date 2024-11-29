@@ -47,7 +47,7 @@ void Logger::Log() {
   memory::Digest d;
   digest_cb_(c, &d);
   std::ostringstream oss;
-  memory::Printer p(oss);
+  memory::TextPrinter p(oss);
 
   p.PrintDigest(d);
   auto str = oss.str();

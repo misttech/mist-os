@@ -54,7 +54,7 @@ void HighWater::RecordHighWater(const Capture& capture) {
   std::ofstream out;
   auto path = files::JoinPath(dir_, kLatest);
   out.open(path);
-  Printer p(out);
+  TextPrinter p(out);
   p.PrintSummary(s, CaptureLevel::VMO, memory::SORTED);
   out.close();
 
@@ -71,7 +71,7 @@ void HighWater::RecordHighWaterDigest(const Capture& capture) {
   std::ofstream out;
   auto path = files::JoinPath(dir_, kLatestDigest);
   out.open(path);
-  Printer p(out);
+  TextPrinter p(out);
   p.PrintDigest(digest);
   out.close();
 

@@ -20,9 +20,10 @@ const char* FormatSize(uint64_t bytes, char* buf);
 
 enum Sorted : uint8_t { UNSORTED, SORTED };
 
-class Printer {
+class JsonPrinter {
  public:
-  explicit Printer(std::ostream& os) : os_(os) {}
+  explicit JsonPrinter(zx::socket& output_socket) : output_socket(output_socket) {}
+
   /* Outputs capture as JSON. In this format:
      {
        "Time":28477260758625,
@@ -58,6 +59,7 @@ class Printer {
       - The names of the VMOs are an index into the VMONames array.
   */
   void PrintCapture(const Capture& capture);
+
   // `bucket_config` must be a valid JSON array, in this format:
   //      [
   //         {
@@ -117,6 +119,15 @@ class Printer {
   //      rest of the entries.
   //    - The names of the VMOs are an index into the VMONames array.
   void PrintCaptureAndBucketConfig(const Capture& capture, const std::string& bucket_config);
+
+ private:
+  zx::socket& output_socket;
+  FXL_DISALLOW_COPY_AND_ASSIGN(JsonPrinter);
+};
+
+class TextPrinter {
+ public:
+  explicit TextPrinter(std::ostream& os) : os_(os) {}
   void PrintSummary(const Summary& summary, CaptureLevel level, Sorted sorted);
   void PrintDigest(const Digest& digest);
   void OutputSummary(const Summary& summary, Sorted sorted, zx_koid_t pid);
@@ -125,7 +136,7 @@ class Printer {
  private:
   void OutputSizes(const Sizes& sizes);
   std::ostream& os_;
-  FXL_DISALLOW_COPY_AND_ASSIGN(Printer);
+  FXL_DISALLOW_COPY_AND_ASSIGN(TextPrinter);
 };
 
 }  // namespace memory

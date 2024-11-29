@@ -9,6 +9,7 @@
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/summary.h"
 #include "src/developer/memory/metrics/tests/test_utils.h"
+#include "src/lib/fsl/socket/strings.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "third_party/rapidjson/include/rapidjson/document.h"
 #include "third_party/rapidjson/include/rapidjson/ostreamwrapper.h"
@@ -38,6 +39,18 @@ void ConfirmLines(std::ostringstream& oss, std::vector<std::string> expected_lin
     std::string_view line = lines.at(li);
     EXPECT_STREQ(expected_line.c_str(), std::string(line).c_str());
   }
+}
+
+std::string ExecuteWithSocket(fit::function<void(zx::socket)> generator) {
+  zx::socket endpoint0, endpoint1;
+  zx::socket::create(ZX_SOCKET_STREAM, &endpoint0, &endpoint1);
+
+  std::string output;
+  std::thread receiver([&]() { fsl::BlockingCopyToString(std::move(endpoint0), &output); });
+  generator(std::move(endpoint1));
+  receiver.join();
+
+  return output;
 }
 
 TEST_F(PrinterUnitTest, PrintCapture) {
@@ -90,10 +103,10 @@ TEST_F(PrinterUnitTest, PrintCapture) {
                                            {.koid = 100, .name = "p1", .vmos = {1}},
                                        },
                                });
-  std::ostringstream oss;
-  Printer(oss).PrintCapture(c);
+  std::string output =
+      ExecuteWithSocket([&](zx::socket socket) { JsonPrinter(socket).PrintCapture(c); });
   rapidjson::Document doc;
-  doc.Parse(oss.str().c_str());
+  doc.Parse(output.c_str());
 
   rapidjson::Document expected;
   expected.Parse(R"json(
@@ -204,8 +217,6 @@ TEST_F(PrinterUnitTest, PrintCaptureAndBucketConfig) {
                                            {.koid = 100, .name = "p1", .vmos = {1}},
                                        },
                                });
-  std::ostringstream oss;
-  Printer p(oss);
 
   const std::string bucket_config = R"(
     [
@@ -217,10 +228,11 @@ TEST_F(PrinterUnitTest, PrintCaptureAndBucketConfig) {
         }
     ]
   )";
-  p.PrintCaptureAndBucketConfig(c, bucket_config);
-
+  std::string output = ExecuteWithSocket([&](zx::socket socket) {
+    JsonPrinter(socket).PrintCaptureAndBucketConfig(c, bucket_config);
+  });
   rapidjson::Document doc;
-  doc.Parse(oss.str().c_str());
+  doc.Parse(output.c_str());
   ASSERT_TRUE(doc.IsObject());
 
   rapidjson::Value const& capture = doc["Capture"];
@@ -308,7 +320,7 @@ TEST_F(PrinterUnitTest, PrintSummaryKMEM) {
                                });
 
   std::ostringstream oss;
-  Printer p(oss);
+  TextPrinter p(oss);
   Summary s(c);
   p.PrintSummary(s, CaptureLevel::KMEM, SORTED);
 
@@ -341,7 +353,7 @@ TEST_F(PrinterUnitTest, PrintSummaryPROCESS) {
                                });
 
   std::ostringstream oss;
-  Printer p(oss);
+  TextPrinter p(oss);
   Summary s(c);
   p.PrintSummary(s, CaptureLevel::PROCESS, SORTED);
 
@@ -376,7 +388,7 @@ TEST_F(PrinterUnitTest, PrintSummaryVMO) {
                                });
 
   std::ostringstream oss;
-  Printer p(oss);
+  TextPrinter p(oss);
   Summary s(c);
   p.PrintSummary(s, CaptureLevel::VMO, SORTED);
 
@@ -422,7 +434,7 @@ TEST_F(PrinterUnitTest, PrintSummaryVMOShared) {
                                });
 
   std::ostringstream oss;
-  Printer p(oss);
+  TextPrinter p(oss);
   Summary s(c);
   p.PrintSummary(s, CaptureLevel::VMO, SORTED);
 
@@ -457,7 +469,7 @@ TEST_F(PrinterUnitTest, OutputSummarySingle) {
   Summary s(c);
 
   std::ostringstream oss;
-  Printer p(oss);
+  TextPrinter p(oss);
 
   p.OutputSummary(s, SORTED, ZX_KOID_INVALID);
   ConfirmLines(oss, {
@@ -489,7 +501,7 @@ TEST_F(PrinterUnitTest, OutputSummaryKernel) {
   Summary s(c);
 
   std::ostringstream oss;
-  Printer p(oss);
+  TextPrinter p(oss);
 
   p.OutputSummary(s, SORTED, ZX_KOID_INVALID);
   ConfirmLines(oss, {
@@ -532,7 +544,7 @@ TEST_F(PrinterUnitTest, OutputSummaryDouble) {
   Summary s(c);
 
   std::ostringstream oss;
-  Printer p(oss);
+  TextPrinter p(oss);
 
   p.OutputSummary(s, SORTED, ZX_KOID_INVALID);
   ConfirmLines(oss, {
@@ -590,7 +602,7 @@ TEST_F(PrinterUnitTest, OutputSummaryShared) {
   Summary s(c);
 
   std::ostringstream oss;
-  Printer p(oss);
+  TextPrinter p(oss);
 
   p.OutputSummary(s, SORTED, ZX_KOID_INVALID);
   ConfirmLines(oss, {
@@ -649,7 +661,7 @@ TEST_F(PrinterUnitTest, PrintDigest) {
   Digester digester({{"A", ".*", "a.*"}, {"B", ".*", "b.*"}});
   Digest d(c, &digester);
   std::ostringstream oss;
-  Printer p(oss);
+  TextPrinter p(oss);
   p.PrintDigest(d);
   ConfirmLines(oss, {"B: 200B", "A: 100B", "Undigested: 300B", "Orphaned: 100B", "Kernel: 10B",
                      "Free: 100B"});
@@ -703,7 +715,7 @@ TEST_F(PrinterUnitTest, OutputDigest) {
   Digester digester({{"A", ".*", "a.*"}, {"B", ".*", "b.*"}});
   Digest d(c, &digester);
   std::ostringstream oss;
-  Printer p(oss);
+  TextPrinter p(oss);
   p.OutputDigest(d);
   ConfirmLines(oss, {"1234,B,200", "1234,A,100", "1234,Undigested,300", "1234,Orphaned,100",
                      "1234,Kernel,10", "1234,Free,100", "1234,[Addl]PagerTotal,300",

@@ -13,10 +13,11 @@
 #include <unordered_set>
 
 #include "lib/trace/internal/event_common.h"
+#include "src/lib/fsl/socket/strings.h"
 #include "third_party/rapidjson/include/rapidjson/document.h"
-#include "third_party/rapidjson/include/rapidjson/ostreamwrapper.h"
 #include "third_party/rapidjson/include/rapidjson/rapidjson.h"
 #include "third_party/rapidjson/include/rapidjson/writer.h"
+
 namespace {
 
 // TODO(https://fxbug.dev/42136089): replace with std::saturate_cast when available.
@@ -30,8 +31,36 @@ rapidjson::SizeType safecast(size_t v) {
                          std::numeric_limits<rapidjson::SizeType>::max()));
 }
 
+class SocketWriteStream {
+ public:
+  typedef char Ch;
+
+  explicit SocketWriteStream(zx::socket& socket) : socket_(socket) {}
+
+  void Put(Ch c) {
+    if (buffer_len_ == sizeof(buffer_)) {
+      Flush();
+    }
+
+    buffer_[buffer_len_++] = c;
+  }
+
+  void Flush() {
+    fsl::BlockingCopyFromString(std::string_view(buffer_, buffer_len_), socket_);
+    buffer_len_ = 0;
+  }
+
+ private:
+  FXL_DISALLOW_COPY_AND_ASSIGN(SocketWriteStream);
+
+  zx::socket& socket_;
+
+  char buffer_[16 * 1024];
+  size_t buffer_len_ = 0;
+};
+
 rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
-  TRACE_DURATION("memory_metrics", "Printer::DocumentFromCapture");
+  TRACE_DURATION("memory_metrics", "JsonPrinter::DocumentFromCapture");
   rapidjson::Document j(rapidjson::kObjectType);
   auto& a = j.GetAllocator();
   j.AddMember("Time", capture.time(), a);
@@ -106,7 +135,7 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
     size_t operator()(const NameCount& kc) const { return std::hash<std::string_view>()(kc.name_); }
   };
 
-  TRACE_DURATION_BEGIN("memory_metrics", "Printer::DocumentFromCapture::Processes");
+  TRACE_DURATION_BEGIN("memory_metrics", "JsonPrinter::DocumentFromCapture::Processes");
   std::unordered_set<NameCount, NameCountHash> name_count;
   rapidjson::Value processes(rapidjson::kArrayType);
   processes.Reserve(safecast(capture.koid_to_process().size()), a);
@@ -126,9 +155,9 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
     process.PushBack(p.koid, a).PushBack(rapidjson::StringRef(p.name), a).PushBack(vmos, a);
     processes.PushBack(process, a);
   }
-  TRACE_DURATION_END("memory_metrics", "Printer::DocumentFromCapture::Processes");
+  TRACE_DURATION_END("memory_metrics", "JsonPrinter::DocumentFromCapture::Processes");
 
-  TRACE_DURATION_BEGIN("memory_metrics", "Printer::DocumentFromCapture::Names");
+  TRACE_DURATION_BEGIN("memory_metrics", "JsonPrinter::DocumentFromCapture::Names");
   std::vector<NameCount> sorted_counts(name_count.begin(), name_count.end());
   std::sort(sorted_counts.begin(), sorted_counts.end(),
             [](const NameCount& kc1, const NameCount& kc2) { return kc1.count > kc2.count; });
@@ -142,9 +171,9 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
   for (const auto& nc : sorted_counts) {
     vmo_names.PushBack(rapidjson::StringRef(nc.name_.data(), nc.name_.length()), a);
   }
-  TRACE_DURATION_END("memory_metrics", "Printer::DocumentFromCapture::Names");
+  TRACE_DURATION_END("memory_metrics", "JsonPrinter::DocumentFromCapture::Names");
 
-  TRACE_DURATION_BEGIN("memory_metrics", "Printer::DocumentFromCapture::Vmos");
+  TRACE_DURATION_BEGIN("memory_metrics", "JsonPrinter::DocumentFromCapture::Vmos");
   rapidjson::Value vmos(rapidjson::kArrayType);
   rapidjson::Value vmo_header(rapidjson::kArrayType);
   vmo_header.PushBack("koid", a)
@@ -169,7 +198,7 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
     }
     vmos.PushBack(vmo_value, a);
   }
-  TRACE_DURATION_END("memory_metrics", "Printer::DocumentFromCapture::Vmos");
+  TRACE_DURATION_END("memory_metrics", "JsonPrinter::DocumentFromCapture::Vmos");
 
   j.AddMember("Processes", processes, a)
       .AddMember("VmoNames", vmo_names, a)
@@ -205,19 +234,19 @@ const char* FormatSize(uint64_t bytes, char* buf) {
   return buf;
 }
 
-void Printer::PrintCapture(const Capture& capture) {
-  TRACE_DURATION("memory_metrics", "Printer::PrintCaptureJson");
+void JsonPrinter::PrintCapture(const Capture& capture) {
+  TRACE_DURATION("memory_metrics", "JsonPrinter::PrintCaptureJson");
   rapidjson::Document doc = DocumentFromCapture(capture);
-  TRACE_DURATION_BEGIN("memory_metrics", "Printer::PrintCaptureJson::Write");
-  rapidjson::OStreamWrapper osw(os_);
-  rapidjson::Writer<rapidjson::OStreamWrapper> writer(osw);
+  TRACE_DURATION_BEGIN("memory_metrics", "JsonPrinter::PrintCaptureJson::Write");
+  SocketWriteStream sw(output_socket);
+  rapidjson::Writer<SocketWriteStream> writer(sw);
   doc.Accept(writer);
-  TRACE_DURATION_END("memory_metrics", "Printer::PrintCaptureJson::Write");
+  TRACE_DURATION_END("memory_metrics", "JsonPrinter::PrintCaptureJson::Write");
 }
 
-void Printer::PrintCaptureAndBucketConfig(const Capture& capture,
-                                          const std::string& bucket_config) {
-  TRACE_DURATION("memory_metrics", "Printer::PrintCaptureAndBucketConfig");
+void JsonPrinter::PrintCaptureAndBucketConfig(const Capture& capture,
+                                              const std::string& bucket_config) {
+  TRACE_DURATION("memory_metrics", "JsonPrinter::PrintCaptureAndBucketConfig");
 
   rapidjson::Document d(rapidjson::kObjectType);
   auto& a = d.GetAllocator();
@@ -229,14 +258,14 @@ void Printer::PrintCaptureAndBucketConfig(const Capture& capture,
   bucket_val.Parse(bucket_config.c_str());
   d.AddMember("Buckets", bucket_val, a);
 
-  TRACE_DURATION_BEGIN("memory_metrics", "Printer::PrintCaptureAndBucketConfig::Write");
-  rapidjson::OStreamWrapper osw(os_);
-  rapidjson::Writer<rapidjson::OStreamWrapper> writer(osw);
+  TRACE_DURATION_BEGIN("memory_metrics", "JsonPrinter::PrintCaptureAndBucketConfig::Write");
+  SocketWriteStream sw(output_socket);
+  rapidjson::Writer<SocketWriteStream> writer(sw);
   d.Accept(writer);
-  TRACE_DURATION_END("memory_metrics", "Printer::PrintCaptureAndBucketConfig::Write");
+  TRACE_DURATION_END("memory_metrics", "JsonPrinter::PrintCaptureAndBucketConfig::Write");
 }
 
-void Printer::OutputSizes(const Sizes& sizes) {
+void TextPrinter::OutputSizes(const Sizes& sizes) {
   if (sizes.total_bytes == sizes.private_bytes) {
     char private_buf[kMaxFormattedStringSize];
     os_ << FormatSize(sizes.private_bytes.integral, private_buf) << "\n";
@@ -249,8 +278,8 @@ void Printer::OutputSizes(const Sizes& sizes) {
       << FormatSize(sizes.total_bytes.integral, total_buf) << "\n";
 }
 
-void Printer::PrintSummary(const Summary& summary, CaptureLevel level, Sorted sorted) {
-  TRACE_DURATION("memory_metrics", "Printer::PrintSummary");
+void TextPrinter::PrintSummary(const Summary& summary, CaptureLevel level, Sorted sorted) {
+  TRACE_DURATION("memory_metrics", "TextPrinter::PrintSummary");
   char vmo_buf[kMaxFormattedStringSize], free_buf[kMaxFormattedStringSize];
   const auto& kstats = summary.kstats();
   os_ << "Time: " << summary.time() << " VMO: " << FormatSize(kstats.vmo_bytes, vmo_buf)
@@ -309,8 +338,8 @@ void Printer::PrintSummary(const Summary& summary, CaptureLevel level, Sorted so
   os_ << std::flush;
 }
 
-void Printer::OutputSummary(const Summary& summary, Sorted sorted, zx_koid_t pid) {
-  TRACE_DURATION("memory_metrics", "Printer::OutputSummary");
+void TextPrinter::OutputSummary(const Summary& summary, Sorted sorted, zx_koid_t pid) {
+  TRACE_DURATION("memory_metrics", "TextPrinter::OutputSummary");
   const auto& summaries = summary.process_summaries();
   std::vector<ProcessSummary> sorted_summaries;
   if (sorted == SORTED) {
@@ -359,8 +388,8 @@ void Printer::OutputSummary(const Summary& summary, Sorted sorted, zx_koid_t pid
   os_ << std::flush;
 }
 
-void Printer::PrintDigest(const Digest& digest) {
-  TRACE_DURATION("memory_metrics", "Printer::PrintDigest");
+void TextPrinter::PrintDigest(const Digest& digest) {
+  TRACE_DURATION("memory_metrics", "TextPrinter::PrintDigest");
   for (auto const& bucket : digest.buckets()) {
     char size_buf[kMaxFormattedStringSize];
     FormatSize(bucket.size(), size_buf);
@@ -368,8 +397,8 @@ void Printer::PrintDigest(const Digest& digest) {
   }
 }
 
-void Printer::OutputDigest(const Digest& digest) {
-  TRACE_DURATION("memory_metrics", "Printer::OutputDigest");
+void TextPrinter::OutputDigest(const Digest& digest) {
+  TRACE_DURATION("memory_metrics", "TextPrinter::OutputDigest");
   auto const time = digest.time() / 1000000000;
   for (auto const& bucket : digest.buckets()) {
     os_ << time << "," << bucket.name() << "," << bucket.size() << "\n";

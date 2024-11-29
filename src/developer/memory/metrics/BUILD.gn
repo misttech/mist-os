@@ -28,6 +28,7 @@ source_set("metrics") {
 
   deps = [
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//third_party/rapidjson",

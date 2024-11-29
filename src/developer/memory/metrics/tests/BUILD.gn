@@ -42,6 +42,7 @@ cc_test_executable("memory_metrics_unittests") {
     ":utils",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/developer/memory/metrics",
+    "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//third_party/googletest:gmock",
