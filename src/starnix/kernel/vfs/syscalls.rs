@@ -1531,6 +1531,9 @@ pub fn sys_ioctl(
     request: u32,
     arg: SyscallArg,
 ) -> Result<SyscallResult, Errno> {
+    // TODO: https://fxbug.dev/364569179 - Figure out what to do about the security
+    // check for FIONREAD, FIBMAP, FIGETBSZ, FIONBIO, and FIOASYNC. These ioctls check
+    // a different set of permissions than other arbitrary ioctls.
     match request {
         FIOCLEX => {
             current_task.files.set_fd_flags(fd, FdFlags::CLOEXEC)?;
@@ -1542,6 +1545,7 @@ pub fn sys_ioctl(
         }
         _ => {
             let file = current_task.files.get(fd)?;
+            security::check_file_ioctl_access(current_task, &file)?;
             file.ioctl(locked, current_task, request, arg)
         }
     }

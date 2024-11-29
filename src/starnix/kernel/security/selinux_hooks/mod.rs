@@ -11,8 +11,8 @@ use super::FsNodeSecurityXattr;
 use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntry, DirEntryHandle, FileHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
-    PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
+    DirEntry, DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr,
+    FsString, PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
 };
 use audit::{audit_log, AuditContext};
 use bstr::BStr;
@@ -20,7 +20,7 @@ use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::PermissionCheck;
 use selinux::policy::FsUseType;
 use selinux::{
-    ClassPermission, CommonFilePermission, DirPermission, FileClass, FileSystemLabel,
+    ClassPermission, CommonFilePermission, DirPermission, FdPermission, FileClass, FileSystemLabel,
     FileSystemLabelingScheme, FileSystemMountOptions, FileSystemPermission, InitialSid,
     ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
 };
@@ -709,6 +709,34 @@ pub(super) fn check_fs_node_removexattr_access(
         current_sid,
         file_sid,
         CommonFilePermission::SetAttr.for_class(file_class),
+    )
+}
+
+/// Returns whether `current_task` can issue an ioctl to `file`.
+pub(super) fn check_file_ioctl_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    file: &FileObject,
+) -> Result<(), Errno> {
+    let permission_check = security_server.as_permission_check();
+    let current_sid = current_task.security_state.lock().current_sid;
+    let file_sid = fs_node_effective_sid(file.node());
+    let mode = file.node().info().mode;
+    let file_class = file_class_from_file_mode(mode)?;
+    todo_check_permission!(
+        TODO("https://fxbug.dev/364569179", "ioctl fd use check"),
+        &permission_check,
+        current_sid,
+        file_sid,
+        FdPermission::Use
+    )?;
+
+    todo_check_permission!(
+        TODO("https://fxbug.dev/364569179", "ioctl"),
+        &permission_check,
+        current_sid,
+        file_sid,
+        CommonFilePermission::Ioctl.for_class(file_class),
     )
 }
 

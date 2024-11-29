@@ -328,6 +328,8 @@ common_permission_enum! {
         Create("create"),
         /// Permission to query attributes, including uid, gid and extended attributes.
         GetAttr("getattr"),
+        /// Permission to execute ioctls on the file.
+        Ioctl("ioctl"),
         /// Permissions to create hard link.
         Link("link"),
         /// Permission to open a file.

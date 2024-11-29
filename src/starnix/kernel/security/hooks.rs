@@ -7,8 +7,8 @@ use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntryHandle, FileHandle, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode,
-    ValueOrSize, XattrOp,
+    DirEntryHandle, FileHandle, FileObject, FileSystemHandle, FsNode, FsStr, FsString,
+    NamespaceNode, ValueOrSize, XattrOp,
 };
 use fuchsia_inspect_contrib::profile_duration;
 use selinux::{SecurityPermission, SecurityServer};
@@ -337,6 +337,15 @@ pub fn check_fs_node_read_link_access(
 pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
     profile_duration!("security.hooks.file_alloc_security");
     FileObjectState { state: selinux_hooks::file_alloc_security(current_task) }
+}
+
+/// Returns whether `current_task` can issue an ioctl to `file`.
+/// Corresponds to the `file_ioctl()` LSM hook.
+pub fn check_file_ioctl_access(current_task: &CurrentTask, file: &FileObject) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_file_ioctl_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_file_ioctl_access(security_server, current_task, file)
+    })
 }
 
 /// Return the default initial `TaskState` for kernel tasks.
