@@ -90,8 +90,7 @@ create_kernel_task_and_unlocked_with_fs_and_selinux(
 ///
 /// Open "/boot" and returns an FsContext rooted in that directory.
 FileSystemHandle create_bootfs(const fbl::RefPtr<Kernel>& kernel) {
-  // TODO (Herrera) fix ZbiFile leaking vmo
-  bootfs::testing::ZbiFile zbi;
+  bootfs::testing::ZbiFile zbi("BootFsZbi");
   zbi.Write({kBootFsZbi, sizeof(kBootFsZbi) - 1});
   fbl::AllocChecker ac;
   zx::vmo vmo(fbl::MakeRefCountedChecked<zx::Value>(&ac, ktl::move(zbi).Finish()));

@@ -17,7 +17,7 @@ namespace bootfs::testing {
 // Copy of SymbolizerFile (zircon//kernel/lib/instrumentation/vmo.cc)
 class ZbiFile {
  public:
-  ZbiFile() {
+  ZbiFile(ktl::string_view name = "ZbiFile") : name_(name) {
     zx_status_t status =
         VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, PAGE_SIZE, &vmo_);
     ZX_ASSERT(status == ZX_OK);
@@ -32,21 +32,21 @@ class ZbiFile {
     return static_cast<int>(str.size());
   }
 
-  Handle* Finish() && {
+  HandleOwner Finish() && {
     KernelHandle<VmObjectDispatcher> handle;
     zx_rights_t rights;
     zx_status_t status = VmObjectDispatcher::Create(
         ktl::move(vmo_), 0, VmObjectDispatcher::InitialMutability::kMutable, &handle, &rights);
     ZX_ASSERT(status == ZX_OK);
-    status = handle.dispatcher()->set_name(kVmoName.data(), kVmoName.size());
+    status = handle.dispatcher()->set_name(name_.data(), name_.size());
     DEBUG_ASSERT(status == ZX_OK);
     status = handle.dispatcher()->SetContentSize(pos_);
     DEBUG_ASSERT(status == ZX_OK);
-    return Handle::Make(ktl::move(handle), rights).release();
+    return Handle::Make(ktl::move(handle), rights);
   }
 
  private:
-  static constexpr ktl::string_view kVmoName = "zbi";
+  ktl::string_view name_;
 
   fbl::RefPtr<VmObjectPaged> vmo_;
   FILE stream_{this};
