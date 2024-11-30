@@ -1059,10 +1059,6 @@ common --enable_bzlmod=false
     # LINT.ThenChange(//build/info/info.gni)
 
     # LINT.IfChange
-    generated_repositories_inputs["fuchsia_sdk"] = all_in_tree_idk_metas
-    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
-
-    # LINT.IfChange
     generated_repositories_inputs["fuchsia_in_tree_idk"] = all_in_tree_idk_metas
     # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
@@ -1076,10 +1072,6 @@ common --enable_bzlmod=false
     generated_repositories_inputs["bazel_rules_fuchsia"] = list(
         rules_fuchsia_files
     )
-    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
-
-    # LINT.IfChange
-    generated_repositories_inputs["internal_sdk"] = all_internal_only_idk_metas
     # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # TODO: support content hash file in fuchsia_clang_repository() definition
@@ -1116,11 +1108,14 @@ common --enable_bzlmod=false
     generated_repositories_inputs["boringssl"] = boringssl_content_files
     # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
-    for repo_name in sorted(generated_repositories_inputs.keys()):
-        repo_inputs = generated_repositories_inputs[repo_name]
-        repo_hash_file = os.path.join(
+    def _get_repo_hash_file_path(repo_name: str) -> str:
+        return os.path.join(
             "workspace", "fuchsia_build_generated", repo_name + ".hash"
         )
+
+    for repo_name in sorted(generated_repositories_inputs.keys()):
+        repo_inputs = generated_repositories_inputs[repo_name]
+        repo_hash_file = _get_repo_hash_file_path(repo_name)
         generated.add_file(repo_hash_file, md5_all_files(repo_inputs))
         if args.depfile:
             # Important: quote file paths because some of them may contain spaces!
@@ -1134,6 +1129,24 @@ common --enable_bzlmod=false
                 for p in repo_inputs
             )
             args.depfile.write(f"{out}: {ins}\n")
+
+    # The following hash content files are aliases of other ones.
+    # Use a symlink to represent them in order to avoid re-hash the
+    # corresponding input files twice.
+    aliased_repositories = {
+        # LINT.IfChange
+        "internal_sdk": "fuchsia_internal_only_idk",
+        # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
+        # LINT.IfChange
+        "fuchsia_sdk": "fuchsia_in_tree_idk",
+        # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
+    }
+    for repo_name, alias_name in aliased_repositories.items():
+        repo_hash_file = _get_repo_hash_file_path(repo_name)
+        alias_hash_file = os.path.join(
+            topdir, _get_repo_hash_file_path(alias_name)
+        )
+        generated.add_symlink(repo_hash_file, alias_hash_file)
 
     force = args.force
     generated_json = generated.to_json()
