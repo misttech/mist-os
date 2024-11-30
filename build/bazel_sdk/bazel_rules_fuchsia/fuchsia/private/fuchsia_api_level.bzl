@@ -4,7 +4,9 @@
 
 """ Defines utilities for working with fuchsia api levels. """
 
-load("//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
+# NOTE: INTERNAL_ONLY_VALID_TARGET_APIS is part of the generated content of @fuchsia_sdk
+# and does not exist in @rules_fuchsia.
+load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
 
 # We define the provider in this file because it is a private implementation
 # detail in this file. It is only made public so that it can be used in tests.

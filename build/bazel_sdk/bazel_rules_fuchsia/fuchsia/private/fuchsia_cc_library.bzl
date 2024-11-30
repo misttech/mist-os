@@ -10,7 +10,7 @@ This should be used whenever a cc_library would otherwise be fuchsia-specific
 and otherwise incompatible with non-fuchsia platforms.
 """
 
-load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 def fuchsia_cc_library(additional_linker_inputs = [], tags = ["manual"], **kwargs):
     native.cc_library(

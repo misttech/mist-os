@@ -9,7 +9,7 @@ See //build/bazel/README.md for details about this file.
 
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "@rules_fuchsia//fuchsia:defs.bzl",
     "fuchsia_devicetree_toolchain_info",
 )
 load(
