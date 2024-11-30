@@ -69,14 +69,6 @@ action("generate_main_workspace") {
     reproxy_config_file,
   ]
 
-  # This dependency is needed to properly populate the @fuchsia_sdk repository.
-  deps = [ "//sdk:bazel_in_tree_idk" ]
-
-  # This dependency is needed to properly populate the @internal_sdk repository.
-  # (see https://fxbug.dev/42063353).
-  # TODO(https://fxbug.dev/333907192): Remove this.
-  deps += [ "//sdk:bazel_internal_only_idk" ]
-
   depfile = "${target_gen_dir}/${target_name}.d"
 
   outputs = [
@@ -288,6 +280,7 @@ group("bazel_action_allowlist") {
     "//build/bazel/bazel_sdk:verify_fuchsia_sdk_repository",
     "//build/bazel/bazel_sdk/docs:docs.bazel_build_group",
     "//build/bazel/examples:examples",
+    "//build/bazel/examples/hello_world",
   ]
 
   visibility += [ "//vendor/*" ]

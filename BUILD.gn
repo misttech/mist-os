@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_workspace.gni")
 import("//build/board.gni")
 import("//build/compiled_action.gni")
 import("//build/config/build_api_module.gni")
@@ -2113,12 +2114,15 @@ group("developer_host_tools") {
 # instead (e.g. see the definition of `bazel_action()`).
 #
 group("bazel_workspace") {
-  deps = [
-    "//build/bazel:generate_main_workspace",
+  deps = [ "//build/bazel:generate_main_workspace" ]
+  deps += bazel_workspace_idk_deps
+}
 
-    # For the @fuchsia_sdk Bazel repository content.
-    "//sdk:core",
-  ]
+# This target is provided as an alternative to `bazel_workspace`
+# for invoking `fx bazel` with `--config=no_sdk`, which allows
+# using the Bazel workspace before the IDK is built with Ninja.
+group("bazel_workspace_no_sdk") {
+  deps = [ "//build/bazel:generate_main_workspace" ]
 }
 
 # IMPORTANT: Nothing should depend on this target. It is here

@@ -3,6 +3,6 @@
 // found in the LICENSE file.
 #include <stdio.h>
 int main() {
-  printf("Hello World!\n");
+  printf("Hello World from Bazel!\n");
   return 0;
 }

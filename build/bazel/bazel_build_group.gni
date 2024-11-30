@@ -67,6 +67,12 @@ import("//build/bazel/bazel_action.gni")
 #       Usual GN meaning. A value provided here applies to the group target
 #       and also to each subtarget that does not have its own visibility definition.
 #
+#    no_sdk_workspace: (optional)
+#       Run command in a workspace that is usable before IDK/SDK atoms are present.
+#       See full documentation for this flag in bazel_action.gni.
+#       Type: boolean
+#       Default: false
+#
 template("bazel_build_group") {
   _bazel_targets = []
   _copy_outputs = []

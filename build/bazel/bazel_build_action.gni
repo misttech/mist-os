@@ -157,6 +157,12 @@ import("//build/bazel/bazel_action.gni")
 #     from them will create a corresponding entry in the @gn_targets external
 #     repository, allowing the Bazel graph to see
 #
+#   no_sdk_workspace: (optional)
+#     Run command in a workspace that is usable before IDK/SDK atoms are present.
+#     See full documentation for this flag in bazel_action.gni.
+#     Type: boolean
+#     Default: false
+#
 #   metadata:
 #   no_output_dir_leaks:
 #   testonly:

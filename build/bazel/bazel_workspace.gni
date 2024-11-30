@@ -25,3 +25,17 @@ bazel_output_base = bazel_main_top_dir + "/output_base"
 
 # Location of the Bazel execroot, relative to the source root.
 bazel_execroot = bazel_output_base + "/execroot/main"
+
+# The list of GN dependencies that are needed to populate the IDK
+# repositories in the Bazel workspace.
+bazel_workspace_idk_deps = [
+  # This dependency is needed to properly populate the @fuchsia_in_tree_sdk
+  # and @fuchsia_sdk repositories.
+  "//sdk:bazel_in_tree_idk",
+
+  # This dependency is needed to properly populate the @fuchsia_internal_idk
+  # and @internal_sdk repositories.
+  # (see https://fxbug.dev/42063353).
+  # TODO(https://fxbug.dev/333907192): Remove this.
+  "//sdk:bazel_internal_only_idk",
+]
