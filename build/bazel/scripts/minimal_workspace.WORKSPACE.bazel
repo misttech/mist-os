@@ -22,11 +22,11 @@ load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 bazel_skylib_workspace()
 
 # The repository containing common definitions for the Fuchsia platform build
-# and the Fuchsia Bazel SDK rules.
+# and cthe Fuchsia Bazel SDK rules.
 # This is needed for remote execution parameters.
 local_repository(
-    name = "fuchsia_sdk_common",
-    path = "build/bazel/local_repositories/fuchsia_sdk_common",
+    name = "rules_fuchsia",
+    path = "build/bazel_sdk/bazel_rules_fuchsia",
 )
 
 # Create the @fuchsia_build_config repository which contains the defs.bzl file
@@ -34,7 +34,7 @@ local_repository(
 # the Fuchsia platform build.
 # buildifier: disable=load-on-top
 load(
-    "@fuchsia_sdk_common//common:fuchsia_platform_build.bzl",
+    "@rules_fuchsia//common:fuchsia_platform_build.bzl",
     "fuchsia_build_config_repository",
 )
 

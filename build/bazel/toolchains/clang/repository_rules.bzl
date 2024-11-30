@@ -5,7 +5,7 @@
 """Repository rules used to populate Clang-based repositories."""
 
 load(
-    "@fuchsia_sdk_common//common:toolchains/clang/repository_utils.bzl",
+    "@rules_fuchsia//common:toolchains/clang/repository_utils.bzl",
     "prepare_clang_repository",
 )
 

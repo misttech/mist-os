@@ -18,13 +18,7 @@ local_path_override(
     path = "../bazel_rules_fuchsia",
 )
 
-bazel_dep(name = "fuchsia_sdk_common", version = "")
-local_path_override(
-    module_name = "fuchsia_sdk_common",
-    path = "../../bazel/local_repositories/fuchsia_sdk_common",
-)
-
-fuchsia_build_config_ext = use_extension("@fuchsia_sdk_common//common:fuchsia_platform_build.bzl", "fuchsia_build_config_ext")
+fuchsia_build_config_ext = use_extension("@rules_fuchsia//common:fuchsia_platform_build.bzl", "fuchsia_build_config_ext")
 use_repo(fuchsia_build_config_ext, "fuchsia_build_config")
 
 fuchsia_sdk_ext = use_extension("@rules_fuchsia//fuchsia:deps.bzl", "fuchsia_sdk_ext")

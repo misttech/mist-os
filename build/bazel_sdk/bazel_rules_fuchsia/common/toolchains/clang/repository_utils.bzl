@@ -265,7 +265,7 @@ toolchain(
 )
 """
     repo_ctx.file("WORKSPACE.bazel", "")
-    repo_ctx.symlink(repo_ctx.path(Label("@fuchsia_sdk_common//common:BUILD.bazel")).dirname, "common")
+    repo_ctx.symlink(repo_ctx.path(Label("@rules_fuchsia//common:BUILD.bazel")).dirname, "common")
     repo_ctx.file("BUILD.bazel", _BUILD_BAZEL_CONTENT)
 
 empty_host_cpp_toolchain_repository = repository_rule(
@@ -276,7 +276,7 @@ Useful when running on machines without an installed GCC or Clang.
 Usage example, from a WORKSPACE.bazel file:
 
   load(
-      "@fuchsia_sdk_common//common:toolchains/clang/repository_utils.bzl",
+      "@rules_fuchsia//common:toolchains/clang/repository_utils.bzl",
       "empty_host_cpp_toolchain_repository",
   )
 

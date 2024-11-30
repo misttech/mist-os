@@ -92,12 +92,12 @@ local_repository(
     path = "third_party/github.com/google/emboss/src",
 )
 
-# Create the @fuchsia_sdk_common repository that
-# only exposes the shared definitions from @fuchsia_sdk//common
-# and nothing else.
+# Create the @@rules_fuchsia repository which contains Bazel SDK rules
+# without any SDK atom data. Including shared definitions used by the
+# platform build in its common/ sub-directory.
 local_repository(
-    name = "fuchsia_sdk_common",
-    path = "build/bazel/local_repositories/fuchsia_sdk_common",
+    name = "rules_fuchsia",
+    path = "build/bazel_sdk/bazel_rules_fuchsia",
 )
 
 # Create the @fuchsia_build_config repository which contains the defs.bzl file
@@ -105,7 +105,7 @@ local_repository(
 # the Fuchsia platform build.
 # buildifier: disable=load-on-top
 load(
-    "@fuchsia_sdk_common//common:fuchsia_platform_build.bzl",
+    "@rules_fuchsia//common:fuchsia_platform_build.bzl",
     "fuchsia_build_config_repository",
 )
 
@@ -181,15 +181,6 @@ go_wrap_sdk(
 
 go_rules_dependencies()
 go_register_toolchains()
-
-# Create @rules_fuchsia
-# NOTE: The following repository is only valid for bootstraping other
-# repositories (eg: cipd, clang, fuchsia sdk).
-# Once @fuchsia_sdk is initialized, it should be used whenever possible.
-local_repository(
-    name = "rules_fuchsia",
-    path = "build/bazel_sdk/bazel_rules_fuchsia",
-)
 
 # com_google_absl is a dependency of com_google_googletest
 local_repository(
@@ -371,7 +362,7 @@ register_toolchains("@prebuilt_clang//:host_clang_%s_arm64_cc_toolchain" % fuchs
 
 # buildifier: disable=load-on-top
 load(
-    "@fuchsia_sdk_common//common:toolchains/python/repository_rule.bzl",
+    "@rules_fuchsia//common:toolchains/python/repository_rule.bzl",
     "compact_python_runtime_repository",
 )
 
