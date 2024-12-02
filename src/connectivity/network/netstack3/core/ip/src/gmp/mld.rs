@@ -19,7 +19,7 @@ use netstack3_filter as filter;
 use packet::serialize::Serializer;
 use packet::InnerPacketBuilder;
 use packet_formats::icmp::mld::{
-    IcmpMldv1MessageType, MldPacket, Mldv1Body, Mldv1MessageBuilder, MulticastListenerDone,
+    IcmpMldv1MessageType, MldPacket, Mldv1MessageBuilder, MulticastListenerDone,
     MulticastListenerReport,
 };
 use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
@@ -35,8 +35,7 @@ use zerocopy::SplitByteSlice;
 use crate::internal::base::{IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpGroupState,
-    GmpMessage, GmpMessageType, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt,
-    MulticastGroupSet,
+    GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
 };
 
 /// The bindings types for MLD.
@@ -113,7 +112,7 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
         if let Err(e) = match packet {
             MldPacket::MulticastListenerQuery(msg) => {
                 let body = msg.body();
-                let addr = body.group_addr();
+                let addr = body.group_addr;
                 SpecifiedAddr::new(addr)
                     .map_or(Some(gmp::v1::QueryTarget::Unspecified), |addr| {
                         MulticastAddr::new(addr.get()).map(gmp::v1::QueryTarget::Specified)
@@ -133,8 +132,8 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
                 return;
             }
             MldPacket::MulticastListenerReport(msg) => {
-                let addr = msg.body().group_addr();
-                MulticastAddr::new(msg.body().group_addr()).map_or(
+                let addr = msg.body().group_addr;
+                MulticastAddr::new(msg.body().group_addr).map_or(
                     Err(MldError::NotAMember { addr }),
                     |group_addr| {
                         gmp::v1::handle_report_message(self, bindings_ctx, device, group_addr)
@@ -152,12 +151,6 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
         } {
             debug!("Error occurred when handling MLD message: {}", e);
         }
-    }
-}
-
-impl<B: SplitByteSlice> GmpMessage<Ipv6> for Mldv1Body<B> {
-    fn group_addr(&self) -> Ipv6Addr {
-        self.group_addr
     }
 }
 
@@ -217,15 +210,15 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
 }
 
 impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> for CC {
-    fn send_message(
+    fn send_message_v1(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<Ipv6Addr>,
-        msg_type: GmpMessageType,
+        msg_type: gmp::v1::GmpMessageType,
     ) {
         let result = match msg_type {
-            GmpMessageType::Report => send_mld_packet::<_, _, _>(
+            gmp::v1::GmpMessageType::Report => send_mld_packet::<_, _, _>(
                 self,
                 bindings_ctx,
                 device,
@@ -234,7 +227,7 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
                 group_addr,
                 (),
             ),
-            GmpMessageType::Leave => send_mld_packet::<_, _, _>(
+            gmp::v1::GmpMessageType::Leave => send_mld_packet::<_, _, _>(
                 self,
                 bindings_ctx,
                 device,

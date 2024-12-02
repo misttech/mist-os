@@ -17,8 +17,8 @@ use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
 use crate::internal::gmp::{
-    self, GmpBindingsContext, GmpContext, GmpContextInner, GmpGroupState, GmpMessageType,
-    GmpStateRef, GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt,
+    self, GmpBindingsContext, GmpContext, GmpContextInner, GmpGroupState, GmpStateRef,
+    GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt,
 };
 
 /// Timers installed by GMP v1.
@@ -26,6 +26,13 @@ use crate::internal::gmp::{
 /// The timer always refers to a delayed report.
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub(super) struct DelayedReportTimerId<I: Ip>(pub(super) MulticastAddr<I::Addr>);
+
+/// A type of GMP v1 message.
+#[derive(Debug)]
+pub(super) enum GmpMessageType {
+    Report,
+    Leave,
+}
 
 /// Actions to take as a consequence of joining a group.
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
@@ -488,7 +495,7 @@ pub(super) fn handle_timer<I, CC, BC, T>(
         .v1_mut()
         .report_timer_expired();
 
-    core_ctx.send_message(bindings_ctx, &device, group_addr, GmpMessageType::Report);
+    core_ctx.send_message_v1(bindings_ctx, &device, group_addr, GmpMessageType::Report);
 }
 
 pub(super) fn handle_report_message<I, BC, CC>(
@@ -582,7 +589,7 @@ where
                     core_ctx.run_actions(bindings_ctx, device, ps_actions);
                 }
                 if let Some(msg) = send_msg {
-                    core_ctx.send_message(bindings_ctx, device, group_addr, msg);
+                    core_ctx.send_message_v1(bindings_ctx, device, group_addr, msg);
                 }
             }
 
@@ -626,7 +633,7 @@ pub(super) fn handle_enabled<I, CC, BC, T>(
             ),
             None
         );
-        core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Report);
+        core_ctx.send_message_v1(bindings_ctx, device, group_addr, GmpMessageType::Report);
     }
 }
 
@@ -652,7 +659,7 @@ pub(super) fn handle_disabled<I, CC, BC, T>(
             );
         }
         if send_leave {
-            core_ctx.send_message(bindings_ctx, device, *group_addr, GmpMessageType::Leave);
+            core_ctx.send_message_v1(bindings_ctx, device, *group_addr, GmpMessageType::Leave);
         }
     }
 }
@@ -691,7 +698,7 @@ where
                 None
             );
 
-            core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Report);
+            core_ctx.send_message_v1(bindings_ctx, device, group_addr, GmpMessageType::Report);
         }
     })
 }
@@ -720,7 +727,7 @@ where
             );
         }
         if send_leave {
-            core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Leave);
+            core_ctx.send_message_v1(bindings_ctx, device, group_addr, GmpMessageType::Leave);
         }
     })
 }

@@ -297,13 +297,6 @@ impl<I: Ip, D: WeakDeviceIdentifier> GmpTimerId<I, D> {
     }
 }
 
-/// A type of GMP message.
-#[derive(Debug)]
-enum GmpMessageType {
-    Report,
-    Leave,
-}
-
 /// The bindings types for GMP.
 pub trait GmpBindingsTypes: InstantBindingsTypes + TimerBindingsTypes {}
 impl<BT> GmpBindingsTypes for BT where BT: InstantBindingsTypes + TimerBindingsTypes {}
@@ -485,12 +478,12 @@ trait GmpContext<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> + Sized
 /// Provides access to external actions while holding the GMP state lock.
 trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
     /// Sends a GMP message.
-    fn send_message(
+    fn send_message_v1(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
-        msg_type: GmpMessageType,
+        msg_type: v1::GmpMessageType,
     );
 
     /// Runs protocol-specific actions.
@@ -500,10 +493,6 @@ trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
         device: &Self::DeviceId,
         actions: Self::Actions,
     );
-}
-
-trait GmpMessage<I: Ip> {
-    fn group_addr(&self) -> I::Addr;
 }
 
 fn handle_timer<I, BC, CC>(

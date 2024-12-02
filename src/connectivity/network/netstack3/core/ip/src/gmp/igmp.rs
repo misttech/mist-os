@@ -21,7 +21,7 @@ use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, Serializer};
 use packet_formats::igmp::messages::{
     IgmpLeaveGroup, IgmpMembershipReportV1, IgmpMembershipReportV2, IgmpPacket,
 };
-use packet_formats::igmp::{IgmpMessage, IgmpPacketBuilder, MessageType};
+use packet_formats::igmp::{IgmpPacketBuilder, MessageType};
 use packet_formats::ip::Ipv4Proto;
 use packet_formats::ipv4::options::Ipv4Option;
 use packet_formats::ipv4::{
@@ -29,13 +29,11 @@ use packet_formats::ipv4::{
 };
 use packet_formats::utils::NonZeroDuration;
 use thiserror::Error;
-use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpGroupState,
-    GmpMessage, GmpMessageType, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt,
-    MulticastGroupSet,
+    GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
 };
 
 /// The bindings types for IGMP.
@@ -186,14 +184,6 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::Dev
     }
 }
 
-impl<B: SplitByteSlice, M: MessageType<B, FixedHeader = Ipv4Addr>> GmpMessage<Ipv4>
-    for IgmpMessage<B, M>
-{
-    fn group_addr(&self) -> Ipv4Addr {
-        self.group_addr()
-    }
-}
-
 impl IpExt for Ipv4 {
     fn should_perform_gmp(addr: MulticastAddr<Ipv4Addr>) -> bool {
         // Per [RFC 2236 Section 6]:
@@ -270,16 +260,16 @@ where
     CC: IgmpSendContext<BC>,
     BC: IgmpBindingsContext,
 {
-    fn send_message(
+    fn send_message_v1(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<Ipv4Addr>,
-        msg_type: GmpMessageType,
+        msg_type: gmp::v1::GmpMessageType,
     ) {
         let Self { igmp_state: IgmpState { v1_router_present, .. }, core_ctx } = self;
         let result = match msg_type {
-            GmpMessageType::Report => {
+            gmp::v1::GmpMessageType::Report => {
                 if *v1_router_present {
                     send_igmp_message::<_, _, IgmpMembershipReportV1>(
                         core_ctx,
@@ -300,7 +290,7 @@ where
                     )
                 }
             }
-            GmpMessageType::Leave => send_igmp_message::<_, _, IgmpLeaveGroup>(
+            gmp::v1::GmpMessageType::Leave => send_igmp_message::<_, _, IgmpLeaveGroup>(
                 core_ctx,
                 bindings_ctx,
                 device,
