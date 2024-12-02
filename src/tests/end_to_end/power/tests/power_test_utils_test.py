@@ -5,6 +5,7 @@
 """Unit tests for the perf metric publishing code."""
 
 import dataclasses
+import math
 import signal
 import tempfile
 import time
@@ -13,7 +14,7 @@ import unittest.mock as mock
 from pathlib import Path
 
 from power_test_utils import power_test_utils
-from trace_processing import trace_time
+from trace_processing import trace_model, trace_time
 
 _METRIC_NAME = "M3tr1cN4m3"
 _MEASUREPOWER_PATH = "path/to/power"
@@ -229,7 +230,7 @@ class GonkSampleTest(unittest.TestCase):
     """Tests for Gonk sample parsing."""
 
     HOST_TIME = "20240927 18:00:23.609548"
-    HOST_TIME_IN_MICROSECONDS = 1727474423609548
+    HOST_TIME_IN_MICROSECONDS = 1727460023609548  # No timezone, i.e. GMT.
 
     VALUES_WITH_DATA = [
         HOST_TIME,
@@ -264,7 +265,7 @@ class GonkSampleTest(unittest.TestCase):
 
     VALUES_WITH_COMMENT = [HOST_TIME, "0", "", "", "", "Header pin assert: 2"]
 
-    def parse_sample_from_values_with_data(self) -> None:
+    def test_parse_sample_from_values_with_data(self) -> None:
         start = trace_time.TimePoint(0)
         sample = power_test_utils.GonkSample.from_values(
             GonkSampleTest.VALUES_WITH_DATA, start
@@ -314,7 +315,7 @@ class GonkSampleTest(unittest.TestCase):
         )
         self.assertIsNone(sample.pin_assert)
 
-    def parse_sample_from_values_with_comment(self) -> None:
+    def test_parse_sample_from_values_with_comment(self) -> None:
         start = trace_time.TimePoint(123456)
         sample = power_test_utils.GonkSample.from_values(
             GonkSampleTest.VALUES_WITH_COMMENT, start
@@ -324,7 +325,95 @@ class GonkSampleTest(unittest.TestCase):
             GonkSampleTest.HOST_TIME_IN_MICROSECONDS,
         )
         self.assertEqual(sample.gonk_time, start)
-        self.assertListEqual(sample.voltages, [float("nan")])
-        self.assertListEqual(sample.currents, [float("nan")])
-        self.assertListEqual(sample.powers, [float("nan")])
+        self.assertEqual(len(sample.voltages), 1)
+        self.assertEqual(len(sample.currents), 1)
+        self.assertEqual(len(sample.powers), 1)
+        self.assertTrue(math.isnan(sample.voltages[0]))
+        self.assertTrue(math.isnan(sample.currents[0]))
+        self.assertTrue(math.isnan(sample.powers[0]))
         self.assertEqual(sample.pin_assert, 2)
+
+
+class GonkMergeTest(unittest.TestCase):
+    """Tests for merging Gonk samples into a trace."""
+
+    TRACE_PID = 0
+    TRACE_TID = 1
+    RAIL_NAMES = ["rail0", "rail1"]
+
+    @classmethod
+    def _create_gpio_trace_event(cls, nanoseconds: int) -> trace_model.Event:
+        return trace_model.Event(
+            category="gpio",
+            name="set-low",
+            start=trace_time.TimePoint(nanoseconds),
+            pid=cls.TRACE_PID,
+            tid=cls.TRACE_TID,
+            args={},
+        )
+
+    @classmethod
+    def _create_gpio_gonk_sample(
+        cls, nanoseconds: int
+    ) -> power_test_utils.GonkSample:
+        n_rails = len(cls.RAIL_NAMES)
+        return power_test_utils.GonkSample(
+            # For now, just assume that host and Gonk times are perfectly synchronized.
+            host_time=trace_time.TimePoint(nanoseconds),
+            gonk_time=trace_time.TimePoint(nanoseconds),
+            delta=trace_time.TimeDelta(nanoseconds),
+            voltages=[float("nan")] * n_rails,
+            currents=[float("nan")] * n_rails,
+            powers=[float("nan")] * n_rails,
+            pin_assert=2,
+        )
+
+    @classmethod
+    def _create_trace_model(
+        cls, trace_events: list[trace_model.Event]
+    ) -> trace_model.Model:
+        thread = trace_model.Thread(
+            cls.TRACE_TID,
+            "test_thread",
+            trace_events,
+        )
+        proc = trace_model.Process(
+            cls.TRACE_PID, "test_process", threads=[thread]
+        )
+        model = trace_model.Model()
+        model.processes.append(proc)
+        return model
+
+    def test_merge_gonk_data_with_trace_events_reversed(self) -> None:
+        gpio_times = [0, 60 * 1000 * 1000 * 1000]  # In nanoseconds.
+        trace_events = []
+        gonk_samples = []
+        for t in gpio_times:
+            trace_events.append(self._create_gpio_trace_event(t))
+            gonk_samples.append(self._create_gpio_gonk_sample(t))
+        trace_events.reverse()
+
+        model = self._create_trace_model(trace_events)
+        # TODO(https://fxbug.dev/381134672): Properly construct the trace file
+        # and validate its contents after merging Gonk data.
+        trace_file = tempfile.NamedTemporaryFile()
+        power_test_utils.merge_gonk_data(
+            model, gonk_samples, trace_file.name, self.RAIL_NAMES
+        )
+
+    def test_merge_gonk_data_with_gonk_samples_reversed(self) -> None:
+        gpio_times = [0, 60 * 1000 * 1000 * 1000]  # In nanoseconds.
+        trace_events = []
+        gonk_samples = []
+        for t in gpio_times:
+            trace_events.append(self._create_gpio_trace_event(t))
+            gonk_samples.append(self._create_gpio_gonk_sample(t))
+        gonk_samples.reverse()
+
+        model = self._create_trace_model(trace_events)
+        # TODO(https://fxbug.dev/381134672): Properly construct the trace file
+        # and validate its contents after merging Gonk data.
+        trace_file = tempfile.NamedTemporaryFile()
+        power_test_utils.merge_gonk_data(
+            model, gonk_samples, trace_file.name, self.RAIL_NAMES
+        )

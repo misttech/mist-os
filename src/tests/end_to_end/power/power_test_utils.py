@@ -1028,7 +1028,11 @@ def merge_gonk_data(
     ), f"Gonk data must contain at least 2 low transitions. Found: {lows_gonk}"
     assert len(lows_gonk) == len(
         lows_trace
-    ), f"Low transitions must match between gonk and trace data. Found: lows_gonk={lows_gonk} lows_trace={lows_trace}"
+    ), f"Gonk and trace data must have the same number of transitions. Found: lows_gonk={lows_gonk} lows_trace={lows_trace}"
+
+    # Gonk and trace data aren't guaranteed to be sorted. Make sure to sort by time ascending.
+    lows_gonk.sort(key=lambda sample: sample.host_time)
+    lows_trace.sort(key=lambda event: event.start)
 
     # Map high-to-low transitions in Gonk to align with trace.
     base_trace: trace_time.TimePoint = lows_trace[0].start
@@ -1039,10 +1043,10 @@ def merge_gonk_data(
 
     assert (
         delta_trace.to_nanoseconds() >= 0
-    ), f"delta_trace should be positive: {delta_trace}"
+    ), f"delta_trace should be positive: {delta_trace} {lows_trace}"
     assert (
         delta_gonk.to_nanoseconds() >= 0
-    ), f"delta_gonk should be positive: {delta_gonk}"
+    ), f"delta_gonk should be positive: {delta_gonk} {lows_gonk}"
 
     def gonk_time_to_trace_delta(
         sample_time: trace_time.TimePoint,
