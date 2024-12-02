@@ -31,7 +31,6 @@
 use component_events::events::*;
 use component_events::matcher::*;
 use component_events::sequence::{EventSequence, Ordering};
-use fasync::Task;
 use fcomponent::{IntrospectorProxy, RealmProxy};
 use fdecl::StartupMode;
 use fidl::endpoints::DiscoverableProtocolMarker;
@@ -115,7 +114,6 @@ struct Fixture {
     event_stream: EventStream,
     introspector: IntrospectorProxy,
     realm: RealmProxy,
-    _task: Task<()>,
 }
 
 /// Creates a nested component manager and route the component runner capability
@@ -128,7 +126,7 @@ async fn setup_realm(mock_runner: Arc<MockRunner>) -> Fixture {
     .await
     .unwrap();
 
-    let (builder, task) = builder
+    let builder = builder
         .with_nested_component_manager("#meta/component_manager_debug_with_mock_runner.cm")
         .await
         .unwrap();
@@ -212,7 +210,7 @@ async fn setup_realm(mock_runner: Arc<MockRunner>) -> Fixture {
         .unwrap()
         .unwrap();
 
-    Fixture { _realm_instance: instance, event_stream, introspector, realm, _task: task }
+    Fixture { _realm_instance: instance, event_stream, introspector, realm }
 }
 
 #[fuchsia::test]

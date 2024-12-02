@@ -11,11 +11,4 @@
     program: {
         binary: "bin/reboot_on_terminate_test_bin",
     },
-    offer: [
-        {
-            protocol: "fuchsia.boot.WriteOnlyLog",
-            from: "parent",
-            to: "#realm_builder",
-        },
-    ],
 }

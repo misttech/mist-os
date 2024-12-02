@@ -595,6 +595,26 @@ closed protocol Realm {
         child_realm server_end:Realm;
     }) -> () error RealmBuilderError;
 
+    /// Adds a child realm which can be built with the client end of
+    /// `child_realm`, and whose contents are initialized from `relative_url`.
+    /// `relative_url` must be a fragment-only URL.
+    @available(added=NEXT)
+    strict AddChildRealmFromRelativeUrl(resource struct {
+        /// The name of the child realm that is being added.
+        name fuchsia.component.name;
+
+        /// The relative (fragment-only) URL.
+        relative_url fuchsia.url.Url;
+
+        /// Additional properties for the child.
+        options ChildOptions;
+
+        /// The server end of the `Realm` channel that will be used to build the
+        /// sub-realm.
+        child_realm server_end:Realm;
+    }) -> () error RealmBuilderError;
+
+
     /// Returns the component decl for the given component. `name` must refer to
     /// a component that is one of the following:
     ///
@@ -671,6 +691,16 @@ closed protocol Realm {
     strict ReplaceRealmDecl(struct {
         /// The new component declaration for this realm.
         component_decl fuchsia.component.decl.Component;
+    }) -> () error RealmBuilderError;
+
+    /// Inform the realm builder server that this realm is using a nested component manager. It's
+    /// expected that the client library has already replaced the realm's declaration with a
+    /// passthrough component manager declaration, with the exception of the root url.
+    /// This method will arrange for [Builder.Build] to install the realm's generated url as the
+    /// root url in this component manager.
+    @available(added=NEXT)
+    strict UseNestedComponentManager(struct {
+        component_manager_relative_url fuchsia.url.Url;
     }) -> () error RealmBuilderError;
 
     /// Mutates component manifests in the realm such that every component in

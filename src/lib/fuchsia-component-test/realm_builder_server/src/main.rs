@@ -3,8 +3,13 @@
 // found in the LICENSE file.
 
 use anyhow::Context;
-use cm_rust::{CapabilityTypeName, FidlIntoNative, NativeIntoFidl, OfferDeclCommon};
-use cm_types::{LongName, RelativePath};
+use cm_rust::{
+    Availability, CapabilityDecl, CapabilityTypeName, DependencyType, DirectoryDecl, ExposeDecl,
+    ExposeDeclCommon, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget,
+    FidlIntoNative, NativeIntoFidl, OfferDecl, OfferDeclCommon, OfferSource, ProtocolDecl,
+    SourceName, UseDecl, UseProtocolDecl, UseSource,
+};
+use cm_types::{LongName, Path, RelativePath};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd};
 use fidl_fuchsia_inspect::InspectSinkMarker;
 use fidl_fuchsia_logger::LogSinkMarker;
@@ -456,6 +461,38 @@ impl Realm {
                         }
                     }
                 }
+                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                ftest::RealmRequest::AddChildRealmFromRelativeUrl {
+                    name,
+                    relative_url,
+                    options,
+                    child_realm,
+                    responder,
+                } => {
+                    if self.realm_has_been_built.load(Ordering::Relaxed) {
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        continue;
+                    }
+                    if !is_fragment_only_url(&relative_url) {
+                        responder.send(Err(ftest::RealmBuilderError::UrlIsNotRelative))?;
+                        continue;
+                    }
+                    match self
+                        .add_child_realm_from_relative_url(
+                            name.clone(),
+                            relative_url,
+                            options,
+                            child_realm,
+                        )
+                        .await
+                    {
+                        Ok(()) => responder.send(Ok(()))?,
+                        Err(err) => {
+                            warn!(method = "Realm.AddChildRealmFromRelativeUrl", message = %err);
+                            responder.send(Err(err.into()))?;
+                        }
+                    }
+                }
                 ftest::RealmRequest::GetComponentDecl { name, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
                         responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
@@ -498,6 +535,23 @@ impl Realm {
                         Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
                             warn!(method = "Realm.ReplaceRealmDecl", message = %err);
+                            responder.send(Err(err.into()))?;
+                        }
+                    }
+                }
+                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                ftest::RealmRequest::UseNestedComponentManager {
+                    component_manager_relative_url,
+                    responder,
+                } => {
+                    if self.realm_has_been_built.load(Ordering::Relaxed) {
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        continue;
+                    }
+                    match self.use_nested_component_manager(&component_manager_relative_url).await {
+                        Ok(()) => responder.send(Ok(()))?,
+                        Err(err) => {
+                            warn!(method = "Realm.UseNestedComponentManager", message = %err);
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -694,19 +748,40 @@ impl Realm {
         self.realm_node.add_child(name, options, child_realm_node).await
     }
 
-    // `Realm::handle_stream` calls `Realm::add_child_realm` which calls `Realm::handle_stream`.
-    // Cycles are not allowed in constructed futures, so we need to place this in a `BoxFuture` to
-    // break the cycle.
-    fn add_child_realm(
+    async fn add_child_realm(
         &self,
         name: String,
         options: ftest::ChildOptions,
         child_realm_server_end: ServerEnd<ftest::RealmMarker>,
+    ) -> Result<(), RealmBuilderError> {
+        self.add_child_realm_with_node(name, options, child_realm_server_end, RealmNode2::new())
+            .await
+    }
+
+    #[allow(unused)]
+    async fn add_child_realm_from_relative_url(
+        &self,
+        name: String,
+        relative_url: String,
+        options: ftest::ChildOptions,
+        child_realm_server_end: ServerEnd<ftest::RealmMarker>,
+    ) -> Result<(), RealmBuilderError> {
+        let node = RealmNode2::load_from_pkg(&relative_url, Clone::clone(&self.pkg_dir)).await?;
+        self.add_child_realm_with_node(name, options, child_realm_server_end, node).await
+    }
+
+    // `Realm::handle_stream` calls `Realm::add_child_realm` which calls `Realm::handle_stream`.
+    // Cycles are not allowed in constructed futures, so we need to place this in a `BoxFuture` to
+    // break the cycle.
+    fn add_child_realm_with_node(
+        &self,
+        name: String,
+        options: ftest::ChildOptions,
+        child_realm_server_end: ServerEnd<ftest::RealmMarker>,
+        child_realm_node: RealmNode2,
     ) -> BoxFuture<'static, Result<(), RealmBuilderError>> {
         let mut child_path = self.realm_path.clone();
         child_path.push(name.clone());
-
-        let child_realm_node = RealmNode2::new();
 
         let child_realm = Realm {
             pkg_dir: Clone::clone(&self.pkg_dir),
@@ -769,6 +844,39 @@ impl Realm {
         component_decl: fcdecl::Component,
     ) -> Result<(), RealmBuilderError> {
         self.realm_node.replace_decl_with_untrusted(component_decl).await
+    }
+
+    #[allow(unused)]
+    async fn use_nested_component_manager(
+        &self,
+        component_manager_fragment_only_url: &str,
+    ) -> Result<(), RealmBuilderError> {
+        let realm_url = self
+            .realm_node
+            .build(
+                self.registry.clone(),
+                self.realm_contents.clone(),
+                vec![],
+                Clone::clone(&self.pkg_dir),
+            )
+            .await?;
+        {
+            let mut state = self.realm_node.state.lock().await;
+            let (decl, mutable_children) = nested_component_manager_decl(
+                &state.decl,
+                &self.pkg_dir,
+                &realm_url,
+                component_manager_fragment_only_url,
+            )
+            .await?;
+            *state = RealmNodeState {
+                decl,
+                mutable_children,
+                config_value_replacements: Default::default(),
+                config_override_policy: Default::default(),
+            };
+        }
+        Ok(())
     }
 
     async fn set_config_value(
@@ -882,6 +990,8 @@ fn new_decl_with_program_entries(entries: Vec<(String, String)>) -> cm_rust::Com
     }
 }
 
+type MutableChildMap = HashMap<LongName, (ftest::ChildOptions, RealmNode2)>;
+
 #[derive(Debug, Clone, Default)]
 struct RealmNodeState {
     decl: cm_rust::ComponentDecl,
@@ -900,7 +1010,7 @@ struct RealmNodeState {
     ///
     /// Suitable `ChildDecl`s for the contents of `mutable_children` are generated and added to
     /// `decl.children` when `commit()` is called.
-    mutable_children: HashMap<LongName, (ftest::ChildOptions, RealmNode2)>,
+    mutable_children: MutableChildMap,
 }
 
 impl RealmNodeState {
@@ -1390,7 +1500,14 @@ impl RealmNode2 {
             // Expose the fuchsia.component.Binder protocol from root in order to give users the ability to manually
             // start the realm.
             if walked_path.is_empty() {
-                state_guard.decl.exposes.push(BINDER_EXPOSE_DECL.clone());
+                if !state_guard
+                    .decl
+                    .exposes
+                    .iter()
+                    .any(|d| d.target_name().as_str() == fcomponent::BinderMarker::DEBUG_NAME)
+                {
+                    state_guard.decl.exposes.push(BINDER_EXPOSE_DECL.clone());
+                }
             }
 
             let mut mutable_children = state_guard.mutable_children.drain().collect::<Vec<_>>();
@@ -1440,6 +1557,171 @@ impl RealmNode2 {
         }
         .boxed()
     }
+}
+
+/// Derive a declaration for a nested component manager from a root component `root_decl` with
+/// `root_url` and the `component_manager_fragment_only_url`,
+async fn nested_component_manager_decl(
+    root_decl: &cm_rust::ComponentDecl,
+    pkg_dir: &fio::DirectoryProxy,
+    root_url: &str,
+    component_manager_fragment_only_url: &str,
+) -> Result<(cm_rust::ComponentDecl, MutableChildMap), RealmBuilderError> {
+    /// The default path of the remote directory through which a nested component
+    /// manager serves capabilities exposed by the root component.
+    const ROOT_CAPABILITY_PATH: &'static str = "/root-exposed";
+
+    /// The default path of the directory in the nested component manager's
+    /// namespace where capabilities offered by the realm builder client are placed.
+    const CLIENT_CAPABILITY_PASSTHROUGH_PATH: &'static str = "/parent-offered";
+
+    let (passthrough_cap_decls, passthrough_expose_decls): (Vec<_>, Vec<_>) = root_decl
+        .exposes
+        .iter()
+        .filter_map(|exposed| match exposed {
+            ExposeDecl::Protocol(decl) => {
+                let source_path =
+                    Path::new(format!("{}/{}", ROOT_CAPABILITY_PATH, decl.target_name.clone()))
+                        .inspect_err(|e| warn!("invalid capability source path: {}", e))
+                        .ok()?;
+                let capability = ProtocolDecl {
+                    name: decl.target_name.clone(),
+                    source_path: Some(source_path),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                    delivery: Default::default(),
+                };
+                let expose = ExposeProtocolDecl {
+                    source: ExposeSource::Self_,
+                    source_name: decl.target_name.clone(),
+                    #[cfg(fuchsia_api_level_at_least = "25")]
+                    source_dictionary: Default::default(),
+                    target: ExposeTarget::Parent,
+                    target_name: decl.target_name.clone(),
+                    availability: decl.availability,
+                };
+                Some((CapabilityDecl::Protocol(capability), ExposeDecl::Protocol(expose)))
+            }
+            ExposeDecl::Directory(decl) => {
+                let source_path =
+                    Path::new(format!("{}/{}", ROOT_CAPABILITY_PATH, decl.target_name.clone()))
+                        .inspect_err(|e| warn!("invalid capability source path: {}", e))
+                        .ok()?;
+                let capability = DirectoryDecl {
+                    name: decl.target_name.clone(),
+                    source_path: Some(source_path),
+                    rights: decl.rights.unwrap_or_else(fio::Operations::default),
+                };
+                let expose = ExposeDirectoryDecl {
+                    source: ExposeSource::Self_,
+                    source_name: decl.target_name.clone(),
+                    #[cfg(fuchsia_api_level_at_least = "25")]
+                    source_dictionary: Default::default(),
+                    target: ExposeTarget::Parent,
+                    target_name: decl.target_name.clone(),
+                    rights: decl.rights,
+                    subdir: decl.subdir.clone(),
+                    availability: decl.availability,
+                };
+                Some((CapabilityDecl::Directory(capability), ExposeDecl::Directory(expose)))
+            }
+            d @ ExposeDecl::Service(_)
+            | d @ ExposeDecl::Config(_)
+            | d @ ExposeDecl::Runner(_)
+            | d @ ExposeDecl::Resolver(_) => {
+                warn!(
+                    "capability type not supported for nested component manager passthrough: {:?}",
+                    d
+                );
+                None
+            }
+            #[cfg(fuchsia_api_level_at_least = "25")]
+            d @ ExposeDecl::Dictionary(_) => {
+                warn!(
+                    "capability type not supported for nested component manager passthrough: {:?}",
+                    d
+                );
+                None
+            }
+        })
+        .unzip();
+
+    let mut passthrough_offer_decls: Vec<OfferDecl> = vec![];
+    for offer in &root_decl.offers {
+        if *offer.source() != OfferSource::Parent {
+            continue;
+        }
+        // A capability can be offered from the parent multiple times, but we
+        // should only add one Use for it.
+        if passthrough_offer_decls.iter().any(|d| d.source_name() == offer.source_name()) {
+            continue;
+        }
+        match offer {
+            OfferDecl::Protocol(_) => {
+                passthrough_offer_decls.push(offer.clone());
+            }
+            d => {
+                warn!(
+                    "capability type not supported for nested component manager \
+                        passthrough: {d:?}"
+                );
+            }
+        }
+    }
+
+    let passthrough_use_decls = passthrough_offer_decls
+        .into_iter()
+        .map(|offer| match offer {
+            OfferDecl::Protocol(decl) => UseDecl::Protocol(UseProtocolDecl {
+                source: UseSource::Parent,
+                source_name: decl.source_name.clone(),
+                target_path: Path::new(format!(
+                    "{CLIENT_CAPABILITY_PASSTHROUGH_PATH}/{}",
+                    decl.source_name
+                ))
+                .unwrap(),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::default(),
+                #[cfg(fuchsia_api_level_at_least = "25")]
+                source_dictionary: decl.source_dictionary,
+            }),
+            o => {
+                unreachable!("unsupported passthrough not caught above? {o:?}");
+            }
+        })
+        .collect::<Vec<UseDecl>>();
+
+    let mut component_manager_decl;
+    let mut component_manager_children;
+    {
+        let tmp_node =
+            RealmNode2::load_from_pkg(component_manager_fragment_only_url, Clone::clone(pkg_dir))
+                .await?;
+        component_manager_decl = cm_rust::ComponentDecl::default();
+        component_manager_children = MutableChildMap::default();
+        let mut state = tmp_node.state.lock().await;
+        std::mem::swap(&mut component_manager_decl, &mut state.decl);
+        std::mem::swap(&mut component_manager_children, &mut state.mutable_children);
+    }
+    match **component_manager_decl
+            .program
+            .as_mut()
+            .expect("component manager's manifest is lacking a program section")
+            .info
+            .entries
+            .get_or_insert(vec![])
+            .iter_mut()
+            .find(|e| e.key == "args")
+            .expect("component manager's manifest doesn't specify a config")
+            .value
+            .as_mut()
+            .expect("component manager's manifest has a malformed 'args' section") {
+                fdata::DictionaryValue::StrVec(ref mut v) => v.push(root_url.into()),
+                _ => panic!("component manager's manifest has a single value for 'args', but we were expecting a vector"),
+        }
+    component_manager_decl.capabilities.append(&mut passthrough_cap_decls.clone());
+    component_manager_decl.exposes.append(&mut passthrough_expose_decls.clone());
+    component_manager_decl.uses.append(&mut passthrough_use_decls.clone());
+    Ok((component_manager_decl, component_manager_children))
 }
 
 async fn add_use_decl_if_needed(

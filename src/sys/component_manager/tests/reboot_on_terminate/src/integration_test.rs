@@ -14,7 +14,7 @@ use {fidl_fidl_test_components as ftest, fuchsia_async as fasync};
 #[fuchsia::test]
 async fn reboot_on_terminate_success() {
     let (send_trigger_called, mut receive_trigger_called) = mpsc::unbounded();
-    let (_instance, _task) = build_reboot_on_terminate_realm(
+    let _instance = build_reboot_on_terminate_realm(
         "#meta/reboot_on_terminate_success.cm",
         send_trigger_called,
     )
@@ -28,7 +28,7 @@ async fn reboot_on_terminate_success() {
 #[fuchsia::test]
 async fn reboot_on_terminate_policy() {
     let (send_trigger_called, mut receive_trigger_called) = mpsc::unbounded();
-    let (_instance, _task) =
+    let _instance =
         build_reboot_on_terminate_realm("#meta/reboot_on_terminate_policy.cm", send_trigger_called)
             .await;
 
@@ -40,17 +40,21 @@ async fn reboot_on_terminate_policy() {
 async fn build_reboot_on_terminate_realm(
     url: &str,
     send_trigger_called: mpsc::UnboundedSender<()>,
-) -> (RealmInstance, fasync::Task<()>) {
+) -> RealmInstance {
     // Define the realm inside component manager.
     let builder = RealmBuilder::new().await.unwrap();
-    let realm = builder.add_child("realm", url, ChildOptions::new().eager()).await.unwrap();
+    let realm = builder
+        .add_child_realm_from_relative_url("realm", url, ChildOptions::new().eager())
+        .await
+        .unwrap();
     builder
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
+                .capability(Capability::protocol_by_name("fuchsia.component.resolver.RealmBuilder"))
+                .capability(Capability::protocol_by_name("fuchsia.component.runner.RealmBuilder"))
                 .capability(Capability::protocol_by_name("fuchsia.sys2.SystemController"))
-                .capability(Capability::protocol_by_name("fidl.test.components.Trigger"))
                 .from(Ref::parent())
                 .to(&realm),
         )
@@ -67,19 +71,11 @@ async fn build_reboot_on_terminate_realm(
         )
         .await
         .unwrap();
+    realm.with_nested_component_manager("#meta/component_manager.cm").await.unwrap();
 
-    let (component_manager_realm, nested_component_manager_task) = builder
-        .with_nested_component_manager_etc(
-            "#meta/component_manager.cm",
-            // This does not originate from the parent (see logic below), so skip passthrough, which
-            // would generate a `use from parent`.
-            &["fidl.test.components.Trigger"],
-        )
-        .await
-        .unwrap();
-
-    // Define a mock component that serves the `/boot` directory to component manager
-    let trigger = component_manager_realm
+    // The realm under test will call the Trigger protocol when it's confirmed it's getting shut
+    // down.
+    let trigger = builder
         .add_local_child(
             "trigger",
             move |handles| Box::pin(trigger_mock(send_trigger_called.clone(), handles)),
@@ -87,17 +83,17 @@ async fn build_reboot_on_terminate_realm(
         )
         .await
         .unwrap();
-    component_manager_realm
+    builder
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fidl.test.components.Trigger"))
                 .from(&trigger)
-                .to(Ref::self_()),
+                .to(&realm),
         )
         .await
         .unwrap();
 
-    (component_manager_realm.build().await.unwrap(), nested_component_manager_task)
+    builder.build().await.unwrap()
 }
 
 async fn trigger_mock(

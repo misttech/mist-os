@@ -179,7 +179,7 @@ async fn add_component_resolver(
 async fn create_realm(
     child_name_prefix: &str,
     test_channel_tx: mpsc::Sender<fresolution::Component>,
-) -> (RealmInstance, fasync::Task<()>) {
+) -> RealmInstance {
     let mut builder = RealmBuilder::new().await.unwrap();
 
     let cr_absent = ComponentResolver::new(TargetAbi::Absent);
@@ -215,21 +215,21 @@ async fn create_realm(
         .await
         .unwrap();
 
-    let (cm_builder, task) = builder
+    let cm_builder = builder
         .with_nested_component_manager("#meta/abi_compat_component_manager.cm")
         .await
         .unwrap();
 
     let instance = cm_builder.build().await.unwrap();
     instance.start_component_tree().await.unwrap();
-    (instance, task)
+    instance
 }
 
 #[fuchsia::test]
 async fn resolve_regular_components() {
     // A channel used to verify component resolver fidl responses.
     let (test_channel_tx, mut test_channel_rx) = mpsc::channel(1);
-    let (instance, _task) = create_realm("", test_channel_tx).await;
+    let instance = create_realm("", test_channel_tx).await;
     // get a handle to lifecycle controller to start components
     let lifecycle_controller = instance
         .root
@@ -293,7 +293,7 @@ async fn resolve_allowlisted_components() {
 
     // Add `exempt_` to the beginning of the component names. These specific
     // component names are allowlisted in abi_compat_cm_config.json5.
-    let (instance, _task) = create_realm("exempt_", test_channel_tx).await;
+    let instance = create_realm("exempt_", test_channel_tx).await;
     // get a handle to lifecycle controller to start components
     let lifecycle_controller = instance
         .root

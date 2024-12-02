@@ -63,7 +63,6 @@ rustc_library("fuchsia-component-test-lib") {
     "//src/lib/fuchsia-fs",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/lib/cm_rust",
-    "//src/sys/lib/cm_types",
     "//src/sys/lib/component-events",
     "//src/sys/lib/runner",
     "//third_party/rust_crates:anyhow",

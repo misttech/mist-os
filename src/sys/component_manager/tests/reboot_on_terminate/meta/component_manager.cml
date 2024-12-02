@@ -14,6 +14,7 @@
     use: [
         {
             protocol: [
+                "fidl.test.components.Trigger",
                 "fuchsia.component.resolver.RealmBuilder",
                 "fuchsia.component.runner.RealmBuilder",
                 "fuchsia.process.Launcher",

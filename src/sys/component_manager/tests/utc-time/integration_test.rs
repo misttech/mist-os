@@ -79,7 +79,7 @@ async fn builtin_time_service_and_clock_routed() {
         .await
         .unwrap();
 
-    let (component_manager_realm, _task) =
+    let component_manager_realm =
         builder.with_nested_component_manager("#meta/component_manager.cm").await.unwrap();
 
     // Define a mock component that serves the `/boot` directory to component manager

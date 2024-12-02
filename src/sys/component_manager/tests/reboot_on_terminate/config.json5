@@ -33,7 +33,7 @@
     security_policy: {
         child_policy: {
             reboot_on_terminate: [
-                "/realm/critical_child",
+                "/critical_child",
             ],
         },
     },
