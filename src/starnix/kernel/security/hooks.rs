@@ -597,27 +597,21 @@ pub fn task_prlimit(
     })
 }
 
-/// Check permission before an object specified by `dev_name` is mounted on the mount point named by `path`.
-/// `type` contains the filesystem type. `flags` contains the mount flags. `data` contains the filesystem-specific data.
+/// Check permission before mounting to `path`. `flags` contains the mount flags that determine the
+/// kind of mount operation done, and therefore the permissions that the caller requires.
 /// Corresponds to the `sb_mount()` LSM hook.
 pub fn sb_mount(
     current_task: &CurrentTask,
-    dev_name: &bstr::BStr,
     path: &NamespaceNode,
-    fs_type: &bstr::BStr,
     flags: MountFlags,
-    data: &bstr::BStr,
 ) -> Result<(), Errno> {
     profile_duration!("security.hooks.sb_mount");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::superblock::sb_mount(
             &security_server.as_permission_check(),
             current_task,
-            dev_name,
             path,
-            fs_type,
             flags,
-            data,
         )
     })
 }

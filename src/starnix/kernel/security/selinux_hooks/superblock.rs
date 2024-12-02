@@ -2,37 +2,65 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security::selinux_hooks::{
+    check_permission, fs_node_effective_sid, FileSystemLabelState,
+};
 use crate::task::CurrentTask;
-use crate::vfs::NamespaceNode;
+use crate::todo_check_permission;
+use crate::vfs::{FileSystem, NamespaceNode};
 use selinux::permission_check::PermissionCheck;
-use starnix_logging::track_stub;
+use selinux::{CommonFilePermission, FileClass, FileSystemPermission, SecurityId};
+use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::unmount_flags::UnmountFlags;
 
-/// Checks if the task with `_source_sid` has the permission to mount at `_path` the object specified by
-/// `_dev_name` of type `_fs_type`, with the mounting flags `_flags` and filesystem data `_data`.
-pub fn sb_mount(
-    _permission_check: &PermissionCheck<'_>,
-    _current_task: &CurrentTask,
-    _dev_name: &bstr::BStr,
-    _path: &NamespaceNode,
-    _fs_type: &bstr::BStr,
-    _flags: MountFlags,
-    _data: &bstr::BStr,
-) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/352507622"), "sb_mount: validate permission");
-    Ok(())
+/// Returns the [`SecurityId`] of `fs`.
+/// If the filesystem is not labeled, returns EPERM.
+fn fs_sid(fs: &FileSystem) -> Result<SecurityId, Errno> {
+    let filesystem_sid = match &*fs.security_state.state.0.lock() {
+        FileSystemLabelState::Labeled { label } => Ok(label.sid),
+        FileSystemLabelState::Unlabeled { .. } => {
+            error!(EPERM)
+        }
+    }?;
+    Ok(filesystem_sid)
 }
 
-/// Checks if the task with `_source_sid` has the permission to unmount the filesystem mounted on
-/// `_node` using the unmount flags `_flags`.
+/// Checks if `current_task` has the permission to mount at `path` with the mounting flags `flags`.
+pub fn sb_mount(
+    permission_check: &PermissionCheck<'_>,
+    current_task: &CurrentTask,
+    path: &NamespaceNode,
+    flags: MountFlags,
+) -> Result<(), Errno> {
+    let source_sid = current_task.security_state.lock().current_sid;
+    if flags.contains(MountFlags::REMOUNT) {
+        let mount = path.mount_if_root()?;
+        let target_sid = fs_sid(&mount.root().entry.node.fs())?;
+        check_permission(permission_check, source_sid, target_sid, FileSystemPermission::Remount)
+    } else {
+        let target_sid = fs_node_effective_sid(&path.entry.node);
+        todo_check_permission!(
+            TODO("https://fxbug.dev/380230897", "Check mounton permission."),
+            permission_check,
+            source_sid,
+            target_sid,
+            CommonFilePermission::MountOn.for_class(FileClass::Dir)
+        )
+    }
+}
+
+/// Checks if `current_task` has the permission to unmount the filesystem mounted on
+/// `node` using the unmount flags `_flags`.
 pub fn sb_umount(
-    _permission_check: &PermissionCheck<'_>,
-    _current_task: &CurrentTask,
-    _node: &NamespaceNode,
+    permission_check: &PermissionCheck<'_>,
+    current_task: &CurrentTask,
+    node: &NamespaceNode,
     _flags: UnmountFlags,
 ) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/353936182"), "sb_umount: validate permission");
-    Ok(())
+    let source_sid = current_task.security_state.lock().current_sid;
+    let mount = node.mount_if_root()?;
+    let target_sid = fs_sid(&mount.root().entry.node.fs())?;
+    check_permission(permission_check, source_sid, target_sid, FileSystemPermission::Unmount)
 }

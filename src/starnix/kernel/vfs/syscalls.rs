@@ -1713,6 +1713,8 @@ pub fn sys_mount(
     let target =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, target_addr, LookupFlags::default())?;
 
+    security::sb_mount(current_task, &target, flags)?;
+
     if flags.contains(MountFlags::REMOUNT) {
         do_mount_remount(target, flags, data_addr)
     } else if flags.contains(MountFlags::BIND) {
@@ -1837,8 +1839,6 @@ fn do_mount_create(
         %data,
         "do_mount_create",
     );
-
-    security::sb_mount(current_task, source, &target, fs_type, flags, data)?;
 
     let options = FileSystemOptions {
         source: source.into(),
