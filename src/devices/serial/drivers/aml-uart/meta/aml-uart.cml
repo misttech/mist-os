@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/aml-uart.so",
         bind: "meta/bind/aml-uart.bindbc",
         colocate: "false",
-        compat: "driver/aml-uart.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
@@ -19,6 +19,13 @@
         { service: "fuchsia.hardware.serialimpl.Service" },
     ],
     use: [
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "enable_suspend",
+            type: "bool",
+        },
+        { protocol: "fuchsia.power.broker.Topology" },
+        { protocol: "fuchsia.power.system.ActivityGovernor" },
         { service: "fuchsia.hardware.platform.device.Service" },
     ],
     expose: [

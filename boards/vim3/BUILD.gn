@@ -221,9 +221,9 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-pwm-init.cm" ]
     },
     {
-      package_target = "//src/devices/serial/drivers/aml-uart:package-dfv2"
+      package_target = "//src/devices/serial/drivers/aml-uart:package"
       package_set = "bootfs"
-      driver_components = [ "meta/aml-uart-dfv2.cm" ]
+      driver_components = [ "meta/aml-uart.cm" ]
     },
     {
       package_target = "//src/devices/thermal/drivers/aml-thermal:package"
@@ -353,7 +353,7 @@ group("vim3-release") {
     "//src/devices/power/drivers/fusb302:package-archive",
     "//src/devices/pwm/drivers/aml-pwm:package-archive",
     "//src/devices/pwm/drivers/aml-pwm-init:package-archive",
-    "//src/devices/serial/drivers/aml-uart:package-dfv2-archive",
+    "//src/devices/serial/drivers/aml-uart:package-archive",
     "//src/devices/suspend/drivers/aml-suspend:package-archive",
     "//src/devices/temperature/drivers/aml-trip:package-archive",
     "//src/devices/thermal/drivers/aml-thermal:package-archive",

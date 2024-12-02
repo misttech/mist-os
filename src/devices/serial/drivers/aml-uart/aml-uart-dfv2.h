@@ -10,7 +10,7 @@
 #include <lib/driver/component/cpp/driver_base.h>
 
 #include "src/devices/serial/drivers/aml-uart/aml-uart.h"
-#include "src/devices/serial/drivers/aml-uart/aml_uart_dfv2_config.h"
+#include "src/devices/serial/drivers/aml-uart/aml_uart_config.h"
 
 namespace serial {
 
@@ -51,7 +51,7 @@ class AmlUartV2 : public fdf::DriverBase {
   compat::AsyncInitializedDeviceServer device_server_;
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_impl_bindings_;
 
-  aml_uart_dfv2_config::Config driver_config_;
+  aml_uart_config::Config driver_config_;
   std::optional<fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>> sag_;
 };
 

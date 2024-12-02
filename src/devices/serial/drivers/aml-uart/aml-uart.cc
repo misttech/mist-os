@@ -4,12 +4,7 @@
 
 #include "src/devices/serial/drivers/aml-uart/aml-uart.h"
 
-#ifdef DFV1
-#include <lib/ddk/debug.h>  // nogncheck
-#else
-#include <lib/driver/compat/cpp/logging.h>  // nogncheck
-#endif
-
+#include <lib/driver/compat/cpp/logging.h>
 #include <lib/zx/clock.h>
 #include <threads.h>
 #include <zircon/syscalls-next.h>

@@ -28,7 +28,7 @@ constexpr std::string_view driver_name = "aml-uart";
 AmlUartV2::AmlUartV2(fdf::DriverStartArgs start_args,
                      fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : fdf::DriverBase(driver_name, std::move(start_args), std::move(driver_dispatcher)),
-      driver_config_(take_config<aml_uart_dfv2_config::Config>()) {}
+      driver_config_(take_config<aml_uart_config::Config>()) {}
 
 void AmlUartV2::Start(fdf::StartCompleter completer) {
   start_completer_.emplace(std::move(completer));

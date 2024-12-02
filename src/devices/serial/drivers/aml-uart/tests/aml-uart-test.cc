@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/serial/drivers/aml-uart/aml-uart-dfv2.h"
-
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <fidl/fuchsia.power.broker/cpp/markers.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/ddk/metadata.h>
@@ -18,8 +17,8 @@
 #include <bind/fuchsia/broadcom/platform/cpp/bind.h>
 #include <gtest/gtest.h>
 
-#include "fidl/fuchsia.power.broker/cpp/markers.h"
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/serial/drivers/aml-uart/aml-uart-dfv2.h"
 #include "src/devices/serial/drivers/aml-uart/tests/device_state.h"
 #include "src/devices/serial/drivers/aml-uart/tests/fake_timer.h"
 
@@ -177,7 +176,7 @@ class AmlUartHarness : public ::testing::Test {
   void SetUp() override {
     zx::result result =
         driver_test().StartDriverWithCustomStartArgs([&](fdf::DriverStartArgs& args) {
-          aml_uart_dfv2_config::Config fake_config;
+          aml_uart_config::Config fake_config;
           fake_config.enable_suspend() = false;
           args.config(fake_config.ToVmo());
         });
@@ -210,7 +209,7 @@ class AmlUartAsyncHarness : public ::testing::Test {
   void SetUp() override {
     zx::result result =
         driver_test().StartDriverWithCustomStartArgs([&](fdf::DriverStartArgs& args) {
-          aml_uart_dfv2_config::Config fake_config;
+          aml_uart_config::Config fake_config;
           fake_config.enable_suspend() = false;
           args.config(fake_config.ToVmo());
         });
@@ -246,7 +245,7 @@ class AmlUartHarnessWithPower : public AmlUartHarness {
   void SetUp() override {
     zx::result result =
         driver_test().StartDriverWithCustomStartArgs([&](fdf::DriverStartArgs& args) {
-          aml_uart_dfv2_config::Config fake_config;
+          aml_uart_config::Config fake_config;
           fake_config.enable_suspend() = true;
           args.config(fake_config.ToVmo());
         });
@@ -260,7 +259,7 @@ class AmlUartAsyncHarnessWithPower : public AmlUartAsyncHarness {
   void SetUp() override {
     zx::result result =
         driver_test().StartDriverWithCustomStartArgs([&](fdf::DriverStartArgs& args) {
-          aml_uart_dfv2_config::Config fake_config;
+          aml_uart_config::Config fake_config;
           fake_config.enable_suspend() = true;
           args.config(fake_config.ToVmo());
         });
