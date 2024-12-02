@@ -53,6 +53,18 @@ zx::result<zx::interrupt> PDev::GetInterrupt(uint32_t index, uint32_t flags) con
   return zx::ok(std::move(result->value()->irq));
 }
 
+zx::result<zx::interrupt> PDev::GetInterrupt(cpp17::string_view name, uint32_t flags) const {
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetInterruptByName> result =
+      pdev_->GetInterruptByName(fidl::StringView::FromExternal(name), flags);
+  if (result.status() != ZX_OK) {
+    return zx::error(result.status());
+  }
+  if (!result->is_ok()) {
+    return zx::error(result->error_value());
+  }
+  return zx::ok(std::move(result->value()->irq));
+}
+
 zx::result<zx::bti> PDev::GetBti(uint32_t index) const {
   fidl::WireResult<fuchsia_hardware_platform_device::Device::GetBtiById> result =
       pdev_->GetBtiById(index);

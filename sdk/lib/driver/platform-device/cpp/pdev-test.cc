@@ -191,6 +191,28 @@ TEST(PDevTest, GetIrqs) {
   ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetInterrupt(4, 0).status_value());
 }
 
+TEST(PDevTest, GetIrqsByName) {
+  constexpr uint32_t kIrqId = 5;
+  constexpr cpp17::string_view kIrqName = "test-name";
+  std::map<uint32_t, zx::interrupt> irqs;
+  {
+    zx::interrupt irq;
+    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
+    irqs[kIrqId] = std::move(irq);
+  }
+  fdf_fake::FakePDev::InterruptNamesMap irq_names;
+  irq_names.insert({std::string(kIrqName), kIrqId});
+
+  FakePDevWithThread infra;
+  zx::result client_channel =
+      infra.Start({.irqs = std::move(irqs), .irq_names = std::move(irq_names)});
+  ASSERT_OK(client_channel);
+
+  fdf::PDev pdev{std::move(client_channel.value())};
+  ASSERT_OK(pdev.GetInterrupt(kIrqName, 0).status_value());
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetInterrupt("unknown-name", 0).status_value());
+}
+
 TEST(PDevTest, GetBtis) {
   constexpr uint32_t kBtiId = 5;
   std::map<uint32_t, zx::bti> btis;
