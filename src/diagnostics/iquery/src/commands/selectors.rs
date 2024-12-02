@@ -48,9 +48,7 @@ impl Command for SelectorsCommand {
 
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
         if self.manifest.is_some() {
-            eprintln!(
-                "WARNING: option `--manifest` is deprecated, please use `--component` instead"
-            );
+            panic!("ERROR: option `--manifest` is deprecated, please use `--component` instead");
         }
 
         if self.selectors.is_empty() && self.component.is_none() && self.manifest.is_none() {

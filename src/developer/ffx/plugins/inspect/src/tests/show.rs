@@ -76,8 +76,8 @@ async fn test_show_unknown_manifest() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ShowCommand {
-        component: None,
-        manifest: Some(String::from("some-bad-moniker")),
+        manifest: None,
+        component: Some(String::from("some-bad-moniker")),
         selectors: vec![],
         accessor: None,
         name: None,
@@ -147,8 +147,8 @@ async fn test_show_with_manifest_that_exists() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ShowCommand {
-        component: None,
-        manifest: Some(String::from("moniker1")),
+        manifest: None,
+        component: Some(String::from("moniker1")),
         selectors: vec![],
         accessor: None,
         name: None,

@@ -153,7 +153,7 @@ async fn test_selectors_filter_serve_fs() {
         iquery_args: vec![
             "--accessor",
             "archivist:fuchsia.diagnostics.ArchiveAccessor",
-            "--manifest",
+            "--component",
             "basic_component.cm",
             "root/fuchsia.inspect.Health",
         ],
@@ -178,7 +178,7 @@ async fn test_selectors_filter() {
         iquery_args: vec![
             "--accessor",
             "archivist:fuchsia.diagnostics.ArchiveAccessor",
-            "--manifest",
+            "--component",
             "basic_component.cm",
             "root/fuchsia.inspect.Health",
         ],
@@ -253,7 +253,7 @@ async fn show_filter_manifest_serve_fs() {
         iquery_args: vec![
             "--accessor",
             "archivist:fuchsia.diagnostics.ArchiveAccessor",
-            "--manifest",
+            "--component",
             "basic_component.cm",
             "root/fuchsia.inspect.Health",
         ],
@@ -278,7 +278,7 @@ async fn show_filter_manifest() {
         iquery_args: vec![
             "--accessor",
             "archivist:fuchsia.diagnostics.ArchiveAccessor",
-            "--manifest",
+            "--component",
             "basic_component.cm",
             "root/fuchsia.inspect.Health",
         ],
@@ -303,7 +303,7 @@ async fn show_filter_manifest_no_selectors_serve_fs() {
         iquery_args: vec![
             "--accessor",
             "archivist:fuchsia.diagnostics.ArchiveAccessor",
-            "--manifest",
+            "--component",
             "basic_component.cm",
         ],
         opts: vec![AssertionOption::Retry],
@@ -327,7 +327,7 @@ async fn show_filter_manifest_no_selectors() {
         iquery_args: vec![
             "--accessor",
             "archivist:fuchsia.diagnostics.ArchiveAccessor",
-            "--manifest",
+            "--component",
             "basic_component.cm",
         ],
         opts: vec![AssertionOption::Retry],
