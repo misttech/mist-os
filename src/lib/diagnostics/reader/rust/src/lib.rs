@@ -363,7 +363,7 @@ impl ArchiveReader {
     {
         loop {
             let iterator = self.batch_iterator::<D>(StreamMode::Snapshot, format)?;
-            let result = drain_batch_iterator::<T>(iterator)
+            let result = drain_batch_iterator::<T>(Arc::new(Mutex::new(iterator)))
                 .filter_map(|value| ready(value.ok()))
                 .collect::<Vec<_>>()
                 .await;
@@ -431,13 +431,16 @@ enum OneOrMany<T> {
     One(T),
 }
 
-fn drain_batch_iterator<T>(iterator: BatchIteratorProxy) -> impl Stream<Item = Result<T, Error>>
+fn drain_batch_iterator<T>(
+    iterator: Arc<Mutex<BatchIteratorProxy>>,
+) -> impl Stream<Item = Result<T, Error>>
 where
     T: for<'a> Deserialize<'a>,
 {
     stream! {
         loop {
             let next_batch = iterator
+                .lock()
                 .get_next()
                 .await
                 .map_err(Error::GetNextCall)?
@@ -480,6 +483,7 @@ where
 pub struct Subscription<T> {
     #[pin]
     recv: Pin<Box<dyn FusedStream<Item = Result<T, Error>> + Send>>,
+    iterator: Arc<Mutex<BatchIteratorProxy>>,
 }
 
 const DATA_CHANNEL_SIZE: usize = 32;
@@ -492,7 +496,16 @@ where
     /// Creates a new subscription stream to a batch iterator.
     /// The stream will return diagnostics data structures.
     pub fn new(iterator: BatchIteratorProxy) -> Self {
-        Subscription { recv: Box::pin(drain_batch_iterator::<T>(iterator).fuse()) }
+        let iterator = Arc::new(Mutex::new(iterator));
+        Subscription {
+            recv: Box::pin(drain_batch_iterator::<T>(iterator.clone()).fuse()),
+            iterator,
+        }
+    }
+
+    /// Wait for the connection with the server to be established.
+    pub async fn wait_for_ready(&self) {
+        self.iterator.lock().wait_for_ready().await.expect("doesn't disconnect");
     }
 
     /// Splits the subscription into two separate streams: results and errors.
