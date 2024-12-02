@@ -161,6 +161,11 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
     return Serve(outgoing.component(), dispatcher);
   }
 
+  zx_status_t ServeForSoftTransition(fdf::OutgoingDirectory& outgoing,
+                                     async_dispatcher_t* dispatcher) {
+    return Serve(outgoing.component(), dispatcher);
+  }
+
   // Serves the fuchsia.driver.metadata/Service service to |outgoing| under the service name
   // `service_name_` and instance name `MetadataServer::instance_name_`.
   zx_status_t Serve(component::OutgoingDirectory& outgoing, async_dispatcher_t* dispatcher) {
