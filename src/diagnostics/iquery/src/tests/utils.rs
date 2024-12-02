@@ -5,8 +5,9 @@
 #![cfg(test)]
 
 use argh::FromArgs;
-use fuchsia_component::client;
-use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use fuchsia_component_test::{
+    Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route, SubRealmBuilder,
+};
 use iquery::command_line::CommandLine;
 use iquery::commands::*;
 use iquery::types::Error;
@@ -16,20 +17,92 @@ use serde::ser::Serialize;
 use serde_json::ser::{PrettyFormatter, Serializer};
 use std::path::Path;
 use std::{fmt, fs};
-use {fidl_fuchsia_sys2 as fsys2, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_inspect as finspect,
+    fidl_fuchsia_logger as flogger, fidl_fuchsia_sys2 as fsys2,
+    fidl_fuchsia_tracing_provider as ftracing, fuchsia_async as fasync,
+};
 
-pub const BASIC_COMPONENT_URL: &str =
-    "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm";
-pub const TEST_COMPONENT_URL: &str =
-    "fuchsia-pkg://fuchsia.com/iquery-tests#meta/test_component.cm";
+const BASIC_COMPONENT_URL: &str = "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm";
+const TEST_COMPONENT_URL: &str = "fuchsia-pkg://fuchsia.com/iquery-tests#meta/test_component.cm";
+const ARCHIVIST_URL: &str =
+    "fuchsia-pkg://fuchsia.com/iquery-tests#meta/archivist-for-embedding.cm";
 
 pub struct TestBuilder {
     builder: RealmBuilder,
+    test_realm: SubRealmBuilder,
+    archivist_ref: ChildRef,
 }
 
 impl TestBuilder {
     pub async fn new() -> Self {
-        Self { builder: RealmBuilder::new().await.expect("Created realm builder") }
+        let builder = RealmBuilder::new().await.expect("Created realm builder");
+        let test_realm = builder
+            .add_child_realm("test", ChildOptions::new().eager())
+            .await
+            .expect("Create child test realm");
+        let archivist = test_realm
+            .add_child("archivist", ARCHIVIST_URL, ChildOptions::new().eager())
+            .await
+            .expect("add child archivist");
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<flogger::LogSinkMarker>())
+                    .capability(Capability::protocol::<ftracing::RegistryMarker>().optional())
+                    .capability(
+                        Capability::event_stream("capability_requested").with_scope(&test_realm),
+                    )
+                    .from(Ref::parent())
+                    .to(&test_realm),
+            )
+            .await
+            .expect("added routes from parent to archivist");
+
+        // Routes for Archivist
+        test_realm
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<flogger::LogSinkMarker>())
+                    .capability(Capability::protocol::<ftracing::RegistryMarker>().optional())
+                    .capability(Capability::event_stream("capability_requested"))
+                    .from(Ref::parent())
+                    .to(&archivist),
+            )
+            .await
+            .expect("added routes from parent to archivist");
+        test_realm
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
+                    .from(&archivist)
+                    .to(Ref::parent()),
+            )
+            .await
+            .expect("added routes from archivist to parent");
+
+        // The realm query scoped to the test
+        test_realm
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<fsys2::RealmQueryMarker>())
+                    .capability(Capability::protocol::<fsys2::LifecycleControllerMarker>())
+                    .from(Ref::framework())
+                    .to(Ref::parent()),
+            )
+            .await
+            .expect("Can route realm query to parent");
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<fsys2::RealmQueryMarker>())
+                    .capability(Capability::protocol::<fsys2::LifecycleControllerMarker>())
+                    .from(&test_realm)
+                    .to(Ref::parent()),
+            )
+            .await
+            .expect("Can route realm query to parent");
+        Self { builder, test_realm, archivist_ref: archivist }
     }
 
     pub async fn add_basic_component(mut self, name: &str) -> Self {
@@ -44,16 +117,35 @@ impl TestBuilder {
 
     pub async fn start(self) -> TestInExecution {
         let instance = self.builder.build().await.expect("create instance");
+        // Ensure archivist has been resolved.
+        let lifecycle = instance
+            .root
+            .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
+            .expect("can connect to lifecycle");
+        lifecycle
+            .resolve_instance("archivist")
+            .await
+            .expect("call lifecycle controller")
+            .expect("Archivist is resolved");
         TestInExecution { instance }
     }
 
     async fn add_child(&mut self, name: &str, url: &str) -> &mut Self {
         let child_ref =
-            self.builder.add_child(name, url, ChildOptions::new().eager()).await.unwrap();
-        self.builder
+            self.test_realm.add_child(name, url, ChildOptions::new().eager()).await.unwrap();
+        self.test_realm
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                    .capability(Capability::protocol::<finspect::InspectSinkMarker>())
+                    .from(&self.archivist_ref)
+                    .to(&child_ref),
+            )
+            .await
+            .unwrap();
+        self.test_realm
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<flogger::LogSinkMarker>())
                     .from(Ref::parent())
                     .to(&child_ref),
             )
@@ -122,26 +214,34 @@ pub struct TestInExecution {
 
 impl TestInExecution {
     pub async fn assert(&self, params: AssertionParameters<'_>) {
+        let realm_query = self
+            .instance
+            .root
+            .connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>()
+            .expect("can connect to realm query");
+        let provider = ArchiveAccessorProvider::new(realm_query);
         for format in Format::all() {
             let expected = self.read_golden(params.golden_basename, format);
-            let mut assertion = CommandAssertion::new(
-                params.command,
-                &expected,
-                format,
-                &params.iquery_args,
-                self.instance.root.child_name(),
-            );
+            let mut assertion =
+                CommandAssertion::new(params.command, &expected, format, &params.iquery_args);
             for opt in &params.opts {
                 match opt {
                     AssertionOption::Retry => assertion.with_retries(),
                 }
             }
-            assertion.assert().await;
+            assertion.assert(&provider).await;
         }
     }
 
-    pub fn instance_child_name(&self) -> &str {
-        self.instance.root.child_name()
+    /// Execute a command: [command, flags, and, iquery_args]
+    pub async fn execute_command(&self, command: &[&str]) -> Result<String, Error> {
+        let realm_query = self
+            .instance
+            .root
+            .connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>()
+            .expect("can connect to realm query");
+        let provider = ArchiveAccessorProvider::new(realm_query);
+        execute_command(command, &provider).await
     }
 
     fn read_golden(&self, golden_basename: &str, format: Format) -> String {
@@ -155,10 +255,9 @@ impl TestInExecution {
 pub struct CommandAssertion<'a> {
     command: IqueryCommand,
     iquery_args: &'a [&'a str],
-    max_retry_time_seconds: i64,
+    max_retry_time: zx::MonotonicDuration,
     expected: &'a str,
     format: Format,
-    instance_child_name: &'a str,
 }
 
 impl<'a> CommandAssertion<'a> {
@@ -167,38 +266,25 @@ impl<'a> CommandAssertion<'a> {
         expected: &'a str,
         format: Format,
         iquery_args: &'a [&'a str],
-        instance_child_name: &'a str,
     ) -> Self {
-        Self {
-            command,
-            iquery_args,
-            max_retry_time_seconds: 0,
-            expected,
-            format,
-            instance_child_name,
-        }
+        Self { command, iquery_args, max_retry_time: zx::MonotonicDuration::ZERO, expected, format }
     }
 
     pub fn with_retries(&mut self) {
-        self.max_retry_time_seconds = 120;
+        self.max_retry_time = zx::MonotonicDuration::from_seconds(120);
     }
 
-    pub(crate) async fn assert(self) {
-        let started = zx::MonotonicInstant::get().into_nanos();
+    pub(crate) async fn assert(self, provider: &ArchiveAccessorProvider) {
+        let started = zx::MonotonicInstant::get();
         let format_str = self.format.to_string();
         let command_str = self.command.to_string();
         let mut command_line = vec!["--format", &format_str, &command_str];
         command_line.append(&mut self.iquery_args.to_vec());
         loop {
-            match execute_command(&command_line[..]).await {
+            match execute_command(&command_line[..], provider).await {
                 Ok(mut result) => {
-                    result = self.cleanup_unrelated_components(result);
-                    let now = zx::MonotonicInstant::get().into_nanos();
-                    if now
-                        >= started
-                            + zx::MonotonicDuration::from_seconds(self.max_retry_time_seconds)
-                                .into_nanos()
-                    {
+                    result = self.post_process_output(result);
+                    if zx::MonotonicInstant::get() >= started + self.max_retry_time {
                         self.assert_result(&result, self.expected);
                         break;
                     }
@@ -207,12 +293,7 @@ impl<'a> CommandAssertion<'a> {
                     }
                 }
                 Err(e) => {
-                    let now = zx::MonotonicInstant::get().into_nanos();
-                    if now
-                        >= started
-                            + zx::MonotonicDuration::from_seconds(self.max_retry_time_seconds)
-                                .into_nanos()
-                    {
+                    if zx::MonotonicInstant::get() >= started + self.max_retry_time {
                         panic!("Error: {:?}", e);
                     }
                 }
@@ -224,22 +305,13 @@ impl<'a> CommandAssertion<'a> {
         }
     }
 
-    fn cleanup_unrelated_components(&self, result: String) -> String {
+    fn post_process_output(&self, result: String) -> String {
         match self.format {
+            Format::Text => result.trim().to_owned(),
             Format::Json => {
                 // Removes the entry in the vector for the archivist
-                let mut result_json: serde_json::Value =
+                let result_json: serde_json::Value =
                     serde_json::from_str(&result).expect("expected json");
-                self.retain_with_moniker_match_in_json(&mut result_json, |val| {
-                    // Also retain paths (for accessor and files lists)
-                    val.starts_with("/")
-                        || val.starts_with("./")
-                        || val.starts_with("archivist")
-                        || val.ends_with("archivist")
-                        || val == "realm_builder_server"
-                        || val.starts_with(&format!("realm_builder\\:{}", self.instance_child_name))
-                        || val.starts_with(&format!("realm_builder:{}", self.instance_child_name))
-                });
                 // Use 4 spaces for indentation since `fx format-code` enforces that in the
                 // goldens.
                 let mut buf = Vec::new();
@@ -248,57 +320,7 @@ impl<'a> CommandAssertion<'a> {
                 result_json.serialize(&mut ser).unwrap();
                 String::from_utf8(buf).unwrap()
             }
-            Format::Text => self.retain_with_moniker_match_in_text(result),
         }
-    }
-
-    fn retain_with_moniker_match_in_json<F>(&self, result_json: &mut serde_json::Value, f: F)
-    where
-        F: Fn(&str) -> bool,
-    {
-        if let Some(arr) = result_json.as_array_mut() {
-            arr.retain(|value| value.as_str().map(&f).unwrap_or(true));
-            arr.retain(|value| {
-                value.get("moniker").and_then(|val| val.as_str()).map(&f).unwrap_or(true)
-            });
-        }
-    }
-
-    // We want to filter out results from other tests. So we only include the components under our
-    // test case root realm.
-    fn retain_with_moniker_match_in_text(&self, initial: String) -> String {
-        let mut result = String::new();
-        let mut include_data = true;
-        for line in initial.lines() {
-            if line.starts_with(" ") {
-                if include_data {
-                    result.push_str(line);
-                    result.push('\n');
-                }
-                continue;
-            }
-
-            if line.starts_with("realm_builder\\:") {
-                if !line.starts_with(&format!("realm_builder\\:{}", self.instance_child_name)) {
-                    include_data = false;
-                    continue;
-                } else {
-                    include_data = true;
-                }
-            }
-            if line.starts_with("realm_builder:") {
-                if !line.starts_with(&format!("realm_builder:{}", self.instance_child_name)) {
-                    include_data = false;
-                    continue;
-                } else {
-                    include_data = true;
-                }
-            }
-
-            result.push_str(line);
-            result.push('\n');
-        }
-        result.trim().to_string()
     }
 
     /// Validates that a command result matches the expected json string
@@ -314,48 +336,11 @@ impl<'a> CommandAssertion<'a> {
     }
 
     /// Cleans-up instances of:
-    /// - RealmBuilder collection child names by CHILD_NAME
     /// - `"start_timestamp_nanos": 7762005786231` by `"start_timestamp_nanos": TIMESTAMP`
-    /// - process IDs and thread IDs
-    /// - instance IDs in monikers
-    /// - timestamps in log strings
-    /// - process and thread IDs in log strings
     fn cleanup_variable_strings(&self, string: impl Into<String>) -> String {
         // Replace start_timestamp_nanos in fuchsia.inspect.Health entries and
         // timestamp in metadatas.
         let mut string: String = string.into();
-
-        // Replace the autogenerated realm builder collection child name (TEXT)
-        let re = Regex::new(r#"realm_builder\\:auto-[[:xdigit:]]+/"#).unwrap();
-        let replacement = "realm_builder\\:CHILD_NAME/";
-        string = re.replace_all(&string, replacement).to_string();
-
-        // Replace the autogenerated realm builder collection child name (JSON)
-        let re = Regex::new(r#"realm_builder\\\\:auto-[[:xdigit:]]+/"#).unwrap();
-        let replacement = "realm_builder\\\\:CHILD_NAME/";
-        string = re.replace_all(&string, replacement).to_string();
-
-        // Replace the autogenerated realm builder collection child name (path)
-        let re = Regex::new(r#"realm_builder:auto-[[:xdigit:]]+/"#).unwrap();
-        let replacement = "realm_builder:CHILD_NAME/";
-        string = re.replace_all(&string, replacement).to_string();
-
-        // Moniker in log metadatas requires special treatment to remove instance ids.
-        let re = Regex::new(r#""moniker": "(.+:)(\d+)""#).unwrap();
-        let replacement = "\"moniker\": \"${1}INSTANCE_ID";
-        string = re.replace_all(&string, replacement).to_string();
-
-        // Timestamp, pid, instance id and tid in log text.
-        let re = Regex::new(r#"\[\d+\.\d+\]\[\d+\]\[\d+\]\[(.+)\]"#).unwrap();
-        string = re.replace_all(&string, "[TIMESTAMP][PID][TID][${1}]").to_string();
-
-        // Make PID and TID constant in JSON outputs.
-        for value in &["pid", "tid"] {
-            let re = Regex::new(&format!("\"{}\": \\d+", value)).unwrap();
-            let replacement = format!("\"{}\": \"{}\"", value, value.to_string().to_uppercase());
-            string = re.replace_all(&string, replacement.as_str()).to_string();
-        }
-
         for value in &["timestamp", "start_timestamp_nanos"] {
             let re = Regex::new(&format!("\"{}\": \\d+", value)).unwrap();
             let replacement = format!("\"{}\": \"TIMESTAMP\"", value);
@@ -365,22 +350,15 @@ impl<'a> CommandAssertion<'a> {
             let replacement = format!("{} = TIMESTAMP", value);
             string = re.replace_all(&string, replacement.as_str()).to_string();
         }
-
-        // Remove tab characters.
-        let re = Regex::new(r#"\t"#).unwrap();
-        string = re.replace_all(&string, "").to_string();
-
         string
     }
 }
 
 /// Execute a command: [command, flags, and, iquery_args]
-pub async fn execute_command(command: &[&str]) -> Result<String, Error> {
-    const ROOT_REALM_QUERY: &str = "/svc/fuchsia.sys2.RealmQuery.root";
-    let realm_query =
-        client::connect_to_protocol_at_path::<fsys2::RealmQueryMarker>(ROOT_REALM_QUERY)
-            .expect("can connect to the root realm query");
-    let provider = ArchiveAccessorProvider::new(realm_query);
+async fn execute_command(
+    command: &[&str],
+    provider: &ArchiveAccessorProvider,
+) -> Result<String, Error> {
     let command_line = CommandLine::from_args(&["iquery"], command).expect("create command line");
-    command_line.execute(&provider).await
+    command_line.execute(provider).await
 }

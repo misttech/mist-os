@@ -14,7 +14,7 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 static EXPECTED_PROTOCOL_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r".*fuchsia\.diagnostics\..*ArchiveAccessor$").unwrap());
+    LazyLock::new(|| Regex::new(r".*fuchsia\.diagnostics\..*ArchiveAccessor.*$").unwrap());
 
 /// Returns the selectors for a component whose url contains the `manifest` string.
 pub async fn get_selectors_for_manifest<P: DiagnosticsProvider>(

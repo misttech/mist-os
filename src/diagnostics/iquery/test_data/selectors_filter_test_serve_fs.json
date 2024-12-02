@@ -1,4 +1,4 @@
 [
-    "realm_builder\\:CHILD_NAME/basic:root/fuchsia.inspect.Health:start_timestamp_nanos",
-    "realm_builder\\:CHILD_NAME/basic:root/fuchsia.inspect.Health:status"
+    "basic:root/fuchsia.inspect.Health:start_timestamp_nanos",
+    "basic:root/fuchsia.inspect.Health:status"
 ]

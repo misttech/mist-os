@@ -37,7 +37,7 @@ impl DiagnosticsProvider for ArchiveAccessorProvider {
     where
         D: DiagnosticsData,
     {
-        let archive = connect_to_accessor_selector(accessor, self.query_proxy.clone()).await?;
+        let archive = connect_to_accessor_selector(accessor, &self.query_proxy).await?;
         ArchiveReader::new()
             .with_archive(archive)
             .retry(RetryConfig::never())
@@ -62,7 +62,7 @@ impl DiagnosticsProvider for ArchiveAccessorProvider {
 /// `bootstrap/archivist:fuchsia.diagnostics.ArchiveAccessor`.
 pub async fn connect_to_accessor_selector(
     selector: Option<&str>,
-    mut query_proxy: fsys2::RealmQueryProxy,
+    query_proxy: &fsys2::RealmQueryProxy,
 ) -> Result<ArchiveAccessorProxy, Error> {
     match selector {
         Some(s) => {
@@ -72,11 +72,11 @@ pub async fn connect_to_accessor_selector(
             let Ok(moniker) = Moniker::try_from(component) else {
                 return Err(Error::invalid_accessor(s));
             };
-            connect_accessor(&moniker, accessor_name, &mut query_proxy).await
+            connect_accessor(&moniker, accessor_name, query_proxy).await
         }
         None => {
             let moniker = Moniker::try_from(ROOT_ARCHIVIST).unwrap();
-            connect_accessor(&moniker, ArchiveAccessorMarker::PROTOCOL_NAME, &mut query_proxy).await
+            connect_accessor(&moniker, ArchiveAccessorMarker::PROTOCOL_NAME, query_proxy).await
         }
     }
 }
@@ -85,7 +85,7 @@ pub async fn connect_to_accessor_selector(
 // opens the `expose` directory and return the proxy to it.
 async fn get_dir_proxy(
     moniker: &Moniker,
-    proxy: &mut fsys2::RealmQueryProxy,
+    proxy: &fsys2::RealmQueryProxy,
 ) -> Result<DirectoryProxy, Error> {
     let directory_proxy = open_instance_dir_root_readable(moniker, OpenDirType::Exposed, proxy)
         .await
@@ -98,7 +98,7 @@ async fn get_dir_proxy(
 pub async fn connect_accessor(
     moniker: &Moniker,
     accessor_name: &str,
-    proxy: &mut fsys2::RealmQueryProxy,
+    proxy: &fsys2::RealmQueryProxy,
 ) -> Result<ArchiveAccessorProxy, Error> {
     let directory_proxy = get_dir_proxy(moniker, proxy).await?;
     let proxy = client::connect_to_named_protocol_at_dir_root::<ArchiveAccessorMarker>(
@@ -119,16 +119,16 @@ mod test {
     #[fuchsia::test]
     async fn test_get_dir_proxy_selector_bad_component() {
         let fake_realm_query = Rc::new(MockRealmQuery::default());
-        let mut proxy = Rc::clone(&fake_realm_query).get_proxy().await;
+        let proxy = Rc::clone(&fake_realm_query).get_proxy().await;
         let moniker = Moniker::try_from("bad/component").unwrap();
-        assert_matches!(get_dir_proxy(&moniker, &mut proxy).await, Err(_));
+        assert_matches!(get_dir_proxy(&moniker, &proxy).await, Err(_));
     }
 
     #[fuchsia::test]
     async fn test_get_dir_proxy_ok() {
         let fake_realm_query = Rc::new(MockRealmQuery::default());
-        let mut proxy = Rc::clone(&fake_realm_query).get_proxy().await;
+        let proxy = Rc::clone(&fake_realm_query).get_proxy().await;
         let moniker = Moniker::try_from("example/component").unwrap();
-        assert_matches!(get_dir_proxy(&moniker, &mut proxy).await, Ok(_));
+        assert_matches!(get_dir_proxy(&moniker, &proxy).await, Ok(_));
     }
 }

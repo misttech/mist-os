@@ -1,4 +1,4 @@
-realm_builder:CHILD_NAME/basic:
+basic:
   metadata:
     name = root
     component_url = fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm

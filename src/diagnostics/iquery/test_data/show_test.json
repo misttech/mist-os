@@ -6,7 +6,7 @@
             "name": "root",
             "timestamp": "TIMESTAMP"
         },
-        "moniker": "realm_builder:CHILD_NAME/basic-1",
+        "moniker": "basic-1",
         "payload": {
             "root": {
                 "fuchsia.inspect.Health": {
@@ -24,7 +24,7 @@
             "name": "root",
             "timestamp": "TIMESTAMP"
         },
-        "moniker": "realm_builder:CHILD_NAME/basic-2",
+        "moniker": "basic-2",
         "payload": {
             "root": {
                 "iquery": "rocks"
@@ -39,7 +39,7 @@
             "name": "root",
             "timestamp": "TIMESTAMP"
         },
-        "moniker": "realm_builder:CHILD_NAME/basic-3",
+        "moniker": "basic-3",
         "payload": {
             "root": {
                 "fuchsia.inspect.Health": {
