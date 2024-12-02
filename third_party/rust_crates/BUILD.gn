@@ -16348,6 +16348,7 @@ rust_library("tokio-v1_32_1") {
       "--cfg=feature=\"process\"",
       "--cfg=feature=\"rt-multi-thread\"",
       "--cfg=feature=\"rt\"",
+      "--cfg=feature=\"signal\"",
       "--cfg=feature=\"signal-hook-registry\"",
       "--cfg=feature=\"socket2\"",
       "--cfg=feature=\"sync\"",

@@ -984,6 +984,7 @@ rustflags = [
   "--cfg=feature=\\\"process\\\"",
   "--cfg=feature=\\\"rt-multi-thread\\\"",
   "--cfg=feature=\\\"rt\\\"",
+  "--cfg=feature=\\\"signal\\\"",
   "--cfg=feature=\\\"signal-hook-registry\\\"",
   "--cfg=feature=\\\"socket2\\\"",
   "--cfg=feature=\\\"sync\\\"",
