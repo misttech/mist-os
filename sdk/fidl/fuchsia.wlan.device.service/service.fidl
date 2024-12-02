@@ -6,7 +6,6 @@ library fuchsia.wlan.device.service;
 
 using fuchsia.wlan.common;
 using fuchsia.wlan.ieee80211 as ieee80211;
-using fuchsia.wlan.mlme;
 using fuchsia.wlan.sme;
 using fuchsia.wlan.stats;
 using zx;
@@ -63,17 +62,6 @@ type GetPowerSaveModeResponse = struct {
     ps_mode fuchsia.wlan.common.PowerSaveType;
 };
 
-type AddIfaceRequest = resource struct {
-    phy_id uint16;
-    assigned_iface_id uint16;
-    iface client_end:fuchsia.wlan.mlme.MLME;
-    generic_sme server_end:fuchsia.wlan.sme.GenericSme;
-};
-
-type AddIfaceResponse = struct {
-    iface_id uint16;
-};
-
 // TODO(https://fxbug.dev/42164319): Move this to wlan_internal.fidl after https://fxbug.dev/42166364 is fixed
 type GetIfaceCounterStatsResponse = strict union {
     1: stats fuchsia.wlan.stats.IfaceCounterStats;
@@ -98,17 +86,6 @@ closed protocol DeviceWatcher {
     });
     strict -> OnIfaceRemoved(struct {
         iface_id uint16;
-    });
-};
-
-@discoverable
-closed protocol DeviceService {
-    // Iface methods
-    strict AddIface(resource struct {
-        req AddIfaceRequest;
-    }) -> (struct {
-        status int32;
-        iface_id box<AddIfaceResponse>;
     });
 };
 
