@@ -92,6 +92,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar",
   "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers",
   "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc",
+  "//sdk/fidl/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci",
   "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio",
   "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc",
   "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial",
