@@ -285,12 +285,12 @@ fn random_report_timeout<R: Rng>(rng: &mut R, period: Duration) -> Duration {
 
 /// A timer ID for GMP to send a report.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct GmpDelayedReportTimerId<I: Ip, D: WeakDeviceIdentifier> {
+pub struct GmpTimerId<I: Ip, D: WeakDeviceIdentifier> {
     pub(crate) device: D,
     pub(crate) _marker: IpVersionMarker<I>,
 }
 
-impl<I: Ip, D: WeakDeviceIdentifier> GmpDelayedReportTimerId<I, D> {
+impl<I: Ip, D: WeakDeviceIdentifier> GmpTimerId<I, D> {
     fn device_id(&self) -> &D {
         let Self { device, _marker: IpVersionMarker { .. } } = self;
         device
@@ -318,23 +318,35 @@ pub trait IpExt: Ip {
     fn should_perform_gmp(addr: MulticastAddr<Self::Addr>) -> bool;
 }
 
+/// The timer id kept in [`GmpState`]'s local timer heap.
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+enum TimerIdInner<I: Ip> {
+    V1(v1::DelayedReportTimerId<I>),
+}
+
+impl<I: Ip> From<v1::DelayedReportTimerId<I>> for TimerIdInner<I> {
+    fn from(value: v1::DelayedReportTimerId<I>) -> Self {
+        Self::V1(value)
+    }
+}
+
 #[cfg_attr(test, derive(Debug))]
 pub struct GmpState<I: Ip, BT: GmpBindingsTypes> {
-    timers: LocalTimerHeap<MulticastAddr<I::Addr>, (), BT>,
+    timers: LocalTimerHeap<TimerIdInner<I>, (), BT>,
 }
 
 // NB: This block is not bound on GmpBindingsContext because we don't need
 // RngContext to construct GmpState.
 impl<I: Ip, BC: GmpBindingsTypes + TimerContext> GmpState<I, BC> {
     /// Constructs a new `GmpState` for `device`.
-    pub fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<GmpDelayedReportTimerId<I, D>, BC>>(
+    pub fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<GmpTimerId<I, D>, BC>>(
         bindings_ctx: &mut BC,
         device: D,
     ) -> Self {
         Self {
             timers: LocalTimerHeap::new_with_context::<_, CC>(
                 bindings_ctx,
-                GmpDelayedReportTimerId { device, _marker: Default::default() },
+                GmpTimerId { device, _marker: Default::default() },
             ),
         }
     }
@@ -492,4 +504,29 @@ trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
 
 trait GmpMessage<I: Ip> {
     fn group_addr(&self) -> I::Addr;
+}
+
+fn handle_timer<I, BC, CC>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    timer: GmpTimerId<I, CC::WeakDeviceId>,
+) where
+    BC: GmpBindingsContext,
+    CC: GmpContext<I, BC>,
+    I: IpExt,
+{
+    let GmpTimerId { device, _marker: IpVersionMarker { .. } } = timer;
+    let Some(device) = device.upgrade() else {
+        return;
+    };
+    core_ctx.with_gmp_state_mut_and_ctx(&device, |mut core_ctx, state| {
+        let Some((timer_id, ())) = state.gmp.timers.pop(bindings_ctx) else {
+            return;
+        };
+        match timer_id {
+            TimerIdInner::V1(v1) => {
+                v1::handle_timer(&mut core_ctx, bindings_ctx, &device, state, v1);
+            }
+        }
+    });
 }

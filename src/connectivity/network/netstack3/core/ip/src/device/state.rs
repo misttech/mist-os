@@ -37,7 +37,7 @@ use crate::internal::device::{
 };
 use crate::internal::gmp::igmp::{IgmpConfig, IgmpState, IgmpTimerId};
 use crate::internal::gmp::mld::{MldConfig, MldTimerId};
-use crate::internal::gmp::{GmpDelayedReportTimerId, GmpGroupState, GmpState, MulticastGroupSet};
+use crate::internal::gmp::{GmpGroupState, GmpState, GmpTimerId, MulticastGroupSet};
 use crate::internal::types::RawMetric;
 
 use super::dad::NonceCollection;
@@ -61,7 +61,7 @@ pub trait IpDeviceStateIpExt: BroadcastIpExt {
     /// The GMP protocol-specific configuration.
     type GmpProtoConfig: Default;
     /// The timer id for GMP timers.
-    type GmpTimerId<D: WeakDeviceIdentifier>: From<GmpDelayedReportTimerId<Self, D>>;
+    type GmpTimerId<D: WeakDeviceIdentifier>: From<GmpTimerId<Self, D>>;
 
     /// Creates a new [`Self::GmpProtoState`].
     fn new_gmp_state<

@@ -10,16 +10,22 @@
 use core::time::Duration;
 
 use assert_matches::assert_matches;
-use net_types::ip::IpVersionMarker;
+use net_types::ip::Ip;
 use net_types::MulticastAddr;
-use netstack3_base::{Instant, WeakDeviceIdentifier};
+use netstack3_base::Instant;
 use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
 use crate::internal::gmp::{
-    self, GmpBindingsContext, GmpContext, GmpContextInner, GmpDelayedReportTimerId, GmpGroupState,
-    GmpMessageType, GmpStateRef, GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt,
+    self, GmpBindingsContext, GmpContext, GmpContextInner, GmpGroupState, GmpMessageType,
+    GmpStateRef, GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt,
 };
+
+/// Timers installed by GMP v1.
+///
+/// The timer always refers to a delayed report.
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+pub(super) struct DelayedReportTimerId<I: Ip>(pub(super) MulticastAddr<I::Addr>);
 
 /// Actions to take as a consequence of joining a group.
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
@@ -462,34 +468,27 @@ impl<I: Instant> GmpStateMachine<I> {
     }
 }
 
-pub(super) fn handle_timer<I, BC, CC>(
+pub(super) fn handle_timer<I, CC, BC, T>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    timer: GmpDelayedReportTimerId<I, CC::WeakDeviceId>,
+    device: &CC::DeviceId,
+    state: GmpStateRef<'_, I, T, BC>,
+    timer: DelayedReportTimerId<I>,
 ) where
     BC: GmpBindingsContext,
-    CC: GmpContext<I, BC>,
+    CC: GmpContextInner<I, BC>,
     I: IpExt,
+    T: GmpTypeLayout<I, BC>,
 {
-    let GmpDelayedReportTimerId { device, _marker: IpVersionMarker { .. } } = timer;
-    let Some(device) = device.upgrade() else {
-        return;
-    };
-    core_ctx.with_gmp_state_mut_and_ctx(
-        &device,
-        |mut core_ctx, GmpStateRef { enabled: _, groups, gmp, config: _ }| {
-            let Some((group_addr, ())) = gmp.timers.pop(bindings_ctx) else {
-                return;
-            };
-            let ReportTimerExpiredActions {} = groups
-                .get_mut(&group_addr)
-                .expect("get state for group with expired report timer")
-                .v1_mut()
-                .report_timer_expired();
+    let GmpStateRef { enabled: _, groups, gmp: _, config: _ } = state;
+    let DelayedReportTimerId(group_addr) = timer;
+    let ReportTimerExpiredActions {} = groups
+        .get_mut(&group_addr)
+        .expect("get state for group with expired report timer")
+        .v1_mut()
+        .report_timer_expired();
 
-            core_ctx.send_message(bindings_ctx, &device, group_addr, GmpMessageType::Report);
-        },
-    );
+    core_ctx.send_message(bindings_ctx, &device, group_addr, GmpMessageType::Report);
 }
 
 pub(super) fn handle_report_message<I, BC, CC>(
@@ -511,7 +510,10 @@ where
             .ok_or_else(|| CC::not_a_member_err(*group_addr))
             .map(|a| a.v1_mut().report_received())?;
         if stop_timer {
-            assert_matches!(gmp.timers.cancel(bindings_ctx, &group_addr), Some(_));
+            assert_matches!(
+                gmp.timers.cancel(bindings_ctx, &DelayedReportTimerId(group_addr).into()),
+                Some(_)
+            );
         }
         Ok(())
     })
@@ -558,13 +560,18 @@ where
                     .query_received(&mut bindings_ctx.rng(), max_response_time, now, config);
                 let send_msg = generic.and_then(|generic| match generic {
                     QueryReceivedGenericAction::ScheduleTimer(delay) => {
-                        let _: Option<(BC::Instant, ())> =
-                            gmp.timers.schedule_after(bindings_ctx, group_addr, (), delay);
+                        let _: Option<(BC::Instant, ())> = gmp.timers.schedule_after(
+                            bindings_ctx,
+                            DelayedReportTimerId(group_addr).into(),
+                            (),
+                            delay,
+                        );
                         None
                     }
                     QueryReceivedGenericAction::StopTimerAndSendReport => {
-                        let _: Option<(BC::Instant, ())> =
-                            gmp.timers.cancel(bindings_ctx, &group_addr);
+                        let _: Option<(BC::Instant, ())> = gmp
+                            .timers
+                            .cancel(bindings_ctx, &DelayedReportTimerId(group_addr).into());
                         Some(GmpMessageType::Report)
                     }
                 });
@@ -610,7 +617,15 @@ pub(super) fn handle_enabled<I, CC, BC, T>(
         let Some(delay) = send_report_and_schedule_timer else {
             continue;
         };
-        assert_matches!(gmp.timers.schedule_after(bindings_ctx, group_addr, (), delay), None);
+        assert_matches!(
+            gmp.timers.schedule_after(
+                bindings_ctx,
+                DelayedReportTimerId(group_addr).into(),
+                (),
+                delay
+            ),
+            None
+        );
         core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Report);
     }
 }
@@ -631,7 +646,10 @@ pub(super) fn handle_disabled<I, CC, BC, T>(
     for (group_addr, state) in groups.groups_mut() {
         let LeaveGroupActions { send_leave, stop_timer } = state.v1_mut().leave_if_member(config);
         if stop_timer {
-            assert_matches!(gmp.timers.cancel(bindings_ctx, group_addr), Some(_));
+            assert_matches!(
+                gmp.timers.cancel(bindings_ctx, &DelayedReportTimerId(*group_addr).into()),
+                Some(_)
+            );
         }
         if send_leave {
             core_ctx.send_message(bindings_ctx, device, *group_addr, GmpMessageType::Leave);
@@ -663,7 +681,15 @@ where
     });
     result.map(|JoinGroupActions { send_report_and_schedule_timer }| {
         if let Some(delay) = send_report_and_schedule_timer {
-            assert_matches!(gmp.timers.schedule_after(bindings_ctx, group_addr, (), delay), None);
+            assert_matches!(
+                gmp.timers.schedule_after(
+                    bindings_ctx,
+                    DelayedReportTimerId(group_addr).into(),
+                    (),
+                    delay
+                ),
+                None
+            );
 
             core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Report);
         }
@@ -688,7 +714,10 @@ where
     groups.leave_group(group_addr).map(|state| {
         let LeaveGroupActions { send_leave, stop_timer } = state.into_v1().leave_group(config);
         if stop_timer {
-            assert_matches!(gmp.timers.cancel(bindings_ctx, &group_addr), Some(_));
+            assert_matches!(
+                gmp.timers.cancel(bindings_ctx, &DelayedReportTimerId(group_addr).into()),
+                Some(_)
+            );
         }
         if send_leave {
             core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Leave);

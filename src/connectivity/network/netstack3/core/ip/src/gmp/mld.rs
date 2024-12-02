@@ -34,9 +34,9 @@ use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
-    self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner,
-    GmpDelayedReportTimerId, GmpGroupState, GmpMessage, GmpMessageType, GmpStateContext,
-    GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
+    self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpGroupState,
+    GmpMessage, GmpMessageType, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt,
+    MulticastGroupSet,
 };
 
 /// The bindings types for MLD.
@@ -313,7 +313,7 @@ impl gmp::v1::ProtocolConfig for MldConfig {
 
 /// An MLD timer to delay the sending of a report.
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
-pub struct MldTimerId<D: WeakDeviceIdentifier>(GmpDelayedReportTimerId<Ipv6, D>);
+pub struct MldTimerId<D: WeakDeviceIdentifier>(GmpTimerId<Ipv6, D>);
 
 impl<D: WeakDeviceIdentifier> MldTimerId<D> {
     pub(crate) fn device_id(&self) -> &D {
@@ -324,12 +324,12 @@ impl<D: WeakDeviceIdentifier> MldTimerId<D> {
     /// Creates a new [`MldTimerId`] for a GMP delayed report on `device`.
     #[cfg(any(test, feature = "testutils"))]
     pub fn new_delayed_report(device: D) -> Self {
-        Self(GmpDelayedReportTimerId { device, _marker: Default::default() })
+        Self(GmpTimerId { device, _marker: Default::default() })
     }
 }
 
-impl<D: WeakDeviceIdentifier> From<GmpDelayedReportTimerId<Ipv6, D>> for MldTimerId<D> {
-    fn from(id: GmpDelayedReportTimerId<Ipv6, D>) -> MldTimerId<D> {
+impl<D: WeakDeviceIdentifier> From<GmpTimerId<Ipv6, D>> for MldTimerId<D> {
+    fn from(id: GmpTimerId<Ipv6, D>) -> MldTimerId<D> {
         MldTimerId(id)
     }
 }
@@ -339,7 +339,7 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> HandleableTimer<CC, BC>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let Self(id) = self;
-        gmp::v1::handle_timer(core_ctx, bindings_ctx, id);
+        gmp::handle_timer(core_ctx, bindings_ctx, id);
     }
 }
 
@@ -595,11 +595,10 @@ mod tests {
     const ROUTER_MAC: Mac = Mac::new([6, 5, 4, 3, 2, 1]);
     const GROUP_ADDR: MulticastAddr<Ipv6Addr> =
         unsafe { MulticastAddr::new_unchecked(Ipv6Addr::new([0xff02, 0, 0, 0, 0, 0, 0, 3])) };
-    const TIMER_ID: MldTimerId<FakeWeakDeviceId<FakeDeviceId>> =
-        MldTimerId(GmpDelayedReportTimerId {
-            device: FakeWeakDeviceId(FakeDeviceId),
-            _marker: IpVersionMarker::new(),
-        });
+    const TIMER_ID: MldTimerId<FakeWeakDeviceId<FakeDeviceId>> = MldTimerId(GmpTimerId {
+        device: FakeWeakDeviceId(FakeDeviceId),
+        _marker: IpVersionMarker::new(),
+    });
 
     fn receive_mld_query(
         core_ctx: &mut FakeCoreCtxImpl,
@@ -726,7 +725,11 @@ mod tests {
                 Duration::from_secs(10),
                 GROUP_ADDR,
             );
-            core_ctx.state.gmp_state().timers.assert_top(&GROUP_ADDR, &());
+            core_ctx
+                .state
+                .gmp_state()
+                .timers
+                .assert_top(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
 
             // We should get two MLD reports - one for the unsolicited one for
@@ -778,7 +781,11 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 1);
 
-            core_ctx.state.gmp_state().timers.assert_top(&GROUP_ADDR, &());
+            core_ctx
+                .state
+                .gmp_state()
+                .timers
+                .assert_top(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
@@ -797,7 +804,11 @@ mod tests {
                 _ => panic!("Wrong State!"),
             }
 
-            core_ctx.state.gmp_state().timers.assert_top(&GROUP_ADDR, &());
+            core_ctx
+                .state
+                .gmp_state()
+                .timers
+                .assert_top(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 3);
             // The frames are all reports.
@@ -820,7 +831,11 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 1);
 
-            core_ctx.state.gmp_state().timers.assert_top(&GROUP_ADDR, &());
+            core_ctx
+                .state
+                .gmp_state()
+                .timers
+                .assert_top(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
@@ -857,7 +872,7 @@ mod tests {
         );
 
         core_ctx.state.gmp_state().timers.assert_timers([(
-            GROUP_ADDR,
+            gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(),
             (),
             FakeInstant::from(Duration::from_micros(590_354)),
         )]);
@@ -868,7 +883,7 @@ mod tests {
         receive_mld_query(&mut core_ctx, &mut bindings_ctx, duration, GROUP_ADDR);
         assert_eq!(core_ctx.frames().len(), 1);
         core_ctx.state.gmp_state().timers.assert_timers([(
-            GROUP_ADDR,
+            gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(),
             (),
             FakeInstant::from(Duration::from_micros(34_751)),
         )]);
@@ -898,7 +913,7 @@ mod tests {
             let now = bindings_ctx.now();
 
             core_ctx.state.gmp_state().timers.assert_range([(
-                &GROUP_ADDR,
+                &gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(),
                 now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
             // The initial unsolicited report.
@@ -941,7 +956,7 @@ mod tests {
             );
             let now = bindings_ctx.now();
             core_ctx.state.gmp_state().timers.assert_range([(
-                &GROUP_ADDR,
+                &gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(),
                 now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
             assert_eq!(core_ctx.frames().len(), 1);
@@ -975,7 +990,11 @@ mod tests {
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            core_ctx.state.gmp_state().timers.assert_top(&GROUP_ADDR, &());
+            core_ctx
+                .state
+                .gmp_state()
+                .timers
+                .assert_top(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             for (_, frame) in core_ctx.frames() {
                 ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
@@ -1071,7 +1090,11 @@ mod tests {
             let now = bindings_ctx.now();
             let range = now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL);
 
-            core_ctx.state.gmp_state().timers.assert_range([(&GROUP_ADDR, range.clone())]);
+            core_ctx
+                .state
+                .gmp_state()
+                .timers
+                .assert_range([(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), range.clone())]);
             let frame = &core_ctx.frames().last().unwrap().1;
             ensure_frame(frame, 131, GROUP_ADDR, GROUP_ADDR);
             ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
@@ -1082,7 +1105,11 @@ mod tests {
             );
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
-            core_ctx.state.gmp_state().timers.assert_range([(&GROUP_ADDR, range.clone())]);
+            core_ctx
+                .state
+                .gmp_state()
+                .timers
+                .assert_range([(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), range.clone())]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1091,7 +1118,11 @@ mod tests {
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
 
-            core_ctx.state.gmp_state().timers.assert_range([(&GROUP_ADDR, range)]);
+            core_ctx
+                .state
+                .gmp_state()
+                .timers
+                .assert_range([(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), range)]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
