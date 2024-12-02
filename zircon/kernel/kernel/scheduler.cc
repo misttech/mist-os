@@ -1319,9 +1319,14 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
   // this is the last time we own and have access to these variables.
   AssertInScheduler(*current_thread);
 
-  const SchedDuration total_runtime_ns = now - start_of_current_time_slice_ns_;
-  const SchedDuration actual_runtime_ns = now - current_state->last_started_running_;
+  // TODO(https://fxbug.dev/381899402): Find the root cause of small negative values in the actual
+  // runtime calculation.
+  const SchedDuration actual_runtime_ns =
+      ktl::max<SchedDuration>(now - current_state->last_started_running_, SchedDuration{0});
   current_state->last_started_running_ = now;
+
+  const SchedDuration total_runtime_ns = now - start_of_current_time_slice_ns_;
+
   current_state->runtime_ns_ += actual_runtime_ns;
   current_thread->UpdateRuntimeStats(current_thread->state());
 
