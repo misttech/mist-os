@@ -87,7 +87,8 @@ fi
 # Use this to conditionally prefix a command with "${RBE_WRAPPER[@]}".
 # NOTE: this function depends on FUCHSIA_BUILD_DIR which is set only after
 # initialization.
-function fx-rbe-enabled {
+# The cached version of this function is 'fx-rbe-enabled', below.
+function recheck-fx-rbe-enabled {
   # This function is called during tests without a build directory.
   # Returns 1 to indicate that RBE is not enabled.
   fx-build-dir-if-present || return 1
@@ -103,7 +104,19 @@ function fx-rbe-enabled {
   fi
 }
 
-function fx-build-needs-auth() {
+_fx_rbe_enabled_cache_var=
+function fx-rbe-enabled {
+  if [[ -z "$_fx_rbe_enabled_cache_var" ]]; then
+     recheck-fx-rbe-enabled
+     # Cache the return status.
+     _fx_rbe_enabled_cache_var="$?"
+  fi
+  return "$_fx_rbe_enabled_cache_var"
+}
+
+# Returns 0 if the build is configured to use authenticated services.
+# The value of this function is cached by 'fx-build-needs-auth'.
+function recheck-fx-build-needs-auth() {
   # For testing-only, return 1 to indicate that authentication is not needed.
   fx-build-dir-if-present || return 1
 
@@ -116,6 +129,16 @@ function fx-build-needs-auth() {
   if [[ "$needs_auth" != "true" ]]; then
     return 1
   fi
+}
+
+_fx_build_needs_auth_cache_var=
+function fx-build-needs-auth {
+  if [[ -z "$_fx_build_needs_auth_cache_var" ]]; then
+     recheck-fx-build-needs-auth
+     # Cache the return status.
+     _fx_build_needs_auth_cache_var="$?"
+  fi
+  return "$_fx_build_needs_auth_cache_var"
 }
 
 # reclient and bazel uses either gcloud or a LOAS credential helper
