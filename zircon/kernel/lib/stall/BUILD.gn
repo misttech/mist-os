@@ -8,6 +8,9 @@ import("//build/zircon/migrated_targets.gni")
 
 zx_library("stall") {
   sources = [ "stall.cc" ]
-  deps = [ "tests" ]
+  deps = [
+    "tests",
+    "//zircon/kernel/lib/init",
+  ]
   public_deps = [ "//zircon/kernel/lib/ktl:headers" ]
 }
