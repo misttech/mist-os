@@ -178,6 +178,7 @@ async fn create_realm(options: RealmOptions) -> Result<SagRealm, Error> {
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.power.suspend.Stats"))
                 .capability(Capability::protocol_by_name("fuchsia.power.system.ActivityGovernor"))
+                .capability(Capability::protocol_by_name("fuchsia.power.system.BootControl"))
                 .capability(Capability::protocol_by_name("fuchsia.power.system.CpuElementManager"))
                 .capability(Capability::service_by_name(
                     "fuchsia.power.broker.ElementInfoProviderService",
