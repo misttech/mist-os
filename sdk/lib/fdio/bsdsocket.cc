@@ -580,3 +580,40 @@ void freeifaddrs(struct ifaddrs* ifp) {
     ifp = n;
   }
 }
+
+__EXPORT
+struct if_nameindex* if_nameindex(void) {
+  auto& provider = get_client<fsocket::Provider>();
+  if (provider.is_error()) {
+    errno = fdio_status_to_errno(provider.status_value());
+    return nullptr;
+  }
+
+  auto response = provider->GetInterfaceAddresses();
+  const zx_status_t status = response.status();
+  if (status != ZX_OK) {
+    errno = fdio_status_to_errno(status);
+    return nullptr;
+  }
+
+  // Allocate memory with one extra entry at the tail, which is set to 0 to
+  // mark the end of the array.
+  struct if_nameindex* result = reinterpret_cast<struct if_nameindex*>(
+      calloc(response->interfaces.count() + 1, sizeof(struct if_nameindex)));
+  for (size_t i = 0; i < response->interfaces.count(); ++i) {
+    auto* nameindex = result + i;
+    auto& iface = response->interfaces[i];
+    nameindex->if_index = static_cast<unsigned int>(iface.id());
+    nameindex->if_name = strdup(iface.name().data());
+  }
+
+  return result;
+}
+
+__EXPORT
+void if_freenameindex(struct if_nameindex* ptr) {
+  for (struct if_nameindex* i = ptr; i->if_name; i++) {
+    free(i->if_name);
+  }
+  free(ptr);
+}

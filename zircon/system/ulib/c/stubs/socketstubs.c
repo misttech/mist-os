@@ -5,6 +5,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <ifaddrs.h>
+#include <net/if.h>
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -132,3 +133,12 @@ weak_alias(stub_getifaddrs, getifaddrs);
 
 static void stub_freeifaddrs(struct ifaddrs* ifp) {}
 weak_alias(stub_freeifaddrs, freeifaddrs);
+
+static struct if_nameindex* stub_if_nameindex(void) {
+  errno = ENOSYS;
+  return NULL;
+}
+weak_alias(stub_if_nameindex, if_nameindex);
+
+static void stub_if_freenameindex(struct if_nameindex* ptr) {}
+weak_alias(stub_if_freenameindex, if_freenameindex);

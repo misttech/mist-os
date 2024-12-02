@@ -132,4 +132,34 @@ TEST(GetIfAddrsTest, GetIfAddrsTest) {
   EXPECT_THAT(seek_addrs, testing::UnorderedElementsAreArray(want_ifaddrs));
 }
 
+TEST(GetIfAddrsTest, IfNameIndex) {
+  auto* ifs = if_nameindex();
+  EXPECT_TRUE(ifs);
+
+  std::set<unsigned int> indices;
+  std::set<std::string> names;
+
+  for (auto* i = ifs; i->if_name; i++) {
+    // Check that the index is unique.
+    EXPECT_TRUE(indices.find(i->if_index) == indices.end());
+    EXPECT_GT(i->if_index, 0U);
+    indices.insert(i->if_index);
+
+    // Check that the name is unique.
+    std::string name(i->if_name);
+    EXPECT_FALSE(name.empty());
+    EXPECT_TRUE(names.find(name) == names.end());
+    names.insert(name);
+  }
+
+  if_freenameindex(ifs);
+
+  EXPECT_TRUE(names.find("lo") != names.end());
+
+  if (kIsFuchsia) {
+    std::set<std::string> expected_names = {"lo", "ep1", "ep2", "ep3", "ep4"};
+    EXPECT_EQ(names, expected_names);
+  }
+}
+
 }  // namespace

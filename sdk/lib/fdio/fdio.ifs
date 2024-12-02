@@ -107,6 +107,8 @@ Symbols:
   - { Name: getpeername, Type: Func }
   - { Name: getsockname, Type: Func }
   - { Name: getsockopt, Type: Func }
+  - { Name: if_freenameindex, Type: Func }
+  - { Name: if_nameindex, Type: Func }
   - { Name: ioctl, Type: Func }
   - { Name: isatty, Type: Func }
   - { Name: lchown, Type: Func }
