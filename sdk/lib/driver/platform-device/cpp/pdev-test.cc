@@ -7,9 +7,10 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/fake-bti/cpp/fake-bti.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
+#include <lib/driver/fake-resource/cpp/fake-resource.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
-#include <lib/fake-bti/bti.h>
-#include <lib/fake-resource/resource.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls/object.h>
@@ -17,7 +18,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/lib/mmio/test-helper.h"
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
@@ -55,10 +55,9 @@ class DeviceServer : public fidl::testing::WireTestBase<fuchsia_hardware_platfor
 class FakePDevWithThread {
  public:
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> Start(
-      fake_pdev::FakePDevFidl::Config config) {
+      fdf_fake::FakePDev::Config config) {
     loop_.StartThread("pdev-fidl-thread");
-    if (zx_status_t status =
-            server.SyncCall(&fake_pdev::FakePDevFidl::SetConfig, std::move(config));
+    if (zx_status_t status = server.SyncCall(&fdf_fake::FakePDev::SetConfig, std::move(config));
         status != ZX_OK) {
       return zx::error(status);
     }
@@ -67,7 +66,7 @@ class FakePDevWithThread {
       return endpoints.take_error();
     }
     if (zx_status_t status =
-            server.SyncCall(&fake_pdev::FakePDevFidl::Connect, std::move(endpoints->server));
+            server.SyncCall(&fdf_fake::FakePDev::Connect, std::move(endpoints->server));
         status != ZX_OK) {
       return zx::error(status);
     }
@@ -76,17 +75,16 @@ class FakePDevWithThread {
 
  private:
   async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  async_patterns::TestDispatcherBound<fake_pdev::FakePDevFidl> server{loop_.dispatcher(),
-                                                                      std::in_place};
+  async_patterns::TestDispatcherBound<fdf_fake::FakePDev> server{loop_.dispatcher(), std::in_place};
 };
 
 TEST(PDevTest, GetMmios) {
   constexpr uint32_t kMmioId = 5;
   constexpr zx_off_t kMmioOffset = 10;
   constexpr size_t kMmioSize = 11;
-  std::map<uint32_t, fake_pdev::Mmio> mmios;
+  std::map<uint32_t, fdf_fake::Mmio> mmios;
   {
-    fake_pdev::MmioInfo mmio{
+    fdf::PDev::MmioInfo mmio{
         .offset = kMmioOffset,
         .size = kMmioSize,
     };
@@ -116,7 +114,7 @@ TEST(PDevTest, GetMmioBuffer) {
   MMIO_PTR void* mmio_vaddr;
   zx_koid_t vmo_koid;
   zx_info_handle_basic info;
-  std::map<uint32_t, fake_pdev::Mmio> mmios;
+  std::map<uint32_t, fdf_fake::Mmio> mmios;
   {
     zx::vmo vmo;
     ASSERT_OK(zx::vmo::create(kMmioSize, 0, &vmo));
@@ -157,8 +155,8 @@ TEST(PDevTest, InvalidMmioHandle) {
   constexpr uint32_t kMmioId = 5;
   constexpr zx_off_t kMmioOffset = 10;
   constexpr size_t kMmioSize = 11;
-  std::map<uint32_t, fake_pdev::Mmio> mmios;
-  mmios[kMmioId] = fake_pdev::MmioInfo{
+  std::map<uint32_t, fdf_fake::Mmio> mmios;
+  mmios[kMmioId] = fdf::PDev::MmioInfo{
       .offset = kMmioOffset,
       .size = kMmioSize,
   };
@@ -197,9 +195,9 @@ TEST(PDevTest, GetBtis) {
   constexpr uint32_t kBtiId = 5;
   std::map<uint32_t, zx::bti> btis;
   {
-    zx::bti bti;
-    ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
-    btis[kBtiId] = std::move(bti);
+    zx::result bti = fake_bti::CreateFakeBti();
+    ASSERT_OK(bti);
+    btis[kBtiId] = std::move(bti.value());
   }
 
   FakePDevWithThread infra;
@@ -239,11 +237,11 @@ TEST(PDevTest, GetDeviceInfo) {
   zx::result client_channel = infra.Start({
       .device_info =
           []() {
-            pdev_device_info_t device_info{
+            fdf::PDev::DeviceInfo device_info{
                 .vid = kVid,
                 .pid = kPid,
+                .name = kName,
             };
-            strncpy(device_info.name, kName, sizeof(device_info.name));
             return device_info;
           }(),
   });
@@ -261,7 +259,7 @@ TEST(PDevTest, GetBoardInfo) {
   FakePDevWithThread infra;
   zx::result client_channel = infra.Start({
       .board_info =
-          pdev_board_info_t{
+          fdf::PDev::BoardInfo{
               .vid = kVid,
               .pid = kPid,
           },

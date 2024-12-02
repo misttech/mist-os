@@ -37,10 +37,10 @@ test("driver-platform-device-test") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//src/devices/bus/testing/fake-pdev",
+    "//sdk/lib/driver/fake-bti/cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
+    "//sdk/lib/driver/fake-resource/cpp",
     "//src/devices/lib/mmio:test_helper",
-    "//src/devices/testing/fake-bti",
-    "//src/devices/testing/fake-resource",
     "//zircon/system/ulib/zxtest",
   ]
 }
