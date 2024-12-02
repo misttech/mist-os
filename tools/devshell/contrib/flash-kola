@@ -21,7 +21,15 @@ readonly FASTBOOT="${FUCHSIA_DIR}/prebuilt/third_party/fastboot/fastboot"
 
 FVM_PATH="$(fx get-build-dir)/$(fx list-build-artifacts --expect-one --name storage-full images)"
 ZBI_PATH="$(fx get-build-dir)/$(fx list-build-artifacts --expect-one --name zircon-a --type zbi images)"
-readonly FVM_PATH ZBI_PATH
+
+# TODO(b/373727276): Change to use `ffx target flash` instead.
+FLASH_SOURCE="$(fx-command-run get-flash-source)"
+PRODUCT_BUNDLE="$(fx get-build-dir)/${FLASH_SOURCE#product-bundle:}"
+ARTIFACTS="${PRODUCT_BUNDLE}/product_bundle.json"
+JQ_FILTER='.partitions.bootloader_partitions[] | select(.name=="dtbo") | .image'
+DTBO_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output "${JQ_FILTER}" "${ARTIFACTS}")"
+
+readonly FVM_PATH ZBI_PATH DTBO_PATH
 
 DEVICE_COUNT=$(${FASTBOOT} devices | awk NF | wc -l)
 readonly DEVICE_COUNT
@@ -57,6 +65,8 @@ fi
 
 ${FASTBOOT} flash boot_a "$ZBI_PATH"
 ${FASTBOOT} flash boot_b "$ZBI_PATH"
+${FASTBOOT} flash dtbo_a "$DTBO_PATH"
+${FASTBOOT} flash dtbo_b "$DTBO_PATH"
 ${FASTBOOT} flash super "$FVM_PATH"
 
 ${FASTBOOT} reboot
