@@ -23,7 +23,7 @@ async fn test_list_accessors() {
 
     let expected = serde_json::to_string(&vec![
         String::from("example/component:fuchsia.diagnostics.ArchiveAccessor"),
-        String::from("foo/bar/thing\\:instance:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+        String::from("foo/bar/thing:instance:fuchsia.diagnostics.FeedbackArchiveAccessor"),
         String::from("foo/component:fuchsia.diagnostics.FeedbackArchiveAccessor"),
     ])
     .unwrap();

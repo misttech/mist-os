@@ -244,9 +244,7 @@ pub async fn get_accessor_selectors(
                         continue;
                     }
                     if decl.exposes.iter().any(|expose| expose.source_name() == capability.name()) {
-                        let moniker_str = instance.moniker.to_string();
-                        let moniker = selectors::sanitize_moniker_for_selectors(&moniker_str);
-                        result.push(format!("{moniker}:{capability_name}"));
+                        result.push(format!("{}:{capability_name}", instance.moniker));
                     }
                 }
             }
@@ -280,9 +278,7 @@ mod test {
             res.unwrap(),
             vec![
                 String::from("example/component:fuchsia.diagnostics.ArchiveAccessor"),
-                String::from(
-                    "foo/bar/thing\\:instance:fuchsia.diagnostics.FeedbackArchiveAccessor"
-                ),
+                String::from("foo/bar/thing:instance:fuchsia.diagnostics.FeedbackArchiveAccessor"),
                 String::from("foo/component:fuchsia.diagnostics.FeedbackArchiveAccessor"),
             ]
         );
