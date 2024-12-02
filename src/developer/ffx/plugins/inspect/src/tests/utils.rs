@@ -9,8 +9,7 @@ use diagnostics_data::{
 use fidl::endpoints::{create_proxy_and_stream, ServerEnd};
 use fidl::Channel;
 use fidl_fuchsia_developer_remotecontrol::{
-    RemoteControlDeprecatedOpenCapabilityResponder, RemoteControlMarker, RemoteControlProxy,
-    RemoteControlRequest,
+    RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
 };
 use fidl_fuchsia_diagnostics::{
     ClientSelectorConfiguration, DataType, Format, StreamMode, StreamParameters,
@@ -19,9 +18,8 @@ use fidl_fuchsia_diagnostics_host::{
     ArchiveAccessorMarker, ArchiveAccessorProxy, ArchiveAccessorRequest,
 };
 use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
-use std::cell::RefCell;
 use std::rc::Rc;
-use {errors as _, ffx_writer as _, fidl_fuchsia_sys2 as fsys};
+use {errors as _, ffx_writer as _, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 #[derive(Default)]
 pub struct FakeArchiveIteratorResponse {
@@ -148,14 +146,14 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
     accessor_proxy: ArchiveAccessorProxy,
     expected_moniker: String,
     expected_protocol: String,
-) -> (RemoteControlProxy, Rc<RefCell<Vec<fuchsia_async::Task<()>>>>) {
+) -> (RemoteControlProxy, fasync::Scope) {
     let mock_realm_query = iquery_test_support::MockRealmQuery::default();
     let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
-    let running_tasks = Rc::new(RefCell::new(vec![]));
-    let running_tasks_clone = running_tasks.clone();
-    let task = fuchsia_async::Task::local(async move {
+    let scope = fasync::Scope::new();
+    let inner_scope = scope.make_ref();
+    scope.spawn_local(async move {
         let querier = Rc::new(mock_realm_query);
-        if let Ok(Some(req)) = stream.try_next().await {
+        while let Ok(Some(req)) = stream.try_next().await {
             match req {
                 RemoteControlRequest::DeprecatedOpenCapability {
                     moniker,
@@ -169,22 +167,17 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
                         assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
                         assert_eq!(capability_name, "svc/fuchsia.sys2.RealmQuery.root");
                         let querier = Rc::clone(&querier);
-                        let mut tasks = running_tasks_clone.borrow_mut();
-                        tasks.push(fuchsia_async::Task::local(async move {
-                            querier.serve(ServerEnd::new(server_channel)).await
-                        }));
+                        inner_scope.spawn_local(querier.serve(ServerEnd::new(server_channel)));
                         responder.send(Ok(())).unwrap();
                     } else if moniker == expected_moniker {
                         assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
                         assert_eq!(moniker, expected_moniker);
                         assert_eq!(capability_name, expected_protocol);
-                        let task = handle_remote_control_connect(
-                            responder,
+                        inner_scope.spawn_local(handle_remote_control_connect(
                             server_channel,
-                            accessor_proxy,
-                        );
-                        let mut tasks = running_tasks_clone.borrow_mut();
-                        tasks.push(task);
+                            accessor_proxy.clone(),
+                        ));
+                        responder.send(Ok(())).unwrap();
                     } else {
                         panic!("Got unexpected moniker: {moniker}");
                     }
@@ -193,32 +186,24 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
             }
         }
     });
-    {
-        let mut tasks = running_tasks.borrow_mut();
-        tasks.push(task);
-    }
-    (proxy, running_tasks)
+    (proxy, scope)
 }
 
-fn handle_remote_control_connect(
-    responder: RemoteControlDeprecatedOpenCapabilityResponder,
+async fn handle_remote_control_connect(
     service_chan: Channel,
     accessor_proxy: ArchiveAccessorProxy,
-) -> fuchsia_async::Task<()> {
-    responder.send(Ok(())).unwrap();
-    fuchsia_async::Task::local(async move {
-        let server_end = ServerEnd::<ArchiveAccessorMarker>::new(service_chan);
-        let mut diagnostics_stream = server_end.into_stream();
-        while let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
-            parameters,
-            stream,
-            responder,
-        })) = diagnostics_stream.next().await
-        {
-            accessor_proxy.stream_diagnostics(&parameters, stream).await.unwrap();
-            responder.send().unwrap();
-        }
-    })
+) {
+    let server_end = ServerEnd::<ArchiveAccessorMarker>::new(service_chan);
+    let mut diagnostics_stream = server_end.into_stream();
+    while let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
+        parameters,
+        stream,
+        responder,
+    })) = diagnostics_stream.next().await
+    {
+        accessor_proxy.stream_diagnostics(&parameters, stream).await.unwrap();
+        responder.send().unwrap();
+    }
 }
 
 pub fn make_inspect_with_length(moniker: &str, timestamp: i64, len: usize) -> InspectData {

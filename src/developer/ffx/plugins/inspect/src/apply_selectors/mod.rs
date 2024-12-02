@@ -6,8 +6,9 @@ use crate::apply_selectors::filter::filter_data_to_lines;
 use crate::apply_selectors::screen::{Line, Screen};
 use crate::apply_selectors::terminal::{Terminal, Termion};
 use crate::HostArchiveReader;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use diagnostics_data::{ExtendedMoniker, Inspect, InspectData};
+use errors::ffx_error;
 use ffx_inspect_args::ApplySelectorsCommand;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorProxy;
@@ -41,7 +42,10 @@ pub async fn execute(
         )
         .context(format!("Unable to deserialize {}.", snapshot_file.display()))?
     } else {
-        let provider = HostArchiveReader::new(diagnostics_proxy, rcs_proxy);
+        let realm_query = rcs::root_realm_query(&rcs_proxy, std::time::Duration::from_secs(15))
+            .await
+            .map_err(|e| anyhow!(ffx_error!("Failed to connect to realm query: {e}")))?;
+        let provider = HostArchiveReader::new(diagnostics_proxy, rcs_proxy, realm_query);
         provider.snapshot::<Inspect>(cmd.accessor_path.as_deref(), std::iter::empty()).await?
     };
     let moniker = match cmd.moniker {

@@ -87,7 +87,7 @@ pub async fn process_fuzzy_inputs<P: DiagnosticsProvider>(
         return Ok(vec![]);
     }
 
-    let realm_query = provider.connect_realm_query().await?;
+    let realm_query = provider.realm_query();
     let mut results = vec![];
     for value in queries {
         match fuzzy_search(&value, &realm_query).await {
@@ -135,7 +135,7 @@ pub async fn process_component_query_with_partial_selectors<P: DiagnosticsProvid
     provider: &P,
 ) -> Result<Vec<Selector>, Error> {
     let mut tree_selectors = tree_selectors.into_iter().peekable();
-    let realm_query = provider.connect_realm_query().await?;
+    let realm_query = provider.realm_query();
     let instance = fuzzy_search(component.as_str(), &realm_query).await?;
 
     let mut results = vec![];
@@ -261,7 +261,7 @@ pub async fn get_accessor_selectors(
 mod test {
     use super::*;
     use assert_matches::assert_matches;
-    use iquery_test_support::MockRealmQuery;
+    use iquery_test_support::{MockRealmQuery, MockRealmQueryBuilder};
     use selectors::parse_verbose;
     use std::rc::Rc;
 
@@ -327,7 +327,20 @@ mod test {
         assert_eq!(expand_selectors(vec![], None).unwrap(), vec![]);
     }
 
-    struct FakeProvider(Vec<&'static str>);
+    struct FakeProvider {
+        realm_query: fsys2::RealmQueryProxy,
+    }
+
+    impl FakeProvider {
+        async fn new(monikers: &'static [&'static str]) -> Self {
+            let mut builder = MockRealmQueryBuilder::default();
+            for name in monikers {
+                builder = builder.when(name).moniker(name).add();
+            }
+            let realm_query_proxy = Rc::new(builder.build()).get_proxy().await;
+            Self { realm_query: realm_query_proxy }
+        }
+    }
 
     impl DiagnosticsProvider for FakeProvider {
         async fn snapshot<D: diagnostics_data::DiagnosticsData>(
@@ -342,13 +355,8 @@ mod test {
             unreachable!("unimplemented");
         }
 
-        async fn connect_realm_query(&self) -> Result<fsys2::RealmQueryProxy, Error> {
-            let mut builder = iquery_test_support::MockRealmQueryBuilder::default();
-            for name in &self.0 {
-                builder = builder.when(name).moniker(name).add();
-            }
-
-            Ok(Rc::new(builder.build()).get_proxy().await)
+        fn realm_query(&self) -> &fsys2::RealmQueryProxy {
+            &self.realm_query
         }
     }
 
@@ -356,7 +364,7 @@ mod test {
     async fn test_process_fuzzy_inputs_success() {
         let actual = process_fuzzy_inputs(
             ["moniker1".to_string()],
-            &FakeProvider(vec!["core/moniker1", "core/moniker2"]),
+            &FakeProvider::new(&["core/moniker1", "core/moniker2"]).await,
         )
         .await
         .unwrap();
@@ -367,7 +375,8 @@ mod test {
 
         let actual = process_fuzzy_inputs(
             ["moniker1:collection".to_string()],
-            &FakeProvider(vec!["core/moniker1:collection", "core/moniker1", "core/moniker2"]),
+            &FakeProvider::new(&["core/moniker1:collection", "core/moniker1", "core/moniker2"])
+                .await,
         )
         .await
         .unwrap();
@@ -378,7 +387,7 @@ mod test {
 
         let actual = process_fuzzy_inputs(
             [r"core/moniker1\:collection".to_string()],
-            &FakeProvider(vec!["core/moniker1:collection"]),
+            &FakeProvider::new(&["core/moniker1:collection"]).await,
         )
         .await
         .unwrap();
@@ -389,7 +398,7 @@ mod test {
 
         let actual = process_fuzzy_inputs(
             ["core/moniker1:root:prop".to_string()],
-            &FakeProvider(vec!["core/moniker1:collection", "core/moniker1"]),
+            &FakeProvider::new(&["core/moniker1:collection", "core/moniker1"]).await,
         )
         .await
         .unwrap();
@@ -400,7 +409,7 @@ mod test {
 
         let actual = process_fuzzy_inputs(
             ["core/moniker1".to_string(), "core/moniker2".to_string()],
-            &FakeProvider(vec!["core/moniker1", "core/moniker2"]),
+            &FakeProvider::new(&["core/moniker1", "core/moniker2"]).await,
         )
         .await
         .unwrap();
@@ -414,7 +423,7 @@ mod test {
 
         let actual = process_fuzzy_inputs(
             ["moniker1".to_string(), "moniker2".to_string()],
-            &FakeProvider(vec!["core/moniker1"]),
+            &FakeProvider::new(&["core/moniker1"]).await,
         )
         .await
         .unwrap();
@@ -429,7 +438,7 @@ mod test {
 
         let actual = process_fuzzy_inputs(
             ["core/moniker1:root:prop".to_string(), "core/moniker2".to_string()],
-            &FakeProvider(vec!["core/moniker1", "core/moniker2"]),
+            &FakeProvider::new(&["core/moniker1", "core/moniker2"]).await,
         )
         .await
         .unwrap();
@@ -445,13 +454,14 @@ mod test {
     #[fuchsia::test]
     async fn test_process_fuzzy_inputs_failures() {
         let actual =
-            process_fuzzy_inputs(["moniker ".to_string()], &FakeProvider(vec!["moniker"])).await;
+            process_fuzzy_inputs(["moniker ".to_string()], &FakeProvider::new(&["moniker"]).await)
+                .await;
 
         assert_matches!(actual, Err(Error::ParseSelector(_, _)));
 
         let actual = process_fuzzy_inputs(
             ["moniker".to_string()],
-            &FakeProvider(vec!["core/moniker1", "core/moniker2"]),
+            &FakeProvider::new(&["core/moniker1", "core/moniker2"]).await,
         )
         .await;
 
@@ -463,7 +473,7 @@ mod test {
         let actual = process_component_query_with_partial_selectors(
             "moniker1".to_string(),
             [].into_iter(),
-            &FakeProvider(vec!["core/moniker1", "core/moniker2"]),
+            &FakeProvider::new(&["core/moniker1", "core/moniker2"]).await,
         )
         .await
         .unwrap();
@@ -475,7 +485,7 @@ mod test {
         let actual = process_component_query_with_partial_selectors(
             "moniker1".to_string(),
             ["root/foo:bar".to_string()].into_iter(),
-            &FakeProvider(vec!["core/moniker1", "core/moniker2"]),
+            &FakeProvider::new(&["core/moniker1", "core/moniker2"]).await,
         )
         .await
         .unwrap();
@@ -487,7 +497,7 @@ mod test {
         let actual = process_component_query_with_partial_selectors(
             "moniker1".to_string(),
             ["root/foo:bar".to_string()].into_iter(),
-            &FakeProvider(vec!["core/moniker2", "core/moniker3"]),
+            &FakeProvider::new(&["core/moniker2", "core/moniker3"]).await,
         )
         .await;
 

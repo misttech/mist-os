@@ -29,5 +29,5 @@ pub trait DiagnosticsProvider: Send + Sync {
     fn get_accessor_paths(&self) -> impl Future<Output = Result<Vec<String>, Error>>;
 
     /// Connect to a RealmQueryProxy for component discovery for fuzzy matching components
-    fn connect_realm_query(&self) -> impl Future<Output = Result<fsys2::RealmQueryProxy, Error>>;
+    fn realm_query(&self) -> &fsys2::RealmQueryProxy;
 }

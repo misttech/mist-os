@@ -5,9 +5,8 @@
 #![cfg(test)]
 
 use argh::FromArgs;
-use fuchsia_async as fasync;
+use fuchsia_component::client;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
-
 use iquery::command_line::CommandLine;
 use iquery::commands::*;
 use iquery::types::Error;
@@ -17,6 +16,7 @@ use serde::ser::Serialize;
 use serde_json::ser::{PrettyFormatter, Serializer};
 use std::path::Path;
 use std::{fmt, fs};
+use {fidl_fuchsia_sys2 as fsys2, fuchsia_async as fasync};
 
 pub const BASIC_COMPONENT_URL: &str =
     "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm";
@@ -376,7 +376,11 @@ impl<'a> CommandAssertion<'a> {
 
 /// Execute a command: [command, flags, and, iquery_args]
 pub async fn execute_command(command: &[&str]) -> Result<String, Error> {
-    let provider = ArchiveAccessorProvider;
+    const ROOT_REALM_QUERY: &str = "/svc/fuchsia.sys2.RealmQuery.root";
+    let realm_query =
+        client::connect_to_protocol_at_path::<fsys2::RealmQueryMarker>(ROOT_REALM_QUERY)
+            .expect("can connect to the root realm query");
+    let provider = ArchiveAccessorProvider::new(realm_query);
     let command_line = CommandLine::from_args(&["iquery"], command).expect("create command line");
     command_line.execute(&provider).await
 }

@@ -26,6 +26,7 @@ enum OneOrMany<T> {
 pub struct HostArchiveReader {
     diagnostics_proxy: ArchiveAccessorProxy,
     rcs_proxy: RemoteControlProxy,
+    query_proxy: fsys2::RealmQueryProxy,
 }
 
 fn add_host_before_last_dot(input: &str) -> Result<String, Error> {
@@ -49,8 +50,12 @@ impl<'a> TryFrom<&'a str> for MonikerAndProtocol<'a> {
 }
 
 impl HostArchiveReader {
-    pub fn new(diagnostics_proxy: ArchiveAccessorProxy, rcs_proxy: RemoteControlProxy) -> Self {
-        Self { diagnostics_proxy, rcs_proxy }
+    pub fn new(
+        diagnostics_proxy: ArchiveAccessorProxy,
+        rcs_proxy: RemoteControlProxy,
+        query_proxy: fsys2::RealmQueryProxy,
+    ) -> Self {
+        Self { diagnostics_proxy, rcs_proxy, query_proxy }
     }
 
     pub async fn snapshot_diagnostics_data<D>(
@@ -135,13 +140,10 @@ impl DiagnosticsProvider for HostArchiveReader {
     }
 
     async fn get_accessor_paths(&self) -> Result<Vec<String>, Error> {
-        let query_proxy = self.connect_realm_query().await?;
-        get_accessor_selectors(&query_proxy).await
+        get_accessor_selectors(&self.query_proxy).await
     }
 
-    async fn connect_realm_query(&self) -> Result<fsys2::RealmQueryProxy, Error> {
-        rcs::root_realm_query(&self.rcs_proxy, std::time::Duration::from_secs(15))
-            .await
-            .map_err(|e| Error::ConnectToProtocol("RemoteControlProxy (host)".to_string(), e))
+    fn realm_query(&self) -> &fsys2::RealmQueryProxy {
+        &self.query_proxy
     }
 }

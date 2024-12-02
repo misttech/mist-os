@@ -16,11 +16,17 @@ use fidl_fuchsia_sys2 as fsys2;
 use fuchsia_component::client;
 use moniker::Moniker;
 
-static ROOT_REALM_QUERY: &str = "/svc/fuchsia.sys2.RealmQuery.root";
 static ROOT_ARCHIVIST: &str = "bootstrap/archivist";
 
-#[derive(Default)]
-pub struct ArchiveAccessorProvider;
+pub struct ArchiveAccessorProvider {
+    query_proxy: fsys2::RealmQueryProxy,
+}
+
+impl ArchiveAccessorProvider {
+    pub fn new(proxy: fsys2::RealmQueryProxy) -> Self {
+        Self { query_proxy: proxy }
+    }
+}
 
 impl DiagnosticsProvider for ArchiveAccessorProvider {
     async fn snapshot<D>(
@@ -31,7 +37,7 @@ impl DiagnosticsProvider for ArchiveAccessorProvider {
     where
         D: DiagnosticsData,
     {
-        let archive = connect_to_accessor_selector(accessor).await?;
+        let archive = connect_to_accessor_selector(accessor, self.query_proxy.clone()).await?;
         ArchiveReader::new()
             .with_archive(archive)
             .retry(RetryConfig::never())
@@ -42,21 +48,12 @@ impl DiagnosticsProvider for ArchiveAccessorProvider {
     }
 
     async fn get_accessor_paths(&self) -> Result<Vec<String>, Error> {
-        let realm_query_proxy = connect_realm_query().await?;
-        get_accessor_selectors(&realm_query_proxy).await
+        get_accessor_selectors(&self.query_proxy).await
     }
 
-    async fn connect_realm_query(&self) -> Result<fsys2::RealmQueryProxy, Error> {
-        crate::commands::connect_realm_query().await
+    fn realm_query(&self) -> &fsys2::RealmQueryProxy {
+        &self.query_proxy
     }
-}
-
-/// Helper method to connect to both the `RealmQuery` and the `RealmExplorer`.
-pub(crate) async fn connect_realm_query() -> Result<fsys2::RealmQueryProxy, Error> {
-    let realm_query_proxy =
-        client::connect_to_protocol_at_path::<fsys2::RealmQueryMarker>(ROOT_REALM_QUERY)
-            .map_err(|e| Error::IOError("unable to connect to root RealmQuery".to_owned(), e))?;
-    Ok(realm_query_proxy)
 }
 
 /// Connect to `fuchsia.diagnostics.*ArchivistAccessor` with the provided selector string.
@@ -65,8 +62,8 @@ pub(crate) async fn connect_realm_query() -> Result<fsys2::RealmQueryProxy, Erro
 /// `bootstrap/archivist:fuchsia.diagnostics.ArchiveAccessor`.
 pub async fn connect_to_accessor_selector(
     selector: Option<&str>,
+    mut query_proxy: fsys2::RealmQueryProxy,
 ) -> Result<ArchiveAccessorProxy, Error> {
-    let mut query_proxy = connect_realm_query().await?;
     match selector {
         Some(s) => {
             let Some((component, accessor_name)) = s.rsplit_once(":") else {

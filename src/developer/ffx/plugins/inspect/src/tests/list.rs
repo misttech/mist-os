@@ -139,7 +139,7 @@ async fn test_list_with_data_with_manifest_and_archive() {
         with_url: true,
         accessor: Some("test/component:fuchsia.diagnostics.ArchiveAccessor".to_owned()),
     };
-    let (accessor, _task) = setup_fake_rcs_with_embedded_archive_accessor(
+    let (remote_control, _scope) = setup_fake_rcs_with_embedded_archive_accessor(
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params.clone(),
             expected_responses.clone(),
@@ -148,7 +148,7 @@ async fn test_list_with_data_with_manifest_and_archive() {
         "fuchsia.diagnostics.host.ArchiveAccessor".into(),
     );
     run_command(
-        accessor,
+        remote_control,
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params,
             // We don't expect any responses on the default accessor.
