@@ -20,11 +20,9 @@
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/serial/drivers/aml-uart/aml-uart-dfv2.h"
 #include "src/devices/serial/drivers/aml-uart/tests/device_state.h"
-#include "src/devices/serial/drivers/aml-uart/tests/fake_timer.h"
 
 namespace {
 
-using fdf_power::testing::FakeElementControl;
 using fuchsia_power_system::LeaseToken;
 
 static constexpr fuchsia_hardware_serial::wire::SerialPortInfo kSerialInfo = {
@@ -556,14 +554,6 @@ TEST_F(AmlUartAsyncHarness, SerialImplAsyncReadDoubleCallback) {
 }
 
 TEST_F(AmlUartHarnessWithPower, AcquireWakeLeaseWithRead) {
-  FakeTimer fake_timer;
-
-  // Inject the fake timer handle to driver. FakeTimer::timer_handle_ will replace the handle
-  // under the driver timer.
-  driver_test().RunInDriverContext([&](serial::AmlUartV2& driver) {
-    driver.aml_uart_for_testing().InjectTimerForTest(FakeTimer::timer_handle_);
-  });
-
   uint8_t data[kDataLen];
   for (size_t i = 0; i < kDataLen; i++) {
     data[i] = static_cast<uint8_t>(i);
@@ -576,10 +566,9 @@ TEST_F(AmlUartHarnessWithPower, AcquireWakeLeaseWithRead) {
   fdf::WireClient<fuchsia_hardware_serialimpl::Device> device_client(
       std::move(driver_connect_result.value()), fdf::Dispatcher::GetCurrent()->get());
 
-  device_client.buffer(arena)->Enable(true).Then(
-      [quit = driver_test().runtime().QuitClosure()](auto& res) { quit(); });
-  driver_test().runtime().Run();
-  driver_test().runtime().ResetQuit();
+  std::atomic<bool> done = false;
+  device_client.buffer(arena)->Enable(true).Then([&done](auto& res) { done = true; });
+  driver_test().runtime().RunUntil([&done]() { return done.load(); });
 
   // Verify that no lease has been acquired. Trigger an interrupt.
   driver_test().RunInEnvironmentTypeContext([&data](Environment& env) {
@@ -587,43 +576,29 @@ TEST_F(AmlUartHarnessWithPower, AcquireWakeLeaseWithRead) {
     env.device_state().Inject(data, kDataLen);
   });
 
-  // Verify that the timer deadline has been set by the driver. Save the deadline for later
-  // comparison.
-  driver_test().runtime().RunUntil([&]() { return FakeTimer::current_deadline_ != 0; });
-  zx_time_t last_deadline = FakeTimer::current_deadline_;
-
-  driver_test().RunInEnvironmentTypeContext([&data](Environment& env) {
-    ASSERT_TRUE(env.sag().HasActiveWakeLease());
-    env.device_state().Inject(data, kDataLen);
-  });
-
-  // Verify that the timer was set again by driver, also the wake lease was not
-  // dropped.
-  driver_test().runtime().RunUntil([&]() {
-    return FakeTimer::current_deadline_ != 0 && FakeTimer::current_deadline_ != last_deadline;
-  });
-
-  driver_test().RunInEnvironmentTypeContext(
-      [](Environment& env) { ASSERT_TRUE(env.sag().HasActiveWakeLease()); });
-
-  // Fire the timer and verify that the wake lease has been dropped.
-  fake_timer.FireTimer();
-
-  // Verify that the deadline has been cleared.
-  EXPECT_EQ(FakeTimer::current_deadline_, 0);
-
+  // Verify that the lease was acquired and triggger another interrupt.
   driver_test().runtime().RunUntil([&]() {
     return driver_test().RunInEnvironmentTypeContext<bool>(
-               [](Environment& env) { return env.sag().HasActiveWakeLease(); }) == false;
+        [](Environment& env) { return env.sag().HasActiveWakeLease(); });
+  });
+  driver_test().RunInEnvironmentTypeContext(
+      [&data](Environment& env) { env.device_state().Inject(data, kDataLen); });
+
+  // Wait for the lease to be dropped.
+  driver_test().runtime().RunUntil([&]() {
+    return !driver_test().RunInEnvironmentTypeContext<bool>(
+        [](Environment& env) { return env.sag().HasActiveWakeLease(); });
   });
 
+  // Inject another interrupt.
   driver_test().RunInEnvironmentTypeContext(
       [&data](Environment& env) { env.device_state().Inject(data, kDataLen); });
 
   // The driver is able to set the timer and acquire lease again.
-  driver_test().runtime().RunUntil([&]() { return FakeTimer::current_deadline_ != 0; });
-  driver_test().RunInEnvironmentTypeContext(
-      [](Environment& env) { ASSERT_TRUE(env.sag().HasActiveWakeLease()); });
+  driver_test().runtime().RunUntil([&]() {
+    return driver_test().RunInEnvironmentTypeContext<bool>(
+        [](Environment& env) { return env.sag().HasActiveWakeLease(); });
+  });
 }
 
 }  // namespace

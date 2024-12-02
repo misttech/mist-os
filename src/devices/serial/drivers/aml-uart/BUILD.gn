@@ -101,7 +101,6 @@ test("aml-uart-test-bin") {
   sources = [
     "tests/aml-uart-test.cc",
     "tests/device_state.h",
-    "tests/fake_timer.cc",
   ]
   deps = [
     ":aml-uart-source",

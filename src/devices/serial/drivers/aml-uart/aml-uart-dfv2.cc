@@ -50,16 +50,7 @@ void AmlUartV2::PrepareStop(fdf::PrepareStopCompleter completer) {
     aml_uart_->Enable(false);
   }
 
-  if (irq_dispatcher_.has_value()) {
-    // The shutdown is async. When it is done, the dispatcher's shutdown callback will complete
-    // the PrepareStopCompleter.
-    prepare_stop_completer_.emplace(std::move(completer));
-    irq_dispatcher_->ShutdownAsync();
-  } else {
-    // No irq_dispatcher_, just reply to the PrepareStopCompleter, timer_dispatcher_ is created
-    // after irq_dispatcher_, so we assume that there's no timer_dispatcher_ either.
-    completer(zx::ok());
-  }
+  completer(zx::ok());
 }
 
 AmlUart& AmlUartV2::aml_uart_for_testing() {
@@ -126,19 +117,6 @@ void AmlUartV2::OnReceivedMetadata(
                        compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
 }
 
-zx_status_t AmlUartV2::GetPowerConfiguration(
-    const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev) {
-  auto sag = incoming()->Connect<fuchsia_power_system::ActivityGovernor>();
-  if (sag.is_error() || !sag->is_valid()) {
-    FDF_LOG(WARNING, "Failed to connect to activity governor: %s", sag.status_string());
-    return sag.status_value();
-  }
-
-  sag_ = std::move(sag.value());
-
-  return ZX_OK;
-}
-
 void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result) {
   if (device_server_init_result.is_error()) {
     CompleteStart(device_server_init_result.take_error());
@@ -155,14 +133,6 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
   fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> fidl_pdev(
       std::move(pdev_connection.value()));
 
-  if (driver_config_.enable_suspend()) {
-    if (zx_status_t status = GetPowerConfiguration(fidl_pdev); status != ZX_OK) {
-      FDF_LOG(INFO, "Could not get power configuration: %s", zx_status_get_string(status));
-      CompleteStart(zx::error(status));
-      return;
-    }
-  }
-
   fdf::PDev pdev(fidl_pdev.TakeClientEnd());
 
   zx::result mmio = pdev.MapMmio(0);
@@ -172,46 +142,18 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
     return;
   }
 
-  zx::result irq_dispatcher_result =
-      fdf::SynchronizedDispatcher::Create({}, "aml_uart_irq", [this](fdf_dispatcher_t*) {
-        // Shutdown timer dispatcher if there is one, otherwise call prepare_stop_completer_.
-        if (timer_dispatcher_) {
-          timer_dispatcher_->ShutdownAsync();
-          return;
-        }
-        if (prepare_stop_completer_.has_value()) {
-          fdf::PrepareStopCompleter completer = std::move(prepare_stop_completer_.value());
-          prepare_stop_completer_.reset();
-          completer(zx::ok());
-        }
-      });
-  if (irq_dispatcher_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create irq dispatcher: %s", irq_dispatcher_result.status_string());
-    CompleteStart(irq_dispatcher_result.take_error());
-    return;
+  fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag;
+  if (driver_config_.enable_suspend()) {
+    zx::result result = incoming()->Connect<fuchsia_power_system::ActivityGovernor>();
+    if (result.is_error() || !result->is_valid()) {
+      FDF_LOG(WARNING, "Failed to connect to activity governor: %s", result.status_string());
+      CompleteStart(result.take_error());
+    }
+    sag = std::move(result.value());
   }
 
-  irq_dispatcher_.emplace(std::move(irq_dispatcher_result.value()));
-
-  zx::result timer_dispatcher_result =
-      fdf::SynchronizedDispatcher::Create({}, "aml_uart_timer", [this](fdf_dispatcher_t*) {
-        if (prepare_stop_completer_.has_value()) {
-          fdf::PrepareStopCompleter completer = std::move(prepare_stop_completer_.value());
-          prepare_stop_completer_.reset();
-          completer(zx::ok());
-        }
-      });
-  if (timer_dispatcher_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create timer dispatcher: %s",
-            timer_dispatcher_result.status_string());
-    CompleteStart(timer_dispatcher_result.take_error());
-    return;
-  }
-
-  timer_dispatcher_.emplace(std::move(timer_dispatcher_result.value()));
   aml_uart_.emplace(std::move(pdev), serial_port_info_, std::move(mmio.value()),
-                    irq_dispatcher_->borrow(), timer_dispatcher_->borrow(),
-                    driver_config_.enable_suspend(), std::move(sag_));
+                    driver_config_.enable_suspend(), std::move(sag));
 
   // Default configuration for the case that serial_impl_config is not called.
   constexpr uint32_t kDefaultBaudRate = 115200;

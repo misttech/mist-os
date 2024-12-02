@@ -27,9 +27,6 @@ class AmlUartV2 : public fdf::DriverBase {
   AmlUart& aml_uart_for_testing();
 
  private:
-  zx_status_t GetPowerConfiguration(
-      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev);
-
   void OnReceivedMetadata(
       fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetMetadata>& metadata_result);
 
@@ -44,15 +41,12 @@ class AmlUartV2 : public fdf::DriverBase {
   fidl::WireClient<fuchsia_driver_compat::Device> compat_client_;
   fidl::WireClient<fuchsia_driver_framework::Node> parent_node_client_;
   fuchsia_hardware_serial::wire::SerialPortInfo serial_port_info_;
-  std::optional<fdf::SynchronizedDispatcher> irq_dispatcher_;
-  std::optional<fdf::SynchronizedDispatcher> timer_dispatcher_;
   std::optional<AmlUart> aml_uart_;
   std::optional<fdf::PrepareStopCompleter> prepare_stop_completer_;
   compat::AsyncInitializedDeviceServer device_server_;
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_impl_bindings_;
 
   aml_uart_config::Config driver_config_;
-  std::optional<fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>> sag_;
 };
 
 }  // namespace serial
