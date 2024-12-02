@@ -301,6 +301,10 @@ if (current_toolchain == default_toolchain) {
 
         # The following is used by lib/vars.sh to auto-startup reproxy.
         needs_reproxy = cxx_enable || link_enable || rust_enable
+
+        # Set the following to true if any remote build service is used.
+        needs_auth =
+            needs_reproxy || bazel_enable || bazel_upload_build_events != ""
       }
     }
     output_conversion = "json"

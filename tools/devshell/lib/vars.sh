@@ -93,19 +93,35 @@ function fx-rbe-enabled {
   fx-build-dir-if-present || return 1
 
   # This RBE settings file is created at GN gen time.
-  local rbe_settings_file="${FUCHSIA_BUILD_DIR}/rbe_settings.json"
+  local -r rbe_settings_file="${FUCHSIA_BUILD_DIR}/rbe_settings.json"
 
   # Check to see if the rbe settings indicate that the reproxy wrapper is
   # needed.
-  needs_reproxy=($("$jq" '-r' '.final.needs_reproxy' < "${rbe_settings_file}"))
+  local needs_reproxy=($("$jq" '-r' '.final.needs_reproxy' < "${rbe_settings_file}"))
   if [[ "$needs_reproxy" != "true" ]]; then
     return 1
   fi
 }
 
-# At the moment, direct use of RBE uses gcloud to authenticate.
-# TODO(https://fxbug.dev/42173157): simplify this process with an auth script
-#   without depending on a locally installed gcloud.
+function fx-build-needs-auth() {
+  # For testing-only, return 1 to indicate that authentication is not needed.
+  fx-build-dir-if-present || return 1
+
+  # This RBE settings file is created at GN gen time.
+  local -r rbe_settings_file="${FUCHSIA_BUILD_DIR}/rbe_settings.json"
+
+  # Return 0 if authentication is needed for build remote services,
+  # otherwise return 1.
+  local needs_auth=($("$jq" '-r' '.final.needs_auth' < "${rbe_settings_file}"))
+  if [[ "$needs_auth" != "true" ]]; then
+    return 1
+  fi
+}
+
+# reclient and bazel uses either gcloud or a LOAS credential helper
+# to authenticate.
+# TODO(b/342026853): if LOAS credentials are unrestricted,
+# use the credential helper, otherwise fallback to gcloud.
 function fx-check-rbe-setup {
   if ! fx-rbe-enabled ; then return ; fi
 
