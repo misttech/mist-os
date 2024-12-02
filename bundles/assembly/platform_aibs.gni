@@ -39,6 +39,7 @@ bootstrap_user_platform_aib_names = [
   "kernel_args_user",
   "kernel_contiguous_physical_pages",
   "kernel_logs_in_reboot_info",
+  "kernel_arm64_event_stream_disable",
 
   # Static resource files.
   "resources",

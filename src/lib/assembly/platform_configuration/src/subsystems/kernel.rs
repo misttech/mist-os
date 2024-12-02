@@ -81,6 +81,10 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             builder.kernel_arg(KernelArg::SchedulerPreferLittleCpus(true));
         }
 
+        if !context.board_info.kernel.arm64_event_stream_enable {
+            builder.platform_bundle("kernel_arm64_event_stream_disable");
+        }
+
         if context.board_info.kernel.quiet_early_boot {
             anyhow::ensure!(
                 context.build_type == &BuildType::Eng,
