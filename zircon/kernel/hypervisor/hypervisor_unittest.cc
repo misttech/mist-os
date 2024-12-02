@@ -422,6 +422,10 @@ static bool guest_physical_aspace_query() {
     return true;
   }
 
+  // Disable the VM scanner to ensure pages stay committed into the VMO, and hence stay mapped into
+  // the aspace before we query.
+  AutoVmScannerDisable scanner_disable;
+
   // This test is arch independent so be conservative with the permission and assume that read is
   // needed for any other permission.
   constexpr uint kMmuFlagTests[] = {
