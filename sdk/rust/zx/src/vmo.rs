@@ -48,6 +48,13 @@ pub struct VmoInfo {
     pub populated_fractional_scaled_bytes: u64,
 }
 
+impl VmoInfo {
+    /// Transitional method. Returns the content of [VmoInfo::cache_policy].
+    pub fn cache_policy(&self) -> CachePolicy {
+        self.cache_policy
+    }
+}
+
 impl Default for VmoInfo {
     fn default() -> VmoInfo {
         Self::from(sys::zx_info_vmo_t::default())
