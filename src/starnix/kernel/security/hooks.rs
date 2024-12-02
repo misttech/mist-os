@@ -706,6 +706,21 @@ pub fn check_fs_node_removexattr_access(
     })
 }
 
+/// If SELinux is enabled and `fs_node` is in a filesystem without xattr support, returns the xattr
+/// name for the security label associated with inode. Otherwise returns None.
+///
+/// This hook is called from the `listxattr` syscall.
+///
+/// Corresponds to the `inode_listsecurity()` LSM hook.
+pub fn fs_node_listsecurity(current_task: &CurrentTask, fs_node: &FsNode) -> Option<FsString> {
+    profile_duration!("security.hooks.fs_node_listsecurity");
+    if_selinux_else(
+        current_task,
+        |security_server| selinux_hooks::fs_node_listsecurity(security_server, fs_node),
+        || None,
+    )
+}
+
 /// Returns the value of the specified "security.*" attribute for `fs_node`.
 /// If SELinux is enabled then requests for the "security.selinux" attribute will return the
 /// Security Context corresponding to the SID with which `fs_node` has been labeled, even if the

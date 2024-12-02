@@ -740,6 +740,18 @@ pub(super) fn check_file_ioctl_access(
     )
 }
 
+/// If `fs_node` is in a filesystem without xattr support, returns the xattr name for the security
+/// label (i.e. "security.selinux"). Otherwise returns None.
+pub(super) fn fs_node_listsecurity(
+    security_server: &SecurityServer,
+    fs_node: &FsNode,
+) -> Option<FsString> {
+    if security_server.filesystem_supports_xattr(fs_node.fs().name().into()) {
+        return None;
+    }
+    return Some(XATTR_NAME_SELINUX.to_bytes().into());
+}
+
 /// Returns the Security Context corresponding to the SID with which `FsNode`
 /// is labelled, otherwise delegates to the node's [`crate::vfs::FsNodeOps`].
 pub(super) fn fs_node_getsecurity<L>(

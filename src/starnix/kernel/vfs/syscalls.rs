@@ -37,7 +37,9 @@ use starnix_uapi::auth::{
     PTRACE_MODE_ATTACH_REALCREDS,
 };
 use starnix_uapi::device_type::DeviceType;
-use starnix_uapi::errors::{Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ETIMEDOUT};
+use starnix_uapi::errors::{
+    Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ENOTSUP, ETIMEDOUT,
+};
 use starnix_uapi::file_lease::FileLeaseType;
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::inotify_mask::InotifyMask;
@@ -1402,11 +1404,26 @@ fn do_listxattr(
     list_addr: UserAddress,
     size: usize,
 ) -> Result<usize, Errno> {
-    let mut list = vec![];
-    let xattrs = match node.entry.node.list_xattrs(locked, current_task, size)? {
-        ValueOrSize::Size(s) => return Ok(s),
-        ValueOrSize::Value(v) => v,
+    let security_xattr = security::fs_node_listsecurity(current_task, &node.entry.node);
+    let xattrs = match node.entry.node.list_xattrs(locked, current_task, size) {
+        Ok(ValueOrSize::Size(s)) => return Ok(s + security_xattr.map_or(0, |s| s.len() + 1)),
+        Ok(ValueOrSize::Value(mut v)) => {
+            if let Some(security_value) = security_xattr {
+                if !v.contains(&security_value) {
+                    v.push(security_value);
+                }
+            }
+            v
+        }
+        Err(e) => {
+            if e.code != ENOTSUP || security_xattr.is_none() {
+                return Err(e);
+            }
+            vec![security_xattr.unwrap()]
+        }
     };
+
+    let mut list = vec![];
     for name in xattrs.iter() {
         list.extend_from_slice(name);
         list.push(b'\0');

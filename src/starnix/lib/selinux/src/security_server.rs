@@ -398,6 +398,17 @@ impl SecurityServer {
         Some(active_policy.sid_table.security_context_to_sid(&security_context).unwrap())
     }
 
+    /// Returns whether the given type of filesystem `fs_type` supports xattr, based on the presence
+    /// of an `fs_use_xattr` statement in the policy file.
+    pub fn filesystem_supports_xattr(&self, fs_type: NullessByteStr<'_>) -> bool {
+        let locked_state = self.state.lock();
+        let active_policy = locked_state.expect_active_policy();
+        if let Some(fs_use) = active_policy.parsed.fs_use_label_and_type(fs_type) {
+            return fs_use.use_type == FsUseType::Xattr;
+        }
+        return false;
+    }
+
     /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
     /// `target_class`.
     fn compute_access_vector(
