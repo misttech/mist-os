@@ -167,13 +167,16 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
                          bool apply_color_conversion = false) {
   std::scoped_lock lock(lock_);
   FX_CHECK(images.size() == rectangles.size());
-  if (images.size() == 1) {
-    // TODO(b/304596608): Handle the most basic case first (images[0]).
-    // This should be extended to other cases later.
-    auto image = images[0];
+  for (uint32_t i = 0; i < images.size(); i++) {
+    // TODO(b/304596608): Currently this solution is not feature complete:
+    //   * We let multiple images overwrite each other.
+    //   * Origin is ignored.
+    //   * Mapping to the target rectangle is ignored.
+    // Fix these use cases.
+    auto image = images[i];
     auto image_id = image.identifier;
 
-    ImageRect rectangle = rectangles[0];
+    ImageRect rectangle = rectangles[i];
     uint32_t rectangle_width = static_cast<uint32_t>(rectangle.extent.x);
     uint32_t rectangle_height = static_cast<uint32_t>(rectangle.extent.y);
 
@@ -226,10 +229,6 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
     FX_CHECK(rectangle.orientation == fuchsia::ui::composition::Orientation::CCW_0_DEGREES);
     FX_CHECK(rectangle_width <= render_target.width);
     FX_CHECK(rectangle_height <= render_target.height);
-    FX_CHECK(rectangle_width == image.width);
-    FX_CHECK(rectangle_height == image.height);
-    FX_CHECK(rectangle.origin.x == 0);
-    FX_CHECK(rectangle.origin.y == 0);
 
     auto image_pixels_per_row = utils::GetPixelsPerRow(image_constraints, image.width);
     auto render_target_pixels_per_row =
