@@ -442,6 +442,9 @@ std::optional<std::vector<uint8_t>> ElfLib::GetNote(const std::string& name, uin
     }
 
     auto data = GetSegmentData(idx);
+    if (data.ptr == nullptr || data.size == 0) {
+      continue;
+    }
 
     Elf64_Nhdr header;
     size_t namesz_padded;
