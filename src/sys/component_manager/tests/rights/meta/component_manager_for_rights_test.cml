@@ -2,41 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
-    ],
-    program: {
-        runner: "elf",
-        binary: "bin/component_manager_eng",
-        args: [
-            "--config",
-            "/pkg/data/component_manager_debug_config",
-        ],
-    },
+    include: [ "//src/sys/component_manager/meta/component_manager.cml" ],
     children: [
         {
             name: "expose_dir_rights",
             url: "#meta/expose_dir_rights.cm",
         },
     ],
-    capabilities: [
-        {
-            protocol: [
-                "fuchsia.sys2.LifecycleController",
-                "fuchsia.sys2.RealmQuery",
-            ],
-        },
-    ],
     use: [
-        {
-            protocol: [
-                "fuchsia.component.resolver.RealmBuilder",
-                "fuchsia.component.runner.RealmBuilder",
-                "fuchsia.process.Launcher",
-            ],
-        },
-
         // Take the maximal set of rights here. They should be scoped down by
         // the component manager configuration file.
         {
@@ -68,15 +41,6 @@
             from: "#expose_dir_rights",
             rights: [ "r*" ],
             path: "/read_only_after_scoped",
-        },
-    ],
-    expose: [
-        {
-            protocol: [
-                "fuchsia.sys2.LifecycleController",
-                "fuchsia.sys2.RealmQuery",
-            ],
-            from: "self",
         },
     ],
 }

@@ -1136,11 +1136,8 @@ async fn nested_component_manager_with_passthrough_directory() -> Result<(), Err
         )
         .await
         .expect("failed to add route");
-    // The expose_dir_rights.cm component manifest is written such that we need
-    // to use it with the component_manager_for_rights_test.cm. We could write a
-    // new manifest, but that seems heavy weight for a single integration test.
     let cm_instance = builder
-        .build_in_nested_component_manager("#meta/component_manager_for_rights_test.cm")
+        .build_in_nested_component_manager("#meta/component_manager_expose_dir_rights.cm")
         .await?;
 
     // component_manager_for_rights_test.cm uses debug configuration, so
@@ -1924,8 +1921,7 @@ async fn from_fragment_invalid_manifest() -> Result<(), Error> {
     // The file referenced here is intentionally not a component manifest
     assert_matches!(
         RealmBuilder::with_params(
-            RealmBuilderParams::new()
-                .from_relative_url("#data/component_manager_realm_builder_config")
+            RealmBuilderParams::new().from_relative_url("#data/component_manager_config")
         )
         .await,
         Err(RealmBuilderError::ServerError(ftest::RealmBuilderError::DeclReadError))

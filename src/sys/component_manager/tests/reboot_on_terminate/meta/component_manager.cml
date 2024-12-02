@@ -2,23 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "syslog/client.shard.cml" ],
-    program: {
-        runner: "elf",
-        binary: "bin/component_manager_eng",
-        args: [
-            "--config",
-            "/pkg/data/component_manager_config",
-        ],
-    },
+    include: [ "//src/sys/component_manager/meta/component_manager.cml" ],
     use: [
-        {
-            protocol: [
-                "fidl.test.components.Trigger",
-                "fuchsia.component.resolver.RealmBuilder",
-                "fuchsia.component.runner.RealmBuilder",
-                "fuchsia.process.Launcher",
-            ],
-        },
+        { protocol: "fidl.test.components.Trigger" },
     ],
 }

@@ -1,17 +1,6 @@
 {
     debug: true,
-    maintain_utc_clock: false,
-    use_builtin_process_launcher: false,
-    num_threads: 1,
     namespace_capabilities: [
-        {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.process.Launcher",
-            ],
-        },
-
         // For route_directories_from_component_manager_namespace test
         {
             directory: "read_only",
@@ -49,24 +38,4 @@
             ],
         },
     ],
-    builtin_capabilities: [
-        {
-            protocol: [
-                "fuchsia.sys2.CrashIntrospect",
-                "fuchsia.sys2.SystemController",
-            ],
-        },
-        {
-            runner: "builtin_elf_runner",
-        },
-        {
-            runner: "realm_builder",
-        },
-        {
-            resolver: "realm_builder_resolver",
-        },
-    ],
-    realm_builder_resolver_and_runner: "namespace",
-    log_all_events: true,
-    enable_introspection: true,
 }

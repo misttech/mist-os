@@ -117,10 +117,8 @@ fn build_runtime_config(args: &startup::Arguments) -> (RuntimeConfig, Option<Boo
             panic!("Failed to read config from uninitialized vfs with error {}.", err)
         })
     } else {
-        // This is the legacy path where bootsvc is hosting a C++ bootfs VFS,
-        // and component manager can read its config using standard filesystem APIs.
         let path = PathBuf::from(&args.config);
-        std::fs::read(path).expect("failed to read config file")
+        std::fs::read(&path).unwrap_or_else(|e| panic!("failed to read config file {path:?}: {e}"))
     };
 
     let mut config = RuntimeConfig::new_from_bytes(&config_bytes)

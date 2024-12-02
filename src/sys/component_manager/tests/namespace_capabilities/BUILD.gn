@@ -67,9 +67,11 @@ rustc_binary("integration_test_root_bin") {
   sources = [ "integration_test_root.rs" ]
 }
 
-component_config("config") {
-  sources = [ "namespace_config.json5" ]
-  dest = "data/component_manager_config"
+component_config("component_manager_config") {
+  sources = [
+    "//src/sys/component_manager/configs/test_config.base.json5",
+    "namespace_config.json5",
+  ]
 }
 
 resource("testdata") {
@@ -80,10 +82,10 @@ resource("testdata") {
 fuchsia_component("component-manager") {
   testonly = true
   deps = [
-    ":config",
+    ":component_manager_config",
     "//src/sys/component_manager:bin_eng",
   ]
-  manifest = "meta/component_manager.cml"
+  manifest = "//src/sys/component_manager/meta/component_manager.cml"
 }
 
 fuchsia_component("integration-test-root") {

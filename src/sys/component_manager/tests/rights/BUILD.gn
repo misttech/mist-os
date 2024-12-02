@@ -179,20 +179,25 @@ fuchsia_component("elf_runner_and_environment") {
   manifest = "meta/elf_runner_and_environment.cml"
 }
 
-component_config("component_manager_debug_config") {
-  sources = [ "rights_test_config.json5" ]
+component_config("component_manager_config") {
+  sources = [
+    "//src/sys/component_manager/configs/test_config.base.json5",
+    "rights_test_config.json5",
+  ]
 }
 
 fuchsia_component("component_manager_for_rights_test") {
   testonly = true
-  deps = [ "//src/sys/component_manager:bin_eng" ]
+  deps = [
+    ":component_manager_config",
+    "//src/sys/component_manager:bin_eng",
+  ]
   manifest = "meta/component_manager_for_rights_test.cml"
 }
 
 fuchsia_unittest_package("rights_integration_test") {
   manifest = "meta/rights_integration_test.cml"
   deps = [
-    ":component_manager_debug_config",
     ":component_manager_for_rights_test",
     ":elf_runner_and_environment",
     ":expose_dir_rights",

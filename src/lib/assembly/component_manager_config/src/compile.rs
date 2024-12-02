@@ -15,6 +15,19 @@ use std::io::Write;
 use std::path::PathBuf;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal};
 
+trait Mergeable {
+    fn merge(self, another: Self) -> Result<Self, Error>
+    where
+        Self: Sized;
+}
+
+impl<T> Mergeable for Vec<T> {
+    fn merge(mut self, another: Self) -> Result<Self, Error> {
+        self.extend(another);
+        Ok(self)
+    }
+}
+
 fn remove_duplicates<T: Ord>(mut v: Vec<T>) -> Vec<T> {
     v.sort();
     v.dedup();
@@ -197,9 +210,9 @@ pub struct SecurityPolicy {
     child_policy: Option<ChildPolicyAllowlists>,
 }
 
-impl SecurityPolicy {
-    fn merge(self, another: SecurityPolicy) -> Result<Self, Error> {
-        return Ok(SecurityPolicy {
+impl Mergeable for SecurityPolicy {
+    fn merge(self, another: Self) -> Result<Self, Error> {
+        return Ok(Self {
             job_policy: deep_merge_field!(self, another, job_policy),
             capability_policy: merge_option(
                 self.capability_policy,
@@ -559,8 +572,8 @@ impl Config {
             maintain_utc_clock: merge_field!(self, another, maintain_utc_clock),
             list_children_batch_size: merge_field!(self, another, list_children_batch_size),
             security_policy: deep_merge_field!(self, another, security_policy),
-            namespace_capabilities: merge_field!(self, another, namespace_capabilities),
-            builtin_capabilities: merge_field!(self, another, builtin_capabilities),
+            namespace_capabilities: deep_merge_field!(self, another, namespace_capabilities),
+            builtin_capabilities: deep_merge_field!(self, another, builtin_capabilities),
             num_threads: merge_field!(self, another, num_threads),
             root_component_url: merge_field!(self, another, root_component_url),
             component_id_index_path: merge_field!(self, another, component_id_index_path),

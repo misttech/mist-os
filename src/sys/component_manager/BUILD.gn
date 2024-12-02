@@ -13,6 +13,7 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/testing/environments.gni")
 import("//build/toolchain/concurrent_jobs.gni")
+import("//build/tools/json_merge/json_merge.gni")
 import("//tools/fidl/measure-tape/measure_tape.gni")
 
 _component_manager_bin = {
@@ -330,7 +331,7 @@ fuchsia_component("component-manager-realm-builder-debug-cmp") {
     ":component_manager_realm_builder_debug_config",
   ]
   component_name = "component_manager"
-  manifest = "meta/component_manager_debug.cml"
+  manifest = "meta/component_manager.cml"
 }
 
 # This is a low-level action that compiles `elf_runner.cml`
@@ -425,18 +426,19 @@ bootfs_files_for_assembly("bootfs") {
 }
 
 component_config("component_manager_realm_builder_config") {
-  sources = [ "configs/realm_builder_config.json5" ]
-  dest = "data/component_manager_realm_builder_config"
+  sources = [
+    "configs/no_debug.json5",
+    "configs/test_config.base.json5",
+  ]
+  dest = "data/component_manager_config"
 }
 
 component_config("component_manager_realm_builder_debug_config") {
-  sources = [ "configs/realm_builder_debug_config.json5" ]
-  dest = "data/component_manager_realm_builder_debug_config"
-}
-
-component_config("component_manager_realm_builder_passthrough_config") {
-  sources = [ "configs/realm_builder_passthrough_config.json5" ]
-  dest = "data/component_manager_realm_builder_passthrough_config"
+  sources = [
+    "configs/debug.json5",
+    "configs/test_config.base.json5",
+  ]
+  dest = "data/component_manager_config"
 }
 
 component_config("component_manager_bootfs_config") {

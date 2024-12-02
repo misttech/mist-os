@@ -109,31 +109,24 @@ fuchsia_component("realm") {
   manifest = "meta/realm.cml"
 }
 
-component_config("cm_config") {
+component_config("component_manager_config") {
   sources = [ "cm_config.json5" ]
 }
 
-resource("cm_config_resource") {
-  sources = [ "$target_gen_dir/cm_config" ]
-  outputs = [ "data/cm_config" ]
-  deps = [ ":cm_config" ]
-}
-
-fuchsia_component("component-manager") {
+fuchsia_component("component_manager") {
   testonly = true
   deps = [
-    ":cm_config_resource",
+    ":component_manager_config",
     "//src/sys/component_manager:bin_eng",
   ]
-  component_name = "component_manager"
-  manifest = "meta/component_manager.cml"
+  manifest = "//src/sys/component_manager/meta/component_manager.cml"
 }
 
 # Run with `fx test utc-time-tests`.
 fuchsia_test_package("utc-time-tests") {
   test_components = [ ":integration-test-component" ]
   deps = [
-    ":component-manager",
+    ":component_manager",
     ":maintainer-component",
     ":realm",
     ":time-client",

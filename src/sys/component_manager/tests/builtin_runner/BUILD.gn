@@ -49,21 +49,9 @@ fuchsia_unittest_package("builtin-runner-test") {
   manifest = "meta/builtin-runner-test.cml"
   deps = [
     ":builtin_runner_test_bin",
-    ":component-manager-realm-builder-debug-with-builtin-runner-cmp",
     ":simple_elf_program_builtin_elf_runner",
     ":simple_elf_program_packaged_elf_runner",
+    "//src/sys/component_manager:component-manager-realm-builder-debug-cmp",
     "//src/sys/component_manager:elf_runner",
   ]
-}
-
-fuchsia_component(
-    "component-manager-realm-builder-debug-with-builtin-runner-cmp") {
-  testonly = true
-  deps = [
-    "//src/sys/component_manager:bin_eng",
-    "//src/sys/component_manager:component_id_index_for_debug_config",
-    "//src/sys/component_manager:component_manager_realm_builder_debug_config",
-  ]
-  component_name = "component_manager"
-  manifest = "meta/component_manager_debug_with_builtin_runner.cml"
 }

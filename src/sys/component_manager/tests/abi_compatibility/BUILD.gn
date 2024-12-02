@@ -42,8 +42,10 @@ fuchsia_test_package("abi_compatibility_tests") {
 }
 
 component_config("component_manager_config") {
-  sources = [ "configs/abi_compat_cm_config.json5" ]
-  dest = "data/cm_config"
+  sources = [
+    "//src/sys/component_manager/configs/test_config.base.json5",
+    "configs/abi_compat_cm_config.json5",
+  ]
 }
 
 fuchsia_component("abi_compat_component_manager") {
@@ -52,7 +54,7 @@ fuchsia_component("abi_compat_component_manager") {
     ":component_manager_config",
     "//src/sys/component_manager:bin_eng",
   ]
-  manifest = "meta/abi_compat_component_manager.cml"
+  manifest = "//src/sys/component_manager/meta/component_manager.cml"
 }
 
 group("tests") {

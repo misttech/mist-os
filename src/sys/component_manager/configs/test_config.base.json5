@@ -1,12 +1,10 @@
 {
-    debug: false,
     maintain_utc_clock: false,
     use_builtin_process_launcher: false,
     num_threads: 2,
     namespace_capabilities: [
         {
             protocol: [
-                "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.tracing.provider.Registry",
