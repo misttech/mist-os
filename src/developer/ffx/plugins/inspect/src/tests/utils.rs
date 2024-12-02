@@ -150,7 +150,7 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
     let mock_realm_query = iquery_test_support::MockRealmQuery::default();
     let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
     let scope = fasync::Scope::new();
-    let inner_scope = scope.make_ref();
+    let inner_scope = scope.to_handle();
     scope.spawn_local(async move {
         let querier = Rc::new(mock_realm_query);
         while let Ok(Some(req)) = stream.try_next().await {
