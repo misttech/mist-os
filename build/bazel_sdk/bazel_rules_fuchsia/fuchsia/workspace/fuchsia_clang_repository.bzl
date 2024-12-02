@@ -73,12 +73,10 @@ def _fuchsia_clang_repository_impl(ctx):
     # Claim dependency on the templates.
     crosstool_template = Label("//fuchsia/workspace/clang_templates:crosstool.BUILD.template")
     toolchain_config_template = Label("//fuchsia/workspace/clang_templates:cc_toolchain_config_template.bzl")
-    cc_features_template_file = Label("//fuchsia/workspace/clang_templates:cc_features_template.bzl")
     defs_template_file = Label("//fuchsia/workspace/clang_templates:defs.bzl")
 
     ctx.path(crosstool_template)
     ctx.path(toolchain_config_template)
-    ctx.path(cc_features_template_file)
     ctx.path(defs_template_file)
 
     # Symlink in common toolchain helpers.
@@ -93,16 +91,6 @@ def _fuchsia_clang_repository_impl(ctx):
 
     normalized_os = normalize_os(ctx)
     normalized_arch = normalize_arch(ctx)
-
-    ctx.template(
-        "cc_features.bzl",
-        cc_features_template_file,
-        substitutions = {
-            "%{HOST_OS}": normalized_os,
-            "%{HOST_ARCH}": normalized_arch,
-        },
-        executable = False,
-    )
 
     if ctx.attr.local_path:
         local_clang = workspace_path(ctx, ctx.attr.local_path)

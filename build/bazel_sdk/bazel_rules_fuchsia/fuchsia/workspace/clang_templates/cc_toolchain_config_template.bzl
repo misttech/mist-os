@@ -16,7 +16,7 @@ load(
     "find_cpp_toolchain",
     "use_cpp_toolchain",
 )
-load("//:cc_features.bzl", "features")
+load("//common:toolchains/clang/cc_features.bzl", "features")
 load("//common:toolchains/clang/toolchain_utils.bzl", "compute_clang_features")
 load("//common/platforms:utils.bzl", "to_fuchsia_cpu_name")
 
