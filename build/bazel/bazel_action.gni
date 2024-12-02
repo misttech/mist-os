@@ -199,19 +199,6 @@ declare_args() {
 #     Type: boolean
 #     Default: false
 #
-#   no_sdk_workspace: (optional)
-#     Set this to true to run the action in the Bazel workspace that is setup
-#     without any Fuchsia IDK or SDK repository. This can be useful to generate
-#     host binaries and other targets in Bazel early in the build, without
-#     depending on building the large number of IDK atoms with Ninja.
-#
-#     Note that in this mode, the content of @fuchsia_sdk and @fuchsia_clang
-#     will be mostly empty, and only the content of @rules_fuchsia//common/
-#     will be usable. It is not possible to generate Fuchsia binaries.
-#
-#     Type: boolean
-#     Default: false
-#
 #   deps:
 #   metadata:
 #   no_output_dir_leaks:
@@ -766,31 +753,14 @@ template("bazel_action") {
 
     args += [ "--" ]
 
-    if (!defined(deps)) {
-      deps = []
-    }
-
-    _no_sdk_workspace =
-        defined(invoker.no_sdk_workspace) && invoker.no_sdk_workspace
-    if (_no_sdk_workspace) {
-      # Use the special config that overrides the IDK and SDK repositories
-      # to point to the empty versions under //build/bazel/local_repositories/
-      # This also sets the default platform to match the host system.
-      args += [ "--config=no_sdk" ]
-    } else {
-      # Ensure that the default platform is set correctly when this build action
-      # is invoked from a Fuchsia or host toolchain. For other ones. Other toolchains
-      # will inherit the 'default' platforms which may be set to
-      # //build/bazel/platforms:common in the future, and does not target any
-      # specific system intentionally.
-      if (is_host || is_fuchsia) {
-        args += [
-          "--platforms=//build/bazel/platforms:${current_os}_${current_cpu}",
-        ]
-      }
-
-      # Ensure the Ninja-build IDK atoms are build before invoking Bazel.
-      deps += bazel_workspace_idk_deps
+    # Ensure that the default platform is set correctly when this build action
+    # is invoked from a Fuchsia or host toolchain. For other ones. Other toolchains
+    # will inherit the 'default' platforms which may be set to
+    # //build/bazel/platforms:common in the future, and does not target any
+    # specific system intentionally.
+    if (is_host || is_fuchsia) {
+      args +=
+          [ "--platforms=//build/bazel/platforms:${current_os}_${current_cpu}" ]
     }
 
     _filter_bazel_info_logs = true
@@ -915,6 +885,9 @@ template("bazel_action") {
       ]
     }
 
+    if (!defined(deps)) {
+      deps = []
+    }
     deps += [
       ":${_all_licenses_spdx_target}",
       ":${_gn_targets_repository_target}",
