@@ -11,11 +11,6 @@ load(
     "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
     "tool_path",
 )
-load(
-    "@bazel_tools//tools/cpp:toolchain_utils.bzl",
-    "find_cpp_toolchain",
-    "use_cpp_toolchain",
-)
 load("//common:toolchains/clang/cc_features.bzl", "features")
 load("//common:toolchains/clang/toolchain_utils.bzl", "compute_clang_features")
 load("//common/platforms:utils.bzl", "to_fuchsia_cpu_name")
@@ -95,31 +90,4 @@ cc_toolchain_config = rule(
         "cpu": attr.string(mandatory = True, values = ["aarch64", "riscv64", "x86_64"]),
     },
     provides = [CcToolchainConfigInfo],
-)
-
-def _feature_flag(ctx):
-    toolchain = find_cpp_toolchain(ctx)
-    feature = ctx.attr.feature_name
-    feature_configuration = cc_common.configure_features(
-        ctx = ctx,
-        cc_toolchain = toolchain,
-        requested_features = ctx.features,
-        unsupported_features = ctx.disabled_features,
-    )
-    return [config_common.FeatureFlagInfo(value = str(cc_common.is_enabled(
-        feature_configuration = feature_configuration,
-        feature_name = feature,
-    )))]
-
-# A flag whose value corresponds to whether a toolchain feature is enabled.
-# For instance if `feature_name = "asan"` and you passed `--features=asan`
-# then the value will be True.
-feature_flag = rule(
-    implementation = _feature_flag,
-    attrs = {
-        "feature_name": attr.string(),
-        "_cc_toolchain": attr.label(default = Label("@bazel_tools//tools/cpp:current_cc_toolchain")),
-    },
-    fragments = ["cpp"],
-    toolchains = use_cpp_toolchain(),
 )
