@@ -68,8 +68,9 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
 
   void ExpectWatchControllerWriteCommands(uint8_t address, uint16_t data) {
     std::visit(
-        overloaded{[&](WatchControllerWriteCommandsCompleter::Async& completer) {
-                     completer.Reply(
+        overloaded{[&](WatchControllerRequest& request) {
+                     EXPECT_EQ(request.address, address);
+                     request.completer.Reply(
                          zx::ok(std::vector<fuchsia_hardware_spmi::Register8>{{address, data}}));
                      expect_watch_ = std::monostate{};
                    },
@@ -156,13 +157,37 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
   void WatchControllerWriteCommands(
       WatchControllerWriteCommandsRequest& request,
       WatchControllerWriteCommandsCompleter::Sync& completer) override {
-    std::visit(overloaded{[](WatchControllerWriteCommandsCompleter::Async&) { ZX_ASSERT(false); },
+    EXPECT_EQ(request.size(), 1);
+
+    std::visit(overloaded{[](WatchControllerRequest&) { ZX_ASSERT(false); },
                           [&](std::vector<fuchsia_hardware_spmi::Register8>& data) {
+                            EXPECT_EQ(data.size(), 1);
+                            EXPECT_EQ(data[0].address(), request.address());
+
                             completer.Reply(zx::ok(std::move(data)));
                             expect_watch_ = std::monostate{};
                           },
-                          [&](std::monostate&) { expect_watch_ = completer.ToAsync(); }},
+                          [&](std::monostate&) {
+                            expect_watch_ = WatchControllerRequest{
+                                .address = request.address(), .completer = completer.ToAsync()};
+                          }},
                expect_watch_);
+  }
+
+  void CancelWatchControllerWriteCommands(
+      CancelWatchControllerWriteCommandsRequest& request,
+      CancelWatchControllerWriteCommandsCompleter::Sync& completer) override {
+    EXPECT_EQ(request.size(), 1);
+
+    std::visit(overloaded{[&](WatchControllerRequest& req) {
+                            EXPECT_EQ(req.address, request.address());
+                            req.completer.Reply(zx::error(ZX_ERR_CANCELED));
+                            expect_watch_ = std::monostate{};
+                          },
+                          [](std::vector<fuchsia_hardware_spmi::Register8>&) { ZX_ASSERT(false); },
+                          [](std::monostate&) { ZX_ASSERT(false); }},
+               expect_watch_);
+    completer.Reply(zx::ok());
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_spmi::Device> metadata,
@@ -175,7 +200,11 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
   }
 
   std::queue<SpmiExpectation> expectations_;
-  std::variant<std::monostate, WatchControllerWriteCommandsCompleter::Async,
+  struct WatchControllerRequest {
+    uint8_t address;
+    WatchControllerWriteCommandsCompleter::Async completer;
+  };
+  std::variant<std::monostate, WatchControllerRequest,
                std::vector<fuchsia_hardware_spmi::Register8>>
       expect_watch_;
 };
