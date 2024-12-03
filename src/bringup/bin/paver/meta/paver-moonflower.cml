@@ -4,6 +4,6 @@
 {
     include: [ "//src/bringup/bin/paver/meta/paver.cml" ],
     program: {
-        binary: "bin/paver-kola",
+        binary: "bin/paver-moonflower",
     },
 }

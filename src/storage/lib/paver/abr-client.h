@@ -123,7 +123,7 @@ class Client {
   Client& operator=(Client&&) = delete;
 
  private:
-  friend class KolaAbrClientTest;
+  friend class MoonflowerAbrClientTest;
 
   AbrOps abr_ops_;
 

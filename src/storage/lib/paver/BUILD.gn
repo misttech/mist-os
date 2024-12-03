@@ -143,8 +143,8 @@ source_set("nelson") {
   ]
 }
 
-source_set("kola") {
-  sources = [ "kola.cc" ]
+source_set("moonflower") {
+  sources = [ "moonflower.cc" ]
   public_deps = [
     ":gpt",
     ":paver-core",
@@ -204,8 +204,8 @@ source_set("paver") {
   public_deps = [
     ":android",
     ":astro",
-    ":kola",
     ":luis",
+    ":moonflower",
     ":nelson",
     ":paver-core",
     ":sherlock",

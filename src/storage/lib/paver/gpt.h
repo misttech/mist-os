@@ -68,7 +68,7 @@ class GptDevicePartitioner {
 
   struct FindPartitionDetailsResult {
     std::unique_ptr<BlockPartitionClient> partition;
-    // TODO(https://fxbug.dev/339491886): Remove this once Kola products are migrated to
+    // TODO(https://fxbug.dev/339491886): Remove this once Moonflower products are migrated to
     // storage-host.
     uint32_t index = UINT32_MAX;
   };

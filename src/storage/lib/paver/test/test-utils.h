@@ -24,8 +24,8 @@
 #include "src/storage/lib/paver/abr-client.h"
 #include "src/storage/lib/paver/astro.h"
 #include "src/storage/lib/paver/device-partitioner.h"
-#include "src/storage/lib/paver/kola.h"
 #include "src/storage/lib/paver/luis.h"
+#include "src/storage/lib/paver/moonflower.h"
 #include "src/storage/lib/paver/nelson.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/vim3.h"
@@ -51,7 +51,8 @@ class PaverTest : public zxtest::Test {
     paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
     paver::DevicePartitionerFactory::Register(
         std::make_unique<paver::SherlockPartitionerFactory>());
-    paver::DevicePartitionerFactory::Register(std::make_unique<paver::KolaPartitionerFactory>());
+    paver::DevicePartitionerFactory::Register(
+        std::make_unique<paver::MoonflowerPartitionerFactory>());
     paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
     paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
 

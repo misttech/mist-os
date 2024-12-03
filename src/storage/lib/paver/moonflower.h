@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_LIB_PAVER_KOLA_H_
-#define SRC_STORAGE_LIB_PAVER_KOLA_H_
+#ifndef SRC_STORAGE_LIB_PAVER_MOONFLOWER_H_
+#define SRC_STORAGE_LIB_PAVER_MOONFLOWER_H_
 
 #include <hwreg/bitfields.h>
 
@@ -17,10 +17,10 @@ namespace paver {
 using FindPartitionDetailsResult = GptDevicePartitioner::FindPartitionDetailsResult;
 using FilterCallback = GptDevicePartitioner::FilterCallback;
 
-struct KolaGptEntryAttributes {
-  static constexpr uint8_t kKolaMaxPriority = 3;
+struct MoonflowerGptEntryAttributes {
+  static constexpr uint8_t kMoonflowerMaxPriority = 3;
 
-  explicit KolaGptEntryAttributes(uint64_t flags) : flags(flags) {}
+  explicit MoonflowerGptEntryAttributes(uint64_t flags) : flags(flags) {}
 
   uint64_t flags;
   DEF_SUBFIELD(flags, 49, 48, priority);
@@ -30,7 +30,7 @@ struct KolaGptEntryAttributes {
   DEF_SUBBIT(flags, 55, unbootable);
 };
 
-class KolaPartitioner : public DevicePartitioner {
+class MoonflowerPartitioner : public DevicePartitioner {
  public:
   static zx::result<std::unique_ptr<DevicePartitioner>> Initialize(
       const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
@@ -76,14 +76,15 @@ class KolaPartitioner : public DevicePartitioner {
   zx::result<std::unique_ptr<GptDevice>> ConnectToGpt() const { return gpt_->ConnectToGpt(); }
 
  private:
-  explicit KolaPartitioner(std::unique_ptr<GptDevicePartitioner> gpt) : gpt_(std::move(gpt)) {}
+  explicit MoonflowerPartitioner(std::unique_ptr<GptDevicePartitioner> gpt)
+      : gpt_(std::move(gpt)) {}
 
   zx::result<std::string> PartitionNameForSpec(const PartitionSpec& spec) const;
 
   std::unique_ptr<GptDevicePartitioner> gpt_;
 };
 
-class KolaPartitionerFactory : public DevicePartitionerFactory {
+class MoonflowerPartitionerFactory : public DevicePartitionerFactory {
  public:
   zx::result<std::unique_ptr<DevicePartitioner>> New(
       const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
@@ -93,4 +94,4 @@ class KolaPartitionerFactory : public DevicePartitionerFactory {
 
 }  // namespace paver
 
-#endif  // SRC_STORAGE_LIB_PAVER_KOLA_H_
+#endif  // SRC_STORAGE_LIB_PAVER_MOONFLOWER_H_

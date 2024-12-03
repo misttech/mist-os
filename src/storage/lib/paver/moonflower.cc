@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/lib/paver/kola.h"
+#include "src/storage/lib/paver/moonflower.h"
 
 #include <fidl/fuchsia.storage.partitions/cpp/wire_types.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -30,10 +30,11 @@ using uuid::Uuid;
 
 }  // namespace
 
-zx::result<std::unique_ptr<DevicePartitioner>> KolaPartitioner::Initialize(
+zx::result<std::unique_ptr<DevicePartitioner>> MoonflowerPartitioner::Initialize(
     const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  if (IsBoard(svc_root, "kola").is_error() && IsBoard(svc_root, "sorrel").is_error()) {
+  if (IsBoard(svc_root, "kola").is_error() && IsBoard(svc_root, "sorrel").is_error() &&
+      IsBoard(svc_root, "lilac").is_error()) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -47,19 +48,19 @@ zx::result<std::unique_ptr<DevicePartitioner>> KolaPartitioner::Initialize(
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  auto partitioner = WrapUnique(new KolaPartitioner(std::move(gpt->gpt)));
+  auto partitioner = WrapUnique(new MoonflowerPartitioner(std::move(gpt->gpt)));
 
-  LOG("Successfully initialized Kola Device Partitioner\n");
+  LOG("Successfully initialized Moonflower Device Partitioner\n");
   return zx::ok(std::move(partitioner));
 }
 
-const paver::BlockDevices& KolaPartitioner::Devices() const { return gpt_->devices(); }
+const paver::BlockDevices& MoonflowerPartitioner::Devices() const { return gpt_->devices(); }
 
-fidl::UnownedClientEnd<fuchsia_io::Directory> KolaPartitioner::SvcRoot() const {
+fidl::UnownedClientEnd<fuchsia_io::Directory> MoonflowerPartitioner::SvcRoot() const {
   return gpt_->svc_root();
 }
 
-bool KolaPartitioner::SupportsPartition(const PartitionSpec& spec) const {
+bool MoonflowerPartitioner::SupportsPartition(const PartitionSpec& spec) const {
   constexpr PartitionSpec supported_specs[] = {
       PartitionSpec(paver::Partition::kZirconA), PartitionSpec(paver::Partition::kZirconB),
       PartitionSpec(paver::Partition::kFuchsiaVolumeManager)};
@@ -67,7 +68,8 @@ bool KolaPartitioner::SupportsPartition(const PartitionSpec& spec) const {
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
 }
 
-zx::result<std::string> KolaPartitioner::PartitionNameForSpec(const PartitionSpec& spec) const {
+zx::result<std::string> MoonflowerPartitioner::PartitionNameForSpec(
+    const PartitionSpec& spec) const {
   if (!SupportsPartition(spec)) {
     ERROR("Unsupported partition %s\n", spec.ToString().c_str());
     return zx::error(ZX_ERR_NOT_SUPPORTED);
@@ -85,18 +87,18 @@ zx::result<std::string> KolaPartitioner::PartitionNameForSpec(const PartitionSpe
       part_name = "super";
       break;
     default:
-      ERROR("Kola partitioner cannot find unknown partition type\n");
+      ERROR("Moonflower partitioner cannot find unknown partition type\n");
       return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   return zx::ok(std::move(part_name));
 }
 
-zx::result<std::unique_ptr<PartitionClient>> KolaPartitioner::FindPartition(
+zx::result<std::unique_ptr<PartitionClient>> MoonflowerPartitioner::FindPartition(
     const PartitionSpec& spec) const {
   return FindGptPartition(spec);
 }
 
-zx::result<std::unique_ptr<BlockPartitionClient>> KolaPartitioner::FindGptPartition(
+zx::result<std::unique_ptr<BlockPartitionClient>> MoonflowerPartitioner::FindGptPartition(
     const PartitionSpec& spec) const {
   zx::result name = PartitionNameForSpec(spec);
   if (name.is_error()) {
@@ -106,12 +108,12 @@ zx::result<std::unique_ptr<BlockPartitionClient>> KolaPartitioner::FindGptPartit
       [&](const GptPartitionMetadata& part) { return FilterByName(part, *name); });
 }
 
-zx::result<std::vector<std::unique_ptr<BlockPartitionClient>>> KolaPartitioner::FindAllPartitions(
-    FilterCallback filter) const {
+zx::result<std::vector<std::unique_ptr<BlockPartitionClient>>>
+MoonflowerPartitioner::FindAllPartitions(FilterCallback filter) const {
   return gpt_->FindAllPartitions(std::move(filter));
 }
 
-zx::result<FindPartitionDetailsResult> KolaPartitioner::FindPartitionDetails(
+zx::result<FindPartitionDetailsResult> MoonflowerPartitioner::FindPartitionDetails(
     const PartitionSpec& spec) const {
   zx::result name = PartitionNameForSpec(spec);
   if (name.is_error()) {
@@ -121,15 +123,15 @@ zx::result<FindPartitionDetailsResult> KolaPartitioner::FindPartitionDetails(
       [&](const GptPartitionMetadata& part) { return FilterByName(part, *name); });
 }
 
-zx::result<> KolaPartitioner::WipeFvm() const { return gpt_->WipeFvm(); }
+zx::result<> MoonflowerPartitioner::WipeFvm() const { return gpt_->WipeFvm(); }
 
-zx::result<> KolaPartitioner::ResetPartitionTables() const {
-  ERROR("Initialising partition tables is not supported for a Kola device\n");
+zx::result<> MoonflowerPartitioner::ResetPartitionTables() const {
+  ERROR("Initialising partition tables is not supported for a Moonflower device\n");
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx::result<> KolaPartitioner::ValidatePayload(const PartitionSpec& spec,
-                                              std::span<const uint8_t> data) const {
+zx::result<> MoonflowerPartitioner::ValidatePayload(const PartitionSpec& spec,
+                                                    std::span<const uint8_t> data) const {
   if (!SupportsPartition(spec)) {
     ERROR("Unsupported partition %s\n", spec.ToString().c_str());
     return zx::error(ZX_ERR_NOT_SUPPORTED);
@@ -144,7 +146,7 @@ zx::result<> KolaPartitioner::ValidatePayload(const PartitionSpec& spec,
   return zx::ok();
 }
 
-zx::result<> KolaPartitioner::OnStop() const {
+zx::result<> MoonflowerPartitioner::OnStop() const {
   const auto state = GetShutdownSystemState(gpt_->svc_root());
   switch (state) {
     case SystemPowerState::kRebootBootloader:
@@ -166,15 +168,15 @@ zx::result<> KolaPartitioner::OnStop() const {
   return zx::ok();
 }
 
-zx::result<std::unique_ptr<DevicePartitioner>> KolaPartitionerFactory::New(
+zx::result<std::unique_ptr<DevicePartitioner>> MoonflowerPartitionerFactory::New(
     const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
     std::shared_ptr<Context> context, fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  return KolaPartitioner::Initialize(devices, svc_root, std::move(block_device));
+  return MoonflowerPartitioner::Initialize(devices, svc_root, std::move(block_device));
 }
 
-class KolaAbrManagerInterface {
+class MoonflowerAbrManagerInterface {
  public:
-  virtual ~KolaAbrManagerInterface() = default;
+  virtual ~MoonflowerAbrManagerInterface() = default;
   // Gets the flags for slots A and B.  If there are pending changes to the flags, they are
   // included.
   virtual zx::result<> GetPartitionFlags(uint64_t* a_flags, uint64_t* b_flags) = 0;
@@ -188,9 +190,10 @@ class KolaAbrManagerInterface {
 };
 
 /// Implementation of A/B management using APIs offered by the storage stack.
-class KolaAbrManager : public KolaAbrManagerInterface {
+class MoonflowerAbrManager : public MoonflowerAbrManagerInterface {
  public:
-  static zx::result<std::unique_ptr<KolaAbrManager>> Create(const KolaPartitioner* partitioner) {
+  static zx::result<std::unique_ptr<MoonflowerAbrManager>> Create(
+      const MoonflowerPartitioner* partitioner) {
     zx::result zircon_a = partitioner->FindGptPartition(PartitionSpec(Partition::kZirconA));
     if (zircon_a.is_error()) {
       ERROR("Failed to find Zircon A partition\n");
@@ -210,8 +213,8 @@ class KolaAbrManager : public KolaAbrManagerInterface {
       return result.take_error();
     }
 
-    return zx::ok(new KolaAbrManager(partitioner, std::move(zircon_a.value()),
-                                     std::move(zircon_b.value()), std::move(client)));
+    return zx::ok(new MoonflowerAbrManager(partitioner, std::move(zircon_a.value()),
+                                           std::move(zircon_b.value()), std::move(client)));
   }
 
   zx::result<> GetPartitionFlags(uint64_t* a_flags, uint64_t* b_flags) override {
@@ -361,9 +364,10 @@ class KolaAbrManager : public KolaAbrManagerInterface {
   }
 
  private:
-  KolaAbrManager(const KolaPartitioner* partitioner, std::unique_ptr<BlockPartitionClient> zircon_a,
-                 std::unique_ptr<BlockPartitionClient> zircon_b,
-                 fidl::ClientEnd<fuchsia_storage_partitions::PartitionsManager> partitions_manager)
+  MoonflowerAbrManager(
+      const MoonflowerPartitioner* partitioner, std::unique_ptr<BlockPartitionClient> zircon_a,
+      std::unique_ptr<BlockPartitionClient> zircon_b,
+      fidl::ClientEnd<fuchsia_storage_partitions::PartitionsManager> partitions_manager)
       : partitioner_(partitioner),
         zircon_a_(std::move(zircon_a)),
         zircon_b_(std::move(zircon_b)),
@@ -417,7 +421,7 @@ class KolaAbrManager : public KolaAbrManagerInterface {
     return zx::ok(std::move(transaction));
   }
 
-  const KolaPartitioner* partitioner_;
+  const MoonflowerPartitioner* partitioner_;
   std::unique_ptr<BlockPartitionClient> zircon_a_;
   std::unique_ptr<BlockPartitionClient> zircon_b_;
   fidl::WireSyncClient<fuchsia_storage_partitions::PartitionsManager> partitions_manager_;
@@ -428,10 +432,10 @@ class KolaAbrManager : public KolaAbrManagerInterface {
 
 /// Implementation of A/B management which relies on directly writing to the GPT.
 /// TODO(https://fxbug.dev/339491886): Remove when products use storage-host.
-class KolaLegacyAbrManager : public KolaAbrManagerInterface {
+class MoonflowerLegacyAbrManager : public MoonflowerAbrManagerInterface {
  public:
-  static zx::result<std::unique_ptr<KolaLegacyAbrManager>> Create(
-      const KolaPartitioner* partitioner) {
+  static zx::result<std::unique_ptr<MoonflowerLegacyAbrManager>> Create(
+      const MoonflowerPartitioner* partitioner) {
     zx::result<FindPartitionDetailsResult> zircon_a =
         partitioner->FindPartitionDetails(PartitionSpec(Partition::kZirconA));
     if (zircon_a.is_error()) {
@@ -446,7 +450,7 @@ class KolaLegacyAbrManager : public KolaAbrManagerInterface {
       return zircon_b.take_error();
     }
 
-    return zx::ok(new KolaLegacyAbrManager(partitioner, zircon_a->index, zircon_b->index));
+    return zx::ok(new MoonflowerLegacyAbrManager(partitioner, zircon_a->index, zircon_b->index));
   }
 
   zx::result<> GetPartitionFlags(uint64_t* a_flags, uint64_t* b_flags) override {
@@ -566,8 +570,8 @@ class KolaLegacyAbrManager : public KolaAbrManagerInterface {
   }
 
  private:
-  KolaLegacyAbrManager(const KolaPartitioner* partitioner, uint32_t zircon_a_index,
-                       uint32_t zircon_b_index)
+  MoonflowerLegacyAbrManager(const MoonflowerPartitioner* partitioner, uint32_t zircon_a_index,
+                             uint32_t zircon_b_index)
       : partitioner_(partitioner),
         zircon_a_index_(zircon_a_index),
         zircon_b_index_(zircon_b_index) {}
@@ -583,15 +587,15 @@ class KolaLegacyAbrManager : public KolaAbrManagerInterface {
     return zx::ok(gpt_.get());
   }
 
-  const KolaPartitioner* partitioner_;
+  const MoonflowerPartitioner* partitioner_;
   std::unique_ptr<GptDevice> gpt_;
   uint32_t zircon_a_index_;
   uint32_t zircon_b_index_;
 };
 
-class KolaAbrClient : public abr::Client {
+class MoonflowerAbrClient : public abr::Client {
  public:
-  explicit KolaAbrClient(std::unique_ptr<KolaAbrManagerInterface> abr)
+  explicit MoonflowerAbrClient(std::unique_ptr<MoonflowerAbrManagerInterface> abr)
       : Client(/*custom=*/true), abr_(std::move(abr)) {}
 
   zx::result<> Flush() override { return abr_->Commit(); }
@@ -636,8 +640,8 @@ class KolaAbrClient : public abr::Client {
     if (result.is_error()) {
       return result.take_error();
     }
-    a_flags = ToKola(*a, *b, a_flags);
-    b_flags = ToKola(*b, *a, b_flags);
+    a_flags = ToMoonflower(*a, *b, a_flags);
+    b_flags = ToMoonflower(*b, *a, b_flags);
 
     auto discard_changes = fit::defer([&]() { abr_->Discard(); });
 
@@ -673,7 +677,7 @@ class KolaAbrClient : public abr::Client {
   }
 
   struct GptEntryAttributes {
-    static constexpr uint8_t kKolaMaxPriority = 3;
+    static constexpr uint8_t kMoonflowerMaxPriority = 3;
 
     explicit GptEntryAttributes(uint64_t flags) : flags(flags) {}
 
@@ -691,16 +695,16 @@ class KolaAbrClient : public abr::Client {
            old_slot->priority < kAbrMaxPriority && old_slot->successful_boot;
   }
 
-  static uint64_t ToKola(const AbrSlotData& current, const AbrSlotData& alternative,
-                         uint64_t gpt_entry_flags) {
-    // The priority field in Kola is only 2 bits wide (max value 3). Normalize AbrSlotData::priority
-    // while maintaining the slots' relative priority.
-    const uint8_t kola_priority = current.priority >= alternative.priority
-                                      ? GptEntryAttributes::kKolaMaxPriority
-                                      : GptEntryAttributes::kKolaMaxPriority - 1;
+  static uint64_t ToMoonflower(const AbrSlotData& current, const AbrSlotData& alternative,
+                               uint64_t gpt_entry_flags) {
+    // The priority field in Moonflower is only 2 bits wide (max value 3). Normalize
+    // AbrSlotData::priority while maintaining the slots' relative priority.
+    const uint8_t moonflower_priority = current.priority >= alternative.priority
+                                            ? GptEntryAttributes::kMoonflowerMaxPriority
+                                            : GptEntryAttributes::kMoonflowerMaxPriority - 1;
 
     GptEntryAttributes attributes(gpt_entry_flags);
-    attributes.set_priority(kola_priority)
+    attributes.set_priority(moonflower_priority)
         .set_retry_count(current.tries_remaining)  // Both fields are 3 bits wide.
         .set_boot_success(current.successful_boot);
     return attributes.flags;
@@ -732,27 +736,27 @@ class KolaAbrClient : public abr::Client {
     return abr_slot_data;
   }
 
-  std::unique_ptr<KolaAbrManagerInterface> abr_;
+  std::unique_ptr<MoonflowerAbrManagerInterface> abr_;
 };
 
-zx::result<std::unique_ptr<abr::Client>> KolaPartitioner::CreateAbrClient() const {
-  std::unique_ptr<KolaAbrManagerInterface> abr;
+zx::result<std::unique_ptr<abr::Client>> MoonflowerPartitioner::CreateAbrClient() const {
+  std::unique_ptr<MoonflowerAbrManagerInterface> abr;
   if (gpt_->devices().IsStorageHost()) {
-    zx::result result = KolaAbrManager::Create(this);
+    zx::result result = MoonflowerAbrManager::Create(this);
     if (result.is_error()) {
       ERROR("Failed to create ABR manager: %s\n", result.status_string());
       return result.take_error();
     }
     abr = std::move(*result);
   } else {
-    zx::result result = KolaLegacyAbrManager::Create(this);
+    zx::result result = MoonflowerLegacyAbrManager::Create(this);
     if (result.is_error()) {
       ERROR("Failed to create ABR manager: %s\n", result.status_string());
       return result.take_error();
     }
     abr = std::move(*result);
   }
-  return zx::ok(std::make_unique<KolaAbrClient>(std::move(abr)));
+  return zx::ok(std::make_unique<MoonflowerAbrClient>(std::move(abr)));
 }
 
 }  // namespace paver
