@@ -271,7 +271,7 @@ mod tests {
             None,
             &FeatureSet::empty(),
             &None,
-            cml::ProtocolRequirements { must_offer: &[], must_use: &[] },
+            cml::CapabilityRequirements { must_offer: &[], must_use: &[] },
         )
         .unwrap();
         return path;

@@ -4,7 +4,7 @@
 
 use crate::error::Error;
 use crate::features::{Feature, FeatureSet};
-use crate::validate::ProtocolRequirements;
+use crate::validate::CapabilityRequirements;
 use crate::{
     offer_to_all_would_duplicate, validate, AnyRef, AsClause, Availability, Capability,
     CapabilityClause, Child, Collection, ConfigKey, ConfigNestedValueType, ConfigRuntimeSource,
@@ -30,7 +30,7 @@ pub struct CompileOptions<'a> {
     file: Option<PathBuf>,
     config_package_path: Option<String>,
     features: Option<&'a FeatureSet>,
-    protocol_requirements: ProtocolRequirements<'a>,
+    capability_requirements: CapabilityRequirements<'a>,
 }
 
 impl<'a> CompileOptions<'a> {
@@ -60,9 +60,9 @@ impl<'a> CompileOptions<'a> {
     /// requirements.
     pub fn protocol_requirements(
         mut self,
-        protocol_requirements: ProtocolRequirements<'a>,
+        protocol_requirements: CapabilityRequirements<'a>,
     ) -> CompileOptions<'a> {
-        self.protocol_requirements = protocol_requirements;
+        self.capability_requirements = protocol_requirements;
         self
     }
 }
@@ -81,7 +81,7 @@ pub fn compile(
         &document,
         options.file.as_ref().map(PathBuf::as_path),
         options.features.unwrap_or(&FeatureSet::empty()),
-        &options.protocol_requirements,
+        &options.capability_requirements,
     )?;
 
     let all_capability_names: BTreeSet<&Name> =

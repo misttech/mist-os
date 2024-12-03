@@ -248,6 +248,13 @@ pub enum Commands {
         /// This can be used to help find missing usages of important capabilities, like
         /// fuchsia.logger.LogSink
         must_use_protocol: Vec<String>,
+        #[structopt(long = "must-offer-dictionary")]
+        /// dictionaries to verify that all children and collections are used
+        ///
+        /// If specified, for each offer named, cmc will require that the offer is in a use block.
+        /// This can be used to help find missing usages of important capabilities, like
+        /// diagnostics
+        must_offer_dictionary: Vec<String>,
     },
 
     #[structopt(name = "print-cml-reference")]

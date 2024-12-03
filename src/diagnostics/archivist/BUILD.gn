@@ -181,7 +181,8 @@ archivist_optimized_binary("bin") {
 fuchsia_component_manifest("root-manifest") {
   manifest = "meta/archivist.cml"
   component_name = "archivist"
-  required_offers = []
+  required_offers = {
+  }
 }
 
 fuchsia_component("component") {

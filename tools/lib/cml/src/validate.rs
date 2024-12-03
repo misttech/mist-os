@@ -19,9 +19,44 @@ use std::path::Path;
 use std::{fmt, iter};
 
 #[derive(Default, Clone)]
-pub struct ProtocolRequirements<'a> {
-    pub must_offer: &'a [String],
-    pub must_use: &'a [String],
+pub struct CapabilityRequirements<'a> {
+    pub must_offer: &'a [MustOfferRequirement<'a>],
+    pub must_use: &'a [MustUseRequirement<'a>],
+}
+
+#[derive(PartialEq)]
+pub enum MustUseRequirement<'a> {
+    Protocol(&'a str),
+}
+
+impl<'a> MustUseRequirement<'a> {
+    fn name(&self) -> &str {
+        match self {
+            MustUseRequirement::Protocol(name) => name,
+        }
+    }
+}
+
+#[derive(PartialEq)]
+pub enum MustOfferRequirement<'a> {
+    Dictionary(&'a str),
+    Protocol(&'a str),
+}
+
+impl<'a> MustOfferRequirement<'a> {
+    fn name(&self) -> &str {
+        match self {
+            MustOfferRequirement::Dictionary(name) => name,
+            MustOfferRequirement::Protocol(name) => name,
+        }
+    }
+
+    fn offer_type(&self) -> &'static str {
+        match self {
+            MustOfferRequirement::Dictionary(_) => "Dictionary",
+            MustOfferRequirement::Protocol(_) => "Protocol",
+        }
+    }
 }
 
 /// Validates a given cml.
@@ -29,9 +64,9 @@ pub(crate) fn validate_cml(
     document: &Document,
     file: Option<&Path>,
     features: &FeatureSet,
-    protocol_requirements: &ProtocolRequirements<'_>,
+    capability_requirements: &CapabilityRequirements<'_>,
 ) -> Result<(), Error> {
-    let mut ctx = ValidationContext::new(&document, features, protocol_requirements);
+    let mut ctx = ValidationContext::new(&document, features, capability_requirements);
     let mut res = ctx.validate();
     if let Err(Error::Validate { filename, .. }) = &mut res {
         if let Some(file) = file {
@@ -51,7 +86,7 @@ fn offer_dependency(offer: &Offer) -> DependencyType {
 struct ValidationContext<'a> {
     document: &'a Document,
     features: &'a FeatureSet,
-    protocol_requirements: &'a ProtocolRequirements<'a>,
+    capability_requirements: &'a CapabilityRequirements<'a>,
     all_children: HashMap<&'a Name, &'a Child>,
     all_collections: HashSet<&'a Name>,
     all_storages: HashMap<&'a Name, &'a CapabilityFromRef>,
@@ -80,12 +115,12 @@ impl<'a> ValidationContext<'a> {
     fn new(
         document: &'a Document,
         features: &'a FeatureSet,
-        protocol_requirements: &'a ProtocolRequirements<'a>,
+        capability_requirements: &'a CapabilityRequirements<'a>,
     ) -> Self {
         ValidationContext {
             document,
             features,
-            protocol_requirements,
+            capability_requirements,
             all_children: HashMap::new(),
             all_collections: HashSet::new(),
             all_storages: HashMap::new(),
@@ -994,11 +1029,11 @@ which is almost certainly a mistake: {}",
         let offers_stub = Vec::new();
         let offers = self.document.offer.as_ref().unwrap_or(&offers_stub);
 
-        for required_offer in self.protocol_requirements.must_offer {
+        for required_offer in self.capability_requirements.must_offer {
             // for each child, check if any offer is:
             //   1) Targeting this child (or all)
             //   AND
-            //   2) Offering the current required protocol
+            //   2) Offering the current required capability
             for child in children.iter() {
                 if !offers.iter().any(|offer| {
                     let names_this_child = offer.to.iter().any(|target| match target {
@@ -1006,18 +1041,23 @@ which is almost certainly a mistake: {}",
                         OfferToRef::All => true,
                         OfferToRef::OwnDictionary(_) => false,
                     });
-
-                    let names_this_capability = match offer.protocol.as_ref() {
-                        Some(protocol) => {
-                            protocol.iter().any(|proto| proto.as_str() == required_offer)
+                    let capability_names = match required_offer {
+                        MustOfferRequirement::Dictionary(_) => offer.dictionary.as_ref(),
+                        MustOfferRequirement::Protocol(_) => offer.protocol.as_ref(),
+                    };
+                    let names_this_capability = match capability_names.as_ref() {
+                        Some(c) => {
+                            c.iter().any(|capability| capability.as_str() == required_offer.name())
                         }
                         None => false,
                     };
                     names_this_child && names_this_capability
                 }) {
+                    let capability_type = required_offer.offer_type();
                     return Err(Error::validate(format!(
-                        r#"Protocol "{}" is not offered to child component "{}" but it is a required offer"#,
-                        required_offer, child.name
+                        r#"{capability_type} "{}" is not offered to child component "{}" but it is a required offer"#,
+                        required_offer.name(),
+                        child.name
                     )));
                 }
             }
@@ -1029,18 +1069,23 @@ which is almost certainly a mistake: {}",
                         OfferToRef::All => true,
                         OfferToRef::OwnDictionary(_) => false,
                     });
-
-                    let names_this_capability = match offer.protocol.as_ref() {
-                        Some(protocol) => {
-                            protocol.iter().any(|proto| proto.as_str() == required_offer)
-                        }
+                    let capability_names = match required_offer {
+                        MustOfferRequirement::Dictionary(_) => offer.dictionary.as_ref(),
+                        MustOfferRequirement::Protocol(_) => offer.protocol.as_ref(),
+                    };
+                    let names_this_capability = match capability_names {
+                        Some(c) => c.iter().any(|capability_list| {
+                            capability_list.as_str() == required_offer.name()
+                        }),
                         None => false,
                     };
                     names_this_collection && names_this_capability
                 }) {
+                    let capability_type = required_offer.offer_type();
                     return Err(Error::validate(format!(
-                        r#"Protocol "{}" is not offered to collection "{}" but it is a required offer"#,
-                        required_offer, collection.name
+                        r#"{capability_type} "{}" is not offered to collection "{}" but it is a required offer"#,
+                        required_offer.name(),
+                        collection.name
                     )));
                 }
             }
@@ -1053,16 +1098,16 @@ which is almost certainly a mistake: {}",
         let use_decls_stub = Vec::new();
         let use_decls = self.document.r#use.as_ref().unwrap_or(&use_decls_stub);
 
-        for required_usage in self.protocol_requirements.must_use {
+        for required_usage in self.capability_requirements.must_use {
             if !use_decls.iter().any(|usage| match usage.protocol.as_ref() {
                 None => false,
-                Some(protocol) => {
-                    protocol.iter().any(|protocol_name| protocol_name.as_str() == required_usage)
-                }
+                Some(protocol) => protocol
+                    .iter()
+                    .any(|protocol_name| protocol_name.as_str() == required_usage.name()),
             }) {
                 return Err(Error::validate(format!(
                     r#"Protocol "{}" is not used by a component but is required by all"#,
-                    required_usage,
+                    required_usage.name(),
                 )));
             }
         }
@@ -1866,7 +1911,7 @@ mod tests {
                 fn $test_name() {
                     let input = format!("{}", $input);
                     let features = $features;
-                    let result = validate_with_features_for_test("test.cml", &input.as_bytes(), &features, &vec![], &vec![]);
+                    let result = validate_with_features_for_test("test.cml", &input.as_bytes(), &features, &vec![], &vec![], &vec![]);
                     assert_matches!(result, $($pattern)+);
                 }
             )+
@@ -1874,7 +1919,7 @@ mod tests {
     }
 
     fn validate_for_test(filename: &str, input: &[u8]) -> Result<(), Error> {
-        validate_with_features_for_test(filename, input, &FeatureSet::empty(), &[], &[])
+        validate_with_features_for_test(filename, input, &FeatureSet::empty(), &[], &[], &[])
     }
 
     fn validate_with_features_for_test(
@@ -1883,6 +1928,7 @@ mod tests {
         features: &FeatureSet,
         required_offers: &[String],
         required_uses: &[String],
+        required_dictionary_offers: &[String],
     ) -> Result<(), Error> {
         let input = format!("{}", std::str::from_utf8(input).unwrap().to_string());
         let file = Path::new(filename);
@@ -1891,7 +1937,21 @@ mod tests {
             &document,
             Some(&file),
             &features,
-            &ProtocolRequirements { must_offer: required_offers, must_use: required_uses },
+            &CapabilityRequirements {
+                must_offer: &required_offers
+                    .iter()
+                    .map(|value| MustOfferRequirement::Protocol(value))
+                    .chain(
+                        required_dictionary_offers
+                            .iter()
+                            .map(|value| MustOfferRequirement::Dictionary(value)),
+                    )
+                    .collect::<Vec<_>>(),
+                must_use: &required_uses
+                    .iter()
+                    .map(|value| MustUseRequirement::Protocol(value))
+                    .collect::<Vec<_>>(),
+            },
         )
     }
 
@@ -1920,6 +1980,7 @@ mod tests {
             &FeatureSet::empty(),
             &[],
             &vec!["fuchsia.logger.LogSink".into()],
+            &[],
         );
 
         assert_matches!(result,
@@ -1951,6 +2012,7 @@ mod tests {
             &FeatureSet::empty(),
             &[],
             &vec!["fuchsia.component.Binder".into()],
+            &[],
         );
         assert!(result.is_ok());
     }
@@ -1998,6 +2060,7 @@ mod tests {
             &FeatureSet::empty(),
             &vec!["fuchsia.logger.LogSink".into(), "fuchsia.inspect.InspectSink".into()],
             &Vec::new(),
+            &[],
         );
         assert!(result.is_ok());
     }
@@ -2045,6 +2108,7 @@ mod tests {
             &FeatureSet::empty(),
             &vec!["fuchsia.logger.LogSink".into()],
             &[],
+            &[],
         );
         assert!(result.is_ok());
 
@@ -2083,6 +2147,7 @@ mod tests {
             &FeatureSet::empty(),
             &vec!["fuchsia.logger.LogSink".into()],
             &[],
+            &[],
         );
         assert!(result.is_ok());
     }
@@ -2116,6 +2181,7 @@ mod tests {
             &FeatureSet::empty(),
             &vec!["fuchsia.logger.LogSink".into()],
             &Vec::new(),
+            &[],
         );
 
         assert!(result.is_ok(), "{:#?}", result);
@@ -2148,6 +2214,7 @@ mod tests {
             &FeatureSet::empty(),
             &vec!["fuchsia.logger.LogSink".into()],
             &Vec::new(),
+            &[],
         );
 
         assert!(result.is_ok(), "{:#?}", result);
@@ -2186,6 +2253,7 @@ mod tests {
             &FeatureSet::empty(),
             &vec!["fuchsia.logger.LogSink".into()],
             &Vec::new(),
+            &[],
         );
 
         // exact duplication is allowed
@@ -2223,6 +2291,7 @@ mod tests {
             &FeatureSet::empty(),
             &vec!["fuchsia.logger.LogSink".into()],
             &Vec::new(),
+            &[],
         );
 
         // aliased duplications are forbidden
@@ -2267,6 +2336,7 @@ mod tests {
             &FeatureSet::empty(),
             &vec!["fuchsia.logger.LogSink".into()],
             &Vec::new(),
+            &[],
         );
 
         // offering the same protocol without an alias from different sources is forbidden
@@ -2318,6 +2388,7 @@ mod tests {
             &FeatureSet::empty(),
             &vec!["fuchsia.logger.LogSink".into()],
             &Vec::new(),
+            &[],
         );
 
         assert_matches!(result,
@@ -2377,6 +2448,7 @@ mod tests {
             &FeatureSet::empty(),
             &vec!["fuchsia.logger.LogSink".into()],
             &Vec::new(),
+            &[],
         );
 
         assert!(result.is_ok());
@@ -2390,6 +2462,17 @@ mod tests {
         format!(
             r#"Protocol "{}" is not offered to {} "{}" but it is a required offer"#,
             protocol, child_or_collection, component
+        )
+    }
+
+    fn fail_to_make_required_offer_dictionary(
+        dictionary: &str,
+        child_or_collection: &str,
+        component: &str,
+    ) -> String {
+        format!(
+            r#"Dictionary "{}" is not offered to {} "{}" but it is a required offer"#,
+            dictionary, child_or_collection, component
         )
     }
 
@@ -2424,6 +2507,7 @@ mod tests {
             input.as_bytes(),
             &FeatureSet::empty(),
             &vec!["fuchsia.logger.LogSink".into()],
+            &[],
             &[],
         );
 
@@ -2468,6 +2552,7 @@ mod tests {
             &FeatureSet::empty(),
             &vec!["fuchsia.logger.LogSink".into()],
             &[],
+            &[],
         );
 
         assert_matches!(result,
@@ -2475,6 +2560,165 @@ mod tests {
                 assert_eq!(
                     err,
                     fail_to_make_required_offer("fuchsia.logger.LogSink", "collection", "coll"),
+                );
+                assert!(filename.is_some(), "Expected there to be a filename in error message");
+            }
+        );
+    }
+
+    #[test]
+    fn fail_to_offer_dictionary_to_all_when_required() {
+        let input = r##"{
+            children: [
+                {
+                    name: "logger",
+                    url: "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
+                },
+                {
+                    name: "something",
+                    url: "fuchsia-pkg://fuchsia.com/something#meta/something.cm",
+                },
+            ],
+            offer: [
+                {
+                    protocol: "fuchsia.logger.LogSink",
+                    from: "parent",
+                    to: "all"
+                },
+                {
+                    dictionary: "diagnostics",
+                    from: "parent",
+                    to: "#logger"
+                },
+                {
+                    protocol: "fuchsia.logger.LegacyLog",
+                    from: "parent",
+                    to: "#something"
+                },
+            ]
+        }"##;
+        let result = validate_with_features_for_test(
+            "test.cml",
+            input.as_bytes(),
+            &FeatureSet::empty(),
+            &vec![],
+            &[],
+            &["diagnostics".to_string()],
+        );
+
+        assert_matches!(result,
+            Err(Error::Validate { err, filename }) => {
+                assert_eq!(
+                    err,
+                    fail_to_make_required_offer_dictionary(
+                        "diagnostics",
+                        "child component",
+                        "something",
+                    ),
+                );
+                assert!(filename.is_some(), "Expected there to be a filename in error message");
+            }
+        );
+
+        let input = r##"{
+            children: [
+                {
+                    name: "logger",
+                    url: "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
+                },
+            ],
+            collections: [
+                {
+                    name: "coll",
+                    durability: "transient",
+                },
+            ],
+            offer: [
+                {
+                    protocol: "fuchsia.logger.LogSink",
+                    from: "parent",
+                    to: "all"
+                },
+                {
+                    protocol: "diagnostics",
+                    from: "parent",
+                    to: "all"
+                },
+                {
+                    dictionary: "diagnostics",
+                    from: "parent",
+                    to: "#logger"
+                },
+            ]
+        }"##;
+        let result = validate_with_features_for_test(
+            "test.cml",
+            input.as_bytes(),
+            &FeatureSet::empty(),
+            &vec!["fuchsia.logger.LogSink".into()],
+            &[],
+            &["diagnostics".to_string()],
+        );
+        assert_matches!(result,
+            Err(Error::Validate { err, filename }) => {
+                assert_eq!(
+                    err,
+                    fail_to_make_required_offer_dictionary("diagnostics", "collection", "coll"),
+                );
+                assert!(filename.is_some(), "Expected there to be a filename in error message");
+            }
+        );
+    }
+
+    #[test]
+    fn fail_to_offer_dictionary_to_all_when_required_even_if_protocol_called_diagnostics_offered() {
+        let input = r##"{
+            children: [
+                {
+                    name: "logger",
+                    url: "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
+                },
+                {
+                    name: "something",
+                    url: "fuchsia-pkg://fuchsia.com/something#meta/something.cm",
+                },
+            ],
+            offer: [
+                {
+                    protocol: "fuchsia.logger.LogSink",
+                    from: "parent",
+                    to: "all"
+                },
+                {
+                    protocol: "diagnostics",
+                    from: "parent",
+                    to: "all"
+                },
+                {
+                    protocol: "fuchsia.logger.LegacyLog",
+                    from: "parent",
+                    to: "#something"
+                },
+            ]
+        }"##;
+        let result = validate_with_features_for_test(
+            "test.cml",
+            input.as_bytes(),
+            &FeatureSet::empty(),
+            &vec![],
+            &[],
+            &["diagnostics".to_string()],
+        );
+
+        assert_matches!(result,
+            Err(Error::Validate { err, filename }) => {
+                assert_eq!(
+                    err,
+                    fail_to_make_required_offer_dictionary(
+                        "diagnostics",
+                        "child component",
+                        "logger",
+                    ),
                 );
                 assert!(filename.is_some(), "Expected there to be a filename in error message");
             }

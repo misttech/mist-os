@@ -41,7 +41,7 @@ use error::Location;
 
 pub use crate::one_or_many::OneOrMany;
 pub use crate::translate::{compile, CompileOptions};
-pub use crate::validate::ProtocolRequirements;
+pub use crate::validate::{CapabilityRequirements, MustOfferRequirement, MustUseRequirement};
 
 lazy_static! {
     static ref DEFAULT_EVENT_STREAM_NAME: Name = "EventStream".parse().unwrap();
