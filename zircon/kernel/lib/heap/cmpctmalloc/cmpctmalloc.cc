@@ -13,6 +13,7 @@
 #endif
 #include <lib/heap_internal.h>
 #include <lib/zircon-internal/align.h>
+#include <stdio.h>
 #include <string.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>

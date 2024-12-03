@@ -78,6 +78,7 @@
 #include <lib/trace-engine/handler.h>
 
 #include <atomic>
+#include <cstdio>
 #include <mutex>
 
 #include "context_impl.h"
