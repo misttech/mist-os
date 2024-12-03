@@ -3660,7 +3660,7 @@ skip_fw_cmds:
 
 // Returns an MLME result code (WLAN_START_RESULT_*) if an error is encountered.
 // If all iovars succeed, MLME is notified when E_LINK event is received.
-static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
+static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
     struct net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartBssRequest* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
@@ -3670,22 +3670,22 @@ static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
 
   if (brcmf_test_bit(brcmf_vif_status_bit_t::AP_CREATED, &ifp->vif->sme_state)) {
     BRCMF_ERR("AP already started");
-    return fuchsia_wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined;
+    return fuchsia_wlan_fullmac_wire::StartResult::kBssAlreadyStartedOrJoined;
   }
 
   if (brcmf_test_bit(brcmf_vif_status_bit_t::AP_START_PENDING, &ifp->vif->sme_state)) {
     BRCMF_ERR("AP start request received, start pending");
-    return fuchsia_wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined;
+    return fuchsia_wlan_fullmac_wire::StartResult::kBssAlreadyStartedOrJoined;
   }
 
   if (req->bss_type() != fuchsia_wlan_common::BssType::kInfrastructure) {
     BRCMF_ERR("Attempt to start AP in unsupported mode (%d)", fidl::ToUnderlying(req->bss_type()));
-    return fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported;
+    return fuchsia_wlan_fullmac_wire::StartResult::kNotSupported;
   }
 
   if (ifp->vif->mbss) {
     BRCMF_ERR("Mesh role not yet supported");
-    return fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported;
+    return fuchsia_wlan_fullmac_wire::StartResult::kNotSupported;
   }
 
   // Enter AP_START_PENDING mode before we abort any on-going scans. As soon as
@@ -3827,7 +3827,7 @@ static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
   cfg->ap_started = true;
   // Save the SSID for checking when SoftAP is stopped.
   ifp->saved_softap_ssid = req->ssid();
-  return fuchsia_wlan_fullmac_wire::WlanStartResult::kSuccess;
+  return fuchsia_wlan_fullmac_wire::StartResult::kSuccess;
 
 fail:
   // Stop the timer when the function fails to issue any of the commands.
@@ -3836,7 +3836,7 @@ fail:
   // thus the SoftAP might have been partially started.
   brcmf_cfg80211_stop_ap(ndev);
 
-  return fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported;
+  return fuchsia_wlan_fullmac_wire::StartResult::kNotSupported;
 }
 
 static zx_status_t brcmf_cfg80211_del_station(struct net_device* ndev, const uint8_t* mac,
@@ -4273,30 +4273,32 @@ void brcmf_if_disassoc_req(net_device* ndev,
   }  // else notification will happen asynchronously
 }
 
-static void brcmf_if_start_conf(net_device* ndev,
-                                fuchsia_wlan_fullmac_wire::WlanStartResult result) {
+static void brcmf_if_start_conf(net_device* ndev, fuchsia_wlan_fullmac_wire::StartResult result) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping AP start callback");
     return;
   }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacStartConfirm start_conf = {.result_code = result};
   BRCMF_IFDBG(WLANIF, ndev, "Sending AP start confirm to SME. result_code: %s",
-              result == fuchsia_wlan_fullmac_wire::WlanStartResult::kSuccess ? "success"
-              : result == fuchsia_wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined
+              result == fuchsia_wlan_fullmac_wire::StartResult::kSuccess ? "success"
+              : result == fuchsia_wlan_fullmac_wire::StartResult::kBssAlreadyStartedOrJoined
                   ? "already started"
-              : result == fuchsia_wlan_fullmac_wire::WlanStartResult::kResetRequiredBeforeStart
+              : result == fuchsia_wlan_fullmac_wire::StartResult::kResetRequiredBeforeStart
                   ? "reset required"
-              : result == fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported
-                  ? "not supported"
-                  : "unknown");
+              : result == fuchsia_wlan_fullmac_wire::StartResult::kNotSupported ? "not supported"
+                                                                                : "unknown");
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
     return;
   }
+
+  auto start_conf = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcStartConfRequest::Builder(*arena)
+                        .result_code(result)
+                        .Build();
+
   auto status = ndev->if_proto.buffer(*arena)->StartConf(start_conf);
   if (!status.ok()) {
     BRCMF_ERR("Failed to send start conf result.status: %s", status.status_string());
@@ -4313,7 +4315,7 @@ static void brcmf_ap_start_timeout_worker(WorkItem* work) {
   // Indicate status only if AP start pending is set
   if (brcmf_test_and_clear_bit(brcmf_vif_status_bit_t::AP_START_PENDING, &ifp->vif->sme_state)) {
     // Indicate AP start failed
-    brcmf_if_start_conf(ndev, fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported);
+    brcmf_if_start_conf(ndev, fuchsia_wlan_fullmac_wire::StartResult::kNotSupported);
   }
 }
 
@@ -4335,7 +4337,7 @@ void brcmf_if_start_req(net_device* ndev,
         "dtim: %d channel: %d bss type: %d beacon period: %d",
         req->has_ssid(), req->has_dtim_period(), req->has_channel(), req->has_bss_type(),
         req->has_beacon_period());
-    brcmf_if_start_conf(ndev, fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported);
+    brcmf_if_start_conf(ndev, fuchsia_wlan_fullmac_wire::StartResult::kNotSupported);
     return;
   }
   BRCMF_IFDBG(WLANIF, ndev, "Start AP request from SME. rsne_len: %zu, channel: %u",
@@ -4344,8 +4346,8 @@ void brcmf_if_start_req(net_device* ndev,
   BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len));
 #endif /* !defined(NDEBUG) */
 
-  fuchsia_wlan_fullmac_wire::WlanStartResult result_code = brcmf_cfg80211_start_ap(ndev, req);
-  if (result_code != fuchsia_wlan_fullmac_wire::WlanStartResult::kSuccess) {
+  fuchsia_wlan_fullmac_wire::StartResult result_code = brcmf_cfg80211_start_ap(ndev, req);
+  if (result_code != fuchsia_wlan_fullmac_wire::StartResult::kSuccess) {
     brcmf_if_start_conf(ndev, result_code);
   }
 }
@@ -6802,7 +6804,7 @@ static zx_status_t brcmf_process_link_event(struct brcmf_if* ifp, const struct b
       // Stop the timer when we get a result from firmware.
       cfg->ap_start_timer->Stop();
       // confirm AP Start
-      brcmf_if_start_conf(ndev, fuchsia_wlan_fullmac_wire::WlanStartResult::kSuccess);
+      brcmf_if_start_conf(ndev, fuchsia_wlan_fullmac_wire::StartResult::kSuccess);
       // Set AP_CREATED
       brcmf_set_bit(brcmf_vif_status_bit_t::AP_CREATED, &ifp->vif->sme_state);
     }

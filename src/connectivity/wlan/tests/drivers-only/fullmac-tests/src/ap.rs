@@ -49,8 +49,9 @@ async fn setup_test_bss_started(
 
             fullmac_driver
                 .ifc_proxy
-                .start_conf(&fidl_fullmac::WlanFullmacStartConfirm {
-                    result_code: fidl_fullmac::WlanStartResult::Success,
+                .start_conf(&fidl_fullmac::WlanFullmacImplIfcStartConfRequest {
+                    result_code: Some(fidl_fullmac::StartResult::Success),
+                    ..Default::default()
                 })
                 .await
                 .expect("Could not send StartConf");
@@ -108,8 +109,9 @@ async fn test_start_2ghz_bss_success() {
 
         fullmac_driver
             .ifc_proxy
-            .start_conf(&fidl_fullmac::WlanFullmacStartConfirm {
-                result_code: fidl_fullmac::WlanStartResult::Success,
+            .start_conf(&fidl_fullmac::WlanFullmacImplIfcStartConfRequest {
+                result_code: Some(fidl_fullmac::StartResult::Success),
+                ..Default::default()
             })
             .await
             .expect("Could not send StartConf");

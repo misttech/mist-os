@@ -77,7 +77,7 @@ class CreateSoftAPTest : public SimTest {
   void VerifyAuth();
   void VerifyAssoc();
   void VerifyNotAssoc();
-  void VerifyStartAPConf(wlan_fullmac_wire::WlanStartResult status);
+  void VerifyStartAPConf(wlan_fullmac_wire::StartResult status);
   void VerifyStopAPConf(wlan_fullmac_wire::WlanStopResult status);
   void VerifyNumOfClient(uint16_t expect_client_num);
   void ClearAssocInd();
@@ -93,7 +93,7 @@ class CreateSoftAPTest : public SimTest {
   void OnAssocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcAssocIndRequest* ind);
   void OnDisassocConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest* resp);
   void OnDisassocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind);
-  void OnStartConf(const wlan_fullmac_wire::WlanFullmacStartConfirm* resp);
+  void OnStartConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcStartConfRequest* resp);
   void OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp);
   void OnChannelSwitch(const wlan_fullmac_wire::WlanFullmacChannelSwitchInfo* info);
   // Status field in the last received authentication frame.
@@ -107,7 +107,7 @@ class CreateSoftAPTest : public SimTest {
   bool disassoc_conf_recv_ = false;
   bool start_conf_received_ = false;
   bool stop_conf_received_ = false;
-  wlan_fullmac_wire::WlanStartResult start_conf_status_;
+  fuchsia_wlan_fullmac::StartResult start_conf_status_;
   wlan_fullmac_wire::WlanStopResult stop_conf_status_;
 
   // The expect mac address for indications
@@ -156,7 +156,8 @@ void SoftApInterface::DisassocInd(DisassocIndRequestView request,
   completer.Reply();
 }
 void SoftApInterface::StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) {
-  test_->OnStartConf(&request->resp);
+  const auto start_conf = fidl::ToNatural(*request);
+  test_->OnStartConf(&start_conf);
   completer.Reply();
 }
 void SoftApInterface::StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) {
@@ -362,9 +363,10 @@ void CreateSoftAPTest::OnDisassocInd(
   disassoc_ind_recv_ = true;
 }
 
-void CreateSoftAPTest::OnStartConf(const wlan_fullmac_wire::WlanFullmacStartConfirm* resp) {
+void CreateSoftAPTest::OnStartConf(
+    const fuchsia_wlan_fullmac::WlanFullmacImplIfcStartConfRequest* resp) {
   start_conf_received_ = true;
-  start_conf_status_ = resp->result_code;
+  start_conf_status_ = resp->result_code().value();
 }
 
 void CreateSoftAPTest::OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp) {
@@ -455,7 +457,7 @@ void CreateSoftAPTest::VerifyNotAssoc() {
   VerifyNumOfClient(0);
 }
 
-void CreateSoftAPTest::VerifyStartAPConf(wlan_fullmac_wire::WlanStartResult status) {
+void CreateSoftAPTest::VerifyStartAPConf(wlan_fullmac_wire::StartResult status) {
   ASSERT_EQ(start_conf_received_, true);
   ASSERT_EQ(start_conf_status_, status);
 }
@@ -473,14 +475,14 @@ TEST_F(CreateSoftAPTest, CreateSoftAP) {
   delay += kStartAPLinkEventDelay + kApStartedEventDelay + zx::msec(10);
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::StopSoftAP, this), delay);
   env_->Run(kSimulatedClockDuration);
-  VerifyStartAPConf(wlan_fullmac_wire::WlanStartResult::kSuccess);
+  VerifyStartAPConf(wlan_fullmac_wire::StartResult::kSuccess);
 }
 
 TEST_F(CreateSoftAPTest, CreateSoftAPFail) {
   InjectStartAPError();
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::StartSoftAP, this), zx::msec(50));
   env_->Run(kSimulatedClockDuration);
-  VerifyStartAPConf(wlan_fullmac_wire::WlanStartResult::kNotSupported);
+  VerifyStartAPConf(wlan_fullmac_wire::StartResult::kNotSupported);
 }
 
 TEST_F(CreateSoftAPTest, CreateSoftAPMissingParams) {
@@ -494,14 +496,14 @@ TEST_F(CreateSoftAPTest, CreateSoftAPMissingParams) {
   auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StartBss(builder.Build());
   EXPECT_TRUE(result.ok());
   // Should have received a StartConf with kNotSupported result.
-  VerifyStartAPConf(wlan_fullmac_wire::WlanStartResult::kNotSupported);
+  VerifyStartAPConf(wlan_fullmac_wire::StartResult::kNotSupported);
 }
 
 TEST_F(CreateSoftAPTest, CreateSoftAPFail_ChanSetError) {
   InjectChanspecError();
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::StartSoftAP, this), zx::msec(50));
   env_->Run(kSimulatedClockDuration);
-  VerifyStartAPConf(wlan_fullmac_wire::WlanStartResult::kNotSupported);
+  VerifyStartAPConf(wlan_fullmac_wire::StartResult::kNotSupported);
 }
 
 // SoftAP can encounter this specific SET_SSID firmware error, which we detect and log.
@@ -513,7 +515,7 @@ TEST_F(CreateSoftAPTest, CreateSoftAPFail_SetSsidError) {
   ASSERT_EQ(count, 0u);
   env_->Run(kSimulatedClockDuration);
 
-  VerifyStartAPConf(wlan_fullmac_wire::WlanStartResult::kNotSupported);
+  VerifyStartAPConf(wlan_fullmac_wire::StartResult::kNotSupported);
 
   // Verify inspect is updated.
   GetApSetSsidErrInspectCount(&count);

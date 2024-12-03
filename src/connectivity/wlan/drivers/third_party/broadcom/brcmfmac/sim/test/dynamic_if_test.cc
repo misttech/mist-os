@@ -148,11 +148,11 @@ void DynamicIfTest::VerifyAssocWithSoftAP() {
 }
 
 void DynamicIfTest::VerifyStartApTimer() {
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 2U);
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.front().result_code,
-            wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined);
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            wlan_fullmac_wire::WlanStartResult::kNotSupported);
+  ASSERT_EQ(softap_ifc_.stats_.start_confirmations.size(), 2U);
+  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.front().result_code(),
+            wlan_fullmac_wire::StartResult::kBssAlreadyStartedOrJoined);
+  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code(),
+            wlan_fullmac_wire::StartResult::kNotSupported);
 }
 
 void DynamicIfTest::SetChanspec(bool is_ap_iface, uint16_t* chanspec, zx_status_t expect_result) {
@@ -987,9 +987,9 @@ TEST_F(DynamicIfTest, StartApIfaceTimeoutWithReqSpamAndFwIgnore) {
   env_->Run(kTestDuration);
 
   // Make sure the AP iface finally stated successfully.
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 3U);
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            wlan_fullmac_wire::WlanStartResult::kSuccess);
+  ASSERT_EQ(softap_ifc_.stats_.start_confirmations.size(), 3U);
+  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code(),
+            wlan_fullmac_wire::StartResult::kSuccess);
 }
 
 // This test case verifies that a scan request comes while a AP start req is in progress will be
@@ -1019,8 +1019,8 @@ TEST_F(DynamicIfTest, RejectScanWhenApStartReqIsPending) {
             wlan_fullmac_wire::WlanScanResult::kShouldWait);
 
   // AP start will also fail because the request is ignored in firmware.
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            wlan_fullmac_wire::WlanStartResult::kNotSupported);
+  ASSERT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
+  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code(),
+            wlan_fullmac_wire::StartResult::kNotSupported);
 }
 }  // namespace wlan::brcmfmac

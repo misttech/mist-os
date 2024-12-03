@@ -401,28 +401,29 @@ pub fn convert_disassociate_indication(
 }
 
 pub fn convert_start_confirm(
-    conf: fidl_fullmac::WlanFullmacStartConfirm,
-) -> fidl_mlme::StartConfirm {
-    use fidl_fullmac::WlanStartResult;
-    fidl_mlme::StartConfirm {
-        result_code: match conf.result_code {
-            WlanStartResult::Success => fidl_mlme::StartResultCode::Success,
-            WlanStartResult::BssAlreadyStartedOrJoined => {
+    conf: fidl_fullmac::WlanFullmacImplIfcStartConfRequest,
+) -> Result<fidl_mlme::StartConfirm> {
+    use fidl_fullmac::StartResult;
+    let result_code = conf.result_code.context("missing result_code")?;
+    Ok(fidl_mlme::StartConfirm {
+        result_code: match result_code {
+            StartResult::Success => fidl_mlme::StartResultCode::Success,
+            StartResult::BssAlreadyStartedOrJoined => {
                 fidl_mlme::StartResultCode::BssAlreadyStartedOrJoined
             }
-            WlanStartResult::ResetRequiredBeforeStart => {
+            StartResult::ResetRequiredBeforeStart => {
                 fidl_mlme::StartResultCode::ResetRequiredBeforeStart
             }
-            WlanStartResult::NotSupported => fidl_mlme::StartResultCode::NotSupported,
+            StartResult::NotSupported => fidl_mlme::StartResultCode::NotSupported,
             _ => {
                 warn!(
                     "Invalid start result {}, defaulting to StartResultCode::InternalError",
-                    conf.result_code.into_primitive()
+                    result_code.into_primitive()
                 );
                 fidl_mlme::StartResultCode::InternalError
             }
         },
-    }
+    })
 }
 pub fn convert_stop_confirm(conf: fidl_fullmac::WlanFullmacStopConfirm) -> fidl_mlme::StopConfirm {
     use fidl_fullmac::WlanStopResult;
@@ -823,11 +824,12 @@ mod tests {
 
     #[test]
     fn test_convert_start_confirm_unknown_result_code_defaults_to_internal_error() {
-        let fullmac = fidl_fullmac::WlanFullmacStartConfirm {
-            result_code: fidl_fullmac::WlanStartResult::from_primitive_allow_unknown(123),
+        let fullmac = fidl_fullmac::WlanFullmacImplIfcStartConfRequest {
+            result_code: Some(fidl_fullmac::StartResult::from_primitive_allow_unknown(123)),
+            ..Default::default()
         };
         assert_eq!(
-            convert_start_confirm(fullmac),
+            convert_start_confirm(fullmac).unwrap(),
             fidl_mlme::StartConfirm { result_code: fidl_mlme::StartResultCode::InternalError }
         );
     }

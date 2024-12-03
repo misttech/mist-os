@@ -82,15 +82,11 @@ type WlanAssocResult = flexible enum : uint8 {
 };
 
 
-type WlanStartResult = flexible enum : uint8 {
+type StartResult = flexible enum : uint8 {
     SUCCESS = 0;
     BSS_ALREADY_STARTED_OR_JOINED = 1;
     RESET_REQUIRED_BEFORE_START = 2;
     NOT_SUPPORTED = 3;
-};
-
-type WlanFullmacStartConfirm = struct {
-    result_code WlanStartResult;
 };
 
 type WlanStopResult = flexible enum : uint8 {
@@ -469,8 +465,10 @@ closed protocol WlanFullmacImplIfc {
         /// externally (e.g. due to receipt of a disassociate frame from an AP).
         3: locally_initiated bool;
     }) -> ();
-    strict StartConf(struct {
-        resp WlanFullmacStartConfirm;
+    /// Report the result of a WlanFullmacImpl::StartBss request.
+    strict StartConf(table {
+        /// The result of the StartBss request. Required.
+        1: result_code StartResult;
     }) -> ();
     strict StopConf(struct {
         resp WlanFullmacStopConfirm;

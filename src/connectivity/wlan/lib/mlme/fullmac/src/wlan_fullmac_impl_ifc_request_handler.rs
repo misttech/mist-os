@@ -97,10 +97,10 @@ fn handle_one_request(
                 ind: fullmac_to_mlme::convert_disassociate_indication(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::StartConf { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::StartConf { payload, responder } => {
             responder.send().context("Failed to respond to StartConf")?;
             driver_event_sink.0.send(FullmacDriverEvent::StartConf {
-                resp: fullmac_to_mlme::convert_start_confirm(resp),
+                resp: fullmac_to_mlme::convert_start_confirm(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::StopConf { resp, responder } => {

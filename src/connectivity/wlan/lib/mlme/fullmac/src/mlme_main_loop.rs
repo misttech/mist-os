@@ -1486,18 +1486,21 @@ mod handle_driver_event_tests {
         );
     }
 
-    #[test_case(fidl_fullmac::WlanStartResult::Success, true, fidl_mlme::StartResultCode::Success; "success start result")]
-    #[test_case(fidl_fullmac::WlanStartResult::BssAlreadyStartedOrJoined, false, fidl_mlme::StartResultCode::BssAlreadyStartedOrJoined; "other start result")]
+    #[test_case(fidl_fullmac::StartResult::Success, true, fidl_mlme::StartResultCode::Success; "success start result")]
+    #[test_case(fidl_fullmac::StartResult::BssAlreadyStartedOrJoined, false, fidl_mlme::StartResultCode::BssAlreadyStartedOrJoined; "other start result")]
     #[fuchsia::test(add_test_attr = false)]
     fn test_start_conf(
-        start_result: fidl_fullmac::WlanStartResult,
+        start_result: fidl_fullmac::StartResult,
         expected_link_state_changed: bool,
         expected_fidl_result_code: fidl_mlme::StartResultCode,
     ) {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let start_conf = fidl_fullmac::WlanFullmacStartConfirm { result_code: start_result };
+        let start_conf = fidl_fullmac::WlanFullmacImplIfcStartConfRequest {
+            result_code: Some(start_result),
+            ..Default::default()
+        };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.start_conf(&start_conf)),
             Poll::Ready(Ok(()))
