@@ -169,7 +169,7 @@ async fn force_stop_guest(
     guest: arguments::GuestType,
     manager: GuestManagerProxy,
 ) -> Result<StopResult, Error> {
-    println!("Forcing {} to stop", guest.to_string());
+    println!("Forcing {} to stop", guest);
     let start = fasync::MonotonicInstant::now();
     manager.force_shutdown().await?;
 

@@ -59,7 +59,7 @@ impl fmt::Display for GuestDetails {
         table.add_row(row!["Guest uptime:", uptime_to_string(Some(self.uptime_nanos))]);
 
         if self.status == "Not started" {
-            write!(f, "{}", table.to_string())?;
+            write!(f, "{}", table)?;
             return Ok(());
         }
 
@@ -106,7 +106,7 @@ impl fmt::Display for GuestDetails {
             table.add_empty_row();
             table.add_row(row!["Inactive devices:", inactive]);
         }
-        write!(f, "{}", table.to_string())?;
+        write!(f, "{}", table)?;
 
         if !self.problems.is_empty() {
             let mut problem_table = Table::new();
@@ -123,7 +123,7 @@ impl fmt::Display for GuestDetails {
             for problem in self.problems.iter() {
                 problem_table.add_row(row![format!("* {}", problem), " "]);
             }
-            write!(f, "{}", problem_table.to_string())?;
+            write!(f, "{}", problem_table)?;
         }
         return Ok(());
     }
@@ -202,7 +202,7 @@ impl fmt::Display for GuestSummary {
         for guest in &self.guests {
             table.add_row(row![guest.name, guest.status, uptime_to_string(guest.uptime_nanos)]);
         }
-        write!(f, "{}", table.to_string())
+        write!(f, "{}", table)
     }
 }
 

@@ -82,7 +82,7 @@ impl fmt::Display for Percentiles {
         table.add_row(row!["\t99th percentile:", get_units(self.p_99th, self.unit)]);
         table.add_row(row!["\tMax:", get_units(self.max, self.unit)]);
 
-        write!(f, "\n{}", table.to_string())
+        write!(f, "\n{}", table)
     }
 }
 

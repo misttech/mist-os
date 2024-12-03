@@ -102,7 +102,7 @@ async fn launch<P: PlatformServices>(
 ) -> Result<GuestProxy, LaunchResult> {
     let (guest, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>();
 
-    println!("Starting {}", guest_type.to_string());
+    println!("Starting {}", guest_type);
     let manager = services
         .connect_to_manager(guest_type)
         .await
