@@ -2,9 +2,6 @@
 //src/devices/clock/drivers/vim3-clk:bazel_package.bazel_build
 //src/devices/usb/drivers/aml-usb-phy:aml-usb-phy-driver
 //src/devices/usb/drivers/aml-usb-phy:bazel_package.bazel_build
-//src/media/audio/drivers/aml-dsp/aml-g12-pdm-dsp:aml-g12-pdm-dsp-driver
-//src/media/audio/drivers/aml-dsp/aml-g12-tdm-dsp:aml-g12-tdm-dsp-driver
-//src/media/audio/drivers/aml-dsp:aml-dsp-driver
 //src/media/audio/drivers/aml-g12-pdm:aml-g12-pdm-driver
 //src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-bazel-package.bazel_build
 //src/media/audio/drivers/aml-g12-tdm:aml-g12-tdm-dai-driver

@@ -680,3 +680,9 @@
   available_in_git: '761eb92fc3c8f621f903b633d9b9ea7283fbf507'
   areas: ['Board']
   path: '/src/devices/board/drivers/acpi-arm64'
+- short_description: 'Amlogic audio DSP driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '1162754'
+  available_in_git: '3c52e1dbdc71dbd034d1e63baf43205284370976'
+  areas: ['Audio']
+  path: 'src/media/audio/drivers/aml-dsp'
