@@ -26,6 +26,15 @@
 ##  fx rbe cleanlogs
 ##      Clean up reproxy log dirs (from using fuchsia-reproxy-wrap.sh).
 ##
+##  fx rbe ensure_loas
+##      Checks for valid LOAS credentials, and runs gcert if needed.
+##
+##  fx rbe ensure_oauth
+##      Checks for valid OAuth token, and runs gcloud auth if needed.
+##
+##  fx rbe preflight
+##      Ensure credentials for using remote build services is valid,
+##      and prompt the user to re-auth if deemed necessary.
 
 set -e
 
@@ -83,6 +92,7 @@ gcloud=
 
 function ensure_gcloud() {
   # go/gcloud-cli#getting-started
+  [[ -z "$gcloud" ]] || return 0
   gcloud="$(which gcloud)" || {
     echo "gcloud not found."
     if is_googler
@@ -267,7 +277,32 @@ function get_loas_cert_type() {
 
 function check_loas_subcommand() {
   echo "Checking LOAS certificate type:"
-  echo "$(get_loas_cert_type "$@")"
+  style::echo --green "$(get_loas_cert_type "$@")"
+}
+
+function ensure_loas() {
+  gcertstatus --check_remaining=2h > /dev/null || gcert
+}
+
+function ensure_oauth() {
+  ensure_gcloud && {
+    # Check for the user's id among list of credentialed accounts.
+    "$gcloud" auth list 2>&1 | grep -q -w "$USER@google.com" || gcloud_auth
+  }
+}
+
+# For builds that use remote services like RBE, ResultStore,
+# ensure that there are valid credentials at the time a build
+# is launched.
+function preflight_subcommand() {
+  local -r loas_cert_type="$(get_loas_cert_type)"
+  case "$loas_cert_type" in
+    unrestricted) ensure_loas ;;
+    restricted) ensure_oauth ;;
+    # With the gcloud auth workflow, there is a risk that the current
+    # credentials expire before the end of the build because OAuth tokens
+    # only last one hour.
+  esac
 }
 
 # LINT.IfChange(reproxy_log_dirs)
@@ -289,6 +324,9 @@ case "$action" in
   auth) auth_subcommand "${action_args[@]}" ;;
   check_loas) check_loas_subcommand "${action_args[@]}" ;;
   cleanlogs) cleanlogs_subcommand "${action_args[@]}" ;;
+  ensure_loas) ensure_loas "${action_args[@]}" ;;
+  ensure_oauth) ensure_oauth "${action_args[@]}" ;;
+  preflight) preflight_subcommand "${action_args[@]}" ;;
 
   *)
     fx-error Invalid syntax

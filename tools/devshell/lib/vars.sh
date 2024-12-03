@@ -1078,7 +1078,6 @@ function fx-run-ninja {
       done
     fi
 
-    # TODO(b/342026853): perform pre-flight auth check
     rbe_wrapper=(
       env
       "${RBE_WRAPPER[@]}"
@@ -1101,6 +1100,8 @@ function fx-run-ninja {
       # Honor environment variable to disable RBE build metrics.
       "FX_REMOTE_BUILD_METRICS=${FX_REMOTE_BUILD_METRICS}"
     )
+    # TODO(b/342026853): pass environment variable to direct bazel
+    # to use credential helper when applicable.
   fi
 
   envs=(
@@ -1157,6 +1158,10 @@ function fx-run-ninja {
     "$cmd"
     "${args[@]}"
   )
+
+  if fx-build-needs-auth
+  then fx-command-run rbe preflight
+  fi
 
   if [[ "${print_full_cmd}" = true ]]; then
     echo "${full_cmdline[@]}"
