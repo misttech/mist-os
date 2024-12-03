@@ -404,6 +404,7 @@ bitflags! {
     #[repr(transparent)]
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct VmoInfoFlags: u32 {
+        const PAGED = sys::ZX_INFO_VMO_TYPE_PAGED;
         const RESIZABLE = sys::ZX_INFO_VMO_RESIZABLE;
         const IS_COW_CLONE = sys::ZX_INFO_VMO_IS_COW_CLONE;
         const VIA_HANDLE = sys::ZX_INFO_VMO_VIA_HANDLE;
@@ -561,6 +562,7 @@ mod tests {
         let vmo = Vmo::create(size).unwrap();
         let info = vmo.info().unwrap();
         assert!(!info.flags.contains(VmoInfoFlags::PAGER_BACKED));
+        assert!(info.flags.contains(VmoInfoFlags::PAGED));
     }
 
     #[test]

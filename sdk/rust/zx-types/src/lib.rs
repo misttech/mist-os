@@ -153,6 +153,7 @@ multiconst!(u64, [
 ]);
 
 multiconst!(u32, [
+    ZX_INFO_VMO_TYPE_PAGED = 1 << 0;
     ZX_INFO_VMO_RESIZABLE = 1 << 1;
     ZX_INFO_VMO_IS_COW_CLONE = 1 << 2;
     ZX_INFO_VMO_VIA_HANDLE = 1 << 3;
