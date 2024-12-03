@@ -17,8 +17,8 @@ use netstack3_base::{
 };
 
 use crate::internal::base::{
-    self, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, IpRouteTablesContext,
-    IpStateContext as _, ResolveRouteError, RoutingTableId,
+    self, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, IpRouteTableContext,
+    IpRouteTablesContext, IpStateContext as _, ResolveRouteError, RoutingTableId,
 };
 use crate::internal::device::{
     IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
@@ -229,7 +229,7 @@ where
     pub fn list_table_ids(
         &mut self,
     ) -> Vec<RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>> {
-        self.core_ctx().with_ip_routing_tables_mut(|tables| tables.keys().cloned().collect())
+        self.core_ctx().with_ip_routing_tables(|_ctx, tables| tables.keys().cloned().collect())
     }
 }
 

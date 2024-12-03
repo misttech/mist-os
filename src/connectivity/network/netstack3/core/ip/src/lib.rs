@@ -229,12 +229,13 @@ pub use internal::base::{
     IpCounters, IpDeviceConfirmReachableContext, IpDeviceContext, IpDeviceEgressStateContext,
     IpDeviceIngressStateContext, IpDeviceMtuContext, IpLayerBindingsContext, IpLayerContext,
     IpLayerEvent, IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination,
-    IpRouteTablesContext, IpSendFrameError, IpSendFrameErrorReason, IpStateContext, IpStateInner,
-    IpTransportContext, IpTransportDispatchContext, Ipv4PresentAddressStatus, Ipv4State,
-    Ipv4StateBuilder, Ipv6PresentAddressStatus, Ipv6State, Ipv6StateBuilder,
-    MulticastMembershipHandler, ReceiveIpPacketMeta, ReceivePacketAction, ResolveRouteError,
-    RoutingTableId, SendIpPacketMeta, TransparentLocalDelivery, TransportIpContext,
-    TransportReceiveError, DEFAULT_HOP_LIMITS, DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
+    IpRouteTableContext, IpRouteTablesContext, IpSendFrameError, IpSendFrameErrorReason,
+    IpStateContext, IpStateInner, IpTransportContext, IpTransportDispatchContext,
+    Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder, Ipv6PresentAddressStatus, Ipv6State,
+    Ipv6StateBuilder, MulticastMembershipHandler, ReceiveIpPacketMeta, ReceivePacketAction,
+    ResolveRouteError, RoutingTableId, SendIpPacketMeta, TransparentLocalDelivery,
+    TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS, DEFAULT_TTL,
+    IPV6_DEFAULT_SUBNET,
 };
 pub use internal::fragmentation::FragmentationCounters;
 pub use internal::path_mtu::{PmtuCache, PmtuContext};

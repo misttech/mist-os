@@ -739,14 +739,33 @@ pub trait IpStateContext<I: IpLayerIpExt>:
 }
 
 /// The state context that gives access to routing tables provided to the IP layer.
-pub trait IpRouteTablesContext<I: IpLayerIpExt>: IpDeviceContext<I> {
-    /// The inner device id context.
-    type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-        + IpRoutingDeviceContext<I>
-        + IpDeviceContext<I>;
+pub trait IpRouteTablesContext<I: IpLayerIpExt>:
+    IpRouteTableContext<I> + IpDeviceContext<I>
+{
+    /// The inner context that can provide access to individual routing tables.
+    type Ctx<'a>: IpRouteTableContext<
+        I,
+        DeviceId = Self::DeviceId,
+        WeakDeviceId = Self::WeakDeviceId,
+    >;
 
     /// Gets the main table ID.
     fn main_table_id(&self) -> RoutingTableId<I, Self::DeviceId>;
+
+    /// Gets immutable access to all the routing tables that currently exist.
+    fn with_ip_routing_tables<
+        O,
+        F: FnOnce(
+            &mut Self::Ctx<'_>,
+            &HashMap<
+                RoutingTableId<I, Self::DeviceId>,
+                PrimaryRc<RwLock<RoutingTable<I, Self::DeviceId>>>,
+            >,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
 
     /// Gets mutable access to all the routing tables that currently exist.
     fn with_ip_routing_tables_mut<
@@ -789,6 +808,14 @@ pub trait IpRouteTablesContext<I: IpLayerIpExt>: IpDeviceContext<I> {
         let main_table_id = self.main_table_id();
         self.with_ip_routing_table_mut(&main_table_id, cb)
     }
+}
+
+/// The state context that gives access to a singular routing table.
+pub trait IpRouteTableContext<I: IpLayerIpExt>: IpDeviceContext<I> {
+    /// The inner device id context.
+    type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        + IpRoutingDeviceContext<I>
+        + IpDeviceContext<I>;
 
     /// Calls the function with an immutable reference to IP routing table.
     fn with_ip_routing_table<

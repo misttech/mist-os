@@ -32,10 +32,10 @@ use netstack3_ip::multicast_forwarding::MulticastForwardingState;
 use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{
     self as ip, FragmentContext, IpCounters, IpDeviceContext, IpLayerBindingsContext, IpLayerIpExt,
-    IpPacketFragmentCache, IpRouteTablesContext, IpStateContext, IpStateInner, IpTransportContext,
-    IpTransportDispatchContext, Marks, MulticastMembershipHandler, PmtuCache, PmtuContext,
-    ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute, RoutingTable, RoutingTableId,
-    RulesTable, TransportReceiveError,
+    IpPacketFragmentCache, IpRouteTableContext, IpRouteTablesContext, IpStateContext, IpStateInner,
+    IpTransportContext, IpTransportDispatchContext, Marks, MulticastMembershipHandler, PmtuCache,
+    PmtuContext, ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute, RoutingTable,
+    RoutingTableId, RulesTable, TransportReceiveError,
 };
 use netstack3_sync::rc::Primary;
 use netstack3_sync::RwLock;
@@ -287,11 +287,27 @@ where
     BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::IpStateRoutingTables<I>>,
 {
-    type IpDeviceIdCtx<'a> =
-        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpStateRoutingTable<I>>>;
+    type Ctx<'a> = CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpStateRoutingTables<I>>>;
 
     fn main_table_id(&self) -> RoutingTableId<I, Self::DeviceId> {
         self.unlocked_access::<crate::lock_ordering::IpMainTableId<I>>().clone()
+    }
+
+    fn with_ip_routing_tables<
+        O,
+        F: FnOnce(
+            &mut Self::Ctx<'_>,
+            &HashMap<
+                RoutingTableId<I, Self::DeviceId>,
+                Primary<RwLock<RoutingTable<I, Self::DeviceId>>>,
+            >,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (table, mut ctx) = self.lock_and::<crate::lock_ordering::IpStateRoutingTables<I>>();
+        cb(&mut ctx, &table)
     }
 
     fn with_ip_routing_tables_mut<
@@ -309,6 +325,17 @@ where
         let mut tables = self.lock::<crate::lock_ordering::IpStateRoutingTables<I>>();
         cb(&mut *tables)
     }
+}
+
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<I, BC, L> IpRouteTableContext<I> for CoreCtx<'_, BC, L>
+where
+    I: IpLayerIpExt,
+    BC: BindingsContext,
+    L: LockBefore<crate::lock_ordering::IpStateRoutingTable<I>>,
+{
+    type IpDeviceIdCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpStateRoutingTable<I>>>;
 
     fn with_ip_routing_table<
         O,
@@ -894,7 +921,10 @@ impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::SlaacTempSecretKey>
     for StackState<BT>
 {
     type Data = IidSecret;
-    type Guard<'l> = &'l IidSecret where Self: 'l;
+    type Guard<'l>
+        = &'l IidSecret
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.ipv6.slaac_temp_secret_key
