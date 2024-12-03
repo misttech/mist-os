@@ -568,8 +568,8 @@ template("fidl_library") {
 
       json_summary_file = "${level_gen_dir}/${library_name}.api_summary.json"
 
-      fidl_ir_target_name = "${main_target_name}_compile_${level}"
-      fidl_ir(fidl_ir_target_name) {
+      fidl_ir_target_name_for_level = "${compilation_target_name}_${level}"
+      fidl_ir(fidl_ir_target_name_for_level) {
         forward_variables_from(invoker, invoker_variables_to_forward_to_fidl_ir)
         fidl_target_name = main_target_name
         fidl_library_name = library_name
@@ -593,11 +593,12 @@ template("fidl_library") {
         out_json_summary = json_summary_file
       }
 
-      sdk_atom_deps += [ ":$fidl_ir_target_name" ]
+      sdk_atom_deps += [ ":${fidl_ir_target_name_for_level}" ]
 
       if (level != "HEAD") {
-        test_target = "${main_target_name}_${level}_compatibility_test"
-        fidl_api_compatibility_test(test_target) {
+        test_target_name_for_level =
+            "${main_target_name}_${level}_compatibility_test"
+        fidl_api_compatibility_test(test_target_name_for_level) {
           forward_variables_from(invoker, [ "testonly" ])
           target_api_level = level
           current = json_summary_file
@@ -613,9 +614,9 @@ template("fidl_library") {
             policy = "no_changes"
           }
 
-          deps = [ ":$fidl_ir_target_name" ]
+          deps = [ ":${fidl_ir_target_name_for_level}" ]
         }
-        sdk_atom_deps += [ ":$test_target" ]
+        sdk_atom_deps += [ ":${test_target_name_for_level}" ]
       }
     }
   }
