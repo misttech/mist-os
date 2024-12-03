@@ -5,6 +5,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.mailbox") {
+  sdk_area = "Drivers"
   sources = [ "mailbox.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  stable = false
+  sdk_category = "partner"
 }

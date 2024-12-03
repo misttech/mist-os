@@ -262,6 +262,7 @@ fidl_library://fidl/fuchsia.hardware.i2c
 fidl_library://fidl/fuchsia.hardware.i2c.businfo (unstable)
 fidl_library://fidl/fuchsia.hardware.i2cimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.light
+fidl_library://fidl/fuchsia.hardware.mailbox (unstable)
 fidl_library://fidl/fuchsia.hardware.network
 fidl_library://fidl/fuchsia.hardware.network.driver (unstable)
 fidl_library://fidl/fuchsia.hardware.pci

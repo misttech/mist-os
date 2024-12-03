@@ -79,6 +79,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl",
   "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo",
   "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light",
+  "//sdk/fidl/fuchsia.hardware.mailbox:fuchsia.hardware.mailbox",
   "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network",
   "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver",
   "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci",
