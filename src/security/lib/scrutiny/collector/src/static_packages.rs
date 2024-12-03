@@ -38,6 +38,7 @@ struct ErrorWithDeps {
     pub error: StaticPkgsError,
 }
 
+#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 fn collect_static_pkgs(
     additional_boot_args: AdditionalBootConfigContents,
     mut artifact_reader: Box<dyn ArtifactReader>,

@@ -148,8 +148,8 @@ async fn main() -> Result<(), Error> {
     let mut svc_dir = fs.dir("svc");
     let mut ta_dir = svc_dir.dir("ta");
 
-    for uuid in configs.keys().cloned() {
-        let _ = ta_dir.dir(&uuid).add_fidl_service(move |stream: ApplicationRequestStream| {
+    for uuid in configs.keys() {
+        let _ = ta_dir.dir(uuid).add_fidl_service(move |stream: ApplicationRequestStream| {
             TAConnectRequest { uuid: uuid.to_string(), stream }
         });
     }
