@@ -166,19 +166,29 @@ template("fidl") {
          "All FIDL dependencies are inherently " +
              "public, use 'public_deps' instead of 'deps'.")
 
+  # Define values that will be used to generate other variables here so that
+  # such use does not count as having used the member of `common_parameters.
+  _fidl_target_name = target_name
+  _fidl_target = ":${_fidl_target_name}($fidl_toolchain)"
+  _fidl_gen_dir =
+      get_label_info(_fidl_target, "target_gen_dir") + "/${_fidl_target_name}"
+  _fidl_ir_target = ":${_fidl_target_name}_compile_fidlc($fidl_toolchain)"
+
   common_parameters = {
-    library_name = target_name
     if (defined(invoker.name)) {
       library_name = invoker.name
+    } else {
+      library_name = target_name
     }
 
-    fidl_target = target_name
-    fidl_gen_dir = get_label_info(":$fidl_target($fidl_toolchain)",
-                                  "target_gen_dir") + "/$fidl_target"
+    fidl_gen_dir = _fidl_gen_dir
 
     # The FIDL IR target, to be forwarded to each backend as a dependency.
-    fidl_ir_target = ":${target_name}_compile_fidlc($fidl_toolchain)"
-    fidl_ir_json = get_label_info(fidl_ir_target, "target_gen_dir") +
+    fidl_ir_target = _fidl_ir_target
+
+    # The path to the IR JSON. When passed to `fidl_library()`, it specifies the
+    # desired path at which to generate the file.
+    fidl_ir_json = get_label_info(_fidl_ir_target, "target_gen_dir") +
                    "/${target_name}.fidl.json"
   }
 
@@ -245,11 +255,7 @@ template("fidl") {
                                    "sdk_category",
                                    "sources",
                                  ])
-      forward_variables_from(common_parameters,
-                             [
-                               "library_name",
-                               "fidl_ir_json",
-                             ])
+      forward_variables_from(common_parameters, "*")
     }
 
     # Check that the IR JSON is indeed an output of the purported IR target.
@@ -293,7 +299,7 @@ template("fidl") {
         fidl_library_name,
       ]
       outputs = [ fidl_ir_root_outfile ]
-      deps = [ ":${common_parameters.fidl_target}($fidl_toolchain)" ]
+      deps = [ _fidl_target ]
     }
 
     # Use SDK category markers to enable detection of host targets that use FIDL
@@ -330,16 +336,15 @@ template("fidl") {
       # TODO(b/295190178): append all_fidl_json.txt with inclusion of
       # fidl_ir_target target.
       deps = [
-        ":${common_parameters.fidl_target}($fidl_toolchain)",
         ":${fidl_ir_root_target}",
+        _fidl_target,
       ]
 
       # Add SDK category markers as FIDL-IR host data is used for host tests
       # that use Fuchsia Controller.
       # Check for allowed marker before adding category.
       import("//src/testing/end_to_end/host_test_allowlist.gni")
-      label_name = get_label_info(":${common_parameters.fidl_target}",
-                                  "label_no_toolchain")
+      label_name = get_label_info(_fidl_target, "label_no_toolchain")
       is_allowed_for_host_test = host_test_fidl_allowlist + [ label_name ] -
                                  [ label_name ] != host_test_fidl_allowlist
       if (is_allowed_for_host_test) {
@@ -385,7 +390,7 @@ template("fidl") {
                                "visibility",
                                "public_deps",
                              ])
-      forward_variables_from(common_parameters, "*", [ "fidl_target" ])
+      forward_variables_from(common_parameters, "*")
       fidl_gen_dir += "/go"
     }
     not_needed(invoker,
@@ -421,6 +426,7 @@ template("fidl") {
                                  "golden_fuzzer",
                                ])
         forward_variables_from(common_parameters, "*")
+        fidl_target = _fidl_target_name
         enable_hlcpp = enable_hlcpp
         enable_cpp = enable_cpp
 
@@ -452,7 +458,7 @@ template("fidl") {
                                  "public_deps",
                                  "disable_rustdoc",
                                ])
-        forward_variables_from(common_parameters, "*", [ "fidl_target" ])
+        forward_variables_from(common_parameters, "*")
         if (!is_host && enable_rust_drivers) {
           forward_variables_from(invoker, [ "contains_drivers" ])
         }
@@ -461,8 +467,7 @@ template("fidl") {
           # Add SDK category markers as Rust is used for ffx host tools.
           # Check for allowed marker before adding category.
           import("//src/developer/ffx/build/ffx_subtool_allowlist.gni")
-          label_name = get_label_info(":${common_parameters.fidl_target}",
-                                      "label_no_toolchain")
+          label_name = get_label_info(_fidl_target, "label_no_toolchain")
           is_allowed_for_ffx = ffx_subtool_fidl_allowlist + [ label_name ] -
                                [ label_name ] != ffx_subtool_fidl_allowlist
           marker_category = "unknown"
@@ -491,14 +496,13 @@ template("fidl") {
 
           fdomain = true
 
-          forward_variables_from(common_parameters, "*", [ "fidl_target" ])
+          forward_variables_from(common_parameters, "*")
           deps = []
 
           # Add SDK category markers as Rust is used for ffx host tools.
           # Check for allowed marker before adding category.
           import("//src/developer/ffx/build/ffx_subtool_allowlist.gni")
-          label_name = get_label_info(":${common_parameters.fidl_target}",
-                                      "label_no_toolchain")
+          label_name = get_label_info(_fidl_target, "label_no_toolchain")
           is_allowed_for_ffx = ffx_subtool_fidl_allowlist + [ label_name ] -
                                [ label_name ] != ffx_subtool_fidl_allowlist
           marker_category = "unknown"
@@ -530,7 +534,7 @@ template("fidl") {
                                  "public_deps",
                                  "disable_rustdoc",
                                ])
-        forward_variables_from(common_parameters, "*", [ "fidl_target" ])
+        forward_variables_from(common_parameters, "*")
         deps = []
         fidl_gen_dir += "/rust_next"
       }
@@ -550,7 +554,7 @@ template("fidl") {
                                  "testonly",
                                  "visibility",
                                ])
-        forward_variables_from(common_parameters, "*", [ "fidl_target" ])
+        forward_variables_from(common_parameters, "*")
         fidl_gen_dir += "/bindlib"
       }
     }

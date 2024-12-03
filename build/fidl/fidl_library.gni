@@ -82,6 +82,14 @@ template("fidl_library") {
   lint_target_name = "${target_name}_lint"
   lint_stamp_file = "$target_gen_dir/$target_name.linted"
 
+  # These parameters are passed to all backends and this template but are unneed
+  # here. Assert that they are correct as a way of using them.
+  assert(invoker.fidl_ir_target ==
+         ":${compilation_target_name}_fidlc($fidl_toolchain)")
+  assert(invoker.fidl_gen_dir ==
+         get_label_info(":${main_target_name}", "target_gen_dir") +
+         "/${main_target_name}")
+
   is_testonly = defined(invoker.testonly) && invoker.testonly
 
   target_dir = get_label_info(main_target_name, "dir")
