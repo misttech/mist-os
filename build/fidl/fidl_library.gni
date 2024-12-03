@@ -45,10 +45,6 @@ if (current_build_target_api_level == "PLATFORM") {
 #    - Required: The path to the associated FIDL IR JSON file.
 #    - Type: path
 #
-#  * fidl_ir_target
-#    - Required: The label of the target that generates the FIDL IR JSON file.
-#    - Type: label
-#
 #  * sources
 #    - Required: See //build/fidl/fidl.gni for a description.
 #    - Type: list(path)
@@ -79,13 +75,15 @@ template("fidl_library") {
 
   compilation_target_name = "${target_name}_compile"
   verification_target_name = "${target_name}_verify"
+  plasa_fragment_target_name = "${target_name}_plasa"
   lint_target_name = "${target_name}_lint"
   lint_stamp_file = "$target_gen_dir/$target_name.linted"
 
   # These parameters are passed to all backends and this template but are unneed
   # here. Assert that they are correct as a way of using them.
-  assert(invoker.fidl_ir_target ==
-         ":${compilation_target_name}_fidlc($fidl_toolchain)")
+  # For historical reasons, "fidl_ir_target" does not reflect the actual value.
+  # TODO(https://fxbug.dev/381123422): Rename it.
+  assert(invoker.fidl_ir_target == ":${main_target_name}($fidl_toolchain)")
   assert(invoker.fidl_gen_dir ==
          get_label_info(":${main_target_name}", "target_gen_dir") +
          "/${main_target_name}")
@@ -370,7 +368,15 @@ template("fidl_library") {
 
   fidl_ir(compilation_target_name) {
     forward_variables_from(invoker, invoker_variables_to_forward_to_fidl_ir)
-    visibility = [ ":*" ]
+
+    # Restrict visibility to targets declared in this file to prevent direct
+    # deps on this target rather than `main_target_name` because that bypasses
+    # metadata generation, linting, etc. See https://fxbug.dev/381123422.
+    visibility = [
+      ":${main_target_name}",
+      ":${plasa_fragment_target_name}",
+      ":${verification_target_name}",
+    ]
     fidl_target_name = main_target_name
     fidl_library_name = library_name
     gen_dir = target_gen_dir
@@ -386,7 +392,6 @@ template("fidl_library") {
   summary_file_json = "$target_gen_dir/$target_name.api_summary.json"
 
   plasa_fragment_file = summary_file_json
-  plasa_fragment_target_name = "${target_name}_plasa"
   plasa_fragment_fidl(plasa_fragment_target_name) {
     forward_variables_from(invoker,
                            [
@@ -413,7 +418,7 @@ template("fidl_library") {
                              "sources",
                              "testonly",
                            ])
-    visibility = [ ":*" ]
+    visibility = [ ":${main_target_name}" ]
 
     script = "//build/scripts/run_and_stamp.sh"
     mnemonic = "LINT"
@@ -449,13 +454,32 @@ template("fidl_library") {
                          "//tools/fidl/fidlc/testdata/*",
                        ]) != []) {
       args += [ ":" ]  # NOOP - Nothing to lint, but touch the stamp file
-    } else if (!defined(invoker.excluded_checks) &&
-               filter_include(
-                   [ get_label_info(target_name, "dir") ],
-                   [
-                     # TODO(https://fxbug.dev/381163466): Fix lint warnings.
-                     "//vendor/*",
-                   ]) != []) {
+    } else if (!defined(invoker.excluded_checks) && filter_include(
+                                                        [ get_label_info(
+                                                            target_name,
+                                                            "dir") ],
+                                                        [
+                                                          # TODO(https://fxbug.dev/381096879): Fix lint warnings.
+                                                          "//examples/fidl/*",
+                                                          "//sdk/banjo/fuchsia.hardware.block.partition/*",
+                                                          "//sdk/fidl/fuchsia.bluetooth.snoop/*",
+                                                          "//sdk/fidl/fuchsia.component.internal/*",
+                                                          "//sdk/fidl/fuchsia.net.masquerade/*",
+                                                          "//sdk/fidl/zbi/*",
+                                                          "//src/connectivity/overnet/tests/integration/*",
+                                                          "//src/connectivity/wlan/tests/helpers/realm-factory/*",
+                                                          "//src/diagnostics/sampler/testing/fidl/*",
+                                                          "//src/lib/component/*",
+                                                          "//src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/*",
+                                                          "//src/lib/fidl_table_validation/*",
+                                                          "//src/lib/process_builder/*",
+                                                          "//src/sys/component_manager/tests/security_policy/capability_allowlist/*",
+                                                          "//src/sys/component_manager/tests/utc-time/*",
+                                                          "//zircon/tools/zither/*",
+
+                                                          # TODO(https://fxbug.dev/381163466): Fix lint warnings.
+                                                          "//vendor/*",
+                                                        ]) != []) {
       args += [ ":" ]  # NOOP - Nothing to lint, but touch the stamp file
     } else {
       args += [ rebase_path(host_tool_path, root_build_dir) ]

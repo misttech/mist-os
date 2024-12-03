@@ -183,8 +183,11 @@ template("fidl") {
 
     fidl_gen_dir = _fidl_gen_dir
 
-    # The FIDL IR target, to be forwarded to each backend as a dependency.
-    fidl_ir_target = _fidl_ir_target
+    # The main FIDL library target on the FIDL toolchain. Every backend must
+    # depend on it.
+    # For historical reasons, the variable name is the FIDL IR target.
+    # TODO(https://fxbug.dev/381123422): Rename it.
+    fidl_ir_target = ":${target_name}($fidl_toolchain)"
 
     # The path to the IR JSON. When passed to `fidl_library()`, it specifies the
     # desired path at which to generate the file.
@@ -259,7 +262,8 @@ template("fidl") {
     }
 
     # Check that the IR JSON is indeed an output of the purported IR target.
-    fidlc_outputs = get_target_outputs(common_parameters.fidl_ir_target)
+    fidlc_outputs =
+        get_target_outputs(":${target_name}_compile_fidlc($fidl_toolchain)")
     assert([ common_parameters.fidl_ir_json ] + fidlc_outputs - fidlc_outputs ==
            [])
   } else {
@@ -329,16 +333,7 @@ template("fidl") {
         testonly = invoker.testonly
       }
 
-      # It's only necessary to depend on fidl_ir_target got get the FIDL IR json
-      # file, but without depending on fidl_target, there is no entry in
-      # all_fidl_json.txt, which at the moment is the main source for finding
-      # the list of current FIDL IR json files.
-      # TODO(b/295190178): append all_fidl_json.txt with inclusion of
-      # fidl_ir_target target.
-      deps = [
-        ":${fidl_ir_root_target}",
-        _fidl_target,
-      ]
+      deps = [ ":${fidl_ir_root_target}" ]
 
       # Add SDK category markers as FIDL-IR host data is used for host tests
       # that use Fuchsia Controller.
