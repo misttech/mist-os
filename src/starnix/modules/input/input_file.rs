@@ -25,11 +25,11 @@ use zerocopy::IntoBytes as _; // for `as_bytes()`
 
 const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 
-pub struct InspectStatus {
+pub struct InputFileStatus {
     /// A node that contains the state below.
     _inspect_node: fuchsia_inspect::Node,
 
-    /// The number of FIDL events received from Fuchsia input system.
+    /// The number of FIDL events received by this file from Fuchsia input system.
     ///
     /// We expect:
     /// fidl_events_received_count = fidl_events_ignored_count +
@@ -64,7 +64,7 @@ pub struct InspectStatus {
     pub last_read_uapi_event_timestamp_ns: fuchsia_inspect::IntProperty,
 }
 
-impl InspectStatus {
+impl InputFileStatus {
     fn new(node: fuchsia_inspect::Node) -> Self {
         let fidl_events_received_count = node.create_uint("fidl_events_received_count", 0);
         let fidl_events_ignored_count = node.create_uint("fidl_events_ignored_count", 0);
@@ -142,9 +142,9 @@ pub struct InputFileMutableState {
     pub events: VecDeque<uapi::input_event>,
     pub waiters: WaitQueue,
     // TODO: https://fxbug.dev/42081918 - remove `Optional` when implementing Inspect for Keyboard InputFiles
-    // Touch InputFile will be initialized with a InspectStatus that holds Inspect data
-    // `None` for Keyboard InputFile
-    pub inspect_status: Option<InspectStatus>,
+    // Touch InputFile will be initialized with a InputFileStatus that holds Inspect data
+    // `None` for Uinput InputFiles
+    pub inspect_status: Option<InputFileStatus>,
 }
 
 /// Returns the minimum number of bytes required to store `n_bits` bits.
@@ -217,12 +217,12 @@ impl InputFile {
     /// - `input_id`: device's bustype, vendor id, product id, and version.
     /// - `width`: width of screen.
     /// - `height`: height of screen.
-    /// - `inspect_node`: The root node for "touch_input_file" inspect tree.
+    /// - `inspect_status`: The inspect status for the parent device of "touch_input_file".
     pub fn new_touch(
         input_id: uapi::input_id,
         width: i32,
         height: i32,
-        inspect_node: Option<fuchsia_inspect::Node>,
+        node: Option<fuchsia_inspect::Node>,
     ) -> Self {
         let device_name = get_device_name("starnix_touch", &input_id);
         // Fuchsia scales the position reported by the touch sensor to fit view coordinates.
@@ -266,7 +266,7 @@ impl InputFile {
             inner: Mutex::new(InputFileMutableState {
                 events: VecDeque::new(),
                 waiters: WaitQueue::default(),
-                inspect_status: inspect_node.map(|n| InspectStatus::new(n)),
+                inspect_status: node.map(|n| InputFileStatus::new(n)),
             }),
             device_name,
         }
@@ -276,10 +276,8 @@ impl InputFile {
     ///
     /// # Parameters
     /// - `input_id`: device's bustype, vendor id, product id, and version.
-    pub fn new_keyboard(
-        input_id: uapi::input_id,
-        inspect_node: Option<fuchsia_inspect::Node>,
-    ) -> Self {
+    /// - `inspect_status`: The inspect status for the parent device of "touch_input_file".
+    pub fn new_keyboard(input_id: uapi::input_id, node: Option<fuchsia_inspect::Node>) -> Self {
         let device_name = get_device_name("starnix_buttons", &input_id);
         Self {
             driver_version: Self::DRIVER_VERSION,
@@ -299,7 +297,7 @@ impl InputFile {
             inner: Mutex::new(InputFileMutableState {
                 events: VecDeque::new(),
                 waiters: WaitQueue::default(),
-                inspect_status: inspect_node.map(|n| InspectStatus::new(n)),
+                inspect_status: node.map(|n| InputFileStatus::new(n)),
             }),
             device_name,
         }

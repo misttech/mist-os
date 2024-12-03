@@ -214,6 +214,8 @@ pub fn run_container_features(
             registry_proxy,
             touch_device.open_files.clone(),
             keyboard_device.open_files.clone(),
+            Some(touch_device.inspect_status.clone()),
+            Some(keyboard_device.inspect_status.clone()),
         );
 
         register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay);
