@@ -250,8 +250,7 @@ impl InputEventsRelay {
                                     log_warn!("Dropping input file for touch that failed to upgrade");
                                     return false;
                                 };
-                                let mut inner = file.inner.lock();
-                                match &inner.inspect_status {
+                                match &file.inspect_status {
                                     Some(file_inspect_status) => {
                                         file_inspect_status.count_received_events(num_received_events);
                                         file_inspect_status.count_ignored_events(num_ignored_events);
@@ -262,18 +261,17 @@ impl InputEventsRelay {
                                       log_warn!("unable to record inspect within the input file")
                                     }
                                 }
-
                                 if !new_events.is_empty() {
                                     // TODO(https://fxbug.dev/42075438): Reading from an `InputFile` should
                                     // not provide access to events that occurred before the file was
                                     // opened.
-                                    if let Some(file_inspect_status) = &inner.inspect_status {
+                                    if let Some(file_inspect_status) = &file.inspect_status {
                                         file_inspect_status.count_generated_events(
                                             new_events.len().try_into().unwrap(),
                                             last_event_time_ns
                                         );
                                     }
-
+                                    let mut inner = file.inner.lock();
                                     inner.events.extend(new_events.clone());
                                     inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 }
@@ -467,8 +465,7 @@ impl InputEventsRelay {
                             log_warn!("Dropping input file for buttons that failed to upgrade");
                             return false;
                         };
-                        let mut inner = file.inner.lock();
-                        match &inner.inspect_status {
+                        match &file.inspect_status {
                             Some(file_inspect_status) => {
                                 file_inspect_status.count_received_events(1);
                                 file_inspect_status.count_ignored_events(ignored_events);
@@ -478,15 +475,14 @@ impl InputEventsRelay {
                                 log_warn!("unable to record inspect within the input file")
                             }
                         }
-
                         if !batch.events.is_empty() {
-                            if let Some(file_inspect_status) = &inner.inspect_status {
+                            if let Some(file_inspect_status) = &file.inspect_status {
                                 file_inspect_status.count_generated_events(
                                     generated_events,
                                     batch.event_time.into_nanos().try_into().unwrap(),
                                 );
                             }
-
+                            let mut inner = file.inner.lock();
                             inner.events.extend(batch.events.clone());
                             inner.waiters.notify_fd_events(FdEvents::POLLIN);
                         }

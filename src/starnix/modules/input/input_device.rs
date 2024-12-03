@@ -12,7 +12,7 @@ use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode, FsString};
 #[cfg(test)]
 use starnix_sync::Unlocked;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex};
 use starnix_uapi::device_type::{DeviceType, INPUT_MAJOR};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -85,6 +85,10 @@ pub struct InputDeviceStatus {
     /// A node that contains the state below.
     pub node: fuchsia_inspect::Node,
 
+    /// Hold onto inspect nodes for files opened on this device, so that when these files are
+    /// closed, their inspect data is maintained.
+    pub file_nodes: Mutex<Vec<fuchsia_inspect::Node>>,
+
     /// The number of FIDL events received by this device from Fuchsia input system.
     ///
     /// We expect:
@@ -133,6 +137,7 @@ impl InputDeviceStatus {
             node.create_int("last_generated_uapi_event_timestamp_ns", 0);
         Self {
             node,
+            file_nodes: Mutex::new(vec![]),
             total_fidl_events_received_count,
             total_fidl_events_ignored_count,
             total_fidl_events_unexpected_count,
@@ -223,33 +228,48 @@ impl InputDevice {
         );
     }
 
+    pub fn open_internal(&self) -> Box<dyn FileOps> {
+        let input_file = match self.device_type {
+            InputDeviceType::Touch(display_width, display_height) => {
+                let mut file_nodes = self.inspect_status.file_nodes.lock();
+                let child_node = self
+                    .inspect_status
+                    .node
+                    .create_child(format!("touch_file_{}", file_nodes.len()));
+                let file = Arc::new(InputFile::new_touch(
+                    TOUCH_INPUT_ID,
+                    display_width,
+                    display_height,
+                    Some(&child_node),
+                ));
+                file_nodes.push(child_node);
+                file
+            }
+            InputDeviceType::Keyboard => {
+                let mut file_nodes = self.inspect_status.file_nodes.lock();
+                let child_node = self
+                    .inspect_status
+                    .node
+                    .create_child(format!("keyboard_file_{}", file_nodes.len()));
+                let file = Arc::new(InputFile::new_keyboard(KEYBOARD_INPUT_ID, Some(&child_node)));
+                file_nodes.push(child_node);
+                file
+            }
+        };
+        self.open_files.lock().push(Arc::downgrade(&input_file));
+        Box::new(input_file)
+    }
+
     #[cfg(test)]
     pub fn open_test(
         &self,
         locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
     ) -> Result<starnix_core::vfs::FileHandle, Errno> {
-        let input_file = match self.device_type {
-            InputDeviceType::Touch(display_width, display_height) => {
-                let child_node = self.inspect_status.node.create_child("touch_file");
-                let file = Arc::new(InputFile::new_touch(
-                    TOUCH_INPUT_ID,
-                    display_width,
-                    display_height,
-                    Some(child_node),
-                ));
-                file
-            }
-            InputDeviceType::Keyboard => {
-                let child_node = self.inspect_status.node.create_child("keyboard_file");
-                let file = Arc::new(InputFile::new_keyboard(KEYBOARD_INPUT_ID, Some(child_node)));
-                file
-            }
-        };
-        self.open_files.lock().push(Arc::downgrade(&input_file));
+        let input_file = self.open_internal();
         let file_object = starnix_core::vfs::FileObject::new(
             current_task,
-            Box::new(input_file),
+            input_file,
             current_task
                 .lookup_path_from_root(locked, ".".into())
                 .expect("failed to get namespace node for root"),
@@ -269,25 +289,8 @@ impl DeviceOps for InputDevice {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let input_file = match self.device_type {
-            InputDeviceType::Touch(display_width, display_height) => {
-                let child_node = self.inspect_status.node.create_child("touch_file");
-                let file = Arc::new(InputFile::new_touch(
-                    TOUCH_INPUT_ID,
-                    display_width,
-                    display_height,
-                    Some(child_node),
-                ));
-                file
-            }
-            InputDeviceType::Keyboard => {
-                let child_node = self.inspect_status.node.create_child("keyboard_file");
-                let file = Arc::new(InputFile::new_keyboard(KEYBOARD_INPUT_ID, Some(child_node)));
-                file
-            }
-        };
-        self.open_files.lock().push(Arc::downgrade(&input_file));
-        Ok(Box::new(input_file))
+        let input_file = self.open_internal();
+        Ok(input_file)
     }
 }
 
@@ -918,7 +921,7 @@ mod test {
                 total_fidl_events_converted_count: 1u64,
                 total_uapi_events_generated_count: 6u64,
                 last_generated_uapi_event_timestamp_ns: 0i64,
-                touch_file: {
+                touch_file_0: {
                     fidl_events_received_count: 3u64,
                     fidl_events_ignored_count: 2u64,
                     fidl_events_unexpected_count: 0u64,
@@ -984,7 +987,7 @@ mod test {
                 total_fidl_events_converted_count: 1u64,
                 total_uapi_events_generated_count: 6u64,
                 last_generated_uapi_event_timestamp_ns: 0i64,
-                touch_file: {
+                touch_file_0: {
                     fidl_events_received_count: 3u64,
                     fidl_events_ignored_count: 1u64,
                     fidl_events_unexpected_count: 1u64,
@@ -1663,7 +1666,7 @@ mod test {
                 total_fidl_events_converted_count: 0u64,
                 total_uapi_events_generated_count: 0u64,
                 last_generated_uapi_event_timestamp_ns: 0i64,
-                touch_file: {
+                touch_file_0: {
                     fidl_events_received_count: 0u64,
                     fidl_events_ignored_count: 0u64,
                     fidl_events_unexpected_count: 0u64,
@@ -1758,9 +1761,169 @@ mod test {
                 total_fidl_events_converted_count: 5u64,
                 total_uapi_events_generated_count: 22u64,
                 last_generated_uapi_event_timestamp_ns: 5000i64,
-                touch_file: {
+                touch_file_0: {
                     fidl_events_received_count: 7u64,
                     fidl_events_ignored_count: 2u64,
+                    fidl_events_unexpected_count: 0u64,
+                    fidl_events_converted_count: 5u64,
+                    uapi_events_generated_count: 22u64,
+                    uapi_events_read_count: 22u64,
+                    last_generated_uapi_event_timestamp_ns: 5000i64,
+                    last_read_uapi_event_timestamp_ns: 5000i64,
+                },
+            }
+        });
+    }
+
+    #[::fuchsia::test]
+    async fn new_file_updates_inspect_status() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+
+        let input_device = InputDevice::new_touch(700, 700, inspector.root());
+        let input_file_0 = input_device
+            .open_test(&mut locked, &current_task)
+            .expect("Failed to create input file");
+
+        let (touch_source_client_end, mut touch_source_stream) =
+            fidl::endpoints::create_request_stream::<TouchSourceMarker>();
+        let (keyboard_proxy, _keyboard_stream) =
+            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
+        let view_ref_pair =
+            fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
+        let (device_registry_proxy, _device_listener_stream) =
+            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>(
+            );
+
+        let relay = input_event_relay::InputEventsRelay::new();
+        relay.add_touch_device(
+            0,
+            input_device.open_files.clone(),
+            Some(input_device.inspect_status.clone()),
+        );
+
+        relay.start_relays(
+            &current_task.kernel(),
+            EventProxyMode::None,
+            touch_source_client_end,
+            keyboard_proxy,
+            view_ref_pair.view_ref,
+            device_registry_proxy,
+            input_device.open_files.clone(),
+            Default::default(),
+            Some(input_device.inspect_status.clone()),
+            None,
+        );
+
+        // Send 2 TouchEvents to proxy that should be counted as `received` by InputFile
+        // A TouchEvent::default() has no pointer sample so these events should be discarded.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => responder
+                .send(&vec![make_empty_touch_event(); 2])
+                .expect("failure sending Watch reply"),
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+
+        // Wait for next `Watch` call and verify it has two elements in `responses`.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responses, responder })) => {
+                assert_matches!(responses.as_slice(), [_, _]);
+                responder.send(&vec![]).expect("failure sending Watch reply");
+            }
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+
+        // Verify file node & properties remain in inspect tree when file is closed
+        input_device.open_files.lock().clear();
+        drop(input_file_0);
+
+        // Open new file which should receive input_device's subsequent events
+        let input_file_1 = input_device
+            .open_test(&mut locked, &current_task)
+            .expect("Failed to create input file");
+
+        // Send 5 TouchEvents with pointer sample to proxy, these should be received and converted
+        // Add/Remove events generate 5 uapi events each. Change events generate 3 uapi events each.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
+                responder
+                    .send(&vec![
+                        make_touch_event_with_coords_phase_timestamp(
+                            0.0,
+                            0.0,
+                            EventPhase::Add,
+                            1,
+                            1000,
+                        ),
+                        make_touch_event_with_coords_phase_timestamp(
+                            0.0,
+                            0.0,
+                            EventPhase::Change,
+                            1,
+                            2000,
+                        ),
+                        make_touch_event_with_coords_phase_timestamp(
+                            0.0,
+                            0.0,
+                            EventPhase::Change,
+                            1,
+                            3000,
+                        ),
+                        make_touch_event_with_coords_phase_timestamp(
+                            0.0,
+                            0.0,
+                            EventPhase::Change,
+                            1,
+                            4000,
+                        ),
+                        make_touch_event_with_coords_phase_timestamp(
+                            0.0,
+                            0.0,
+                            EventPhase::Remove,
+                            1,
+                            5000,
+                        ),
+                    ])
+                    .expect("failure sending Watch reply");
+            }
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+
+        // Wait for next `Watch` call and verify it has five elements in `responses`.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responses, .. })) => {
+                assert_matches!(responses.as_slice(), [_, _, _, _, _])
+            }
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+
+        let _events = read_uapi_events(&mut locked, &input_file_1, &current_task);
+
+        // Verify file node & properties remain in inspect tree when file is closed
+        input_device.open_files.lock().clear();
+        drop(input_file_1);
+
+        assert_data_tree!(inspector, root: {
+            touch_device: {
+                total_fidl_events_received_count: 7u64,
+                total_fidl_events_ignored_count: 2u64,
+                total_fidl_events_unexpected_count: 0u64,
+                total_fidl_events_converted_count: 5u64,
+                total_uapi_events_generated_count: 22u64,
+                last_generated_uapi_event_timestamp_ns: 5000i64,
+                touch_file_0: {
+                    fidl_events_received_count: 2u64,
+                    fidl_events_ignored_count: 2u64,
+                    fidl_events_unexpected_count: 0u64,
+                    fidl_events_converted_count: 0u64,
+                    uapi_events_generated_count: 0u64,
+                    uapi_events_read_count: 0u64,
+                    last_generated_uapi_event_timestamp_ns: 0i64,
+                    last_read_uapi_event_timestamp_ns: 0i64,
+                },
+                touch_file_1: {
+                    fidl_events_received_count: 5u64,
+                    fidl_events_ignored_count: 0u64,
                     fidl_events_unexpected_count: 0u64,
                     fidl_events_converted_count: 5u64,
                     uapi_events_generated_count: 22u64,
@@ -1787,7 +1950,7 @@ mod test {
                 total_fidl_events_converted_count: 0u64,
                 total_uapi_events_generated_count: 0u64,
                 last_generated_uapi_event_timestamp_ns: 0i64,
-                keyboard_file: {
+                keyboard_file_0: {
                     fidl_events_received_count: 0u64,
                     fidl_events_ignored_count: 0u64,
                     fidl_events_unexpected_count: 0u64,
@@ -1864,7 +2027,7 @@ mod test {
                 total_uapi_events_generated_count: 4u64,
                 // Button events perform a realtime clockread, so any value will do.
                 last_generated_uapi_event_timestamp_ns: AnyProperty,
-                keyboard_file: {
+                keyboard_file_0: {
                     fidl_events_received_count: 2u64,
                     fidl_events_ignored_count: 0u64,
                     fidl_events_unexpected_count: 0u64,
