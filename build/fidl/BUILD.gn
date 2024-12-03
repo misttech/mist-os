@@ -49,6 +49,7 @@ action("gen_fidl_project") {
   outputs = [ _output ]
 
   args = [
+    rebase_path(root_build_dir, root_build_dir),
     rebase_path("//", root_build_dir),
     rebase_path(_input, root_build_dir),
     rebase_path(_output, root_build_dir),
