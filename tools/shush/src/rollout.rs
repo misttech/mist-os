@@ -17,7 +17,12 @@ pub fn rollout(api: &mut (impl Api + ?Sized), rollout_path: &Path, verbose: bool
 
     println!("Rolling out {} lints...", created_issues.len());
 
-    Issue::rollout(created_issues, api, verbose)?;
+    let comment = "The toolchain has been updated at ToT, and this issue can now be \
+    reproduced and fixed. If files here should not be owned by this component/owners, please add \
+    or update the relevant OWNERS file and re-assign this bug."
+        .to_owned();
+
+    Issue::rollout(created_issues, Some(comment), api, verbose)?;
 
     Ok(())
 }

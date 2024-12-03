@@ -114,8 +114,17 @@ impl<'a> IssueTemplate<'a> {
         link
     }
 
-    fn get_component_defs(&self, api: &mut (impl Api + ?Sized)) -> Result<&ComponentDefs> {
-        self.component_defs.get_or_try_init(|| ComponentDefs::load(api))
+    fn get_component_defs(
+        &self,
+        api: &mut (impl Api + ?Sized),
+        verbose: bool,
+    ) -> Result<&ComponentDefs> {
+        self.component_defs.get_or_try_init(|| {
+            if verbose {
+                println!("Loading component definitions, this may take a bit...")
+            };
+            ComponentDefs::load(api)
+        })
     }
 
     pub fn create(
@@ -124,8 +133,9 @@ impl<'a> IssueTemplate<'a> {
         ownership: &FileOwnership,
         files: &[&LintFile],
         holding_component_name: &str,
+        verbose: bool,
     ) -> Result<Issue> {
-        let component_defs = self.get_component_defs(api)?;
+        let component_defs = self.get_component_defs(api, verbose)?;
 
         let mut title = "Please inspect ".to_string();
         match self.filter {
@@ -208,6 +218,7 @@ pub struct Issue {
 impl Issue {
     pub fn rollout(
         mut issues: Vec<Self>,
+        comment: Option<String>,
         api: &mut (impl Api + ?Sized),
         verbose: bool,
     ) -> Result<()> {
@@ -223,6 +234,7 @@ impl Issue {
                 owner: issue.owner,
                 cc_users: issue.cc_users,
                 component: issue.component,
+                comment: comment.clone(),
             })?;
         }
 

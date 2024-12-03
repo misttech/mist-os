@@ -4,4 +4,4 @@ INSERT_DETAILS_HERE
 
 To reproduce a lint locally, remove the `#[allow]` attribute (will either be on the statement that causes the lint or the function containing it) and run `fx clippy -f $FILE`. If you need help or have questions about the lints, feel free to ask in the [discord channel](https://discordapp.com/channels/835268677472485376/940708230403866674).
 
-If files here should not be owned by this component/owners, please add or update the relevant OWNERS file and re-assign this bug.
+*Note: the issue can only be reproduced locally after the lint has been rolled out. This bug will be automatically assigned to an OWNER once the lint is rolled out. Please do not take action until the bug is assigned.*

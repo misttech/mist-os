@@ -27,7 +27,10 @@ impl Api for Bugspec {
             println!("[bugspec] Creating new issue");
         }
 
-        let response = Command::new(&self.path).arg("create").run_with(&request.to_bugspec())?;
+        let response = Command::new(&self.path)
+            .arg("create")
+            .arg("--format=MARKDOWN")
+            .run_with(&request.to_bugspec())?;
 
         if self.log_api {
             println!("[bugspec] Successfully created issue");

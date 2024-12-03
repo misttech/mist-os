@@ -47,8 +47,13 @@ pub fn allow(
         }
 
         if !public_files.is_empty() {
-            let issue =
-                issue_template.create(api, ownership, &public_files, holding_component_name)?;
+            let issue = issue_template.create(
+                api,
+                ownership,
+                &public_files,
+                holding_component_name,
+                verbose,
+            )?;
             let bug_link = format!("https://fxbug.dev/{}", issue.id);
             created_issues.push(issue);
 
