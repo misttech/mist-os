@@ -10,10 +10,20 @@
 // This file contains symbols decls that are called directly by tests in
 // //sdk/lib/dl/test:unittests. These symbols should be provided by targets that
 // serve as startup modules for those tests.
-extern "C" [[gnu::visibility("default")]] int64_t foo_v1_StartupModulesBasic();
-extern "C" [[gnu::visibility("default")]] int64_t foo_v2_StartupModulesBasic();
+extern "C" {
 
-extern "C" [[gnu::visibility("default")]] int64_t foo_v1_StartupModulesPriorityOverGlobal();
-extern "C" [[gnu::visibility("default")]] int64_t call_foo_v1_StartupModulesPriorityOverGlobal();
+[[gnu::visibility("default")]] int64_t foo_v1_StartupModulesBasic();
+[[gnu::visibility("default")]] int64_t foo_v2_StartupModulesBasic();
+
+[[gnu::visibility("default")]] int64_t foo_v1_StartupModulesPriorityOverGlobal();
+[[gnu::visibility("default")]] int64_t call_foo_v1_StartupModulesPriorityOverGlobal();
+
+[[gnu::visibility("default")]] int* get_static_tls_var();
+
+[[gnu::visibility("default"),
+  gnu::tls_model("global-dynamic")]] extern thread_local int gStaticTlsVar;
+}
+
+constexpr int kStaticTlsDataValue = 16;
 
 #endif  // LIB_LD_TEST_MODULES_STARTUP_SYMBOLS_H_

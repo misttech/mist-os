@@ -1474,6 +1474,49 @@ TYPED_TEST(DlTests, StartupModulesPriorityOverGlobal) {
   ASSERT_TRUE(this->DlClose(has_foov2_open.value()).is_ok());
 }
 
+TYPED_TEST(DlTests, StartupModulesStaticTlsDesc) {
+  const std::string kGetTlsVarFile = "static-tls-desc-module.so";
+
+  if constexpr (!TestFixture::kSupportsTls) {
+    GTEST_SKIP() << "test requires TLS";
+  }
+
+  EXPECT_EQ(gStaticTlsVar, kStaticTlsDataValue);
+
+  this->ExpectRootModule(kGetTlsVarFile);
+
+  auto open = this->DlOpen(kGetTlsVarFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value()) << open.error_value();
+
+  auto sym = this->DlSym(open.value(), "get_static_tls_var");
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
+
+  int* ptr = RunFunction<int*>(sym.value());
+  EXPECT_EQ(*ptr, kStaticTlsDataValue);
+
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+}
+
+TYPED_TEST(DlTests, StartupModulesStaticTlsGetAddr) {
+  const std::string kGetTlsVarFile = "static-tls-module.so";
+
+  if constexpr (!TestFixture::kSupportsTls) {
+    GTEST_SKIP() << "test requires TLS";
+  }
+
+  this->ExpectRootModule(kGetTlsVarFile);
+
+  // Don't expect tls_get_addr() to return any useful value for relocations, but
+  // expect that dlopen() will at least succeed when calling it.
+  auto open = this->DlOpen(kGetTlsVarFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value()) << open.error_value();
+
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+}
+
 // A common test subroutine for basic TLS accesses.
 //
 // This test exercises the following sequence of events:

@@ -83,6 +83,8 @@ group("dl-test-data.deps") {
   visibility = [ ":*" ]
   testonly = true
   deps = [
+    ":static-tls-desc-module",
+    ":static-tls-module",
     ":tls-dep-module",
     ":tls-desc-dep-module",
   ]
@@ -108,6 +110,7 @@ group("dl-unittest.deps") {
     ":has-foo-v1.StartupModulesPriorityOverGlobal",
     ":ld-dep-foo-v1.StartupModulesBasic",
     ":ld-dep-foo-v2.StartupModulesBasic",
+    ":static-tls-var",
   ]
 }
 
@@ -1522,6 +1525,38 @@ foreach(test, [ "" ] + per_test_suffices) {
     sources = [ "foo.cc" ]
     deps = [ ":ld-dep-foo-v1$suffix" ]
   }
+}
+
+test_shared_library("static-tls-var") {
+  sources = [ "static-tls-var.cc" ]
+}
+
+# This resolves a static TLS symbol with tls-desc.
+test_loadable_module("static-tls-desc-module") {
+  sources = [ "static-tls-desc-module.cc" ]
+  configs = [ "//build/config:tlsdesc" ]
+  deps = [ ":static-tls-var" ]
+
+  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
+  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs = [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
+}
+
+# This is the same as :static-tls-desc-module, except it uses __tls_get_addr.
+test_loadable_module("static-tls-module") {
+  sources = [ "static-tls-module.cc" ]
+  configs = [ "//build/config:no-tlsdesc" ]
+
+  deps = [
+    ":static-tls-var",
+    "//src/lib/elfldltl",
+  ]
+
+  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
+  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs = [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
 }
 
 test_executable("llvm-profdata") {
