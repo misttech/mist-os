@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_COORDINATOR_EVENTS_BANJO_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_COORDINATOR_EVENTS_BANJO_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_EVENTS_BANJO_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_EVENTS_BANJO_H_
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/stdcompat/span.h>
@@ -11,28 +11,31 @@
 
 #include <fbl/mutex.h>
 
-#include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-interface.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-interface.h"
 
 namespace virtio_display {
 
-// Banjo <-> C++ bridge for the events interface with the Display Coordinator.
+// Translates `DisplayEngineEventsInterface` C++ method calls to Banjo.
+//
+// This adapter targets the
+// [`fuchsia.hardware.display.controller/DisplayEngineListener`] Banjo API.
 //
 // Instances are thread-safe, because Banjo does not make any threading
 // guarantees.
-class DisplayCoordinatorEventsBanjo final : public DisplayCoordinatorEventsInterface {
+class DisplayEngineEventsBanjo final : public DisplayEngineEventsInterface {
  public:
-  explicit DisplayCoordinatorEventsBanjo();
+  explicit DisplayEngineEventsBanjo();
 
-  DisplayCoordinatorEventsBanjo(const DisplayCoordinatorEventsBanjo&) = delete;
-  DisplayCoordinatorEventsBanjo& operator=(const DisplayCoordinatorEventsBanjo&) = delete;
+  DisplayEngineEventsBanjo(const DisplayEngineEventsBanjo&) = delete;
+  DisplayEngineEventsBanjo& operator=(const DisplayEngineEventsBanjo&) = delete;
 
-  ~DisplayCoordinatorEventsBanjo();
+  ~DisplayEngineEventsBanjo();
 
   // `display_engine_listener` may be null.
   void RegisterDisplayEngineListener(
       const display_engine_listener_protocol_t* display_engine_listener);
 
-  // DisplayCoordinatorEventsInterface:
+  // DisplayEngineEventsInterface:
   void OnDisplayAdded(const raw_display_info_t& display_info) override;
   void OnDisplayRemoved(display::DisplayId display_id) override;
   void OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
@@ -46,4 +49,4 @@ class DisplayCoordinatorEventsBanjo final : public DisplayCoordinatorEventsInter
 
 }  // namespace virtio_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_COORDINATOR_EVENTS_BANJO_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_EVENTS_BANJO_H_

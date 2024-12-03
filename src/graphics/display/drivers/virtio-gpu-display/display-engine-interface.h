@@ -26,7 +26,7 @@ namespace virtio_display {
 // The methods in the [`fuchsia.hardware.display.engine/Engine`] FIDL interface.
 //
 // This abstract base class only represents the methods in the FIDL interface.
-// The events are represented by `CoordinatorEventsInterface`.
+// The events are represented by `DisplayEngineEventsInterface`.
 //
 // This abstract base class also represents the
 // [`fuchsia.hardware.display.controller/DisplayEngine`] Banjo

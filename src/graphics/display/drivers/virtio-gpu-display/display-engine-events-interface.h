@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_COORDINATOR_EVENTS_INTERFACE_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_COORDINATOR_EVENTS_INTERFACE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_EVENTS_INTERFACE_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_EVENTS_INTERFACE_H_
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 // TODO(https://fxbug.dev/42079190): Switch from Banjo to FIDL or api-types-cpp types.
@@ -26,14 +26,14 @@ namespace virtio_display {
 // This abstract base class also represents the
 // [`fuchsia.hardware.display.controller/DisplayEngineListener`] Banjo
 // interface.
-class DisplayCoordinatorEventsInterface {
+class DisplayEngineEventsInterface {
  public:
-  DisplayCoordinatorEventsInterface() = default;
+  DisplayEngineEventsInterface() = default;
 
-  DisplayCoordinatorEventsInterface(const DisplayCoordinatorEventsInterface&) = delete;
-  DisplayCoordinatorEventsInterface(DisplayCoordinatorEventsInterface&&) = delete;
-  DisplayCoordinatorEventsInterface& operator=(const DisplayCoordinatorEventsInterface&) = delete;
-  DisplayCoordinatorEventsInterface& operator=(DisplayCoordinatorEventsInterface&&) = delete;
+  DisplayEngineEventsInterface(const DisplayEngineEventsInterface&) = delete;
+  DisplayEngineEventsInterface(DisplayEngineEventsInterface&&) = delete;
+  DisplayEngineEventsInterface& operator=(const DisplayEngineEventsInterface&) = delete;
+  DisplayEngineEventsInterface& operator=(DisplayEngineEventsInterface&&) = delete;
 
   // TODO(https://fxbug.dev/42079190): Switch from Banjo to FIDL or api-types-cpp types.
   virtual void OnDisplayAdded(const raw_display_info_t& display_info) = 0;
@@ -48,9 +48,9 @@ class DisplayCoordinatorEventsInterface {
  protected:
   // Destruction via base class pointer is not supported intentionally.
   // Instances are not expected to be owned by pointers to base classes.
-  ~DisplayCoordinatorEventsInterface() = default;
+  ~DisplayEngineEventsInterface() = default;
 };
 
 }  // namespace virtio_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_COORDINATOR_EVENTS_INTERFACE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_EVENTS_INTERFACE_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_CONTROLLER_BANJO_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_CONTROLLER_BANJO_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_BANJO_ADAPTER_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_BANJO_ADAPTER_H_
 
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/driver/compat/cpp/banjo_server.h>
@@ -14,26 +14,35 @@
 
 #include <cstdint>
 
-#include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-banjo.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine.h"
 
 namespace virtio_display {
 
-// Banjo <-> C++ bridge for the methods interface with the Display Coordinator.
+// Translates Banjo API calls to `DisplayEngineInterface` C++ method calls.
+//
+// This adapter implements the
+// [`fuchsia.hardware.display.controller/DisplayEngine`] Banjo API.
 //
 // Instances are thread-safe, because Banjo does not make any threading
 // guarantees.
-class DisplayControllerBanjo : public ddk::DisplayEngineProtocol<DisplayControllerBanjo> {
+class DisplayEngineBanjoAdapter : public ddk::DisplayEngineProtocol<DisplayEngineBanjoAdapter> {
  public:
-  // `engine` and `coordinator_events` must not be null, and must outlive the
-  // newly created instance.
-  explicit DisplayControllerBanjo(DisplayEngine* engine,
-                                  DisplayCoordinatorEventsBanjo* coordinator_events);
+  // `engine` receives translated Banjo calls to the
+  // [`fuchsia.hardware.display.controller/DisplayEngine`] interface. It must not be
+  // null, and must outlive the newly created instance.
+  //
+  // `engine_events` is notified when a
+  // [`fuchsia.hardware.display.controller/DisplayEngineListener`] Banjo
+  // interface implementation is registered or unregistered with the display
+  // engine. It must not be null, and must outlive the newly created instance.
+  explicit DisplayEngineBanjoAdapter(DisplayEngine* engine,
+                                     DisplayEngineEventsBanjo* engine_events);
 
-  DisplayControllerBanjo(const DisplayControllerBanjo&) = delete;
-  DisplayControllerBanjo& operator=(const DisplayControllerBanjo&) = delete;
+  DisplayEngineBanjoAdapter(const DisplayEngineBanjoAdapter&) = delete;
+  DisplayEngineBanjoAdapter& operator=(const DisplayEngineBanjoAdapter&) = delete;
 
-  ~DisplayControllerBanjo();
+  ~DisplayEngineBanjoAdapter();
 
   // Serves the Banjo protocol over the DFv2 compatibility server.
   //
@@ -80,7 +89,7 @@ class DisplayControllerBanjo : public ddk::DisplayEngineProtocol<DisplayControll
   DisplayEngine& engine_;
 
   // This data member is thread-safe because it is immutable.
-  DisplayCoordinatorEventsBanjo& coordinator_events_;
+  DisplayEngineEventsBanjo& engine_events_;
 
   // Serves the Banjo protocol over the DFv2 compatibility server.
   compat::BanjoServer banjo_server_;
@@ -88,4 +97,4 @@ class DisplayControllerBanjo : public ddk::DisplayEngineProtocol<DisplayControll
 
 }  // namespace virtio_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_CONTROLLER_BANJO_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_BANJO_ADAPTER_H_

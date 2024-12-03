@@ -98,7 +98,7 @@ void DisplayEngine::OnCoordinatorConnected() {
       .pixel_formats_count = kSupportedFormats.size(),
   };
 
-  coordinator_events_.OnDisplayAdded(banjo_display_info);
+  engine_events_.OnDisplayAdded(banjo_display_info);
 }
 
 zx::result<> DisplayEngine::ImportBufferCollection(
@@ -318,13 +318,13 @@ zx::result<> DisplayEngine::SetMinimumRgb(uint8_t minimum_rgb) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-DisplayEngine::DisplayEngine(DisplayCoordinatorEventsInterface* coordinator_events,
+DisplayEngine::DisplayEngine(DisplayEngineEventsInterface* engine_events,
                              fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client,
                              std::unique_ptr<VirtioGpuDevice> gpu_device)
     : imported_images_(std::move(sysmem_client)),
-      coordinator_events_(*coordinator_events),
+      engine_events_(*engine_events),
       gpu_device_(std::move(gpu_device)) {
-  ZX_DEBUG_ASSERT(coordinator_events != nullptr);
+  ZX_DEBUG_ASSERT(engine_events != nullptr);
   ZX_DEBUG_ASSERT(gpu_device_);
 }
 
@@ -333,8 +333,7 @@ DisplayEngine::~DisplayEngine() = default;
 // static
 zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
     fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client, zx::bti bti,
-    std::unique_ptr<virtio::Backend> backend,
-    DisplayCoordinatorEventsInterface* coordinator_events) {
+    std::unique_ptr<virtio::Backend> backend, DisplayEngineEventsInterface* engine_events) {
   zx::result<std::unique_ptr<VirtioPciDevice>> virtio_device_result =
       VirtioPciDevice::Create(std::move(bti), std::move(backend));
   if (!virtio_device_result.is_ok()) {
@@ -351,7 +350,7 @@ zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
   }
 
   auto display_engine = fbl::make_unique_checked<DisplayEngine>(
-      &alloc_checker, coordinator_events, std::move(sysmem_client), std::move(gpu_device));
+      &alloc_checker, engine_events, std::move(sysmem_client), std::move(gpu_device));
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -416,8 +415,7 @@ void DisplayEngine::virtio_gpu_flusher() {
 
     {
       fbl::AutoLock al(&flush_lock_);
-      coordinator_events_.OnDisplayVsync(kDisplayId, zx::time(next_deadline),
-                                         displayed_config_stamp_);
+      engine_events_.OnDisplayVsync(kDisplayId, zx::time(next_deadline), displayed_config_stamp_);
     }
     next_deadline = zx_time_add_duration(next_deadline, period);
   }

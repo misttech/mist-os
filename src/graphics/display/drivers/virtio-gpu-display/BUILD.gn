@@ -42,11 +42,11 @@ source_set("gpu_control_server") {
 
 source_set("common_srcs") {
   sources = [
-    "display-controller-banjo.cc",
-    "display-controller-banjo.h",
-    "display-coordinator-events-banjo.cc",
-    "display-coordinator-events-banjo.h",
-    "display-coordinator-events-interface.h",
+    "display-engine-banjo-adapter.cc",
+    "display-engine-banjo-adapter.h",
+    "display-engine-events-banjo.cc",
+    "display-engine-events-banjo.h",
+    "display-engine-events-interface.h",
     "display-engine-interface.h",
     "display-engine.cc",
     "display-engine.h",
