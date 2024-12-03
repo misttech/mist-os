@@ -482,12 +482,20 @@ pub fn write_rule<W: io::Write>(
     // GN root relative path
     let root_relative_path = format!(
         "//{}",
-        target.crate_root.canonicalize_utf8().unwrap().strip_prefix(project_root).with_context(
-            || format!(
+        target
+            .crate_root
+            .canonicalize_utf8()
+            .unwrap()
+            .strip_prefix(project_root)
+            .with_context(|| format!(
                 "{} is located outside of the project. Check your vendoring setup",
                 target.name()
-            )
-        )?
+            ))?
+            .to_string()
+            // NOTE: This is necessary because '+' is not a allowed in Bazel labels. For this
+            // reason, crate_universe replaces '+' in directory names of vendored crates with '-'.
+            // See https://github.com/bazelbuild/rules_rust/blob/1c0de8a98c4e10091155627bf5ee926653334504/crate_universe/src/utils.rs#L50
+            .replace('+', "-")
     );
     let output_name = if is_test {
         output_name.map_or_else(

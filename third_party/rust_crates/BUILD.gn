@@ -1779,14 +1779,14 @@ rust_library("arrayvec-v0_7_4") {
 license("ash-v0_37_0+1_3_209.license") {
   public_package_name = "ash"
   license_files = [
-    "//third_party/rust_crates/vendor/ash-0.37.0+1.3.209/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/ash-0.37.0+1.3.209/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/ash-0.37.0-1.3.209/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/ash-0.37.0-1.3.209/LICENSE-MIT",
   ]
 }
 
 rust_library("ash-v0_37_0+1_3_209") {
   crate_name = "ash"
-  crate_root = "//third_party/rust_crates/vendor/ash-0.37.0+1.3.209/src/lib.rs"
+  crate_root = "//third_party/rust_crates/vendor/ash-0.37.0-1.3.209/src/lib.rs"
   output_name = "ash-b07aaa2f97684336"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
@@ -18218,7 +18218,7 @@ rust_library("want-v0_3_0") {
 
 rust_library("wasi-v0_11_0+wasi-snapshot-preview1") {
   crate_name = "wasi"
-  crate_root = "//third_party/rust_crates/empty/wasi-0.11.0+wasi-snapshot-preview1/src/lib.rs"
+  crate_root = "//third_party/rust_crates/empty/wasi-0.11.0-wasi-snapshot-preview1/src/lib.rs"
   output_name = "wasi-b8a75a95bc9b1a8a"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
@@ -18937,13 +18937,13 @@ rust_library("zip-v0_5_5") {
 license("zstd-v0_11_2+zstd_1_5_2.license") {
   public_package_name = "zstd"
   license_files =
-      [ "//third_party/rust_crates/vendor/zstd-0.11.2+zstd.1.5.2/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/zstd-0.11.2-zstd.1.5.2/LICENSE" ]
 }
 
 rust_library("zstd-v0_11_2+zstd_1_5_2") {
   crate_name = "zstd"
   crate_root =
-      "//third_party/rust_crates/vendor/zstd-0.11.2+zstd.1.5.2/src/lib.rs"
+      "//third_party/rust_crates/vendor/zstd-0.11.2-zstd.1.5.2/src/lib.rs"
   output_name = "zstd-bcf2d1c121863bf5"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
@@ -18971,16 +18971,16 @@ rust_library("zstd-v0_11_2+zstd_1_5_2") {
 license("zstd-safe-v5_0_2+zstd_1_5_2.license") {
   public_package_name = "zstd_safe"
   license_files = [
-    "//third_party/rust_crates/vendor/zstd-safe-5.0.2+zstd.1.5.2/LICENSE",
-    "//third_party/rust_crates/vendor/zstd-safe-5.0.2+zstd.1.5.2/LICENSE.Apache-2.0",
-    "//third_party/rust_crates/vendor/zstd-safe-5.0.2+zstd.1.5.2/LICENSE.Mit",
+    "//third_party/rust_crates/vendor/zstd-safe-5.0.2-zstd.1.5.2/LICENSE",
+    "//third_party/rust_crates/vendor/zstd-safe-5.0.2-zstd.1.5.2/LICENSE.Apache-2.0",
+    "//third_party/rust_crates/vendor/zstd-safe-5.0.2-zstd.1.5.2/LICENSE.Mit",
   ]
 }
 
 rust_library("zstd-safe-v5_0_2+zstd_1_5_2") {
   crate_name = "zstd_safe"
   crate_root =
-      "//third_party/rust_crates/vendor/zstd-safe-5.0.2+zstd.1.5.2/src/lib.rs"
+      "//third_party/rust_crates/vendor/zstd-safe-5.0.2-zstd.1.5.2/src/lib.rs"
   output_name = "zstd_safe-b1d2ef593bc9f55f"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
