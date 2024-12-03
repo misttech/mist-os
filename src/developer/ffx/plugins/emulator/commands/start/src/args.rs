@@ -197,8 +197,30 @@ pub struct StartCommand {
     /// create and start an emulator with a full GPT disk including UEFI boot environment and all
     /// partitions in one flat file. This approximates a physical device as closely as possible.
     /// Note that this is currently only enabled for x64 and arm64 targets. RISC-V is unsupported.
+    /// Note that for full GPT disks, it is also required to provide the `--vbmeta-key` and
+    /// `--vbmeta-key-metadata` arguments, otherwise the resulting GPT image will not be able to
+    /// boot into its A and B slots.
     #[argh(switch)]
     pub uefi: bool,
+
+    /// path to the key (a PEM file) that should be used to sign a vbmeta file for the ZBI after
+    /// embedding the SSH keys, for example:
+    /// https://cs.opensource.google/fuchsia/fuchsia/+/main:boards/x64/BUILD.gn;l=44-46;drc=04892e7f8875e2d16c3fcda89bc462dc6b0f35f8)
+    /// Note that this is only required when using `--uefi`. Also, when an emulator is `--reuse`d
+    /// after it was stopped with the `--persist` flag, this argument is not necessary as the
+    /// previously created images will be used.
+    #[argh(option)]
+    #[ffx_config_default(key = "emu.vbmeta.key")]
+    pub vbmeta_key: Option<String>,
+
+    /// path to the key metadata (a binary file accompanying the PEM, for example
+    /// https://cs.opensource.google/fuchsia/fuchsia/+/main:boards/x64/BUILD.gn;l=44-46;drc=04892e7f8875e2d16c3fcda89bc462dc6b0f35f8)
+    /// that should be used to sign a vbmeta file for the ZBI after embedding the SSH keys.
+    /// Note that this is only required when using `--uefi`. Also, when an emulator is `--reuse`d
+    /// after it was stopped with the `--persist` flag, this argument is not necessary as the
+    #[argh(option)]
+    #[ffx_config_default(key = "emu.vbmeta.metadata")]
+    pub vbmeta_key_metadata: Option<String>,
 
     /// enables extra logging for debugging.
     #[argh(switch, short = 'V')]

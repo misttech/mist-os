@@ -81,12 +81,15 @@ pub struct FlagData {
     pub options: Vec<String>,
 }
 
-/// A pre-formatted disk image containing the base packages of the system.
+/// A pre-formatted disk image to be used by the emulator
+///
+/// The disk images may contain the base packages of the system, or multiple data partitions.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum DiskImage {
     Fat(PathBuf),
     Fvm(PathBuf),
     Fxfs(PathBuf),
+    Gpt(PathBuf),
 }
 
 impl AsRef<Path> for DiskImage {
@@ -103,6 +106,7 @@ impl Deref for DiskImage {
             DiskImage::Fat(path) => path,
             DiskImage::Fvm(path) => path,
             DiskImage::Fxfs(path) => path,
+            DiskImage::Gpt(path) => path,
         }
     }
 }
@@ -128,6 +132,14 @@ pub struct GuestConfig {
     #[serde(default)]
     pub zbi_hash: String,
 
+    /// Path to a PEM style key file. This is used when re-signing a vbmeta file for a modified ZBI.
+    #[serde(default)]
+    pub vbmeta_key_file: Option<PathBuf>,
+
+    // Path to the key metadata. This is required when a PEM file is used to re-sign a vbmeta file.
+    #[serde(default)]
+    pub vbmeta_key_metadata_file: Option<PathBuf>,
+
     /// Hash of disk_image. Used to detect changes when reusing an emulator instance.
     #[serde(default)]
     pub disk_hash: String,
@@ -140,6 +152,19 @@ pub struct GuestConfig {
     /// Firmware emulation data file. This is read-write, so it should be unique per emulator instance.
     #[serde(default)]
     pub ovmf_vars: PathBuf,
+
+    /// Path to the product bundle from where the emulator is staged.
+    /// TODO(https://fxbug.dev/381263769): Note that this is passed to make-fuchsia-vol for
+    /// constructing GPT images until a better solution is in place. Please avoid using it, as it
+    /// may go away without warning.
+    #[serde(default)]
+    pub product_bundle_path: Option<PathBuf>,
+
+    /// Whether this guest is running from a GPT partitioned full disk image.
+    /// Note that this is used to pass the info whether this is a GPT-image based instance to the
+    /// arguments template parsing in arg_templates.rs as it cannot call `is_gpt()`.
+    #[serde(default)]
+    pub is_gpt: bool,
 }
 
 impl GuestConfig {
@@ -153,6 +178,14 @@ impl GuestConfig {
                     false
                 }
             }
+        }
+    }
+
+    pub fn is_gpt(&self) -> bool {
+        if let Some(DiskImage::Gpt(_)) = self.disk_image {
+            true
+        } else {
+            false
         }
     }
 
@@ -191,23 +224,29 @@ impl GuestConfig {
         let zbi_path = &self.zbi_image;
         let disk_image_path = &self.disk_image;
 
-        // Either a kernel of a FAT diskimage (which is the bootloader) needs
-        // to be present.
+        // If no kernel is provided, a FAT diskimage or a full GPT disk containing the bootloader
+        // needs to be present.
         match kernel_path {
             Some(file_path) => {
                 if !file_path.exists() {
                     bail!("kernel file {:?} does not exist.", kernel_path);
                 }
             }
-            None => {
-                if let Some(DiskImage::Fat(fat_path)) = disk_image_path {
+            None => match disk_image_path {
+                Some(DiskImage::Fat(fat_path)) => {
                     if !fat_path.exists() {
                         bail!("FAT file {:?} does not exist.", fat_path);
                     }
-                } else {
+                }
+                Some(DiskImage::Gpt(gpt_path)) => {
+                    if !gpt_path.exists() {
+                        bail!("Full GPT disk file {:?} does not exist.", gpt_path);
+                    }
+                }
+                _ => {
                     bail!("No kernel file or bootloader file configured.");
                 }
-            }
+            },
         };
 
         if let Some(file_path) = zbi_path.as_ref() {

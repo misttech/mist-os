@@ -168,6 +168,9 @@ impl<T: EngineOperations> EmuStartTool<T> {
     ) -> Result<Vec<String>> {
         let loaded_product_bundle = self.finalize_start_command(writer).await?;
 
+        let product_bundle_path = loaded_product_bundle
+            .as_ref()
+            .map(|b| b.loaded_from_path().to_path_buf().into_std_path_buf());
         let product_bundle: Option<pbms::ProductBundle> = loaded_product_bundle.map(|b| b.into());
 
         // List the devices available in this product bundle
@@ -182,13 +185,15 @@ impl<T: EngineOperations> EmuStartTool<T> {
             return Ok(vec![message]);
         }
 
-        let emulator_configuration = make_configs(
+        let mut emulator_configuration = make_configs(
             &self.engine_operations.context(),
             &self.cmd,
             product_bundle.clone(),
             &self.engine_operations.get_emu_instances(),
         )
         .await?;
+        emulator_configuration.guest.product_bundle_path = product_bundle_path;
+
         let engine_type =
             EngineType::from_str(&self.cmd.engine().unwrap_or_else(|_| "femu".to_string()))
                 .context("Reading engine type from ffx config.")?;

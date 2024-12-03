@@ -12,11 +12,12 @@
     helper calls a rust function to perform that substitution. If the parameter
     doesn't deserialize to a DataUnits, the helper just returns the usual
     serialized value of the parameter. }}
-{{! This is a template for starting an emulator instance using an efi kernel image }}
+{{! This is a template for starting an emulator instance using an efi kernel image
+    or a full disk GPT partitioned disk with UEFI and bootloader.}}
 
 {
   "args": [
-    {{#if guest.kernel_image }}
+    {{#if guest.kernel_image}}
         "-kernel",
         "{{guest.kernel_image}}",
     {{/if}}
@@ -24,13 +25,20 @@
     "if=pflash,format=raw,readonly=on,file={{guest.ovmf_code}}",
     "-drive",
     "if=pflash,format=raw,snapshot=on,file={{guest.ovmf_vars}}",
-    {{#if guest.disk_image }}
+    {{#if guest.disk_image}}
         "-drive",
         "if=none,format=raw,file={{di guest.disk_image}},id=uefi",
-        "-device",
-        "nec-usb-xhci,id=xhci0",
-        "-device",
-        "usb-storage,bus=xhci0.0,drive=uefi,removable=on,bootindex=0",
+        {{#if (eq guest.is_gpt true)}}
+            "-object",
+            "iothread,id=iothread0",
+            "-device",
+            "virtio-blk-pci,drive=uefi,iothread=iothread0",
+        {{else}}
+            "-device",
+            "nec-usb-xhci,id=xhci0",
+            "-device",
+            "usb-storage,bus=xhci0.0,drive=uefi,removable=on,bootindex=0",
+        {{/if}}
     {{/if}}
     "-m",
     "{{device.memory.quantity}}{{ua device.memory.units}}",
@@ -75,11 +83,15 @@
         {{/if}}
     {{/if}}
     {{#if (eq device.cpu.architecture "x64")}}
-        "--machine",
+        "-machine",
         {{#if (eq runtime.engine_type "qemu")}}
             "q35,smbios-entry-point-type=32",
         {{else}}
             "q35",
+        {{/if}}
+        {{#if (eq guest.is_gpt true)}}
+            "-device",
+            "isa-debug-exit,iobase=0xf4,iosize=0x04",
         {{/if}}
         {{! Override the SeaBIOS serial port to keep it from outputting
                 a terminal reset on start. }}
@@ -87,7 +99,7 @@
         "name=etc/sercon-port,string=0",
     {{/if}}
     {{#if (eq device.cpu.architecture "riscv64")}}
-        "--machine",
+        "-machine",
         "virt",
     {{/if}}
     {{#if (eq host.acceleration "none")}}
@@ -260,6 +272,10 @@
         "TERM=xterm-256color",
     {{else}}
         "TERM=dumb",
+    {{/if}}
+    {{#if (eq guest.is_gpt true)}}
+        "bootloader.default=default",
+        "bootloader.timeout=5",
     {{/if}}
     "kernel.entropy-mixin=de330defe83c3d93556612a133f893892b6b49f96944c3c363197a679a6339b0",
     "kernel.halt-on-panic=true",

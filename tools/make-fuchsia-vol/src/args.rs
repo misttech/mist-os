@@ -6,7 +6,11 @@ use argh::FromArgs;
 use camino::Utf8PathBuf;
 use std::str::FromStr;
 
-#[derive(Debug)]
+pub const ABR_SIZE: u64 = 256 * 1024 * 1024;
+pub const EFI_SIZE: u64 = 63 * 1024 * 1024;
+pub const VBMETA_SIZE: u64 = 64 * 1024;
+
+#[derive(Debug, PartialEq)]
 pub enum Arch {
     X64,
     Arm64,
@@ -162,11 +166,11 @@ pub struct TopLevel {
     pub vbmeta_r: Option<Utf8PathBuf>,
 
     /// kernel partition size for A/B/R
-    #[argh(option, default = "256 * 1024 * 1024")]
+    #[argh(option, default = "ABR_SIZE")]
     pub abr_size: u64,
 
     /// partition size for vbmeta A/B/R
-    #[argh(option, default = "64 * 1024")]
+    #[argh(option, default = "VBMETA_SIZE")]
     pub vbmeta_size: u64,
 
     /// A/B/R partition to boot by default
@@ -178,7 +182,7 @@ pub struct TopLevel {
     pub block_size: Option<u64>,
 
     /// efi partition size in bytes
-    #[argh(option, default = "63 * 1024 * 1024")]
+    #[argh(option, default = "EFI_SIZE")]
     pub efi_size: u64,
 
     /// system (i.e. FVM or Fxfs) disk partition size in bytes (unspecified means `fill`)

@@ -14,6 +14,7 @@ if (is_host) {
       "src/qemu_based/comms.rs",
       "src/qemu_based/crosvm/mod.rs",
       "src/qemu_based/femu/mod.rs",
+      "src/qemu_based/gpt.rs",
       "src/qemu_based/mod.rs",
       "src/qemu_based/qemu/mod.rs",
       "src/serialization.rs",
@@ -34,12 +35,14 @@ if (is_host) {
       "//src/lib/fuchsia-async",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",
+      "//third_party/rust_crates:camino",
       "//third_party/rust_crates:handlebars",
       "//third_party/rust_crates:nix",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:shared_child",
       "//third_party/rust_crates:tempfile",
       "//third_party/rust_crates:tracing",
+      "//tools/make-fuchsia-vol:lib",
     ]
     test_deps = [
       "//src/lib/fuchsia",
