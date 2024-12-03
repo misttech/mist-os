@@ -276,8 +276,12 @@ function get_loas_cert_type() {
   fi
 
   # Re-run LOAS check.
-  local loas_cert_type
-  [[ "$recache" == 0 ]] || loas_destroy
+  local loas_cert_type=restricted  # safe default
+  [[ "$recache" == 0 ]] || loas_destroy || :
+  # if `loas_destroy` appears to be missing, it is because having a valid
+  # gcert is required to access on gLinux laptops in the first place.
+  # Since we want to be in an unauthenticated state in this case,
+  # it is safe and correct to ignore.
   loas_cert_type="$(check_loas_restrictions)" || {
     fx-error "Error trying to check LOAS certificate type."
     return 1
