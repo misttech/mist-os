@@ -1072,8 +1072,38 @@ function fx-run-ninja {
   # through the proxy.
   #
   local -r build_uuid="$(fx-uuid)"
-  local rbe_wrapper=()
-  local user_rbe_env=()
+  local -a user_rbe_env=()
+
+  local -a rbe_wrapper_loas_args=()
+  if fx-build-needs-auth
+  then
+    local loas_type
+    # TODO(b/342026853): automatic use of gcert for authentication in bazel
+    # is still experimental, and is opt-in with FX_BUILD_AUTO_AUTH=1.
+    # gcert authentication for reclient already works.
+    local -r loas_type_detected="$(fx-command-run rbe _check_loas_type)"
+    local -r loas_type_for_reclient="$loas_type_detected"
+    local loas_type_for_bazel
+    if [[ "$FX_BUILD_AUTO_AUTH" == 1 ]]
+    then loas_type_for_bazel="$loas_type_detected"
+    else loas_type_for_bazel="restricted"
+    fi
+    rbe_wrapper_loas_args+=( --loas-type="$loas_type_for_reclient" )
+    user_rbe_env+=(
+      # Automatic auth with gcert (from re-client bootstrap) needs $USER.
+      "USER=${USER}"
+      "FX_BUILD_LOAS_TYPE=$loas_type_for_bazel"
+      # A few tools need credentials for authentication, like remotetool.
+      # Explicitly set this variable without forwarding $HOME.
+      # User-overridable.
+      "GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-$HOME/.config/gcloud/application_default_credentials.json}"
+      # For bazel subinvocations to be able to authenticate with gcert,
+      # need to forward the authentication socket (used by gnubby).
+      "SSH_AUTH_SOCK=${SSH_AUTH_SOCK}"
+    )
+  fi
+
+  local -a rbe_wrapper=()
   if fx-rbe-enabled
   then
     # Move the reproxy logs outside of $FUCHSIA_BUILD_DIR so they do not get cleaned,
@@ -1114,24 +1144,17 @@ function fx-run-ninja {
       --logdir "$reproxy_logdir"
       --tmpdir "$reproxy_tmpdir"
       "${proxy_cfg_args[@]}"
+      "${rbe_wrapper_loas_args[@]}"
       --
     )
     [[ "${USER-NOT_SET}" != "NOT_SET" ]] || {
       echo "Error: USER is not set"
       exit 1
     }
-    user_rbe_env=(
-      # Automatic auth with gcert (from re-client bootstrap) needs $USER.
-      "USER=${USER}"
-      # A few tools need credentials for authentication, like remotetool.
-      # Explicitly set this variable without forwarding $HOME.
-      # User-overridable.
-      "GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-$HOME/.config/gcloud/application_default_credentials.json}"
+    user_rbe_env+=(
       # Honor environment variable to disable RBE build metrics.
       "FX_REMOTE_BUILD_METRICS=${FX_REMOTE_BUILD_METRICS}"
     )
-    # TODO(b/342026853): pass environment variable to direct bazel
-    # to use credential helper when applicable.
   fi
 
   envs=(
@@ -1154,6 +1177,7 @@ function fx-run-ninja {
     ${TMPDIR+"TMPDIR=$TMPDIR"}
     ${CLICOLOR_FORCE+"CLICOLOR_FORCE=$CLICOLOR_FORCE"}
     ${FX_BUILD_RBE_STATS+"FX_BUILD_RBE_STATS=$FX_BUILD_RBE_STATS"}
+    ${FX_BUILD_AUTO_AUTH+"FX_BUILD_AUTO_AUTH=$FX_BUILD_AUTO_AUTH"}
   )
 
   if [[ "${have_jobs}" ]]; then

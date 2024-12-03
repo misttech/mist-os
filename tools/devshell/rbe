@@ -18,10 +18,11 @@
 ##
 ##  fx rbe check_loas [options...]
 ##      For Google FTEs only.
-##      Detect the LOAS certificate type (cached).
+##      Reports the type of LOAS certificate as "restricted" or "unrestricted".
 ##      Options:
 ##        -f,--force: re-evaluate LOAS certificate type and update the
 ##          cache file, instead of just taking the cached result.
+##      Use `fx-command-run rbe _check_loas_type` inside other fx scripts.
 ##
 ##  fx rbe cleanlogs
 ##      Clean up reproxy log dirs (from using fuchsia-reproxy-wrap.sh).
@@ -163,6 +164,17 @@ function test_bazel_rbe() {
   # Shutdown any bazel server each time to prevent it from caching
   # stale credentials, and force it to refresh.
   # Limit the number of upload retries to make this operation fail-fast.
+
+  # TODO(b/342026853): using gcert for bazel authentication is opt-in while
+  # it is still experimental.  Opt-in with FX_BUILD_AUTO_AUTH=1.
+  local loas_type=restricted
+  if [[ "$FX_BUILD_AUTO_AUTH" == 1 ]]
+  then loas_type="$(get_loas_cert_type)"
+  fi
+  local -a auth_config=()
+  if [[ "$loas_type" == "unrestricted" ]]
+  then auth_config+=( --config=gcertauth )
+  fi
   (
     cd "$BAZEL_TEST_DIR/workspace" &&
       ../bazel shutdown && \
@@ -170,6 +182,7 @@ function test_bazel_rbe() {
           test \
           --config=remote \
           --config=resultstore \
+          "${auth_config[@]}" \
           --experimental_build_event_upload_max_retries=1 \
           :all
   )
@@ -323,6 +336,7 @@ case "$action" in
 
   auth) auth_subcommand "${action_args[@]}" ;;
   check_loas) check_loas_subcommand "${action_args[@]}" ;;
+  _check_loas_type) get_loas_cert_type "${action_args[@]}" ;;
   cleanlogs) cleanlogs_subcommand "${action_args[@]}" ;;
   ensure_loas) ensure_loas "${action_args[@]}" ;;
   ensure_oauth) ensure_oauth "${action_args[@]}" ;;

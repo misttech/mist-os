@@ -866,7 +866,10 @@ def main() -> int:
     if job_count:
         jobs = int(job_count)
 
-    # TODO(b/342026853): use --config=gcertauth if LOAS creds are unrestricted
+    # With unrestricted LOAS credentials, the credential helper
+    # can renew OAuth tokens automatically.
+    if os.environ.get("FX_BUILD_LOAS_TYPE", "") == "unrestricted":
+        bazel_config_args += ["--config=gcertauth"]
 
     bazel_config_args += build_metadata_flags(siblings_link_template)
 
