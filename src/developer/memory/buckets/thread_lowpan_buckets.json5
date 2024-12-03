@@ -1,0 +1,8 @@
+[
+    {
+        name: "Thread",
+        process: "lowpan.*|ot-stack.*",
+        vmo: "",
+        event_code: 56,
+    },
+]

@@ -3479,6 +3479,8 @@ assembly_input_bundle("thread_lowpan") {
       ]
     },
   ]
+  memory_buckets =
+      [ "//src/developer/memory/buckets/thread_lowpan_buckets.json5" ]
 }
 
 # WLAN policy component
