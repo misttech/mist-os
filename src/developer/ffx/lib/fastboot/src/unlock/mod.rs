@@ -5,16 +5,17 @@
 use crate::common::crypto::unlock_device;
 use crate::common::{is_locked, MISSING_CREDENTIALS};
 use crate::file_resolver::FileResolver;
+use crate::util;
+use crate::util::Event;
 use anyhow::Result;
 use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
-use std::io::Write;
+use tokio::sync::mpsc::Sender;
 
-const UNLOCKED: &str = "Target is now unlocked.";
 const UNLOCKED_ERR: &str = "Target is already unlocked.";
 
-pub async fn unlock<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
-    writer: &mut W,
+pub async fn unlock<F: FileResolver + Sync, T: FastbootInterface>(
+    messages: Sender<Event>,
     file_resolver: &mut F,
     credentials: &Vec<String>,
     fastboot_interface: &mut T,
@@ -27,8 +28,8 @@ pub async fn unlock<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
         ffx_bail!("{}", MISSING_CREDENTIALS);
     }
 
-    unlock_device(writer, file_resolver, credentials, fastboot_interface).await?;
-    writeln!(writer, "{}", UNLOCKED)?;
+    unlock_device(&messages, file_resolver, credentials, fastboot_interface).await?;
+    messages.send(util::Event::Unlock(util::UnlockEvent::Done)).await?;
     Ok(())
 }
 
@@ -37,6 +38,8 @@ pub async fn unlock<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
 
 #[cfg(test)]
 mod test {
+    use tokio::sync::mpsc;
+
     use super::*;
     use crate::common::vars::LOCKED_VAR;
     use crate::file_resolver::resolvers::EmptyResolver;
@@ -50,10 +53,9 @@ mod test {
             // is_locked
             state.set_var(LOCKED_VAR.to_string(), "no".to_string());
         }
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(1);
         let result =
-            unlock(&mut writer, &mut EmptyResolver::new()?, &vec!["test".to_string()], &mut proxy)
-                .await;
+            unlock(client, &mut EmptyResolver::new()?, &vec!["test".to_string()], &mut proxy).await;
         assert!(result.is_err());
         Ok(())
     }
@@ -66,8 +68,8 @@ mod test {
             // is_locked
             state.set_var(LOCKED_VAR.to_string(), "yes".to_string());
         }
-        let mut writer = Vec::<u8>::new();
-        let result = unlock(&mut writer, &mut EmptyResolver::new()?, &vec![], &mut proxy).await;
+        let (client, _server) = mpsc::channel(1);
+        let result = unlock(client, &mut EmptyResolver::new()?, &vec![], &mut proxy).await;
         assert!(result.is_err());
         Ok(())
     }

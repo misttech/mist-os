@@ -11,12 +11,13 @@ use crate::common::{
 use crate::file_resolver::FileResolver;
 use crate::manifest::v1::FlashManifest as FlashManifestV1;
 use crate::unlock::unlock;
+use crate::util::Event;
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use serde::{Deserialize, Serialize};
-use std::io::Write;
+use tokio::sync::mpsc::Sender;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FlashManifest {
@@ -29,16 +30,15 @@ pub struct FlashManifest {
 
 #[async_trait(?Send)]
 impl Flash for FlashManifest {
-    #[tracing::instrument(skip(self, writer, file_resolver, cmd))]
-    async fn flash<W, F, T>(
+    #[tracing::instrument(skip(self, file_resolver, cmd))]
+    async fn flash<F, T>(
         &self,
-        writer: &mut W,
+        messenger: &Sender<Event>,
         file_resolver: &mut F,
         fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
@@ -53,51 +53,50 @@ impl Flash for FlashManifest {
             if self.credentials.len() == 0 {
                 ffx_bail!("{}", MISSING_CREDENTIALS);
             } else {
-                unlock_device(writer, file_resolver, &self.credentials, fastboot_interface).await?;
+                unlock_device(messenger, file_resolver, &self.credentials, fastboot_interface)
+                    .await?;
             }
         }
-        flash_bootloader(writer, file_resolver, product, fastboot_interface, &cmd).await?;
+        flash_bootloader(&messenger, file_resolver, product, fastboot_interface, &cmd).await?;
         if product.requires_unlock && !is_locked(fastboot_interface).await? {
             lock_device(fastboot_interface).await?;
         }
-        flash_product(writer, file_resolver, product, fastboot_interface, &cmd).await?;
-        finish(writer, fastboot_interface).await
+        flash_product(&messenger, file_resolver, product, fastboot_interface, &cmd).await?;
+        finish(fastboot_interface).await
     }
 }
 
 #[async_trait(?Send)]
 impl Unlock for FlashManifest {
-    async fn unlock<W, F, T>(
+    async fn unlock<F, T>(
         &self,
-        writer: &mut W,
+        messenger: &Sender<Event>,
         file_resolver: &mut F,
         fastboot_interface: &mut T,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
-        unlock(writer, file_resolver, &self.credentials, fastboot_interface).await
+        unlock(messenger.clone(), file_resolver, &self.credentials, fastboot_interface).await
     }
 }
 
 #[async_trait(?Send)]
 impl Boot for FlashManifest {
-    async fn boot<W, F, T>(
+    async fn boot<F, T>(
         &self,
-        writer: &mut W,
+        messenger: Sender<Event>,
         file_resolver: &mut F,
         slot: String,
         fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
-        self.v1.boot(writer, file_resolver, slot, fastboot_interface, cmd).await
+        self.v1.boot(messenger, file_resolver, slot, fastboot_interface, cmd).await
     }
 }
 
@@ -113,6 +112,7 @@ mod test {
     use serde_json::{from_str, json};
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
+    use tokio::sync::mpsc;
 
     const MISMATCH_MANIFEST: &'static str = r#"{
         "hw_revision": "mismatch",
@@ -189,9 +189,9 @@ mod test {
             state.set_var(REVISION_VAR.to_string(), "rev_test-b4".to_string());
             state.set_var(MAX_DOWNLOAD_SIZE_VAR.to_string(), "8192".to_string());
         }
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(100);
         v.flash(
-            &mut writer,
+            &client,
             &mut TestResolver::new(),
             &mut proxy,
             ManifestParams {
@@ -214,10 +214,10 @@ mod test {
             state.set_var(IS_USERSPACE_VAR.to_string(), "yes".to_string());
             state.set_var(REVISION_VAR.to_string(), "test".to_string());
         }
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(100);
         assert!(v
             .flash(
-                &mut writer,
+                &client,
                 &mut TestResolver::new(),
                 &mut proxy,
                 ManifestParams {
@@ -243,10 +243,10 @@ mod test {
             state.set_var(REVISION_VAR.to_string(), "zedboot".to_string());
             state.set_var(LOCKED_VAR.to_string(), "yes".to_string());
         }
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(100);
         assert!(v
             .flash(
-                &mut writer,
+                &client,
                 &mut TestResolver::new(),
                 &mut proxy,
                 ManifestParams {
@@ -261,7 +261,7 @@ mod test {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_boot_should_succeed() -> Result<()> {
+    async fn test_minimal_manifest_succeeds() -> Result<()> {
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
 
@@ -297,9 +297,9 @@ mod test {
             state.set_var(REVISION_VAR.to_string(), "zedboot".to_string());
             state.set_var(MAX_DOWNLOAD_SIZE_VAR.to_string(), "8192".to_string());
         }
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(100);
         v.flash(
-            &mut writer,
+            &client,
             &mut TestResolver::new(),
             &mut proxy,
             ManifestParams {

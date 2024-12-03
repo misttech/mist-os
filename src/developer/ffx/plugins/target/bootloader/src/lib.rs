@@ -5,11 +5,10 @@
 use addr::TargetAddr;
 use anyhow::anyhow;
 use async_trait::async_trait;
-use chrono::Duration;
+use chrono::{DateTime, Duration, Utc};
 use errors::ffx_bail;
 use ffx_bootloader_args::SubCommand::{Boot, Info, Lock, Unlock};
 use ffx_bootloader_args::{BootCommand, BootloaderCommand, UnlockCommand};
-use ffx_fastboot::boot::boot;
 use ffx_fastboot::common::fastboot::{
     tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
 };
@@ -18,17 +17,25 @@ use ffx_fastboot::file_resolver::resolvers::EmptyResolver;
 use ffx_fastboot::info::info;
 use ffx_fastboot::lock::lock;
 use ffx_fastboot::unlock::unlock;
-use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
-use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
+use ffx_fastboot::util::Event;
+use ffx_fastboot::{boot::boot, util::UnlockEvent};
+use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, UploadProgress, Variable};
+use fho::{FfxContext, FfxMain, FfxTool, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::{
     FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
     TargetState,
 };
 use fuchsia_async::{MonotonicInstant, Timer};
+use futures::try_join;
+use schemars::JsonSchema;
+use serde::Serialize;
 use std::io::{stdin, Write};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Once;
+use termion::{color, style};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::Receiver;
 
 const MISSING_ZBI: &str = "Error: vbmeta parameter must be used with zbi parameter";
 
@@ -46,9 +53,40 @@ pub struct BootloaderTool {
 
 fho::embedded_plugin!(BootloaderTool);
 
+#[derive(Default, Debug, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum BootloaderToolMessageType {
+    #[default]
+    Unknown,
+    Info,
+    Rebooting,
+    Error,
+}
+
+#[derive(Debug, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub struct VariableMessage {
+    key: String,
+    value: String,
+}
+
+#[derive(Default, Debug, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub struct InfoMessage {
+    variables: Vec<VariableMessage>,
+}
+
+#[derive(Default, Debug, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub struct BootloaderToolMessage {
+    message_type: BootloaderToolMessageType,
+    info_message: InfoMessage,
+}
+
 #[async_trait(?Send)]
 impl FfxMain for BootloaderTool {
-    type Writer = SimpleWriter;
+    type Writer = VerifiedMachineWriter<BootloaderToolMessage>;
+
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let mut info = self.target_proxy.identity().await.map_err(|e| anyhow!(e))?;
 
@@ -201,16 +239,193 @@ Using address {} as node name
     }
 }
 
-pub async fn bootloader_impl<W: Write>(
+async fn handle_upload(
+    writer: &mut VerifiedMachineWriter<BootloaderToolMessage>,
+    mut prog_server: Receiver<UploadProgress>,
+) -> anyhow::Result<()> {
+    let mut start_time: Option<DateTime<Utc>> = None;
+    loop {
+        match prog_server.recv().await {
+            Some(UploadProgress::OnStarted { size, .. }) => {
+                start_time.replace(Utc::now());
+                tracing::debug!("Upload started: {}", size);
+                write!(writer, "Uploading... ")?;
+                if size > (1 << 24) {
+                    write!(writer, "Large file")?;
+                }
+                writer.flush()?;
+            }
+            Some(UploadProgress::OnFinished { .. }) => {
+                if let Some(st) = start_time {
+                    let d = Utc::now().signed_duration_since(st);
+                    tracing::debug!("Upload duration: {:.2}s", (d.num_milliseconds() / 1000));
+                } else {
+                    writeln!(writer, "{}Done{}", color::Fg(color::Green), style::Reset)?;
+                    writer.flush()?;
+                }
+                tracing::debug!("Upload finished");
+            }
+            Some(UploadProgress::OnError { error, .. }) => {
+                tracing::error!("{}", error);
+                ffx_bail!("{}", error)
+            }
+            Some(UploadProgress::OnProgress { bytes_written, .. }) => {
+                tracing::trace!("Upload progress: {}", bytes_written);
+            }
+            None => return Ok(()),
+        }
+    }
+}
+
+fn done_time(duration: Duration) -> String {
+    format!(
+        "{}Done{} [{}{:.2}s{}]",
+        color::Fg(color::Green),
+        style::Reset,
+        color::Fg(color::Blue),
+        (duration.num_milliseconds() as f32) / (1000 as f32),
+        style::Reset
+    )
+}
+async fn handle_events(
+    writer: &mut VerifiedMachineWriter<BootloaderToolMessage>,
+    mut var_server: Receiver<Event>,
+) -> anyhow::Result<()> {
+    let mut start_time: Option<DateTime<Utc>> = None;
+    loop {
+        match var_server.recv().await {
+            Some(Event::Locked) => {
+                writeln!(writer, "Locked")?;
+            }
+            Some(Event::Unlock(unlock_event)) => {
+                let message = match unlock_event {
+                    UnlockEvent::SearchingForCredentials => {
+                        "Looking for unlock credentials... ".to_string()
+                    }
+                    UnlockEvent::FoundCredentials(delta) => format!("{}\n", done_time(delta)),
+                    UnlockEvent::GeneratingToken => "Generating unlock token... ".to_string(),
+                    UnlockEvent::FinishedGeneratingToken(delta) => {
+                        format!("{}\n", done_time(delta))
+                    }
+                    UnlockEvent::BeginningUploadOfToken => {
+                        "Preparing to upload unlock token\n".to_string()
+                    }
+                    UnlockEvent::Done => "Done\n".to_string(),
+                };
+                write!(writer, "{}", message)?;
+            }
+            Some(Event::RebootStarted) => {
+                writeln!(writer, "Reboot started")?;
+            }
+            Some(Event::Rebooted(_)) => {
+                writeln!(writer, "Rebooted")?;
+            }
+            Some(Event::Oem { oem_command }) => {
+                writeln!(writer, "settnt oem command: {}", oem_command)?;
+            }
+            Some(Event::Upload(upload)) => match upload {
+                UploadProgress::OnStarted { size, .. } => {
+                    start_time.replace(Utc::now());
+                    tracing::debug!("Upload started: {}", size);
+                    write!(writer, "Uploading... ")?;
+                    if size > (1 << 24) {
+                        write!(writer, "Large file")?;
+                    }
+                    writer.flush()?;
+                }
+                UploadProgress::OnFinished { .. } => {
+                    if let Some(st) = start_time {
+                        let d = Utc::now().signed_duration_since(st);
+                        tracing::debug!("Upload duration: {:.2}s", (d.num_milliseconds() / 1000));
+                    } else {
+                        writeln!(writer, "{}Done{}", color::Fg(color::Green), style::Reset)?;
+                        writer.flush()?;
+                    }
+                    tracing::debug!("Upload finished");
+                }
+                UploadProgress::OnError { error, .. } => {
+                    tracing::error!("{}", error);
+                    ffx_bail!("{}", error)
+                }
+                UploadProgress::OnProgress { bytes_written, .. } => {
+                    tracing::trace!("Upload progress: {}", bytes_written);
+                }
+            },
+            Some(Event::FlashPartition { .. }) | Some(Event::FlashPartitionFinished { .. }) => {
+                ffx_bail!("Should not get flash partition events in this bootloader command.");
+            }
+            Some(Event::Variable(_)) => {
+                ffx_bail!("Should not get variable event in this bootloader command.");
+            }
+            None => break,
+        }
+    }
+    return Ok(());
+}
+
+async fn handle_variables_for_fastboot(
+    writer: &mut VerifiedMachineWriter<BootloaderToolMessage>,
+    mut var_server: Receiver<Variable>,
+) -> anyhow::Result<()> {
+    let mut variables = vec![];
+    loop {
+        match var_server.recv().await {
+            Some(Variable { name, value, .. }) => {
+                variables.push(VariableMessage { key: name, value });
+            }
+            None => break,
+        }
+    }
+    let message = variables
+        .iter()
+        .map(|x| format!("{}: {}", x.key, x.value))
+        .collect::<Vec<String>>()
+        .join("\n");
+    writer
+        .machine_or(
+            &BootloaderToolMessage {
+                message_type: BootloaderToolMessageType::Info,
+                info_message: InfoMessage { variables },
+            },
+            message,
+        )
+        .map_err(|e| anyhow!(e))
+}
+
+pub async fn bootloader_impl(
     mut fastboot_proxy: impl FastbootInterface,
-    cmd: BootloaderCommand,
-    writer: &mut W,
+    mut cmd: BootloaderCommand,
+    writer: &mut VerifiedMachineWriter<BootloaderToolMessage>,
 ) -> fho::Result<()> {
+    if cmd.product_bundle.is_none() && cmd.manifest.is_none() {
+        let product_path = ffx_config::get("product.path").ok();
+        if let Some(product_path) = product_path {
+            writeln!(
+                writer,
+                "No product bundle or manifest passed. Inferring product bundle path from config: {}",
+                product_path
+            )
+            .user_message("Error writing user message")?;
+            cmd.product_bundle = Some(product_path);
+        }
+    }
     // SubCommands can overwrite the manifest with their own parameters, so check for those
     // conditions before continuing through to check the flash manifest.
     match &cmd.subcommand {
-        Info(_) => return info(writer, &mut fastboot_proxy).await.map_err(fho::Error::from),
-        Lock(_) => return lock(writer, &mut fastboot_proxy).await.map_err(fho::Error::from),
+        Info(_) => {
+            let (client, server) = mpsc::channel(1);
+            try_join!(
+                info(client, &mut fastboot_proxy),
+                handle_variables_for_fastboot(writer, server)
+            )
+            .map_err(fho::Error::from)?;
+            return Ok(());
+        }
+        Lock(_) => {
+            lock(&mut fastboot_proxy).await.map_err(fho::Error::from)?;
+            writeln!(writer, "Target is now locked.").bug_context("failed to write")?;
+            return Ok(());
+        }
         Unlock(UnlockCommand { cred, force }) => {
             if !force {
                 writeln!(writer, "{}", WARNING).bug_context("failed to write")?;
@@ -229,14 +444,15 @@ pub async fn bootloader_impl<W: Write>(
             }
             match cred {
                 Some(cred_file) => {
-                    return unlock(
-                        writer,
-                        &mut EmptyResolver::new()?,
-                        &vec![cred_file.to_string()],
-                        &mut fastboot_proxy,
+                    let (client, server) = mpsc::channel(1);
+                    let credentials = vec![cred_file.to_string()];
+                    let mut resolver = EmptyResolver::new()?;
+                    try_join!(
+                        unlock(client, &mut resolver, &credentials, &mut fastboot_proxy,),
+                        handle_events(writer, server)
                     )
-                    .await
-                    .map_err(fho::Error::from);
+                    .map_err(fho::Error::from)?;
+                    return Ok(());
                 }
                 _ => {}
             }
@@ -247,22 +463,30 @@ pub async fn bootloader_impl<W: Write>(
             }
             match zbi {
                 Some(z) => {
-                    return boot(
-                        writer,
-                        &mut EmptyResolver::new()?,
-                        z.to_owned(),
-                        vbmeta.to_owned(),
-                        &mut fastboot_proxy,
+                    let (client, server) = mpsc::channel(1);
+                    let mut resolver = EmptyResolver::new()?;
+                    try_join!(
+                        boot(
+                            client,
+                            &mut resolver,
+                            z.to_owned(),
+                            vbmeta.to_owned(),
+                            &mut fastboot_proxy,
+                        ),
+                        handle_upload(writer, server)
                     )
-                    .await
-                    .map_err(fho::Error::from);
+                    .map_err(fho::Error::from)?;
+                    return Ok(());
                 }
                 _ => {}
             }
         }
     }
 
-    from_manifest(writer, cmd, &mut fastboot_proxy).await.map_err(fho::Error::from)
+    let (client, server) = mpsc::channel(1);
+    try_join!(from_manifest(client, cmd, &mut fastboot_proxy), handle_events(writer, server))
+        .map_err(fho::Error::from)?;
+    return Ok(());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -274,6 +498,7 @@ mod test {
     use ffx_bootloader_args::LockCommand;
     use ffx_fastboot::common::vars::LOCKED_VAR;
     use ffx_fastboot::test::setup;
+    use fho::Format;
     use tempfile::NamedTempFile;
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -283,6 +508,7 @@ mod test {
         let vbmeta_file = NamedTempFile::new().expect("tmp access failed");
         let vbmeta_file_name = vbmeta_file.path().to_string_lossy().to_string();
         let (state, proxy) = setup();
+        let mut w = VerifiedMachineWriter::<BootloaderToolMessage>::new(Some(Format::Json));
         bootloader_impl(
             proxy,
             BootloaderCommand {
@@ -296,7 +522,7 @@ mod test {
                     slot: "a".to_string(),
                 }),
             },
-            &mut std::io::stdout(),
+            &mut w,
         )
         .await?;
         let state = state.lock().unwrap();
@@ -310,6 +536,7 @@ mod test {
         let zbi_file = NamedTempFile::new().expect("tmp access failed");
         let zbi_file_name = zbi_file.path().to_string_lossy().to_string();
         let (state, proxy) = setup();
+        let mut w = VerifiedMachineWriter::<BootloaderToolMessage>::new(Some(Format::Json));
         bootloader_impl(
             proxy,
             BootloaderCommand {
@@ -323,7 +550,7 @@ mod test {
                     slot: "a".to_string(),
                 }),
             },
-            &mut std::io::stdout(),
+            &mut w,
         )
         .await?;
         let state = state.lock().unwrap();
@@ -337,6 +564,7 @@ mod test {
         let vbmeta_file = NamedTempFile::new().expect("tmp access failed");
         let vbmeta_file_name = vbmeta_file.path().to_string_lossy().to_string();
         let (_, proxy) = setup();
+        let mut w = VerifiedMachineWriter::<BootloaderToolMessage>::new(Some(Format::Json));
         assert!(bootloader_impl(
             proxy,
             BootloaderCommand {
@@ -350,7 +578,7 @@ mod test {
                     slot: "a".to_string(),
                 }),
             },
-            &mut std::io::stdout(),
+            &mut w,
         )
         .await
         .is_err());
@@ -365,6 +593,7 @@ mod test {
             state.set_var(LOCKED_VAR.to_string(), "no".to_string());
             state.set_var("vx-unlockable".to_string(), "no".to_string());
         }
+        let mut w = VerifiedMachineWriter::<BootloaderToolMessage>::new(Some(Format::Json));
         bootloader_impl(
             proxy,
             BootloaderCommand {
@@ -374,7 +603,7 @@ mod test {
                 skip_verify: false,
                 subcommand: Lock(LockCommand {}),
             },
-            &mut std::io::stdout(),
+            &mut w,
         )
         .await?;
         let state = state.lock().unwrap();

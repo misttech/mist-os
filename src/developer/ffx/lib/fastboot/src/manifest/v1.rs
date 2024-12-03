@@ -9,12 +9,14 @@ use crate::common::{
     Unlock, MISSING_PRODUCT, UNLOCK_ERR,
 };
 use crate::file_resolver::FileResolver;
+use crate::util::Event;
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
+use futures::try_join;
 use serde::{Deserialize, Serialize};
-use std::io::Write;
+use tokio::sync::mpsc::{self, Sender};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Product {
@@ -82,16 +84,15 @@ pub struct FlashManifest(pub Vec<Product>);
 
 #[async_trait(?Send)]
 impl Flash for FlashManifest {
-    #[tracing::instrument(skip(writer, file_resolver, cmd))]
-    async fn flash<W, F, T>(
+    #[tracing::instrument(skip(file_resolver, cmd))]
+    async fn flash<F, T>(
         &self,
-        writer: &mut W,
+        messenger: &Sender<Event>,
         file_resolver: &mut F,
         fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
@@ -102,7 +103,7 @@ impl Flash for FlashManifest {
         if product.requires_unlock && is_locked(fastboot_interface).await? {
             ffx_bail!("{}", UNLOCK_ERR);
         }
-        flash_and_reboot(writer, file_resolver, product, fastboot_interface, cmd).await
+        flash_and_reboot(messenger, file_resolver, product, fastboot_interface, cmd).await
     }
 }
 
@@ -111,16 +112,15 @@ impl Unlock for FlashManifest {}
 
 #[async_trait(?Send)]
 impl Boot for FlashManifest {
-    async fn boot<W, F, T>(
+    async fn boot<F, T>(
         &self,
-        writer: &mut W,
+        messenger: Sender<Event>,
         file_resolver: &mut F,
         slot: String,
         fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
@@ -138,7 +138,20 @@ impl Boot for FlashManifest {
         let vbmeta =
             partitions.iter().find(|p| p.name().contains("vbmeta")).map(|p| p.file().to_string());
         match zbi {
-            Some(z) => boot(writer, file_resolver, z, vbmeta, fastboot_interface).await,
+            Some(z) => {
+                let (up_client, mut up_server) = mpsc::channel(100);
+                try_join!(boot(up_client, file_resolver, z, vbmeta, fastboot_interface), async {
+                    loop {
+                        match up_server.recv().await {
+                            Some(u) => messenger.send(Event::Upload(u)).await?,
+                            None => {
+                                return Ok(());
+                            }
+                        }
+                    }
+                })?;
+                Ok(())
+            }
             None => ffx_bail!("Could not find matching partitions for slot {}", slot),
         }
     }
@@ -152,10 +165,10 @@ mod test {
     use super::*;
     use crate::common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR};
     use crate::test::{setup, TestResolver};
-    use regex::Regex;
     use serde_json::{from_str, json};
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
+    use tokio::sync::mpsc;
 
     const MANIFEST: &'static str = r#"[
         {
@@ -248,10 +261,10 @@ mod test {
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
         let v: FlashManifest = from_str(MANIFEST)?;
         let (_, mut proxy) = setup();
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(100);
         assert!(v
             .flash(
-                &mut writer,
+                &client,
                 &mut TestResolver::new(),
                 &mut proxy,
                 ManifestParams {
@@ -316,9 +329,9 @@ mod test {
             state.set_var(IS_USERSPACE_VAR.to_string(), "yes".to_string());
             state.set_var(MAX_DOWNLOAD_SIZE_VAR.to_string(), "8192".to_string());
         }
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(100);
         v.flash(
-            &mut writer,
+            &client,
             &mut TestResolver::new(),
             &mut proxy,
             ManifestParams {
@@ -328,11 +341,6 @@ mod test {
             },
         )
         .await?;
-        let output = String::from_utf8(writer).expect("utf-8 string");
-        for partition in &v.0[1].partitions {
-            let name_listing = Regex::new(&partition.name()).expect("test regex");
-            assert_eq!(name_listing.find_iter(&output).count(), 1);
-        }
         Ok(())
     }
 
@@ -374,9 +382,9 @@ mod test {
             state.set_var(IS_USERSPACE_VAR.to_string(), "yes".to_string());
             state.set_var(MAX_DOWNLOAD_SIZE_VAR.to_string(), "8192".to_string());
         }
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(100);
         v.flash(
-            &mut writer,
+            &client,
             &mut TestResolver::new(),
             &mut proxy,
             ManifestParams {
@@ -425,9 +433,9 @@ mod test {
             state.set_var("var3".to_string(), "not_value3".to_string());
             state.set_var(MAX_DOWNLOAD_SIZE_VAR.to_string(), "8192".to_string());
         }
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(100);
         v.flash(
-            &mut writer,
+            &client,
             &mut TestResolver::new(),
             &mut proxy,
             ManifestParams {
@@ -437,12 +445,6 @@ mod test {
             },
         )
         .await?;
-        let output = String::from_utf8(writer).expect("utf-8 string");
-        for (i, partition) in v.0[0].bootloader_partitions.iter().enumerate() {
-            let name_listing = Regex::new(&partition.name()).expect("test regex");
-            let expected = if i == 1 { 1 } else { 0 };
-            assert_eq!(name_listing.find_iter(&output).count(), expected);
-        }
         Ok(())
     }
 
@@ -497,9 +499,9 @@ mod test {
             state.set_var(MAX_DOWNLOAD_SIZE_VAR.to_string(), "8192".to_string());
         }
 
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(100);
         v.flash(
-            &mut writer,
+            &client,
             &mut TestResolver::new(),
             &mut proxy,
             ManifestParams {
@@ -526,10 +528,10 @@ mod test {
             state.set_var(LOCKED_VAR.to_string(), "vx-locked".to_string());
             state.set_var(LOCKED_VAR.to_string(), "yes".to_string());
         }
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(100);
         let res = v
             .flash(
-                &mut writer,
+                &client,
                 &mut TestResolver::new(),
                 &mut proxy,
                 ManifestParams {

@@ -12,11 +12,11 @@ use crate::manifest::resolvers::{
 use crate::manifest::v1::FlashManifest as FlashManifestV1;
 use crate::manifest::v2::FlashManifest as FlashManifestV2;
 use crate::manifest::v3::FlashManifest as FlashManifestV3;
+use crate::util::Event;
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_partitions_config::{PartitionAndImage, PartitionImageMapper, Slot};
 use async_trait::async_trait;
 use camino::Utf8Path;
-use chrono::Utc;
 use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use pbms::load_product_bundle;
@@ -26,7 +26,7 @@ use serde_json::{from_value, to_value, Value};
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
-use termion::{color, style};
+use tokio::sync::mpsc::Sender;
 
 pub mod resolvers;
 pub mod v1;
@@ -208,109 +208,73 @@ fn get_mapped_partitions(
 
 #[async_trait(?Send)]
 impl Flash for FlashManifestVersion {
-    #[tracing::instrument(skip(writer, cmd, file_resolver, self))]
-    async fn flash<W, F, T>(
+    #[tracing::instrument(skip(cmd, file_resolver, self))]
+    async fn flash<F, T>(
         &self,
-        writer: &mut W,
+        messenger: &Sender<Event>,
         file_resolver: &mut F,
         fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
-        let total_time = Utc::now();
         match self {
-            Self::V1(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
-            Self::V2(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
-            Self::V3(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
+            Self::V1(v) => v.flash(messenger, file_resolver, fastboot_interface, cmd).await?,
+            Self::V2(v) => v.flash(messenger, file_resolver, fastboot_interface, cmd).await?,
+            Self::V3(v) => v.flash(messenger, file_resolver, fastboot_interface, cmd).await?,
         };
-        let duration = Utc::now().signed_duration_since(total_time);
-        writeln!(
-            writer,
-            "{}Done. Total Time{} [{}{:.2}s{}]",
-            color::Fg(color::Green),
-            style::Reset,
-            color::Fg(color::Blue),
-            (duration.num_milliseconds() as f32) / (1000 as f32),
-            style::Reset
-        )?;
         Ok(())
     }
 }
 
 #[async_trait(?Send)]
 impl Unlock for FlashManifestVersion {
-    async fn unlock<W, F, T>(
+    async fn unlock<F, T>(
         &self,
-        writer: &mut W,
+        messenger: &Sender<Event>,
         file_resolver: &mut F,
         fastboot_interface: &mut T,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
-        let total_time = Utc::now();
         match self {
-            Self::V1(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
-            Self::V2(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
-            Self::V3(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
+            Self::V1(v) => v.unlock(messenger, file_resolver, fastboot_interface).await?,
+            Self::V2(v) => v.unlock(messenger, file_resolver, fastboot_interface).await?,
+            Self::V3(v) => v.unlock(messenger, file_resolver, fastboot_interface).await?,
         };
-        let duration = Utc::now().signed_duration_since(total_time);
-        writeln!(
-            writer,
-            "{}Done. Total Time{} [{}{:.2}s{}]",
-            color::Fg(color::Green),
-            style::Reset,
-            color::Fg(color::Blue),
-            (duration.num_milliseconds() as f32) / (1000 as f32),
-            style::Reset
-        )?;
         Ok(())
     }
 }
 
 #[async_trait(?Send)]
 impl Boot for FlashManifestVersion {
-    async fn boot<W, F, T>(
+    async fn boot<F, T>(
         &self,
-        writer: &mut W,
+        messenger: Sender<Event>,
         file_resolver: &mut F,
         slot: String,
         fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
-        let total_time = Utc::now();
         match self {
-            Self::V1(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
-            Self::V2(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
-            Self::V3(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
+            Self::V1(v) => v.boot(messenger, file_resolver, slot, fastboot_interface, cmd).await?,
+            Self::V2(v) => v.boot(messenger, file_resolver, slot, fastboot_interface, cmd).await?,
+            Self::V3(v) => v.boot(messenger, file_resolver, slot, fastboot_interface, cmd).await?,
         };
-        let duration = Utc::now().signed_duration_since(total_time);
-        writeln!(
-            writer,
-            "{}Done. Total Time{} [{}{:.2}s{}]",
-            color::Fg(color::Green),
-            style::Reset,
-            color::Fg(color::Blue),
-            (duration.num_milliseconds() as f32) / (1000 as f32),
-            style::Reset
-        )?;
         Ok(())
     }
 }
 
-pub async fn from_sdk<W: Write, F: FastbootInterface>(
-    writer: &mut W,
+pub async fn from_sdk<F: FastbootInterface>(
+    messenger: &Sender<Event>,
     fastboot_interface: &mut F,
     cmd: ManifestParams,
 ) -> Result<()> {
@@ -322,7 +286,7 @@ pub async fn from_sdk<W: Write, F: FastbootInterface>(
                 resolver: Resolver::new(PathBuf::from(b))?,
                 version: FlashManifestVersion::from_product_bundle(&product_bundle)?,
             }
-            .flash(writer, fastboot_interface, cmd)
+            .flash(messenger, fastboot_interface, cmd)
             .await
         }
         None => ffx_bail!(
@@ -331,9 +295,9 @@ pub async fn from_sdk<W: Write, F: FastbootInterface>(
     }
 }
 
-#[tracing::instrument(skip(writer, cmd))]
-pub async fn from_local_product_bundle<W: Write, F: FastbootInterface>(
-    writer: &mut W,
+#[tracing::instrument(skip(cmd))]
+pub async fn from_local_product_bundle<F: FastbootInterface>(
+    messenger: &Sender<Event>,
     path: PathBuf,
     fastboot_interface: &mut F,
     cmd: ManifestParams,
@@ -347,10 +311,10 @@ pub async fn from_local_product_bundle<W: Write, F: FastbootInterface>(
     match (path.is_file(), path.extension()) {
         (true, Some("zip")) => {
             FlashManifest {
-                resolver: ZipArchiveResolver::new(writer, path.into())?,
+                resolver: ZipArchiveResolver::new(path.into())?,
                 version: flash_manifest_version,
             }
-            .flash(writer, fastboot_interface, cmd)
+            .flash(messenger, fastboot_interface, cmd)
             .await
         }
         (true, extension) => Err(anyhow!(
@@ -359,28 +323,28 @@ pub async fn from_local_product_bundle<W: Write, F: FastbootInterface>(
         )),
         (false, _) => {
             FlashManifest { resolver: Resolver::new(path.into())?, version: flash_manifest_version }
-                .flash(writer, fastboot_interface, cmd)
+                .flash(messenger, fastboot_interface, cmd)
                 .await
         }
     }
 }
 
-pub async fn from_in_tree<W: Write, T: FastbootInterface>(
-    writer: &mut W,
+pub async fn from_in_tree<T: FastbootInterface>(
+    messenger: &Sender<Event>,
     fastboot_interface: &mut T,
     cmd: ManifestParams,
 ) -> Result<()> {
     tracing::debug!("fastboot manifest from_in_tree");
     if cmd.product_bundle.is_some() {
         tracing::debug!("in tree, but product bundle specified, use in-tree sdk");
-        from_sdk(writer, fastboot_interface, cmd).await
+        from_sdk(messenger, fastboot_interface, cmd).await
     } else {
         bail!("manifest or product_bundle must be specified")
     }
 }
 
-pub async fn from_path<W: Write, T: FastbootInterface>(
-    writer: &mut W,
+pub async fn from_path<T: FastbootInterface>(
+    messenger: &Sender<Event>,
     path: PathBuf,
     fastboot_interface: &mut T,
     cmd: ManifestParams,
@@ -389,19 +353,19 @@ pub async fn from_path<W: Write, T: FastbootInterface>(
     match path.extension() {
         Some(ext) => {
             if ext == "zip" {
-                let r = ArchiveResolver::new(writer, path)?;
-                load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
+                let r = ArchiveResolver::new(path)?;
+                load_flash_manifest(r).await?.flash(messenger, fastboot_interface, cmd).await
             } else if ext == "tgz" || ext == "tar.gz" || ext == "tar" {
-                let r = FlashManifestTarResolver::new(writer, path)?;
-                load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
+                let r = FlashManifestTarResolver::new(path)?;
+                load_flash_manifest(r).await?.flash(messenger, fastboot_interface, cmd).await
             } else {
                 let r = FlashManifestResolver::new(path)?;
-                load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
+                load_flash_manifest(r).await?.flash(messenger, fastboot_interface, cmd).await
             }
         }
         _ => {
             let r = FlashManifestResolver::new(path)?;
-            load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
+            load_flash_manifest(r).await?.flash(messenger, fastboot_interface, cmd).await
         }
     }
 }
@@ -419,25 +383,31 @@ pub struct FlashManifest<F: FileResolver + Sync> {
 }
 
 impl<F: FileResolver + Sync> FlashManifest<F> {
-    #[tracing::instrument(skip(self, writer, cmd))]
-    pub async fn flash<W: Write, T: FastbootInterface>(
+    #[tracing::instrument(skip(self, cmd))]
+    pub async fn flash<T: FastbootInterface>(
         &mut self,
-        writer: &mut W,
+        messenger: &Sender<Event>,
         fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()> {
         match &cmd.op {
             Command::Flash => {
-                self.version.flash(writer, &mut self.resolver, fastboot_interface, cmd).await
+                self.version.flash(messenger, &mut self.resolver, fastboot_interface, cmd).await
             }
             Command::Unlock(_) => {
                 // Using the manifest, don't need the unlock credential from the UnlockCommand
                 // here.
-                self.version.unlock(writer, &mut self.resolver, fastboot_interface).await
+                self.version.unlock(messenger, &mut self.resolver, fastboot_interface).await
             }
             Command::Boot(BootParams { slot, .. }) => {
                 self.version
-                    .boot(writer, &mut self.resolver, slot.to_owned(), fastboot_interface, cmd)
+                    .boot(
+                        messenger.clone(),
+                        &mut self.resolver,
+                        slot.to_owned(),
+                        fastboot_interface,
+                        cmd,
+                    )
                     .await
             }
         }

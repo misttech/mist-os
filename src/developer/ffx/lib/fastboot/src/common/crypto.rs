@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::{done_time, handle_upload_progress_for_staging, is_locked};
+use crate::common::is_locked;
 use crate::file_resolver::FileResolver;
+use crate::util::{Event, UnlockEvent};
 use anyhow::{anyhow, bail, Result};
 use async_fs::OpenOptions;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -17,7 +18,7 @@ use futures::try_join;
 use ring::rand;
 use ring::signature::{RsaKeyPair, RSA_PKCS1_SHA512};
 use std::fs::File;
-use std::io::{copy, Write};
+use std::io::copy;
 use std::path::{Path, PathBuf};
 use tempfile::tempdir;
 use tokio::sync::mpsc;
@@ -160,8 +161,8 @@ impl UnlockCredentials {
     }
 }
 
-pub async fn unlock_device<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
-    writer: &mut W,
+pub async fn unlock_device<F: FileResolver + Sync, T: FastbootInterface>(
+    messenger: &Sender<Event>,
     file_resolver: &mut F,
     creds: &Vec<String>,
     fastboot_interface: &mut T,
@@ -170,31 +171,34 @@ pub async fn unlock_device<W: Write, F: FileResolver + Sync, T: FastbootInterfac
         ffx_bail!("No credentials given. Could not unlock device.")
     }
     let search = Utc::now();
-    write!(writer, "Looking for unlock credentials...")?;
-    writer.flush()?;
+    messenger.send(Event::Unlock(UnlockEvent::SearchingForCredentials)).await?;
     let challenge = get_unlock_challenge(fastboot_interface).await?;
     for cred in creds {
-        let cred_file = file_resolver.get_file(writer, cred).await?;
+        let cred_file = file_resolver.get_file(cred).await?;
         let unlock_creds = UnlockCredentials::new(&cred_file).await?;
         if challenge.product_id_hash[..] == *unlock_creds.get_atx_certificate_subject() {
             let d = Utc::now().signed_duration_since(search);
-            done_time(writer, d)?;
-            return unlock_device_with_creds(writer, unlock_creds, challenge, fastboot_interface)
-                .await;
+            messenger.send(Event::Unlock(UnlockEvent::FoundCredentials(d))).await?;
+            return unlock_device_with_creds(
+                messenger,
+                unlock_creds,
+                challenge,
+                fastboot_interface,
+            )
+            .await;
         }
     }
     ffx_bail!("Key mismatch. Credentials given could not unlock the device.")
 }
 
-async fn unlock_device_with_creds<W: Write, F: FastbootInterface>(
-    writer: &mut W,
+async fn unlock_device_with_creds<F: FastbootInterface>(
+    messenger: &Sender<Event>,
     unlock_creds: UnlockCredentials,
     challenge: UnlockChallenge,
     fastboot_interface: &mut F,
 ) -> Result<()> {
     let gen = Utc::now();
-    write!(writer, "Generating unlock token...")?;
-    writer.flush()?;
+    messenger.send(Event::Unlock(UnlockEvent::GeneratingToken)).await?;
 
     let rng = rand::SystemRandom::new();
     let mut signature = vec![0; unlock_creds.unlock_key.public_modulus_len()];
@@ -222,13 +226,13 @@ async fn unlock_device_with_creds<W: Write, F: FastbootInterface>(
     file.flush().await?;
 
     let d_gen = Utc::now().signed_duration_since(gen);
-    done_time(writer, d_gen)?;
+    messenger.send(Event::Unlock(UnlockEvent::FinishedGeneratingToken(d_gen))).await?;
 
-    writeln!(writer, "Preparing to upload unlock token")?;
+    messenger.send(Event::Unlock(UnlockEvent::BeginningUploadOfToken)).await?;
 
     let file_path =
         path.to_str().ok_or_else(|| anyhow!("Could not get path for temporary token file"))?;
-    let (prog_client, prog_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
+    let (prog_client, mut prog_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
         mpsc::channel(1);
     let path = file_path.to_string();
     try_join!(
@@ -237,7 +241,16 @@ async fn unlock_device_with_creds<W: Write, F: FastbootInterface>(
             file_path,
             e
         )),
-        handle_upload_progress_for_staging(writer, prog_server),
+        async {
+            loop {
+                match prog_server.recv().await {
+                    Some(e) => {
+                        messenger.send(Event::Upload(e)).await?;
+                    }
+                    None => return Ok(()),
+                }
+            }
+        },
     )?;
 
     fastboot_interface

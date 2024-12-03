@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::done_time;
 use crate::file_resolver::resolvers::{Resolver, TarResolver};
 use crate::file_resolver::FileResolver;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use chrono::Utc;
 use errors::{ffx_bail, ffx_error};
 use std::fs::{create_dir_all, File};
-use std::io::{copy, Write};
+use std::io::copy;
 use std::path::{Path, PathBuf};
 use tempfile::{tempdir, TempDir};
 use walkdir::WalkDir;
@@ -48,8 +46,8 @@ impl FlashManifestResolver {
 
 #[async_trait(?Send)]
 impl FileResolver for FlashManifestResolver {
-    async fn get_file<W: Write>(&mut self, writer: &mut W, file: &str) -> Result<String> {
-        self.0.get_file(writer, file).await
+    async fn get_file(&mut self, file: &str) -> Result<String> {
+        self.0.get_file(file).await
     }
 }
 
@@ -68,7 +66,7 @@ pub struct ArchiveResolver {
 }
 
 impl ArchiveResolver {
-    pub fn new<W: Write>(writer: &mut W, path: PathBuf) -> Result<Self> {
+    pub fn new(path: PathBuf) -> Result<Self> {
         let temp_dir = tempdir()?;
         let file = File::open(path.clone())
             .map_err(|e| ffx_error!("Could not open archive file: {}", e))?;
@@ -95,17 +93,7 @@ impl ArchiveResolver {
                     }
                 }
                 let mut outfile = File::create(&manifest)?;
-                let time = Utc::now();
-                write!(
-                    writer,
-                    "Extracting {} to {}... ",
-                    internal_path.file_name().expect("has a file name").to_string_lossy(),
-                    temp_dir.path().display()
-                )?;
-                writer.flush()?;
                 copy(&mut archive_file, &mut outfile)?;
-                let duration = Utc::now().signed_duration_since(time);
-                done_time(writer, duration)?;
                 manifest_path.replace(manifest);
                 break;
             }
@@ -126,7 +114,7 @@ impl ArchiveResolver {
 
 #[async_trait(?Send)]
 impl FileResolver for ArchiveResolver {
-    async fn get_file<W: Write>(&mut self, writer: &mut W, file: &str) -> Result<String> {
+    async fn get_file(&mut self, file: &str) -> Result<String> {
         let mut file = match self.internal_manifest_path.parent() {
             Some(p) => {
                 let mut path = PathBuf::new();
@@ -149,21 +137,8 @@ impl FileResolver for ArchiveResolver {
                 create_dir_all(&p)?;
             }
         }
-        let time = Utc::now();
-        write!(
-            writer,
-            "Extracting {} to {}... ",
-            file.sanitized_name().file_name().expect("has a file name").to_string_lossy(),
-            self.temp_dir.path().display()
-        )?;
-        if file.size() > (1 << 24) {
-            write!(writer, "large file, please wait... ")?;
-        }
-        writer.flush()?;
         let mut outfile = File::create(&outpath)?;
         copy(&mut file, &mut outfile)?;
-        let duration = Utc::now().signed_duration_since(time);
-        done_time(writer, duration)?;
         Ok(outpath.to_str().ok_or_else(|| anyhow!("invalid temp file name"))?.to_owned())
     }
 }
@@ -171,8 +146,8 @@ impl FileResolver for ArchiveResolver {
 pub struct FlashManifestTarResolver(TarResolver, PathBuf);
 
 impl FlashManifestTarResolver {
-    pub fn new<W: Write>(writer: &mut W, path: PathBuf) -> Result<Self> {
-        let resolver_inner = TarResolver::new(writer, path.clone())?;
+    pub fn new(path: PathBuf) -> Result<Self> {
+        let resolver_inner = TarResolver::new(path.clone())?;
 
         let manifest_path = WalkDir::new(resolver_inner.root_path())
             .into_iter()
@@ -192,8 +167,8 @@ impl FlashManifestTarResolver {
 
 #[async_trait(?Send)]
 impl FileResolver for FlashManifestTarResolver {
-    async fn get_file<W: Write>(&mut self, writer: &mut W, file: &str) -> Result<String> {
-        self.0.get_file(writer, file).await
+    async fn get_file(&mut self, file: &str) -> Result<String> {
+        self.0.get_file(file).await
     }
 }
 
