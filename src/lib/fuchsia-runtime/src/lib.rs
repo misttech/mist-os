@@ -358,6 +358,36 @@ pub type UtcInstant = Instant<UtcTimeline>;
 /// A duration in the UTC timeline.
 pub type UtcDuration = Duration<UtcTimeline>;
 
+/// Special methods that are only valid for UtcDuration.
+pub trait UtcDurationExt {
+    /// Converts the reading of a duration on the UTC timeline to a reading on the boot timeline.
+    ///
+    /// This is "lossy" because durations are usually differences of
+    /// two Instants, and Boot time and UTC time mostly tick at the same rate.
+    /// However, they aren't required to tick in lock-step.
+    fn to_boot_lossy(&self) -> zx::Duration<BootTimeline>;
+}
+
+impl UtcDurationExt for UtcDuration {
+    fn to_boot_lossy(&self) -> zx::Duration<BootTimeline> {
+        zx::Duration::from_nanos(self.into_nanos())
+    }
+}
+
+/// Special methods that are only valid for zx::BootDuration.
+pub trait BootDurationExt {
+    /// Converts the reading of a duration on the boot timeline to a reading on the UTC timeline.
+    ///
+    /// See notes alongside [UtcDurationExt::to_boot_lossy].
+    fn to_utc_lossy(&self) -> UtcDuration;
+}
+
+impl BootDurationExt for zx::BootDuration {
+    fn to_utc_lossy(&self) -> UtcDuration {
+        zx::Duration::from_nanos(self.into_nanos())
+    }
+}
+
 /// A clock that will return UTC timestamps.
 pub type UtcClock = Clock<BootTimeline, UtcTimeline>;
 
