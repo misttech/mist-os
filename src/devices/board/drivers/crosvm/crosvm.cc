@@ -102,12 +102,12 @@ zx::result<> Crosvm::CreateRoothost() {
 zx::result<> Crosvm::CreateMetadata() {
   fuchsia_hardware_pci::BoardConfiguration board_config{
       {fuchsia_hardware_pci::UseIntxWorkaroundType()}};
-  if (zx_status_t status = metadata_server_.SetMetadata(board_config); status != ZX_OK) {
-    return zx::error(status);
+  if (zx::result result = metadata_server_.SetMetadata(board_config); result.is_error()) {
+    return result.take_error();
   }
 
-  if (zx_status_t status = metadata_server_.Serve(*outgoing(), dispatcher()); status != ZX_OK) {
-    return zx::error(status);
+  if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
+    return result.take_error();
   }
 
   return zx::ok();

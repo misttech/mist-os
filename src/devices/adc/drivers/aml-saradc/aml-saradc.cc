@@ -211,22 +211,22 @@ zx::result<> AmlSaradc::Start() {
     return metadata.take_error();
   }
 
-  zx_status_t status = metadata_server_.SetMetadata(metadata.value());
-  if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", zx_status_get_string(status)));
-    return zx::error(status);
+  if (zx::result result = metadata_server_.SetMetadata(metadata.value()); result.is_error()) {
+    FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", result.status_string()));
+    return result.take_error();
   }
 
-  status = metadata_server_.Serve(*outgoing(), fdf::Dispatcher::GetCurrent()->async_dispatcher());
-  if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", zx_status_get_string(status)));
-    return zx::error(status);
+  zx::result result =
+      metadata_server_.Serve(*outgoing(), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  if (result.is_error()) {
+    FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", result.status_string()));
+    return result.take_error();
   }
 
   device_ = std::make_unique<AmlSaradcDevice>(std::move(adc_mmio.value()),
                                               std::move(ao_mmio.value()), std::move(irq.value()));
   device_->HwInit();
-  auto result = outgoing()->AddService<fuchsia_hardware_adcimpl::Service>(
+  result = outgoing()->AddService<fuchsia_hardware_adcimpl::Service>(
       fuchsia_hardware_adcimpl::Service::InstanceHandler({
           .device = bindings_.CreateHandler(device_.get(), fdf::Dispatcher::GetCurrent()->get(),
                                             fidl::kIgnoreBindingClosure),

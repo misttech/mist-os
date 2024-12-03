@@ -1828,11 +1828,15 @@ zx_status_t AmlSdmmc::InitMetadataServer(fdf::PDev& pdev) {
     FDF_LOGL(ERROR, logger(), "Failed to get metadata: %s", metadata.status_string());
     return metadata.status_value();
   }
-  metadata_server_.SetMetadata(metadata.value());
-  zx_status_t status = metadata_server_.Serve(*outgoing(), dispatcher());
-  if (status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to serve metadata: %s", zx_status_get_string(status));
-    return status;
+  zx::result result = metadata_server_.SetMetadata(metadata.value());
+  if (result.is_error()) {
+    FDF_LOGL(ERROR, logger(), "Failed to set metadata: %s", result.status_string());
+    return result.status_value();
+  }
+  result = metadata_server_.Serve(*outgoing(), dispatcher());
+  if (result.is_error()) {
+    FDF_LOGL(ERROR, logger(), "Failed to serve metadata: %s", result.status_string());
+    return result.status_value();
   }
 
   return ZX_OK;

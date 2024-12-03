@@ -24,13 +24,13 @@ class SenderDriver final : public fdf::DriverBase,
 
   zx::result<> Start() override {
     // Serve the metadata to the driver's child nodes.
-    zx_status_t status = metadata_server_.Serve(*outgoing(), dispatcher());
-    if (status != ZX_OK) {
-      fdf::error("Failed to serve metadata: {}", zx::make_result(status));
-      return zx::error(status);
+    zx::result result = metadata_server_.Serve(*outgoing(), dispatcher());
+    if (result.is_error()) {
+      fdf::error("Failed to serve metadata: {}", result);
+      return result.take_error();
     }
 
-    status = AddForwarderChild();
+    zx_status_t status = AddForwarderChild();
     if (status != ZX_OK) {
       fdf::error("Failed to add forwarder child: {}", zx::make_result(status));
       return zx::error(status);
@@ -41,10 +41,10 @@ class SenderDriver final : public fdf::DriverBase,
 
   // fuchsia.examples.metadata/Sender implementation.
   void SetMetadata(SetMetadataRequest& request, SetMetadataCompleter::Sync& completer) override {
-    zx_status_t status = metadata_server_.SetMetadata(request.metadata());
-    if (status != ZX_OK) {
-      fdf::error("Failed to set metadata: {}", zx::make_result(status));
-      completer.Reply(fit::error(status));
+    zx::result result = metadata_server_.SetMetadata(request.metadata());
+    if (result.is_error()) {
+      fdf::error("Failed to set metadata: {}", result);
+      completer.Reply(result.take_error());
     }
     completer.Reply(fit::ok());
   }
