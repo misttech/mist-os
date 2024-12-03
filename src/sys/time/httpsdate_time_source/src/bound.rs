@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_runtime::{UtcDuration, UtcInstant, BootDurationExt};
 use std::cmp;
 
 /// An estimate of the worst possible time drift in the device's oscillator.
@@ -14,9 +15,9 @@ pub struct Bound {
     /// Reference time for which the bound is valid.
     pub reference: zx::BootInstant,
     /// The minimum possible UTC time.
-    pub utc_min: zx::BootInstant,
+    pub utc_min: UtcInstant,
     /// The maximum possible UTC time.
-    pub utc_max: zx::BootInstant,
+    pub utc_max: UtcInstant,
 }
 
 impl Bound {
@@ -41,23 +42,23 @@ impl Bound {
 
     /// Project a bound to a different monotonic time. The bound is expanded by the time
     /// elapsed between the bound and the provided monotonic time multiplied by the drift.
-    fn project(&self, later_monotonic: zx::BootInstant) -> Bound {
-        let time_delta = later_monotonic - self.reference;
+    fn project(&self, later_boot: zx::BootInstant) -> Bound {
+        let time_delta = later_boot - self.reference;
         let max_drift = (time_delta * MAX_DRIFT_PPM) / ONE_MILLION;
         Bound {
-            reference: later_monotonic,
-            utc_min: self.utc_min + time_delta - max_drift,
-            utc_max: self.utc_max + time_delta + max_drift,
+            reference: later_boot,
+            utc_min: self.utc_min + (time_delta - max_drift).to_utc_lossy(),
+            utc_max: self.utc_max + (time_delta + max_drift).to_utc_lossy(),
         }
     }
 
     /// Returns the size of the possible range.
-    pub fn size(&self) -> zx::BootDuration {
+    pub fn size(&self) -> UtcDuration {
         self.utc_max - self.utc_min
     }
 
     /// Returns the center of the possible UTC range.
-    pub fn center(&self) -> zx::BootInstant {
+    pub fn center(&self) -> UtcInstant {
         self.utc_min + self.size() / 2
     }
 }
@@ -66,11 +67,12 @@ impl Bound {
 mod test {
     use super::*;
     use lazy_static::lazy_static;
+    use fuchsia_runtime::UtcDurationExt;
 
-    const DURATION_MICROS_500: zx::BootDuration = zx::BootDuration::from_micros(500);
+    const DURATION_MICROS_500: UtcDuration = UtcDuration::from_micros(500);
     const MONOTONIC_TIME: zx::BootInstant = zx::BootInstant::from_nanos(1_000_000_000_000);
     lazy_static! {
-        static ref DRIFT_IN_500_MICROS: zx::BootDuration =
+        static ref DRIFT_IN_500_MICROS: UtcDuration =
             DURATION_MICROS_500 * MAX_DRIFT_PPM / ONE_MILLION;
     }
 
@@ -82,13 +84,13 @@ mod test {
     fn combine_bounds_with_same_monotonic_times() {
         let earlier_utc_bound = Bound {
             reference: MONOTONIC_TIME,
-            utc_min: zx::BootInstant::from_nanos(1_000_000),
-            utc_max: zx::BootInstant::from_nanos(2_000_000),
+            utc_min: UtcInstant::from_nanos(1_000_000),
+            utc_max: UtcInstant::from_nanos(2_000_000),
         };
         let later_utc_bound = Bound {
             reference: MONOTONIC_TIME,
-            utc_min: zx::BootInstant::from_nanos(1_500_000),
-            utc_max: zx::BootInstant::from_nanos(2_500_000),
+            utc_min: UtcInstant::from_nanos(1_500_000),
+            utc_max: UtcInstant::from_nanos(2_500_000),
         };
         assert_eq!(
             earlier_utc_bound.combine(&later_utc_bound).unwrap(),
@@ -102,13 +104,13 @@ mod test {
 
         let enclosing_utc_bound = Bound {
             reference: MONOTONIC_TIME,
-            utc_min: zx::BootInstant::from_nanos(1_000_000),
-            utc_max: zx::BootInstant::from_nanos(2_000_000),
+            utc_min: UtcInstant::from_nanos(1_000_000),
+            utc_max: UtcInstant::from_nanos(2_000_000),
         };
         let enclosed_utc_bound = Bound {
             reference: MONOTONIC_TIME,
-            utc_min: zx::BootInstant::from_nanos(1_200_000),
-            utc_max: zx::BootInstant::from_nanos(1_800_000),
+            utc_min: UtcInstant::from_nanos(1_200_000),
+            utc_max: UtcInstant::from_nanos(1_800_000),
         };
         assert_eq!(enclosed_utc_bound.combine(&enclosing_utc_bound).unwrap(), enclosed_utc_bound);
         assert_combine_commutative(&enclosed_utc_bound, &enclosing_utc_bound);
@@ -118,13 +120,13 @@ mod test {
     fn combine_bounds_with_different_monotonic_times() {
         let earlier = Bound {
             reference: MONOTONIC_TIME,
-            utc_min: zx::BootInstant::from_nanos(1_000_000),
-            utc_max: zx::BootInstant::from_nanos(2_000_000),
+            utc_min: UtcInstant::from_nanos(1_000_000),
+            utc_max: UtcInstant::from_nanos(2_000_000),
         };
         let later = Bound {
-            reference: MONOTONIC_TIME + DURATION_MICROS_500,
-            utc_min: zx::BootInstant::from_nanos(2_000_000),
-            utc_max: zx::BootInstant::from_nanos(3_000_000),
+            reference: MONOTONIC_TIME + DURATION_MICROS_500.to_boot_lossy(),
+            utc_min: UtcInstant::from_nanos(2_000_000),
+            utc_max: UtcInstant::from_nanos(3_000_000),
         };
         assert_eq!(
             earlier.combine(&later).unwrap(),
@@ -138,26 +140,26 @@ mod test {
 
         let earlier_enclosing = Bound {
             reference: MONOTONIC_TIME,
-            utc_min: zx::BootInstant::from_nanos(1_000_000),
-            utc_max: zx::BootInstant::from_nanos(2_000_000),
+            utc_min: UtcInstant::from_nanos(1_000_000),
+            utc_max: UtcInstant::from_nanos(2_000_000),
         };
         let later_enclosed = Bound {
-            reference: MONOTONIC_TIME + DURATION_MICROS_500,
-            utc_min: zx::BootInstant::from_nanos(1_700_000),
-            utc_max: zx::BootInstant::from_nanos(2_300_000),
+            reference: MONOTONIC_TIME + DURATION_MICROS_500.to_boot_lossy(),
+            utc_min: UtcInstant::from_nanos(1_700_000),
+            utc_max: UtcInstant::from_nanos(2_300_000),
         };
         assert_eq!(earlier_enclosing.combine(&later_enclosed).unwrap(), later_enclosed);
         assert_combine_commutative(&earlier_enclosing, &later_enclosed);
 
         let earlier_enclosed = Bound {
             reference: MONOTONIC_TIME,
-            utc_min: zx::BootInstant::from_nanos(1_200_000),
-            utc_max: zx::BootInstant::from_nanos(1_800_000),
+            utc_min: UtcInstant::from_nanos(1_200_000),
+            utc_max: UtcInstant::from_nanos(1_800_000),
         };
         let later_enclosing = Bound {
-            reference: MONOTONIC_TIME + DURATION_MICROS_500,
-            utc_min: zx::BootInstant::from_nanos(1_500_000),
-            utc_max: zx::BootInstant::from_nanos(2_500_000),
+            reference: MONOTONIC_TIME + DURATION_MICROS_500.to_boot_lossy(),
+            utc_min: UtcInstant::from_nanos(1_500_000),
+            utc_max: UtcInstant::from_nanos(2_500_000),
         };
         assert_eq!(
             earlier_enclosed.combine(&later_enclosing).unwrap(),
@@ -174,26 +176,26 @@ mod test {
     fn combine_bounds_no_overlap() {
         let earlier_utc = Bound {
             reference: MONOTONIC_TIME,
-            utc_min: zx::BootInstant::from_nanos(1_000_000),
-            utc_max: zx::BootInstant::from_nanos(2_000_000),
+            utc_min: UtcInstant::from_nanos(1_000_000),
+            utc_max: UtcInstant::from_nanos(2_000_000),
         };
         let later_utc = Bound {
             reference: MONOTONIC_TIME,
-            utc_min: zx::BootInstant::from_nanos(2_500_000),
-            utc_max: zx::BootInstant::from_nanos(3_500_000),
+            utc_min: UtcInstant::from_nanos(2_500_000),
+            utc_max: UtcInstant::from_nanos(3_500_000),
         };
         assert!(earlier_utc.combine(&later_utc).is_none());
         assert_combine_commutative(&earlier_utc, &later_utc);
 
         let earlier = Bound {
             reference: MONOTONIC_TIME,
-            utc_min: zx::BootInstant::from_nanos(1_000_000),
-            utc_max: zx::BootInstant::from_nanos(2_000_000),
+            utc_min: UtcInstant::from_nanos(1_000_000),
+            utc_max: UtcInstant::from_nanos(2_000_000),
         };
         let later = Bound {
-            reference: MONOTONIC_TIME + DURATION_MICROS_500,
-            utc_min: zx::BootInstant::from_nanos(2_600_000),
-            utc_max: zx::BootInstant::from_nanos(3_600_000),
+            reference: MONOTONIC_TIME + DURATION_MICROS_500.to_boot_lossy(),
+            utc_min: UtcInstant::from_nanos(2_600_000),
+            utc_max: UtcInstant::from_nanos(3_600_000),
         };
         assert!(earlier.combine(&later).is_none());
         assert_combine_commutative(&earlier, &later);

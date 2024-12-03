@@ -11,6 +11,7 @@ use fuchsia_inspect::{
 };
 use fuchsia_sync::Mutex;
 
+use fuchsia_runtime::{UtcDuration, UtcInstant};
 use httpdate_hyper::HttpsDateErrorType;
 use std::collections::HashMap;
 use tracing::error;
@@ -19,12 +20,10 @@ use tracing::error;
 const SAMPLES_RECORDED: usize = 5;
 /// Empty sample with which the sample buffer is originally initialized.
 const EMPTY_SAMPLE: HttpsSample = HttpsSample {
-    // TODO: b/374817071 - this is very wrong, but a side-effect of the historic
-    // conflation of various timelines. Will be fixed in future changes.
-    utc: zx::BootInstant::ZERO,
+    utc: UtcInstant::ZERO,
     reference: zx::BootInstant::ZERO,
-    standard_deviation: zx::BootDuration::from_nanos(0),
-    final_bound_size: zx::BootDuration::from_nanos(0),
+    standard_deviation: UtcDuration::from_nanos(0),
+    final_bound_size: UtcDuration::from_nanos(0),
     polls: vec![],
 };
 
@@ -197,18 +196,17 @@ mod test {
     use lazy_static::lazy_static;
 
     lazy_static! {
-        // TODO: b/374817071: This is temporarily allowed to be on a wrong timeline.
-        static ref TEST_UTC: zx::BootInstant = zx::BootInstant::from_nanos(999_900_000_000);
+        static ref TEST_UTC: UtcInstant = UtcInstant::from_nanos(999_900_000_000);
         static ref TEST_REFERENCE: zx::BootInstant = zx::BootInstant::from_nanos(550_000_000_000);
     }
 
-    const TEST_STANDARD_DEVIATION: zx::BootDuration = zx::BootDuration::from_millis(211);
+    const TEST_STANDARD_DEVIATION: UtcDuration = UtcDuration::from_millis(211);
 
     const TEST_ROUND_TRIP_1: zx::BootDuration = zx::BootDuration::from_millis(100);
     const TEST_ROUND_TRIP_2: zx::BootDuration = zx::BootDuration::from_millis(150);
     const TEST_ROUND_TRIP_3: zx::BootDuration = zx::BootDuration::from_millis(200);
 
-    const TEST_BOUND_SIZE: zx::BootDuration = zx::BootDuration::from_millis(75);
+    const TEST_BOUND_SIZE: UtcDuration = UtcDuration::from_millis(75);
 
     fn sample_with_rtts(round_trip_times: &[zx::BootDuration]) -> HttpsSample {
         HttpsSample {

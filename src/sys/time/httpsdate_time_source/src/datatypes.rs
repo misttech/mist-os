@@ -4,6 +4,7 @@
 
 use fidl_fuchsia_time_external::TimeSample;
 
+use fuchsia_runtime::{UtcDuration, UtcInstant};
 use push_source::Update;
 use time_metrics_registry::HttpsdateBoundSizeMigratedMetricDimensionPhase as CobaltPhase;
 
@@ -12,13 +13,13 @@ use time_metrics_registry::HttpsdateBoundSizeMigratedMetricDimensionPhase as Cob
 #[derive(Clone, Debug, PartialEq)]
 pub struct HttpsSample {
     /// The utc time sample.
-    pub utc: zx::BootInstant,
+    pub utc: UtcInstant,
     /// A reference time at which the `utc` sample was most valid.
     pub reference: zx::BootInstant,
     /// Standard deviation of the error distribution of `utc`.
-    pub standard_deviation: zx::BootDuration,
+    pub standard_deviation: UtcDuration,
     /// The size of the final bound on utc time for the sample.
-    pub final_bound_size: zx::BootDuration,
+    pub final_bound_size: UtcDuration,
     /// Metrics for individual polls used to produce this sample.
     pub polls: Vec<Poll>,
 }
@@ -85,15 +86,15 @@ mod test {
 
     #[fuchsia::test]
     fn test_https_sample_into_update() {
-        let utc_time = zx::BootInstant::from_nanos(111_111_111_111);
+        let utc_time = UtcInstant::from_nanos(111_111_111_111);
         let boot_time = zx::BootInstant::from_nanos(222_222_222_222);
-        let standard_deviation = zx::BootDuration::from_nanos(333_333);
+        let standard_deviation = UtcDuration::from_nanos(333_333);
 
         let sample = HttpsSample {
             utc: utc_time,
             reference: boot_time,
             standard_deviation,
-            final_bound_size: zx::BootDuration::from_nanos(9001),
+            final_bound_size: UtcDuration::from_nanos(9001),
             polls: vec![],
         };
 

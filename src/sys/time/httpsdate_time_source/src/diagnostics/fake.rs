@@ -6,6 +6,7 @@ use crate::datatypes::{HttpsSample, Phase};
 use crate::diagnostics::{Diagnostics, Event};
 use fuchsia_sync::Mutex;
 use httpdate_hyper::HttpsDateErrorType;
+use fuchsia_runtime::{UtcInstant, UtcDuration};
 
 /// A fake `Diagnostics` implementation useful for verifying unittests.
 pub struct FakeDiagnostics {
@@ -82,10 +83,10 @@ mod test {
 
     lazy_static! {
         static ref TEST_SAMPLE: HttpsSample = HttpsSample {
-            utc: zx::BootInstant::from_nanos(111_111_111),
+            utc: UtcInstant::from_nanos(111_111_111),
             reference: zx::BootInstant::from_nanos(222_222_222),
-            standard_deviation: zx::BootDuration::from_millis(235),
-            final_bound_size: zx::BootDuration::from_millis(100),
+            standard_deviation: UtcDuration::from_millis(235),
+            final_bound_size: UtcDuration::from_millis(100),
             polls: vec![Poll { round_trip_time: zx::BootDuration::from_nanos(23) }],
         };
         static ref TEST_SUCCESS: Event<'static> = Event::Success(&*TEST_SAMPLE);
