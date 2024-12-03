@@ -435,11 +435,11 @@ impl Primitives {
     pub fn into_lines(self) -> Lines {
         let mut lines = Lines::default();
 
-        thread_local!(static BUFFERS: RefCell<ScratchBuffers> = RefCell::new(ScratchBuffers {
+        thread_local!(static BUFFERS: RefCell<ScratchBuffers> = const { RefCell::new(ScratchBuffers {
             point_indices: Vec::new(),
             quad_indices: Vec::new(),
             point_commands: Vec::new(),
-        }));
+        }) });
 
         BUFFERS.with(|buffers| {
             let mut buffers = buffers.borrow_mut();

@@ -26,6 +26,7 @@ pub(super) struct InitialContender {
 }
 
 impl InitialContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_one_finger_contact_contender(
         self: Box<Self>,
         one_finger_contact_event: TouchpadEvent,
@@ -37,6 +38,7 @@ impl InitialContender {
         })
     }
 
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_two_finger_contacts_contender(
         self: Box<Self>,
         two_finger_contacts_event: TouchpadEvent,
@@ -99,6 +101,7 @@ struct OneFingerContactContender {
 }
 
 impl OneFingerContactContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_two_finger_contacts_contender(
         self: Box<Self>,
         two_finger_contacts_event: TouchpadEvent,
@@ -197,6 +200,7 @@ struct TwoFingerContactsContender {
 }
 
 impl TwoFingerContactsContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_one_finger_raised_contender(self: Box<Self>) -> Box<dyn gesture_arena::Contender> {
         Box::new(OneFingerRaisedContender {
             two_finger_contacts_event: self.two_finger_contacts_event,
@@ -205,6 +209,7 @@ impl TwoFingerContactsContender {
         })
     }
 
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_matched_contender(
         self: Box<Self>,
         no_contacts_event: TouchpadEvent,
@@ -335,6 +340,7 @@ struct OneFingerRaisedContender {
 }
 
 impl OneFingerRaisedContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_matched_contender(
         self: Box<Self>,
         no_contacts_event: TouchpadEvent,

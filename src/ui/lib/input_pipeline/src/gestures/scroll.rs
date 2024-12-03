@@ -232,6 +232,7 @@ impl Movement {
 }
 
 impl InitialContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_one_finger_contact_contender(
         self: Box<Self>,
         initial_position: ContactPosition,
@@ -245,6 +246,7 @@ impl InitialContender {
         })
     }
 
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_two_finger_contact_contender(
         self: Box<Self>,
         initial_positions: ContactPositions,
@@ -301,6 +303,7 @@ impl gesture_arena::Contender for InitialContender {
 }
 
 impl OneFingerContactContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_two_finger_contact_contender(
         self: Box<Self>,
         initial_positions: ContactPositions,
@@ -377,6 +380,7 @@ impl gesture_arena::Contender for OneFingerContactContender {
 }
 
 impl TwoFingerContactContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_matched_contender(
         self: Box<Self>,
         direction: ScrollDirection,
@@ -463,6 +467,7 @@ impl gesture_arena::Contender for TwoFingerContactContender {
 }
 
 impl MatchedContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_winner(
         self: Box<Self>,
         last_positions: ContactPositions,

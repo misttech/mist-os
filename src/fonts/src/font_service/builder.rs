@@ -382,7 +382,7 @@ impl Display for ManifestOrPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ManifestOrPath::Manifest(_manifest) => write!(f, "{}", "FontManifestWrapper {{ ... }}"),
-            ManifestOrPath::Path(path) => write!(f, "{}", path.to_string_lossy().to_string()),
+            ManifestOrPath::Path(path) => write!(f, "{}", path.to_string_lossy()),
         }
     }
 }

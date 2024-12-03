@@ -287,7 +287,7 @@ impl VulkanRenderer {
             vk::KhrExternalSemaphoreCapabilitiesFn::name().as_ptr(),
         ];
 
-        let enabled_layer_names: Vec<CString> = vec!["VK_LAYER_KHRONOS_validation"]
+        let enabled_layer_names: Vec<CString> = ["VK_LAYER_KHRONOS_validation"]
             .iter()
             .map(|layer_name| CString::new(*layer_name).unwrap())
             .collect();
@@ -339,7 +339,7 @@ impl VulkanRenderer {
             .queue_priorities(&queue_priorities)
             .build();
 
-        let enabled_layer_names: Vec<CString> = vec!["VK_LAYER_KHRONOS_validation"]
+        let enabled_layer_names: Vec<CString> = ["VK_LAYER_KHRONOS_validation"]
             .iter()
             .map(|layer_name| CString::new(*layer_name).unwrap())
             .collect();

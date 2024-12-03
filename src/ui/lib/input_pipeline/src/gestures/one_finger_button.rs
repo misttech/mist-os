@@ -118,6 +118,7 @@ struct ButtonUpWinner {
 }
 
 impl InitialContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_finger_contact_contender(
         self: Box<Self>,
         initial_position: Position,
@@ -132,6 +133,7 @@ impl InitialContender {
         })
     }
 
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_matched_contender(
         self: Box<Self>,
         pressed_event: TouchpadEvent,
@@ -179,6 +181,7 @@ impl gesture_arena::Contender for InitialContender {
 }
 
 impl FingerContactContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_matched_contender(
         self: Box<Self>,
         pressed_event: TouchpadEvent,
@@ -231,6 +234,7 @@ impl gesture_arena::Contender for FingerContactContender {
 }
 
 impl MatchedContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_button_down_winner(self: Box<Self>) -> Box<dyn gesture_arena::Winner> {
         Box::new(ButtonDownWinner {
             spurious_to_intentional_motion_threshold_mm: self
@@ -267,6 +271,7 @@ impl gesture_arena::MatchedContender for MatchedContender {
 }
 
 impl ButtonDownWinner {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_drag_winner(self: Box<Self>) -> Box<dyn gesture_arena::Winner> {
         Box::new(DragWinner {
             spurious_to_intentional_motion_threshold_button_change_mm: self
@@ -276,6 +281,7 @@ impl ButtonDownWinner {
         })
     }
 
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_button_up(
         self: Box<Self>,
         button_up_event: TouchpadEvent,
@@ -325,6 +331,7 @@ impl gesture_arena::Winner for ButtonDownWinner {
 }
 
 impl DragWinner {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_drag_winner(
         self: Box<Self>,
         last_event: TouchpadEvent,
@@ -337,6 +344,7 @@ impl DragWinner {
         })
     }
 
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_button_up(
         self: Box<Self>,
         button_up_event: TouchpadEvent,

@@ -201,6 +201,10 @@ impl ViewAssistant for FontMetricsViewAssistant {
             let mut root_builder = SceneBuilder::new()
                 .background_color(Color::white())
                 .round_scene_corners(self.round_scene_corners);
+            #[allow(
+                clippy::vec_init_then_push,
+                reason = "mass allow for https://fxbug.dev/381896734"
+            )]
             root_builder.group().stack().expand().align(Alignment::top_center()).contents(
                 |stack_builder| {
                     let text_size = size.height.min(size.width) / self.sample_size_divisor;

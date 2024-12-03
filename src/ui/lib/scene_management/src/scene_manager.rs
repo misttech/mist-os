@@ -446,6 +446,7 @@ const POINTER_INJECTOR_PRESENT_TRACING_NAME: &CStr =
 const SCENE_TRACING_NAME: &CStr = c"Flatland::PerAppPresent[SceneManager Scene]";
 
 impl SceneManager {
+    #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
     pub async fn new(
         display: ui_comp::FlatlandDisplayProxy,
         singleton_display_info: singleton_display::InfoProxy,
