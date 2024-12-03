@@ -230,8 +230,9 @@ async fn test_stop_bss() {
 
         fullmac_driver
             .ifc_proxy
-            .stop_conf(&fidl_fullmac::WlanFullmacStopConfirm {
-                result_code: fidl_fullmac::WlanStopResult::Success,
+            .stop_conf(&fidl_fullmac::WlanFullmacImplIfcStopConfRequest {
+                result_code: Some(fidl_fullmac::StopResult::Success),
+                ..Default::default()
             })
             .await
             .expect("Could not send StopConf");

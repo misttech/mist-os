@@ -425,22 +425,25 @@ pub fn convert_start_confirm(
         },
     })
 }
-pub fn convert_stop_confirm(conf: fidl_fullmac::WlanFullmacStopConfirm) -> fidl_mlme::StopConfirm {
-    use fidl_fullmac::WlanStopResult;
-    fidl_mlme::StopConfirm {
-        result_code: match conf.result_code {
-            WlanStopResult::Success => fidl_mlme::StopResultCode::Success,
-            WlanStopResult::BssAlreadyStopped => fidl_mlme::StopResultCode::BssAlreadyStopped,
-            WlanStopResult::InternalError => fidl_mlme::StopResultCode::InternalError,
+pub fn convert_stop_confirm(
+    conf: fidl_fullmac::WlanFullmacImplIfcStopConfRequest,
+) -> Result<fidl_mlme::StopConfirm> {
+    use fidl_fullmac::StopResult;
+    let result_code = conf.result_code.context("missing result_code")?;
+    Ok(fidl_mlme::StopConfirm {
+        result_code: match result_code {
+            StopResult::Success => fidl_mlme::StopResultCode::Success,
+            StopResult::BssAlreadyStopped => fidl_mlme::StopResultCode::BssAlreadyStopped,
+            StopResult::InternalError => fidl_mlme::StopResultCode::InternalError,
             _ => {
                 warn!(
                     "Invalid stop result {}, defaulting to StopResultCode::InternalError",
-                    conf.result_code.into_primitive()
+                    result_code.into_primitive()
                 );
                 fidl_mlme::StopResultCode::InternalError
             }
         },
-    }
+    })
 }
 pub fn convert_eapol_confirm(
     conf: fidl_fullmac::WlanFullmacEapolConfirm,
@@ -836,11 +839,12 @@ mod tests {
 
     #[test]
     fn test_convert_stop_confirm_unknown_result_code_defaults_to_internal_error() {
-        let fullmac = fidl_fullmac::WlanFullmacStopConfirm {
-            result_code: fidl_fullmac::WlanStopResult::from_primitive_allow_unknown(123),
+        let fullmac = fidl_fullmac::WlanFullmacImplIfcStopConfRequest {
+            result_code: Some(fidl_fullmac::StopResult::from_primitive_allow_unknown(123)),
+            ..Default::default()
         };
         assert_eq!(
-            convert_stop_confirm(fullmac),
+            convert_stop_confirm(fullmac).unwrap(),
             fidl_mlme::StopConfirm { result_code: fidl_mlme::StopResultCode::InternalError }
         );
     }

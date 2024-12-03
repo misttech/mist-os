@@ -89,14 +89,10 @@ type StartResult = flexible enum : uint8 {
     NOT_SUPPORTED = 3;
 };
 
-type WlanStopResult = flexible enum : uint8 {
+type StopResult = flexible enum : uint8 {
     SUCCESS = 0;
     BSS_ALREADY_STOPPED = 1;
     INTERNAL_ERROR = 2;
-};
-
-type WlanFullmacStopConfirm = struct {
-    result_code WlanStopResult;
 };
 
 type WlanEapolResult = flexible enum : uint8 {
@@ -470,8 +466,10 @@ closed protocol WlanFullmacImplIfc {
         /// The result of the StartBss request. Required.
         1: result_code StartResult;
     }) -> ();
-    strict StopConf(struct {
-        resp WlanFullmacStopConfirm;
+    /// Report the result of a WlanFullmacImpl::StopBss request.
+    strict StopConf(table {
+        /// The result of the StopBss request. Required.
+        1: result_code StopResult;
     }) -> ();
     strict EapolConf(struct {
         resp WlanFullmacEapolConfirm;

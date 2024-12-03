@@ -103,10 +103,10 @@ fn handle_one_request(
                 resp: fullmac_to_mlme::convert_start_confirm(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::StopConf { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::StopConf { payload, responder } => {
             responder.send().context("Failed to respond to StopConf")?;
             driver_event_sink.0.send(FullmacDriverEvent::StopConf {
-                resp: fullmac_to_mlme::convert_stop_confirm(resp),
+                resp: fullmac_to_mlme::convert_stop_confirm(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::EapolConf { resp, responder } => {

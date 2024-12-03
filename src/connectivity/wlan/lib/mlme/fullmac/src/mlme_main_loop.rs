@@ -1528,8 +1528,9 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let stop_conf = fidl_fullmac::WlanFullmacStopConfirm {
-            result_code: fidl_fullmac::WlanStopResult::Success,
+        let stop_conf = fidl_fullmac::WlanFullmacImplIfcStopConfRequest {
+            result_code: Some(fidl_fullmac::StopResult::Success),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.stop_conf(&stop_conf)),

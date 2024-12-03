@@ -78,7 +78,7 @@ class CreateSoftAPTest : public SimTest {
   void VerifyAssoc();
   void VerifyNotAssoc();
   void VerifyStartAPConf(wlan_fullmac_wire::StartResult status);
-  void VerifyStopAPConf(wlan_fullmac_wire::WlanStopResult status);
+  void VerifyStopAPConf(wlan_fullmac_wire::StopResult status);
   void VerifyNumOfClient(uint16_t expect_client_num);
   void ClearAssocInd();
   void InjectStartAPError();
@@ -94,7 +94,7 @@ class CreateSoftAPTest : public SimTest {
   void OnDisassocConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest* resp);
   void OnDisassocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind);
   void OnStartConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcStartConfRequest* resp);
-  void OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp);
+  void OnStopConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcStopConfRequest* resp);
   void OnChannelSwitch(const wlan_fullmac_wire::WlanFullmacChannelSwitchInfo* info);
   // Status field in the last received authentication frame.
   wlan_ieee80211::StatusCode auth_resp_status_;
@@ -108,7 +108,7 @@ class CreateSoftAPTest : public SimTest {
   bool start_conf_received_ = false;
   bool stop_conf_received_ = false;
   fuchsia_wlan_fullmac::StartResult start_conf_status_;
-  wlan_fullmac_wire::WlanStopResult stop_conf_status_;
+  fuchsia_wlan_fullmac::StopResult stop_conf_status_;
 
   // The expect mac address for indications
   common::MacAddr ind_expect_mac_ = kFakeMac;
@@ -161,7 +161,8 @@ void SoftApInterface::StartConf(StartConfRequestView request, StartConfCompleter
   completer.Reply();
 }
 void SoftApInterface::StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) {
-  test_->OnStopConf(&request->resp);
+  const auto stop_conf = fidl::ToNatural(*request);
+  test_->OnStopConf(&stop_conf);
   completer.Reply();
 }
 void SoftApInterface::OnChannelSwitch(OnChannelSwitchRequestView request,
@@ -369,9 +370,10 @@ void CreateSoftAPTest::OnStartConf(
   start_conf_status_ = resp->result_code().value();
 }
 
-void CreateSoftAPTest::OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp) {
+void CreateSoftAPTest::OnStopConf(
+    const fuchsia_wlan_fullmac::WlanFullmacImplIfcStopConfRequest* resp) {
   stop_conf_received_ = true;
-  stop_conf_status_ = resp->result_code;
+  stop_conf_status_ = resp->result_code().value();
 }
 
 void CreateSoftAPTest::OnChannelSwitch(
@@ -462,7 +464,7 @@ void CreateSoftAPTest::VerifyStartAPConf(wlan_fullmac_wire::StartResult status) 
   ASSERT_EQ(start_conf_status_, status);
 }
 
-void CreateSoftAPTest::VerifyStopAPConf(wlan_fullmac_wire::WlanStopResult status) {
+void CreateSoftAPTest::VerifyStopAPConf(wlan_fullmac_wire::StopResult status) {
   ASSERT_EQ(stop_conf_received_, true);
   ASSERT_EQ(stop_conf_status_, status);
 }
@@ -528,7 +530,7 @@ TEST_F(CreateSoftAPTest, BssIovarFail) {
   // Start SoftAP
   StartSoftAP();
   StopSoftAP();
-  VerifyStopAPConf(wlan_fullmac_wire::WlanStopResult::kSuccess);
+  VerifyStopAPConf(wlan_fullmac_wire::StopResult::kSuccess);
 }
 
 TEST_F(CreateSoftAPTest, BssStopMissingParam) {
@@ -540,7 +542,7 @@ TEST_F(CreateSoftAPTest, BssStopMissingParam) {
   auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StopBss(builder.Build());
   EXPECT_TRUE(result.ok());
   // Should have received a StartConf with kNotSupported result.
-  VerifyStopAPConf(wlan_fullmac_wire::WlanStopResult ::kInternalError);
+  VerifyStopAPConf(wlan_fullmac_wire::StopResult ::kInternalError);
 }
 
 // Start SoftAP in secure mode and then restart in open mode.

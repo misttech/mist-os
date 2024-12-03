@@ -3589,19 +3589,18 @@ bool brcmf_is_ap_start_pending(brcmf_cfg80211_info* cfg) {
 }
 
 // Deauthenticate with specified STA.
-static fuchsia_wlan_fullmac_wire::WlanStopResult brcmf_cfg80211_stop_ap(struct net_device* ndev) {
+static fuchsia_wlan_fullmac_wire::StopResult brcmf_cfg80211_stop_ap(struct net_device* ndev) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   zx_status_t status;
   bcme_status_t fw_err = BCME_OK;
-  fuchsia_wlan_fullmac_wire::WlanStopResult result =
-      fuchsia_wlan_fullmac_wire::WlanStopResult::kSuccess;
+  auto result = fuchsia_wlan_fullmac_wire::StopResult::kSuccess;
   struct brcmf_join_params join_params;
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
 
   if (!brcmf_test_bit(brcmf_vif_status_bit_t::AP_CREATED, &ifp->vif->sme_state) &&
       !brcmf_test_bit(brcmf_vif_status_bit_t::AP_START_PENDING, &ifp->vif->sme_state)) {
     BRCMF_INFO("attempt to stop already stopped AP");
-    return fuchsia_wlan_fullmac_wire::WlanStopResult::kBssAlreadyStopped;
+    return fuchsia_wlan_fullmac_wire::StopResult::kBssAlreadyStopped;
   }
 
   // If we are in the process of resetting, then ap interface no longer exists
@@ -3617,7 +3616,7 @@ static fuchsia_wlan_fullmac_wire::WlanStopResult brcmf_cfg80211_stop_ap(struct n
   if (status != ZX_OK) {
     BRCMF_ERR("SET SSID error: %s, fw err %s", zx_status_get_string(status),
               brcmf_fil_get_errstr(fw_err));
-    result = fuchsia_wlan_fullmac_wire::WlanStopResult::kInternalError;
+    result = fuchsia_wlan_fullmac_wire::StopResult::kInternalError;
   }
 
   // Issue "bss" iovar to bring down the SoftAP IF.
@@ -4357,8 +4356,7 @@ void brcmf_if_stop_req(net_device* ndev,
                        const fuchsia_wlan_fullmac_wire::WlanFullmacImplStopBssRequest* req) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   struct brcmf_if* ifp = ndev_to_if(ndev);
-  fuchsia_wlan_fullmac_wire::WlanStopResult result_code;
-  fuchsia_wlan_fullmac_wire::WlanFullmacStopConfirm result;
+  fuchsia_wlan_fullmac_wire::StopResult result_code;
 
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping AP stop callback");
@@ -4368,7 +4366,7 @@ void brcmf_if_stop_req(net_device* ndev,
   BRCMF_IFDBG(WLANIF, ndev, "Stop AP request from SME.");
   if (!req->has_ssid()) {
     BRCMF_ERR("Stop req does not contain ssid");
-    result_code = fuchsia_wlan_fullmac_wire::WlanStopResult::kInternalError;
+    result_code = fuchsia_wlan_fullmac_wire::StopResult::kInternalError;
     goto done;
   }
 #if !defined(NDEBUG)
@@ -4379,27 +4377,29 @@ void brcmf_if_stop_req(net_device* ndev,
     BRCMF_ERR("SSID does not match running SoftAP, req SSID: " FMT_SSID, " current SSID: " FMT_SSID,
               FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len),
               FMT_SSID_BYTES(ifp->saved_softap_ssid.data.data(), ifp->saved_softap_ssid.len));
-    result_code = fuchsia_wlan_fullmac_wire::WlanStopResult::kInternalError;
+    result_code = fuchsia_wlan_fullmac_wire::StopResult::kInternalError;
     goto done;
   }
 
   result_code = brcmf_cfg80211_stop_ap(ndev);
 done:
-  result = {.result_code = result_code};
-
-  BRCMF_IFDBG(WLANIF, ndev, "Sending AP stop confirm to SME. result_code: %s",
-              result_code == fuchsia_wlan_fullmac_wire::WlanStopResult ::kSuccess ? "success"
-              : result_code == fuchsia_wlan_fullmac_wire::WlanStopResult::kBssAlreadyStopped
-                  ? "already stopped"
-              : result_code == fuchsia_wlan_fullmac_wire::WlanStopResult::kInternalError
-                  ? "internal error"
-                  : "unknown");
+  BRCMF_IFDBG(
+      WLANIF, ndev, "Sending AP stop confirm to SME. result_code: %s",
+      result_code == fuchsia_wlan_fullmac_wire::StopResult ::kSuccess            ? "success"
+      : result_code == fuchsia_wlan_fullmac_wire::StopResult::kBssAlreadyStopped ? "already stopped"
+      : result_code == fuchsia_wlan_fullmac_wire::StopResult::kInternalError     ? "internal error"
+                                                                                 : "unknown");
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
     return;
   }
+
+  auto result = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcStopConfRequest::Builder(*arena)
+                    .result_code(result_code)
+                    .Build();
+
   auto proto_status = ndev->if_proto.buffer(*arena)->StopConf(result);
   if (!proto_status.ok()) {
     BRCMF_ERR("Failed to send stop conf result.status: %s", proto_status.status_string());
