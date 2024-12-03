@@ -23,6 +23,11 @@
             from: "parent",
             to: "all",
         },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "all",
+        },
     ],
     expose: [
         {

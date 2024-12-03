@@ -26,6 +26,11 @@
                 "#test-suite",
             ],
         },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "all",
+        },
     ],
     expose: [
         {

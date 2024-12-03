@@ -27,6 +27,14 @@
             ],
         },
         {
+            dictionary: [ "diagnostics" ],
+            from: "parent",
+            to: [
+                "#starnix_test_runner",
+                "#starnix_unit_test_runner",
+            ],
+        },
+        {
             directory: "boot-kernel",
             from: "parent",
             to: [

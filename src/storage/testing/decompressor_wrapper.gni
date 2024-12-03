@@ -52,7 +52,7 @@ template("wrap_with_decompressor") {
             {
               dictionary = "diagnostics"
               from = "parent"
-              to = "#test"
+              to = "all"
             },
             {
               protocol = "fuchsia.logger.LogSink"

@@ -18,12 +18,12 @@
     ],
     offer: [
         {
-            from: "parent",
-            to: "#font-server",
             config: [
                 "fuchsia.fonts.FontManifest",
                 "fuchsia.fonts.VerboseLogging",
             ],
+            from: "parent",
+            to: "#font-server",
         },
         {
             protocol: "fuchsia.tracing.provider.Registry",
@@ -37,6 +37,14 @@
         {
             // Logging.
             protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: [
+                "#asset-provider",
+                "#font-server",
+            ],
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#asset-provider",

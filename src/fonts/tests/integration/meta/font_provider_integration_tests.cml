@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
             name: "font_resolver",
@@ -29,10 +32,7 @@
             subdir: "data",
         },
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
             to: [
                 "#driver",

@@ -48,6 +48,11 @@ def main() -> int:
                 from: "parent",
                 to: "#validation-server",
             },
+            {
+                dictionary: "diagnostics",
+                from: "parent",
+                to: "#validation-server",
+            },
         ],
     }
         """

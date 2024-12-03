@@ -3,18 +3,14 @@
 // found in the LICENSE file.
 // Constructs an intermediate node that attempts to increase its rights to the read only directory.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
             name: "expose_dir_rights",
             url: "#meta/expose_dir_rights.cm",
-        },
-    ],
-    offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [ "#expose_dir_rights" ],
         },
     ],
     expose: [

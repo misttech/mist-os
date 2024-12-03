@@ -31,6 +31,16 @@
             ],
         },
         {
+            // TODO: This should only be present in debugging configurations.
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [
+                "#binder-proxy",
+                "#ta-manager",
+                "#ta-manager-config",
+            ],
+        },
+        {
             directory: "ta",
             from: "#ta-manager",
             to: "#binder-proxy",
