@@ -248,10 +248,7 @@ template("loader_test_lib") {
     exclude_toolchain_tags = [ "instrumented" ]
 
     if (is_linux) {
-      configs -= [
-        "//build/config/linux:default-pie",
-        "//build/config/linux:implicit-host-libs",
-      ]
+      configs -= [ "//build/config/linux:implicit-host-libs" ]
       configs += [ "//build/config/zircon:nolibc" ]
     }
     if (is_fuchsia) {
