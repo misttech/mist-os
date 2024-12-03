@@ -103,7 +103,9 @@ closed protocol PushSource {
 /// A correspondence pair that describes a UTC and the reference clock readings
 /// at the measurement instant.
 type TimeSample = table {
-    /// The UTC time sample. Must always be provided.
+    /// The UTC time sample.  The value of this instant is a value on the UTC
+    /// timeline. However, the field is not type safe, as there is no UTC
+    /// specific type on the zx level.
     1: utc zx.Time;
     /// The monotonic time at which the sample was most valid. Must always be
     /// provided.
