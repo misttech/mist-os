@@ -119,6 +119,26 @@ where
         })
     }
 
+    /// Like the Iterator fold accumulator.
+    ///
+    /// Applies the given `cb` to each route across all routing tables.
+    pub fn fold_routes<B, F>(&mut self, init: B, mut cb: F) -> B
+    where
+        F: FnMut(
+            B,
+            &RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+            &Entry<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        ) -> B,
+    {
+        self.core_ctx().with_ip_routing_tables(|ctx, tables| {
+            tables.keys().fold(init, |state, table_id| {
+                ctx.with_ip_routing_table(table_id, |_ctx, table| {
+                    table.iter_table().fold(state, |state, entry| cb(state, table_id, entry))
+                })
+            })
+        })
+    }
+
     /// Resolve the route to a given destination.
     ///
     /// Returns `Some` [`ResolvedRoute`] with details for reaching the destination,
