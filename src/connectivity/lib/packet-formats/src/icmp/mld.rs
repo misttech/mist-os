@@ -310,21 +310,6 @@ pub trait Mldv1MessageType {
     type GroupAddr: Into<Ipv6Addr> + Debug + Copy;
 }
 
-/// The trait for MLDv2 Message headers.
-pub trait Mldv2MessageHeaderType {
-    /// It should be `()` for Report messages, and be `Mldv2ResponseDelay` for Query messages.
-    type MaxRespDelay: MaxCode<U16> + Debug + Copy;
-    /// The type used to represent the group_addr in the message.
-    ///
-    /// For Query Messages, it is just `Ipv6Addr` because
-    /// this should be `MulticastAddr<Ipv6Addr>`.
-    type GroupAddr: Into<Ipv6Addr> + Debug + Copy + IntoBytes + Immutable;
-    /// It should be `Mldv2QQIC` for Query messages.
-    type QQIC: MaxCode<u8> + Debug + Copy;
-    /// It should be `Mldv2QRV` for Query messages.
-    type QRV: Into<u8> + Debug + Copy;
-}
-
 /// The trait for MLDv2 Messages.
 pub trait Mldv2MessageType {
     /// The type used to track the header.
@@ -834,13 +819,6 @@ pub struct Mldv2QueryMessageHeader {
     number_of_sources: U16,
 }
 
-impl Mldv2MessageHeaderType for Mldv2QueryMessageHeader {
-    type MaxRespDelay = Mldv2ResponseDelay;
-    type GroupAddr = Ipv6Addr;
-    type QQIC = Mldv2QQIC;
-    type QRV = Mldv2QRV;
-}
-
 impl Mldv2QueryMessageHeader {
     const S_FLAG_MASK: u8 = (1 << 3);
 
@@ -848,11 +826,11 @@ impl Mldv2QueryMessageHeader {
 
     /// Crates a new [Mldv2QueryMessageHeader].
     pub fn new(
-        max_response_delay: <Self as Mldv2MessageHeaderType>::MaxRespDelay,
-        group_addr: <Self as Mldv2MessageHeaderType>::GroupAddr,
+        max_response_delay: Mldv2ResponseDelay,
+        group_addr: Ipv6Addr,
         s_flag: bool,
-        qrv: <Self as Mldv2MessageHeaderType>::QRV,
-        qqic: <Self as Mldv2MessageHeaderType>::QQIC,
+        qrv: Mldv2QRV,
+        qqic: Mldv2QQIC,
         number_of_sources: u16,
     ) -> Self {
         // sqrv contains 4 reserved bits, the s_flag and the qrv,
