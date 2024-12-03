@@ -441,7 +441,6 @@ config("download_outputs") {
 # optimization level by remove default_optimize and manually applying one of
 # the configs below.
 
-# This is the default optimization level for "debug" builds.
 config("optimize_none") {
   cflags = [ "-O0" ]
   ldflags = cflags
@@ -457,7 +456,6 @@ config("optimize_debug") {
   rustflags = [ "-Copt-level=1" ]
 }
 
-# This is the default optimization level for "fastbuild" builds.
 config("optimize_minimal") {
   cflags = [ "-O1" ]
   ldflags = cflags
@@ -500,7 +498,6 @@ config("optimize_size") {
   configs = [ ":linker_string_merging" ]
 }
 
-# This is the default optimization level for "release" builds.
 config("optimize_size_lto") {
   if (zircon_toolchain != false) {
     configs = [ ":optimize_moderate" ]
