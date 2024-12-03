@@ -5834,14 +5834,23 @@ zx_status_t brcmf_if_sae_handshake_resp(
 }
 
 zx_status_t brcmf_if_sae_frame_tx(net_device* ndev,
-                                  const fuchsia_wlan_fullmac_wire::WlanFullmacSaeFrame* frame) {
+                                  const fuchsia_wlan_fullmac_wire::SaeFrame* frame) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   bcme_status_t fw_err = BCME_OK;
   zx_status_t err = ZX_OK;
 
+  if (!frame->has_status_code() || !frame->has_peer_sta_address() || !frame->has_sae_fields() ||
+      !frame->has_seq_num()) {
+    BRCMF_ERR(
+        "SaeFrameTx missing fields: has_status_code=%u, has_peer_sta_address=%u, has_sae_fields=%u, has_seq_num=%u",
+        frame->has_status_code(), frame->has_peer_sta_address(), frame->has_sae_fields(),
+        frame->has_seq_num());
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   // Mac header(24 bytes) + Auth frame header(6 bytes) + sae_fields length.
-  uint32_t frame_size = sizeof(wlan::MgmtFrameHeader) + sizeof(wlan::Authentication) +
-                        frame->sae_fields.count();  // LOOK INTO THIS _count;
+  uint32_t frame_size =
+      sizeof(wlan::MgmtFrameHeader) + sizeof(wlan::Authentication) + frame->sae_fields().count();
   // Carry the SAE authentication frame in the last field of assoc_mgr_cmd.
   uint32_t cmd_buf_len = sizeof(assoc_mgr_cmd_t) + frame_size;
   uint8_t cmd_buf[cmd_buf_len];
@@ -5858,27 +5867,27 @@ zx_status_t brcmf_if_sae_frame_tx(net_device* ndev,
       reinterpret_cast<brcmf_sae_auth_frame*>(cmd_buf + offsetof(assoc_mgr_cmd_t, params));
 
   // Set MAC addresses in MAC header, firmware will check these parts, and fill other missing parts.
-  sae_frame->mac_hdr.addr1 = wlan::common::MacAddr(frame->peer_sta_address.data());  // DA
-  sae_frame->mac_hdr.addr2 = wlan::common::MacAddr(ifp->mac_addr);                   // SA
-  sae_frame->mac_hdr.addr3 = wlan::common::MacAddr(frame->peer_sta_address.data());  // BSSID
+  sae_frame->mac_hdr.addr1 = wlan::common::MacAddr(frame->peer_sta_address().data());  // DA
+  sae_frame->mac_hdr.addr2 = wlan::common::MacAddr(ifp->mac_addr);                     // SA
+  sae_frame->mac_hdr.addr3 = wlan::common::MacAddr(frame->peer_sta_address().data());  // BSSID
 
   BRCMF_DBG(CONN,
             "The peer_sta_address: " FMT_MAC ", the ifp mac is: " FMT_MAC
             ", the seq_num is %u, the status_code is %hu",
-            FMT_MAC_ARGS(frame->peer_sta_address), FMT_MAC_ARGS(ifp->mac_addr), frame->seq_num,
-            fidl::ToUnderlying(frame->status_code));
+            FMT_MAC_ARGS(frame->peer_sta_address()), FMT_MAC_ARGS(ifp->mac_addr), frame->seq_num(),
+            fidl::ToUnderlying(frame->status_code()));
 
   // Fill the authentication frame header fields.
   sae_frame->auth_hdr.auth_algorithm_number = BRCMF_AUTH_MODE_SAE;
-  sae_frame->auth_hdr.auth_txn_seq_number = frame->seq_num;
-  sae_frame->auth_hdr.status_code = static_cast<uint16_t>(frame->status_code);
+  sae_frame->auth_hdr.auth_txn_seq_number = frame->seq_num();
+  sae_frame->auth_hdr.status_code = static_cast<uint16_t>(frame->status_code());
 
   BRCMF_DBG(CONN, "auth_algorithm_number: %u, auth_txn_seq_number: %u, status_code: %u",
             sae_frame->auth_hdr.auth_algorithm_number, sae_frame->auth_hdr.auth_txn_seq_number,
             sae_frame->auth_hdr.status_code);
 
   // Attach SAE payload after authentication frame header.
-  memcpy(sae_frame->sae_payload, frame->sae_fields.data(), frame->sae_fields.count());
+  memcpy(sae_frame->sae_payload, frame->sae_fields().data(), frame->sae_fields().count());
 
   err = brcmf_fil_iovar_data_set(ifp, "assoc_mgr_cmd", cmd_buf, cmd_buf_len, &fw_err);
   if (err != ZX_OK) {
@@ -6184,7 +6193,6 @@ static zx_status_t brcmf_rx_auth_frame(struct brcmf_if* ifp, const uint32_t data
     return ZX_ERR_BAD_HANDLE;
   }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacSaeFrame frame = {};
   auto pframe = (uint8_t*)data;
   auto pframe_hdr = reinterpret_cast<wlan::Authentication*>(pframe);
 
@@ -6193,21 +6201,27 @@ static zx_status_t brcmf_rx_auth_frame(struct brcmf_if* ifp, const uint32_t data
   BRCMF_DBG(CONN, " status code: %u", pframe_hdr->status_code);
   BRCMF_DBG(CONN, " sequence number: %u", pframe_hdr->auth_txn_seq_number);
 
-  // Copy authentication frame header information.
-  memcpy(frame.peer_sta_address.data(), ifp->connect_req.selected_bss()->bssid().data(), ETH_ALEN);
-  frame.status_code = static_cast<fuchsia_wlan_ieee80211_wire::StatusCode>(pframe_hdr->status_code);
-  frame.seq_num = pframe_hdr->auth_txn_seq_number;
-
-  // Copy challenge text to sae_fields.
-  frame.sae_fields = ::fidl::VectorView<uint8_t>::FromExternal(
-      pframe + sizeof(wlan::Authentication), datalen - sizeof(wlan::Authentication));
-
-  // Sending SAE authentication up to SME, not rx from SME.
   auto arena = fdf::Arena::Create(0, 0);
+  // Sending SAE authentication up to SME, not rx from SME.
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
+
+  // Copy authentication frame header information.
+  fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  memcpy(peer_sta_address.data(), ifp->connect_req.selected_bss()->bssid().data(), ETH_ALEN);
+
+  auto frame =
+      fuchsia_wlan_fullmac_wire::SaeFrame::Builder(*arena)
+          .peer_sta_address(peer_sta_address)
+          .status_code(
+              static_cast<fuchsia_wlan_ieee80211_wire::StatusCode>(pframe_hdr->status_code))
+          .seq_num(pframe_hdr->auth_txn_seq_number)
+          .sae_fields(::fidl::VectorView<uint8_t>::FromExternal(
+              pframe + sizeof(wlan::Authentication), datalen - sizeof(wlan::Authentication)))
+          .Build();
+
   auto result = ndev->if_proto.buffer(*arena)->SaeFrameRx(frame);
   if (!result.ok()) {
     BRCMF_ERR("Failed to send sae frame rx result.status: %s", result.status_string());

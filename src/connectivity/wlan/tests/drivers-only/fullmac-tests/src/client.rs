@@ -768,15 +768,15 @@ async fn test_wpa3_connect_success() {
 
     let sae_commit =
         assert_variant!(&fullmac_request_history[1], FullmacRequest::SaeFrameTx(req) => req);
-    assert_eq!(sae_commit.peer_sta_address, COMPATIBLE_WPA3_BSS.bssid.to_array());
-    assert_eq!(sae_commit.status_code, fidl_ieee80211::StatusCode::Success);
-    assert_eq!(sae_commit.seq_num, 1);
+    assert_eq!(sae_commit.peer_sta_address.unwrap(), COMPATIBLE_WPA3_BSS.bssid.to_array());
+    assert_eq!(sae_commit.status_code.unwrap(), fidl_ieee80211::StatusCode::Success);
+    assert_eq!(sae_commit.seq_num.unwrap(), 1);
 
     let sae_confirm =
         assert_variant!(&fullmac_request_history[2], FullmacRequest::SaeFrameTx(req) => req);
-    assert_eq!(sae_confirm.peer_sta_address, COMPATIBLE_WPA3_BSS.bssid.to_array());
-    assert_eq!(sae_confirm.status_code, fidl_ieee80211::StatusCode::Success);
-    assert_eq!(sae_confirm.seq_num, 2);
+    assert_eq!(sae_confirm.peer_sta_address.unwrap(), COMPATIBLE_WPA3_BSS.bssid.to_array());
+    assert_eq!(sae_confirm.status_code.unwrap(), fidl_ieee80211::StatusCode::Success);
+    assert_eq!(sae_confirm.seq_num.unwrap(), 2);
 
     assert_eq!(
         fullmac_request_history[3],

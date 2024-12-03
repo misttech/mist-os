@@ -259,10 +259,10 @@ async fn get_sae_frame_from_test_realm(
     });
 
     fidl_mlme::SaeFrame {
-        peer_sta_address: fullmac_sae_frame.peer_sta_address,
-        status_code: fullmac_sae_frame.status_code,
-        seq_num: fullmac_sae_frame.seq_num,
-        sae_fields: fullmac_sae_frame.sae_fields,
+        peer_sta_address: fullmac_sae_frame.peer_sta_address.unwrap(),
+        status_code: fullmac_sae_frame.status_code.unwrap(),
+        seq_num: fullmac_sae_frame.seq_num.unwrap(),
+        sae_fields: fullmac_sae_frame.sae_fields.unwrap(),
     }
 }
 
@@ -271,11 +271,12 @@ async fn send_sae_frame_to_test_realm(
     fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcProxy,
 ) {
     fullmac_ifc_proxy
-        .sae_frame_rx(&fidl_fullmac::WlanFullmacSaeFrame {
-            peer_sta_address: frame.peer_sta_address,
-            status_code: frame.status_code,
-            seq_num: frame.seq_num,
-            sae_fields: frame.sae_fields.clone(),
+        .sae_frame_rx(&fidl_fullmac::SaeFrame {
+            peer_sta_address: Some(frame.peer_sta_address),
+            status_code: Some(frame.status_code),
+            seq_num: Some(frame.seq_num),
+            sae_fields: Some(frame.sae_fields.clone()),
+            ..Default::default()
         })
         .await
         .expect("Could not send authenticator SAE commit frame");

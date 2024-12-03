@@ -224,12 +224,13 @@ pub fn convert_sae_handshake_response(
     }
 }
 
-pub fn convert_sae_frame(frame: fidl_mlme::SaeFrame) -> fidl_fullmac::WlanFullmacSaeFrame {
-    fidl_fullmac::WlanFullmacSaeFrame {
-        peer_sta_address: frame.peer_sta_address,
-        status_code: frame.status_code,
-        seq_num: frame.seq_num,
-        sae_fields: frame.sae_fields,
+pub fn convert_sae_frame(frame: fidl_mlme::SaeFrame) -> fidl_fullmac::SaeFrame {
+    fidl_fullmac::SaeFrame {
+        peer_sta_address: Some(frame.peer_sta_address),
+        status_code: Some(frame.status_code),
+        seq_num: Some(frame.seq_num),
+        sae_fields: Some(frame.sae_fields),
+        ..Default::default()
     }
 }
 

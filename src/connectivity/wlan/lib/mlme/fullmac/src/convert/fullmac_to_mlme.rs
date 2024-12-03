@@ -483,13 +483,13 @@ pub fn convert_sae_handshake_indication(
 ) -> fidl_mlme::SaeHandshakeIndication {
     fidl_mlme::SaeHandshakeIndication { peer_sta_address: ind.peer_sta_address }
 }
-pub fn convert_sae_frame(frame: fidl_fullmac::WlanFullmacSaeFrame) -> fidl_mlme::SaeFrame {
-    fidl_mlme::SaeFrame {
-        peer_sta_address: frame.peer_sta_address,
-        status_code: frame.status_code,
-        seq_num: frame.seq_num,
-        sae_fields: frame.sae_fields,
-    }
+pub fn convert_sae_frame(frame: fidl_fullmac::SaeFrame) -> Result<fidl_mlme::SaeFrame> {
+    Ok(fidl_mlme::SaeFrame {
+        peer_sta_address: frame.peer_sta_address.context("missing peer_sta_address")?,
+        status_code: frame.status_code.context("missing status code")?,
+        seq_num: frame.seq_num.context("missing seq_num")?,
+        sae_fields: frame.sae_fields.context("missing sae_fields")?,
+    })
 }
 pub fn convert_wmm_params(
     wmm_params: fidl_common::WlanWmmParameters,

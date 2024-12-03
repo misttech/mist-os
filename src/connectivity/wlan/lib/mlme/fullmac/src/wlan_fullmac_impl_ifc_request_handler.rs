@@ -148,7 +148,7 @@ fn handle_one_request(
         fidl_fullmac::WlanFullmacImplIfcRequest::SaeFrameRx { frame, responder } => {
             responder.send().context("Failed to respond to SaeFrameRx")?;
             driver_event_sink.0.send(FullmacDriverEvent::SaeFrameRx {
-                frame: fullmac_to_mlme::convert_sae_frame(frame),
+                frame: fullmac_to_mlme::convert_sae_frame(frame)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::OnWmmStatusResp {

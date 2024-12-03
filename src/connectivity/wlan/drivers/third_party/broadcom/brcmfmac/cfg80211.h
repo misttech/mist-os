@@ -664,7 +664,7 @@ zx_status_t brcmf_if_sae_handshake_resp(
     net_device* ndev,
     const fuchsia_wlan_fullmac_wire::WlanFullmacImplSaeHandshakeRespRequest* resp);
 zx_status_t brcmf_if_sae_frame_tx(net_device* ndev,
-                                  const fuchsia_wlan_fullmac_wire::WlanFullmacSaeFrame* frame);
+                                  const fuchsia_wlan_fullmac_wire::SaeFrame* frame);
 void brcmf_if_wmm_status_req(net_device* ndev);
 
 void brcmf_return_assoc_result(struct net_device* ndev, status_code_t status_code);
