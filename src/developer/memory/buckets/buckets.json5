@@ -26,33 +26,6 @@
         event_code: 26,
     },
     {
-        name: "BlobfsInactive",
-        process: "/pkg/bin/blobfs|blobfs\\.cm",
-        vmo: "inactive-blob-.*",
-        event_code: 29,
-
-        // The relative ordering between 'Blobfs', 'BlobfsInactive' and 'Fxblob' is
-        // important to ensure that shared VMOs between these filesystem processes
-        // are attributed to the right buckets.
-        //
-        // BlobfsInactive blobs should be ahead of Blobfs, to ensure that inactive
-        // blobs are counted separately.
-        //
-        // Blobfs blobs appear in Fxfs, but Fxfs blobs do not appear in Blobfs, so
-        // Blobfs should be ahead of FxBlob, to attribute Blobfs blobs inside Fxfs
-        // to Blobfs, and the rest to Fxfs.
-        order: 50,
-    },
-    {
-        name: "Blobfs",
-        process: "/pkg/bin/blobfs|blobfs\\.cm",
-        vmo: "",
-        event_code: 5,
-
-        // See 'BlobfsInactive' for the rationale behind this order.
-        order: 60,
-    },
-    {
         name: "Camera",
         process: "camera_device.*\\.cm|driver_host:pdev:05:04:15",
         vmo: "",
@@ -65,25 +38,10 @@
         event_code: 57,
     },
     {
-        name: "Fxblob",
-        process: "fxfs\\.cm",
-        vmo: "blob-.*",
-        event_code: 73,
-
-        // See 'BlobfsInactive' for the rationale behind this order.
-        order: 70,
-    },
-    {
         name: "Storage",
         process: "fshost\\.cm|fxfs-crypt\\.cm|fxfs\\.cm|memfs\\.cm|decompressor-sandbox\\.cm",
         vmo: "",
         event_code: 72,
-    },
-    {
-        name: "Minfs",
-        process: "/pkg/bin/minfs",
-        vmo: "",
-        event_code: 4,
     },
     {
         name: "Scenic",
@@ -180,12 +138,6 @@
         process: "httpsdate_time_source\\.cm|fonts\\.cm|intl\\.cm|intl_services\\.cm|timezone\\.cm|time-zone-info-service\\.cm",
         vmo: "",
         event_code: 53,
-    },
-    {
-        name: "SetUI",
-        process: "setui_service\\.cm|setui_service_with_camera\\.cm",
-        vmo: "",
-        event_code: 54,
     },
     {
         name: "SoftwareDelivery",

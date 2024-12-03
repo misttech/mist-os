@@ -1,0 +1,8 @@
+[
+    {
+        name: "Minfs",
+        process: "/pkg/bin/minfs",
+        vmo: "",
+        event_code: 4,
+    },
+]
