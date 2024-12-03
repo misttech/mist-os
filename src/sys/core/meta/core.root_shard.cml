@@ -7,7 +7,6 @@
             name: "core",
             url: "fuchsia-pkg://fuchsia.com/core#meta/core.cm",
             environment: "#core-env",
-            on_terminate: "reboot",
         },
         {
             name: "startup",
