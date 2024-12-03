@@ -146,7 +146,7 @@ class DataFrameTest : public SimTest {
   void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthIndRequest* ind);
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp);
   void OnDisassocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind);
-  void OnEapolConf(const wlan_fullmac_wire::WlanFullmacEapolConfirm* resp);
+  void OnEapolConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcEapolConfRequest* resp);
   void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
   void OnEapolInd(const wlan_fullmac_wire::WlanFullmacEapolIndication* ind);
 
@@ -195,7 +195,7 @@ class DataFrameTest : public SimTest {
   struct EapolContext {
     std::list<std::vector<uint8_t>> sent_data;
     std::list<std::vector<uint8_t>> received_data;
-    std::list<wlan_fullmac_wire::WlanEapolResult> tx_eapol_conf_codes;
+    std::list<fuchsia_wlan_fullmac::EapolTxResult> tx_eapol_conf_codes;
   };
 
   // data frames sent by our driver detected by the environment
@@ -247,13 +247,14 @@ void DataFrameInterface::ConnectConf(ConnectConfRequestView request,
 }
 void DataFrameInterface::DisassocInd(DisassocIndRequestView request,
                                      DisassocIndCompleter::Sync& completer) {
-  auto disassoc_ind = fidl::ToNatural(*request);
+  const auto disassoc_ind = fidl::ToNatural(*request);
   test_->OnDisassocInd(&disassoc_ind);
   completer.Reply();
 }
 void DataFrameInterface::EapolConf(EapolConfRequestView request,
                                    EapolConfCompleter::Sync& completer) {
-  test_->OnEapolConf(&request->resp);
+  const auto eapol_conf = fidl::ToNatural(*request);
+  test_->OnEapolConf(&eapol_conf);
   completer.Reply();
 }
 void DataFrameInterface::SignalReport(SignalReportRequestView request,
@@ -315,8 +316,9 @@ void DataFrameTest::OnConnectConf(
   assoc_context_.expected_results.pop_front();
 }
 
-void DataFrameTest::OnEapolConf(const wlan_fullmac_wire::WlanFullmacEapolConfirm* resp) {
-  eapol_context_.tx_eapol_conf_codes.push_back(resp->result_code);
+void DataFrameTest::OnEapolConf(
+    const fuchsia_wlan_fullmac::WlanFullmacImplIfcEapolConfRequest* resp) {
+  eapol_context_.tx_eapol_conf_codes.push_back(resp->result_code().value());
 }
 
 void DataFrameTest::OnEapolInd(const wlan_fullmac_wire::WlanFullmacEapolIndication* ind) {
@@ -524,9 +526,9 @@ TEST_F(DataFrameTest, TxEapolFrame) {
   env_->Run(kSimulatedClockDuration);
 
   // Verify response
-  EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
+  ASSERT_EQ(assoc_context_.connect_resp_count, 1U);
   EXPECT_EQ(eapol_context_.tx_eapol_conf_codes.front(),
-            wlan_fullmac_wire::WlanEapolResult::kSuccess);
+            fuchsia_wlan_fullmac::EapolTxResult::kSuccess);
 
   WithSimDevice([&](brcmfmac::SimDevice* device) {
     auto& tx_results = device->DataPath().TxResults();

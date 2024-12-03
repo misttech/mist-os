@@ -4426,22 +4426,31 @@ std::vector<zx_status_t> brcmf_if_set_keys_req(
 static void brcmf_send_eapol_confirm(
     net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplEapolTxRequest* req,
     zx_status_t result) {
-  fuchsia_wlan_fullmac_wire::WlanFullmacEapolConfirm confirm = {};
-  confirm.result_code = result == ZX_OK
-                            ? fuchsia_wlan_fullmac_wire::WlanEapolResult::kSuccess
-                            : fuchsia_wlan_fullmac_wire::WlanEapolResult::kTransmissionFailure;
-  memcpy(confirm.dst_addr.data(), req->dst_addr().data(), ETH_ALEN);
-  BRCMF_IFDBG(
-      WLANIF, ndev, "Sending EAPOL xmit confirm to SME. result: %s",
-      confirm.result_code == fuchsia_wlan_fullmac_wire::WlanEapolResult::kSuccess ? "success"
-      : confirm.result_code == fuchsia_wlan_fullmac_wire::WlanEapolResult::kTransmissionFailure
-          ? "failure"
-          : "unknown");
+  const auto eapol_result = result == ZX_OK
+                                ? fuchsia_wlan_fullmac_wire::EapolTxResult::kSuccess
+                                : fuchsia_wlan_fullmac_wire::EapolTxResult::kTransmissionFailure;
+
+  BRCMF_IFDBG(WLANIF, ndev, "Sending EAPOL xmit confirm to SME. result: %s, code: %u",
+              eapol_result == fuchsia_wlan_fullmac_wire::EapolTxResult::kSuccess ? "success"
+              : eapol_result == fuchsia_wlan_fullmac_wire::EapolTxResult::kTransmissionFailure
+                  ? "failure"
+                  : "unknown",
+              eapol_result);
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
     return;
   }
+
+  fidl::Array<uint8_t, ETH_ALEN> dst_addr;
+  memcpy(dst_addr.data(), req->dst_addr().data(), ETH_ALEN);
+
+  const auto confirm =
+      fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcEapolConfRequest::Builder(*arena)
+          .result_code(eapol_result)
+          .dst_addr(dst_addr)
+          .Build();
+
   auto proto_status = ndev->if_proto.buffer(*arena)->EapolConf(confirm);
   if (!proto_status.ok()) {
     BRCMF_ERR("Failed to send eapol confirm result.status: %s", proto_status.status_string());

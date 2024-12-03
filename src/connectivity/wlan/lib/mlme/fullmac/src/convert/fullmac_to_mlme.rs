@@ -446,23 +446,24 @@ pub fn convert_stop_confirm(
     })
 }
 pub fn convert_eapol_confirm(
-    conf: fidl_fullmac::WlanFullmacEapolConfirm,
-) -> fidl_mlme::EapolConfirm {
-    use fidl_fullmac::WlanEapolResult;
-    fidl_mlme::EapolConfirm {
-        result_code: match conf.result_code {
-            WlanEapolResult::Success => fidl_mlme::EapolResultCode::Success,
-            WlanEapolResult::TransmissionFailure => fidl_mlme::EapolResultCode::TransmissionFailure,
+    conf: fidl_fullmac::WlanFullmacImplIfcEapolConfRequest,
+) -> Result<fidl_mlme::EapolConfirm> {
+    use fidl_fullmac::EapolTxResult;
+    let result_code = conf.result_code.context("missing result_code")?;
+    Ok(fidl_mlme::EapolConfirm {
+        result_code: match result_code {
+            EapolTxResult::Success => fidl_mlme::EapolResultCode::Success,
+            EapolTxResult::TransmissionFailure => fidl_mlme::EapolResultCode::TransmissionFailure,
             _ => {
                 warn!(
                     "Invalid eapol result code {}, defaulting to EapolResultCode::TransmissionFailure",
-                    conf.result_code.into_primitive()
+                    result_code.into_primitive()
                 );
                 fidl_mlme::EapolResultCode::TransmissionFailure
             }
         },
-        dst_addr: conf.dst_addr,
-    }
+        dst_addr: conf.dst_addr.context("missing dst_addr")?,
+    })
 }
 pub fn convert_channel_switch_info(
     info: fidl_fullmac::WlanFullmacChannelSwitchInfo,
@@ -856,12 +857,13 @@ mod tests {
 
     #[test]
     fn test_convert_eapol_confirm_unknown_result_code_defaults_to_transmission_failure() {
-        let fullmac = fidl_fullmac::WlanFullmacEapolConfirm {
-            dst_addr: [1; 6],
-            result_code: fidl_fullmac::WlanEapolResult::from_primitive_allow_unknown(123),
+        let fullmac = fidl_fullmac::WlanFullmacImplIfcEapolConfRequest {
+            dst_addr: Some([1; 6]),
+            result_code: Some(fidl_fullmac::EapolTxResult::from_primitive_allow_unknown(123)),
+            ..Default::default()
         };
         assert_eq!(
-            convert_eapol_confirm(fullmac),
+            convert_eapol_confirm(fullmac).unwrap(),
             fidl_mlme::EapolConfirm {
                 dst_addr: [1; 6],
                 result_code: fidl_mlme::EapolResultCode::TransmissionFailure,

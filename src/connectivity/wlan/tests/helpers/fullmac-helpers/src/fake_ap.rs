@@ -232,9 +232,10 @@ async fn get_eapol_frame_from_test_realm(
     });
 
     fullmac_ifc_proxy
-        .eapol_conf(&fidl_fullmac::WlanFullmacEapolConfirm {
-            result_code: fidl_fullmac::WlanEapolResult::Success,
-            dst_addr: authenticator_addr,
+        .eapol_conf(&fidl_fullmac::WlanFullmacImplIfcEapolConfRequest {
+            result_code: Some(fidl_fullmac::EapolTxResult::Success),
+            dst_addr: Some(authenticator_addr),
+            ..Default::default()
         })
         .await
         .expect("Could not send EAPOL conf");

@@ -109,10 +109,10 @@ fn handle_one_request(
                 resp: fullmac_to_mlme::convert_stop_confirm(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::EapolConf { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::EapolConf { payload, responder } => {
             responder.send().context("Failed to respond to EapolConf")?;
             driver_event_sink.0.send(FullmacDriverEvent::EapolConf {
-                resp: fullmac_to_mlme::convert_eapol_confirm(resp),
+                resp: fullmac_to_mlme::convert_eapol_confirm(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::OnChannelSwitch { ind, responder } => {

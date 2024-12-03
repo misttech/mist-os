@@ -95,17 +95,9 @@ type StopResult = flexible enum : uint8 {
     INTERNAL_ERROR = 2;
 };
 
-type WlanEapolResult = flexible enum : uint8 {
+type EapolTxResult = flexible enum : uint8 {
     SUCCESS = 0;
     TRANSMISSION_FAILURE = 1;
-};
-
-type WlanFullmacEapolConfirm = struct {
-    result_code WlanEapolResult;
-    /// This value corresponds to the dst_addr in the EapolTxRequest we're confirming.
-    /// IEEE 802.11-2016 does not include this field, but we need it to disambiguate
-    /// if multiple EAPoL handshakes are ongoing.
-    dst_addr ieee80211.MacAddr;
 };
 
 type WlanFullmacSignalReportIndication = struct {
@@ -466,8 +458,16 @@ closed protocol WlanFullmacImplIfc {
         /// The result of the StopBss request. Required.
         1: result_code StopResult;
     }) -> ();
-    strict EapolConf(struct {
-        resp WlanFullmacEapolConfirm;
+    /// Report the result of a EAPoL frame transmission (IEEE 802.11-2020 6.3.22.2).
+    /// EAPoL frames are transmitted by the platform via WlanFullmacImpl::EapolTx.
+    strict EapolConf(table {
+        /// The result of the transmission. Required.
+        1: result_code EapolTxResult;
+        /// This value corresponds to the dst_addr in the EapolTxRequest we're confirming.
+        /// IEEE 802.11-2020 does not include this field, but we need it to disambiguate
+        /// if multiple EAPoL handshakes are ongoing.
+        /// Required.
+        2: dst_addr ieee80211.MacAddr;
     }) -> ();
     strict OnChannelSwitch(struct {
         ind WlanFullmacChannelSwitchInfo;
