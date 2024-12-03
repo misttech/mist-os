@@ -76,9 +76,7 @@ pub(crate) mod tap {
             &self,
             mut iter: InterfaceAddressIterator,
         ) -> Result<InterfaceAddress> {
-            if let Some(interface) =
-                iter.find(|i| i.interface_name == String::from(TAP_INTERFACE_NAME))
-            {
+            if let Some(interface) = iter.find(|i| i.interface_name == *TAP_INTERFACE_NAME) {
                 // InterfaceAddressIterator doesn't persist once it's been iterated over, so this
                 // clone() is needed to take ownership of the data.
                 Ok(interface)

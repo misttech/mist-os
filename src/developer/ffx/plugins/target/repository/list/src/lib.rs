@@ -59,6 +59,10 @@ impl From<RepositoryConfig> for RepositoryInfo {
                 .iter()
                 .filter_map(|x| {
                     if let Ed25519Key(data) = x {
+                        #[allow(
+                            clippy::format_collect,
+                            reason = "mass allow for https://fxbug.dev/381896734"
+                        )]
                         Some(data.iter().map(|c| format!("{c:02x}")).collect::<String>())
                     } else {
                         None

@@ -296,7 +296,7 @@ Warning: the target does not have a node name and is in UDP fastboot mode.
 Rediscovering the target after bootloader reboot will be impossible.
 Please try --no-bootloader-reboot to avoid a reboot.
 Using address {} as node name",
-                        socket_addr.to_string()
+                        socket_addr
                     )
                     .user_message("Error writing user message")?;
                     socket_addr.to_string()
@@ -331,7 +331,7 @@ Warning: the target does not have a node name and is in TCP fastboot mode.
 Rediscovering the target after bootloader reboot will be impossible.
 Please try --no-bootloader-reboot to avoid a reboot.
 Using address {} as node name",
-                        socket_addr.to_string()
+                        socket_addr
                     )
                     .user_message("Error writing user message")?;
                     socket_addr.to_string()

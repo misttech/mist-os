@@ -906,7 +906,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         "execute": "human-monitor-command",
                         "arguments": { "command-line": "info usernet"}
                     })
-                    .to_string()
                 ))
                 .map_err(|e| bug!("Error writing info usernet: {e}"))?;
         }

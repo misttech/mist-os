@@ -101,7 +101,7 @@ impl RepoStopTool {
             }
         } else if let Some(product_bundle) = &self.cmd.product_bundle {
             if let Some(instance) = instances.iter().find(|s| {
-                s.repo_path_display() == product_bundle.to_string()
+                s.repo_path_display() == *product_bundle
                     && (repo_port.is_none() || repo_port.unwrap() == s.port())
             }) {
                 return Self::stop_instance(instance, &None).await;

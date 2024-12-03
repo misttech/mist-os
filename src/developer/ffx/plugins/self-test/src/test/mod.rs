@@ -143,13 +143,11 @@ fn nocol(color: bool) -> &'static str {
 macro_rules! tests {
     ( $( $x:expr ),* $(,)* ) => {
         {
-            let mut temp_vec = Vec::new();
-            $(
+            vec![$(
                 // We need to store a boxed, pinned future, so let's provide the closure that
                 // does that.
-                temp_vec.push($crate::test::TestCase::new(stringify!($x), move || Box::pin($x())));
-            )*
-            temp_vec
+                $crate::test::TestCase::new(stringify!($x), move || Box::pin($x())),
+            )*]
         }
     };
 }

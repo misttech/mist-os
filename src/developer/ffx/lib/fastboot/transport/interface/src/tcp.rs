@@ -130,7 +130,7 @@ where
                 Poll::Ready(Ok(())) => {
                     self.write_header_task = None;
                     self.wrote_header = true;
-                    cx.waker().clone().wake();
+                    cx.waker().wake_by_ref();
                     Poll::Pending
                 }
                 Poll::Ready(Err(e)) => {
@@ -182,7 +182,7 @@ where
                 Poll::Ready(Err(e))
             }
             Poll::Pending => {
-                cx.waker().clone().wake();
+                cx.waker().wake_by_ref();
                 Poll::Pending
             }
         }

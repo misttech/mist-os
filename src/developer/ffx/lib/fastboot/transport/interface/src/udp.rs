@@ -158,9 +158,7 @@ impl AsyncRead for UdpNetworkInterface {
             match task.as_mut().poll(cx) {
                 Poll::Ready(Ok((sz, out_buf))) => {
                     self.read_task = None;
-                    for i in 0..sz {
-                        buf[i] = out_buf[i];
-                    }
+                    buf[..sz].copy_from_slice(&out_buf[..sz]);
                     self.sequence += Wrapping(1u16);
                     Poll::Ready(Ok(sz))
                 }

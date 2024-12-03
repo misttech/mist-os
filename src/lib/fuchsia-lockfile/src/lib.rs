@@ -108,6 +108,7 @@ impl LockfileCreateError {
         matches!(self.kind, LockfileCreateErrorKind::TimedOut)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Removes the lockfile if it exists, consuming the error if it was removed
     /// or returning the error back if it failed in any other way than already not-existing.
     pub fn remove_lock(self) -> Result<(), Self> {
@@ -185,6 +186,7 @@ impl LockContext {
 }
 
 impl Lockfile {
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Creates a lockfile at `filename` if possible. Returns the underlying error
     /// from the file create call. Note that this won't retry. Use [`Lockfile::lock`]
     /// or [`Lockfile::lock_for`] to do that.
@@ -208,6 +210,7 @@ impl Lockfile {
             .map_err(|e| LockfileCreateError::new(lock_path, e))
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Creates a lockfile at `filename`.lock if possible. See [`Lockfile::new`] for details on
     /// the return value.
     pub fn new_for(filename: &Path, context: LockContext) -> Result<Self, LockfileCreateError> {

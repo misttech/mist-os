@@ -165,8 +165,8 @@ fn find_debug_file(symbol_index: &SymbolIndex, binary_id: &str) -> Result<PathBu
             .iter()
             .find_map(|dir| {
                 let p = PathBuf::from(&dir.path)
-                    .join(binary_id[..2].to_string())
-                    .join(format!("{}.debug", binary_id[2..].to_string()));
+                    .join(&binary_id[..2])
+                    .join(format!("{}.debug", &binary_id[2..]));
                 p.exists().then_some(p)
             })
             .ok_or_else(|| anyhow!("no matching debug files found for binary ID {}", binary_id))

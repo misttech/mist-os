@@ -44,7 +44,7 @@ pub trait EmbeddedPacketBuilder {
     /// Return the output of packet building as a Vec<u8>, useful for tests that don't care about
     /// zerocopy resource constraints.
     fn bytes(&self) -> Vec<u8> {
-        let mut vec = Vec::with_capacity(self.bytes_len());
+        let mut vec = vec![0; self.bytes_len()];
         vec.resize(self.bytes_len(), 0u8);
         self.serialize(&mut &mut vec.as_mut_slice());
         vec

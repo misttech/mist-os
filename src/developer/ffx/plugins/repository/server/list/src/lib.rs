@@ -154,7 +154,7 @@ fn format_text(infos: Vec<PkgServerData>, full: bool) -> String {
             format!(
                 "{name: <30}\t{address}\t{repo_path}",
                 name = info.name,
-                address = info.address.to_string(),
+                address = info.address,
                 repo_path = info.repo_path
             )
         } else {
@@ -163,7 +163,7 @@ fn format_text(infos: Vec<PkgServerData>, full: bool) -> String {
             \tRegistration type: {reg_type:?}\taliases: {aliases:?}\tconflict mode: {mode:?}",
                 name = info.name,
                 pid = info.pid,
-                address = info.address.to_string(),
+                address = info.address,
                 server_mode = info.server_mode,
                 repo_path = info.repo_path,
                 reg_type = info.registration_storage_type,

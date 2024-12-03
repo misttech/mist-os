@@ -63,7 +63,7 @@ impl ManualTargetTester for TcpOpenManualTargetTester {
                 tracing::trace!("Could connect to SocketAddr: {}. Testing if Fastboot TCP", target);
                 match tcp_proxy(&target).await {
                     Ok(mut fastboot_interface) => {
-                        if fastboot_interface.get_var(&"version".to_string()).await.is_ok() {
+                        if fastboot_interface.get_var("version").await.is_ok() {
                             tracing::trace!("SocketAddr: {}. Is in Fastboot TCP", target);
                             ManualTargetState::Fastboot
                         } else {
