@@ -6,10 +6,10 @@ use crate::features::{Feature, FeatureSet};
 use crate::{
     offer_to_all_would_duplicate, AnyRef, Availability, Capability, CapabilityClause,
     CapabilityFromRef, CapabilityId, Child, Collection, ConfigKey, ConfigType, ConfigValueType,
-    DependencyType, DictionaryRef, Disable, Document, Environment, EnvironmentExtends,
-    EnvironmentRef, Error, EventScope, Expose, ExposeFromRef, ExposeToRef, FromClause, Name, Offer,
-    OfferFromRef, OfferToRef, OneOrMany, Program, RegistrationRef, Rights, RootDictionaryRef,
-    SourceAvailability, Use, UseFromRef,
+    DependencyType, DictionaryRef, Document, Environment, EnvironmentExtends, EnvironmentRef,
+    Error, EventScope, Expose, ExposeFromRef, ExposeToRef, FromClause, Name, Offer, OfferFromRef,
+    OfferToRef, OneOrMany, Program, RegistrationRef, Rights, RootDictionaryRef, SourceAvailability,
+    Use, UseFromRef,
 };
 use cm_types::IterablePath;
 use directed_graph::DirectedGraph;
@@ -993,22 +993,8 @@ which is almost certainly a mistake: {}",
         let collections = self.document.collections.as_ref().unwrap_or(&collections_stub);
         let offers_stub = Vec::new();
         let offers = self.document.offer.as_ref().unwrap_or(&offers_stub);
-        let must_offer_protocol_stub = Vec::new();
-        let disable_stub = Disable::default();
-        let disabled_required_offers = self
-            .document
-            .disable
-            .as_ref()
-            .unwrap_or(&disable_stub)
-            .must_offer_protocol
-            .as_ref()
-            .unwrap_or(&must_offer_protocol_stub);
 
         for required_offer in self.protocol_requirements.must_offer {
-            if disabled_required_offers.iter().any(|offer| required_offer == offer) {
-                continue;
-            }
-
             // for each child, check if any offer is:
             //   1) Targeting this child (or all)
             //   AND
@@ -1066,22 +1052,8 @@ which is almost certainly a mistake: {}",
     fn validate_required_use_decls(&self) -> Result<(), Error> {
         let use_decls_stub = Vec::new();
         let use_decls = self.document.r#use.as_ref().unwrap_or(&use_decls_stub);
-        let disable_stub = Disable::default();
-        let disabled_must_use_protocol_stub = Vec::new();
-        let disabled_required_use_decls = self
-            .document
-            .disable
-            .as_ref()
-            .unwrap_or(&disable_stub)
-            .must_use_protocol
-            .as_ref()
-            .unwrap_or(&disabled_must_use_protocol_stub);
 
         for required_usage in self.protocol_requirements.must_use {
-            if disabled_required_use_decls.iter().any(|usage| required_usage == usage) {
-                continue;
-            }
-
             if !use_decls.iter().any(|usage| match usage.protocol.as_ref() {
                 None => false,
                 Some(protocol) => {
@@ -1923,38 +1895,6 @@ mod tests {
         )
     }
 
-    #[test]
-    fn disable_required_offer() {
-        let input = r##"{
-            children: [
-                {
-                    name: "logger",
-                    url: "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
-                },
-                {
-                    name: "something",
-                    url: "fuchsia-pkg://fuchsia.com/something#meta/something.cm",
-                },
-                {
-                    name: "something_v2",
-                    url: "fuchsia-pkg://fuchsia.com/something_v2#meta/something_v2.cm",
-                },
-            ],
-            disable: {
-                must_offer_protocol: [ "fuchsia.logger.LogSink" ],
-            }
-        }"##;
-        let features = FeatureSet::empty();
-        let result = validate_with_features_for_test(
-            "test.cml",
-            &input.as_bytes(),
-            &features,
-            &vec!["fuchsia.logger.LogSink".into()],
-            &vec![],
-        );
-        assert!(result.is_ok());
-    }
-
     fn unused_component_err_message(missing: &str) -> String {
         format!(r#"Protocol "{}" is not used by a component but is required by all"#, missing)
     }
@@ -2011,39 +1951,6 @@ mod tests {
             &FeatureSet::empty(),
             &[],
             &vec!["fuchsia.component.Binder".into()],
-        );
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn disable_must_use_protocol() {
-        let input = r##"{
-            children: [
-                {
-                    name: "logger",
-                    url: "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
-                },
-                {
-                    name: "something",
-                    url: "fuchsia-pkg://fuchsia.com/something#meta/something.cm",
-                },
-                {
-                    name: "something_v2",
-                    url: "fuchsia-pkg://fuchsia.com/something_v2#meta/something_v2.cm",
-                },
-            ],
-
-            disable: {
-                must_use_protocol: [ "fuchsia.logger.LogSink" ],
-            }
-        }"##;
-
-        let result = validate_with_features_for_test(
-            "test.cml",
-            input.as_bytes(),
-            &FeatureSet::empty(),
-            &[],
-            &vec!["fuchsia.logger.LogSink".into()],
         );
         assert!(result.is_ok());
     }
