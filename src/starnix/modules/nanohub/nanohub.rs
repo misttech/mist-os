@@ -12,23 +12,46 @@ pub fn nanohub_device_init<L>(locked: &mut Locked<'_, L>, current_task: &Current
 where
     L: LockBefore<FileOpsCore>,
 {
-    let devices = [
-        ["/dev/nanohub_brightness", "nanohub_brightness", "nanohub"],
-        ["/dev/nanohub_render", "nanohub_render", "nanohub"],
-        ["/dev/nanohub_display", "nanohub_display", "nanohub"],
-        ["/dev/nanohub_pele", "nanohub_pele", "nanohub"],
-    ];
-
-    for device in devices {
-        register_socket_tunnel_device(
-            locked,
-            current_task,
-            device[0].into(),
-            device[1].into(),
-            device[2].into(),
-            DeviceDirectory::new,
-        );
-    }
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        b"/dev/nanohub".into(),
+        b"nanohub".into(),
+        b"nanohub".into(),
+        DeviceDirectory::new,
+    );
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        b"/dev/nanohub_brightness".into(),
+        b"nanohub_brightness".into(),
+        b"nanohub".into(),
+        DeviceDirectory::new,
+    );
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        b"/dev/nanohub_display".into(),
+        b"nanohub_display".into(),
+        b"nanohub".into(),
+        DeviceDirectory::new,
+    );
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        b"/dev/nanohub_pele".into(),
+        b"nanohub_pele".into(),
+        b"nanohub".into(),
+        DeviceDirectory::new,
+    );
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        b"/dev/nanohub_render".into(),
+        b"nanohub_render".into(),
+        b"nanohub".into(),
+        DeviceDirectory::new,
+    );
 
     // /dev/nanohub_comms requires a set of additional sysfs nodes, so create this route
     // with a specialized NanohubCommsDirectory implementation.
