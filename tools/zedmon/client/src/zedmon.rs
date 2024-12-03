@@ -35,7 +35,7 @@ fn zedmon_match(ifc: &InterfaceInfo) -> Option<String> {
                 eprintln!(
                     "Warning: Detected a USB device whose serial number was not null-terminated:"
                 );
-                eprintln!("{}", (*String::from_utf8_lossy(&ifc.serial_number)).to_string());
+                eprintln!("{}", &(*String::from_utf8_lossy(&ifc.serial_number)));
                 return None;
             }
         };

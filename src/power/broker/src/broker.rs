@@ -1403,6 +1403,7 @@ impl Catalog {
         for claim in assertive_claims {
             let element_pair =
                 (claim.dependent().element_id.clone(), claim.requires().element_id.clone());
+            #[allow(clippy::map_entry, reason = "mass allow for https://fxbug.dev/381896734")]
             if observed_pairs.contains_key(&element_pair) {
                 continue;
             } else {
@@ -1413,6 +1414,7 @@ impl Catalog {
         for claim in opportunistic_claims {
             let element_pair =
                 (claim.dependent().element_id.clone(), claim.requires().element_id.clone());
+            #[allow(clippy::map_entry, reason = "mass allow for https://fxbug.dev/381896734")]
             if observed_pairs.contains_key(&element_pair) {
                 if let Some(requires) = observed_pairs.get(&element_pair) {
                     if requires.level.satisfies(claim.requires().level) {
@@ -1437,7 +1439,7 @@ impl Catalog {
         let lease_element_id = self
             .topology
             .add_synthetic_element(
-                format!("{}_{}_LEASE", element_id, Uuid::new_v4().as_simple().to_string()).as_str(),
+                format!("{}_{}_LEASE", element_id, Uuid::new_v4().as_simple()).as_str(),
                 vec![LeasePowerLevel::Pending as u8, LeasePowerLevel::Satisfied as u8],
             )
             .expect("Failed to create lease element");
