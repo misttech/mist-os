@@ -78,6 +78,8 @@ rustc_binary("wlanix_bin") {
     "src/nl80211/nested.rs",
     "src/security.rs",
   ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("component") {

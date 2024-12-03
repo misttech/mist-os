@@ -63,6 +63,9 @@ rustc_library("wlan-telemetry") {
     "//src/lib/fuchsia",
     "//third_party/rust_crates:rand",
   ]
+
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("wlan-telemetry-tests") {

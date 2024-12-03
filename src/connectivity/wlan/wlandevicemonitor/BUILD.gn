@@ -73,6 +73,8 @@ rustc_binary("bin") {
   deps = wlandevicemonitor_deps
   test_deps = wlandevicemonitor_test_deps
   sources = wlandevicemonitor_srcs
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 # TODO(https://fxbug.dev/42173544): fuchsia_component_manifest will soon be unnecessary and can

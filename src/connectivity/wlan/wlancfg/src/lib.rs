@@ -2,17 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![warn(clippy::suspicious)]
-#![warn(clippy::complexity)]
 // The complexity of a separate struct doesn't seem universally better than having many arguments
 #![allow(clippy::too_many_arguments)]
-// Turn on a couple selected lints from clippy::style
-#![warn(clippy::collapsible_else_if)]
-#![warn(clippy::from_over_into)]
-#![warn(clippy::len_zero)]
-#![warn(clippy::manual_map)]
-#![warn(clippy::needless_borrow)]
-#![warn(clippy::wrong_self_convention)]
 
 pub mod access_point;
 pub mod client;
