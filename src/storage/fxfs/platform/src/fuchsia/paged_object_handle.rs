@@ -409,6 +409,8 @@ impl PagedObjectHandle {
         let modified_ranges =
             self.collect_modified_ranges().context("collect_modified_ranges failed")?;
 
+        debug!(?modified_ranges, ?page_aligned_content_size, "flush: modified ranges from kernel");
+
         let mut flush_batches = FlushBatches::default();
         let mut last_end = 0;
         for modified_range in modified_ranges {
@@ -2994,6 +2996,39 @@ mod tests {
                 .unwrap(),
             write_data,
         );
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_allocate_truncate_allocate() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let contents = vec![1; 15000];
+        fuchsia_fs::file::write(&file, &contents).await.unwrap();
+        file.allocate(0, 6000, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        file.resize(2000).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.allocate(14000, 4000, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
 
         fixture.close().await;
     }

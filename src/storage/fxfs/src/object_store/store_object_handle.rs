@@ -1234,7 +1234,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                                     AttributeKey::Extent(ExtentKey { range }),
                                 ),
                         },
-                    value: ObjectValue::Extent(ExtentValue::Some { device_offset, mode, .. }),
+                    value: ObjectValue::Extent(extent_value),
                     ..
                 }) if *object_id == self.object_id() && *attribute_id == attr_id => {
                     // If this extent ends before the target range starts (not possible on the
@@ -1244,6 +1244,18 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         iter.advance().await?;
                         continue;
                     }
+                    let (device_offset, mode) = match extent_value {
+                        ExtentValue::None => {
+                            return Err(anyhow!(FxfsError::Inconsistent)).with_context(|| {
+                                format!(
+                                    "multi_overwrite failed: target_range ({}, {}) overlaps with \
+                                deleted extent found at ({}, {})",
+                                    target_range.start, target_range.end, range.start, range.end,
+                                )
+                            })
+                        }
+                        ExtentValue::Some { device_offset, mode, .. } => (device_offset, mode),
+                    };
                     // The ranges passed to this function should already by allocated, so
                     // extent records should exist for them.
                     if range.start > target_range.start {
