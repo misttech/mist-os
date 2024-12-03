@@ -109,7 +109,7 @@ where
         component: Arc<Component>,
         run_listener: &RunListenerProxy,
     ) -> Result<(), RunTestError> {
-        if "main" != invocation.name.as_ref().ok_or(RunTestError::TestCaseName)?.to_string() {
+        if "main" != *invocation.name.as_ref().ok_or(RunTestError::TestCaseName)? {
             // "main" is the only valid test case name
             return Ok(());
         }

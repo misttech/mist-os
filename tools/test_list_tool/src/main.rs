@@ -322,6 +322,7 @@ fn write_depfile(
     if inputs.len() == 0 {
         return Ok(());
     }
+    #[allow(clippy::format_collect, reason = "mass allow for https://fxbug.dev/381896734")]
     let contents =
         format!("{}: {}\n", output, &inputs.iter().map(|i| format!(" {}", i)).collect::<String>(),);
     if let Some(depfile_dir) = depfile.parent() {
