@@ -19,15 +19,14 @@ fx-config-read
 # Use the in-tree fastboot.
 readonly FASTBOOT="${FUCHSIA_DIR}/prebuilt/third_party/fastboot/fastboot"
 
-FVM_PATH="$(fx get-build-dir)/$(fx list-build-artifacts --expect-one --name storage-full images)"
-ZBI_PATH="$(fx get-build-dir)/$(fx list-build-artifacts --expect-one --name zircon-a --type zbi images)"
 
 # TODO(b/373727276): Change to use `ffx target flash` instead.
 FLASH_SOURCE="$(fx-command-run get-flash-source)"
 PRODUCT_BUNDLE="$(fx get-build-dir)/${FLASH_SOURCE#product-bundle:}"
 ARTIFACTS="${PRODUCT_BUNDLE}/product_bundle.json"
-JQ_FILTER='.partitions.bootloader_partitions[] | select(.name=="dtbo") | .image'
-DTBO_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output "${JQ_FILTER}" "${ARTIFACTS}")"
+DTBO_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output '.partitions.bootloader_partitions[] | select(.name=="dtbo") | .image' "${ARTIFACTS}")"
+FVM_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output '.system_a[] | select(.name=="storage-full") | .path' "${ARTIFACTS}")"
+ZBI_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output '.system_a[] | select(.name=="zircon-a") | .path' "${ARTIFACTS}")"
 
 readonly FVM_PATH ZBI_PATH DTBO_PATH
 
