@@ -1159,10 +1159,6 @@ function fx-run-ninja {
     "${args[@]}"
   )
 
-  if fx-build-needs-auth
-  then fx-command-run rbe preflight
-  fi
-
   if [[ "${print_full_cmd}" = true ]]; then
     echo "${full_cmdline[@]}"
     echo
