@@ -641,10 +641,6 @@ template("fidl_library") {
                            ])
 
     metadata = {
-      if (defined(invoker.metadata)) {
-        forward_variables_from(invoker.metadata, "*")
-      }
-
       # Metadata to allow us to query all FIDL IR files.
       fidl_json = [ rebase_path(invoker.fidl_ir_json, root_build_dir) ]
       generated_sources = fidl_json
