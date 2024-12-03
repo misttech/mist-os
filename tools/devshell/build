@@ -505,9 +505,7 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
       # When using any remote build services, do a quick authentication
       # check before starting the build.
       if [[ "$skip_auth_check" == 0 ]]; then
-        if fx-build-needs-auth; then
-          fx-command-run rbe preflight
-        fi
+        fx-command-run rbe preflight
       fi
     fi
 

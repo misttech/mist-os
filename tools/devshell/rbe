@@ -308,6 +308,9 @@ function ensure_oauth() {
 # ensure that there are valid credentials at the time a build
 # is launched.
 function preflight_subcommand() {
+  if ! fx-build-needs-auth
+  then return 0
+  fi
   local -r loas_cert_type="$(get_loas_cert_type)"
   case "$loas_cert_type" in
     unrestricted) ensure_loas ;;

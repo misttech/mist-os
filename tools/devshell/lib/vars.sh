@@ -141,45 +141,6 @@ function fx-build-needs-auth {
   return "$_fx_build_needs_auth_cache_var"
 }
 
-# reclient and bazel uses either gcloud or a LOAS credential helper
-# to authenticate.
-# TODO(b/342026853): if LOAS credentials are unrestricted,
-# use the credential helper, otherwise fallback to gcloud.
-function fx-check-rbe-setup {
-  if ! fx-rbe-enabled ; then return ; fi
-
-  # build/rbe/fuchsia-reproxy-wrap.sh now uses gcert to authenticate
-  # See go/rbe/dev/x/reclientoptions#autoauth
-  if which gcert > /dev/null ; then return ; fi
-
-  # gcloud is only needed as a backup authentication method
-  gcloud="$(which gcloud)" || {
-    cat <<EOF
-
-\`gcloud\` command not found (but is needed to authenticate).
-\`gcloud\` can be installed from the Cloud SDK:
-
-  http://go/cloud-sdk#installing-and-using-the-cloud-sdk
-
-EOF
-  return
-  }
-
-# Check authentication first.
-# Instruct user to authenticate if needed.
-  "$gcloud" auth list 2>&1 | grep -q "$USER@google.com" || {
-    cat <<EOF
-Did not find credentialed account (\`gcloud auth list\`): $USER@google.com.
-
-To authenticate, run:
-
-  gcloud auth login --update-adc --no-browser
-
-EOF
-}
-
-}
-
 # fx-is-stderr-tty exits with success if stderr is a tty.
 function fx-is-stderr-tty {
   [[ -t 2 ]]
