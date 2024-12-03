@@ -159,6 +159,7 @@ impl GenerateTransferManifest {
             key(&repository.timestamp_private_key_path)?;
         }
         product_bundle_entries.sort();
+        product_bundle_entries.dedup();
 
         let local = diff_utf8_paths(&canonical_product_bundle_path, &canonical_out_dir)
             .context("rebasing product_bundle path")?;
