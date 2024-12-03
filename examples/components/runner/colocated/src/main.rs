@@ -183,22 +183,23 @@ fn start(
         ),
     );
 
-    let mut updates = vec![];
-    updates.push(fattribution::AttributionUpdate::Add(fattribution::NewPrincipal {
-        identifier: Some(instance_token.get_koid().unwrap().raw_koid()),
-        description: Some(fattribution::Description::Component(
-            instance_token.duplicate_handle(fidl::Rights::SAME_RIGHTS).unwrap(),
-        )),
-        detailed_attribution: None,
-        ..Default::default()
-    }));
-    updates.push(fattribution::AttributionUpdate::Update(fattribution::UpdatedPrincipal {
-        identifier: Some(instance_token.get_koid().unwrap().raw_koid()),
-        resources: Some(fattribution::Resources::Data(fattribution::Data {
-            resources: vec![fattribution::Resource::KernelObject(vmo_koid)],
-        })),
-        ..Default::default()
-    }));
+    let updates = vec![
+        fattribution::AttributionUpdate::Add(fattribution::NewPrincipal {
+            identifier: Some(instance_token.get_koid().unwrap().raw_koid()),
+            description: Some(fattribution::Description::Component(
+                instance_token.duplicate_handle(fidl::Rights::SAME_RIGHTS).unwrap(),
+            )),
+            detailed_attribution: None,
+            ..Default::default()
+        }),
+        fattribution::AttributionUpdate::Update(fattribution::UpdatedPrincipal {
+            identifier: Some(instance_token.get_koid().unwrap().raw_koid()),
+            resources: Some(fattribution::Resources::Data(fattribution::Data {
+                resources: vec![fattribution::Resource::KernelObject(vmo_koid)],
+            })),
+            ..Default::default()
+        }),
+    ];
     publisher.on_update(updates);
     let termination = program.wait_for_termination();
     let termination_clone = program.wait_for_termination();
