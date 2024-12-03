@@ -70,6 +70,7 @@ fn new_test_params(test_url: &str) -> TestParams {
         min_severity_logs: vec![],
         tags: vec![TestTag { key: "internal".to_string(), value: "true".to_string() }],
         break_on_failure: false,
+        no_exception_channel: false,
     }
 }
 
@@ -94,6 +95,7 @@ async fn new_test_params_with_realm(test_url: &str, realm_str: &str) -> TestPara
         min_severity_logs: vec![],
         tags: vec![TestTag { key: "internal".to_string(), value: "true".to_string() }],
         break_on_failure: false,
+        no_exception_channel: false,
     }
 }
 

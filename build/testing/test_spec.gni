@@ -247,6 +247,11 @@ if (allowed_device_types == []) {
 #     [string] The intended cpu for the test to run on. If not defined, the
 #     current_cpu will be used.
 #
+#   create_no_exception_channel (optional)
+#     [bool] Indicates that test_manager should create no exception channels as it would
+#     otherwise do to detect panics. Some tests that create exception channels at the job
+#     level will fail if test_manager creates its customary exception channels.
+#
 template("test_spec") {
   testonly = true
 
@@ -321,6 +326,16 @@ template("test_spec") {
     assert(defined(invoker.package_url))
     assert(is_v2_component, "'parallel' only works for v2 test components.")
     _parallel = invoker.parallel
+  }
+
+  if (defined(invoker.create_no_exception_channel)) {
+    assert(
+        is_fuchsia,
+        "'create_no_exception_channel' can only be used when target is fuchsia.")
+    assert(defined(invoker.package_url))
+    assert(is_v2_component,
+           "'create_no_exception_channel' only works for v2 test components.")
+    _create_no_exception_channel = invoker.create_no_exception_channel
   }
 
   target_envs = []
@@ -473,6 +488,9 @@ template("test_spec") {
                              ])
       if (defined(_parallel)) {
         parallel = _parallel
+      }
+      if (defined(_create_no_exception_channel)) {
+        create_no_exception_channel = _create_no_exception_channel
       }
       label = invoker.target
       assert(label == get_label_info(label, "label_with_toolchain"),

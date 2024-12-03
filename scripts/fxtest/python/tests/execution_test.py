@@ -303,6 +303,78 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(test.environment())
         self.assertTrue(test.should_symbolize())
 
+    @parameterized.expand(
+        [
+            (
+                "test execution does not pass a --no-exception-channel by default",
+                None,
+                [],
+            ),
+            (
+                "test execution respects create_no_exception_channel in test specs",
+                True,
+                ["--no-exception-channel"],
+            ),
+        ]
+    )
+    async def test_test_execution_create_no_exception_channel(
+        self,
+        _unused_name: str,
+        spec_create_no_exception_channel: bool | None,
+        expected_args: list[str],
+    ) -> None:
+        """Test the usage of the TestExecution wrapper on a component test"""
+        exec_env = _make_exec_env("/fuchsia", "/out/fuchsia")
+
+        test = execution.TestExecution(
+            test_list_file.Test(
+                tests_json_file.TestEntry(
+                    tests_json_file.TestSection(
+                        "foo",
+                        "//foo",
+                        "fuchsia",
+                        create_no_exception_channel=spec_create_no_exception_channel,
+                    )
+                ),
+                test_list_file.TestListEntry(
+                    "foo",
+                    [],
+                    test_list_file.TestListExecutionEntry(
+                        "fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm",
+                        realm="foo_tests",
+                        max_severity_logs="INFO",
+                        min_severity_logs="TRACE",
+                    ),
+                ),
+            ),
+            exec_env,
+            args.parse_args(["--no-use-package-hash"]),
+        )
+
+        self.assertListEqual(
+            test.command_line(),
+            [
+                "fx",
+                "ffx",
+                "test",
+                "run",
+                "--realm",
+                "foo_tests",
+                "--max-severity-logs",
+                "INFO",
+                "--min-severity-logs",
+                "TRACE",
+            ]
+            + expected_args
+            + [
+                "fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm",
+            ],
+        )
+
+        self.assertFalse(test.is_hermetic())
+        self.assertIsNone(test.environment())
+        self.assertTrue(test.should_symbolize())
+
     async def test_test_execution_component_with_experimental_new_path(
         self,
     ) -> None:

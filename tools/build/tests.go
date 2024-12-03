@@ -84,6 +84,11 @@ type Test struct {
 
 	// TimeoutSecs is the timeout for the test.
 	TimeoutSecs int `json:"timeout_secs,omitempty"`
+
+	// When true, indicates that test_manager should create no exception channels as it would
+	// otherwise do to detect panics. Some tests that create exception channels at the job
+	// level will fail if test_manager creates its customary exception channels.
+	CreateNoExceptionChannel bool `json:"create_no_exception_channel,omitempty"`
 }
 
 // IsComponentV2 returns whether the test is a component v2 test.

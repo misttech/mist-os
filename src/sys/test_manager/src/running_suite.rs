@@ -166,6 +166,7 @@ impl RunningSuite {
             debug_agent: if use_debug_agent {
                 DebugAgent::new().await.map_err(log_warning).ok()
             } else {
+                warn!("Not using debug_agent for test {} because it is marked create_no_exception_channel", test_url);
                 None
             },
         })

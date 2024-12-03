@@ -39,6 +39,7 @@ pub async fn test_params_from_reader<R: Read>(
                     max_severity_logs,
                     min_severity_logs,
                     realm,
+                    create_no_exception_channel,
                 } = component_execution;
                 let mut provided_realm = None;
                 if let Some(realm_str) = &realm {
@@ -81,6 +82,7 @@ pub async fn test_params_from_reader<R: Read>(
                     min_severity_logs: min_severity_selectors,
                     tags,
                     break_on_failure: false,
+                    no_exception_channel: create_no_exception_channel,
                 });
             }
             _ => {

@@ -53,6 +53,11 @@ class TestSection:
     # ffx test run --parallel
     parallel: int | None = None
 
+    # Indicates that test_manager should create no exception channels as it would
+    # otherwise do to detect panics. Some tests that create exception channels at the job
+    # level will fail if test_manager creates its customary exception channels.
+    create_no_exception_channel: bool | None = None
+
 
 @dataparse
 @dataclass

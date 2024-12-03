@@ -148,6 +148,14 @@ class TestExecution:
                     str(parallel_cases),
                 ]
 
+            if (
+                self._test.build.test.create_no_exception_channel is not None
+                and self._test.build.test.create_no_exception_channel
+            ):
+                extra_args += [
+                    "--no-exception-channel",
+                ]
+
             for test_filter in self._flags.test_filter:
                 extra_args += ["--test-filter", test_filter]
             if self._flags.also_run_disabled_tests:

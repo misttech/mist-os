@@ -192,6 +192,14 @@
       "short": null,
       "description": "disable structured output to a directory. Note structured output is disabled by default, unless --output-directory is specified. This option supported an experiment which has been removed. It is now a no-op and will soon be removed.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--no-exception-channel",
+      "short": null,
+      "description": "when set, prevents test_manager from creating exception channels that may confilict with those created by the test.",
+      "hidden": false
     }
   ],
   "notes": [

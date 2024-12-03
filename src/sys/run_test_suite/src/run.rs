@@ -138,6 +138,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
             break_on_failure: Some(params.break_on_failure),
             log_iterator: Some(run_params.log_protocol.unwrap_or_else(diagnostics::get_type)),
             log_interest: Some(combined_log_interest),
+            no_exception_channel: Some(params.no_exception_channel),
             ..Default::default()
         };
         let suite = run_reporter.new_suite(&params.test_url, &suite_id)?;

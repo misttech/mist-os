@@ -651,13 +651,14 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 		Name:   test.PackageURL,
 		Labels: []string{test.Label},
 		Execution: build.ExecutionDef{
-			Type:            "fuchsia_component",
-			ComponentURL:    test.PackageURL,
-			TimeoutSeconds:  int(test.Timeout.Seconds()),
-			Parallel:        test.Parallel,
-			MaxSeverityLogs: test.LogSettings.MaxSeverity,
-			MinSeverityLogs: test.LogSettings.MinSeverity,
-			Realm:           test.Realm,
+			Type:                     "fuchsia_component",
+			ComponentURL:             test.PackageURL,
+			TimeoutSeconds:           int(test.Timeout.Seconds()),
+			Parallel:                 test.Parallel,
+			MaxSeverityLogs:          test.LogSettings.MaxSeverity,
+			MinSeverityLogs:          test.LogSettings.MinSeverity,
+			Realm:                    test.Realm,
+			CreateNoExceptionChannel: test.CreateNoExceptionChannel,
 		},
 		Tags: test.Tags,
 	}}
@@ -1753,6 +1754,9 @@ func commandForTest(test *testsharder.Test, useSerial bool, timeout time.Duratio
 			// TODO(https://fxbug.dev/42126211): Once fixed, combine timeout flag setting for v1 and v2.
 			if timeout > 0 {
 				command = append(command, "--timeout", fmt.Sprintf("%d", int64(timeout.Seconds())))
+			}
+			if test.CreateNoExceptionChannel {
+				command = append(command, "--no-exception-channel")
 			}
 		} else {
 			return nil, fmt.Errorf("CFv1 tests are no longer supported: %q", test.PackageURL)
