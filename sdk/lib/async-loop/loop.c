@@ -820,7 +820,7 @@ static zx_status_t async_loop_bind_irq(async_dispatcher_t* dispatcher, async_irq
   if (status == ZX_OK) {
     list_add_head(&loop->irq_list, irq_to_node(irq));
   } else {
-    ZX_ASSERT_MSG(status == ZX_ERR_ACCESS_DENIED, "zx_object_wait_async: status=%d", status);
+    ZX_ASSERT_MSG(status == ZX_ERR_ACCESS_DENIED, "zx_interrupt_bind (bind): status=%d", status);
   }
 
   mtx_unlock(&loop->lock);
@@ -839,10 +839,14 @@ static zx_status_t async_loop_unbind_irq(async_dispatcher_t* dispatcher, async_i
 
   zx_status_t status =
       zx_interrupt_bind(irq->object, loop->port, (uintptr_t)irq, ZX_INTERRUPT_UNBIND);
-  if (status == ZX_OK) {
+
+  // ZX_ERR_CANCELED is returned if the interrupt has already been destroyed
+  // before it's unbound.
+  if (status == ZX_OK || status == ZX_ERR_CANCELED) {
     list_delete(irq_to_node(irq));
+    status = ZX_OK;
   } else {
-    ZX_ASSERT_MSG(status == ZX_ERR_ACCESS_DENIED, "zx_object_wait_async: status=%d", status);
+    ZX_ASSERT_MSG(status == ZX_ERR_ACCESS_DENIED, "zx_interrupt_bind (unbind): status=%d", status);
   }
   mtx_unlock(&loop->lock);
   return status;

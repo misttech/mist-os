@@ -588,6 +588,17 @@ TEST(Loop, Irq) {
     EXPECT_EQ(ZX_ERR_CANCELED, wait.last_status);
     EXPECT_EQ(ZX_OK, irq.ack());
   }
+  // Ensure that we can unbind the interrupt successfully if it had been already destroyed
+  // when it is unbound.
+  {
+    async::Loop loop(&config);
+    zx::interrupt irq;
+    EXPECT_EQ(ZX_OK, zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &irq));
+    TestWaitIrq wait(irq.get());
+    EXPECT_EQ(ZX_OK, wait.Begin(loop.dispatcher()));
+    EXPECT_EQ(ZX_OK, irq.destroy());
+    EXPECT_EQ(ZX_OK, wait.Cancel(loop.dispatcher()));
+  }
 }
 
 TEST(Loop, WaitTimestamp) {
