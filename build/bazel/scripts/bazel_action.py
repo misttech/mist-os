@@ -1292,6 +1292,8 @@ def main() -> int:
     if jobs:
         cmd += [f"--jobs={jobs}"]
 
+    # TODO(b/342026853): use --config=gcertauth if applicable.
+
     if _DEBUG:
         debug("BUILD_CMD: " + " ".join(shlex.quote(c) for c in cmd))
 

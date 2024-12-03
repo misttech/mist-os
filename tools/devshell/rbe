@@ -16,6 +16,13 @@
 ##        To revoke gcloud credentials: gcloud auth revoke
 ##        To revoke LOAS credentials: loas_destroy
 ##
+##  fx rbe check_loas [options...]
+##      For Google FTEs only.
+##      Detect the LOAS certificate type (cached).
+##      Options:
+##        -f,--force: re-evaluate LOAS certificate type and update the
+##          cache file, instead of just taking the cached result.
+##
 ##  fx rbe cleanlogs
 ##      Clean up reproxy log dirs (from using fuchsia-reproxy-wrap.sh).
 ##
@@ -202,6 +209,67 @@ function auth_subcommand() {
     style::echo --bold --green "You can now 'fx build' with RBE."
 }
 
+# Determine whether or not host environment can get unrestricted LOAS
+# credentials.
+# Applicable to Google corp. networks only.
+# Returns 0 (success) if LOAS credentials are unrestricted.
+# Returns non-zero if credentials are restricted or some other error occurred.
+function check_loas_restrictions() {
+  local -r check_loas_script="${FUCHSIA_DIR}/build/rbe/check_loas_restrictions.sh"
+  [[ -r "$check_loas_script" ]] || {
+    fx-error "Script not found: $check_loas_script"
+    return 1
+  }
+
+  # Print only the last line, in case there was any interactive gcert.
+  "$check_loas_script" | tail -n 1
+}
+
+function get_loas_cert_type() {
+  # Prints "restricted" or "unrestricted" based on LOAS certificate type.
+  # Also uses cache file.
+  # This only needs to be computed once per development environment,
+  # or whenever the network changes.
+  # Options:
+  #   -f,--force : don't read the cache file, re-evaluate and re-write it.
+
+  local recache=0
+  for opt in "$@"
+  do
+    case "$opt" in
+      -f|--force) recache=1 ;;
+      *) fx-error "get_loas_cert_type: Unknown option $opt"; return 1 ;;
+    esac
+  done
+
+  # Use the cached result unless -f forces an update to the cache.
+  local -r auth_config="${FUCHSIA_DIR}/.fx/auth-config"
+  if [[ -r "$auth_config" && "$recache" == 0 ]]
+  then
+    # Print the cached value
+    grep "loas_cert_type" "$auth_config" | cut -d"=" -f2
+    return
+  fi
+
+  # Re-run LOAS check.
+  local loas_cert_type
+  [[ "$recache" == 0 ]] || loas_destroy
+  loas_cert_type="$(check_loas_restrictions)" || {
+    fx-error "Error trying to check LOAS certificate type."
+    return 1
+  }
+
+  # Cache result to file.
+  echo "loas_cert_type=$loas_cert_type" > "$auth_config"
+  echo "$loas_cert_type"
+}
+
+
+function check_loas_subcommand() {
+  echo "Checking LOAS certificate type:"
+  echo "$(get_loas_cert_type "$@")"
+}
+
 # LINT.IfChange(reproxy_log_dirs)
 # vars.sh:fx-run-ninja writes RBE logs here:
 readonly rbe_logs_dir="${FUCHSIA_DIR}/out/.reproxy_logs"
@@ -219,6 +287,7 @@ case "$action" in
     ;;
 
   auth) auth_subcommand "${action_args[@]}" ;;
+  check_loas) check_loas_subcommand "${action_args[@]}" ;;
   cleanlogs) cleanlogs_subcommand "${action_args[@]}" ;;
 
   *)

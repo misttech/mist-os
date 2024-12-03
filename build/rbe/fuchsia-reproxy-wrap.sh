@@ -227,6 +227,7 @@ rewrapper_env=(
 )
 
 # Check authentication.
+# TODO(b/342026853): taken action depends on LOAS certificate type
 auth_option=()
 if [[ -n "${USER+x}" ]]
 then

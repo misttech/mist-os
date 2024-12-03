@@ -866,6 +866,8 @@ def main() -> int:
     if job_count:
         jobs = int(job_count)
 
+    # TODO(b/342026853): use --config=gcertauth if LOAS creds are unrestricted
+
     bazel_config_args += build_metadata_flags(siblings_link_template)
 
     if args.bazel_build_events_log_json:

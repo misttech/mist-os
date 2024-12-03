@@ -1078,6 +1078,7 @@ function fx-run-ninja {
       done
     fi
 
+    # TODO(b/342026853): perform pre-flight auth check
     rbe_wrapper=(
       env
       "${RBE_WRAPPER[@]}"
