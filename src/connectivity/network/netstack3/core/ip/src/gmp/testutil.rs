@@ -13,7 +13,9 @@ use net_declare::{net_ip_v4, net_ip_v6};
 use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::MulticastAddr;
 use netstack3_base::testutil::{FakeBindingsCtx, FakeDeviceId, FakeWeakDeviceId};
-use netstack3_base::{AnyDevice, CtxPair, DeviceIdContext, IntoCoreTimerCtx};
+use netstack3_base::{
+    AnyDevice, CtxPair, DeviceIdContext, HandleableTimer, IntoCoreTimerCtx, TimerBindingsTypes,
+};
 use packet_formats::utils::NonZeroDuration;
 
 use crate::internal::gmp::{
@@ -57,6 +59,19 @@ impl<I: IpExt> GmpContext<I, FakeGmpBindingsContext<I>> for FakeGmpContext<I> {
     ) -> O {
         let Self { inner, enabled, groups, gmp, config } = self;
         cb(inner, GmpStateRef { enabled: *enabled, groups, gmp, config })
+    }
+}
+
+impl<I: IpExt> HandleableTimer<FakeGmpContext<I>, FakeGmpBindingsContext<I>>
+    for GmpTimerId<I, FakeWeakDeviceId<FakeDeviceId>>
+{
+    fn handle(
+        self,
+        core_ctx: &mut FakeGmpContext<I>,
+        bindings_ctx: &mut FakeGmpBindingsContext<I>,
+        _timer: <FakeGmpBindingsContext<I> as TimerBindingsTypes>::UniqueTimerId,
+    ) {
+        gmp::handle_timer(core_ctx, bindings_ctx, self);
     }
 }
 
@@ -127,6 +142,12 @@ impl gmp::v1::ProtocolConfig for FakeGmpConfig {
         _max_resp_time: Duration,
     ) -> Option<Self::QuerySpecificActions> {
         None
+    }
+}
+
+impl gmp::v2::ProtocolConfig for FakeGmpConfig {
+    fn query_response_interval(&self) -> NonZeroDuration {
+        gmp::v2::DEFAULT_QUERY_RESPONSE_INTERVAL
     }
 }
 

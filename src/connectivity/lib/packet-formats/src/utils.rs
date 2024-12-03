@@ -113,6 +113,19 @@ impl NonZeroDuration {
         Some(NonZeroDuration(d))
     }
 
+    /// Like [`Duration::saturating_add`].
+    pub fn saturating_add(self, d: Duration) -> Self {
+        // NB: Duration is strictly positive so we're not violating the
+        // invariant.
+        Self(self.0.saturating_add(d))
+    }
+
+    /// Like [`Duration::saturating_mul`].
+    pub fn saturating_mul(self, m: NonZeroU32) -> Self {
+        // NB: multiplier is nonzero so we're not violating the invariant.
+        Self(self.0.saturating_mul(m.into()))
+    }
+
     /// Returns the value as a [`Duration`].
     pub const fn get(self) -> Duration {
         self.0

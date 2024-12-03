@@ -323,6 +323,12 @@ impl gmp::v1::ProtocolConfig for MldConfig {
     }
 }
 
+impl gmp::v2::ProtocolConfig for MldConfig {
+    fn query_response_interval(&self) -> NonZeroDuration {
+        gmp::v2::DEFAULT_QUERY_RESPONSE_INTERVAL
+    }
+}
+
 /// An MLD timer to delay the sending of a report.
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
 pub struct MldTimerId<D: WeakDeviceIdentifier>(GmpTimerId<Ipv6, D>);

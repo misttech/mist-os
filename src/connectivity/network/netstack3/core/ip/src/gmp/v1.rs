@@ -598,8 +598,10 @@ where
             state.as_mut(),
             GmpMode::V1 { compat: true },
         );
-        // TODO(https://fxbug.dev/42071006): Update compat mode timer on v1
-        // report.
+        // Schedule the compat timer if we're in compat mode.
+        if state.gmp.mode.is_v1_compat() {
+            gmp::schedule_v1_compat(bindings_ctx, state.as_mut())
+        }
 
         let GmpStateRef { enabled: _, groups, gmp, config } = state;
 

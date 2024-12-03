@@ -337,6 +337,8 @@ where
             core_ctx: _,
         } = self;
         match actions {
+            // TODO(https://fxbug.dev/42071006): Consider the GMP mode to
+            // install a v1 router present timer or not.
             Igmpv2Actions::ScheduleV1RouterPresentTimer(duration) => {
                 *v1_router_present = true;
                 let _: Option<BC::Instant> =
@@ -557,6 +559,12 @@ impl gmp::v1::ProtocolConfig for IgmpConfig {
         let v1_router_present = max_resp_time.as_micros() == 0;
         v1_router_present
             .then(|| Igmpv2Actions::ScheduleV1RouterPresentTimer(self.v1_router_present_timeout))
+    }
+}
+
+impl gmp::v2::ProtocolConfig for IgmpConfig {
+    fn query_response_interval(&self) -> NonZeroDuration {
+        gmp::v2::DEFAULT_QUERY_RESPONSE_INTERVAL
     }
 }
 
