@@ -196,12 +196,19 @@ zx::result<> ScsiDriver::Start() {
 }
 
 void ScsiDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
-  scsi_device_->Release();
+  if (scsi_device_) {
+    scsi_device_->Release();
+  }
   completer(zx::ok());
 }
 
 zx_status_t ScsiDriver::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                            iovec data) {
+  if (!scsi_device_) {
+    FDF_LOG(ERROR, "ExecuteCommandSync called for driver that has not been started.");
+    return ZX_ERR_INTERNAL;
+  }
+
   struct scsi_sync_callback_state {
     sync_completion_t completion;
     zx_status_t status;
@@ -241,6 +248,13 @@ zx::result<> ScsiDevice::AllocatePages(zx::vmo& vmo, fzl::VmoMapper& mapper, siz
 void ScsiDriver::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                      uint32_t block_size_bytes, scsi::DeviceOp* device_op,
                                      iovec data) {
+  zx_status_t status = ZX_ERR_INTERNAL;
+  auto complete_op = fit::defer([&] { device_op->Complete(status); });
+  if (!scsi_device_) {
+    FDF_LOG(ERROR, "ExecuteCommandAsync called for driver that has not been started.");
+    return;
+  }
+
   zx_handle_t data_vmo;
   zx_off_t vmo_offset_bytes;
   size_t transfer_bytes;
@@ -274,7 +288,6 @@ void ScsiDriver::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
   if (data_vmo != ZX_HANDLE_INVALID) {
     // To use zx_vmar_map, offset, length must be page aligned. If it isn't (uncommon),
     // allocate a temp buffer and do a copy.
-    zx_status_t status;
     if ((transfer_bytes > 0) && ((transfer_bytes % zx_system_get_page_size()) == 0) &&
         ((vmo_offset_bytes % zx_system_get_page_size()) == 0)) {
       vmar_mapped = true;
@@ -283,7 +296,6 @@ void ScsiDriver::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
       status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, data_vmo,
                            vmo_offset_bytes, transfer_bytes, &mapped_addr);
       if (status != ZX_OK) {
-        device_op->Complete(status);
         return;
       }
       rw_data = reinterpret_cast<void*>(mapped_addr);
@@ -294,13 +306,13 @@ void ScsiDriver::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
         status = zx_vmo_read(data_vmo, rw_data, vmo_offset_bytes, transfer_bytes);
         if (status != ZX_OK) {
           free(rw_data);
-          device_op->Complete(status);
           return;
         }
       }
     }
   }
 
+  complete_op.cancel();
   return scsi_device_->QueueCommand(target, lun, cdb, is_write, zx::unowned_vmo(data_vmo),
                                     vmo_offset_bytes, transfer_bytes, DeviceOpCompletionCb,
                                     static_cast<void*>(device_op), rw_data, vmar_mapped,
