@@ -125,6 +125,13 @@ where
             None => bindings_ctx.cancel_timer(next_wakeup),
         };
     }
+
+    /// Removes all timers.
+    pub fn clear(&mut self, bindings_ctx: &mut BC) {
+        let Self { next_wakeup, heap } = self;
+        heap.clear();
+        let _: Option<BC::Instant> = bindings_ctx.cancel_timer(next_wakeup);
+    }
 }
 
 /// A timer heap that is keyed on `K`.
@@ -265,6 +272,12 @@ impl<K: Hash + Eq + Clone, V, T: Instant> KeyedHeap<K, V, T> {
             }
         };
         (popped, changed_heap)
+    }
+
+    fn clear(&mut self) {
+        let Self { map, heap } = self;
+        map.clear();
+        heap.clear();
     }
 }
 
@@ -655,5 +668,16 @@ mod tests {
         assert!(heap.pop(&mut ctx).is_some());
         assert_eq!(heap.next_wakeup.scheduled, None);
         assert_eq!(heap.pop(&mut ctx), None);
+    }
+
+    #[test]
+    fn clear() {
+        let mut ctx = FakeTimerCtx::default();
+        let mut heap = LocalTimerHeap::new(&mut ctx, ());
+        assert_eq!(heap.schedule_instant(&mut ctx, TIMER1, (), T1), None);
+        assert_eq!(heap.schedule_instant(&mut ctx, TIMER2, (), T1), None);
+        heap.clear(&mut ctx);
+        heap.assert_map_entries([]);
+        assert_eq!(heap.next_wakeup.scheduled, None);
     }
 }

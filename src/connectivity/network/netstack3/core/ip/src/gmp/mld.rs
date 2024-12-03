@@ -36,6 +36,7 @@ use crate::internal::base::{IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpGroupState,
     GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
+    NotAMemberErr,
 };
 
 /// The bindings types for MLD.
@@ -47,7 +48,9 @@ pub(crate) trait MldBindingsContext: GmpBindingsContext {}
 impl<BC> MldBindingsContext for BC where BC: GmpBindingsContext {}
 
 /// Provides immutable access to MLD state.
-pub trait MldStateContext<BT: MldBindingsTypes>: DeviceIdContext<AnyDevice> {
+pub trait MldStateContext<BT: MldBindingsTypes>:
+    DeviceIdContext<AnyDevice> + MldContextMarker
+{
     /// Calls the function with an immutable reference to the device's MLD
     /// state.
     fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<BT>>) -> O>(
@@ -59,7 +62,7 @@ pub trait MldStateContext<BT: MldBindingsTypes>: DeviceIdContext<AnyDevice> {
 
 /// The execution context capable of sending frames for MLD.
 pub trait MldSendContext<BT: MldBindingsTypes>:
-    DeviceIdContext<AnyDevice> + IpLayerHandler<Ipv6, BT>
+    DeviceIdContext<AnyDevice> + IpLayerHandler<Ipv6, BT> + MldContextMarker
 {
     /// Gets the IPv6 link local address on `device`.
     fn get_ipv6_link_local_addr(
@@ -68,8 +71,11 @@ pub trait MldSendContext<BT: MldBindingsTypes>:
     ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>>;
 }
 
+/// A marker context for MLD traits to allow for GMP test fakes.
+pub trait MldContextMarker {}
+
 /// The execution context for the Multicast Listener Discovery (MLD) protocol.
-pub trait MldContext<BT: MldBindingsTypes>: DeviceIdContext<AnyDevice> {
+pub trait MldContext<BT: MldBindingsTypes>: DeviceIdContext<AnyDevice> + MldContextMarker {
     /// The inner context given to `with_mld_state_mut`.
     type SendContext<'a>: MldSendContext<BT, DeviceId = Self::DeviceId> + 'a;
 
@@ -125,6 +131,7 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
                             group_addr,
                             body.max_response_delay(),
                         )
+                        .map_err(Into::into)
                     })
             }
             MldPacket::MulticastListenerQueryV2(_msg) => {
@@ -137,6 +144,7 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
                     Err(MldError::NotAMember { addr }),
                     |group_addr| {
                         gmp::v1::handle_report_message(self, bindings_ctx, device, group_addr)
+                            .map_err(Into::into)
                     },
                 )
             }
@@ -174,7 +182,9 @@ impl IpExt for Ipv6 {
     }
 }
 
-impl<BT: MldBindingsTypes, CC: DeviceIdContext<AnyDevice>> GmpTypeLayout<Ipv6, BT> for CC {
+impl<BT: MldBindingsTypes, CC: DeviceIdContext<AnyDevice> + MldContextMarker>
+    GmpTypeLayout<Ipv6, BT> for CC
+{
     type Actions = Never;
     type Config = MldConfig;
 }
@@ -190,7 +200,6 @@ impl<BT: MldBindingsTypes, CC: MldStateContext<BT>> GmpStateContext<Ipv6, BT> fo
 }
 
 impl<BC: MldBindingsContext, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
-    type Err = MldError;
     type Inner<'a> = CC::SendContext<'a>;
 
     fn with_gmp_state_mut_and_ctx<
@@ -202,10 +211,6 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
         cb: F,
     ) -> O {
         self.with_mld_state_mut(device, cb)
-    }
-
-    fn not_a_member_err(addr: Ipv6Addr) -> Self::Err {
-        Self::Err::NotAMember { addr }
     }
 }
 
@@ -250,6 +255,14 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
     fn run_actions(&mut self, _bindings_ctx: &mut BC, _device: &CC::DeviceId, actions: Never) {
         match actions {}
     }
+
+    fn handle_mode_change(
+        &mut self,
+        _bindings_ctx: &mut BC,
+        _device: &Self::DeviceId,
+        _new_mode: gmp::GmpMode,
+    ) {
+    }
 }
 
 #[derive(Debug, Error)]
@@ -261,6 +274,12 @@ pub(crate) enum MldError {
     /// Failed to send an IGMP packet.
     #[error("failed to send out an IGMP packet to address: {}", addr)]
     SendFailure { addr: Ipv6Addr },
+}
+
+impl From<NotAMemberErr<Ipv6>> for MldError {
+    fn from(NotAMemberErr(addr): NotAMemberErr<Ipv6>) -> Self {
+        Self::NotAMember { addr }
+    }
 }
 
 pub(crate) type MldResult<T> = Result<T, MldError>;
@@ -477,6 +496,9 @@ mod tests {
         (),
     >;
 
+    impl MldContextMarker for FakeCoreCtxImpl {}
+    impl MldContextMarker for &'_ mut FakeCoreCtxImpl {}
+
     impl MldStateContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_mld_state<
             O,
@@ -586,8 +608,7 @@ mod tests {
     };
     const MY_MAC: Mac = Mac::new([1, 2, 3, 4, 5, 6]);
     const ROUTER_MAC: Mac = Mac::new([6, 5, 4, 3, 2, 1]);
-    const GROUP_ADDR: MulticastAddr<Ipv6Addr> =
-        unsafe { MulticastAddr::new_unchecked(Ipv6Addr::new([0xff02, 0, 0, 0, 0, 0, 0, 3])) };
+    const GROUP_ADDR: MulticastAddr<Ipv6Addr> = <Ipv6 as gmp::testutil::TestIpExt>::GROUP_ADDR1;
     const TIMER_ID: MldTimerId<FakeWeakDeviceId<FakeDeviceId>> = MldTimerId(GmpTimerId {
         device: FakeWeakDeviceId(FakeDeviceId),
         _marker: IpVersionMarker::new(),

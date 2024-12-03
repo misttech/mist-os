@@ -33,7 +33,8 @@ use thiserror::Error;
 use crate::internal::base::{IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpGroupState,
-    GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
+    GmpMode, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
+    NotAMemberErr,
 };
 
 /// The bindings types for IGMP.
@@ -66,8 +67,13 @@ impl<BC: IgmpBindingsTypes + TimerContext> IgmpState<BC> {
     }
 }
 
+/// A marker context for IGMP traits to allow for GMP test fakes.
+pub trait IgmpContextMarker {}
+
 /// Provides immutable access to IGMP state.
-pub trait IgmpStateContext<BT: IgmpBindingsTypes>: DeviceIdContext<AnyDevice> {
+pub trait IgmpStateContext<BT: IgmpBindingsTypes>:
+    DeviceIdContext<AnyDevice> + IgmpContextMarker
+{
     /// Calls the function with an immutable reference to the device's IGMP
     /// state.
     fn with_igmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<BT>>) -> O>(
@@ -89,7 +95,9 @@ pub trait IgmpSendContext<BT: IgmpBindingsTypes>:
 }
 
 /// The execution context for the Internet Group Management Protocol (IGMP).
-pub trait IgmpContext<BT: IgmpBindingsTypes>: DeviceIdContext<AnyDevice> {
+pub trait IgmpContext<BT: IgmpBindingsTypes>:
+    DeviceIdContext<AnyDevice> + IgmpContextMarker
+{
     /// The inner IGMP context capable of sending packets.
     type SendContext<'a>: IgmpSendContext<BT, DeviceId = Self::DeviceId> + 'a;
 
@@ -141,7 +149,7 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::Dev
             } // TODO: Do something else here?
         };
 
-        if let Err(e) = match packet {
+        let result = match packet {
             IgmpPacket::MembershipQueryV2(msg) => {
                 let addr = msg.group_addr();
                 SpecifiedAddr::new(addr)
@@ -156,18 +164,21 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::Dev
                             group_addr,
                             msg.max_response_time().into(),
                         )
+                        .map_err(Into::into)
                     })
             }
             IgmpPacket::MembershipReportV1(msg) => {
                 let addr = msg.group_addr();
                 MulticastAddr::new(addr).map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
                     gmp::v1::handle_report_message(self, bindings_ctx, device, group_addr)
+                        .map_err(Into::into)
                 })
             }
             IgmpPacket::MembershipReportV2(msg) => {
                 let addr = msg.group_addr();
                 MulticastAddr::new(addr).map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
                     gmp::v1::handle_report_message(self, bindings_ctx, device, group_addr)
+                        .map_err(Into::into)
                 })
             }
             IgmpPacket::LeaveGroup(_) => {
@@ -178,9 +189,10 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::Dev
                 debug!("TODO(https://fxbug.dev/42071402): Support IGMPv3");
                 return;
             }
-        } {
+        };
+        result.unwrap_or_else(|e| {
             debug!("Error occurred when handling IGMPv2 message: {}", e);
-        }
+        })
     }
 }
 
@@ -203,7 +215,9 @@ impl IpExt for Ipv4 {
     }
 }
 
-impl<BT: IgmpBindingsTypes, CC: DeviceIdContext<AnyDevice>> GmpTypeLayout<Ipv4, BT> for CC {
+impl<BT: IgmpBindingsTypes, CC: DeviceIdContext<AnyDevice> + IgmpContextMarker>
+    GmpTypeLayout<Ipv4, BT> for CC
+{
     type Actions = Igmpv2Actions;
     type Config = IgmpConfig;
 }
@@ -219,7 +233,6 @@ impl<BT: IgmpBindingsTypes, CC: IgmpStateContext<BT>> GmpStateContext<Ipv4, BT> 
 }
 
 impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> GmpContext<Ipv4, BC> for CC {
-    type Err = IgmpError;
     type Inner<'a> = IgmpContextInner<'a, CC::SendContext<'a>, BC>;
 
     fn with_gmp_state_mut_and_ctx<
@@ -235,15 +248,19 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> GmpContext<Ipv4, BC> for CC {
             cb(inner, state_ref)
         })
     }
-
-    fn not_a_member_err(addr: Ipv4Addr) -> Self::Err {
-        Self::Err::NotAMember { addr }
-    }
 }
 
 pub struct IgmpContextInner<'a, CC, BT: IgmpBindingsTypes> {
     igmp_state: &'a mut IgmpState<BT>,
     core_ctx: CC,
+}
+
+impl<CC, BT: IgmpBindingsTypes> GmpTypeLayout<Ipv4, BT> for IgmpContextInner<'_, CC, BT>
+where
+    CC: DeviceIdContext<AnyDevice>,
+{
+    type Actions = Igmpv2Actions;
+    type Config = IgmpConfig;
 }
 
 impl<BT, CC> DeviceIdContext<AnyDevice> for IgmpContextInner<'_, CC, BT>
@@ -327,6 +344,26 @@ where
             }
         }
     }
+
+    fn handle_mode_change(
+        &mut self,
+        bindings_ctx: &mut BC,
+        _device: &Self::DeviceId,
+        new_mode: GmpMode,
+    ) {
+        match new_mode {
+            GmpMode::V1 { .. } => {}
+            GmpMode::V2 => {
+                let Self {
+                    igmp_state: IgmpState { v1_router_present_timer, v1_router_present },
+                    core_ctx: _,
+                } = self;
+                // Remove any information around v1 routers present when entering GMPv2.
+                *v1_router_present = false;
+                let _: Option<_> = bindings_ctx.cancel_timer(v1_router_present_timer);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -338,6 +375,12 @@ pub(crate) enum IgmpError {
     /// Failed to send an IGMP packet.
     #[error("failed to send out an IGMP packet to address: {}", addr)]
     SendFailure { addr: Ipv4Addr },
+}
+
+impl From<NotAMemberErr<Ipv4>> for IgmpError {
+    fn from(NotAMemberErr(addr): NotAMemberErr<Ipv4>) -> Self {
+        Self::NotAMember { addr }
+    }
 }
 
 pub(crate) type IgmpResult<T> = Result<T, IgmpError>;
@@ -601,6 +644,8 @@ mod tests {
         (),
     >;
 
+    impl IgmpContextMarker for FakeCoreCtx {}
+
     impl IgmpStateContext<FakeBindingsCtx> for FakeCoreCtx {
         fn with_igmp_state<
             O,
@@ -738,9 +783,8 @@ mod tests {
         unsafe { SpecifiedAddr::new_unchecked(Ipv4Addr::new([192, 168, 0, 2])) };
     const ROUTER_ADDR: Ipv4Addr = Ipv4Addr::new([192, 168, 0, 1]);
     const OTHER_HOST_ADDR: Ipv4Addr = Ipv4Addr::new([192, 168, 0, 3]);
-    const GROUP_ADDR: MulticastAddr<Ipv4Addr> = Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS;
-    const GROUP_ADDR_2: MulticastAddr<Ipv4Addr> =
-        unsafe { MulticastAddr::new_unchecked(Ipv4Addr::new([224, 0, 0, 4])) };
+    const GROUP_ADDR: MulticastAddr<Ipv4Addr> = <Ipv4 as gmp::testutil::TestIpExt>::GROUP_ADDR1;
+    const GROUP_ADDR_2: MulticastAddr<Ipv4Addr> = <Ipv4 as gmp::testutil::TestIpExt>::GROUP_ADDR2;
     const GMP_TIMER_ID: IgmpTimerId<FakeWeakDeviceId<FakeDeviceId>> =
         IgmpTimerId::Gmp(GmpTimerId {
             device: FakeWeakDeviceId(FakeDeviceId),

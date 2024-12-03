@@ -40,8 +40,9 @@ use netstack3_ip::device::{
     SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
 };
 use netstack3_ip::gmp::{
-    GmpGroupState, GmpStateRef, IgmpContext, IgmpSendContext, IgmpState, IgmpStateContext,
-    MldContext, MldSendContext, MldStateContext, MulticastGroupSet,
+    GmpGroupState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext, IgmpState,
+    IgmpStateContext, MldContext, MldContextMarker, MldSendContext, MldStateContext,
+    MulticastGroupSet,
 };
 use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
 use netstack3_ip::{
@@ -212,6 +213,8 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
     }
 }
 
+impl<BT: BindingsTypes, L> IgmpContextMarker for CoreCtx<'_, BT, L> {}
+
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     IgmpStateContext<BC> for CoreCtx<'_, BC, L>
 {
@@ -226,6 +229,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>
         cb(groups)
     }
 }
+
+impl<BT: BindingsTypes, L> MldContextMarker for CoreCtx<'_, BT, L> {}
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
     MldStateContext<BC> for CoreCtx<'_, BC, L>
@@ -1154,6 +1159,11 @@ where
     }
 }
 
+impl<BC: BindingsContext, Config, L> IgmpContextMarker
+    for CoreCtxWithIpDeviceConfiguration<'_, Config, L, BC>
+{
+}
+
 impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpContext<BC>
     for CoreCtxWithIpDeviceConfiguration<
         'a,
@@ -1212,6 +1222,11 @@ impl<'a, BC: BindingsContext> IgmpSendContext<BC>
     ) -> Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>> {
         ip::device::get_ipv4_addr_subnet(self, device)
     }
+}
+
+impl<BC: BindingsContext, Config, L> MldContextMarker
+    for CoreCtxWithIpDeviceConfiguration<'_, Config, L, BC>
+{
 }
 
 impl<
