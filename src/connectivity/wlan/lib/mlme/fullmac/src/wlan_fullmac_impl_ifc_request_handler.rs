@@ -133,10 +133,10 @@ fn handle_one_request(
                 ind: fullmac_to_mlme::convert_eapol_indication(ind),
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::OnPmkAvailable { info, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::OnPmkAvailable { payload, responder } => {
             responder.send().context("Failed to respond to OnPmkAvailable")?;
             driver_event_sink.0.send(FullmacDriverEvent::OnPmkAvailable {
-                info: fullmac_to_mlme::convert_pmk_info(info),
+                info: fullmac_to_mlme::convert_pmk_info(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::SaeHandshakeInd { ind, responder } => {

@@ -479,8 +479,13 @@ pub fn convert_eapol_indication(
 ) -> fidl_mlme::EapolIndication {
     fidl_mlme::EapolIndication { src_addr: ind.src_addr, dst_addr: ind.dst_addr, data: ind.data }
 }
-pub fn convert_pmk_info(info: fidl_fullmac::WlanFullmacPmkInfo) -> fidl_mlme::PmkInfo {
-    fidl_mlme::PmkInfo { pmk: info.pmk, pmkid: info.pmkid }
+pub fn convert_pmk_info(
+    info: fidl_fullmac::WlanFullmacImplIfcOnPmkAvailableRequest,
+) -> Result<fidl_mlme::PmkInfo> {
+    Ok(fidl_mlme::PmkInfo {
+        pmk: info.pmk.context("missing pmk")?,
+        pmkid: info.pmkid.context("missing pmkid")?,
+    })
 }
 pub fn convert_sae_handshake_indication(
     ind: fidl_fullmac::WlanFullmacSaeHandshakeInd,

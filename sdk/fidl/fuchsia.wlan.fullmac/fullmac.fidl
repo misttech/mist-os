@@ -325,11 +325,6 @@ type WlanFullmacChannelSwitchInfo = struct {
     new_channel uint8;
 };
 
-type WlanFullmacPmkInfo = struct {
-    pmk vector<uint8>:MAX;
-    pmkid vector<uint8>:MAX;
-};
-
 /// Protocol definition for communication from the fullmac vendor driver to the platform.
 @discoverable
 closed protocol WlanFullmacImplIfc {
@@ -485,8 +480,12 @@ closed protocol WlanFullmacImplIfc {
     strict EapolInd(struct {
         ind WlanFullmacEapolIndication;
     }) -> ();
-    strict OnPmkAvailable(struct {
-        info WlanFullmacPmkInfo;
+    /// Inform the platform that the PMK is available after a driver-handled SAE handshake.
+    strict OnPmkAvailable(table {
+        /// The pairwise master key bytes. Required.
+        1: pmk vector<uint8>:MAX;
+        /// The PMK IDs. Required.
+        2: pmkid vector<uint8>:MAX;
     }) -> ();
     strict SaeHandshakeInd(struct {
         ind WlanFullmacSaeHandshakeInd;

@@ -1812,7 +1812,11 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let pmk_info = fidl_fullmac::WlanFullmacPmkInfo { pmk: vec![1u8; 2], pmkid: vec![3u8; 4] };
+        let pmk_info = fidl_fullmac::WlanFullmacImplIfcOnPmkAvailableRequest {
+            pmk: Some(vec![1u8; 2]),
+            pmkid: Some(vec![3u8; 4]),
+            ..Default::default()
+        };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.on_pmk_available(&pmk_info)),
             Poll::Ready(Ok(()))
