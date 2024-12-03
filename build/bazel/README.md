@@ -130,6 +130,32 @@ the user's home directory (e.g. `$HOME/.cache/bazel/`) are:
   build configuration. See `//build/bazel/platforms/BUILD.bazel` for more
   details.
 
+# ACCESSING THE BAZEL WORKSPACE AND ARTIFACTS EASILY
+
+Several convenience symlinks in your Fuchsia source tree are created
+by `fx set` to access the Bazel workspace, external repositories and
+artifacts more easily. Namely:
+
+- `bazel-workspace` points to the Bazel workspace directory. This link will
+  be dangling after a clean build, until you generate the workspace itself
+  (e.g. with `fx build bazel_workspace`).
+
+- `bazel-bin` and `bazel-out` have the same role as with regular Bazel, but
+  will only point to directories corresponding to the *latest* Bazel build
+  invocation. Keep in mind that a single `fx build <target>` command might
+  end up invoking several different Bazel build commands.
+
+- `bazel-repos` points to the directory where all external repositories
+  are stored. This is mostly useful to the build team to inspect that
+  repository rules generated the correct output.
+
+These symlinks targets will be updated on each `fx set`, `fx use` or
+`fx change-build-dir` command.
+
+IMPORTANT: This feature is *purely* for developer convenience during local
+development and *nothing* should depend on these links in our build rules
+or scripts. In particular, these directories never exist on infra builders.
+
 # NINJA OUTPUTS AS BAZEL INPUTS
 
 GN target outputs (i.e. Ninja build artifacts) can be exposed to the Bazel

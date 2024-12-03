@@ -233,6 +233,19 @@ function _symlink_relative {
   ln -sf "$source_rel" "$link"
 }
 
+function _directory_symlink_relative {
+  source="$1"
+  link="$2"
+  # Do _not_ support ln's behavior, remove any existing link if it exists.
+  # otherwise a new link will be created into the target directory instead.
+  if [ -e "$link" ]; then
+    rm "$link"
+  fi
+  link_dir="$(dirname "$link")"
+  source_rel="${source#"$link_dir/"}"
+  ln -sf "$source_rel" "$link"
+}
+
 function _link_gen_artifacts {
   # These artifacts need to be in the root directory.
   local -r linked_artifacts=("compile_commands.json" "rust-project.json")
@@ -241,6 +254,23 @@ function _link_gen_artifacts {
       _symlink_relative "${FUCHSIA_BUILD_DIR}/$artifact" "${FUCHSIA_DIR}/$artifact"
     fi
   done
+
+  # Create Bazel convenience symlinks. See //build/bazel/README.md
+  _directory_symlink_relative \
+      "${FUCHSIA_BUILD_DIR}/gen/build/bazel/workspace" \
+      "${FUCHSIA_DIR}/bazel-workspace"
+
+  _directory_symlink_relative \
+      "${FUCHSIA_BUILD_DIR}/gen/build/bazel/workspace/bazel-bin" \
+      "${FUCHSIA_DIR}/bazel-bin"
+
+  _directory_symlink_relative \
+      "${FUCHSIA_BUILD_DIR}/gen/build/bazel/workspace/bazel-out" \
+      "${FUCHSIA_DIR}/bazel-out"
+
+  _directory_symlink_relative \
+      "${FUCHSIA_BUILD_DIR}/gen/build/bazel/output_base/external" \
+      "${FUCHSIA_DIR}/bazel-repos"
 }
 
 function fx-gen-internal {

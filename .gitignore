@@ -184,6 +184,12 @@ tables_generator_tests_*.txt
 # rust-analyzer
 /rust-project.json
 
+# Symlinks related to the Bazel workspace
+/bazel-bin
+/bazel-out
+/bazel-repos
+/bazel-workspace
+
 # Symlinks created by `fx setup-go`.
 /go.mod
 /go.sum

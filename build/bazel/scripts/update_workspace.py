@@ -787,6 +787,9 @@ def main() -> int:
         # Don´t symlink the .git directory as well, since it needs to be handled separately.
         if path.startswith((".jiri", ".fx", ".git")):
             return True
+        # Don't symlink the convenience symlinks from the Fuchsia source tree
+        if path in ("bazel-bin", "bazel-out", "bazel-repos", "bazel-workspace"):
+            return True
         return False
 
     generated.add_top_entries(fuchsia_dir, "workspace", excluded_file)
