@@ -291,7 +291,7 @@ impl PhyManager {
     /// Creates an interface of the requested role for the requested PHY ID.  Returns either the
     /// ID of the created interface or an error.
     async fn create_iface(
-        &self,
+        &mut self,
         phy_id: u16,
         role: fidl_common::WlanMacRole,
         sta_addr: MacAddr,
@@ -326,12 +326,11 @@ impl PhyManager {
             }
         };
 
-        if create_iface_response.is_ok() {
-            self.telemetry_sender.send(TelemetryEvent::IfaceCreationResult(Ok(())));
-        } else {
-            self.telemetry_sender.send(TelemetryEvent::IfaceCreationResult(Err(())));
+        if create_iface_response.is_err() {
+            self.record_defect(Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id }));
+            return create_iface_response;
         }
-
+        self.telemetry_sender.send(TelemetryEvent::IfaceCreationResult(Ok(())));
         create_iface_response
     }
 }
@@ -475,9 +474,6 @@ impl PhyManagerApi for PhyManager {
                         Err(e) => {
                             warn!("Failed to recover iface for PHY {}: {:?}", phy_id, e);
                             let _ = available_iface_ids.insert(phy_id, Err(e));
-                            self.record_defect(Defect::Phy(PhyFailure::IfaceCreationFailure {
-                                phy_id,
-                            }));
                             continue;
                         }
                     };
@@ -597,15 +593,7 @@ impl PhyManagerApi for PhyManager {
                     None => NULL_ADDR,
                 };
                 let iface_id =
-                    match self.create_iface(*ap_phy_id, fidl_common::WlanMacRole::Ap, mac).await {
-                        Ok(iface_id) => iface_id,
-                        Err(e) => {
-                            self.record_defect(Defect::Phy(PhyFailure::IfaceCreationFailure {
-                                phy_id: *ap_phy_id,
-                            }));
-                            return Err(e);
-                        }
-                    };
+                    self.create_iface(*ap_phy_id, fidl_common::WlanMacRole::Ap, mac).await?;
 
                 let phy_container = self.phys.get_mut(ap_phy_id).unwrap();
                 let _ = phy_container.ap_ifaces.insert(iface_id);
@@ -743,8 +731,19 @@ impl PhyManagerApi for PhyManager {
         let mut recovery_action = None;
 
         match defect {
-            Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id })
-            | Defect::Phy(PhyFailure::IfaceDestructionFailure { phy_id }) => {
+            Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id }) => {
+                self.telemetry_sender.send(TelemetryEvent::IfaceCreationResult(Err(())));
+                if let Some(container) = self.phys.get_mut(&phy_id) {
+                    container.defects.add_event(defect);
+                    recovery_action = (self.recovery_profile)(
+                        phy_id,
+                        &mut container.defects,
+                        &mut container.recoveries,
+                        defect,
+                    )
+                }
+            }
+            Defect::Phy(PhyFailure::IfaceDestructionFailure { phy_id }) => {
                 if let Some(container) = self.phys.get_mut(&phy_id) {
                     container.defects.add_event(defect);
                     recovery_action = (self.recovery_profile)(
@@ -3821,7 +3820,7 @@ mod tests {
     fn test_create_iface_succeeds() {
         let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
-        let phy_manager = PhyManager::new(
+        let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
             recovery::lookup_recovery_profile(""),
             false,
@@ -3854,7 +3853,7 @@ mod tests {
     fn test_create_iface_fails() {
         let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
-        let phy_manager = PhyManager::new(
+        let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
             recovery::lookup_recovery_profile(""),
             false,
@@ -3862,35 +3861,47 @@ mod tests {
             test_values.telemetry_sender,
             test_values.recovery_sender,
         );
+        let mut phy_container = PhyContainer::new(vec![]);
+        let _ = phy_container.client_ifaces.insert(0, fake_security_support());
+        let _ = phy_manager.phys.insert(0, phy_container);
 
-        // Issue a create iface request
-        let fut = phy_manager.create_iface(0, fidl_common::WlanMacRole::Client, NULL_ADDR);
-        let mut fut = pin!(fut);
+        {
+            // Issue a create iface request
+            let fut = phy_manager.create_iface(0, fidl_common::WlanMacRole::Client, NULL_ADDR);
+            let mut fut = pin!(fut);
 
-        // Wait for the request to stall out waiting for DeviceMonitor.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            // Wait for the request to stall out waiting for DeviceMonitor.
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Send back a failure from DeviceMonitor.
-        send_create_iface_response(&mut exec, &mut test_values.monitor_stream, None);
+            // Send back a failure from DeviceMonitor.
+            send_create_iface_response(&mut exec, &mut test_values.monitor_stream, None);
 
-        // The future should complete.
-        assert_variant!(
-            exec.run_until_stalled(&mut fut),
-            Poll::Ready(Err(PhyManagerError::IfaceCreateFailure))
+            // The future should complete.
+            assert_variant!(
+                exec.run_until_stalled(&mut fut),
+                Poll::Ready(Err(PhyManagerError::IfaceCreateFailure))
+            );
+
+            // Verify that a metric has been logged.
+            assert_variant!(
+                test_values.telemetry_receiver.try_next(),
+                Ok(Some(TelemetryEvent::IfaceCreationResult(Err(()))))
+            );
+        }
+
+        // Verify the defect was recorded.
+        assert_eq!(phy_manager.phys[&0].defects.events.len(), 1);
+        assert_eq!(
+            phy_manager.phys[&0].defects.events[0].value,
+            Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id: 0 })
         );
-
-        // Verify that a metric has been logged.
-        assert_variant!(
-            test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::IfaceCreationResult(Err(()))))
-        )
     }
 
     #[fuchsia::test]
     fn test_create_iface_request_fails() {
         let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
-        let phy_manager = PhyManager::new(
+        let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
             recovery::lookup_recovery_profile(""),
             false,
@@ -3898,24 +3909,36 @@ mod tests {
             test_values.telemetry_sender,
             test_values.recovery_sender,
         );
+        let mut phy_container = PhyContainer::new(vec![]);
+        let _ = phy_container.client_ifaces.insert(0, fake_security_support());
+        let _ = phy_manager.phys.insert(0, phy_container);
 
         drop(test_values.monitor_stream);
 
-        // Issue a create iface request
-        let fut = phy_manager.create_iface(0, fidl_common::WlanMacRole::Client, NULL_ADDR);
-        let mut fut = pin!(fut);
+        {
+            // Issue a create iface request
+            let fut = phy_manager.create_iface(0, fidl_common::WlanMacRole::Client, NULL_ADDR);
+            let mut fut = pin!(fut);
 
-        // The request should immediately fail.
-        assert_variant!(
-            exec.run_until_stalled(&mut fut),
-            Poll::Ready(Err(PhyManagerError::IfaceCreateFailure))
+            // The request should immediately fail.
+            assert_variant!(
+                exec.run_until_stalled(&mut fut),
+                Poll::Ready(Err(PhyManagerError::IfaceCreateFailure))
+            );
+
+            // Verify that a metric has been logged.
+            assert_variant!(
+                test_values.telemetry_receiver.try_next(),
+                Ok(Some(TelemetryEvent::IfaceCreationResult(Err(()))))
+            );
+        }
+
+        // Verify the defect was recorded.
+        assert_eq!(phy_manager.phys[&0].defects.events.len(), 1);
+        assert_eq!(
+            phy_manager.phys[&0].defects.events[0].value,
+            Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id: 0 })
         );
-
-        // Verify that a metric has been logged.
-        assert_variant!(
-            test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::IfaceCreationResult(Err(()))))
-        )
     }
 
     #[fuchsia::test]
