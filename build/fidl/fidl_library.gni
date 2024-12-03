@@ -441,6 +441,14 @@ template("fidl_library") {
                          "//tools/fidl/fidlc/testdata/*",
                        ]) != []) {
       args += [ ":" ]  # NOOP - Nothing to lint, but touch the stamp file
+    } else if (!defined(invoker.excluded_checks) &&
+               filter_include(
+                   [ get_label_info(target_name, "dir") ],
+                   [
+                     # TODO(https://fxbug.dev/381163466): Fix lint warnings.
+                     "//vendor/*",
+                   ]) != []) {
+      args += [ ":" ]  # NOOP - Nothing to lint, but touch the stamp file
     } else {
       args += [ rebase_path(host_tool_path, root_build_dir) ]
 
@@ -658,19 +666,19 @@ template("fidl_library") {
     }
 
     # Generate the library metadata.
-    meta_file = "$target_gen_dir/${target_name}.sdk_meta.json"
-    meta_target_name = "${target_name}_meta"
+    sdk_meta_file = "${target_gen_dir}/${target_name}.sdk_meta.json"
+    sdk_meta_target_name = "${target_name}_meta"
 
-    action(meta_target_name) {
+    action(sdk_meta_target_name) {
       script = "//build/fidl/gen_sdk_meta.py"
 
       inputs = sdk_metas
 
-      outputs = [ meta_file ]
+      outputs = [ sdk_meta_file ]
 
       args = [
         "--out",
-        rebase_path(meta_file, root_build_dir),
+        rebase_path(sdk_meta_file, root_build_dir),
         "--name",
         library_name,
         "--root",
@@ -718,7 +726,7 @@ template("fidl_library") {
       }
 
       meta = {
-        source = meta_file
+        source = sdk_meta_file
         dest = "$file_base/meta.json"
         schema = "fidl_library"
         stable = is_stable
@@ -747,8 +755,8 @@ template("fidl_library") {
       }
 
       non_sdk_deps = [
-                       ":$compilation_target_name",
-                       ":$meta_target_name",
+                       ":$main_target_name",
+                       ":$sdk_meta_target_name",
                      ] + sdk_atom_deps
 
       deps = []

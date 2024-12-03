@@ -239,9 +239,6 @@ sdk_molecule("fidl") {
   non_sdk_deps = []
   foreach(fidl_library_path, _partner_idk_fidl_libraries_targets_list) {
     deps += [ "${fidl_library_path}_sdk($fidl_toolchain)" ]
-
-    # For completeness, build the underlying libraries too.
-    non_sdk_deps += [ "${fidl_library_path}($fidl_toolchain)" ]
   }
 
   # Ensure that the API compatibility tests run on libraries that require
@@ -311,11 +308,8 @@ sdk_molecule("partner_internal_fidl_libraries_non_sdk_molecule") {
 
   deps = []
   non_sdk_deps = []
-  foreach(fidl_library, _partner_internal_fidl_libraries_targets_list) {
-    deps += [ "${fidl_library}_sdk($fidl_toolchain)" ]
-
-    # For completeness, build the underlying libraries too.
-    non_sdk_deps += [ "${fidl_library}($fidl_toolchain)" ]
+  foreach(fidl_library_path, _partner_internal_fidl_libraries_targets_list) {
+    deps += [ "${fidl_library_path}_sdk($fidl_toolchain)" ]
   }
 }
 
