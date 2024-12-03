@@ -617,7 +617,7 @@ fn parse_integration_manifest(
             matches!(
                 e,
                 Ok(XmlEvent::StartElement { name, .. })
-                    if name.local_name == String::from("project")
+                    if name.local_name == *"project"
             )
         })
         .map(|e| match e {

@@ -60,8 +60,8 @@ impl BuildScriptOutput {
                 "rerun-if-changed" => continue, // ignored because these are always vendored
                 "rerun-if-env-changed" => continue, // ignored because these are always vendored
                 "rustc-cfg" => bs.rustflags.push(format!("\"--cfg={}\"", value)),
-                "rustc-env" => bs.rustenv.push(format!("\"{}\"", value.to_string())),
-                "rustc-flags" => bs.rustflags.push(format!("\"{}\"", value.to_string())),
+                "rustc-env" => bs.rustenv.push(format!("\"{}\"", value)),
+                "rustc-flags" => bs.rustflags.push(format!("\"{}\"", value)),
                 "rustc-link-arg" => bs.rustflags.push(format!("\"-C link-arg={}\"", value)),
                 "rustc-link-lib" => bs.rustflags.push(format!("\"-l {}\"", value)),
                 // "rustc-link-search" => bs.rustflags.push(format!("-L {}", value)),

@@ -61,6 +61,7 @@ impl Args {
     }
 }
 
+#[allow(clippy::large_enum_variant, reason = "mass allow for https://fxbug.dev/381896734")]
 #[derive(Debug, FromArgs)]
 #[argh(subcommand)]
 enum Action {
