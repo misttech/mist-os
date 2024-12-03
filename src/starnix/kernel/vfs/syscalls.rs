@@ -1514,7 +1514,7 @@ fn get_fd_flags(flags: u32) -> FdFlags {
 }
 
 pub fn sys_pipe2(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_pipe: UserRef<FdNumber>,
     flags: u32,
@@ -1523,7 +1523,7 @@ pub fn sys_pipe2(
     if flags & !(O_CLOEXEC | supported_file_flags.bits()) != 0 {
         return error!(EINVAL);
     }
-    let (read, write) = new_pipe(current_task)?;
+    let (read, write) = new_pipe(locked, current_task)?;
 
     let file_flags = OpenFlags::from_bits_truncate(flags & supported_file_flags.bits());
     read.update_file_flags(file_flags, supported_file_flags);

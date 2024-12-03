@@ -16,6 +16,7 @@ use starnix_core::fs::sysfs::{sys_fs, DeviceDirectory};
 use starnix_core::fs::tmpfs::tmp_fs;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::fs_registry::FsRegistry;
+use starnix_core::vfs::pipe::register_pipe_fs;
 use starnix_modules_cgroup::{CgroupV1Fs, CgroupV2Fs};
 use starnix_modules_device_mapper::{create_device_mapper, device_mapper_init};
 use starnix_modules_ext4::ExtFilesystem;
@@ -114,6 +115,7 @@ pub fn register_common_file_systems(_locked: &mut Locked<'_, Unlocked>, kernel: 
     registry.register(b"fusectl".into(), new_fusectl_fs);
     registry.register(b"nmfs".into(), nmfs);
     registry.register(b"overlay".into(), new_overlay_fs);
+    register_pipe_fs(registry.as_ref());
     registry.register(b"proc".into(), proc_fs);
     registry.register(b"remotefs".into(), new_remote_fs);
     registry.register(b"selinuxfs".into(), selinux_fs);

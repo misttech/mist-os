@@ -555,7 +555,8 @@ mod tests {
     use crate::testing::{create_kernel_task_and_unlocked, create_task};
     use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
     use crate::vfs::eventfd::{new_eventfd, EventFdType};
-    use crate::vfs::pipe::new_pipe;
+    use crate::vfs::fs_registry::FsRegistry;
+    use crate::vfs::pipe::{new_pipe, register_pipe_fs};
     use crate::vfs::socket::{SocketDomain, SocketType, UnixSocket};
     use starnix_lifecycle::AtomicUsizeCounter;
     use starnix_sync::Unlocked;
@@ -571,9 +572,10 @@ mod tests {
         const EVENT_DATA: u64 = 42;
 
         let (kernel, _init_task, mut locked) = create_kernel_task_and_unlocked();
+        register_pipe_fs(kernel.expando.get::<FsRegistry>().as_ref());
         let current_task = create_task(&mut locked, &kernel, "main-task");
 
-        let (pipe_out, pipe_in) = new_pipe(&current_task).unwrap();
+        let (pipe_out, pipe_in) = new_pipe(&mut locked, &current_task).unwrap();
 
         let test_string = "hello starnix".to_string();
         let test_len = test_string.len();
@@ -620,9 +622,10 @@ mod tests {
     async fn test_epoll_ready_then_wait() {
         const EVENT_DATA: u64 = 42;
 
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        register_pipe_fs(kernel.expando.get::<FsRegistry>().as_ref());
 
-        let (pipe_out, pipe_in) = new_pipe(&current_task).unwrap();
+        let (pipe_out, pipe_in) = new_pipe(&mut locked, &current_task).unwrap();
 
         let test_string = "hello starnix".to_string();
         let test_bytes = test_string.as_bytes();

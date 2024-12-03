@@ -6,13 +6,12 @@ use crate::mm::{
     read_to_vec, MemoryAccessorExt, NumberOfElementsRead, TaskMemoryAccessor, PAGE_SIZE,
 };
 use crate::signals::{send_standard_signal, SignalInfo};
-use crate::task::{
-    CurrentTask, EventHandler, Kernel, WaitCallback, WaitCanceler, WaitQueue, Waiter,
-};
+use crate::task::{CurrentTask, EventHandler, WaitCallback, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{
     Buffer, InputBuffer, InputBufferCallback, MessageData, MessageQueue, OutputBuffer,
     OutputBufferCallback, PeekBufferSegmentsCallback, PipeMessageData, UserBuffersOutputBuffer,
 };
+use crate::vfs::fs_registry::FsRegistry;
 use crate::vfs::{
     default_fcntl, default_ioctl, fileops_impl_nonseekable, fileops_impl_noop_sync, CacheMode,
     FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
@@ -388,8 +387,16 @@ impl Pipe {
 /// The first FileObject is the read endpoint of the pipe. The second is the
 /// write endpoint of the pipe. This order matches the order expected by
 /// sys_pipe2().
-pub fn new_pipe(current_task: &CurrentTask) -> Result<(FileHandle, FileHandle), Errno> {
-    let fs = pipe_fs(current_task.kernel());
+pub fn new_pipe(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+) -> Result<(FileHandle, FileHandle), Errno> {
+    let fs = current_task
+        .kernel()
+        .expando
+        .get::<FsRegistry>()
+        .create(locked, current_task, "pipefs".into(), FileSystemOptions::default())
+        .ok_or_else(|| errno!(EINVAL))??;
     let node = fs.create_node(current_task, SpecialNode, |id| {
         let mut info = FsNodeInfo::new(id, mode!(IFIFO, 0o600), current_task.as_fscred());
         info.blksize = ATOMIC_IO_BYTES.into();
@@ -424,11 +431,24 @@ impl FileSystemOps for PipeFs {
         "pipefs".into()
     }
 }
-fn pipe_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {
-    kernel.pipe_fs.get_or_init(|| {
-        FileSystem::new(kernel, CacheMode::Uncached, PipeFs, FileSystemOptions::default())
-            .expect("pipefs constructed with valid options")
-    })
+
+fn pipe_fs(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    _options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    let kernel = current_task.kernel();
+    Ok(kernel
+        .pipe_fs
+        .get_or_init(|| {
+            FileSystem::new(kernel, CacheMode::Uncached, PipeFs, FileSystemOptions::default())
+                .expect("pipefs constructed with valid options")
+        })
+        .clone())
+}
+
+pub fn register_pipe_fs(fs_registry: &FsRegistry) {
+    fs_registry.register("pipefs".into(), pipe_fs);
 }
 
 pub struct PipeFileObject {
