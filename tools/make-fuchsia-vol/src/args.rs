@@ -88,6 +88,11 @@ pub struct TopLevel {
     #[argh(option)]
     pub product_bundle_name: Option<String>,
 
+    /// the path to the mkfs-msdosfs tool. If this is not specified, make-fuchsia-vol will try
+    /// to derive it from fuchsia_build_dir and/or environment variables.
+    #[argh(option)]
+    pub mkfs_msdosfs: Option<Utf8PathBuf>,
+
     /// the architecture of the target CPU (x64|arm64)
     #[argh(option, default = "Arch::X64")]
     pub arch: Arch,
