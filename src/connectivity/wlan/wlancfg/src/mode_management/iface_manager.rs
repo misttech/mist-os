@@ -693,21 +693,30 @@ impl IfaceManagerService {
             self.clients.iter().position(|client_container| client_container.iface_id == iface_id)
         {
             let _ = self.clients.remove(iface_index);
-            let client_ifaces = match self
+            let client_iface_ids = self
                 .phy_manager
                 .lock()
                 .await
                 .create_all_client_ifaces(CreateClientIfacesReason::RecoverClientIfaces)
-                .await
-            {
-                Ok(iface_ids) => iface_ids,
-                Err((iface_ids, e)) => {
-                    warn!("failed to recover some client interfaces: {:?}", e);
-                    iface_ids
-                }
-            };
+                .await;
+            if client_iface_ids.values().any(Result::is_err) {
+                warn!(
+                    "failed to recover some client interfaces: {:?}",
+                    client_iface_ids
+                        .iter()
+                        .filter_map(|(phy_id, iface_ids)| {
+                            if iface_ids.is_err() {
+                                Some((phy_id, iface_ids.clone().unwrap_err()))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                );
+            }
+            let client_iface_ids = client_iface_ids.into_values().flat_map(Result::unwrap);
 
-            for iface_id in client_ifaces {
+            for iface_id in client_iface_ids {
                 match self.get_client(Some(iface_id)).await {
                     Ok(iface) => self.clients.push(iface),
                     Err(e) => {
@@ -796,22 +805,23 @@ impl IfaceManagerService {
 
     async fn start_client_connections(&mut self) -> Result<(), Error> {
         let mut phy_manager = self.phy_manager.lock().await;
-        let client_iface_ids = match phy_manager
+        let client_iface_ids = phy_manager
             .create_all_client_ifaces(CreateClientIfacesReason::StartClientConnections)
-            .await
-        {
-            Ok(client_iface_ids) => client_iface_ids,
-            Err((_, phy_manager_error)) => {
-                return Err(format_err!(
-                    "could not start client connection {:?}",
-                    phy_manager_error
-                ));
-            }
-        };
+            .await;
+        if client_iface_ids.values().any(Result::is_err) {
+            return Err(format_err!(
+                "could not start client connection: {:?}",
+                client_iface_ids
+                    .into_iter()
+                    .map(|(phy_id, error)| (phy_id, error.unwrap_err()))
+                    .collect::<Vec<_>>()
+            ));
+        }
+        let client_iface_ids = client_iface_ids.into_values().flat_map(Result::unwrap);
 
         // Resume client interfaces.
         drop(phy_manager);
-        for iface_id in client_iface_ids.clone() {
+        for iface_id in client_iface_ids {
             if let Err(e) = self.handle_added_iface(iface_id).await {
                 error!("failed to resume client {}: {:?}", iface_id, e);
             };
@@ -1533,6 +1543,7 @@ mod tests {
     use futures::task::Poll;
     use ieee80211::MacAddr;
     use lazy_static::lazy_static;
+    use std::collections::HashMap;
     use std::pin::pin;
     use test_case::test_case;
     use wlan_common::channel::Cbw;
@@ -1680,11 +1691,11 @@ mod tests {
         async fn create_all_client_ifaces(
             &mut self,
             _reason: CreateClientIfacesReason,
-        ) -> Result<Vec<u16>, (Vec<u16>, PhyManagerError)> {
+        ) -> HashMap<u16, Result<Vec<u16>, PhyManagerError>> {
             if self.create_iface_ok {
-                Ok(self.client_ifaces.clone())
+                HashMap::from([(0, Ok(self.client_ifaces.clone()))])
             } else {
-                Err((vec![], PhyManagerError::IfaceCreateFailure))
+                HashMap::from([(0, Err(PhyManagerError::IfaceCreateFailure))])
             }
         }
 

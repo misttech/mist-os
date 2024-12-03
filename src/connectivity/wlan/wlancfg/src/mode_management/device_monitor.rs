@@ -154,6 +154,7 @@ mod tests {
     use futures::task::Poll;
     use futures::StreamExt;
     use ieee80211::MacAddr;
+    use std::collections::HashMap;
     use std::pin::pin;
     use wlan_common::assert_variant;
     use {
@@ -792,7 +793,7 @@ mod tests {
         async fn create_all_client_ifaces(
             &mut self,
             _reason: CreateClientIfacesReason,
-        ) -> Result<Vec<u16>, (Vec<u16>, PhyManagerError)> {
+        ) -> HashMap<u16, Result<Vec<u16>, PhyManagerError>> {
             unimplemented!()
         }
 
