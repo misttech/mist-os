@@ -1,1 +1,1 @@
-include /sdk/fidl/fuchsia.component.config/OWNERS
+include /sdk/fidl/fuchsia.component/OWNERS
