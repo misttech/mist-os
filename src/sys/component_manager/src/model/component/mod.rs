@@ -882,6 +882,7 @@ impl ComponentInstance {
                 futures.push(nf);
             }
         }
+        #[allow(clippy::manual_try_fold, reason = "mass allow for https://fxbug.dev/381896734")]
         join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))
     }
 
@@ -1092,6 +1093,10 @@ impl ComponentInstance {
                 .iter()
                 .map(|component| async move { component.ensure_started(&StartReason::Eager).await })
                 .collect();
+            #[allow(
+                clippy::manual_try_fold,
+                reason = "mass allow for https://fxbug.dev/381896734"
+            )]
             join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))?;
             Ok(())
         };

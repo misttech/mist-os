@@ -1761,7 +1761,7 @@ where
         let path = to_obj.path().expect("no path on use storage");
         Some(OneOrMany::One(path.clone()))
     } else if let Some(_) = in_obj.event_stream() {
-        let default_path = Path::new("/svc/fuchsia.component.EventStream".to_string()).unwrap();
+        let default_path = Path::new("/svc/fuchsia.component.EventStream").unwrap();
         let path = to_obj.path().unwrap_or(&default_path);
         Some(OneOrMany::One(path.clone()))
     } else {

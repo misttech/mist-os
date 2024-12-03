@@ -104,7 +104,7 @@ impl LocalComponentHandles {
         &self,
         name: &str,
     ) -> Result<P::Proxy, Error> {
-        let svc_dir_proxy = self.namespace.get(&"/svc".to_string()).ok_or_else(|| {
+        let svc_dir_proxy = self.namespace.get("/svc").ok_or_else(|| {
             format_err!("the component's namespace doesn't have a /svc directory")
         })?;
         fuchsia_component::client::connect_to_named_protocol_at_dir_root::<P>(svc_dir_proxy, name)

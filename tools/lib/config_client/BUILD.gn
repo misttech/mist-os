@@ -33,7 +33,10 @@ if (is_host) {
       "//third_party/rust_crates:syn",
       "//third_party/rust_crates:thiserror",
     ]
-    test_deps = [ "//src/sys/lib/fidl_fuchsia_component_config_ext" ]
+    test_deps = [
+      "//src/sys/lib/fidl_fuchsia_component_config_ext",
+      "//third_party/rust_crates:pretty_assertions",
+    ]
   }
 }
 

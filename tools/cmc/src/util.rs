@@ -51,6 +51,7 @@ pub(crate) fn write_depfile(
             fs::remove_file(depfile)?;
         }
     } else if let Some(output_path) = output {
+        #[allow(clippy::format_collect, reason = "mass allow for https://fxbug.dev/381896734")]
         let depfile_contents = format!(
             "{}:{}\n",
             output_path.display(),

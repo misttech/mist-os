@@ -141,8 +141,7 @@ impl Store {
         while cursor.position() < bytes_len as u64 {
             let client_name_length =
                 cursor.read_u64::<LittleEndian>().context("reading name length")? as usize;
-            let mut client_name = Vec::new();
-            client_name.resize(client_name_length, 0);
+            let mut client_name = vec![0; client_name_length];
             cursor.read_exact(&mut client_name[..]).context("reading name")?;
 
             let client_entries = cursor.read_u64::<LittleEndian>().context("reading # entries")?;
@@ -151,8 +150,7 @@ impl Store {
             for _ in 0..client_entries {
                 let key_length =
                     cursor.read_u64::<LittleEndian>().context("reading key length")? as usize;
-                let mut key_bytes = Vec::new();
-                key_bytes.resize(key_length, 0);
+                let mut key_bytes = vec![0; key_length];
                 cursor.read_exact(&mut key_bytes[..]).context("reading key")?;
 
                 let mut val_type = [0; 1];
@@ -162,8 +160,7 @@ impl Store {
                 let val_length =
                     cursor.read_u64::<LittleEndian>().context("reading value length")? as usize;
 
-                let mut val_bytes = Vec::new();
-                val_bytes.resize(val_length, 0);
+                let mut val_bytes = vec![0; val_length];
                 cursor.read_exact(&mut val_bytes[..]).context("reading value")?;
 
                 client_data

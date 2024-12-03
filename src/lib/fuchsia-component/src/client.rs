@@ -418,11 +418,8 @@ pub fn connect_to_instance_in_service_dir<S: ServiceMarker>(
     directory: &fio::DirectoryProxy,
     instance: &str,
 ) -> Result<S::Proxy, Error> {
-    let directory_proxy = fuchsia_fs::directory::open_directory_async(
-        directory,
-        &instance.to_string(),
-        fio::Flags::empty(),
-    )?;
+    let directory_proxy =
+        fuchsia_fs::directory::open_directory_async(directory, instance, fio::Flags::empty())?;
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
 }
 

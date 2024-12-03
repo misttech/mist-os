@@ -378,10 +378,8 @@ where
             Ok(FilteredAggregateCapabilityRouteData { capability_source, instance_filter })
         };
         // Without the explicit type, this does not compile
-        let mut out: Vec<
-            BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>,
-        > = vec![];
-        out.push(Box::pin(fut));
+        let out: Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>> =
+            vec![Box::pin(fut)];
         out
     }
 

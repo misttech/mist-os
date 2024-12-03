@@ -110,9 +110,7 @@ async fn monitor_storage(
                     log_cobalt_occurence(
                         &cobalt_logger,
                         metrics::CACHE_EVICTION_METRIC_ID,
-                        &vec![
-                            metrics::CacheEvictionMetricDimensionResult::FailedChannelClosed as u32,
-                        ],
+                        &[metrics::CacheEvictionMetricDimensionResult::FailedChannelClosed as u32],
                     )
                     .await;
                     panic!(

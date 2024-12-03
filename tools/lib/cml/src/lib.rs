@@ -198,7 +198,7 @@ impl<'a> CapabilityId<'a> {
                 return Ok(vec![CapabilityId::UsedEventStream(path.clone())]);
             }
             return Ok(vec![CapabilityId::UsedEventStream(Path::new(
-                "/svc/fuchsia.component.EventStream".to_string(),
+                "/svc/fuchsia.component.EventStream",
             )?)]);
         } else if let Some(n) = use_.runner() {
             match n {

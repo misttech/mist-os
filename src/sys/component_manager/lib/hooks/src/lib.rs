@@ -362,10 +362,10 @@ impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let payload = match &self.payload {
             EventPayload::CapabilityRequested { source_moniker, name, .. } => {
-                format!("requested '{}' from '{}'", name.to_string(), source_moniker)
+                format!("requested '{}' from '{}'", name, source_moniker)
             }
             EventPayload::Stopped { status, .. } => {
-                format!("with status: {}", status.to_string())
+                format!("with status: {}", status)
             }
             EventPayload::Destroyed { .. }
             | EventPayload::Resolved { .. }
@@ -373,7 +373,7 @@ impl fmt::Display for Event {
             | EventPayload::Started { .. }
             | EventPayload::Unresolved => "".to_string(),
         };
-        write!(f, "[{}] '{}' {}", self.event_type().to_string(), self.target_moniker, payload)
+        write!(f, "[{}] '{}' {}", self.event_type(), self.target_moniker, payload)
     }
 }
 
