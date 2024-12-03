@@ -56,6 +56,12 @@ class ExceptionHandle {
   // order to differentiate this case from "0" addresses, ExceptionRecord.valid will be set to
   // false on failure.
   virtual debug_ipc::ExceptionRecord GetRecord() const = 0;
+
+  // Returns the raw process id from the low level exception object.
+  virtual uint64_t GetPid() const = 0;
+
+  // Returns the raw thread id from the low level exception object.
+  virtual uint64_t GetTid() const = 0;
 };
 
 }  // namespace debug_agent

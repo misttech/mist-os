@@ -88,4 +88,8 @@ debug_ipc::ExceptionRecord ZirconExceptionHandle::GetRecord() const {
   return debug_ipc::ExceptionRecord();
 }
 
+uint64_t ZirconExceptionHandle::GetPid() const { return info_.pid; }
+
+uint64_t ZirconExceptionHandle::GetTid() const { return info_.tid; }
+
 }  // namespace debug_agent

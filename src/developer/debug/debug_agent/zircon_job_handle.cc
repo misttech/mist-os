@@ -70,17 +70,29 @@ debug::Status ZirconJobHandle::WatchJobExceptions(JobExceptionObserver* observer
 void ZirconJobHandle::OnJobException(zx::exception exception, zx_exception_info_t exception_info) {
   zx::process process;
   zx_status_t status = exception.get_process(&process);
-  FX_DCHECK(status == ZX_OK) << "Got: " << zx_status_get_string(status);
+  if (status != ZX_OK) {
+    LOGS(Warn) << "Failed to get process " << exception_info.pid
+               << " from exception_info: " << zx_status_get_string(status);
+    return;
+  }
   auto process_handle = std::make_unique<ZirconProcessHandle>(std::move(process));
 
   zx::thread thread;
   status = exception.get_thread(&thread);
-  FX_DCHECK(status == ZX_OK) << "Got: " << zx_status_get_string(status);
+  if (status != ZX_OK) {
+    LOGS(Warn) << "Failed to get thread " << exception_info.tid
+               << " from exception_info: " << zx_status_get_string(status);
+    return;
+  }
 
   zx_exception_report_t report = {};
   status =
       thread.get_info(ZX_INFO_THREAD_EXCEPTION_REPORT, &report, sizeof(report), nullptr, nullptr);
-  FX_DCHECK(status == ZX_OK) << "Got: " << zx_status_get_string(status);
+  if (status != ZX_OK) {
+    LOGS(Warn) << "Failed to get thread exception report for thread " << exception_info.tid << ": "
+               << zx_status_get_string(status);
+    return;
+  }
 
   if (exception_info.type == ZX_EXCP_PROCESS_STARTING) {
     exception_observer_->OnProcessStarting(std::move(process_handle));

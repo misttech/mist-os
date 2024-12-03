@@ -37,6 +37,8 @@ class ZirconExceptionHandle : public ExceptionHandle {
   fit::result<debug::Status, debug_ipc::ExceptionStrategy> GetStrategy() const override;
   debug::Status SetStrategy(debug_ipc::ExceptionStrategy strategy) override;
   debug_ipc::ExceptionRecord GetRecord() const override;
+  uint64_t GetPid() const override;
+  uint64_t GetTid() const override;
 
  private:
   zx::exception exception_;
