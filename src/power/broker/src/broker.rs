@@ -15,6 +15,7 @@ use itertools::Itertools;
 use std::borrow::Cow;
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
+use std::ffi::CStr;
 use std::fmt::{self, Debug};
 use std::hash::Hash;
 use uuid::Uuid;
@@ -1322,8 +1323,8 @@ impl Catalog {
             leases: HashMap::new(),
             lease_status: SubscribeMap::new(Some(inspect_parent.create_child("leases"))),
             lease_contingent: HashMap::new(),
-            assertive_claims: ClaimActivationTracker::new(),
-            opportunistic_claims: ClaimActivationTracker::new(),
+            assertive_claims: ClaimActivationTracker::new(DependencyType::Assertive),
+            opportunistic_claims: ClaimActivationTracker::new(DependencyType::Opportunistic),
         }
     }
 
@@ -1576,6 +1577,12 @@ impl Catalog {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum ClaimStatus {
+    Pending,
+    Activated,
+}
+
 /// ClaimActivationTracker divides a set of claims into Pending and Activated
 /// states, each of which can separately be accessed as a ClaimLookup.
 /// Pending claims have not yet taken effect because of some prerequisite.
@@ -1600,8 +1607,11 @@ impl fmt::Display for ClaimActivationTracker {
 }
 
 impl ClaimActivationTracker {
-    fn new() -> Self {
-        Self { pending: ClaimLookup::new(), activated: ClaimLookup::new() }
+    fn new(dependency_type: DependencyType) -> Self {
+        Self {
+            pending: ClaimLookup::new(dependency_type, ClaimStatus::Pending),
+            activated: ClaimLookup::new(dependency_type, ClaimStatus::Activated),
+        }
     }
 
     /// Activates a pending claim, moving it to activated.
@@ -1627,6 +1637,7 @@ impl ClaimActivationTracker {
 
 #[derive(Debug)]
 struct ClaimLookup {
+    label: &'static CStr,
     claims: HashMap<ClaimID, Claim>,
     claims_by_required_element_id: HashMap<ElementID, Vec<ClaimID>>,
     claims_by_lease: HashMap<LeaseID, Vec<ClaimID>>,
@@ -1634,8 +1645,24 @@ struct ClaimLookup {
 }
 
 impl ClaimLookup {
-    fn new() -> Self {
+    fn new(dependency_type: DependencyType, status: ClaimStatus) -> Self {
+        let label = match (dependency_type, status) {
+            (DependencyType::Assertive, ClaimStatus::Pending) => c"claims_assertive_pending",
+            (DependencyType::Opportunistic, ClaimStatus::Pending) => {
+                c"claims_Opportunistic_pending"
+            }
+            (DependencyType::Assertive, ClaimStatus::Activated) => c"claims_assertive_activated",
+            (DependencyType::Opportunistic, ClaimStatus::Activated) => {
+                c"claims_opportunistic_activated"
+            }
+            (DependencyType::__SourceBreaking { .. }, _) => c"claims_unknown",
+        };
+        fuchsia_trace::counter!(
+            c"power-broker", label, 0,
+            "claims" => 0 as u32
+        );
         Self {
+            label,
             claims: HashMap::new(),
             claims_by_required_element_id: HashMap::new(),
             claims_by_lease: HashMap::new(),
@@ -1653,6 +1680,10 @@ impl ClaimLookup {
             .or_insert(Vec::new())
             .push(claim.id.clone());
         self.claims.insert(claim.id.clone(), claim);
+        fuchsia_trace::counter!(
+            c"power-broker", self.label, 0,
+            "claims" => self.claims.len() as u32
+        );
     }
 
     fn remove(&mut self, id: &ClaimID) -> Option<Claim> {
@@ -1674,6 +1705,10 @@ impl ClaimLookup {
                 self.claims_by_lease.remove(&claim.lease_id);
             }
         }
+        fuchsia_trace::counter!(
+            c"power-broker", self.label, 0,
+            "claims" => self.claims.len() as u32
+        );
         Some(claim)
     }
 
@@ -2065,7 +2100,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_claim_lookup_add_remove() {
-        let mut lookup = ClaimLookup::new();
+        let mut lookup = ClaimLookup::new(DependencyType::Assertive, ClaimStatus::Activated);
 
         let claim_a_1_b_1 = create_test_claim("A".into(), 1, "B".into(), 1);
         let claim_a_2_b_2 = create_test_claim("A".into(), 2, "B".into(), 2);
