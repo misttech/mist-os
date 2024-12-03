@@ -38,6 +38,7 @@
 ##      and prompt the user to re-auth if deemed necessary.
 
 set -e
+set -o pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 source "${FUCHSIA_DIR}/tools/devshell/lib/style.sh" || exit $?
@@ -290,7 +291,10 @@ function get_loas_cert_type() {
 
 function check_loas_subcommand() {
   echo "Checking LOAS certificate type:"
-  style::echo --green "$(get_loas_cert_type "$@")"
+  local -r loas_cert_type="$(get_loas_cert_type "$@")" || {
+    return 1
+  }
+  style::echo --green "$loas_cert_type"
 }
 
 function ensure_loas() {
@@ -311,7 +315,9 @@ function preflight_subcommand() {
   if ! fx-build-needs-auth
   then return 0
   fi
-  local -r loas_cert_type="$(get_loas_cert_type)"
+  local -r loas_cert_type="$(get_loas_cert_type)" || {
+    exit 1
+  }
   case "$loas_cert_type" in
     unrestricted) ensure_loas ;;
     restricted) ensure_oauth ;;
