@@ -21,7 +21,6 @@ import("//build/testing/host_test_data.gni")
 # Subtargets:
 #  * `${target_name}`: available only in the FIDL toolchain
 #  * `${target_name}_sdk`: available only in the FIDL toolchain
-#     - An SDK atom. Does not depend on `${target_name}.
 #  * `${target_name}_go`: available only in the Go toolchain
 #  * `${target_name}_${backend_name}`: available in every toolchain but Go
 #  * `${target_name}_host_test_data`: available on host toolchain

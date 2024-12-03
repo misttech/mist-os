@@ -687,10 +687,6 @@ template("fidl_library") {
     }
 
     sdk_atom("${target_name}_sdk") {
-      # Ensure the behavior matches the documentation in fidl.gni. Both could be
-      # changed if it makes sense.
-      assert_no_deps = [ ":${main_target_name}" ]
-
       forward_variables_from(invoker, [ "sdk_area" ])
 
       id = "sdk://fidl/$library_name"
