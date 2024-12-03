@@ -1790,7 +1790,7 @@ assembly_input_bundle("factory_reset_trigger") {
 # move them to other AIBs that are included by all other products.
 #
 assembly_input_bundle("common_standard") {
-  memory_buckets = [ "//src/developer/memory/buckets/buckets.json" ]
+  memory_buckets = [ "//src/developer/memory/buckets/buckets.json5" ]
 
   bootfs_files_labels = [ "//src/sys/core:bootfs" ]
 
