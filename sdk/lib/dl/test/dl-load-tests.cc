@@ -1477,10 +1477,6 @@ TYPED_TEST(DlTests, StartupModulesPriorityOverGlobal) {
 TYPED_TEST(DlTests, StartupModulesStaticTlsDesc) {
   const std::string kGetTlsVarFile = "static-tls-desc-module.so";
 
-  if constexpr (!TestFixture::kSupportsTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   EXPECT_EQ(gStaticTlsVar, kStaticTlsDataValue);
 
   this->ExpectRootModule(kGetTlsVarFile);
@@ -1501,10 +1497,6 @@ TYPED_TEST(DlTests, StartupModulesStaticTlsDesc) {
 
 TYPED_TEST(DlTests, StartupModulesStaticTlsGetAddr) {
   const std::string kGetTlsVarFile = "static-tls-module.so";
-
-  if constexpr (!TestFixture::kSupportsTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
 
   this->ExpectRootModule(kGetTlsVarFile);
 
@@ -1534,7 +1526,7 @@ TYPED_TEST(DlTests, StartupModulesStaticTlsGetAddr) {
 // we can guarantee for all implementations.
 template <class TestFixture, bool UseTlsDesc, class Test>
 void BasicGlobalDynamicTls(Test& self) {
-  if constexpr (!TestFixture::kSupportsTls) {
+  if constexpr (!TestFixture::kSupportsDynamicTls) {
     GTEST_SKIP() << "test requires TLS";
   }
 

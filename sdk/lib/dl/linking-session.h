@@ -9,6 +9,7 @@
 #include <lib/fit/result.h>
 #include <lib/ld/decoded-module-in-memory.h>
 #include <lib/ld/load-module.h>
+#include <lib/ld/tlsdesc.h>
 
 #include <ranges>
 
@@ -25,13 +26,17 @@ namespace dl {
 template <class Loader>
 class LinkingSession {
  public:
+  using size_type = Elf::size_type;
+
   // Not copyable, not movable.
   LinkingSession(const LinkingSession&) = delete;
   LinkingSession(LinkingSession&&) = delete;
 
   // A LinkingSession is provided a reference to the dynamic linker's list of
-  // already loaded modules to refer to during the linking procedure.
-  explicit LinkingSession(const ModuleList& loaded_modules) : loaded_modules_(loaded_modules) {}
+  // already loaded modules to refer to during the linking procedure, and the
+  // max static TLS module id from the passive ABI to use for TLS resolution.
+  explicit LinkingSession(const ModuleList& loaded_modules, size_type max_static_tls_modid)
+      : loaded_modules_(loaded_modules), tls_desc_resolver_(max_static_tls_modid) {}
 
   ~LinkingSession() = default;
 
@@ -57,6 +62,28 @@ class LinkingSession {
   class SessionModule;
 
   using SessionModuleList = fbl::DoublyLinkedList<std::unique_ptr<SessionModule>>;
+
+  class TlsDescResolver : public ld::LocalRuntimeTlsDescResolver {
+   public:
+    explicit TlsDescResolver(size_type max_static_tls_modid)
+        : max_static_tls_modid_(max_static_tls_modid) {}
+
+    TlsDescGot operator()(Addend addend) const {
+      return ld::LocalRuntimeTlsDescResolver::operator()(addend);
+    }
+
+    fit::result<bool, TlsDescGot> operator()(auto& diag, const auto& defn) const {
+      assert(defn.tls_module_id() != 0);
+      if (defn.tls_module_id() <= max_static_tls_modid_) {
+        return ld::LocalRuntimeTlsDescResolver::operator()(diag, defn);
+      }
+      return fit::error{
+          diag.FormatError("TODO(https://fxbug.dev/342480690): dynamic TLS is not supported")};
+    }
+
+   private:
+    size_type max_static_tls_modid_;
+  };
 
   // TODO(https://fxbug.dev/333573264): Talk about how previously-loaded modules
   // are handled in this function.
@@ -192,12 +219,13 @@ class LinkingSession {
                  std::ranges::ref_view(loaded_global),
                  std::ranges::ref_view(session_local),
              },
-         &diag](SessionModule& session_module) -> bool {
+         &diag, this](SessionModule& session_module) -> bool {
       // TODO(https://fxbug.dev/339662473): this doesn't use the root module's
       // name in the scoped diagnostics. Add test for missing transitive symbol
       // and make sure the correct name is used in the error message.
       ld::ScopedModuleDiagnostics root_module_diag{diag, session_module.name().str()};
-      return session_module.Relocate(diag, resolution_modules) && session_module.ProtectRelro(diag);
+      return session_module.Relocate(diag, resolution_modules, tls_desc_resolver_) &&
+             session_module.ProtectRelro(diag);
     };
     return std::all_of(std::begin(session_modules_), std::end(session_modules_),
                        relocate_and_relro);
@@ -223,6 +251,10 @@ class LinkingSession {
   // The set of loaded modules at the time this LinkingSession instance was
   // created.
   const ModuleList& loaded_modules_;
+
+  // TODO(https://fxbug.dev/342480690): Support Dynamic TLS.
+  // The resolver used for TLSDESC relocations.
+  const TlsDescResolver tls_desc_resolver_;
 };
 
 // SessionModule is the temporary data structure created to load a file and
@@ -238,20 +270,6 @@ class LinkingSession<Loader>::SessionModule
   using Dyn = Elf::Dyn;
   using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StaticVector<ld::kMaxSegments>::Container>;
   using TlsDescGot = Elf::TlsDescGot;
-
-  // TODO(https://fxbug.dev/331421403): Implement TLS.
-  struct NoTlsDesc {
-    constexpr TlsDescGot operator()() const {
-      assert(false && "TLS is not supported");
-      return {};
-    }
-    template <class Diagnostics, class Definition>
-    constexpr fit::result<bool, TlsDescGot> operator()(Diagnostics& diag,
-                                                       const Definition& defn) const {
-      assert(false && "TLS is not supported");
-      return fit::error{false};
-    }
-  };
 
   // This is the observer used to collect DT_NEEDED offsets from the dynamic phdr.
   static const constexpr std::string_view kNeededError{"DT_NEEDED offsets"};
@@ -326,11 +344,11 @@ class LinkingSession<Loader>::SessionModule
 
   // Perform relative and symbolic relocations, resolving symbols from the
   // ordered list of modules as needed.
-  bool Relocate(Diagnostics& diag, const auto& ordered_modules) {
-    constexpr NoTlsDesc kNoTlsDesc{};
+  bool Relocate(Diagnostics& diag, const auto& ordered_modules,
+                const TlsDescResolver& tls_desc_resolver) {
     auto memory = ld::ModuleMemory{module()};
     auto resolver =
-        elfldltl::MakeSymbolResolver(runtime_module_, ordered_modules, diag, kNoTlsDesc);
+        elfldltl::MakeSymbolResolver(runtime_module_, ordered_modules, diag, tls_desc_resolver);
     return elfldltl::RelocateRelative(diag, memory, reloc_info(), load_bias()) &&
            elfldltl::RelocateSymbolic(memory, diag, reloc_info(), symbol_info(), load_bias(),
                                       resolver);

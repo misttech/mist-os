@@ -41,8 +41,8 @@ class DlTestsBase : public ::testing::Test {
   // resolution, regardless of whether it is a global module.
   static constexpr bool kStrictLoadOrderPriority = false;
 
-  // Whether the test fixture supports TLS.
-  static constexpr bool kSupportsTls = true;
+  // Whether the test fixture supports dynamic TLS.
+  static constexpr bool kSupportsDynamicTls = true;
 
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);

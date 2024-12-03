@@ -30,8 +30,8 @@ class DlImplTests : public Base {
   static constexpr bool kCanMatchExactError = true;
   // TODO(https://fxbug.dev/348727901): Implement RTLD_NOLOAD
   static constexpr bool kSupportsNoLoadMode = false;
-  // TODO(https://fxbug.dev/342480690): Support TLS
-  static constexpr bool kSupportsTls = false;
+  // TODO(https://fxbug.dev/342480690): Support Dynamic TLS
+  static constexpr bool kSupportsDynamicTls = false;
 
   void SetUp() override {
     fbl::AllocChecker ac;

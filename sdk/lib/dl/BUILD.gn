@@ -21,7 +21,10 @@ source_set("runtime") {
     "runtime-module.cc",
     "runtime-module.h",
   ]
-  deps = [ ":concat-view" ]
+  deps = [
+    ":concat-view",
+    "//sdk/lib/ld:tlsdesc",
+  ]
   if (is_fuchsia) {
     sources += [ "unmap-zircon.cc" ]
   } else {
