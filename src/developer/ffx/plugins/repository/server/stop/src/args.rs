@@ -18,6 +18,11 @@ pub struct StopCommand {
     #[argh(option)]
     pub product_bundle: Option<Utf8PathBuf>,
 
+    #[argh(option, short = 'p')]
+    /// repository server port number.
+    /// Required to disambiguate multiple repositories with the same name.
+    pub port: Option<u16>,
+
     /// stop the repository server with the given name.
     #[argh(positional)]
     pub name: Option<String>,

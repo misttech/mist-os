@@ -92,9 +92,10 @@ impl RegisterTool {
             configured using 'ffx repository default set'"
             )
         })?;
+        let repo_port = self.cmd.port;
 
         // if none was found, check for a product bundle repo server which has the prefix of repo_name.
-        let pkg_server_info = match mgr.get_instance(repo_name.clone())? {
+        let pkg_server_info = match mgr.get_instance(repo_name.clone(), repo_port)? {
             Some(instance) => Some(instance),
             None => {
                 let instances = mgr.list_instances()?;
@@ -512,6 +513,7 @@ mod test {
         let tool = RegisterTool {
             cmd: RegisterCommand {
                 repository: Some(REPO_NAME.to_string()),
+                port: None,
                 alias: aliases.clone(),
                 storage_type: None,
                 alias_conflict_mode:
@@ -572,6 +574,7 @@ mod test {
         let tool = RegisterTool {
             cmd: RegisterCommand {
                 repository: Some(REPO_NAME.to_string()),
+                port: None,
                 alias: aliases.clone(),
                 storage_type: None,
                 alias_conflict_mode:
@@ -650,6 +653,7 @@ mod test {
         let tool = RegisterTool {
             cmd: RegisterCommand {
                 repository: None,
+                port: None,
                 alias: vec![],
                 storage_type: None,
                 alias_conflict_mode:
@@ -701,6 +705,7 @@ mod test {
         let tool = RegisterTool {
             cmd: RegisterCommand {
                 repository: None,
+                port: None,
                 alias: vec![],
                 storage_type: None,
                 alias_conflict_mode:
@@ -761,6 +766,7 @@ mod test {
         let tool = RegisterTool {
             cmd: RegisterCommand {
                 repository: Some(REPO_NAME.to_string()),
+                port: None,
                 alias: aliases.clone(),
                 storage_type: Some(RepositoryStorageType::Persistent),
                 alias_conflict_mode:
@@ -819,6 +825,7 @@ mod test {
         let tool = RegisterTool {
             cmd: RegisterCommand {
                 repository: Some(REPO_NAME.to_string()),
+                port: None,
                 alias: vec![],
                 storage_type: None,
                 alias_conflict_mode:
@@ -884,6 +891,7 @@ mod test {
         let tool = RegisterTool {
             cmd: RegisterCommand {
                 repository: Some(REPO_NAME.to_string()),
+                port: None,
                 alias: vec![],
                 storage_type: None,
                 alias_conflict_mode:
@@ -942,6 +950,7 @@ mod test {
         let tool = RegisterTool {
             cmd: RegisterCommand {
                 repository: Some(REPO_NAME.to_string()),
+                port: None,
                 alias: vec![],
                 storage_type: None,
                 alias_conflict_mode:
@@ -1002,6 +1011,7 @@ mod test {
         let tool = RegisterTool {
             cmd: RegisterCommand {
                 repository: Some(REPO_NAME.to_string()),
+                port: None,
                 alias: aliases.clone(),
                 storage_type: None,
                 alias_conflict_mode:

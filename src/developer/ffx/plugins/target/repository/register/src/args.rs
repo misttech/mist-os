@@ -18,6 +18,11 @@ pub struct RegisterCommand {
     /// register this repository, rather than the default.
     pub repository: Option<String>,
 
+    #[argh(option, short = 'p')]
+    /// repository server port number.
+    /// Required to disambiguate multiple repositories with the same name.
+    pub port: Option<u16>,
+
     /// enable persisting this repository across reboots.
     #[argh(option, from_str_fn(parse_storage_type))]
     pub storage_type: Option<RepositoryStorageType>,

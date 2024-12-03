@@ -26,6 +26,18 @@
     {
       "kind": {
         "Option": {
+          "arg_name": "port"
+        }
+      },
+      "optionality": "optional",
+      "long": "--port",
+      "short": "p",
+      "description": "repository server port number. Required to disambiguate multiple repositories with the same name.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
           "arg_name": "storage-type"
         }
       },
