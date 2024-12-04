@@ -51,12 +51,14 @@ readonly python="$PREBUILT_PYTHON3"
 # remote_action.py exercises rewrapper
 readonly remote_action="$FUCHSIA_DIR/build/rbe/remote_action.py"
 
-reproxy_wrap_cmd=( "$reproxy_wrap" )
+declare -a subshell_trace=()
 # Propagate tracing option from `fx -x rbe ...` to the wrapper script.
 # This is less invasive than re-exporting SHELLOPTS.
 if [[ -o xtrace ]]; then
-  reproxy_wrap_cmd=( "$SHELL" -x "${reproxy_wrap_cmd[@]}" )
+  subshell_trace=( "$SHELL" -x )
 fi
+
+readonly -a reproxy_wrap_cmd=( "${subshell_trace[@]}" "$reproxy_wrap" )
 
 # A single command that tests RBE end-to-end through reclient.
 reclient_auth_test_cmd=(
@@ -246,7 +248,7 @@ function check_loas_restrictions() {
   }
 
   # Print only the last line, in case there was any interactive gcert.
-  "$check_loas_script" | tail -n 1
+  "${subshell_trace[@]}" "$check_loas_script" | tail -n 1
 }
 
 function get_loas_cert_type() {
