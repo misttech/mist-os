@@ -462,12 +462,30 @@ fuchsia_product_bundle(
     ],
 )
 
+fuchsia_product_configuration(
+    name = "product_config_reduced_perf_variation",
+    base_packages = _PRODUCT_BASE_PACKAGES,
+    cache_packages = _PRODUCT_CACHE_PACKAGES,
+    product_config_json = {
+        "platform": _PRODUCT_CONFIG_BASE_JSON["platform"] | {
+            "kernel": {
+                "page_scanner": {
+                    "disable_at_boot": True,
+                    "zero_page_scans_per_second": "no_scans",
+                    "disable_eviction": True,
+                },
+            },
+        },
+        "product": _PRODUCT_CONFIG_BASE_JSON["product"],
+    },
+)
+
 fuchsia_product(
     name = "image.vim3_reduced_perf_variation",
     board_config = "//boards:vim3_reduced_perf_variation",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
-    product_config = ":product_config",
+    product_config = ":product_config_reduced_perf_variation",
 )
 
 fuchsia_elf_sizes(
@@ -493,12 +511,37 @@ fuchsia_product_bundle(
     ],
 )
 
+# TODO(https://fxbug.dev/370543906): Remove this product once it's no longer
+# needed.
+fuchsia_product_configuration(
+    name = "product_config_with_netstack2_reduced_perf_variation",
+    base_packages = _PRODUCT_BASE_PACKAGES,
+    cache_packages = _PRODUCT_CACHE_PACKAGES,
+    product_config_json = {
+        "platform": _PRODUCT_CONFIG_BASE_JSON["platform"] | {
+            "connectivity": {
+                "network": {
+                    "netstack_version": "netstack2",
+                },
+            },
+            "kernel": {
+                "page_scanner": {
+                    "disable_at_boot": True,
+                    "zero_page_scans_per_second": "no_scans",
+                    "disable_eviction": True,
+                },
+            },
+        },
+        "product": _PRODUCT_CONFIG_BASE_JSON["product"],
+    },
+)
+
 fuchsia_product(
     name = "image_with_netstack2.vim3_reduced_perf_variation",
     board_config = "//boards:vim3_reduced_perf_variation",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
-    product_config = ":product_config_with_netstack2",
+    product_config = ":product_config_with_netstack2_reduced_perf_variation",
 )
 
 fuchsia_elf_sizes(
