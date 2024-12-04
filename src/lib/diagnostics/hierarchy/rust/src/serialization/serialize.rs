@@ -23,7 +23,7 @@ pub struct SerializableHierarchyFields<'a, Key> {
     pub(crate) hierarchy: &'a DiagnosticsHierarchy<Key>,
 }
 
-impl<'a, Key> Serialize for SerializableHierarchyFields<'a, Key>
+impl<Key> Serialize for SerializableHierarchyFields<'_, Key>
 where
     Key: AsRef<str>,
 {

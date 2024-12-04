@@ -69,7 +69,7 @@ pub struct EdgeGraphMetadataRef<'a> {
     lock: RwLockWriteGuard<'a, EdgeState>,
 }
 
-impl<'a> Deref for EdgeGraphMetadataRef<'a> {
+impl Deref for EdgeGraphMetadataRef<'_> {
     type Target = EdgeGraphMetadata;
 
     fn deref(&self) -> &Self::Target {
@@ -77,7 +77,7 @@ impl<'a> Deref for EdgeGraphMetadataRef<'a> {
     }
 }
 
-impl<'a> DerefMut for EdgeGraphMetadataRef<'a> {
+impl DerefMut for EdgeGraphMetadataRef<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.lock.metadata_mut()
     }

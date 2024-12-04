@@ -18,6 +18,7 @@ pub struct SelfProfilesReport {
 }
 
 impl SelfProfilesReport {
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn from_snapshot(data: &[InspectData]) -> Result<Vec<Self>, AnalysisError> {
         let mut summaries = vec![];
         for d in data {
@@ -41,6 +42,7 @@ impl SelfProfilesReport {
         None
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     fn from_node(
         name: &ExtendedMoniker,
         node: &DiagnosticsHierarchy,
@@ -114,10 +116,17 @@ impl std::fmt::Display for SelfProfilesReport {
             writeln!(f, "Custom rollup: {}\n", rollup.display_title)?;
 
             for (name, duration) in &leaf_durations {
-                if let Some(_) =
-                    rollup.match_prefixes.iter().find(|prefix| name.starts_with(prefix.as_str()))
+                #[allow(
+                    clippy::search_is_some,
+                    reason = "mass allow for https://fxbug.dev/381896734"
+                )]
+                if rollup
+                    .match_prefixes
+                    .iter()
+                    .find(|prefix| name.starts_with(prefix.as_str()))
+                    .is_some()
                 {
-                    write!(f, "{}", duration.display_tree(&name, root_runtime))?;
+                    write!(f, "{}", duration.display_tree(name, root_runtime))?;
                 }
             }
         }
@@ -135,6 +144,7 @@ struct DurationSummaryBuilder {
 }
 
 impl DurationSummaryBuilder {
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     fn from_inspect(node: &DiagnosticsHierarchy) -> Result<Self, AnalysisError> {
         let mut children = BTreeMap::new();
         for child_node in &node.children {
@@ -144,11 +154,12 @@ impl DurationSummaryBuilder {
         let location = node.get_property("location").unwrap().string().unwrap().to_owned();
 
         // The top-level node doesn't get any metrics recorded, it's just a container for children.
-        let runtime = children.iter().map(|(_, c)| c.runtime).sum();
+        let runtime = children.values().map(|c| c.runtime).sum();
 
         Ok(Self { runtime, count: 0, children, location })
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     fn from_inspect_recursive(
         node: &DiagnosticsHierarchy,
     ) -> Result<(String, Self), AnalysisError> {
@@ -259,7 +270,7 @@ impl DurationSummary {
             }
         } else {
             for (name, child) in &self.children {
-                child.summarize_leaves(&name, leaves);
+                child.summarize_leaves(name, leaves);
             }
         }
     }
@@ -362,10 +373,11 @@ impl DurationSummary {
 impl std::fmt::Display for DurationSummary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let total_child_runtime = self.children().map(|(_, c)| c.runtime).sum();
-        write!(f, "{}", self.display_tree("overall".into(), total_child_runtime))
+        write!(f, "{}", self.display_tree("overall", total_child_runtime))
     }
 }
 
+#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 fn get_time_property(
     node: &DiagnosticsHierarchy,
     name: &'static str,

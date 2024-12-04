@@ -20,7 +20,7 @@ impl InspectType for DoubleProperty {}
 
 crate::impl_inspect_type_internal!(DoubleProperty);
 
-impl<'t> Property<'t> for DoubleProperty {
+impl Property<'_> for DoubleProperty {
     type Type = f64;
 
     fn set(&self, value: f64) {

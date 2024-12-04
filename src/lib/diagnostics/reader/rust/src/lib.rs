@@ -431,6 +431,7 @@ enum OneOrMany<T> {
     One(T),
 }
 
+#[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
 fn drain_batch_iterator<T>(
     iterator: Arc<Mutex<BatchIteratorProxy>>,
 ) -> impl Stream<Item = Result<T, Error>>
@@ -504,6 +505,7 @@ where
     }
 
     /// Wait for the connection with the server to be established.
+    #[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
     pub async fn wait_for_ready(&self) {
         self.iterator.lock().wait_for_ready().await.expect("doesn't disconnect");
     }

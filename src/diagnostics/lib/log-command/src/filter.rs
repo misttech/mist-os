@@ -105,10 +105,10 @@ impl LogFilterCriteria {
     /// Returns true if the given 'LogsData' matches the filter string by
     /// message, moniker, or component URL.
     fn matches_filter_string(filter_string: &str, message: &str, log: &LogsData) -> bool {
-        return message.contains(filter_string)
+        message.contains(filter_string)
             || log.file_path().map_or(false, |s| s.contains(filter_string))
             || log.metadata.component_url.as_ref().map_or(false, |s| s.contains(filter_string))
-            || log.moniker.to_string().contains(filter_string);
+            || log.moniker.to_string().contains(filter_string)
     }
 
     // TODO(b/303315896): If/when debuglog is strutured remove this.

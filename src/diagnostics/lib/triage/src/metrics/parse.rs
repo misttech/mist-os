@@ -451,7 +451,7 @@ mod test {
         };
     }
 
-    impl<'a, T> Res<'a, T> {
+    impl<T> Res<'_, T> {
         fn is_err(&self) -> bool {
             match self {
                 Res::Err(_) => true,

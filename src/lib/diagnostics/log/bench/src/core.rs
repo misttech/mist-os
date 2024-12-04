@@ -21,8 +21,8 @@ async fn setup_publisher() -> (zx::Socket, Publisher) {
             .wait_for_initial_interest(false)
             .listen_for_interest_updates(false)
             .use_log_sink(proxy);
-        let publisher = Publisher::new(options).unwrap();
-        publisher
+
+        Publisher::new(options).unwrap()
     });
     let socket = match requests.next().await.unwrap().unwrap() {
         LogSinkRequest::ConnectStructured { socket, .. } => socket,
@@ -38,7 +38,7 @@ fn write_log_benchmark<F, S>(
     subscriber: S,
     mut logging_fn: F,
 ) where
-    F: FnMut() -> (),
+    F: FnMut(),
     S: Subscriber + Send + Sync,
 {
     tracing::subscriber::with_default(subscriber, || {
@@ -94,18 +94,18 @@ where
         });
     };
     let bench = if let Some(benchmark) = benchmark {
-        benchmark.with_function(&format!("Publisher/{}/AllArguments", name), all_args_bench)
+        benchmark.with_function(format!("Publisher/{}/AllArguments", name), all_args_bench)
     } else {
-        criterion::Benchmark::new(&format!("Publisher/{}/AllArguments", name), all_args_bench)
+        criterion::Benchmark::new(format!("Publisher/{}/AllArguments", name), all_args_bench)
     };
     bench
-        .with_function(&format!("Publisher/{}/NoArguments", name), move |b| {
+        .with_function(format!("Publisher/{}/NoArguments", name), move |b| {
             let (socket, subscriber) = make_subscriber();
             write_log_benchmark(b, socket, subscriber, || {
                 tracing::info!("this is a log emitted from the benchmark");
             });
         })
-        .with_function(&format!("Publisher/{}/MessageWithSomeArguments", name), move |b| {
+        .with_function(format!("Publisher/{}/MessageWithSomeArguments", name), move |b| {
             let (socket, subscriber) = make_subscriber();
             write_log_benchmark(b, socket, subscriber, || {
                 tracing::info!(
@@ -116,7 +116,7 @@ where
                 );
             });
         })
-        .with_function(&format!("Publisher/{}/MessageAsString", name), move |b| {
+        .with_function(format!("Publisher/{}/MessageAsString", name), move |b| {
             let (socket, subscriber) = make_subscriber();
             write_log_benchmark(b, socket, subscriber, || {
                 tracing::info!(
@@ -176,13 +176,13 @@ where
         LogTracer::init().unwrap();
     });
     bench
-        .with_function(&format!("Publisher/{}/NoArguments", name), move |b| {
+        .with_function(format!("Publisher/{}/NoArguments", name), move |b| {
             let (socket, subscriber) = make_subscriber();
             write_log_benchmark(b, socket, subscriber, || {
                 log::info!("this is a log emitted from the benchmark");
             });
         })
-        .with_function(&format!("Publisher/{}/MessageAsString", name), move |b| {
+        .with_function(format!("Publisher/{}/MessageAsString", name), move |b| {
             let (socket, subscriber) = make_subscriber();
             write_log_benchmark(b, socket, subscriber, || {
                 log::info!(
@@ -216,12 +216,11 @@ fn main() {
         // and run for much longer.
         .sample_size(10);
 
-    let mut bench =
-        setup_tracing_write_benchmarks("Tracing", &create_real_tracing_subscriber, None);
-    bench = setup_tracing_write_benchmarks("TracingNoOp", &create_noop_subscriber, Some(bench));
+    let mut bench = setup_tracing_write_benchmarks("Tracing", create_real_tracing_subscriber, None);
+    bench = setup_tracing_write_benchmarks("TracingNoOp", create_noop_subscriber, Some(bench));
 
-    bench = setup_log_write_benchmarks("Log", bench, &create_real_tracing_subscriber);
-    bench = setup_log_write_benchmarks("LogNoOp", bench, &create_noop_subscriber);
+    bench = setup_log_write_benchmarks("Log", bench, create_real_tracing_subscriber);
+    bench = setup_log_write_benchmarks("LogNoOp", bench, create_noop_subscriber);
 
     c.bench("fuchsia.diagnostics_log_rust.core", bench);
 }

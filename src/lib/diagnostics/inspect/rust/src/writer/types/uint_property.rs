@@ -20,7 +20,7 @@ impl InspectType for UintProperty {}
 
 crate::impl_inspect_type_internal!(UintProperty);
 
-impl<'t> Property<'t> for UintProperty {
+impl Property<'_> for UintProperty {
     type Type = u64;
 
     fn set(&self, value: u64) {

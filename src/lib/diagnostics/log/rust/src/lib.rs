@@ -39,7 +39,7 @@ pub struct PublishOptions<'t> {
     pub(crate) panic_prefix: Option<&'static str>,
 }
 
-impl<'t> Default for PublishOptions<'t> {
+impl Default for PublishOptions<'_> {
     fn default() -> Self {
         Self {
             publisher: PublisherOptions::default(),
@@ -49,7 +49,7 @@ impl<'t> Default for PublishOptions<'t> {
     }
 }
 
-impl<'t> PublishOptions<'t> {
+impl PublishOptions<'_> {
     /// Whether or not to install a panic hook which will log an ERROR whenever a panic happens.
     ///
     /// Default: true.

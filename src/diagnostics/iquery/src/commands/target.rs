@@ -103,7 +103,7 @@ pub async fn connect_accessor(
     let directory_proxy = get_dir_proxy(moniker, proxy).await?;
     let proxy = client::connect_to_named_protocol_at_dir_root::<ArchiveAccessorMarker>(
         &directory_proxy,
-        &accessor_name,
+        accessor_name,
     )
     .map_err(|e| Error::ConnectToProtocol(accessor_name.to_string(), anyhow!("{:?}", e)))?;
     Ok(proxy)

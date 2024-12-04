@@ -14,7 +14,6 @@ use std::sync::Arc;
 /// This file serves the fuchsia.diagnostics.test.DetectController protocol,
 /// which is used for performance testing.
 /// This file is unrelated to lib.rs::Mode::Testing which is used for integration testing.
-
 pub(crate) async fn run_test_service(
     mut stream: DetectControllerRequestStream,
     detection_runner: Arc<Mutex<impl RunsDetection>>,

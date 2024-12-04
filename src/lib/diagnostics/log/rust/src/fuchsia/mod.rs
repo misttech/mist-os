@@ -55,7 +55,7 @@ pub struct PublisherOptions<'t> {
     pub(crate) always_log_file_line: bool,
 }
 
-impl<'t> Default for PublisherOptions<'t> {
+impl Default for PublisherOptions<'_> {
     fn default() -> Self {
         Self {
             blocking: false,

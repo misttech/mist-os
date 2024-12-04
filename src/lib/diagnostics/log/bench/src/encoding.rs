@@ -30,7 +30,7 @@ where
 {
     move |b: &mut criterion::Bencher| {
         b.iter_batched_ref(
-            || encoder(),
+            encoder,
             |encoder| encoder.write_raw_argument("foo", value),
             criterion::BatchSize::SmallInput,
         );
@@ -128,16 +128,16 @@ fn main() {
         .sample_size(10);
 
     let mut bench = criterion::Benchmark::new("Encoder/Create", move |b| {
-        b.iter_with_large_drop(|| encoder());
+        b.iter_with_large_drop(encoder);
     })
     .with_function("Encoder/Argument/Boolean", bench_argument(true))
-    .with_function("Encoder/Argument/Floating", bench_argument(1234.5678 as f64))
-    .with_function("Encoder/Argument/UnsignedInt", bench_argument(12345 as u64))
-    .with_function("Encoder/Argument/SignedInt", bench_argument(-12345 as i64));
+    .with_function("Encoder/Argument/Floating", bench_argument(1234.5678_f64))
+    .with_function("Encoder/Argument/UnsignedInt", bench_argument(12345_u64))
+    .with_function("Encoder/Argument/SignedInt", bench_argument(-12345_i64));
 
     for size in [16, 128, 256, 512, 1024, 32000] {
         bench = bench.with_function(
-            &format!("Encoder/Argument/Text/{}", size),
+            format!("Encoder/Argument/Text/{}", size),
             bench_argument((*common::PLACEHOLDER_TEXT).get(..size).unwrap()),
         )
     }

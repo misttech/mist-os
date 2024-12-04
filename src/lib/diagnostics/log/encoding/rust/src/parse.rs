@@ -78,7 +78,7 @@ enum ParseState {
 }
 
 /// Parses an argument
-pub fn parse_argument<'a>(buf: &'a [u8]) -> Result<(Argument<'a>, &'a [u8]), ParseError> {
+pub fn parse_argument(buf: &[u8]) -> Result<(Argument<'_>, &[u8]), ParseError> {
     parse_argument_internal(buf, &mut ParseState::Initial)
 }
 

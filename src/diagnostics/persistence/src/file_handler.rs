@@ -78,7 +78,7 @@ impl PersistSchema {
 
 struct ErrorHelper<'a>(&'a str);
 
-impl<'a> Serialize for ErrorHelper<'a> {
+impl Serialize for ErrorHelper<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -115,7 +115,7 @@ pub(crate) fn write(service_name: &ServiceName, tag: &Tag, data: &PersistSchema)
             return;
         }
     };
-    fs::write(&format!("{}/{}", path, tag), data)
+    fs::write(format!("{}/{}", path, tag), data)
         .map_err(|e| warn!("Could not write file {}/{}: {:?}", path, tag, e))
         .ok();
 }

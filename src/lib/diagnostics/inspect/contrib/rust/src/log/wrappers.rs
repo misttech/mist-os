@@ -37,7 +37,7 @@ impl<T: AsRef<[u8]>> WriteInspect for InspectBytes<T> {
 /// ```
 pub struct InspectList<'a, T>(pub &'a [T]);
 
-impl<'a, T> WriteInspect for InspectList<'a, T>
+impl<T> WriteInspect for InspectList<'_, T>
 where
     T: WriteInspect,
 {
@@ -75,7 +75,7 @@ pub struct InspectListClosure<'a, T, F>(pub &'a [T], pub F)
 where
     F: Fn(&Node, &str, &T);
 
-impl<'a, T, F> WriteInspect for InspectListClosure<'a, T, F>
+impl<T, F> WriteInspect for InspectListClosure<'_, T, F>
 where
     F: Fn(&Node, &str, &T),
 {

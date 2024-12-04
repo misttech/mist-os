@@ -103,11 +103,8 @@ fn bench_iterate_concurrent(b: &mut criterion::Bencher, args: IterateArgs) {
             let mut items_read = 0;
             let mut cursor = pin!(container.cursor(StreamMode::SnapshotThenSubscribe).unwrap());
             while items_read < args.size {
-                match cursor.next().await.expect("must have some value") {
-                    LazyItem::Next(_) => {
-                        items_read += 1;
-                    }
-                    _ => {}
+                if let LazyItem::Next(_) = cursor.next().await.expect("must have some value") {
+                    items_read += 1;
                 }
             }
         });

@@ -29,7 +29,7 @@ fn node_benchmarks(mut bench: criterion::Benchmark) -> criterion::Benchmark {
         let root = inspector.root();
         b.iter_with_large_setup(
             || root.create_child(NAME),
-            |child| criterion::black_box(drop(child)),
+            |child| drop(criterion::black_box(child)),
         );
     });
     bench
@@ -93,7 +93,7 @@ macro_rules! bench_numeric_property_fn {
 
 /// Returns a string value to use in benchmarks.
 fn get_string_value(size: usize) -> String {
-    std::iter::repeat("a").take(size).collect::<String>()
+    "a".repeat(size)
 }
 
 /// Returns a bytes value to use in benchmarks.
@@ -302,7 +302,7 @@ fn string_array_property_benchmarks(
         let root = inspector.root();
         b.iter_with_large_setup(
             || root.create_string_array(NAME, array_size),
-            |p| criterion::black_box(drop(p)),
+            |p| drop(criterion::black_box(p)),
         );
     });
     bench
@@ -419,7 +419,7 @@ macro_rules! bench_histogram_property_fn {
                     b.iter_with_large_setup(
                         || root.[<create_ $name _ $histogram_type _histogram>](
                             NAME, params.clone()),
-                        |p| criterion::black_box(drop(p)));
+                        |p| drop(criterion::black_box(p)))
                 });
 
                 bench
@@ -489,7 +489,7 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
                 let (container, _) = Container::read_and_write(1 << 21).unwrap();
                 Heap::empty(container).unwrap()
             },
-            |heap| criterion::black_box(drop(heap)),
+            |heap| drop(criterion::black_box(heap)),
         );
     });
 
@@ -511,6 +511,7 @@ fn bench_write_after_tree_cow_read(mut bench: criterion::Benchmark) -> criterion
     let (proxy, tree_server_fut) = fuchsia_inspect_bench_utils::spawn_server(inspector).unwrap();
     let task = fasync::Task::spawn(tree_server_fut);
     // Force TLB shootdown for following writes on the local inspector
+    #[allow(clippy::let_underscore_future, reason = "mass allow for https://fxbug.dev/381896734")]
     let _ = proxy.vmo();
 
     bench = bench.with_function("Node/IntProperty::CoW::Add", move |b| {
@@ -547,15 +548,12 @@ fn main() {
     );
 
     let mut bench = criterion::Benchmark::new("Inspector/new", |b| {
-        b.iter_with_large_drop(|| Inspector::default());
+        b.iter_with_large_drop(Inspector::default);
     });
     bench = bench.with_function("Inspector/root", |b| {
-        b.iter_with_large_setup(
-            || Inspector::default(),
-            |inspector| {
-                inspector.root();
-            },
-        );
+        b.iter_with_large_setup(Inspector::default, |inspector| {
+            inspector.root();
+        });
     });
     bench = node_benchmarks(bench);
     bench = int_property_benchmarks(bench);

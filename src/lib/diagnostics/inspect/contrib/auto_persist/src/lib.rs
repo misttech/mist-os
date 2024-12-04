@@ -56,7 +56,7 @@ pub struct AutoPersistGuard<'a, T> {
     sender_is_blocked: Arc<AtomicBool>,
 }
 
-impl<'a, T> Deref for AutoPersistGuard<'a, T> {
+impl<T> Deref for AutoPersistGuard<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -64,13 +64,13 @@ impl<'a, T> Deref for AutoPersistGuard<'a, T> {
     }
 }
 
-impl<'a, T> DerefMut for AutoPersistGuard<'a, T> {
+impl<T> DerefMut for AutoPersistGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inspect_node
     }
 }
 
-impl<'a, T> Drop for AutoPersistGuard<'a, T> {
+impl<T> Drop for AutoPersistGuard<'_, T> {
     fn drop(&mut self) {
         if self.persistence_req_sender.try_send(self.persistence_tag.to_string()).is_err() {
             // If sender has not been blocked before, set bool to true and log error message

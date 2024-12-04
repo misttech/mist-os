@@ -332,7 +332,7 @@ pub struct LockedStateGuard<'a> {
 }
 
 #[cfg(target_os = "fuchsia")]
-impl<'a> LockedStateGuard<'a> {
+impl LockedStateGuard<'_> {
     /// Freezes the VMO, does a CoW duplication, thaws the parent, and returns the child.
     pub fn frozen_vmo_copy(&mut self) -> Result<Option<zx::Vmo>, Error> {
         self.inner_lock.frozen_vmo_copy()

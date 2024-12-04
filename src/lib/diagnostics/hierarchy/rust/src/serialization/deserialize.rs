@@ -615,7 +615,7 @@ parse_numeric_vec_impls!(f64, u64, i64);
 
 struct NumericValueVisitor;
 
-impl<'de> Visitor<'de> for NumericValueVisitor {
+impl Visitor<'_> for NumericValueVisitor {
     type Value = NumericValue;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

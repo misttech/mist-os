@@ -444,7 +444,7 @@ impl<'a> MetricState<'a> {
         if self.stack.borrow().contains(&name.full_name(namespace)) {
             // Clear the stack for future reuse
             let _ = self.stack.replace(HashSet::new());
-            return evaluation_error(&format!(
+            return evaluation_error(format!(
                 "Cycle encountered while evaluating variable {} in the expression",
                 name.name
             ));
@@ -794,13 +794,13 @@ impl<'a> MetricState<'a> {
                 Err(problem) => return problem,
             };
         if arguments.len() != 1 {
-            return syntax_error(&format!(
+            return syntax_error(format!(
                 "{} needs two arguments (function, vector)",
                 args.function_name
             ));
         }
         let MetricValue::Vector(v) = &arguments[0] else {
-            return syntax_error(&format!(
+            return syntax_error(format!(
                 "The second argument passed to {} must be a vector",
                 args.function_name
             ));

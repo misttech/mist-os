@@ -16,7 +16,7 @@ pub struct BoolProperty {
     inner: Inner<InnerValueType>,
 }
 
-impl<'t> Property<'t> for BoolProperty {
+impl Property<'_> for BoolProperty {
     type Type = bool;
 
     fn set(&self, value: bool) {

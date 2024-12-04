@@ -64,10 +64,10 @@ async fn fuzzy_search(
     query: &str,
     realm_query: &fsys2::RealmQueryProxy,
 ) -> Result<Instance, Error> {
-    let mut instances = component_debug::query::get_instances_from_query(query, &realm_query)
+    let mut instances = component_debug::query::get_instances_from_query(query, realm_query)
         .await
-        .map_err(|e| Error::FuzzyMatchRealmQuery(e.into()))?;
-    if instances.len() == 0 {
+        .map_err(Error::FuzzyMatchRealmQuery)?;
+    if instances.is_empty() {
         return Err(Error::SearchParameterNotFound(query.to_string()));
     } else if instances.len() > 1 {
         return Err(Error::FuzzyMatchTooManyMatches(
@@ -90,7 +90,7 @@ pub async fn process_fuzzy_inputs<P: DiagnosticsProvider>(
     let realm_query = provider.realm_query();
     let mut results = vec![];
     for value in queries {
-        match fuzzy_search(&value, &realm_query).await {
+        match fuzzy_search(&value, realm_query).await {
             // try again in case this is a fully escaped moniker or selector
             Err(Error::SearchParameterNotFound(_)) => {
                 // In case they included a tree-selector segment, attempt to parse but don't bail
@@ -136,7 +136,7 @@ pub async fn process_component_query_with_partial_selectors<P: DiagnosticsProvid
 ) -> Result<Vec<Selector>, Error> {
     let mut tree_selectors = tree_selectors.into_iter().peekable();
     let realm_query = provider.realm_query();
-    let instance = fuzzy_search(component.as_str(), &realm_query).await?;
+    let instance = fuzzy_search(component.as_str(), realm_query).await?;
 
     let mut results = vec![];
     if tree_selectors.peek().is_none() {
@@ -206,11 +206,8 @@ pub fn expand_selectors(
     for mut selector in selectors {
         if let Some(tree_name) = &tree_name {
             selector = add_tree_name(selector, tree_name.clone())?;
-        } else {
-            match selector.tree_names {
-                None => selector.tree_names = Some(TreeNames::All(All {})),
-                Some(_) => {}
-            }
+        } else if selector.tree_names.is_none() {
+            selector.tree_names = Some(TreeNames::All(All {}))
         }
         result.push(selector)
     }

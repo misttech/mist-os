@@ -314,10 +314,7 @@ impl TryFrom<Vec<JsonValue>> for InspectFetcher {
     type Error = anyhow::Error;
 
     fn try_from(component_vec: Vec<JsonValue>) -> Result<Self, Self::Error> {
-        fn extract_json_value<'a>(
-            component: &'a mut JsonValue,
-            key: &'_ str,
-        ) -> Result<JsonValue, Error> {
+        fn extract_json_value(component: &mut JsonValue, key: &'_ str) -> Result<JsonValue, Error> {
             Ok(component
                 .get_mut(key)
                 .ok_or_else(|| anyhow!("'{}' not found in Inspect component", key))?

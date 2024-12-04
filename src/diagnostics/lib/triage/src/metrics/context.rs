@@ -28,7 +28,7 @@ impl<'a> ParsingContext<'a> {
     }
 }
 
-impl<'a> AsBytes for ParsingContext<'a> {
+impl AsBytes for ParsingContext<'_> {
     fn as_bytes(&self) -> &[u8] {
         self.input.as_bytes()
     }
@@ -67,13 +67,13 @@ impl<'a> InputIter for ParsingContext<'a> {
     }
 }
 
-impl<'a> InputLength for ParsingContext<'a> {
+impl InputLength for ParsingContext<'_> {
     fn input_len(&self) -> usize {
         self.input.len()
     }
 }
 
-impl<'a> InputTake for ParsingContext<'a> {
+impl InputTake for ParsingContext<'_> {
     fn take(&self, count: usize) -> Self {
         Self::new(&self.input[..count], self.namespace)
     }
@@ -93,7 +93,7 @@ where
     }
 }
 
-impl<'a> InputTakeAtPosition for ParsingContext<'a> {
+impl InputTakeAtPosition for ParsingContext<'_> {
     type Item = char;
     fn split_at_position<P, E: ParseError<Self>>(&self, predicate: P) -> IResult<Self, Self, E>
     where
@@ -148,7 +148,7 @@ impl<'a> InputTakeAtPosition for ParsingContext<'a> {
     }
 }
 
-impl<'a> Offset for ParsingContext<'a> {
+impl Offset for ParsingContext<'_> {
     fn offset(&self, second: &Self) -> usize {
         self.input.offset(second.input)
     }

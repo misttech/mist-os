@@ -39,7 +39,7 @@ pub struct PublisherOptions<'t> {
     _lifetime: PhantomData<&'t ()>,
 }
 
-impl<'t> Default for PublisherOptions<'t> {
+impl Default for PublisherOptions<'_> {
     fn default() -> Self {
         Self {
             interest: Interest::default(),
