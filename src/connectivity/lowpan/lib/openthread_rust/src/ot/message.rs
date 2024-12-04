@@ -229,7 +229,7 @@ impl std::fmt::Debug for Message<'_> {
 
 // SAFETY: `Message` transparently wraps around an opaque type and is
 //         never used by value nor passed by value.
-unsafe impl<'a> ot::Boxable for Message<'a> {
+unsafe impl ot::Boxable for Message<'_> {
     type OtType = otMessage;
     unsafe fn finalize(&mut self) {
         otMessageFree(self.as_ot_ptr())
@@ -317,7 +317,7 @@ impl<'a> Message<'a> {
     }
 }
 
-impl<'a> Message<'a> {
+impl Message<'_> {
     /// Functional equivalent of [`otsys::otMessageAppend`](crate::otsys::otMessageAppend).
     ///
     /// The length of `data` must be less than 2^16, or else the method will return

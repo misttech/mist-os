@@ -81,7 +81,7 @@ unsafe extern "C" fn otTaskletsSignalPending(instance: *mut otInstance) {
 /// Created by [`TaskletsStreamExt::tasklets_stream()`].
 #[derive(Debug)]
 pub struct TaskletsStream<'a, T: ?Sized>(&'a T);
-impl<'a, T: TaskletsStreamExt + ?Sized> Stream for TaskletsStream<'a, T> {
+impl<T: TaskletsStreamExt + ?Sized> Stream for TaskletsStream<'_, T> {
     type Item = ();
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.0.tasklets_poll(cx)

@@ -162,7 +162,7 @@ pub struct Ip6AddressInfo<'a>(otIp6AddressInfo, PhantomData<*mut &'a ()>);
 
 impl_ot_castable!(lifetime Ip6AddressInfo<'_>, otIp6AddressInfo, Default::default());
 
-impl<'a> Debug for Ip6AddressInfo<'a> {
+impl Debug for Ip6AddressInfo<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.addr().fmt(f)?;
         write!(f, "/{} {:?}", self.prefix_len(), self.scope())?;

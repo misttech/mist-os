@@ -11,7 +11,7 @@ pub struct NeighborInfoIterator<'a, T: ?Sized> {
     ot_iter: otNeighborInfoIterator,
 }
 
-impl<'a, T: ?Sized + Thread> Iterator for NeighborInfoIterator<'a, T> {
+impl<T: ?Sized + Thread> Iterator for NeighborInfoIterator<'_, T> {
     type Item = NeighborInfo;
     fn next(&mut self) -> Option<Self::Item> {
         self.ot_instance.iter_next_neighbor_info(&mut self.ot_iter)

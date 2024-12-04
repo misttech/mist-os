@@ -11,7 +11,7 @@ pub struct MulticastListenerIterator<'a, T: ?Sized> {
     ot_listener_iter: otBackboneRouterMulticastListenerIterator,
 }
 
-impl<'a, T: ?Sized + BackboneRouter> Iterator for MulticastListenerIterator<'a, T> {
+impl<T: ?Sized + BackboneRouter> Iterator for MulticastListenerIterator<'_, T> {
     type Item = BackboneRouterMulticastListenerInfo;
     fn next(&mut self) -> Option<Self::Item> {
         self.ot_instance.multicast_listener_get_next(&mut self.ot_listener_iter)

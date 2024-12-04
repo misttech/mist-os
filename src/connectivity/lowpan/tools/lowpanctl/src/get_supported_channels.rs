@@ -33,7 +33,7 @@ impl GetSupportedChannelsCommand {
             };
             let id = match channel_info.id {
                 Some(x) => format!("{:?}", x),
-                None => format!("{}", "N/A".to_string()),
+                None => format!("{}", "N/A"),
             };
             let max_transmit_power = match channel_info.max_transmit_power_dbm {
                 Some(x) => format!("{:^14}", x),

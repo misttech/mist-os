@@ -17,7 +17,7 @@ pub struct LocalExternalRouteIterator<'a, T: ?Sized> {
     ot_iter: otNetworkDataIterator,
 }
 
-impl<'a, T: ?Sized + BorderRouter> Iterator for LocalExternalRouteIterator<'a, T> {
+impl<T: ?Sized + BorderRouter> Iterator for LocalExternalRouteIterator<'_, T> {
     type Item = ExternalRouteConfig;
     fn next(&mut self) -> Option<Self::Item> {
         self.ot_instance.iter_next_local_external_route(&mut self.ot_iter)
@@ -31,7 +31,7 @@ pub struct LocalOnMeshPrefixIterator<'a, T: ?Sized> {
     ot_iter: otNetworkDataIterator,
 }
 
-impl<'a, T: ?Sized + BorderRouter> Iterator for LocalOnMeshPrefixIterator<'a, T> {
+impl<T: ?Sized + BorderRouter> Iterator for LocalOnMeshPrefixIterator<'_, T> {
     type Item = BorderRouterConfig;
     fn next(&mut self) -> Option<Self::Item> {
         self.ot_instance.iter_next_local_on_mesh_prefix(&mut self.ot_iter)

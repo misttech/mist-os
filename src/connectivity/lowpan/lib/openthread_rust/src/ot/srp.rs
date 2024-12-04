@@ -52,13 +52,13 @@ pub struct SrpServerHostIterator<'a, T: SrpServer> {
 
 // This cannot be easily derived because T doesn't implement `Clone`,
 // so we must implement it manually.
-impl<'a, T: SrpServer> Clone for SrpServerHostIterator<'a, T> {
+impl<T: SrpServer> Clone for SrpServerHostIterator<'_, T> {
     fn clone(&self) -> Self {
         SrpServerHostIterator { prev: self.prev, ot_instance: self.ot_instance }
     }
 }
 
-impl<'a, T: SrpServer> std::fmt::Debug for SrpServerHostIterator<'a, T> {
+impl<T: SrpServer> std::fmt::Debug for SrpServerHostIterator<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[")?;
         for item in self.clone() {

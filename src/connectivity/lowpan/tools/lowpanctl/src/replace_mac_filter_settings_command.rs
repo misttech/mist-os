@@ -27,7 +27,7 @@ impl ReplaceMacFilterSettingsCommand {
         &self,
         mac_addr_str: &str,
     ) -> Result<fidl_fuchsia_lowpan::MacAddress, Error> {
-        let vec = hex::decode(mac_addr_str.to_string())?;
+        let vec = hex::decode(mac_addr_str)?;
         let octets = vec
             .try_into()
             .map_err(|_: Vec<u8>| format_err!("malformed MAC address {}", mac_addr_str))?;

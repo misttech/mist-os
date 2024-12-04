@@ -51,7 +51,7 @@ impl FormCommand {
         self.xpanid
             .as_ref()
             .map(|value| {
-                let vec = hex::decode(value.to_string())?;
+                let vec = hex::decode(value)?;
                 let octets = vec
                     .try_into()
                     .map_err(|_: Vec<u8>| format_err!("malformed xpanid {}", value))?;
@@ -64,7 +64,7 @@ impl FormCommand {
         self.credential_master_key
             .as_ref()
             .map(|value| {
-                let res = hex::decode(value.to_string())?;
+                let res = hex::decode(value)?;
                 if res.len() != PROVISION_CMD_CRED_MASTER_LEY_LEN[0]
                     && res.len() != PROVISION_CMD_CRED_MASTER_LEY_LEN[1]
                 {

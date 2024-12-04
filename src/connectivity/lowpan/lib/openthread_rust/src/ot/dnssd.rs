@@ -121,7 +121,7 @@ impl<'a> DnsTxtEntry<'a> {
     }
 }
 
-impl<'a> std::fmt::Debug for DnsTxtEntry<'a> {
+impl std::fmt::Debug for DnsTxtEntry<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DnsTxtEntry")
             .field("key_field", &self.key_field())
@@ -130,7 +130,7 @@ impl<'a> std::fmt::Debug for DnsTxtEntry<'a> {
     }
 }
 
-impl<'a> std::fmt::Display for DnsTxtEntry<'a> {
+impl std::fmt::Display for DnsTxtEntry<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", ascii_dump(&self.to_vec()))
     }
