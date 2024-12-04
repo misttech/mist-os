@@ -6,13 +6,14 @@
 //!
 //! Wire serialization and deserialization functions.
 
+use core::borrow::Borrow;
 use core::fmt::Debug;
 use core::mem::size_of;
 use core::ops::Deref;
 use core::time::Duration;
 
-use net_types::ip::{Ipv6, Ipv6Addr};
-use net_types::MulticastAddr;
+use net_types::ip::{Ip, Ipv6, Ipv6Addr};
+use net_types::{MulticastAddr, Witness as _};
 use packet::records::{ParsedRecord, RecordParseResult, Records, RecordsImpl, RecordsImplLayout};
 use packet::serialize::InnerPacketBuilder;
 use packet::BufferView;
@@ -258,14 +259,6 @@ impl_icmp_message!(
     Mldv2ReportBody<B>
 );
 
-impl Mldv2MessageType for MulticastListenerReportV2 {
-    type MessageHeader = Mldv2ReportHeader;
-    type RecordHeader = Mldv2ReportRecordHeader;
-    type RecordRepeatedContent = Ipv6Addr;
-}
-
-impl IcmpMldv2MessageType for MulticastListenerReportV2 {}
-
 /// Multicast Listener Query V1 Message.
 #[repr(C)]
 #[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned, Copy, Clone, Debug)]
@@ -310,38 +303,9 @@ pub trait Mldv1MessageType {
     type GroupAddr: Into<Ipv6Addr> + Debug + Copy;
 }
 
-/// The trait for MLDv2 Messages.
-pub trait Mldv2MessageType {
-    /// The type used to track the header.
-    ///
-    /// It should be [Mldv2QueryMessageHeader] for [MulticastListenerQueryV2] and
-    /// [Mldv2ReportHeader] for [MulticastListenerReportV2].
-    type MessageHeader: Debug + IntoBytes + Immutable;
-
-    /// An [Mldv2Message] will have a set of records with a fix sized part and a variable sized
-    /// part: [RecordHeader] tracks the fix sized part.
-    ///
-    /// It should be [Ipv6Addr] for [MulticastListenerQueryV2] and [Mldv2ReportRecordHeader] for
-    /// [MulticastListenerReportV2].
-    type RecordHeader: Debug + IntoBytes + Immutable;
-
-    /// An [Mldv2Message] will have a set of records with a fix sized part and a variable sized
-    /// part: [RecordRepeatedContent] tracks the variable sized part.
-    ///
-    /// It should be [()] for [MulticastListenerQueryV2] and [Ipv6Addr] for
-    /// [MulticastListenerReportV2].
-    type RecordRepeatedContent: Debug + IntoBytes + Immutable;
-}
-
 /// The trait for all ICMPv6 messages holding MLDv1 messages.
 pub trait IcmpMldv1MessageType:
     Mldv1MessageType + IcmpMessage<Ipv6, Code = IcmpUnusedCode>
-{
-}
-
-/// The trait for all ICMPv6 messages holding MLDv2 messages.
-pub trait IcmpMldv2MessageType:
-    Mldv2MessageType + IcmpMessage<Ipv6, Code = IcmpUnusedCode>
 {
 }
 
@@ -623,60 +587,181 @@ impl<M: Mldv1MessageType> InnerPacketBuilder for Mldv1MessageBuilder<M> {
     }
 }
 
-/// The builder for MLDv2 Messages.
+/// The builder for MLDv2 Query Messages.
 #[derive(Debug)]
-pub struct Mldv2MessageBuilder<'a, M: Mldv2MessageType> {
-    header: M::MessageHeader,
-    body: &'a [(M::RecordHeader, &'a [M::RecordRepeatedContent])],
+pub struct Mldv2QueryMessageBuilder<I> {
+    max_response_delay: Mldv2ResponseDelay,
+    group_addr: Option<MulticastAddr<Ipv6Addr>>,
+    s_flag: bool,
+    qrv: Mldv2QRV,
+    qqic: Mldv2QQIC,
+    sources: I,
 }
 
-impl<'a, M: Mldv2MessageType> Mldv2MessageBuilder<'a, M> {
-    /// Create an `Mldv2MessageBuilder` with a `max_resp_delay`
-    /// for Query messages.
-    pub fn new_with_records(
-        header: M::MessageHeader,
-        body: &'a [(M::RecordHeader, &'a [M::RecordRepeatedContent])],
+impl<I> Mldv2QueryMessageBuilder<I> {
+    /// Creates a new [`Mldv2QueryMessageBuilder`].
+    pub fn new(
+        max_response_delay: Mldv2ResponseDelay,
+        group_addr: Option<MulticastAddr<Ipv6Addr>>,
+        s_flag: bool,
+        qrv: Mldv2QRV,
+        qqic: Mldv2QQIC,
+        sources: I,
     ) -> Self {
-        Mldv2MessageBuilder { header, body }
+        Self { max_response_delay, group_addr, s_flag, qrv, qqic, sources }
+    }
+}
+
+impl<I> InnerPacketBuilder for Mldv2QueryMessageBuilder<I>
+where
+    I: Iterator<Item: Borrow<Ipv6Addr>> + Clone,
+{
+    fn bytes_len(&self) -> usize {
+        core::mem::size_of::<Mldv2QueryMessageHeader>()
+            + self.sources.clone().count() * core::mem::size_of::<Ipv6Addr>()
     }
 
-    fn serialize_message(&self, mut buf: &mut [u8]) {
+    fn serialize(&self, mut buf: &mut [u8]) {
         use packet::BufferViewMut;
         let mut bytes = &mut buf;
-
-        bytes.write_obj_front(self.header.as_bytes()).expect("too few bytes for MLDv2 message");
-        for (record_header, repeated_content) in self.body.iter() {
-            bytes
-                .write_obj_front(record_header.as_bytes())
-                .expect("too few bytes for MLDv2 message");
-            for content in repeated_content.iter() {
-                bytes.write_obj_front(content.as_bytes()).expect("too few bytes for MLDv2 message");
-            }
+        let mut header = bytes
+            .take_obj_front_zero::<Mldv2QueryMessageHeader>()
+            .expect("too few bytes for header");
+        let Mldv2QueryMessageHeader {
+            max_response_code,
+            _reserved,
+            group_addr,
+            sqrv,
+            qqic,
+            number_of_sources,
+        } = &mut *header;
+        let Self {
+            max_response_delay,
+            group_addr: wr_group_addr,
+            s_flag,
+            qrv,
+            qqic: wr_qqic,
+            sources,
+        } = self;
+        *max_response_code = max_response_delay.as_code();
+        *group_addr =
+            wr_group_addr.as_ref().map(|addr| addr.get()).unwrap_or(Ipv6::UNSPECIFIED_ADDRESS);
+        // sqrv contains 4 reserved bits, the s_flag and the qrv,
+        // see https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.
+        *sqrv = (u8::from(*s_flag) << 3) | (Mldv2QueryMessageHeader::QRV_MASK & u8::from(*qrv));
+        *qqic = wr_qqic.as_code();
+        let mut count: u16 = 0;
+        for src in sources.clone() {
+            count = count.checked_add(1).expect("overflowed number of sources");
+            bytes.write_obj_front(src.borrow()).expect("too few bytes for source");
         }
+        *number_of_sources = count.into();
     }
 }
 
-impl<'a, M: Mldv2MessageType> InnerPacketBuilder for Mldv2MessageBuilder<'a, M> {
+/// The builder for MLDv2 Report Messages.
+#[derive(Debug)]
+pub struct Mldv2ReportMessageBuilder<I> {
+    groups: I,
+}
+
+impl<I> Mldv2ReportMessageBuilder<I> {
+    /// Creates a new [`Mldv2ReportMessageBuilder`].
+    pub fn new(groups: I) -> Self {
+        Self { groups }
+    }
+}
+
+impl<I> InnerPacketBuilder for Mldv2ReportMessageBuilder<I>
+where
+    I: Iterator<Item: Mldv2ReportGroupRecord> + Clone,
+{
     fn bytes_len(&self) -> usize {
-        self.header.as_bytes().len()
+        core::mem::size_of::<Mldv2ReportHeader>()
             + self
-                .body
-                .iter()
-                .map(|record| {
-                    let (record_header, record_repeated_content) = record;
-                    record_header.as_bytes().len()
-                        + record_repeated_content.iter().map(|x| x.as_bytes().len()).sum::<usize>()
+                .groups
+                .clone()
+                .map(|g| {
+                    core::mem::size_of::<Mldv2ReportRecordHeader>()
+                        + g.sources().count() * core::mem::size_of::<Ipv6Addr>()
                 })
                 .sum::<usize>()
     }
 
-    fn serialize(&self, buf: &mut [u8]) {
-        self.serialize_message(buf);
+    fn serialize(&self, mut buf: &mut [u8]) {
+        use packet::BufferViewMut;
+        let mut bytes = &mut buf;
+        let mut header =
+            bytes.take_obj_front_zero::<Mldv2ReportHeader>().expect("too few bytes for header");
+        let Mldv2ReportHeader { _reserved, num_mcast_addr_records } = &mut *header;
+        let mut mcast_count: u16 = 0;
+        for group in self.groups.clone() {
+            mcast_count = mcast_count.checked_add(1).expect("multicast groups count overflows");
+            let mut header = bytes
+                .take_obj_front_zero::<Mldv2ReportRecordHeader>()
+                .expect("too few bytes for record header");
+            let Mldv2ReportRecordHeader {
+                record_type,
+                aux_data_len,
+                number_of_sources,
+                multicast_address,
+            } = &mut *header;
+            *record_type = group.record_type().into();
+            *aux_data_len = 0;
+            *multicast_address = group.group().into();
+            let mut source_count: u16 = 0;
+            for src in group.sources() {
+                source_count = source_count.checked_add(1).expect("sources count overflows");
+                bytes.write_obj_front(src.borrow()).expect("too few bytes for source");
+            }
+            *number_of_sources = source_count.into();
+        }
+        *num_mcast_addr_records = mcast_count.into();
     }
 }
 
-/// Maximum Response Delay used in Queryv2 messages, defined in [RFC 3810 section 5.1.3].
-/// [RFC 3810 section 5.1.3]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.3
+/// A trait abstracting every multicast group record in an
+/// `Mldv2ReportMessageBuilder`.
+///
+/// This trait facilitates the nested iterators required for implementing group
+/// records (iterator of groups, each of which with an iterator of sources)
+/// without propagating the inner iterator types far up.
+///
+/// An implementation for tuples of `(group, record_type, iterator)` is
+/// provided.
+pub trait Mldv2ReportGroupRecord {
+    /// Returns the multicast group this report refers to.
+    fn group(&self) -> MulticastAddr<Ipv6Addr>;
+
+    /// Returns record type to insert in the record entry.
+    fn record_type(&self) -> Mldv2MulticastRecordType;
+
+    /// Returns an iterator over the sources in the report.
+    fn sources(&self) -> impl Iterator<Item: Borrow<Ipv6Addr>> + '_;
+}
+
+impl<I> Mldv2ReportGroupRecord for (MulticastAddr<Ipv6Addr>, Mldv2MulticastRecordType, I)
+where
+    I: Iterator<Item: Borrow<Ipv6Addr>> + Clone,
+{
+    fn group(&self) -> MulticastAddr<Ipv6Addr> {
+        self.0
+    }
+
+    fn record_type(&self) -> Mldv2MulticastRecordType {
+        self.1
+    }
+
+    fn sources(&self) -> impl Iterator<Item: Borrow<Ipv6Addr>> + '_ {
+        self.2.clone()
+    }
+}
+
+/// Maximum Response Delay used in Queryv2 messages, defined in [RFC 3810
+/// section 5.1.3].
+///
+/// [RFC 3810 section 5.1.3]:
+///     https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.3
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct Mldv2ResponseDelay(u16);
 
@@ -737,6 +822,7 @@ impl From<Mldv2QRV> for u8 {
 
 /// QQIC (Querier's Query Interval Code) used in Queryv2 messages, defined in
 /// [RFC 3810 section 5.1.9].
+///
 /// [RFC 3810 section 5.1.9]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.9
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct Mldv2QQIC(u8);
@@ -802,20 +888,20 @@ pub struct Mldv2QueryMessageHeader {
     /// In a Query message, the Multicast Address field is set to zero when
     /// sending a General Query, and set to a specific IPv6 multicast address
     /// when sending a Multicast-Address-Specific Query.
-    ///
-    /// In a Report or Done message, the Multicast Address field holds a
-    /// specific IPv6 multicast address to which the message sender is
-    /// listening or is ceasing to listen, respectively.
     pub group_addr: Ipv6Addr,
 
-    /// Tracks 4 reserved bits, the s_flag defined in [RFC 3810 section 5.1.7] and the qrv defined
-    /// in [RFC 3810 section 5.1.8].
-    /// [RFC 3810 section 5.1.7]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.7
-    /// [RFC 3810 section 5.1.8]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.8
+    /// Tracks 4 reserved bits, the s_flag defined in [RFC 3810 section 5.1.7]
+    /// and the qrv defined in [RFC 3810 section 5.1.8].
+    ///
+    /// [RFC 3810 section 5.1.7]:
+    ///     https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.7
+    /// [RFC 3810 section 5.1.8]:
+    ///     https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.8
     sqrv: u8,
     /// Querier's Query Interval Code.
     qqic: u8,
-    /// Number of Sources i.e. how many source addresses are present in the Query.
+    /// Number of Sources i.e. how many source addresses are present in the
+    /// Query.
     number_of_sources: U16,
 }
 
@@ -823,28 +909,6 @@ impl Mldv2QueryMessageHeader {
     const S_FLAG_MASK: u8 = (1 << 3);
 
     const QRV_MASK: u8 = 0x07;
-
-    /// Crates a new [Mldv2QueryMessageHeader].
-    pub fn new(
-        max_response_delay: Mldv2ResponseDelay,
-        group_addr: Ipv6Addr,
-        s_flag: bool,
-        qrv: Mldv2QRV,
-        qqic: Mldv2QQIC,
-        number_of_sources: u16,
-    ) -> Self {
-        // sqrv contains 4 reserved bits, the s_flag and the qrv,
-        // see https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.
-        let sqrv = (u8::from(s_flag) << 3) | (Self::QRV_MASK & u8::from(qrv));
-        Mldv2QueryMessageHeader {
-            max_response_code: max_response_delay.as_code(),
-            _reserved: U16::ZERO,
-            group_addr: group_addr.into(),
-            sqrv,
-            qqic: qqic.as_code(),
-            number_of_sources: U16::from(number_of_sources),
-        }
-    }
 
     /// Gets the response delay value.
     pub fn max_response_delay(&self) -> Duration {
@@ -927,14 +991,6 @@ impl_icmp_message!(
     IcmpUnusedCode,
     Mldv2QueryBody<B>
 );
-
-impl Mldv2MessageType for MulticastListenerQueryV2 {
-    type MessageHeader = Mldv2QueryMessageHeader;
-    type RecordHeader = Ipv6Addr;
-    type RecordRepeatedContent = UninstantiableRecord;
-}
-
-impl IcmpMldv2MessageType for MulticastListenerQueryV2 {}
 
 #[cfg(test)]
 mod tests {
@@ -1029,12 +1085,14 @@ mod tests {
             .to_vec()
     }
 
-    fn serialize_to_bytes_with_builder_v2<M: IcmpMldv2MessageType + Debug>(
+    fn serialize_to_bytes_with_builder_v2<
+        M: IcmpMessage<Ipv6, Code = IcmpUnusedCode> + Debug,
+        B: InnerPacketBuilder + Debug,
+    >(
         src_ip: Ipv6Addr,
         dst_ip: Ipv6Addr,
         msg: M,
-        header: M::MessageHeader,
-        body: &[(M::RecordHeader, &[M::RecordRepeatedContent])],
+        builder: B,
     ) -> Vec<u8> {
         let ip = Ipv6PacketBuilder::new(src_ip, dst_ip, 1, Ipv6Proto::Icmpv6);
         let with_options = Ipv6PacketBuilderWithHbhOptions::new(
@@ -1048,7 +1106,7 @@ mod tests {
         .unwrap();
         //Serialize an MLD(ICMPv6) packet using the builder.
 
-        Mldv2MessageBuilder::<M>::new_with_records(header, body)
+        builder
             .into_serializer()
             .encapsulate(IcmpPacketBuilder::new(src_ip, dst_ip, IcmpUnusedCode, msg))
             .encapsulate(with_options)
@@ -1095,7 +1153,7 @@ mod tests {
     fn check_mld_query_v2<
         'a,
         B: SplitByteSlice,
-        M: IcmpMessage<Ipv6, Body<B> = Mldv2QueryBody<B>> + Mldv2MessageType + Debug,
+        M: IcmpMessage<Ipv6, Body<B> = Mldv2QueryBody<B>> + Debug,
     >(
         icmp: &IcmpPacket<Ipv6, B, M>,
         max_resp_code: u16,
@@ -1114,7 +1172,7 @@ mod tests {
     fn check_mld_report_v2<
         'a,
         B: SplitByteSlice,
-        M: IcmpMessage<Ipv6, Body<B> = Mldv2ReportBody<B>> + Mldv2MessageType + Debug,
+        M: IcmpMessage<Ipv6, Body<B> = Mldv2ReportBody<B>> + Debug,
     >(
         icmp: &IcmpPacket<Ipv6, B, M>,
         expected_records_header: &[(Mldv2MulticastRecordType, Ipv6Addr)],
@@ -1304,27 +1362,18 @@ mod tests {
         use crate::testdata::mld_router_query::*;
         use core::time::Duration;
 
-        let header = Mldv2QueryMessageHeader::new(
+        let builder = Mldv2QueryMessageBuilder::new(
             Mldv2ResponseDelay::lossy_try_from(Duration::from_millis(MAX_RESP_CODE.into()))
                 .unwrap(),
-            HOST_GROUP_ADDRESS,
+            MulticastAddr::new(HOST_GROUP_ADDRESS),
             S_FLAG,
             Mldv2QRV::new(QRV),
             Mldv2QQIC::lossy_try_from(Duration::from_secs(QQIC.into())).unwrap(),
-            SOURCES.len().try_into().unwrap(),
+            SOURCES.into_iter(),
         );
 
-        let repeated_content = vec![];
-        let body: Vec<(Ipv6Addr, &[UninstantiableRecord])> =
-            SOURCES.into_iter().map(|source| (*source, &repeated_content[..])).collect();
-
-        let bytes = serialize_to_bytes_with_builder_v2::<_>(
-            SRC_IP,
-            DST_IP,
-            MulticastListenerQueryV2,
-            header,
-            &body,
-        );
+        let bytes =
+            serialize_to_bytes_with_builder_v2(SRC_IP, DST_IP, MulticastListenerQueryV2, builder);
         assert_eq!(&bytes[..], QUERY_V2);
         let mut req = &bytes[..];
         let ip = req.parse_with::<_, Ipv6Packet<_>>(()).unwrap();
@@ -1340,35 +1389,19 @@ mod tests {
 
     #[test]
     fn test_mld_serialize_and_parse_report_v2() {
-        use crate::icmp::mld::{Mldv2ReportHeader, MulticastListenerReportV2};
+        use crate::icmp::mld::MulticastListenerReportV2;
         use crate::testdata::mld_router_report_v2::*;
 
-        let header = Mldv2ReportHeader::new(RECORDS_HEADERS.len().try_into().unwrap());
-        let body: Vec<(Mldv2ReportRecordHeader, &[Ipv6Addr])> = RECORDS_HEADERS
-            .into_iter()
-            .zip(RECORDS_SOURCES.into_iter())
-            .map(|record| {
+        let builder = Mldv2ReportMessageBuilder::new(
+            RECORDS_HEADERS.into_iter().zip(RECORDS_SOURCES.into_iter()).map(|record| {
                 let (record_header, record_sources) = record;
                 let (record_type, multicast_addr) = record_header;
-                (
-                    Mldv2ReportRecordHeader::new(
-                        *record_type,
-                        0,
-                        record_sources.len().try_into().unwrap(),
-                        *multicast_addr,
-                    ),
-                    *record_sources,
-                )
-            })
-            .collect();
-
-        let bytes = serialize_to_bytes_with_builder_v2::<_>(
-            SRC_IP,
-            DST_IP,
-            MulticastListenerReportV2,
-            header,
-            &body,
+                (MulticastAddr::new(*multicast_addr).unwrap(), *record_type, record_sources.iter())
+            }),
         );
+
+        let bytes =
+            serialize_to_bytes_with_builder_v2(SRC_IP, DST_IP, MulticastListenerReportV2, builder);
         assert_eq!(&bytes[..], REPORT);
         let mut req = &bytes[..];
         let ip = req.parse_with::<_, Ipv6Packet<_>>(()).unwrap();
