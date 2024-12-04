@@ -102,22 +102,6 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
     return zx::ok();
   }
 
-  zx_status_t SetMetadataForSoftTransition(const FidlType& metadata) {
-    static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
-    static_assert(!fidl::IsResource<FidlType>::value,
-                  "|FidlType| cannot be a resource type. Resources cannot be persisted.");
-
-    fit::result data = fidl::Persist(metadata);
-    if (data.is_error()) {
-      FDF_SLOG(ERROR, "Failed to persist metadata.",
-               KV("status", data.error_value().status_string()));
-      return data.error_value().status();
-    }
-    encoded_metadata_.emplace(data.value());
-
-    return ZX_OK;
-  }
-
   // Sets the metadata to be served to the metadata found in |incoming|.
   //
   // If the metadata found in |incoming| changes after this function has been called then those
@@ -159,11 +143,6 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
 
   zx::result<> Serve(fdf::OutgoingDirectory& outgoing, async_dispatcher_t* dispatcher) {
     return Serve(outgoing.component(), dispatcher);
-  }
-
-  zx_status_t ServeForSoftTransition(fdf::OutgoingDirectory& outgoing,
-                                     async_dispatcher_t* dispatcher) {
-    return Serve(outgoing.component(), dispatcher).status_value();
   }
 
   // Serves the fuchsia.driver.metadata/Service service to |outgoing| under the service name
