@@ -1785,10 +1785,11 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let eapol_ind = fidl_fullmac::WlanFullmacEapolIndication {
-            src_addr: [1u8; 6],
-            dst_addr: [2u8; 6],
-            data: vec![3u8; 4],
+        let eapol_ind = fidl_fullmac::WlanFullmacImplIfcEapolIndRequest {
+            src_addr: Some([1u8; 6]),
+            dst_addr: Some([2u8; 6]),
+            data: Some(vec![3u8; 4]),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.eapol_ind(&eapol_ind)),

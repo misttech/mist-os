@@ -203,10 +203,11 @@ async fn send_eapol_frame_to_test_realm(
     fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcProxy,
 ) {
     fullmac_ifc_proxy
-        .eapol_ind(&fidl_fullmac::WlanFullmacEapolIndication {
-            src_addr: authenticator_addr,
-            dst_addr: client_addr,
-            data: frame.into(),
+        .eapol_ind(&fidl_fullmac::WlanFullmacImplIfcEapolIndRequest {
+            src_addr: Some(authenticator_addr),
+            dst_addr: Some(client_addr),
+            data: Some(frame.into()),
+            ..Default::default()
         })
         .await
         .expect("Could not send EAPOL ind");

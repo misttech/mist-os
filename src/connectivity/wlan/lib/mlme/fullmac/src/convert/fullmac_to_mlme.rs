@@ -476,9 +476,13 @@ pub fn convert_signal_report_indication(
     fidl_internal::SignalReportIndication { rssi_dbm: ind.rssi_dbm, snr_db: ind.snr_db }
 }
 pub fn convert_eapol_indication(
-    ind: fidl_fullmac::WlanFullmacEapolIndication,
-) -> fidl_mlme::EapolIndication {
-    fidl_mlme::EapolIndication { src_addr: ind.src_addr, dst_addr: ind.dst_addr, data: ind.data }
+    ind: fidl_fullmac::WlanFullmacImplIfcEapolIndRequest,
+) -> Result<fidl_mlme::EapolIndication> {
+    Ok(fidl_mlme::EapolIndication {
+        src_addr: ind.src_addr.context("missing src_addr")?,
+        dst_addr: ind.dst_addr.context("missing dst_addr")?,
+        data: ind.data.context("missing data")?,
+    })
 }
 pub fn convert_pmk_info(
     info: fidl_fullmac::WlanFullmacImplIfcOnPmkAvailableRequest,

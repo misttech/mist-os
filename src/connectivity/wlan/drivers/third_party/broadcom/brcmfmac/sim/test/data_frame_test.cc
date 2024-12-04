@@ -148,7 +148,7 @@ class DataFrameTest : public SimTest {
   void OnDisassocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind);
   void OnEapolConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcEapolConfRequest* resp);
   void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
-  void OnEapolInd(const wlan_fullmac_wire::WlanFullmacEapolIndication* ind);
+  void OnEapolInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcEapolIndRequest* ind);
 
  protected:
   void GetHighWmeRxErrorRateInspectCount(uint64_t* out_count) {
@@ -263,7 +263,8 @@ void DataFrameInterface::SignalReport(SignalReportRequestView request,
   completer.Reply();
 }
 void DataFrameInterface::EapolInd(EapolIndRequestView request, EapolIndCompleter::Sync& completer) {
-  test_->OnEapolInd(&request->ind);
+  const auto eapol_ind = fidl::ToNatural(*request);
+  test_->OnEapolInd(&eapol_ind);
   completer.Reply();
 }
 
@@ -321,10 +322,10 @@ void DataFrameTest::OnEapolConf(
   eapol_context_.tx_eapol_conf_codes.push_back(resp->result_code().value());
 }
 
-void DataFrameTest::OnEapolInd(const wlan_fullmac_wire::WlanFullmacEapolIndication* ind) {
+void DataFrameTest::OnEapolInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcEapolIndRequest* ind) {
   std::vector<uint8_t> resp;
-  resp.resize(ind->data.count());
-  std::memcpy(resp.data(), ind->data.data(), ind->data.count());
+  resp.resize(ind->data()->size());
+  std::copy(ind->data()->begin(), ind->data()->end(), resp.begin());
 
   eapol_context_.received_data.push_back(std::move(resp));
 

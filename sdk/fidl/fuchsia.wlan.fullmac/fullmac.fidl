@@ -105,12 +105,6 @@ type WlanFullmacSignalReportIndication = struct {
     snr_db int8;
 };
 
-type WlanFullmacEapolIndication = struct {
-    src_addr ieee80211.MacAddr;
-    dst_addr ieee80211.MacAddr;
-    data vector<uint8>:MAX;
-};
-
 type WlanFullmacSaeHandshakeInd = struct {
     peer_sta_address ieee80211.MacAddr;
 };
@@ -477,8 +471,14 @@ closed protocol WlanFullmacImplIfc {
     strict SignalReport(struct {
         ind WlanFullmacSignalReportIndication;
     }) -> ();
-    strict EapolInd(struct {
-        ind WlanFullmacEapolIndication;
+    /// Report that an EAPoL frame was received.
+    strict EapolInd(table {
+        /// The address of the sender. Required.
+        1: src_addr ieee80211.MacAddr;
+        /// The address of the intended destination. Required.
+        2: dst_addr ieee80211.MacAddr;
+        /// The bytes of the EAPoL frame data. Required.
+        3: data vector<uint8>:MAX;
     }) -> ();
     /// Inform the platform that the PMK is available after a driver-handled SAE handshake.
     strict OnPmkAvailable(table {

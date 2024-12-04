@@ -127,10 +127,10 @@ fn handle_one_request(
                 ind: fullmac_to_mlme::convert_signal_report_indication(ind),
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::EapolInd { ind, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::EapolInd { payload, responder } => {
             responder.send().context("Failed to respond to EapolInd")?;
             driver_event_sink.0.send(FullmacDriverEvent::EapolInd {
-                ind: fullmac_to_mlme::convert_eapol_indication(ind),
+                ind: fullmac_to_mlme::convert_eapol_indication(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::OnPmkAvailable { payload, responder } => {

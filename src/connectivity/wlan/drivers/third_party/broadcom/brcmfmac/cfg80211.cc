@@ -2981,20 +2981,32 @@ void brcmf_cfg80211_handle_eapol_frame(struct brcmf_if* ifp, const void* data, s
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping eapol frame callback");
     return;
   }
-  uint8_t* data_bytes = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(data));
-  fuchsia_wlan_fullmac_wire::WlanFullmacEapolIndication eapol_ind = {};
-  // IEEE Std. 802.1X-2010, 11.3, Figure 11-1
-  memcpy(eapol_ind.dst_addr.data(), data_bytes, ETH_ALEN);
-  memcpy(eapol_ind.src_addr.data(), data_bytes + 6, ETH_ALEN);
-  eapol_ind.data = ::fidl::VectorView<uint8_t>::FromExternal(data_bytes + 14, size - 14);
-
-  BRCMF_IFDBG(WLANIF, ndev, "Sending EAPOL frame to SME. data_len: %zu", size - 14);
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
     return;
   }
+
+  uint8_t* data_bytes = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(data));
+
+  fidl::Array<uint8_t, ETH_ALEN> dst_addr;
+  memcpy(dst_addr.data(), data_bytes, ETH_ALEN);
+
+  fidl::Array<uint8_t, ETH_ALEN> src_addr;
+  memcpy(src_addr.data(), data_bytes + 6, ETH_ALEN);
+
+  const auto eapol_ind =
+      fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcEapolIndRequest::Builder(*arena)
+          .dst_addr(dst_addr)
+          .src_addr(src_addr)
+          // The EAPOL PDU is stored at data_bytes + 14.
+          // See IEEE Std. 802.1X-2010, 11.3, Figure 11-1 for the format of the EAPOL PDU.
+          .data(::fidl::VectorView<uint8_t>::FromExternal(data_bytes + 14, size - 14))
+          .Build();
+
+  BRCMF_IFDBG(WLANIF, ndev, "Sending EAPOL frame to SME. data_len: %zu", size - 14);
+
   auto result = ndev->if_proto.buffer(*arena)->EapolInd(eapol_ind);
   if (!result.ok()) {
     BRCMF_ERR("Failed to send eapol ind result.status: %s", result.status_string());
