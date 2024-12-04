@@ -18,11 +18,11 @@ use net_types::ip::{
     Ipv6Addr, Mtu,
 };
 use net_types::{map_ip_twice, MulticastAddr, SpecifiedAddr, Witness as _};
-use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, BroadcastIpExt, CounterContext, DeviceIdContext, ExistsError, Ipv4DeviceAddr,
-    Ipv6DeviceAddr, NotFoundError, ReceivableFrameMeta, RecvIpFrameMeta, ReferenceNotifiersExt,
-    RemoveResourceResultWithContext, ResourceCounterContext, SendFrameError,
+    AnyDevice, BroadcastIpExt, CounterContext, DeviceIdContext, ExistsError,
+    IpDeviceAddressIdContext, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError, ReceivableFrameMeta,
+    RecvIpFrameMeta, ReferenceNotifiersExt, RemoveResourceResultWithContext,
+    ResourceCounterContext, SendFrameError,
 };
 use netstack3_device::ethernet::{
     self, EthernetDeviceCounters, EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext,
@@ -39,12 +39,12 @@ use netstack3_device::{
 };
 use netstack3_filter::ProofOfEgressCheck;
 use netstack3_ip::device::{
-    AddressIdIter, AssignedAddress as _, DualStackIpDeviceState, IpDeviceAddressContext,
-    IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceFlags, IpDeviceIpExt,
+    AddressId, AddressIdIter, AssignedAddressState as _, DualStackIpDeviceState,
+    IpDeviceAddressContext, IpDeviceConfigurationContext, IpDeviceFlags, IpDeviceIpExt,
     IpDeviceSendContext, IpDeviceStateContext, Ipv4AddressEntry, Ipv4AddressState,
     Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState, Ipv6DadState,
     Ipv6DeviceConfiguration, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
-    Ipv6NetworkLearnedParameters,
+    Ipv6NetworkLearnedParameters, PrimaryAddressId, WeakAddressId,
 };
 use netstack3_ip::nud::{
     ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
@@ -325,8 +325,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 }
 
 impl<BC: BindingsContext, L> IpDeviceAddressIdContext<Ipv4> for CoreCtx<'_, BC, L> {
-    type AddressId = StrongRc<Ipv4AddressEntry<BC>>;
-    type WeakAddressId = WeakRc<Ipv4AddressEntry<BC>>;
+    type AddressId = AddressId<Ipv4AddressEntry<BC>>;
+    type WeakAddressId = WeakAddressId<Ipv4AddressEntry<BC>>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv4DeviceAddressState>>
@@ -398,10 +398,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
             .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
             .remove(&addr.addr().addr())
             .expect("should exist when address ID exists");
-        assert!(PrimaryRc::ptr_eq(&primary, &addr));
+        assert!(PrimaryAddressId::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
-        BC::unwrap_or_notify_with_new_reference_notifier(primary, |entry| {
+        BC::unwrap_or_notify_with_new_reference_notifier(primary.into_inner(), |entry| {
             entry.addr_sub().to_witness::<SpecifiedAddr<_>>()
         })
     }
@@ -416,7 +416,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
             .read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
             .iter()
             .find(|a| a.addr().addr() == *addr)
-            .map(PrimaryRc::clone_strong)
+            .map(PrimaryAddressId::clone_strong)
             .ok_or(NotFoundError);
         addr_id
     }
@@ -591,8 +591,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 }
 
 impl<BC: BindingsContext, L> IpDeviceAddressIdContext<Ipv6> for CoreCtx<'_, BC, L> {
-    type AddressId = StrongRc<Ipv6AddressEntry<BC>>;
-    type WeakAddressId = WeakRc<Ipv6AddressEntry<BC>>;
+    type AddressId = AddressId<Ipv6AddressEntry<BC>>;
+    type WeakAddressId = WeakAddressId<Ipv6AddressEntry<BC>>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressState>>
@@ -662,10 +662,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
             .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
             .remove(&addr.addr().addr())
             .expect("should exist when address ID exists");
-        assert!(PrimaryRc::ptr_eq(&primary, &addr));
+        assert!(PrimaryAddressId::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
-        BC::unwrap_or_notify_with_new_reference_notifier(primary, |entry| {
+        BC::unwrap_or_notify_with_new_reference_notifier(primary.into_inner(), |entry| {
             entry.addr_sub().to_witness::<SpecifiedAddr<_>>()
         })
     }
@@ -679,7 +679,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         let addr_id = state
             .read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
             .iter()
-            .find_map(|a| (a.addr().addr() == *addr).then(|| PrimaryRc::clone_strong(a)))
+            .find_map(|a| (a.addr().addr() == *addr).then(|| PrimaryAddressId::clone_strong(a)))
             .ok_or(NotFoundError);
         addr_id
     }

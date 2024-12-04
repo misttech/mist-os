@@ -32,8 +32,8 @@ use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
-    HandleableTimer, Inspectable, Inspector, InstantContext, IpDeviceAddr, IpExt, Matcher as _,
-    NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
+    HandleableTimer, Inspectable, Inspector, InstantContext, IpAddressId, IpDeviceAddr, IpExt,
+    Matcher as _, NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
     StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
     WrapBroadcastMarker,
 };
@@ -59,9 +59,7 @@ use crate::internal::device::slaac::SlaacCounters;
 use crate::internal::device::state::{
     IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv6AddressFlags, Ipv6AddressState,
 };
-use crate::internal::device::{
-    self, IpAddressId as _, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext,
-};
+use crate::internal::device::{self, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext};
 use crate::internal::fragmentation::{
     FragmentableIpSerializer, FragmentationCounters, FragmentationIpExt, IpFragmenter,
 };

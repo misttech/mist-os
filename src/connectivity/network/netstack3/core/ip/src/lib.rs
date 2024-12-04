@@ -64,26 +64,27 @@ pub mod device {
         SLAAC_MIN_REGEN_ADVANCE,
     };
     pub use crate::internal::device::state::{
-        AddressIdIter, AssignedAddress, CommonAddressProperties, DefaultHopLimit,
+        AddressId, AddressIdIter, AssignedAddressState, CommonAddressProperties, DefaultHopLimit,
         DualStackIpDeviceState, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceFlags,
         IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv4AddrConfig,
         Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration,
         Ipv4DeviceConfigurationAndFlags, Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddrSlaacConfig,
         Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState,
         Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags, Ipv6NetworkLearnedParameters,
-        Lifetime, PreferredLifetime, SlaacConfig, TemporarySlaacConfig,
+        Lifetime, PreferredLifetime, PrimaryAddressId, SlaacConfig, TemporarySlaacConfig,
+        WeakAddressId,
     };
     pub use crate::internal::device::{
         add_ip_addr_subnet_with_config, clear_ipv4_device_state, clear_ipv6_device_state,
         del_ip_addr_inner, get_ipv4_addr_subnet, get_ipv6_hop_limit, is_ip_device_enabled,
         is_ip_multicast_forwarding_enabled, is_ip_unicast_forwarding_enabled, join_ip_multicast,
         join_ip_multicast_with_config, leave_ip_multicast, leave_ip_multicast_with_config,
-        receive_igmp_packet, AddressRemovedReason, DelIpAddr, IpAddressId, IpAddressIdSpec,
-        IpAddressIdSpecContext, IpAddressState, IpDeviceAddressContext, IpDeviceAddressIdContext,
-        IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
-        IpDeviceSendContext, IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceTimerId,
-        Ipv6DeviceConfigurationContext, Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId,
-        WithIpDeviceConfigurationMutInner, WithIpv6DeviceConfigurationMutInner,
+        receive_igmp_packet, AddressRemovedReason, DelIpAddr, IpAddressIdSpec,
+        IpAddressIdSpecContext, IpAddressState, IpDeviceAddressContext, IpDeviceBindingsContext,
+        IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceSendContext,
+        IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceTimerId, Ipv6DeviceConfigurationContext,
+        Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, WithIpDeviceConfigurationMutInner,
+        WithIpv6DeviceConfigurationMutInner,
     };
 
     /// IP device test utilities.

@@ -6,12 +6,12 @@
 
 use net_types::ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::SpecifiedAddr;
-use netstack3_base::{AnyDevice, DeviceIdContext, IpDeviceAddr};
+use netstack3_base::{AnyDevice, DeviceIdContext, IpAddressId, IpDeviceAddr};
 
 use crate::internal::device::state::{
     IpDeviceStateBindingsTypes, Ipv6AddressFlags, Ipv6AddressState,
 };
-use crate::internal::device::{IpAddressId, IpDeviceAddressContext as _, IpDeviceStateContext};
+use crate::internal::device::{IpDeviceAddressContext as _, IpDeviceStateContext};
 use crate::internal::socket::ipv6_source_address_selection::{self, SasCandidate};
 
 /// A handler for Source Address Selection.

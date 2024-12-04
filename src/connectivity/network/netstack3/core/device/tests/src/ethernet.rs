@@ -10,7 +10,7 @@ use net_types::ethernet::Mac;
 use net_types::ip::{AddrSubnet, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Ipv6Addr};
 use net_types::{SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::testutil::{new_rng, TestIpExt, TEST_ADDRS_V4};
-use netstack3_base::FrameDestination;
+use netstack3_base::{FrameDestination, IpAddressId as _};
 use netstack3_core::device::{
     DeviceId, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta,
 };
@@ -25,7 +25,7 @@ use netstack3_core::testutil::{
 };
 use netstack3_core::IpExt;
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
-use netstack3_ip::device::{IpAddressId as _, IpDeviceStateContext};
+use netstack3_ip::device::IpDeviceStateContext;
 use packet::{Buf, Serializer as _};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::IcmpDestUnreachable;

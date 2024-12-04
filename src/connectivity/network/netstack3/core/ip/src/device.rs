@@ -27,11 +27,12 @@ use net_types::ip::{
 };
 use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::{
-    AnyDevice, CounterContext, DeferredResourceRemovalContext, DeviceIdContext, EventContext,
-    ExistsError, HandleableTimer, Inspectable, Instant, InstantBindingsTypes, InstantContext,
-    IpDeviceAddr, IpExt, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError,
-    RemoveResourceResultWithContext, RngContext, SendFrameError, StrongDeviceIdentifier,
-    TimerBindingsTypes, TimerContext, TimerHandler, WeakDeviceIdentifier,
+    AnyDevice, AssignedAddrIpExt, CounterContext, DeferredResourceRemovalContext, DeviceIdContext,
+    EventContext, ExistsError, HandleableTimer, Inspectable, Instant, InstantBindingsTypes,
+    InstantContext, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Ipv4DeviceAddr,
+    Ipv6DeviceAddr, NotFoundError, RemoveResourceResultWithContext, RngContext, SendFrameError,
+    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, WeakDeviceIdentifier,
+    WeakIpAddressId,
 };
 use netstack3_filter::ProofOfEgressCheck;
 use packet::{BufferMut, Serializer};
@@ -263,7 +264,7 @@ impl<
 }
 
 /// An extension trait adding IP device properties.
-pub trait IpDeviceIpExt: IpDeviceStateIpExt {
+pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt {
     /// IP layer state kept by the device.
     type State<BT: IpDeviceStateBindingsTypes>: AsRef<IpDeviceState<Self, BT>>
         + AsMut<IpDeviceState<Self, BT>>;
@@ -277,15 +278,6 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt {
         + PartialEq
         + Debug
         + Hash;
-    /// The witness type for assigned addresses.
-    type AssignedWitness: Witness<Self::Addr>
-        + Copy
-        + Eq
-        + PartialEq
-        + Debug
-        + Display
-        + Hash
-        + Into<SpecifiedAddr<Self::Addr>>;
     /// Device address configuration.
     type AddressConfig<I: Instant>: Default + Debug;
     /// Manual device address configuration (user-initiated).
@@ -326,7 +318,6 @@ impl IpDeviceIpExt for Ipv4 {
     type State<BT: IpDeviceStateBindingsTypes> = Ipv4DeviceState<BT>;
     type Configuration = Ipv4DeviceConfiguration;
     type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec> = Ipv4DeviceTimerId<D>;
-    type AssignedWitness = Ipv4DeviceAddr;
     type AddressConfig<I: Instant> = Ipv4AddrConfig<I>;
     type ManualAddressConfig<I: Instant> = Ipv4AddrConfig<I>;
     type AddressState<I: Instant> = Ipv4AddressState<I>;
@@ -359,7 +350,6 @@ impl IpDeviceIpExt for Ipv6 {
     type State<BT: IpDeviceStateBindingsTypes> = Ipv6DeviceState<BT>;
     type Configuration = Ipv6DeviceConfiguration;
     type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec> = Ipv6DeviceTimerId<D, A::WeakV6>;
-    type AssignedWitness = Ipv6DeviceAddr;
     type AddressConfig<I: Instant> = Ipv6AddrConfig<I>;
     type ManualAddressConfig<I: Instant> = Ipv6AddrManualConfig<I>;
     type AddressState<I: Instant> = Ipv6AddressState<I>;
@@ -527,42 +517,6 @@ impl<
             + EventContext<IpDeviceEvent<D, I, <Self as InstantBindingsTypes>::Instant>>,
     > IpDeviceBindingsContext<I, D> for BC
 {
-}
-
-/// An IP address ID.
-pub trait IpAddressId<A: IpAddress>: Clone + Eq + Debug + Hash {
-    /// The weak version of this ID.
-    type Weak: WeakIpAddressId<A>;
-
-    /// Downgrades this ID to a weak reference.
-    fn downgrade(&self) -> Self::Weak;
-
-    /// Returns the address this ID represents.
-    fn addr(&self) -> IpDeviceAddr<A>;
-
-    /// Returns the address subnet this ID represents.
-    fn addr_sub(&self) -> AddrSubnet<A, <A::Version as IpDeviceIpExt>::AssignedWitness>
-    where
-        A::Version: IpDeviceIpExt;
-}
-
-/// A weak IP address ID.
-pub trait WeakIpAddressId<A: IpAddress>: Clone + Eq + Debug + Hash {
-    /// The strong version of this ID.
-    type Strong: IpAddressId<A>;
-
-    /// Attempts to upgrade this ID to the strong version.
-    ///
-    /// Upgrading fails if this is no longer a valid assigned IP address.
-    fn upgrade(&self) -> Option<Self::Strong>;
-}
-
-/// Provides the execution context related to address IDs.
-pub trait IpDeviceAddressIdContext<I: IpDeviceIpExt>: DeviceIdContext<AnyDevice> {
-    /// The strong address identifier.
-    type AddressId: IpAddressId<I::Addr, Weak = Self::WeakAddressId>;
-    /// The weak address identifier.
-    type WeakAddressId: WeakIpAddressId<I::Addr, Strong = Self::AddressId>;
 }
 
 /// A marker trait for a spec of address IDs.
@@ -1736,7 +1690,7 @@ pub enum DelIpAddr<Id, A> {
     AddressId(Id),
 }
 
-impl<Id: IpAddressId<A>, A: IpAddress> Display for DelIpAddr<Id, A> {
+impl<Id: IpAddressId<A>, A: IpAddress<Version: AssignedAddrIpExt>> Display for DelIpAddr<Id, A> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             DelIpAddr::SpecifiedAddr(addr) => write!(f, "{}", *addr),
@@ -1962,44 +1916,5 @@ pub(crate) mod testutil {
                     .then(|| addr_id.addr_sub())
             })))
         })
-    }
-
-    #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-    pub struct FakeWeakAddressId<T>(pub T);
-
-    impl<A: IpAddress, T: IpAddressId<A>> WeakIpAddressId<A> for FakeWeakAddressId<T> {
-        type Strong = T;
-
-        fn upgrade(&self) -> Option<Self::Strong> {
-            let Self(inner) = self;
-            Some(inner.clone())
-        }
-    }
-
-    impl<A: IpAddress> IpAddressId<A> for AddrSubnet<A, <A::Version as IpDeviceIpExt>::AssignedWitness>
-    where
-        A::Version: IpDeviceIpExt,
-        SpecifiedAddr<A>: From<<A::Version as IpDeviceIpExt>::AssignedWitness>,
-    {
-        type Weak = FakeWeakAddressId<Self>;
-
-        fn downgrade(&self) -> Self::Weak {
-            FakeWeakAddressId(self.clone())
-        }
-
-        fn addr(&self) -> IpDeviceAddr<A> {
-            #[derive(GenericOverIp)]
-            #[generic_over_ip(I, Ip)]
-            struct WrapIn<I: IpDeviceIpExt>(I::AssignedWitness);
-            A::Version::map_ip(
-                WrapIn(self.addr()),
-                |WrapIn(v4_addr)| IpDeviceAddr::new_from_witness(v4_addr),
-                |WrapIn(v6_addr)| IpDeviceAddr::new_from_ipv6_device_addr(v6_addr),
-            )
-        }
-
-        fn addr_sub(&self) -> AddrSubnet<A, <A::Version as IpDeviceIpExt>::AssignedWitness> {
-            self.clone()
-        }
     }
 }

@@ -29,7 +29,7 @@ use netstack3_device::{
     ArpConfigContext, ArpContext, ArpNudCtx, ArpSenderContext, ArpState,
     DeviceLayerEventDispatcher, DeviceLayerTimerId, DeviceSendFrameError, IpLinkDeviceState,
 };
-use netstack3_ip::device::AssignedAddress;
+use netstack3_ip::device::AssignedAddressState;
 use netstack3_ip::icmp::{self, NdpCounters};
 use netstack3_ip::nud::{
     DelegateNudContext, NudConfigContext, NudContext, NudIcmpContext, NudSenderContext, NudState,
