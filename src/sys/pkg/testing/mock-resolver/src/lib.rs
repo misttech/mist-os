@@ -333,7 +333,7 @@ pub struct ForUrl<'a> {
     url: String,
 }
 
-impl<'a> ForUrl<'a> {
+impl ForUrl<'_> {
     /// Fail resolve requests for the given URL with the given error status.
     pub fn fail(self, error: fidl_fuchsia_pkg::ResolveError) {
         self.svc.expectations.lock().insert(self.url, Expectation::ImmediateConstant(Err(error)));

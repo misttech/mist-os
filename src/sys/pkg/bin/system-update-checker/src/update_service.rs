@@ -62,11 +62,8 @@ impl UpdateService {
                         }
                     };
 
-                    let monitor = if let Some(monitor) = monitor {
-                        Some(RealStateNotifier { proxy: monitor.into_proxy() })
-                    } else {
-                        None
-                    };
+                    let monitor =
+                        monitor.map(|monitor| RealStateNotifier { proxy: monitor.into_proxy() });
 
                     let res = self.handle_check_now(options, monitor).await;
                     responder.send(res).context("error sending CheckNow response")?;

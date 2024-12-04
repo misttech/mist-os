@@ -42,7 +42,7 @@ impl EagerPackageConfigs {
             path,
             fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
         )
-        .map_err(|e| EagerPackageConfigsError::Open(e))?;
+        .map_err(EagerPackageConfigsError::Open)?;
         match fuchsia_fs::file::read(&proxy).await {
             Ok(json) => Self::from_json(&json),
             Err(e) => {
