@@ -56,7 +56,7 @@ fn format_valico_error(error: &Box<dyn ValicoError>) -> String {
 fn format_missing_refs(url: &Url) -> String {
     let mut result = String::new();
     result.push_str("Missing schema reference: ");
-    result.push_str(&url.to_string());
+    result.push_str(url.as_ref());
     result
 }
 
