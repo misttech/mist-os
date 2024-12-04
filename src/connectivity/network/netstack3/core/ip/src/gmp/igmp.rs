@@ -185,8 +185,8 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::Dev
                 debug!("Hosts are not interested in Leave Group messages");
                 return;
             }
-            _ => {
-                debug!("TODO(https://fxbug.dev/42071402): Support IGMPv3");
+            IgmpPacket::MembershipQueryV3(_) | IgmpPacket::MembershipReportV3(_) => {
+                debug!("TODO(https://fxbug.dev/42071006): Support IGMPv3");
                 return;
             }
         };
