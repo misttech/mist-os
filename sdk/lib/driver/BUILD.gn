@@ -16,6 +16,7 @@ group("tests") {
     "fake-object/cpp:tests",
     "fake-resource/cpp:tests",
     "metadata/cpp:tests",
+    "mock-mmio-range/cpp:tests",
     "platform-device/cpp:tests",
     "power/cpp:tests",
     "runtime/rust:tests",
