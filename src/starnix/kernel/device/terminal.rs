@@ -747,7 +747,7 @@ impl TerminalMutableState<Base = Terminal> {
             let mut echo_bytes = vec![];
             if self.termios.has_local_flags(ECHO) {
                 if let Some(erase_span) = maybe_erase_span {
-                    let erase_echo = vec![BACKSPACE_CHAR, b' ', BACKSPACE_CHAR];
+                    let erase_echo = [BACKSPACE_CHAR, b' ', BACKSPACE_CHAR];
                     echo_bytes = erase_echo
                         .iter()
                         .cycle()

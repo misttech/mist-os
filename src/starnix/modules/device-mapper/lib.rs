@@ -701,9 +701,9 @@ fn parse_parameter_string(
                     return error!(ENOTSUP);
                 }
                 for i in 0..num_optional_args {
-                    if String::from(v[11 + i as usize]) == "ignore_zero_blocks" {
+                    if v[11 + i as usize] == "ignore_zero_blocks" {
                         optional_args.ignore_zero_blocks = true;
-                    } else if String::from(v[11 + i as usize]) == "restart_on_corruption" {
+                    } else if v[11 + i as usize] == "restart_on_corruption" {
                         track_stub!(
                             TODO("https://fxbug.dev/338243823"),
                             "Support restart on corruption."

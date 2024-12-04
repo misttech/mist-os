@@ -31,6 +31,7 @@ fn tar_to_pkg(
     };
 
     // Write a fini manifest
+    #[allow(clippy::format_collect, reason = "mass allow for https://fxbug.dev/381896734")]
     std::fs::write(
         format!("{}/manifest.fini", out_dir_path.as_os_str().to_str().unwrap()),
         manifest
@@ -40,6 +41,7 @@ fn tar_to_pkg(
     )?;
 
     if let Some(dep_file) = dep_file {
+        #[allow(clippy::format_collect, reason = "mass allow for https://fxbug.dev/381896734")]
         let mut deps: String = manifest.iter().map(|(_, path)| format!("{path} ")).collect();
         deps += &format!(": {image_path}");
         std::fs::write(dep_file, &deps)?;

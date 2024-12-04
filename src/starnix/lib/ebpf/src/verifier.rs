@@ -893,9 +893,7 @@ impl Stack {
         let byte_count = width.bytes();
         let original_buf = original.as_mut_bytes();
         let value_buf = value.as_bytes();
-        for i in 0..byte_count {
-            original_buf[i + offset] = value_buf[i];
-        }
+        original_buf[offset..(byte_count + offset)].copy_from_slice(&value_buf[..byte_count]);
         original
     }
 

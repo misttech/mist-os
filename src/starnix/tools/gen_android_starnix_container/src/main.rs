@@ -249,7 +249,7 @@ fn generate(cmd: Command) -> Result<()> {
     builder.manifest_path(manifest_path);
     builder.build(&cmd.outdir, &metafar_path).context("Building starnix container")?;
     deps.track_outputs(
-        vec![
+        [
             cmd.outdir.join("meta.far"),
             cmd.outdir.join("meta/fuchsia.abi/abi-revision"),
             cmd.outdir.join("meta/fuchsia.pkg/subpackages"),

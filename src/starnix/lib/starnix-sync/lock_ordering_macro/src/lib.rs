@@ -80,7 +80,7 @@ pub fn lock_ordering(input: TokenStream) -> TokenStream {
     let mut result = proc_macro2::TokenStream::new();
     for level in levels.into_iter() {
         adj_list.insert(level.clone(), HashSet::new());
-        if level.to_string() != "Unlocked" {
+        if level != "Unlocked" {
             result.extend(quote::quote! {
                 pub enum #level {}
                 impl starnix_sync::LockEqualOrBefore<#level> for #level {}

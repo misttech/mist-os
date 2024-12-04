@@ -710,6 +710,7 @@ impl FuchsiaTouchEventToLinuxTouchEventConverter {
 pub fn parse_fidl_keyboard_event_to_linux_input_event(
     e: &fuiinput::KeyEvent,
 ) -> Vec<uapi::input_event> {
+    #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
     match e {
         &fuiinput::KeyEvent {
             timestamp: Some(time_nanos),
