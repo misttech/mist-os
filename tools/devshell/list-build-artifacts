@@ -28,9 +28,6 @@
 ##
 ##  MODE          One of the following:
 ##                `images` -- returns the list of images
-##                `pave`-- returns the list of images needed to pave;
-##                `pave-zedboot`-- returns the list of images needed to pave
-##                zedboot;
 ##                `netboot`-- returns the list of images needed to netboot
 ##                `flash`-- returns the list of images needed to flash
 ##                `mkzedboot` -- returns the list of images needed to mkzedboot
@@ -136,14 +133,6 @@ name_regex=false
 path_key="path"
 if [[ "${mode}" == images ]]; then
   manifest="${IMAGES_JSON}"
-elif [[ "${mode}" == pave ]]; then
-  manifest="${IMAGES_JSON}"
-  paths+=("pave.sh")
-  jq_filter+=" | select(.bootserver_pave != null)"
-elif [[ "${mode}" == pave-zedboot ]]; then
-  manifest="${IMAGES_JSON}"
-  paths+=("pave-zedboot.sh")
-  jq_filter+=" | select(.bootserver_pave_zedboot != null)"
 elif [[ "${mode}" == netboot ]]; then
   manifest="${IMAGES_JSON}"
   paths+=("netboot.sh")

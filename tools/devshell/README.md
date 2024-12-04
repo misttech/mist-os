@@ -23,12 +23,12 @@ shell programs without a significant test plan can lead to hard to maintain
 tools. If there is a need to produce a more sophisticated program the
 recommended approach is to author a host tool program as part of the regular
 Fuchsia build, and only to wrap that program in a very slim way in a script.
-Examples of such cases can be found in `fx pave` and `fx make-fuchsia-vol`. A
-good rule of thumb here is that if a script only needs to launch and manage a
-one or a few sub-processes, then shell may be a fine language. If the program
-needs to perform any significant string manipulation or business logic, it is
-likely better authored in a language that provides more structural
-capabilities and standard library.
+Examples of such cases can be found in `fx make-fuchsia-vol`. A good rule of 
+thumb here is that if a script only needs to launch and manage a one or a few 
+sub-processes, then shell may be a fine language. If the program needs to 
+perform any significant string manipulation or business logic, it is likely 
+better authored in a language that provides more structural capabilities and 
+standard library.
 
 ## Consuming vars.sh and implementing subcommands
 

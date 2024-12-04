@@ -36,32 +36,16 @@ BT_SET_UP() {
   cat > "${BT_TEMP_DIR}/out/default/images.json" <<EOF
 [
       {
-        "bootserver_pave": [
-          "--zirconr"
-        ],
-        "bootserver_pave_zedboot": [
-          "--zircona"
-        ],
         "name": "zircon-r",
         "path": "zedboot.zbi",
         "type": "zbi"
       },
       {
-        "bootserver_pave": [
-          "--vbmetar"
-        ],
-        "bootserver_pave_zedboot": [
-          "--vbmetaa"
-        ],
         "name": "zircon-r",
         "path": "zedboot.vbmeta",
         "type": "vbmeta"
       },
       {
-        "bootserver_pave": [
-          "--boot",
-          "--zircona"
-        ],
         "fastboot_flash": [
           "zircon_a",
           "zircon_b"
@@ -71,9 +55,6 @@ BT_SET_UP() {
         "type": "zbi"
       },
       {
-        "bootserver_pave": [
-          "--vbmetaa"
-        ],
         "fastboot_flash": [
           "vbmeta_a",
           "vbmeta_b"
@@ -88,9 +69,6 @@ BT_SET_UP() {
         "type": "blk"
       },
       {
-        "bootserver_pave": [
-          "--fvm"
-        ],
         "fastboot_flash": [
           "fvm"
         ],
@@ -236,14 +214,6 @@ TEST_fx-list-build-artifacts-images-by-name-and-type() {
 
 TEST_fx-list-build-artifacts-netboot() {
   BT_EXPECT_EQ "$(${fx} list-build-artifacts netboot)" "netboot.sh netboot.zbi"
-}
-
-TEST_fx-list-build-artifacts-pave() {
-  BT_EXPECT_EQ "$(${fx} list-build-artifacts pave)" "pave.sh zedboot.zbi zedboot.vbmeta fuchsia.zbi fuchsia.vbmeta obj/build/images/fvm.sparse.blk"
-}
-
-TEST_fx-list-build-artifacts-pave-zedboot() {
-  BT_EXPECT_EQ "$(${fx} list-build-artifacts pave-zedboot)" "pave-zedboot.sh zedboot.zbi zedboot.vbmeta"
 }
 
 TEST_fx-list-build-artifacts-flash() {
