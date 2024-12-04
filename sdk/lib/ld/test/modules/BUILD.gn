@@ -1529,6 +1529,9 @@ foreach(test, [ "" ] + per_test_suffices) {
 
 test_shared_library("static-tls-var") {
   sources = [ "static-tls-var.cc" ]
+
+  # workaround for b/349448459 to remote-link successfully
+  configs = [ "//build/config:remote_link_scandeps_workaround" ]
 }
 
 # This resolves a static TLS symbol with tls-desc.
@@ -1557,6 +1560,9 @@ test_loadable_module("static-tls-module") {
   # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
   remove_configs = [ "//build/config/lto" ]
   configs += [ "//build/config/lto:no-lto" ]
+
+  # workaround for b/349448459 to remote-link successfully
+  configs += [ "//build/config:remote_link_scandeps_workaround" ]
 }
 
 test_executable("llvm-profdata") {
