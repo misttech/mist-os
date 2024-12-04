@@ -29,7 +29,7 @@ use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::device_type::DeviceType;
-use starnix_uapi::errors::Errno;
+use starnix_uapi::errors::{Errno, ENODATA};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::{errno, error};
 use std::collections::HashSet;
@@ -100,6 +100,7 @@ where
         // fs_use_xattr-labelling defers to the security attribute on the file node, with fall-back
         // behaviours for missing and invalid labels.
         FileSystemLabelingScheme::FsUse { fs_use_type, def_sid, root_sid, .. } => {
+            let is_root_node = dir_entry.parent().is_none();
             let maybe_sid = match fs_use_type {
                 FsUseType::Xattr => {
                     // Determine the SID from the "security.selinux" attribute.
@@ -116,21 +117,43 @@ where
                                 .security_context_to_sid((&security_context).into())
                                 .unwrap_or_else(|_| SecurityId::initial(InitialSid::Unlabeled)),
                         ),
-                        _ => {
-                            // TODO: https://fxbug.dev/334094811 - Determine how to handle errors besides
-                            // `ENODATA` (no such xattr).
-                            None
+                        Ok(ValueOrSize::Size(_)) => None,
+                        Err(err) => {
+                            if err.code == ENODATA && is_root_node {
+                                // The root node of xattr-labeled filesystems should be labeled at
+                                // creation in principle. Distinguishing creation of the root of the
+                                // filesystem from re-instantiation of the `FsNode` representing an
+                                // existing root is tricky, so we work-around the issue by writing
+                                // the `root_sid` label here.
+                                let root_context =
+                                    security_server.sid_to_security_context(root_sid).unwrap();
+                                fs_node.ops().set_xattr(
+                                    &mut locked.cast_locked::<FileOpsCore>(),
+                                    fs_node,
+                                    current_task,
+                                    XATTR_NAME_SELINUX.to_bytes().into(),
+                                    root_context.as_slice().into(),
+                                    XattrOp::Create,
+                                )?;
+                                Some(root_sid)
+                            } else {
+                                // TODO: https://fxbug.dev/334094811 - Determine how to handle errors besides
+                                // `ENODATA` (no such xattr).
+                                None
+                            }
                         }
                     }
                 }
-                _ => None,
+                _ => {
+                    if is_root_node {
+                        Some(root_sid)
+                    } else {
+                        None
+                    }
+                }
             };
             maybe_sid.unwrap_or_else(|| {
-                // The node does not have a label, so apply the filesystem's default or root SID,
-                // depending on whether this is the root node.
-                if dir_entry.parent().is_none() {
-                    root_sid
-                } else {
+                // The node does not have a label, so apply the filesystem's default SID.
                     if fs.name() == "remotefs" {
                         track_stub!(TODO("https://fxbug.dev/378688761"), "RemoteFS node missing security label. Perhaps your device needs re-flashing?");
                     } else {
@@ -141,7 +164,6 @@ where
                         );
                     }
                     def_sid
-                }
             })
         }
         FileSystemLabelingScheme::GenFsCon => {
