@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::time::Duration;
-
 use crate::ServerStartTool;
 use ffx_config::EnvironmentContext;
 use ffx_repository_serve::{get_repo_base_name, serve_impl};
@@ -13,6 +11,7 @@ use fho::{bug, user_error, Connector, FfxMain, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use pkg::{PkgServerInstanceInfo, PkgServerInstances, ServerMode};
+use std::time::Duration;
 
 // map from the start command to the serve command.
 pub(crate) fn to_serve_command(cmd: &StartCommand) -> ServeCommand {
