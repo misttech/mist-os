@@ -12,7 +12,10 @@ Before you begin, make sure you have completed the following:
 * [Familiarized yourself with the Fuchsia tracing system](/docs/concepts/kernel/tracing-system.md).
 * [Registered your component as a tracing provider](/docs/development/tracing/tutorial/register-a-trace-provider.md).
 * [Familiarized yourself with adding synchronous tracing your code](/docs/development/tracing/tutorial/add-tracing-in-code.md).
-* [Included the `libtrace` library to capture trace data](/docs/reference/tracing/libraries.md#libtrace-trace-event).
+
+Also, make sure to use the relevant library in your code:
+
+<<../_common/_tracing_headers.md>>
 
 ## Add asynchronous tracing
 
