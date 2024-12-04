@@ -596,7 +596,7 @@ impl ContainerBuffer {
 
     /// Returns true if the container has messages or sockets.
     pub fn is_active(&self) -> bool {
-        self.shared_buffer.inner.lock().containers.get(self.container_id).map_or(false, |c| {
+        self.shared_buffer.inner.lock().containers.get(self.container_id).is_some_and(|c| {
             c.msg_ids.start != c.msg_ids.end || c.first_socket_id != SocketId::NULL
         })
     }
