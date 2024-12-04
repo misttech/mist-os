@@ -4,11 +4,11 @@
 
 #include "src/graphics/display/drivers/intel-display/pch-engine.h"
 
+#include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <gtest/gtest.h>
-#include <mock-mmio-range/mock-mmio-range.h>
 
 namespace intel_display {
 
@@ -172,12 +172,12 @@ class PchEngineTest : public ::testing::Test {
  protected:
   constexpr static int kMmioRangeSize = 0x100000;
   fdf_testing::ScopedGlobalLogger logger_;
-  ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
+  mock_mmio::MockMmioRange mmio_range_{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 };
 
 TEST_F(PchEngineTest, KabyLakeZeroedRegisters) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = 0},
       {.address = kPpControlOffset, .value = 0},
@@ -213,7 +213,7 @@ TEST_F(PchEngineTest, KabyLakeZeroedRegisters) {
 }
 
 TEST_F(PchEngineTest, TigerLakeZeroedRegisters) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = 0},
       {.address = kPpControlOffset, .value = 0},
@@ -249,7 +249,7 @@ TEST_F(PchEngineTest, TigerLakeZeroedRegisters) {
 }
 
 TEST_F(PchEngineTest, KabyLakeNuc7BootloaderConfig) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = 0x18},
       {.address = kPpControlOffset, .value = 0x00},
@@ -285,7 +285,7 @@ TEST_F(PchEngineTest, KabyLakeNuc7BootloaderConfig) {
 }
 
 TEST_F(PchEngineTest, KabyLakeAtlasBootloaderConfig) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = 0x18},
       {.address = kPpControlOffset, .value = 0x07},
@@ -321,7 +321,7 @@ TEST_F(PchEngineTest, KabyLakeAtlasBootloaderConfig) {
 }
 
 TEST_F(PchEngineTest, KabyLakeAtlasSecureBootloaderConfig) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = 0x18},
       {.address = kPpControlOffset, .value = 0x08},
@@ -357,7 +357,7 @@ TEST_F(PchEngineTest, KabyLakeAtlasSecureBootloaderConfig) {
 }
 
 TEST_F(PchEngineTest, TigerLakeDell5420BootloaderConfig) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0x901},
       {.address = kRawClkOffset, .value = 0x1012'0800},
       {.address = kPpControlOffset, .value = 0x67},
@@ -391,7 +391,7 @@ TEST_F(PchEngineTest, TigerLakeDell5420BootloaderConfig) {
 }
 
 TEST_F(PchEngineTest, TigerLakeNuc11BootloaderConfig) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0x900},
       {.address = kRawClkOffset, .value = 0x1012'0800},
       {.address = kPpControlOffset, .value = 0x08},
@@ -429,7 +429,7 @@ TEST_F(PchEngineTest, TigerLakeNuc11BootloaderConfig) {
 TEST_F(PchEngineTest, KabyLakeRestoreClockParameters) {
   // The register values are based on real values, and slightly modified to
   // catch register-swapping bugs.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = 0x18},
       {.address = kPpControlOffset, .value = 0x07},
@@ -439,7 +439,7 @@ TEST_F(PchEngineTest, KabyLakeRestoreClockParameters) {
       {.address = kSblcPwmCtl1Offset, .value = 0x8000'0000},
       {.address = kSblcPwmCtl2Offset, .value = 0x1d4c'1d4c},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kRawClkOffset, .value = 0x18, .write = true},
       {.address = kPpDivisor, .value = 0x0004'af06, .write = true},
       {.address = kSChicken1Offset, .value = 0, .write = true},
@@ -455,7 +455,7 @@ TEST_F(PchEngineTest, TigerLakeRestoreClockParameters) {
   //
   // S_CHICKEN1 has bit 7 set to check that RestoreClockParameters() implements
   // the workaround that requires resetting that bit.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0x981},
       {.address = kRawClkOffset, .value = 0x1012'0800},
       {.address = kPpControlOffset, .value = 0x67},
@@ -465,7 +465,7 @@ TEST_F(PchEngineTest, TigerLakeRestoreClockParameters) {
       {.address = kSblcPwmFreqOffset, .value = 0x0001'7700},
       {.address = kSblcPwmDutyOffset, .value = 0x0001'7700},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kRawClkOffset, .value = 0x1012'0800, .write = true},
       {.address = kSChicken1Offset, .value = 0x901, .write = true},
   }));
@@ -480,7 +480,7 @@ TEST_F(PchEngineTest, KabyLakeRestoreNonClockParameters) {
   //
   // PP_CONTROL bits 0 and 2 and SBLC_PWM_CTL1 bit 31 are set to check that
   // RestoreParameters() turn off panel power and disable the backlight PWM.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = 0x18},
       {.address = kPpControlOffset, .value = 0x07},
@@ -490,7 +490,7 @@ TEST_F(PchEngineTest, KabyLakeRestoreNonClockParameters) {
       {.address = kSblcPwmCtl1Offset, .value = 0xa000'0000},
       {.address = kSblcPwmCtl2Offset, .value = 0x1d4c'122c},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpOnDelays, .value = 0x0001'0001, .write = true},
       {.address = kPpOffDelays, .value = 0x01f4'0000, .write = true},
       {.address = kPpControlOffset, .value = 0x02, .write = true},
@@ -508,7 +508,7 @@ TEST_F(PchEngineTest, TigerLakeRestoreNonClockParameters) {
   //
   // PP_CONTROL bits 0 and 2 and SBLC_PWM_CTL1 bit 31 are set to check that
   // RestoreParameters() turn off panel power and disable the backlight PWM.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0x981},
       {.address = kRawClkOffset, .value = 0x1012'0800},
       {.address = kPpControlOffset, .value = 0x67},
@@ -518,7 +518,7 @@ TEST_F(PchEngineTest, TigerLakeRestoreNonClockParameters) {
       {.address = kSblcPwmFreqOffset, .value = 0x0001'7700},
       {.address = kSblcPwmDutyOffset, .value = 0x0001'2200},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpOnDelays, .value = 0x0001'0001, .write = true},
       {.address = kPpOffDelays, .value = 0x01f4'0001, .write = true},
       {.address = kPpControlOffset, .value = 0x62, .write = true},
@@ -537,7 +537,7 @@ class PchEngineResetHandshakeTest : public PchEngineTest {
   void SetUp() override {
     PchEngineTest::SetUp();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSChicken1Offset, .value = 0},
         {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
         {.address = kPpControlOffset, .value = 0},
@@ -551,7 +551,7 @@ class PchEngineResetHandshakeTest : public PchEngineTest {
 };
 
 TEST_F(PchEngineResetHandshakeTest, GenericSetPchResetHandshakeEnabled) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kNdeRstWrnOpt, .value = 0},
       {.address = kNdeRstWrnOpt, .value = 0x10, .write = true},
   }));
@@ -560,7 +560,7 @@ TEST_F(PchEngineResetHandshakeTest, GenericSetPchResetHandshakeEnabled) {
 }
 
 TEST_F(PchEngineResetHandshakeTest, GenericSetPchResetHandshakeEnabledNoChange) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kNdeRstWrnOpt, .value = 0},
       {.address = kNdeRstWrnOpt, .value = 0x10, .write = true},
       {.address = kNdeRstWrnOpt, .value = 0x10},
@@ -573,7 +573,7 @@ TEST_F(PchEngineResetHandshakeTest, GenericSetPchResetHandshakeEnabledNoChange) 
 }
 
 TEST_F(PchEngineResetHandshakeTest, GenericSetPchResetHandshakeEnabledFromAtlasBootloaderState) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kNdeRstWrnOpt, .value = 0x30},
   }));
   PchEngine pch_engine(&mmio_buffer_, kAtlasGpuDeviceId);
@@ -581,7 +581,7 @@ TEST_F(PchEngineResetHandshakeTest, GenericSetPchResetHandshakeEnabledFromAtlasB
 }
 
 TEST_F(PchEngineResetHandshakeTest, GenericSetPchResetHandshakeDisabled) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kNdeRstWrnOpt, .value = 0xff},
       {.address = kNdeRstWrnOpt, .value = 0xef, .write = true},
   }));
@@ -590,7 +590,7 @@ TEST_F(PchEngineResetHandshakeTest, GenericSetPchResetHandshakeDisabled) {
 }
 
 TEST_F(PchEngineResetHandshakeTest, GenericSetPchResetHandshakeDisabledNoChange) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kNdeRstWrnOpt, .value = 0xff},
       {.address = kNdeRstWrnOpt, .value = 0xef, .write = true},
       {.address = kNdeRstWrnOpt, .value = 0xef},
@@ -607,19 +607,19 @@ class PchEngineKabyLakeClockTest : public PchEngineTest {
   // Set up expectations for registers except for RAWCLK_FREQ and PP_DIVISOR.
   template <typename Lambda1, typename Lambda2>
   void SetPchMmioExpectations(Lambda1 raw_clock_expectations, Lambda2 panel_divisor_expectations) {
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSChicken1Offset, .value = 0},
     }));
     raw_clock_expectations();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kPpControlOffset, .value = 0},
         {.address = kPpOnDelays, .value = 0},
         {.address = kPpOffDelays, .value = 0},
     }));
     panel_divisor_expectations();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSblcPwmCtl1Offset, .value = 0},
         {.address = kSblcPwmCtl2Offset, .value = 0},
     }));
@@ -686,7 +686,7 @@ TEST_F(PchEngineKabyLakeClockTest, SetStandardClockStandardDivisor) {
   SetPchMmioExpectations([&]() { mmio_range_.Expect({.address = kRawClkOffset, .value = 0}); },
                          [&]() { mmio_range_.Expect({.address = kPpDivisor, .value = 0}); });
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock, .write = true},
       {.address = kPpDivisor, .value = kKabyLakeStandardPpDivisor, .write = true},
   }));
@@ -714,7 +714,7 @@ TEST_F(PchEngineKabyLakeClockTest, SetHalfClockDoubleDivisor) {
   SetPchMmioExpectations([&]() { mmio_range_.Expect({.address = kRawClkOffset, .value = 0}); },
                          [&]() { mmio_range_.Expect({.address = kPpDivisor, .value = 0}); });
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kRawClkOffset, .value = kKabyLakeHalfRawClock, .write = true},
       {.address = kPpDivisor, .value = kKabyLakeDoublePpDivisor, .write = true},
   }));
@@ -730,7 +730,7 @@ TEST_F(PchEngineKabyLakeClockTest, SetRawClockOverflow) {
   SetPchMmioExpectations([&]() { mmio_range_.Expect({.address = kRawClkOffset, .value = 0}); },
                          [&]() { mmio_range_.Expect({.address = kPpDivisor, .value = 0}); });
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kRawClkOffset, .value = 0x0000'03ff, .write = true},
       {.address = kPpDivisor, .value = 0xffff'ff00, .write = true},
   }));
@@ -752,7 +752,7 @@ TEST_F(PchEngineKabyLakeClockTest, SetDivisorUnderflow) {
   SetPchMmioExpectations([&]() { mmio_range_.Expect({.address = kRawClkOffset, .value = 0}); },
                          [&]() { mmio_range_.Expect({.address = kPpDivisor, .value = 0}); });
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kRawClkOffset, .value = 0x0000'0001, .write = true},
       {.address = kPpDivisor, .value = 0x0000'0100, .write = true},
   }));
@@ -787,12 +787,12 @@ class PchEngineTigerLakeClockParametersTest : public PchEngineTest {
   // Set up expectations for registers except for RAWCLK_FREQ.
   template <typename Lambda>
   void SetPchMmioExpectations(Lambda raw_clock_expectations) {
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSChicken1Offset, .value = 0},
     }));
     raw_clock_expectations();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kPpControlOffset, .value = 0},
         {.address = kPpOnDelays, .value = 0},
         {.address = kPpOffDelays, .value = 0},
@@ -859,7 +859,7 @@ TEST_F(PchEngineTigerLakeClockParametersTest, Ones) {
 TEST_F(PchEngineTigerLakeClockParametersTest, SetStandardClock) {
   SetPchMmioExpectations([&]() { mmio_range_.Expect({.address = kRawClkOffset, .value = 0}); });
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kRawClkOffset, .value = kTigerLakeStandardRawClock, .write = true},
   }));
 
@@ -885,7 +885,7 @@ TEST_F(PchEngineTigerLakeClockParametersTest, SetStandardClockNoChange) {
 TEST_F(PchEngineTigerLakeClockParametersTest, SetAlternateClock) {
   SetPchMmioExpectations([&]() { mmio_range_.Expect({.address = kRawClkOffset, .value = 0}); });
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kRawClkOffset, .value = kTigerLakeAlternateRawClock, .write = true},
   }));
 
@@ -899,7 +899,7 @@ TEST_F(PchEngineTigerLakeClockParametersTest, SetAlternateClock) {
 TEST_F(PchEngineTigerLakeClockParametersTest, SetDg1StandardClock) {
   SetPchMmioExpectations([&]() { mmio_range_.Expect({.address = kRawClkOffset, .value = 0}); });
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kRawClkOffset, .value = kDg1StandardRawClock, .write = true},
   }));
 
@@ -913,7 +913,7 @@ TEST_F(PchEngineTigerLakeClockParametersTest, SetDg1StandardClock) {
 TEST_F(PchEngineTigerLakeClockParametersTest, SetOverflow) {
   SetPchMmioExpectations([&]() { mmio_range_.Expect({.address = kRawClkOffset, .value = 0}); });
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kRawClkOffset, .value = 0x1fff'3800, .write = true},
   }));
 
@@ -966,20 +966,20 @@ class PchEnginePanelPowerTargetTest : public PchEngineTest {
   template <typename Lambda1, typename Lambda2>
   void SetPchMmioExpectations(Lambda1 power_control_expectations,
                               Lambda2 backlight_control_expectations) {
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSChicken1Offset, .value = 0},
         {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
     }));
     power_control_expectations();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kPpOnDelays, .value = 0},
         {.address = kPpOffDelays, .value = 0},
         {.address = kPpDivisor, .value = kKabyLakeStandardPpDivisor},
     }));
     backlight_control_expectations();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSblcPwmCtl2Offset, .value = 0},
     }));
   }
@@ -1133,7 +1133,7 @@ TEST_F(PchEnginePanelPowerTargetTest, GenericSetBacklightOnBrightnessPwmOnFromPo
       [&]() { mmio_range_.Expect({.address = kPpControlOffset, .value = 0x01}); },
       [&]() { mmio_range_.Expect({.address = kSblcPwmCtl1Offset, .value = 0}); });
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpControlOffset, .value = 0x05, .write = true},
       {.address = kSblcPwmCtl1Offset, .value = 0x8000'0000, .write = true},
   }));
@@ -1198,7 +1198,7 @@ TEST_F(PchEnginePanelPowerTargetTest, GenericSetBacklightOffBrightnessPwmOff) {
       [&]() { mmio_range_.Expect({.address = kPpControlOffset, .value = 0x05}); },
       [&]() { mmio_range_.Expect({.address = kSblcPwmCtl1Offset, .value = 0xa000'0000}); });
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpControlOffset, .value = 0x01, .write = true},
       {.address = kSblcPwmCtl1Offset, .value = 0x2000'0000, .write = true},
   }));
@@ -1232,7 +1232,7 @@ TEST_F(PchEngineTest, KabyLakePanelParameters) {
   // The parameters are inspired from the eDP and SPWG standards, but are
   // tweaked so each delay is unique. This is intended to help catch bugs where
   // values are incorrectly mapped to register fields.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
 
@@ -1259,7 +1259,7 @@ TEST_F(PchEngineTest, KabyLakePanelParameters) {
 }
 
 TEST_F(PchEngineTest, KabyLakePanelParametersPowerDownOnResetEnabled) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
 
@@ -1286,7 +1286,7 @@ TEST_F(PchEngineTest, KabyLakePanelParametersPowerDownOnResetEnabled) {
 }
 
 TEST_F(PchEngineTest, KabyLakePanelParametersBacklightPwmInverted) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
       {.address = kPpControlOffset, .value = 0x05},
@@ -1313,7 +1313,7 @@ TEST_F(PchEngineTest, KabyLakePanelParametersBacklightPwmInverted) {
 }
 
 TEST_F(PchEngineTest, TigerLakePanelParametersStandardRawClock) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kTigerLakeStandardRawClock},
 
@@ -1343,7 +1343,7 @@ TEST_F(PchEngineTest, TigerLakePanelParametersAlternateRawClock) {
   // The parameters are inspired from the eDP and SPWG standards, but are
   // tweaked so each delay is unique. This is intended to help catch bugs where
   // values are incorrectly mapped to register fields.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
 
       // The different raw clock value must not influence how we interpret the
@@ -1377,7 +1377,7 @@ TEST_F(PchEngineTest, TigerLakePanelParametersAlternateRawClock) {
 }
 
 TEST_F(PchEngineTest, KabyLakeSetPanelParameters) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
       {.address = kPpControlOffset, .value = 0},
@@ -1387,7 +1387,7 @@ TEST_F(PchEngineTest, KabyLakeSetPanelParameters) {
       {.address = kSblcPwmCtl1Offset, .value = 0x2000'0000},
       {.address = kSblcPwmCtl2Offset, .value = 0},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpOnDelays, .value = 0x0384'0a28, .write = true},
       {.address = kPpOffDelays, .value = 0x1388'07d0, .write = true},
       {.address = kPpDivisor, .value = 0x0004'af0a, .write = true},
@@ -1413,7 +1413,7 @@ TEST_F(PchEngineTest, KabyLakeSetPanelParameters) {
 }
 
 TEST_F(PchEngineTest, KabyLakeSetPanelParametersWhileBacklightPwmIsOn) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
       {.address = kPpControlOffset, .value = 0},
@@ -1423,7 +1423,7 @@ TEST_F(PchEngineTest, KabyLakeSetPanelParametersWhileBacklightPwmIsOn) {
       {.address = kSblcPwmCtl1Offset, .value = 0xa000'0000},
       {.address = kSblcPwmCtl2Offset, .value = 0},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpOnDelays, .value = 0x0384'0a28, .write = true},
       {.address = kPpOffDelays, .value = 0x1388'07d0, .write = true},
       {.address = kPpDivisor, .value = 0x0004'af0a, .write = true},
@@ -1470,7 +1470,7 @@ class PchEngineKabyLakeSetPanelParametersZerosTest : public PchEngineTest {
   void SetUp() override {
     PchEngineTest::SetUp();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSChicken1Offset, .value = 0},
         {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
         {.address = kPpControlOffset, .value = 0x0a},
@@ -1480,7 +1480,7 @@ class PchEngineKabyLakeSetPanelParametersZerosTest : public PchEngineTest {
         {.address = kSblcPwmCtl1Offset, .value = 0x2000'0000},
         {.address = kSblcPwmCtl2Offset, .value = 0x0000'ffff},
     }));
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kPpOnDelays, .value = 0, .write = true},
         {.address = kPpOffDelays, .value = 0, .write = true},
         {.address = kPpDivisor, .value = 0x0004'af01, .write = true},
@@ -1524,7 +1524,7 @@ class PchEngineKabyLakeSetPanelParametersOverflowTest : public PchEngineTest {
   void SetUp() override {
     PchEngineTest::SetUp();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSChicken1Offset, .value = 0},
         {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
         {.address = kPpControlOffset, .value = 0},
@@ -1536,7 +1536,7 @@ class PchEngineKabyLakeSetPanelParametersOverflowTest : public PchEngineTest {
         // These values check for overflow in brightness-preserving logic.
         {.address = kSblcPwmCtl2Offset, .value = 0x0001'ffff},
     }));
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kPpOnDelays, .value = 0x1fff'1fff, .write = true},
         {.address = kPpOffDelays, .value = 0x1fff'1fff, .write = true},
         {.address = kPpDivisor, .value = 0x0004'af1f, .write = true},
@@ -1572,7 +1572,7 @@ TEST_F(PchEngineKabyLakeSetPanelParametersOverflowTest, RepeatedWithNoChange) {
 }
 
 TEST_F(PchEngineTest, KabyLakeSetPanelParametersOnlyPowerDownOnReset) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
       {.address = kPpControlOffset, .value = 0},
@@ -1582,7 +1582,7 @@ TEST_F(PchEngineTest, KabyLakeSetPanelParametersOnlyPowerDownOnReset) {
       {.address = kSblcPwmCtl1Offset, .value = 0},
       {.address = kSblcPwmCtl2Offset, .value = 0x0001'0000},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpControlOffset, .value = 0x02, .write = true},
   }));
 
@@ -1600,7 +1600,7 @@ TEST_F(PchEngineTest, KabyLakeSetPanelParametersOnlyPowerDownOnReset) {
 }
 
 TEST_F(PchEngineTest, KabyLakeSetPanelParametersOnlyBacklightPwmInverted) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
       {.address = kPpControlOffset, .value = 0},
@@ -1610,7 +1610,7 @@ TEST_F(PchEngineTest, KabyLakeSetPanelParametersOnlyBacklightPwmInverted) {
       {.address = kSblcPwmCtl1Offset, .value = 0},
       {.address = kSblcPwmCtl2Offset, .value = 0x0001'0000},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmCtl1Offset, .value = 0x2000'0000, .write = true},
   }));
 
@@ -1630,7 +1630,7 @@ TEST_F(PchEngineTest, KabyLakeSetPanelParametersOnlyBacklightPwmInverted) {
 TEST_F(PchEngineTest, TigerLakeSetPanelParameters) {
   // PP_CONTROL is non-zero to check that control bits are mixed correctly with
   // the delay field.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kTigerLakeStandardRawClock},
       {.address = kPpControlOffset, .value = 0x08},
@@ -1640,7 +1640,7 @@ TEST_F(PchEngineTest, TigerLakeSetPanelParameters) {
       {.address = kSblcPwmFreqOffset, .value = 0},
       {.address = kSblcPwmDutyOffset, .value = 0x0001},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpOnDelays, .value = 0x0384'0a28, .write = true},
       {.address = kPpOffDelays, .value = 0x1388'07d0, .write = true},
       {.address = kPpControlOffset, .value = 0x8a, .write = true},
@@ -1666,7 +1666,7 @@ TEST_F(PchEngineTest, TigerLakeSetPanelParameters) {
 }
 
 TEST_F(PchEngineTest, TigerLakeSetPanelParametersWhileBacklightPwmIsOn) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kTigerLakeStandardRawClock},
       {.address = kPpControlOffset, .value = 0x08},
@@ -1676,7 +1676,7 @@ TEST_F(PchEngineTest, TigerLakeSetPanelParametersWhileBacklightPwmIsOn) {
       {.address = kSblcPwmFreqOffset, .value = 0},
       {.address = kSblcPwmDutyOffset, .value = 0x0001},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpOnDelays, .value = 0x0384'0a28, .write = true},
       {.address = kPpOffDelays, .value = 0x1388'07d0, .write = true},
       {.address = kPpControlOffset, .value = 0x8a, .write = true},
@@ -1704,7 +1704,7 @@ TEST_F(PchEngineTest, TigerLakeSetPanelParametersWhileBacklightPwmIsOn) {
 }
 
 TEST_F(PchEngineTest, TigerLakeSetPanelParametersAlternateRawClock) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
 
       // The different raw clock value must not influence how we interpret the
@@ -1722,7 +1722,7 @@ TEST_F(PchEngineTest, TigerLakeSetPanelParametersAlternateRawClock) {
       {.address = kSblcPwmFreqOffset, .value = 0},
       {.address = kSblcPwmDutyOffset, .value = 0x0001},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpOnDelays, .value = 0x0384'0a28, .write = true},
       {.address = kPpOffDelays, .value = 0x1388'07d0, .write = true},
       {.address = kPpControlOffset, .value = 0x8a, .write = true},
@@ -1749,7 +1749,7 @@ class PchEngineTestTigerLakeSetPanelParametersZerosTest : public PchEngineTest {
   void SetUp() override {
     PchEngineTest::SetUp();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSChicken1Offset, .value = 0},
         {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
         {.address = kPpControlOffset, .value = 0x4a},
@@ -1762,7 +1762,7 @@ class PchEngineTestTigerLakeSetPanelParametersZerosTest : public PchEngineTest {
         {.address = kSblcPwmFreqOffset, .value = 0},
         {.address = kSblcPwmDutyOffset, .value = 0xffff'ffff},
     }));
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kPpOnDelays, .value = 0, .write = true},
         {.address = kPpOffDelays, .value = 0, .write = true},
         {.address = kPpControlOffset, .value = 0x18, .write = true},
@@ -1792,7 +1792,7 @@ class PchEngineTigerLakeSetPanelParametersOverflowTest : public PchEngineTest {
   void SetUp() override {
     PchEngineTest::SetUp();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSChicken1Offset, .value = 0},
         {.address = kRawClkOffset, .value = kTigerLakeMaxRawClock},
         {.address = kPpControlOffset, .value = 0x08},
@@ -1805,7 +1805,7 @@ class PchEngineTigerLakeSetPanelParametersOverflowTest : public PchEngineTest {
         // The maximum duty cycle value tests the brightness clamping logic.
         {.address = kSblcPwmDutyOffset, .value = 0xffff'ffff},
     }));
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kPpOnDelays, .value = 0x1fff'1fff, .write = true},
         {.address = kPpOffDelays, .value = 0x1fff'1fff, .write = true},
         {.address = kPpControlOffset, .value = 0x01fa, .write = true},
@@ -1839,7 +1839,7 @@ TEST_F(PchEngineTigerLakeSetPanelParametersOverflowTest, RepeatedWithNoChange) {
 }
 
 TEST_F(PchEngineTest, TigerLakeSetPanelParametersOnlyPowerDownOnReset) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kTigerLakeStandardRawClock},
       {.address = kPpControlOffset, .value = 0x10},
@@ -1849,7 +1849,7 @@ TEST_F(PchEngineTest, TigerLakeSetPanelParametersOnlyPowerDownOnReset) {
       {.address = kSblcPwmFreqOffset, .value = 0x0000'0001},
       {.address = kSblcPwmDutyOffset, .value = 0},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpControlOffset, .value = 0x12, .write = true},
   }));
 
@@ -1867,7 +1867,7 @@ TEST_F(PchEngineTest, TigerLakeSetPanelParametersOnlyPowerDownOnReset) {
 }
 
 TEST_F(PchEngineTest, TigerLakeSetPanelParametersOnlyBacklightPwmInverted) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kTigerLakeStandardRawClock},
       {.address = kPpControlOffset, .value = 0x10},
@@ -1877,7 +1877,7 @@ TEST_F(PchEngineTest, TigerLakeSetPanelParametersOnlyBacklightPwmInverted) {
       {.address = kSblcPwmFreqOffset, .value = 0x0000'0001},
       {.address = kSblcPwmDutyOffset, .value = 0},
   }));
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmCtl1Offset, .value = 0x2000'0000, .write = true},
   }));
 
@@ -1898,7 +1898,7 @@ class PchEngineBrightnessPwmTest : public PchEngineTest {
  public:
   // Sets PP_* register expectations so no unrelated assertion is triggered.
   void SetKabyLakePanelPowerReadExpectations() {
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kPpControlOffset, .value = 0},
         {.address = kPpOnDelays, .value = 0},
         {.address = kPpOffDelays, .value = 0},
@@ -1908,12 +1908,12 @@ class PchEngineBrightnessPwmTest : public PchEngineTest {
 };
 
 TEST_F(PchEngineBrightnessPwmTest, KabyLake16IncrementMinFrequency) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
   }));
   SetKabyLakePanelPowerReadExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmCtl1Offset, .value = 0},
       {.address = kSblcPwmCtl2Offset, .value = 0xffff0000},
   }));
@@ -1926,12 +1926,12 @@ TEST_F(PchEngineBrightnessPwmTest, KabyLake16IncrementMinFrequency) {
 }
 
 TEST_F(PchEngineBrightnessPwmTest, KabyLake16Increment100StepsMaxFrequency) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
   }));
   SetKabyLakePanelPowerReadExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmCtl1Offset, .value = 0},
       {.address = kSblcPwmCtl2Offset, .value = 0x0064'0000},
   }));
@@ -1942,12 +1942,12 @@ TEST_F(PchEngineBrightnessPwmTest, KabyLake16Increment100StepsMaxFrequency) {
 }
 
 TEST_F(PchEngineBrightnessPwmTest, KabyLake16Increment256StepsMaxFrequency) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 0},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
   }));
   SetKabyLakePanelPowerReadExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmCtl1Offset, .value = 0},
       {.address = kSblcPwmCtl2Offset, .value = 0x0100'0000},
   }));
@@ -1958,12 +1958,12 @@ TEST_F(PchEngineBrightnessPwmTest, KabyLake16Increment256StepsMaxFrequency) {
 }
 
 TEST_F(PchEngineBrightnessPwmTest, KabyLake128IncrementMinFrequency) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 1},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
   }));
   SetKabyLakePanelPowerReadExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmCtl1Offset, .value = 0},
       {.address = kSblcPwmCtl2Offset, .value = 0xffff0000},
   }));
@@ -1974,12 +1974,12 @@ TEST_F(PchEngineBrightnessPwmTest, KabyLake128IncrementMinFrequency) {
 }
 
 TEST_F(PchEngineBrightnessPwmTest, KabyLake128Increment100StepsMaxFrequency) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 1},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
   }));
   SetKabyLakePanelPowerReadExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmCtl1Offset, .value = 0},
       {.address = kSblcPwmCtl2Offset, .value = 0x0064'0000},
   }));
@@ -1990,12 +1990,12 @@ TEST_F(PchEngineBrightnessPwmTest, KabyLake128Increment100StepsMaxFrequency) {
 }
 
 TEST_F(PchEngineBrightnessPwmTest, KabyLake128Increment256StepsMaxFrequency) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSChicken1Offset, .value = 1},
       {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
   }));
   SetKabyLakePanelPowerReadExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmCtl1Offset, .value = 0},
       {.address = kSblcPwmCtl2Offset, .value = 0x0100'0000},
   }));
@@ -2011,7 +2011,7 @@ class PchEngineKabyLakeBrightnessTest : public PchEngineTest {
   void SetUp() override {
     PchEngineTest::SetUp();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSChicken1Offset, .value = 1},
         {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
         {.address = kPpControlOffset, .value = 0},
@@ -2079,7 +2079,7 @@ class PchEngineTigerLakeBrightnessTest : public PchEngineTest {
   void SetUp() override {
     PchEngineTest::SetUp();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSChicken1Offset, .value = 0},
         {.address = kRawClkOffset, .value = kTigerLakeStandardRawClock},
 
@@ -2094,7 +2094,7 @@ class PchEngineTigerLakeBrightnessTest : public PchEngineTest {
 };
 
 TEST_F(PchEngineTigerLakeBrightnessTest, ReadZero) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmFreqOffset, .value = 0x9600},
       {.address = kSblcPwmDutyOffset, .value = 0},
   }));
@@ -2103,7 +2103,7 @@ TEST_F(PchEngineTigerLakeBrightnessTest, ReadZero) {
 }
 
 TEST_F(PchEngineTigerLakeBrightnessTest, ReadOne) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmFreqOffset, .value = 0x9600},
       {.address = kSblcPwmDutyOffset, .value = 0x9600},
   }));
@@ -2112,7 +2112,7 @@ TEST_F(PchEngineTigerLakeBrightnessTest, ReadOne) {
 }
 
 TEST_F(PchEngineTigerLakeBrightnessTest, ReadSmallFraction) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmFreqOffset, .value = 0x9600},
       {.address = kSblcPwmDutyOffset, .value = 0x004b},
   }));
@@ -2121,7 +2121,7 @@ TEST_F(PchEngineTigerLakeBrightnessTest, ReadSmallFraction) {
 }
 
 TEST_F(PchEngineTigerLakeBrightnessTest, ReadLargeFraction) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmFreqOffset, .value = 0x9600},
       {.address = kSblcPwmDutyOffset, .value = 0x95b5},
   }));
@@ -2130,7 +2130,7 @@ TEST_F(PchEngineTigerLakeBrightnessTest, ReadLargeFraction) {
 }
 
 TEST_F(PchEngineTigerLakeBrightnessTest, WriteSmallFraction) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmFreqOffset, .value = 0x9600},
       {.address = kSblcPwmDutyOffset, .value = 0x9600},
   }));
@@ -2140,7 +2140,7 @@ TEST_F(PchEngineTigerLakeBrightnessTest, WriteSmallFraction) {
 }
 
 TEST_F(PchEngineTigerLakeBrightnessTest, WriteLargeFraction) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmFreqOffset, .value = 0x9600},
       {.address = kSblcPwmDutyOffset, .value = 0x0000},
   }));
@@ -2150,7 +2150,7 @@ TEST_F(PchEngineTigerLakeBrightnessTest, WriteLargeFraction) {
 }
 
 TEST_F(PchEngineTigerLakeBrightnessTest, WriteSmallFractionNoChange) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmFreqOffset, .value = 0x9600},
       {.address = kSblcPwmDutyOffset, .value = 0x004b},
   }));
@@ -2159,7 +2159,7 @@ TEST_F(PchEngineTigerLakeBrightnessTest, WriteSmallFractionNoChange) {
 }
 
 TEST_F(PchEngineTigerLakeBrightnessTest, WriteMisconfiguredNoChange) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kSblcPwmFreqOffset, .value = 0x0000},
       {.address = kSblcPwmDutyOffset, .value = 0x1111},
   }));
@@ -2172,7 +2172,7 @@ class PchEnginePanelPowerStateTest : public PchEngineTest {
   void SetUp() override {
     PchEngineTest::SetUp();
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kSChicken1Offset, .value = 1},
         {.address = kRawClkOffset, .value = kKabyLakeStandardRawClock},
         {.address = kPpControlOffset, .value = 0},
@@ -2270,7 +2270,7 @@ TEST_F(PchEnginePanelPowerStateTest, WaitForPanelPowerStateInstant) {
 }
 
 TEST_F(PchEnginePanelPowerStateTest, WaitForPanelPowerStateAfter20Ms) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpStatusOffset, .value = 0x0000'0000},  // Powered down.
       {.address = kPpStatusOffset, .value = 0x1000'0000},  // Powering up.
       {.address = kPpStatusOffset, .value = 0x8000'0000},  // Powered up.
@@ -2281,7 +2281,7 @@ TEST_F(PchEnginePanelPowerStateTest, WaitForPanelPowerStateAfter20Ms) {
 }
 
 TEST_F(PchEnginePanelPowerStateTest, WaitForPanelPowerStateLastChance) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpStatusOffset, .value = 0x0000'0000},  // Powered down.
       {.address = kPpStatusOffset, .value = 0x1000'0000},  // Powering up.
       {.address = kPpStatusOffset, .value = 0x1000'0000},  // Powering up.
@@ -2293,7 +2293,7 @@ TEST_F(PchEnginePanelPowerStateTest, WaitForPanelPowerStateLastChance) {
 }
 
 TEST_F(PchEnginePanelPowerStateTest, WaitForPanelPowerStateTimeout) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpStatusOffset, .value = 0x0000'0000},  // Powered down.
       {.address = kPpStatusOffset, .value = 0x1000'0000},  // Powering up.
       {.address = kPpStatusOffset, .value = 0x1000'0000},  // Powering up.
@@ -2305,7 +2305,7 @@ TEST_F(PchEnginePanelPowerStateTest, WaitForPanelPowerStateTimeout) {
 }
 
 TEST_F(PchEnginePanelPowerStateTest, WaitForPanelPowerStateTimeoutRounding) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kPpStatusOffset, .value = 0x0000'0000},  // Powered down.
       {.address = kPpStatusOffset, .value = 0x1000'0000},  // Powering up.
       {.address = kPpStatusOffset, .value = 0x1000'0000},  // Powering up.

@@ -9,9 +9,9 @@ test("hdmi-transmitter-controller-impl-test-bin") {
   sources = [ "hdmi-transmitter-controller-impl-test.cc" ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
+    "//sdk/lib/driver/mock-mmio-range/cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/devices/lib/mmio",
-    "//src/devices/testing/mock-mmio-range",
     "//src/graphics/display/lib/designware-hdmi:hdmi-transmitter-controller-impl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",

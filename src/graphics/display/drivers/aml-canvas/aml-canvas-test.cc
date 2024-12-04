@@ -6,6 +6,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fake-bti/bti.h>
@@ -13,7 +14,6 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <mock-mmio-range/mock-mmio-range.h>
 
 #include "src/graphics/display/drivers/aml-canvas/dmc-regs.h"
 #include "src/lib/testing/predicates/status.h"
@@ -149,7 +149,7 @@ class AmlCanvasTest : public testing::Test {
 
   void SetRegisterExpectations() {
     // TODO(costan): Remove the read expectations when we get rid of the unnecessary R/M/W.
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kCanvasLutDataLowOffset, .value = CanvasLutDataLowValue(), .write = true},
         {.address = kCanvasLutDataHighOffset, .value = CanvasLutDataHighValue(), .write = true},
         {.address = kCanvasLutAddressOffset,
@@ -161,7 +161,7 @@ class AmlCanvasTest : public testing::Test {
 
   void SetRegisterExpectations(uint8_t index) {
     // TODO(costan): Remove the read expectations when we get rid of the unnecessary R/M/W.
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kCanvasLutDataLowOffset, .value = CanvasLutDataLowValue(), .write = true},
         {.address = kCanvasLutDataHighOffset, .value = CanvasLutDataHighValue(), .write = true},
         {.address = kCanvasLutAddressOffset, .value = CanvasLutAddrValue(index), .write = true},
@@ -207,7 +207,7 @@ class AmlCanvasTest : public testing::Test {
   std::vector<uint8_t> canvas_indices_;
 
   constexpr static int kMmioRangeSize = 0x100;
-  ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
+  mock_mmio::MockMmioRange mmio_range_{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
 
   // Note, set up to execute on testing thread.
   std::unique_ptr<AmlCanvas> canvas_;

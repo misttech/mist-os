@@ -4,11 +4,11 @@
 
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller-impl.h"
 
+#include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 
 #include <fbl/array.h>
 #include <gtest/gtest.h>
-#include <mock-mmio-range/mock-mmio-range.h>
 
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 
@@ -176,7 +176,7 @@ class HdmiTransmitterControllerImplTest : public testing::Test {
   void TearDown() override { mmio_range_.CheckAllAccessesReplayed(); }
 
   void ExpectScdcWrite(uint8_t address, uint8_t value) {
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kI2cmTargetOffset, .value = 0x54, .write = true},
         {.address = kI2cmAddressOffset, .value = address, .write = true},
         {.address = kI2cmDataoOffset, .value = value, .write = true},
@@ -185,7 +185,7 @@ class HdmiTransmitterControllerImplTest : public testing::Test {
   }
 
   void ExpectScdcRead(uint8_t address, uint8_t value) {
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kI2cmTargetOffset, .value = 0x54, .write = true},
         {.address = kI2cmAddressOffset, .value = address, .write = true},
         {.address = kI2cmOperationOffset, .value = 0b00'0001, .write = true},
@@ -197,13 +197,13 @@ class HdmiTransmitterControllerImplTest : public testing::Test {
   fdf_testing::ScopedGlobalLogger logger_;
 
   constexpr static int kMmioRangeSize = 0x8000;
-  ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k8};
+  mock_mmio::MockMmioRange mmio_range_{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k8};
 
   std::unique_ptr<HdmiTransmitterControllerImpl> hdmitx_controller_;
 };
 
 TEST_F(HdmiTransmitterControllerImplTest, InitHwTest) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kMcLockonclockOffset, .value = 0b1111'1111, .write = true},
       {.address = kMcClkdisOffset, .value = 0b0000'0000, .write = true},
 
@@ -254,7 +254,7 @@ TEST_F(HdmiTransmitterControllerImplTest, EdidTransferTest) {
       },
   };
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
       {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
       {.address = kI2cmSegPtrOffset, .value = 0x01, .write = true},
@@ -326,7 +326,7 @@ TEST_F(HdmiTransmitterControllerImplTest, ConfigHdmitxTest) {
       .is4K = false,
   };
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kTxInvid0Offset, .value = 0x03, .write = true},
 
       {.address = kTxInstuffingOffset, .value = 0b000, .write = true},
@@ -431,7 +431,7 @@ TEST_F(HdmiTransmitterControllerImplTest, ConfigHdmitxTest) {
 }
 
 TEST_F(HdmiTransmitterControllerImplTest, SetupInterruptsTest) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kIhMuteFcStat0Offset, .value = 0b1111'1111, .write = true},
       {.address = kIhMuteFcStat1Offset, .value = 0b1111'1111, .write = true},
       {.address = kIhMuteFcStat2Offset, .value = 0b0'0011, .write = true},
@@ -450,7 +450,7 @@ TEST_F(HdmiTransmitterControllerImplTest, SetupInterruptsTest) {
 }
 
 TEST_F(HdmiTransmitterControllerImplTest, ResetTest) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kMcSwrstzreqOffset, .value = 0b0000'0000, .write = true},
       {.address = kMcSwrstzreqOffset, .value = 0b0111'1101, .write = true},
       {.address = kFcVsyncinwidthOffset, .value = 0x41},
@@ -485,7 +485,7 @@ TEST_F(HdmiTransmitterControllerImplTest, SetupScdcTest) {
 }
 
 TEST_F(HdmiTransmitterControllerImplTest, ResetFcTest) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kFcInvidconfOffset, .value = 0b1111'1111},
       {.address = kFcInvidconfOffset, .value = 0b1111'0111, .write = true},
       {.address = kFcInvidconfOffset, .value = 0b0000'0000},
@@ -497,14 +497,14 @@ TEST_F(HdmiTransmitterControllerImplTest, ResetFcTest) {
 
 TEST_F(HdmiTransmitterControllerImplTest, SetFcScramblerCtrlTest) {
   // is4k = true
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kFcScamblerCtrlOffset, .value = 0b0000'0000},
       {.address = kFcScamblerCtrlOffset, .value = 0b0000'0001, .write = true},
   }));
   hdmitx_controller_->SetFcScramblerCtrl(true);
 
   // is4k = false
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kFcScamblerCtrlOffset, .value = 0b0000'0000, .write = true},
   }));
 

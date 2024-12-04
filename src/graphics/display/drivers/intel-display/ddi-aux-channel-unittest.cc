@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/ddi-aux-channel.h"
 
+#include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/span.h>
@@ -14,7 +15,6 @@
 #include <optional>
 
 #include <gtest/gtest.h>
-#include <mock-mmio-range/mock-mmio-range.h>
 
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/lib/testing/predicates/status.h"
@@ -60,7 +60,7 @@ class DdiAuxChannelTest : public ::testing::Test {
  protected:
   constexpr static int kMmioRangeSize = 0x100000;
   fdf_testing::ScopedGlobalLogger logger_;
-  ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
+  mock_mmio::MockMmioRange mmio_range_{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 };
 
@@ -68,35 +68,35 @@ class DdiAuxChannelTest : public ::testing::Test {
 class DdiAuxChannelConstructorTest : public DdiAuxChannelTest {};
 
 TEST_F(DdiAuxChannelConstructorTest, KabyLakeDdiA) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = kDdiAuxCtlQuietStart},
   }));
 
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_A, kAtlasGpuDeviceId);
 }
 TEST_F(DdiAuxChannelConstructorTest, KabyLakeDdiC) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlCOffset, .value = kDdiAuxCtlQuietStart},
   }));
 
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_C, kAtlasGpuDeviceId);
 }
 TEST_F(DdiAuxChannelConstructorTest, TigerLakeDdiA) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = kDdiAuxCtlQuietStart},
   }));
 
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_A, kDell5420GpuDeviceId);
 }
 TEST_F(DdiAuxChannelConstructorTest, TigerLakeDdiC) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlCOffset, .value = kDdiAuxCtlQuietStart},
   }));
 
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_C, kDell5420GpuDeviceId);
 }
 TEST_F(DdiAuxChannelConstructorTest, TigerLakeDdiTC2) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlUsbBOffset, .value = kDdiAuxCtlQuietStart},
   }));
 
@@ -104,7 +104,7 @@ TEST_F(DdiAuxChannelConstructorTest, TigerLakeDdiTC2) {
 }
 
 TEST_F(DdiAuxChannelConstructorTest, WaitsForPendingTransaction) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x8000'00ff},
       {.address = kDdiAuxCtlAOffset, .value = 0x4000'00ff},
   }));
@@ -113,7 +113,7 @@ TEST_F(DdiAuxChannelConstructorTest, WaitsForPendingTransaction) {
 }
 
 TEST_F(DdiAuxChannelConstructorTest, ControlNotChangedDuringPendingTransaction) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       // The SYNC pulse count fields are both incorrect. This verifies that they
       // don't get overwritten (with good values) while a transaction is pending.
       {.address = kDdiAuxCtlAOffset, .value = 0x8000'0000},
@@ -126,7 +126,7 @@ TEST_F(DdiAuxChannelConstructorTest, ControlNotChangedDuringPendingTransaction) 
 class DdiAuxChannelConfigTest : public DdiAuxChannelTest {};
 
 TEST_F(DdiAuxChannelConfigTest, KabyLakeDefault) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = kDdiAuxCtlDefault},
   }));
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_A, kAtlasGpuDeviceId);
@@ -138,7 +138,7 @@ TEST_F(DdiAuxChannelConfigTest, KabyLakeDefault) {
   EXPECT_EQ(false, config.use_thunderbolt);
 }
 TEST_F(DdiAuxChannelConfigTest, KabyLakeQuietStart) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = kDdiAuxCtlQuietStart},
   }));
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_A, kAtlasGpuDeviceId);
@@ -150,7 +150,7 @@ TEST_F(DdiAuxChannelConfigTest, KabyLakeQuietStart) {
   EXPECT_EQ(false, config.use_thunderbolt);
 }
 TEST_F(DdiAuxChannelConfigTest, KabyLakeZeros) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0},
   }));
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_A, kAtlasGpuDeviceId);
@@ -162,7 +162,7 @@ TEST_F(DdiAuxChannelConfigTest, KabyLakeZeros) {
   EXPECT_EQ(false, config.use_thunderbolt);
 }
 TEST_F(DdiAuxChannelConfigTest, KabyLakeOnes) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x7ef0'03ff},
   }));
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_A, kAtlasGpuDeviceId);
@@ -175,7 +175,7 @@ TEST_F(DdiAuxChannelConfigTest, KabyLakeOnes) {
 }
 
 TEST_F(DdiAuxChannelConfigTest, TigerLakeDefault) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = kDdiAuxCtlDefault},
   }));
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_A, kDell5420GpuDeviceId);
@@ -187,7 +187,7 @@ TEST_F(DdiAuxChannelConfigTest, TigerLakeDefault) {
   EXPECT_EQ(false, config.use_thunderbolt);
 }
 TEST_F(DdiAuxChannelConfigTest, TigerLakeQuietStart) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = kDdiAuxCtlQuietStart},
   }));
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_A, kDell5420GpuDeviceId);
@@ -199,7 +199,7 @@ TEST_F(DdiAuxChannelConfigTest, TigerLakeQuietStart) {
   EXPECT_EQ(false, config.use_thunderbolt);
 }
 TEST_F(DdiAuxChannelConfigTest, TigerLakeZeros) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0},
   }));
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_A, kDell5420GpuDeviceId);
@@ -211,7 +211,7 @@ TEST_F(DdiAuxChannelConfigTest, TigerLakeZeros) {
   EXPECT_EQ(false, config.use_thunderbolt);
 }
 TEST_F(DdiAuxChannelConfigTest, TigerLakeOnes) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x7ef0'0bff},
   }));
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_A, kDell5420GpuDeviceId);
@@ -223,7 +223,7 @@ TEST_F(DdiAuxChannelConfigTest, TigerLakeOnes) {
   EXPECT_EQ(true, config.use_thunderbolt);
 }
 TEST_F(DdiAuxChannelConfigTest, SetUseThunderbolt) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       // Start from an all-zeros configuration to verify that the right bit it set.
       {.address = kDdiAuxCtlUsbBOffset, .value = 0},
   }));
@@ -237,7 +237,7 @@ TEST_F(DdiAuxChannelConfigTest, SetUseThunderbolt) {
   EXPECT_EQ(true, config.use_thunderbolt);
 }
 TEST_F(DdiAuxChannelConfigTest, SetUseThunderboltClear) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       // Start from an allmost-all-ones configuration to verify that the right bit is cleared.
       {.address = kDdiAuxCtlAOffset, .value = 0x7ef0'0bff},
   }));
@@ -257,14 +257,14 @@ class DdiAuxChannelWriteRequestTest : public DdiAuxChannelTest {
     DdiAuxChannelTest::SetUp();
 
     // The DdiAuxChannel constructor's MMIO activity.
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kDdiAuxCtlAOffset, .value = kDdiAuxCtlQuietStart},
     }));
   }
 };
 
 TEST_F(DdiAuxChannelWriteRequestTest, Read1Byte) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxDataA0Offset, .value = 0x9abc'de00, .write = true},
   }));
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_A, kAtlasGpuDeviceId);
@@ -272,7 +272,7 @@ TEST_F(DdiAuxChannelWriteRequestTest, Read1Byte) {
       {.address = 0xabcde, .command = 9, .op_size = 1, .data = cpp20::span<uint8_t>()});
 }
 TEST_F(DdiAuxChannelWriteRequestTest, Read16Bytes) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxDataA0Offset, .value = 0x9abc'de0f, .write = true},
   }));
   DdiAuxChannel aux_channel(&mmio_buffer_, DdiId::DDI_A, kAtlasGpuDeviceId);
@@ -281,7 +281,7 @@ TEST_F(DdiAuxChannelWriteRequestTest, Read16Bytes) {
 }
 
 TEST_F(DdiAuxChannelWriteRequestTest, Write1Byte) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxDataA0Offset, .value = 0x8abc'de00, .write = true},
       {.address = kDdiAuxDataA1Offset, .value = 0x4100'0000, .write = true},
   }));
@@ -291,7 +291,7 @@ TEST_F(DdiAuxChannelWriteRequestTest, Write1Byte) {
       {.address = 0xabcde, .command = 8, .op_size = 1, .data = kData});
 }
 TEST_F(DdiAuxChannelWriteRequestTest, Write2Bytes) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxDataA0Offset, .value = 0x8abc'de01, .write = true},
       {.address = kDdiAuxDataA1Offset, .value = 0x4142'0000, .write = true},
   }));
@@ -301,7 +301,7 @@ TEST_F(DdiAuxChannelWriteRequestTest, Write2Bytes) {
       {.address = 0xabcde, .command = 8, .op_size = 2, .data = kData});
 }
 TEST_F(DdiAuxChannelWriteRequestTest, Write3Bytes) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxDataA0Offset, .value = 0x8abc'de02, .write = true},
       {.address = kDdiAuxDataA1Offset, .value = 0x4142'4300, .write = true},
   }));
@@ -311,7 +311,7 @@ TEST_F(DdiAuxChannelWriteRequestTest, Write3Bytes) {
       {.address = 0xabcde, .command = 8, .op_size = 3, .data = kData});
 }
 TEST_F(DdiAuxChannelWriteRequestTest, Write4Bytes) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxDataA0Offset, .value = 0x8abc'de03, .write = true},
       {.address = kDdiAuxDataA1Offset, .value = 0x4142'4344, .write = true},
   }));
@@ -321,7 +321,7 @@ TEST_F(DdiAuxChannelWriteRequestTest, Write4Bytes) {
       {.address = 0xabcde, .command = 8, .op_size = 4, .data = kData});
 }
 TEST_F(DdiAuxChannelWriteRequestTest, Write5Bytes) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxDataA0Offset, .value = 0x8abc'de04, .write = true},
       {.address = kDdiAuxDataA1Offset, .value = 0x4142'4344, .write = true},
       {.address = kDdiAuxDataA2Offset, .value = 0x4500'0000, .write = true},
@@ -332,7 +332,7 @@ TEST_F(DdiAuxChannelWriteRequestTest, Write5Bytes) {
       {.address = 0xabcde, .command = 8, .op_size = 5, .data = kData});
 }
 TEST_F(DdiAuxChannelWriteRequestTest, Write6Bytes) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxDataA0Offset, .value = 0x8abc'de05, .write = true},
       {.address = kDdiAuxDataA1Offset, .value = 0x4142'4344, .write = true},
       {.address = kDdiAuxDataA2Offset, .value = 0x4546'0000, .write = true},
@@ -343,7 +343,7 @@ TEST_F(DdiAuxChannelWriteRequestTest, Write6Bytes) {
       {.address = 0xabcde, .command = 8, .op_size = 6, .data = kData});
 }
 TEST_F(DdiAuxChannelWriteRequestTest, Write7Bytes) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxDataA0Offset, .value = 0x8abc'de06, .write = true},
       {.address = kDdiAuxDataA1Offset, .value = 0x4142'4344, .write = true},
       {.address = kDdiAuxDataA2Offset, .value = 0x4546'4700, .write = true},
@@ -354,7 +354,7 @@ TEST_F(DdiAuxChannelWriteRequestTest, Write7Bytes) {
       {.address = 0xabcde, .command = 8, .op_size = 7, .data = kData});
 }
 TEST_F(DdiAuxChannelWriteRequestTest, Write8Bytes) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxDataA0Offset, .value = 0x8abc'de07, .write = true},
       {.address = kDdiAuxDataA1Offset, .value = 0x4142'4344, .write = true},
       {.address = kDdiAuxDataA2Offset, .value = 0x4546'4748, .write = true},
@@ -366,7 +366,7 @@ TEST_F(DdiAuxChannelWriteRequestTest, Write8Bytes) {
 }
 
 TEST_F(DdiAuxChannelWriteRequestTest, Write15Bytes) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxDataA0Offset, .value = 0x8abc'de0e, .write = true},
       {.address = kDdiAuxDataA1Offset, .value = 0x4142'4344, .write = true},
       {.address = kDdiAuxDataA2Offset, .value = 0x4546'4748, .write = true},
@@ -380,7 +380,7 @@ TEST_F(DdiAuxChannelWriteRequestTest, Write15Bytes) {
       {.address = 0xabcde, .command = 8, .op_size = 15, .data = kData});
 }
 TEST_F(DdiAuxChannelWriteRequestTest, Write16Bytes) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxDataA0Offset, .value = 0x8abc'de0f, .write = true},
       {.address = kDdiAuxDataA1Offset, .value = 0x4142'4344, .write = true},
       {.address = kDdiAuxDataA2Offset, .value = 0x4546'4748, .write = true},
@@ -398,7 +398,7 @@ class DdiAuxChannelTransactTest : public DdiAuxChannelTest {
  public:
   // MMIO activity for DdiAuxChannel setup and a 16-byte read request.
   void SetUpMmioExpectations() {
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kDdiAuxCtlAOffset, .value = kDdiAuxCtlQuietStart},
         {.address = kDdiAuxDataA0Offset, .value = 0x9abc'de0f, .write = true},
     }));
@@ -417,7 +417,7 @@ class DdiAuxChannelTransactTest : public DdiAuxChannelTest {
 };
 
 TEST_F(DdiAuxChannelTransactTest, TransactAdjustsZeroControl) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0},
       {.address = kDdiAuxDataA0Offset, .value = 0x9abc'de0f, .write = true},
       {.address = kDdiAuxCtlAOffset, .value = 0xfe40'00f9, .write = true},
@@ -432,7 +432,7 @@ TEST_F(DdiAuxChannelTransactTest, TransactAdjustsZeroControl) {
 }
 
 TEST_F(DdiAuxChannelTest, TransactAdjustsDefaultControl) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = kDdiAuxCtlDefault},
       {.address = kDdiAuxDataA0Offset, .value = 0x9abc'de0f, .write = true},
       {.address = kDdiAuxCtlAOffset, .value = 0xfe40'00ff, .write = true},
@@ -448,7 +448,7 @@ TEST_F(DdiAuxChannelTest, TransactAdjustsDefaultControl) {
 
 TEST_F(DdiAuxChannelTransactTest, InstantSuccess) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0xfe40'00ff, .write = true},
       {.address = kDdiAuxCtlAOffset, .value = 0x6c20'00ff},
   }));
@@ -460,7 +460,7 @@ TEST_F(DdiAuxChannelTransactTest, InstantSuccess) {
 
 TEST_F(DdiAuxChannelTransactTest, PendingThenSuccess) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0xfe40'00ff, .write = true},
       {.address = kDdiAuxCtlAOffset, .value = 0xac00'00ff},
       {.address = kDdiAuxCtlAOffset, .value = 0xac00'00ff},
@@ -475,7 +475,7 @@ TEST_F(DdiAuxChannelTransactTest, PendingThenSuccess) {
 
 TEST_F(DdiAuxChannelTransactTest, PendingThenNotCompleteThenSuccess) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0xfe40'00ff, .write = true},
       {.address = kDdiAuxCtlAOffset, .value = 0xac00'00ff},
       {.address = kDdiAuxCtlAOffset, .value = 0x2c00'00ff},
@@ -490,7 +490,7 @@ TEST_F(DdiAuxChannelTransactTest, PendingThenNotCompleteThenSuccess) {
 
 TEST_F(DdiAuxChannelTransactTest, DdiReportsReceiveError) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0xfe40'00ff, .write = true},
       {.address = kDdiAuxCtlAOffset, .value = 0x6d20'00ff},
   }));
@@ -502,7 +502,7 @@ TEST_F(DdiAuxChannelTransactTest, DdiReportsReceiveError) {
 
 TEST_F(DdiAuxChannelTransactTest, DdiReportsTimeout) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0xfe40'00ff, .write = true},
       {.address = kDdiAuxCtlAOffset, .value = 0x7c20'00ff},
   }));
@@ -514,7 +514,7 @@ TEST_F(DdiAuxChannelTransactTest, DdiReportsTimeout) {
 
 TEST_F(DdiAuxChannelTransactTest, EmptyReply) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0xfe40'00ff, .write = true},
       {.address = kDdiAuxCtlAOffset, .value = 0x6c00'00ff},
   }));
@@ -526,7 +526,7 @@ TEST_F(DdiAuxChannelTransactTest, EmptyReply) {
 
 TEST_F(DdiAuxChannelTransactTest, LongReply) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0xfe40'00ff, .write = true},
       {.address = kDdiAuxCtlAOffset, .value = 0x6d20'00ff},
   }));
@@ -538,7 +538,7 @@ TEST_F(DdiAuxChannelTransactTest, LongReply) {
 
 TEST_F(DdiAuxChannelTransactTest, DdiTimesOut) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0xfe40'00ff, .write = true},
   }));
 
@@ -570,7 +570,7 @@ class DdiAuxChannelReadReplyTest : public DdiAuxChannelTest {
   // is 16 bytes, and short reads are allowed. So, the read reply could be of
   // any (valid) size.
   void SetUpMmioExpectations() {
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kDdiAuxCtlAOffset, .value = kDdiAuxCtlQuietStart},
         {.address = kDdiAuxDataA0Offset, .value = 0x9abc'de0f, .write = true},
         {.address = kDdiAuxCtlAOffset, .value = 0xfe40'00ff, .write = true},
@@ -598,7 +598,7 @@ class DdiAuxChannelReadReplyTest : public DdiAuxChannelTest {
 // results in ACK with no data. So, this is a valid reply to a read request.
 TEST_F(DdiAuxChannelReadReplyTest, EmptyAckRead) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x6c10'00ff},
       {.address = kDdiAuxDataA0Offset, .value = 0x00de'adbe},
   }));
@@ -612,7 +612,7 @@ TEST_F(DdiAuxChannelReadReplyTest, EmptyAckRead) {
 
 TEST_F(DdiAuxChannelReadReplyTest, EmptyNackRead) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x6c10'00ff},
       {.address = kDdiAuxDataA0Offset, .value = 0x10de'adbe},
   }));
@@ -626,7 +626,7 @@ TEST_F(DdiAuxChannelReadReplyTest, EmptyNackRead) {
 
 TEST_F(DdiAuxChannelReadReplyTest, ReadAck1Byte) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x6c20'00ff},
       {.address = kDdiAuxDataA0Offset, .value = 0x0041'dead},
   }));
@@ -641,7 +641,7 @@ TEST_F(DdiAuxChannelReadReplyTest, ReadAck1Byte) {
 }
 TEST_F(DdiAuxChannelReadReplyTest, ReadAck2Bytes) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x6c30'00ff},
       {.address = kDdiAuxDataA0Offset, .value = 0x0041'42de},
   }));
@@ -656,7 +656,7 @@ TEST_F(DdiAuxChannelReadReplyTest, ReadAck2Bytes) {
 }
 TEST_F(DdiAuxChannelReadReplyTest, ReadAck3Bytes) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x6c40'00ff},
       {.address = kDdiAuxDataA0Offset, .value = 0x0041'4243},
   }));
@@ -671,7 +671,7 @@ TEST_F(DdiAuxChannelReadReplyTest, ReadAck3Bytes) {
 }
 TEST_F(DdiAuxChannelReadReplyTest, ReadAck4Bytes) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x6c50'00ff},
       {.address = kDdiAuxDataA0Offset, .value = 0x0041'4243},
       {.address = kDdiAuxDataA1Offset, .value = 0x44de'adbe},
@@ -687,7 +687,7 @@ TEST_F(DdiAuxChannelReadReplyTest, ReadAck4Bytes) {
 }
 TEST_F(DdiAuxChannelReadReplyTest, ReadAck5Bytes) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x6c60'00ff},
       {.address = kDdiAuxDataA0Offset, .value = 0x0041'4243},
       {.address = kDdiAuxDataA1Offset, .value = 0x4445'dead},
@@ -703,7 +703,7 @@ TEST_F(DdiAuxChannelReadReplyTest, ReadAck5Bytes) {
 }
 TEST_F(DdiAuxChannelReadReplyTest, ReadAck6Bytes) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x6c70'00ff},
       {.address = kDdiAuxDataA0Offset, .value = 0x0041'4243},
       {.address = kDdiAuxDataA1Offset, .value = 0x4445'46de},
@@ -719,7 +719,7 @@ TEST_F(DdiAuxChannelReadReplyTest, ReadAck6Bytes) {
 }
 TEST_F(DdiAuxChannelReadReplyTest, ReadAck7Bytes) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x6c80'00ff},
       {.address = kDdiAuxDataA0Offset, .value = 0x00414243},
       {.address = kDdiAuxDataA1Offset, .value = 0x44454647},
@@ -735,7 +735,7 @@ TEST_F(DdiAuxChannelReadReplyTest, ReadAck7Bytes) {
 }
 TEST_F(DdiAuxChannelReadReplyTest, ReadAck8Bytes) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x6c90'00ff},
       {.address = kDdiAuxDataA0Offset, .value = 0x0041'4243},
       {.address = kDdiAuxDataA1Offset, .value = 0x4445'4647},
@@ -753,7 +753,7 @@ TEST_F(DdiAuxChannelReadReplyTest, ReadAck8Bytes) {
 
 TEST_F(DdiAuxChannelReadReplyTest, ReadAck15Bytes) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x6d00'00ff},
       {.address = kDdiAuxDataA0Offset, .value = 0x0041'4243},
       {.address = kDdiAuxDataA1Offset, .value = 0x4445'4647},
@@ -772,7 +772,7 @@ TEST_F(DdiAuxChannelReadReplyTest, ReadAck15Bytes) {
 }
 TEST_F(DdiAuxChannelReadReplyTest, ReadAck16Bytes) {
   SetUpMmioExpectations();
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = 0x6d10'00ff},
       {.address = kDdiAuxDataA0Offset, .value = 0x0041'4243},
       {.address = kDdiAuxDataA1Offset, .value = 0x4445'4647},
@@ -792,7 +792,7 @@ TEST_F(DdiAuxChannelReadReplyTest, ReadAck16Bytes) {
 }
 
 TEST_F(DdiAuxChannelTest, DoTransactReadAck1Byte) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = kDdiAuxCtlQuietStart},
       {.address = kDdiAuxDataA0Offset, .value = 0x9abc'de00, .write = true},
       {.address = kDdiAuxCtlAOffset, .value = 0xfe40'00ff, .write = true},
@@ -815,7 +815,7 @@ TEST_F(DdiAuxChannelTest, DoTransactReadAck1Byte) {
 }
 
 TEST_F(DdiAuxChannelTest, DoTransactWrite7BytesNack) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kDdiAuxCtlAOffset, .value = kDdiAuxCtlQuietStart},
       {.address = kDdiAuxDataA0Offset, .value = 0x8abc'de06, .write = true},
       {.address = kDdiAuxDataA1Offset, .value = 0x4142'4344, .write = true},
