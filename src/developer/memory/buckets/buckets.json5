@@ -146,12 +146,6 @@
         event_code: 59,
     },
     {
-        name: "OtherProductComponents",
-        process: "brightness_manager\\.cm|color_tint_service\\.cm|nest_policy_agent\\.cm|presence_agent\\.cm",
-        vmo: "",
-        event_code: 62,
-    },
-    {
         name: "DriverFramework",
         process: "driver-index\\.cm|driver_manager\\.cm|sysinfo\\.cm",
         vmo: "",
