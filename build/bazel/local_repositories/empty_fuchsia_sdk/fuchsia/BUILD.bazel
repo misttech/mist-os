@@ -19,7 +19,7 @@ toolchain_type(
     name = "devicetree_toolchain_type",
 )
 
-# Set --@fuchsia_sdk//fuchsia:assembly_developer_overrides_list=<label>
+# Set --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=<label>
 # to point to a fuchsia_assembly_developer_overrides_list() target.
 label_flag(
     name = "assembly_developer_overrides_list",
