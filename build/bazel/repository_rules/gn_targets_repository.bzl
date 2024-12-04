@@ -135,9 +135,6 @@ alias(
                 # Create //_files/{ninja_path} as a symlink to the real path.
                 repo_ctx.symlink(target_path, link_path)
 
-                # Create //{gn_dir}/{bazel_name}.directory as a symlink to //_files/{ninja_path}
-                repo_ctx.symlink(link_path, "%s/%s.directory" % (bazel_package, bazel_name))
-
         repo_ctx.file("%s/BUILD.bazel" % bazel_package, content, executable = False)
         repo_ctx.symlink(build_dir_name, "%s/_files" % bazel_package)
 
