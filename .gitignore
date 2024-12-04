@@ -175,6 +175,8 @@ tables_generator_tests_*.txt
 /third_party/pypng/src
 !/third_party/fuchsia-infra-bazel-rules
 /third_party/fuchsia-infra-bazel-rules/src
+!/third_party/volk
+/third_party/volk/src
 
 /tmp/
 /vendor/

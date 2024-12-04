@@ -62,6 +62,15 @@
             },
             {
                 "notes": [
+                    "Temporarily skip to allow volk to land.",
+                    "See b/382158082 for more info."
+                ],
+                "paths": [
+                    "third_party/volk"
+                ]
+            },
+            {
+                "notes": [
                     "Exempt the SDK workflow validation test workspace directory"
                 ],
                 "paths": [
