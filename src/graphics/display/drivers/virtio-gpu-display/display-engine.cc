@@ -277,13 +277,11 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
           .cpu_domain_supported(true)
           .Build());
 
-  static constexpr fuchsia_images2::wire::ColorSpace kColorSpaces[] = {
-      fuchsia_images2::wire::ColorSpace::kSrgb};
   constraints.image_format_constraints(
       std::vector{fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
                       .pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)
                       .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
-                      .color_spaces(kColorSpaces)
+                      .color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kSrgb})
                       .bytes_per_row_divisor(4)
                       .Build()});
 

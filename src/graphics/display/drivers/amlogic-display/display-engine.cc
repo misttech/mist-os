@@ -89,7 +89,7 @@ void SetDefaultImageFormatConstraints(fuchsia_images2::wire::PixelFormat format,
                                       fuchsia_sysmem2::wire::ImageFormatConstraints& constraints,
                                       fidl::AnyArena& arena) {
   constraints.Allocate(arena);
-  constraints.set_color_spaces(arena, std::vector{fuchsia_images2::wire::ColorSpace::kSrgb});
+  constraints.set_color_spaces(arena, std::array{fuchsia_images2::wire::ColorSpace::kSrgb});
   constraints.set_pixel_format(format);
   constraints.set_pixel_format_modifier(arena, fuchsia_images2::PixelFormatModifier(modifier));
   constraints.set_bytes_per_row_divisor(kBufferAlignment);

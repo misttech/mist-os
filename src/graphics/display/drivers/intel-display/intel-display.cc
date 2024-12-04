@@ -1920,7 +1920,7 @@ zx_status_t Controller::DisplayEngineSetBufferCollectionConstraints(
               .start_offset_divisor(1);  // Not meaningful
           break;
       }
-      image_constraints.color_spaces(std::vector{fuchsia_images2::wire::ColorSpace::kSrgb});
+      image_constraints.color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kSrgb});
       image_constraints_vec.push_back(image_constraints.Build());
     }
   }
@@ -1931,7 +1931,7 @@ zx_status_t Controller::DisplayEngineSetBufferCollectionConstraints(
   for (unsigned i = 0; i < std::size(kYuvPixelFormatTypes); ++i) {
     auto image_constraints = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
     image_constraints.pixel_format(kYuvPixelFormatTypes[i]);
-    image_constraints.color_spaces(std::vector{fuchsia_images2::wire::ColorSpace::kRec709});
+    image_constraints.color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kRec709});
     image_constraints_vec.push_back(image_constraints.Build());
   }
 

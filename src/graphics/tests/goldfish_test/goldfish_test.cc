@@ -220,7 +220,7 @@ TEST(GoldfishControlTests, GoldfishControlTest) {
               .ram_domain_supported(false)
               .cpu_domain_supported(false)
               .inaccessible_domain_supported(true)
-              .permitted_heaps(std::vector{
+              .permitted_heaps(std::array{
                   fuchsia_sysmem2::wire::Heap::Builder(arena)
                       .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
                       .id(0)
@@ -336,18 +336,18 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisible) {
               .min_size_bytes(kMinSizeBytes)
               .max_size_bytes(kMaxSizeBytes)
               .cpu_domain_supported(true)
-              .permitted_heaps(std::vector{
+              .permitted_heaps(std::array{
                   fuchsia_sysmem2::wire::Heap::Builder(arena)
                       .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_HOST_VISIBLE)
                       .id(0)
                       .Build()})
               .Build())
       .image_format_constraints(
-          std::vector{fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
-                          .pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)
-                          .color_spaces(std::vector{fuchsia_images2::wire::ColorSpace::kSrgb})
-                          .min_size(fuchsia_math::wire::SizeU{.width = 32, .height = 32})
-                          .Build()});
+          std::array{fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
+                         .pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)
+                         .color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kSrgb})
+                         .min_size(fuchsia_math::wire::SizeU{.width = 32, .height = 32})
+                         .Build()});
 
   fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> collection(
       std::move(collection_endpoints.client));
@@ -464,7 +464,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisible_MultiClients) {
     auto builder = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
     auto image_constraints = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
     image_constraints.pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)
-        .color_spaces(std::vector{fuchsia_images2::wire::ColorSpace::kSrgb});
+        .color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kSrgb});
 
     // Set different min_coded_width and required_max_coded_width for each client.
     if (i == 0) {
@@ -484,16 +484,16 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisible_MultiClients) {
                 .cpu_domain_supported(true)
                 .min_size_bytes(kMinSizeBytes)
                 .max_size_bytes(kMaxSizeBytes)
-                .permitted_heaps(std::vector{
+                .permitted_heaps(std::array{
                     fuchsia_sysmem2::wire::Heap::Builder(arena)
                         .heap_type(
                             bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_HOST_VISIBLE)
                         .id(0)
                         .Build()})
                 .Build())
-        .image_format_constraints(std::vector{image_constraints
+        .image_format_constraints(std::array{image_constraints
 
-                                                  .Build()});
+                                                 .Build()});
     constraints.push_back(builder.Build());
   }
 
@@ -607,7 +607,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisibleBuffer) {
               .ram_domain_supported(false)
               .cpu_domain_supported(true)
               .inaccessible_domain_supported(false)
-              .permitted_heaps(std::vector{
+              .permitted_heaps(std::array{
                   fuchsia_sysmem2::wire::Heap::Builder(arena)
                       .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_HOST_VISIBLE)
                       .id(0)
@@ -705,7 +705,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_DataBuffer) {
               .ram_domain_supported(false)
               .cpu_domain_supported(false)
               .inaccessible_domain_supported(true)
-              .permitted_heaps(std::vector{
+              .permitted_heaps(std::array{
                   fuchsia_sysmem2::wire::Heap::Builder(arena)
                       .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
                       .id(0)
@@ -886,7 +886,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_CreateColorBuffer2Args) {
               .ram_domain_supported(false)
               .cpu_domain_supported(false)
               .inaccessible_domain_supported(true)
-              .permitted_heaps(std::vector{
+              .permitted_heaps(std::array{
                   fuchsia_sysmem2::wire::Heap::Builder(arena)
                       .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
                       .id(0)
@@ -1038,7 +1038,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_CreateBuffer2Args) {
               .ram_domain_supported(false)
               .cpu_domain_supported(false)
               .inaccessible_domain_supported(true)
-              .permitted_heaps(std::vector{
+              .permitted_heaps(std::array{
                   fuchsia_sysmem2::wire::Heap::Builder(arena)
                       .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
                       .id(0)
@@ -1147,7 +1147,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_GetNotCreatedColorBuffer) {
               .ram_domain_supported(false)
               .cpu_domain_supported(false)
               .inaccessible_domain_supported(true)
-              .permitted_heaps(std::vector{
+              .permitted_heaps(std::array{
                   fuchsia_sysmem2::wire::Heap::Builder(arena)
                       .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
                       .id(0)
@@ -1412,7 +1412,7 @@ TEST(GoldfishHostMemoryTests, GoldfishHostVisibleColorBuffer) {
               .ram_domain_supported(false)
               .cpu_domain_supported(false)
               .inaccessible_domain_supported(true)
-              .permitted_heaps(std::vector{
+              .permitted_heaps(std::array{
                   fuchsia_sysmem2::wire::Heap::Builder(arena)
                       .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
                       .id(0)
@@ -1547,7 +1547,7 @@ TEST_P(GoldfishCreateColorBufferTest, CreateColorBufferWithFormat) {
               .ram_domain_supported(false)
               .cpu_domain_supported(false)
               .inaccessible_domain_supported(true)
-              .permitted_heaps(std::vector{
+              .permitted_heaps(std::array{
                   fuchsia_sysmem2::wire::Heap::Builder(arena)
                       .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
                       .id(0)
