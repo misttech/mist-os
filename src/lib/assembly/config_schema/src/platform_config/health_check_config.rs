@@ -26,9 +26,9 @@ pub enum VerifyComponent {
 impl VerifyComponent {
     /// Map the VerifyComponent to its moniker.
     pub fn source_moniker(&self) -> &str {
-        match self {
-            &VerifyComponent::Storage => "bootstrap/fshost",
-            &VerifyComponent::Netstack => "core/network/netstack",
+        match *self {
+            VerifyComponent::Storage => "bootstrap/fshost",
+            VerifyComponent::Netstack => "core/network/netstack",
         }
     }
 }

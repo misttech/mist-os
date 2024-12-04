@@ -134,7 +134,7 @@ pub(crate) struct ConfigurationContext<'a> {
     pub developer_only_options: Option<&'a DeveloperOnlyOptions>,
 }
 
-impl<'a> ConfigurationContext<'a> {
+impl ConfigurationContext<'_> {
     /// Ensure that the configuration context matches the given set of
     /// build-types and feature-set-levels.
     ///

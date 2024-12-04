@@ -112,9 +112,7 @@ impl PackageCopier {
     /// Given a package manifest, load all of its blobs into the given map.
     fn load_blobs_from<'a>(&mut self, manifest: &'a PackageManifest) {
         for blob in manifest.blobs() {
-            if !self.blobs.contains_key(&blob.merkle) {
-                self.blobs.insert(blob.merkle, Utf8PathBuf::from(&blob.source_path));
-            }
+            self.blobs.entry(blob.merkle).or_insert_with(|| Utf8PathBuf::from(&blob.source_path));
         }
     }
 

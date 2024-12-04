@@ -170,6 +170,7 @@ impl<'a, K: Ord, V> InsertAllUniqueExt<MapEntry<K, V>> for &'a mut BTreeMap<K, V
     ) -> Result<(), Self::Error> {
         let result = iter.into_iter().try_for_each(|entry| {
             let MapEntry(key, new_value) = entry;
+            #[allow(clippy::map_entry, reason = "false positive, would need to clone new_value")]
             if self.contains_key(&key) {
                 Err((key, new_value))
             } else {
