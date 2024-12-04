@@ -5,6 +5,7 @@
 use super::errors::Errno;
 use super::math::round_up_to_increment;
 use super::uapi;
+use crate::errno;
 use std::marker::PhantomData;
 use std::{fmt, mem, ops};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
@@ -15,6 +16,18 @@ use zx_types::zx_vaddr_t;
 )]
 #[repr(transparent)]
 pub struct UserAddress(u64);
+
+#[derive(
+    Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, KnownLayout, FromBytes, Immutable,
+)]
+#[repr(transparent)]
+pub struct UserAddress32(u32);
+
+impl UserAddress32 {
+    const NULL_PTR: u32 = 0;
+
+    pub const NULL: Self = Self(Self::NULL_PTR);
+}
 
 impl UserAddress {
     const NULL_PTR: u64 = 0;
@@ -61,6 +74,10 @@ impl UserAddress {
 
     pub fn saturating_sub(&self, rhs: usize) -> Self {
         UserAddress(self.0.saturating_sub(rhs as u64))
+    }
+
+    pub fn is_lower_32bit(&self) -> bool {
+        self.0 < (1 << 32)
     }
 }
 
@@ -171,6 +188,37 @@ impl fmt::Display for UserAddress {
 impl fmt::Debug for UserAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("UserAddress").field(&format_args!("{:#x}", self.0)).finish()
+    }
+}
+
+impl fmt::Debug for UserAddress32 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("UserAddress32").field(&format_args!("{:#x}", self.0)).finish()
+    }
+}
+
+impl Default for UserAddress32 {
+    fn default() -> Self {
+        Self::NULL
+    }
+}
+
+impl From<u32> for UserAddress32 {
+    fn from(value: u32) -> Self {
+        UserAddress32(value)
+    }
+}
+
+impl TryFrom<UserAddress> for UserAddress32 {
+    type Error = Errno;
+    fn try_from(value: UserAddress) -> Result<Self, Self::Error> {
+        Ok(UserAddress32(u32::try_from(value.0).map_err(|_| errno!(EFAULT))?))
+    }
+}
+
+impl From<UserAddress32> for UserAddress {
+    fn from(value: UserAddress32) -> Self {
+        UserAddress(value.0 as u64)
     }
 }
 

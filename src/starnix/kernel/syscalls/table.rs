@@ -2,28 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use paste::paste;
-use starnix_sync::{Locked, Unlocked};
+#![allow(clippy::wildcard_imports)]
 
 use crate::arch::syscalls::sys_clone;
 use crate::task::CurrentTask;
 use fuchsia_inspect_contrib::profile_duration;
+use paste::paste;
+use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::errors::Errno;
 
-macro_rules! syscall_match {
+macro_rules! syscall_match_generic {
     {
-        $locked:ident; $current_task:ident; $syscall_number:expr; $args:ident;
+        $path:path; $fn_prefix:ident; $locked:ident; $current_task:ident; $syscall_number:expr; $args:ident;
         $($(#[$match:meta])? $call:ident [$num_args:tt],)*
     } => {
         paste! {
             match $syscall_number as u32 {
                 $(
                     $(#[$match])?
-                    starnix_uapi::[<__NR_ $call>] => {
+                    $path :: [<__NR_ $call>] => {
                         profile_duration!(stringify!($call));
-                        match syscall_match!(@call $locked; $current_task; $args; [<sys_ $call>][$num_args]) {
+                        match syscall_match_generic!(@call $locked; $current_task; $args; [<$fn_prefix $call>][$num_args]) {
                             Ok(x) => Ok(SyscallResult::from(x)),
                             Err(err) => Err(err),
                         }
@@ -41,6 +42,27 @@ macro_rules! syscall_match {
     (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [4]) => ($func($locked, $current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into()));
     (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [5]) => ($func($locked, $current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into(), $args.4.into()));
     (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [6]) => ($func($locked, $current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into(), $args.4.into(), $args.5.into()));
+}
+
+macro_rules! syscall_match {
+    {
+        $($token:tt)*
+    } => {
+        syscall_match_generic! {
+            starnix_uapi; sys_; $($token)*
+        }
+    }
+}
+
+#[cfg(all(target_arch = "aarch64", feature = "arch32"))]
+macro_rules! arch32_syscall_match {
+    {
+        $($token:tt)*
+    } => {
+        syscall_match_generic! {
+            starnix_uapi::arch32; sys_arch32_; $($token)*
+        }
+    }
 }
 
 pub fn dispatch_syscall(
@@ -110,76 +132,90 @@ pub fn dispatch_syscall(
     #[cfg(target_arch = "aarch64")]
     use crate::arch::syscalls::sys_renameat;
 
+    #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
+    mod aarch64_arch32 {
+        pub use crate::arch::syscalls::{
+            sys_arch32_ARM_set_tls, sys_arch32_access, sys_arch32_fstat64, sys_arch32_mmap2,
+            sys_arch32_munmap, sys_arch32_open, sys_arch32_readlink, sys_arch32_set_robust_list,
+            sys_arch32_stat64, sys_arch32_ugetrlimit, sys_arch32_uname,
+        };
+        pub use crate::mm::syscalls::{
+            sys_brk as sys_arch32_brk, sys_mprotect as sys_arch32_mprotect,
+        };
+        pub use crate::signals::syscalls::{
+            sys_rt_sigaction as sys_arch32_rt_sigaction,
+            sys_rt_sigprocmask as sys_arch32_rt_sigprocmask,
+        };
+        pub use crate::syscalls::time::sys_clock_gettime as sys_arch32_clock_gettime;
+        pub use crate::task::syscalls::{
+            sys_exit as sys_arch32_exit, sys_exit_group as sys_arch32_exit_group,
+            sys_getpid as sys_arch32_getpid, sys_set_tid_address as sys_arch32_set_tid_address,
+            sys_setuid as sys_arch32_setuid,
+        };
+        pub use crate::vfs::syscalls::{
+            sys_close as sys_arch32_close, sys_lseek as sys_arch32_lseek,
+            sys_newfstatat as sys_arch32_fstatat64, sys_openat as sys_arch32_openat,
+            sys_pwritev as sys_arch32_pwritev, sys_read as sys_arch32_read,
+            sys_readlinkat as sys_arch32_readlinkat, sys_write as sys_arch32_write,
+        };
+    }
+    #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
+    use aarch64_arch32::*;
+
     #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_access;
+    mod x86_64 {
+        pub use crate::arch::syscalls::{
+            sys_access, sys_alarm, sys_arch_prctl, sys_chmod, sys_chown, sys_creat, sys_dup2,
+            sys_epoll_create, sys_epoll_wait, sys_eventfd, sys_fork, sys_getdents, sys_getpgrp,
+            sys_inotify_init, sys_lchown, sys_link, sys_lstat, sys_mkdir, sys_mknod, sys_open,
+            sys_pause, sys_pipe, sys_poll, sys_readlink, sys_rename, sys_renameat, sys_rmdir,
+            sys_signalfd, sys_stat, sys_symlink, sys_time, sys_unlink, sys_vfork,
+        };
+        pub use crate::vfs::syscalls::sys_select;
+    }
     #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_alarm;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_arch_prctl;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_chmod;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_chown;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_creat;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_dup2;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_epoll_create;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_epoll_wait;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_eventfd;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_fork;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_getdents;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_getpgrp;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_inotify_init;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_lchown;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_link;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_lstat;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_mkdir;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_mknod;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_open;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_pause;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_pipe;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_poll;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_readlink;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_rename;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_renameat;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_rmdir;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_signalfd;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_stat;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_symlink;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_time;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_unlink;
-    #[cfg(target_arch = "x86_64")]
-    use crate::arch::syscalls::sys_vfork;
-    #[cfg(target_arch = "x86_64")]
-    use crate::vfs::syscalls::sys_select;
+    use x86_64::*;
 
     let args = (syscall.arg0, syscall.arg1, syscall.arg2, syscall.arg3, syscall.arg4, syscall.arg5);
+
+    #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
+    if current_task.thread_state.arch_width.is_arch32() {
+        return arch32_syscall_match! {
+            locked; current_task; syscall.decl.number; args;
+            ARM_set_tls[1],
+            access[2],
+            brk[1],
+            clock_gettime[2],
+            close[1],
+            exit[1],
+            exit_group[1],
+            fstat64[2],
+            fstatat64[4],
+            getpid[0],
+            lseek[3],
+            mmap2[6],
+            mprotect[3],
+            munmap[2],
+            open[3],
+            openat[4],
+            pwritev[4],
+            read[3],
+            readlink[3],
+            readlinkat[4],
+            rt_sigaction[4],
+            rt_sigprocmask[4],
+            set_robust_list[2],
+            set_tid_address[1],
+            setuid[1],
+            stat64[2],
+            ugetrlimit[2],
+            uname[1],
+            write[3],
+        };
+    }
+
+    // An if-else isn't used to allow the above code to be removed and for
+    // constant optimization to occur below.
     syscall_match! {
         locked; current_task; syscall.decl.number; args;
         accept4[4],

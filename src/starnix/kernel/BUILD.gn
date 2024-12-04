@@ -415,6 +415,10 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:zerocopy",
   ]
 
+  if (starnix_enable_arch32) {
+    deps += [ ":vdso-data($bionic_linux_arch32_toolchain)" ]
+  }
+
   test_deps = [
     "//src/connectivity/lib/net-declare",
     "//src/lib/const-unwrap",
@@ -431,6 +435,9 @@ rustc_library("starnix_core") {
   ]
 
   features = []
+  if (starnix_enable_arch32) {
+    features += [ "arch32" ]
+  }
   if (starnix_syscall_stats) {
     features += [ "syscall_stats" ]
   }
@@ -608,11 +615,14 @@ config("vdso_config") {
 
   # Force LTO so that functions are inlined when appropriate even across
   # different compilation units.
-  if (!is_debug) {
+  # TODO(https://fxbug.dev/378658421): Disable lto on arm32 because it doesn't compile
+  if (!is_debug && current_cpu != "arm") {
     # Add thinlto config if lto variants are not used.
     if (!is_lto_variant) {
       configs = [ "//build/config/lto:thinlto" ]
     }
+  } else {
+    configs = [ "//build/config/lto:no-lto" ]
   }
 
   # Use a custom linker script to ensure only one PT_LOAD header.
@@ -644,8 +654,14 @@ loadable_module("vdso") {
     ":vdso-calculate-utc",
     "//zircon/kernel/lib/fasttime:headers",
     "//zircon/system/public",
-    "//zircon/system/ulib/affine",
   ]
+
+  if (current_cpu != "arm") {
+    deps += [
+      "//zircon/kernel/lib/fasttime:headers",
+      "//zircon/system/ulib/affine",
+    ]
+  }
 
   output_name = "libvdso"
   configs += [ ":vdso_config" ]
@@ -660,7 +676,11 @@ loadable_module("vdso") {
 
 resource("vdso-data") {
   sources = [ "$root_out_dir/libvdso.so" ]
-  outputs = [ "data/libvdso.so" ]
+  if (current_cpu != "arm") {
+    outputs = [ "data/libvdso.so" ]
+  } else {
+    outputs = [ "data/libvdso-arch32.so" ]
+  }
   deps = [ ":vdso" ]
 }
 

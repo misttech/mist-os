@@ -5,6 +5,7 @@
 #![allow(non_upper_case_globals)]
 
 use crate::SyscallArg;
+use starnix_types::arch::ArchWidth;
 
 /// Helper for for_each_syscall! that adds any architecture-specific syscalls.
 ///
@@ -75,6 +76,122 @@ macro_rules! for_each_arch_syscall {
             utime,  // utimesat
             vfork,  // clone
             vserver,  // (unused)
+        }
+    }
+}
+
+// This macro ensures there is a unique way to identify syscalls that have a
+// distinct implementation from the primary architecture.
+#[cfg(all(target_arch = "aarch64", feature = "arch32"))]
+#[macro_export]
+macro_rules! for_each_arch_arch32_syscall {
+    {$callback:ident; $($context:ident;)* ; $($common_name:ident,)*} => {
+        $callback!{
+            $($context;)*
+            $($common_name,)*
+            renameat,  // renameat2
+            ARM_breakpoint,
+            ARM_cacheflush,
+            ARM_set_tls,
+            ARM_usr26,
+            ARM_usr32,
+            open,
+            execve,
+            lseek,
+            ptrace,
+            times,
+            ioctl,
+            fcntl,
+            ustat,
+            sigaction,
+            sigpending,
+            setrlimit,
+            getrusage,
+            gettimeofday,
+            settimeofday,
+            truncate,
+            ftruncate,
+            statfs,
+            fstatfs,
+            setitimer,
+            getitimer,
+            stat,
+            lstat,
+            fstat,
+            wait4,
+            sysinfo,
+            sigreturn,
+            sigprocmask,
+            getdents,
+            _newselect,
+            rt_sigreturn,
+            rt_sigaction,
+            rt_sigprocmask,
+            rt_sigpending,
+            rt_sigtimedwait,
+            rt_sigqueueinfo,
+            rt_sigsuspend,
+            pread64,
+            pwrite64,
+            sigaltstack,
+            sendfile,
+            ugetrlimit,
+            mmap2,
+            truncate64,
+            ftruncate64,
+            fcntl64,
+            readahead,
+            sched_setaffinity,
+            sched_getaffinity,
+            io_setup,
+            io_submit,
+            timer_create,
+            statfs64,
+            fstatfs64,
+            arm_fadvise64_64,
+            mq_open,
+            mq_notify,
+            mq_getsetattr,
+            waitid,
+            recv,
+            recvfrom,
+            sendmsg,
+            recvmsg,
+            semctl,
+            msgsnd,
+            msgrcv,
+            msgctl,
+            shmat,
+            shmctl,
+            keyctl,
+            openat,
+            pselect6,
+            ppoll,
+            set_robust_list,
+            get_robust_list,
+            sync_file_range2,
+            epoll_pwait,
+            kexec_load,
+            signalfd,
+            fallocate,
+            signalfd4,
+            preadv,
+            pwritev,
+            rt_tgsigqueueinfo,
+            recvmmsg,
+            fanotify_mark,
+            open_by_handle_at,
+            sendmmsg,
+            execveat,
+            preadv2,
+            pwritev2,
+            io_pgetevents,
+            pselect6_time64,
+            ppoll_time64,
+            io_pgetevents_time64,
+            recvmmsg_time64,
+            rt_sigtimedwait_time64,
+            epoll_pwait2,
         }
     }
 }
@@ -435,6 +552,257 @@ pub struct SyscallDecl {
     pub name: &'static str,
 }
 
+/// As above, but this calls through for the arch32 for arch support.
+/// It's worth noting that common syscalls above are not common across
+/// arches like x86 or arm.  The common list below reflects only
+/// those common across arch32 arches.
+///
+/// Additionally, common syscalls are excluded if they have a different
+/// implementation when compared to the main arch.
+#[cfg(feature = "arch32")]
+#[macro_export]
+macro_rules! for_each_arch32_syscall {
+    {$callback:ident $(,$context:ident)*} => {
+        $crate::for_each_arch_arch32_syscall!{
+            $callback;
+            $($context;)*
+            ;
+            _sysctl,
+            accept,
+            accept4,
+            access,  // faccessat
+            acct,
+            add_key,
+            adjtimex,
+            bind,
+            bpf,
+            brk,
+            cachestat,
+            capget,
+            capset,
+            chdir,
+            chroot,
+            clock_adjtime,
+            clock_getres,
+            clock_gettime,
+            clock_nanosleep,
+            clock_settime,
+            clone,
+            clone3,
+            close_range,
+            close,
+            connect,
+            copy_file_range,
+            delete_module,
+            dup,
+            dup3,
+            epoll_create1,
+            epoll_ctl,
+            eventfd2,
+            exit_group,
+            exit,
+            faccessat,
+            faccessat2,
+            fanotify_init,
+            fchdir,
+            fchmod,
+            fchmodat,
+            fchown,
+            fchownat,
+            fdatasync,
+            fgetxattr,
+            finit_module,
+            flistxattr,
+            flock,
+            fremovexattr,
+            fsconfig,
+            fsetxattr,
+            fsmount,
+            fsopen,
+            fspick,
+            fsync,
+            futex_waitv,
+            futex,
+            get_mempolicy,
+            getcpu,
+            getcwd,
+            getdents64,
+            getegid,
+            geteuid,
+            getgid,
+            getgroups,
+            getpeername,
+            getpgid,
+            getpid,
+            getppid,
+            getpriority,
+            getrandom,
+            getresgid,
+            getresuid,
+            getsid,
+            getsockname,
+            getsockopt,
+            gettid,
+            getuid,
+            getxattr,
+            init_module,
+            inotify_add_watch,
+            inotify_init1,
+            inotify_rm_watch,
+            io_cancel,
+            io_destroy,
+            io_getevents,
+            io_uring_enter,
+            io_uring_register,
+            io_uring_setup,
+            ioprio_get,
+            ioprio_set,
+            kcmp,
+            kexec_file_load,
+            kill,
+            landlock_add_rule,
+            landlock_create_ruleset,
+            landlock_restrict_self,
+            lgetxattr,
+            linkat,
+            listen,
+            listxattr,
+            llistxattr,
+            lookup_dcookie,
+            lremovexattr,
+            lsetxattr,
+            madvise,
+            mbind,
+            membarrier,
+            memfd_create,
+            // memfd_secret,  Not yet in our arm uapi
+            migrate_pages,
+            mincore,
+            mkdirat,
+            mknodat,
+            mlock,
+            mlock2,
+            mlockall,
+            mount_setattr,
+            mount,
+            move_mount,
+            move_pages,
+            mprotect,
+            mq_timedreceive,
+            mq_timedsend,
+            mq_unlink,
+            mremap,
+            msgget,
+            msync,
+            munlock,
+            munlockall,
+            munmap,
+            name_to_handle_at,
+            nanosleep,
+            nfsservctl,
+            open_tree,
+            openat2,
+            perf_event_open,
+            personality,
+            pidfd_getfd,
+            pidfd_open,
+            pidfd_send_signal,
+            pipe2,
+            pivot_root,
+            pkey_alloc,
+            pkey_free,
+            pkey_mprotect,
+            prctl,
+            prlimit64,
+            process_madvise,
+            process_mrelease,
+            process_vm_readv,
+            process_vm_writev,
+            quotactl_fd,
+            quotactl,
+            read,
+            readlinkat,
+            readv,
+            reboot,
+            remap_file_pages,
+            removexattr,
+            renameat2,
+            request_key,
+            restart_syscall,
+            rseq,
+            sched_get_priority_max,
+            sched_get_priority_min,
+            sched_getattr,
+            sched_getparam,
+            sched_getscheduler,
+            sched_rr_get_interval,
+            sched_setattr,
+            sched_setparam,
+            sched_setscheduler,
+            sched_yield,
+            seccomp,
+            semget,
+            semop,
+            semtimedop,
+            sendto,
+            set_mempolicy_home_node,
+            set_mempolicy,
+            set_tid_address,
+            setdomainname,
+            setfsgid,
+            setfsuid,
+            setgid,
+            setgroups,
+            sethostname,
+            setns,
+            setpgid,
+            setpriority,
+            setregid,
+            setresgid,
+            setresuid,
+            setreuid,
+            setsid,
+            setsockopt,
+            setuid,
+            setxattr,
+            shmdt,
+            shmget,
+            shutdown,
+            socket,
+            socketpair,
+            splice,
+            statx,
+            swapoff,
+            swapon,
+            symlinkat,
+            sync,
+            syncfs,
+            syslog,
+            tee,
+            tgkill,
+            timer_delete,
+            timer_getoverrun,
+            timer_gettime,
+            timer_settime,
+            timerfd_create,
+            timerfd_gettime,
+            timerfd_settime,
+            tkill,
+            umask,
+            umount2,
+            uname,
+            unlinkat,
+            unshare,
+            userfaultfd,
+            utimensat,
+            vhangup,
+            vmsplice,
+            write,
+            writev,
+        }
+    }
+}
+
 impl std::fmt::Debug for SyscallDecl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}", self.name, self.number)
@@ -478,11 +846,37 @@ macro_rules! syscall_number_to_name_literal_callback {
     }
 }
 
+// As above, but for the arch32 namespace.
+//)
+#[cfg(feature = "arch32")]
+#[macro_export]
+macro_rules! syscall_arch32_number_to_name_literal_callback {
+    {$number:ident; $($name:ident,)*} => {
+        $crate::__paste::paste! {
+            match $number as u32 {
+                $(starnix_uapi::arch32::[<__NR_ $name>] => stringify!($name),)*
+                _ => "<unknown syscall>",
+            }
+        }
+    }
+}
+
 impl SyscallDecl {
     /// The SyscallDecl for the given syscall number.
     ///
     /// Returns &DECL_UNKNOWN if the given syscall number is not known.
-    pub fn from_number(number: u64) -> SyscallDecl {
+    pub fn from_number(
+        number: u64,
+        #[allow(unused_variables)] arch_width: ArchWidth,
+    ) -> SyscallDecl {
+        #[cfg(feature = "arch32")]
+        if arch_width.is_arch32() {
+            // We are looking up the SyscallDecl from the number but we use the
+            // arch32 module for the list.
+            let name =
+                for_each_arch32_syscall! { syscall_arch32_number_to_name_literal_callback, number };
+            return Self { number, name };
+        }
         let name = for_each_syscall! { syscall_number_to_name_literal_callback, number };
         Self { number, name }
     }

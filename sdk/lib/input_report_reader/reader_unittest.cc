@@ -6,10 +6,9 @@
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/input_report_reader/reader.h>
+#include <zircon/time.h>
 
 #include <zxtest/zxtest.h>
-
-#include "zircon/system/public/zircon/time.h"
 
 struct MouseReport {
   int64_t movement_x;

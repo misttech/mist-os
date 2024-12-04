@@ -126,6 +126,22 @@ impl Vdso {
         let (vvar_writeable, vvar_readonly) = create_vvar_and_handles();
         Self { memory, sigreturn_offset, vvar_writeable, vvar_readonly }
     }
+
+    pub fn new_arch32() -> Option<Self> {
+        let maybe_memory = load_vdso_arch32_from_file();
+        if maybe_memory.is_err() {
+            return None;
+        }
+        let memory = maybe_memory.unwrap();
+        let sigreturn_offset = match VDSO_SIGRETURN_NAME {
+            Some(name) => get_sigreturn32_offset(&memory, name)
+                .expect("Couldn't find sigreturn trampoline code in arch32 vDSO"),
+            None => 0,
+        };
+
+        let (vvar_writeable, vvar_readonly) = create_vvar_and_handles();
+        Some(Self { memory, sigreturn_offset, vvar_writeable, vvar_readonly })
+    }
 }
 
 fn create_vvar_and_handles() -> (Arc<MemoryMappedVvar>, Arc<MemoryObject>) {
@@ -165,6 +181,23 @@ fn sync_open_in_namespace(
 /// Reads the vDSO file and returns the backing VMO.
 fn load_vdso_from_file() -> Result<Arc<MemoryObject>, Errno> {
     const VDSO_FILENAME: &str = "libvdso.so";
+    const VDSO_LOCATION: &str = "/pkg/data";
+
+    let dir_proxy = sync_open_in_namespace(VDSO_LOCATION, fio::PERM_READABLE)?;
+    let vdso_vmo = syncio::directory_open_vmo(
+        &dir_proxy,
+        VDSO_FILENAME,
+        fio::VmoFlags::READ,
+        zx::MonotonicInstant::INFINITE,
+    )
+    .map_err(|status| from_status_like_fdio!(status))?;
+
+    Ok(Arc::new(MemoryObject::from(vdso_vmo)))
+}
+
+/// Reads the vDSO file and returns the backing VMO.
+fn load_vdso_arch32_from_file() -> Result<Arc<MemoryObject>, Errno> {
+    const VDSO_FILENAME: &str = "libvdso-arch32.so";
     const VDSO_LOCATION: &str = "/pkg/data";
 
     let dir_proxy = sync_open_in_namespace(VDSO_LOCATION, fio::PERM_READABLE)?;
@@ -244,6 +277,44 @@ fn get_sigreturn_offset(vdso_memory: &MemoryObject, sigreturn_name: &str) -> Res
             .map_err(|status| from_status_like_fdio!(status))?;
         if sym_entry.st_name as usize == strtab_idx {
             return Ok(sym_entry.st_value);
+        }
+        symtab_offset += SYM_ENTRY_SIZE as u64;
+    }
+}
+
+fn get_sigreturn32_offset(vdso_memory: &MemoryObject, sigreturn_name: &str) -> Result<u64, Errno> {
+    let vdso_vmo = vdso_memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;
+    let dyn_section =
+        elf_parse::Elf64DynSection::from_vmo_with_arch32(vdso_vmo).map_err(|_| errno!(EINVAL))?;
+    let symtab = dyn_section
+        .dynamic_entry_with_tag(elf_parse::Elf64DynTag::Symtab)
+        .ok_or_else(|| errno!(EINVAL))?;
+    let strtab = dyn_section
+        .dynamic_entry_with_tag(elf_parse::Elf64DynTag::Strtab)
+        .ok_or_else(|| errno!(EINVAL))?;
+    let strsz = dyn_section
+        .dynamic_entry_with_tag(elf_parse::Elf64DynTag::Strsz)
+        .ok_or_else(|| errno!(EINVAL))?;
+
+    // Find the name of the signal trampoline in the string table and store the index.
+    let strtab_bytes = vdso_vmo
+        .read_to_vec(strtab.value, strsz.value)
+        .map_err(|status| from_status_like_fdio!(status))?;
+    let mut strtab_items = strtab_bytes.split(|c: &u8| *c == 0u8);
+    let strtab_idx = strtab_items
+        .position(|entry: &[u8]| std::str::from_utf8(entry) == Ok(sigreturn_name))
+        .ok_or_else(|| errno!(ENOENT))?;
+
+    const SYM_ENTRY_SIZE: usize = std::mem::size_of::<elf_parse::Elf32Sym>();
+
+    // In the symbolic table, find a symbol with a name index pointing to the name we're looking for.
+    let mut symtab_offset = symtab.value;
+    loop {
+        let sym_entry = vdso_vmo
+            .read_to_object::<elf_parse::Elf32Sym>(symtab_offset)
+            .map_err(|status| from_status_like_fdio!(status))?;
+        if sym_entry.st_name as usize == strtab_idx {
+            return Ok(sym_entry.st_value as u64);
         }
         symtab_offset += SYM_ENTRY_SIZE as u64;
     }
