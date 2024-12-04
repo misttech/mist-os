@@ -22,13 +22,13 @@ using OutputProducerConfig = AudioPerformance::OutputProducerConfig;
 
 namespace {
 
-enum class Benchmark { Create, Mix, Output };
+enum class Benchmark : uint8_t { Create, Mix, Output };
 
 constexpr char kBenchmarkDurationSwitch[] = "bench-time";
 
 constexpr char kBenchmarkRunsSwitch[] = "bench-runs";
 
-constexpr char kProfileMixerCreationSwitch[] = "enable-create";
+constexpr char kProfileCreationSwitch[] = "enable-create";
 constexpr char kProfileMixingSwitch[] = "enable-mix";
 constexpr char kProfileOutputSwitch[] = "enable-output";
 
@@ -111,7 +111,7 @@ struct Options {
   std::optional<std::string> perftest_json;
 
   // Provide matching source and dest rates if available; else return a default.
-  const std::pair<int32_t, int32_t> matching_rates() const {
+  std::pair<int32_t, int32_t> matching_rates() const {
     for (auto [src, dest] : source_dest_rates) {
       if (src == dest) {
         return {src, dest};
@@ -122,14 +122,15 @@ struct Options {
 };
 
 std::vector<MixerConfig> ConfigsForMixerCreation(const Options& opt) {
-  if (opt.enabled.count(Benchmark::Create) == 0) {
+  if (!opt.enabled.contains(Benchmark::Create)) {
     return {};
   }
-  if (opt.samplers.count(Resampler::WindowedSinc) == 0) {
+  if (!opt.samplers.contains(Resampler::WindowedSinc)) {
     return {};
   }
 
   std::vector<MixerConfig> out;
+  out.reserve(opt.source_dest_rates.size());
   for (auto [source_rate, dest_rate] : opt.source_dest_rates) {
     out.push_back({
         .sampler_type = Resampler::WindowedSinc,
@@ -145,8 +146,8 @@ std::vector<MixerConfig> ConfigsForMixerCreation(const Options& opt) {
 }
 
 // Create mixer configs that cover every combination of provided Options.
-std::vector<MixerConfig> ConfigsForMixer(const Options& opt) {
-  if (opt.enabled.count(Benchmark::Mix) == 0) {
+std::vector<MixerConfig> ConfigsForMixing(const Options& opt) {
+  if (!opt.enabled.contains(Benchmark::Mix)) {
     return {};
   }
 
@@ -182,8 +183,8 @@ std::vector<MixerConfig> ConfigsForMixer(const Options& opt) {
 }
 
 // Create mixer configs such that one of each provided Option is included in a config.
-std::vector<MixerConfig> ConfigsForMixerReduced(const Options& opt) {
-  if (opt.enabled.count(Benchmark::Mix) == 0) {
+std::vector<MixerConfig> ConfigsForMixingReduced(const Options& opt) {
+  if (!opt.enabled.contains(Benchmark::Mix)) {
     return {};
   }
 
@@ -303,7 +304,7 @@ std::vector<MixerConfig> ConfigsForMixerReduced(const Options& opt) {
 }
 
 std::vector<OutputProducerConfig> ConfigsForOutputProducer(const Options& opt) {
-  if (opt.enabled.count(Benchmark::Output) == 0) {
+  if (!opt.enabled.contains(Benchmark::Output)) {
     return {};
   }
 
@@ -326,7 +327,7 @@ std::vector<OutputProducerConfig> ConfigsForOutputProducer(const Options& opt) {
 
 // Create output producer configs such that one of each provided Option is included in a config.
 std::vector<OutputProducerConfig> ConfigsForOutputProducerReduced(const Options& opt) {
-  if (opt.enabled.count(Benchmark::Output) == 0) {
+  if (!opt.enabled.contains(Benchmark::Output)) {
     return {};
   }
 
@@ -452,7 +453,7 @@ void Usage(const char* prog_name) {
   printf("    Run each benchmark for this many iterations at most (default: %zu, minimum: %zu).\n",
          kBenchmarkRunsDefault, kBenchmarkMinRuns);
   printf("\n");
-  printf("  --%s=<bool>\n", kProfileMixerCreationSwitch);
+  printf("  --%s=<bool>\n", kProfileCreationSwitch);
   printf("    Run Mixer creation benchmarks (default: true).\n");
   printf("  --%s=<bool>\n", kProfileMixingSwitch);
   printf("    Run Mixer::Mix() benchmarks (default: true).\n");
@@ -511,11 +512,7 @@ Options ParseCommandLine(int argc, char** argv) {
     }
     std::string str;
     command_line.GetOptionValue(flag_name, &str);
-    if (str == "" || str == "true") {
-      out = true;
-    } else {
-      out = false;
-    }
+    out = (str == "" || str == "true");
   };
 
   auto duration_seconds_flag = [&command_line](const std::string& flag_name, zx::duration& out) {
@@ -535,7 +532,8 @@ Options ParseCommandLine(int argc, char** argv) {
     out.clear();
     std::string str;
     command_line.GetOptionValue(flag_name, &str);
-    for (auto s : fxl::SplitStringCopy(str, ",", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty)) {
+    for (const auto& s :
+         fxl::SplitStringCopy(str, ",", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty)) {
       if (value_mapping.count(s) > 0) {
         out.insert(value_mapping[s]);
       }
@@ -550,7 +548,8 @@ Options ParseCommandLine(int argc, char** argv) {
     out.clear();
     std::string str;
     command_line.GetOptionValue(flag_name, &str);
-    for (auto s : fxl::SplitStringCopy(str, ",", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty)) {
+    for (const auto& s :
+         fxl::SplitStringCopy(str, ",", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty)) {
       auto pair = fxl::SplitStringCopy(s, ":", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
       if (pair.size() == 2) {
         out.insert({std::stoi(pair[0]), std::stoi(pair[1])});
@@ -580,7 +579,7 @@ Options ParseCommandLine(int argc, char** argv) {
   bool profile_creation = true;
   bool profile_mixing = true;
   bool profile_output_producer = true;
-  bool_flag(kProfileMixerCreationSwitch, profile_creation);
+  bool_flag(kProfileCreationSwitch, profile_creation);
   bool_flag(kProfileMixingSwitch, profile_mixing);
   bool_flag(kProfileOutputSwitch, profile_output_producer);
 
@@ -655,17 +654,17 @@ int main(int argc, char** argv) {
     results.reset(new perftest::ResultsSet());
   }
 
-  if (opt.enabled.count(Benchmark::Create) > 0) {
+  if (opt.enabled.contains(Benchmark::Create)) {
     AudioPerformance::ProfileMixerCreation(ConfigsForMixerCreation(opt), opt.limits, results.get());
   }
 
-  if (opt.enabled.count(Benchmark::Mix) > 0) {
-    AudioPerformance::ProfileMixer(results ? ConfigsForMixerReduced(opt) : ConfigsForMixer(opt),
-                                   opt.limits, results.get());
+  if (opt.enabled.contains(Benchmark::Mix)) {
+    AudioPerformance::ProfileMixing(results ? ConfigsForMixingReduced(opt) : ConfigsForMixing(opt),
+                                    opt.limits, results.get());
   }
 
-  if (opt.enabled.count(Benchmark::Output) > 0) {
-    AudioPerformance::ProfileOutputProducer(
+  if (opt.enabled.contains(Benchmark::Output)) {
+    AudioPerformance::ProfileMixOutput(
         results ? ConfigsForOutputProducerReduced(opt) : ConfigsForOutputProducer(opt), opt.limits,
         results.get());
   }
