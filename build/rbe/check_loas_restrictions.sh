@@ -61,8 +61,10 @@ test -x "$cred_printer" || {
 }
 
 "$cred_printer" > /dev/null 2>&1 || {
-  # For gLinux laptops, this may be blocked on b/380510724.
-  error "Unable to execute $cred_printer.  See b/380510724, b/380507052."
+  # For gLinux laptops, this may be blocked on b/380510724, b/380507052.
+  # Conservatively, treat credentials as restricted.
+  echo "restricted"
+  exit 0
 }
 
 # Locate LOAS credentials file.
