@@ -172,6 +172,7 @@ pub fn encode_to_string_v1<'a>(
         .into_iter()
         .map(|inst| encode_instruction(inst.to_instruction()))
         .collect::<Result<Vec<_>, BindRulesEncodeError>>()?;
+    #[allow(clippy::format_collect, reason = "mass allow for https://fxbug.dev/381896734")]
     Ok(result
         .into_iter()
         .map(|RawInstruction([word0, word1, word2])| {

@@ -21,7 +21,7 @@ pub fn format_bytes(size: u64) -> String {
 
     format!(
         "{}{}",
-        s.to_string(),
+        s,
         match divs {
             0 => "B",
             1 => "K",

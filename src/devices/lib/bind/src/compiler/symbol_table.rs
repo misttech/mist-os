@@ -287,6 +287,7 @@ pub fn construct_symbol_table(
     Ok(symbol_table)
 }
 
+#[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
 /// Hard code these symbols during the migration from macros to bind rules. Eventually these
 /// will be defined in libraries and the compiler will emit strings for them in the bytecode.
 fn deprecated_keys() -> Vec<(String, u32)> {
