@@ -2111,7 +2111,7 @@ impl<'a> HdlRef<'a> {
 
 #[cfg(debug_assertions)]
 std::thread_local! {
-    static IN_WITH_HANDLE: Cell<bool> = Cell::new(false);
+    static IN_WITH_HANDLE: Cell<bool> = const { Cell::new(false) };
 }
 
 fn with_handle<R>(handle: u32, f: impl FnOnce(HdlRef<'_>, Side) -> R) -> R {

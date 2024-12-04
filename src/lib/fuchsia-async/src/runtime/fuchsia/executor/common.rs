@@ -28,7 +28,7 @@ pub(crate) const TASK_READY_WAKEUP_ID: u64 = u64::MAX - 1;
 pub(crate) const MAIN_TASK_ID: usize = 0;
 
 thread_local!(
-    static EXECUTOR: RefCell<Option<ScopeHandle>> = RefCell::new(None)
+    static EXECUTOR: RefCell<Option<ScopeHandle>> = const { RefCell::new(None) }
 );
 
 pub enum ExecutorTime {
@@ -845,7 +845,7 @@ impl Drop for Task {
 }
 
 thread_local! {
-    static CURRENT_TASK: Cell<*const Task> = Cell::new(std::ptr::null());
+    static CURRENT_TASK: Cell<*const Task> = const { Cell::new(std::ptr::null()) };
 }
 
 impl Task {

@@ -7,7 +7,7 @@ use std::rc::Rc;
 use tokio::task::LocalSet;
 
 thread_local!(
-    static LOCAL_EXECUTOR: RefCell<Option<Rc<LocalSet>>> = RefCell::new(None)
+    static LOCAL_EXECUTOR: RefCell<Option<Rc<LocalSet>>> = const { RefCell::new(None) }
 );
 
 pub mod scope;

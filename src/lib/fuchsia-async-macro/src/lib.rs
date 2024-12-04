@@ -112,10 +112,7 @@ fn common(item: TokenStream, run_executor: TokenStream, test: bool) -> TokenStre
         }
 
         // Only allow on 'main' or 'test' functions
-        if sig.ident.to_string() != "main"
-            && !test
-            && !attrs.iter().any(|a| a.path().is_ident("test"))
-        {
+        if sig.ident != "main" && !test && !attrs.iter().any(|a| a.path().is_ident("test")) {
             return Err(Error::new(
                 sig.ident.span(),
                 "async entry must be named 'main' or be a '#[test]'.",
