@@ -114,7 +114,7 @@ impl Controller {
             PeerControllerRequest::ReconfigureStream { responder } => {
                 // Only one frequency, channel mode, block length, subband,
                 // and allocation for reconfigure (A2DP 4.3.2)
-                let generic_capabilities = vec![ServiceCapability::MediaCodec {
+                let generic_capabilities = [ServiceCapability::MediaCodec {
                     media_type: MediaType::Audio,
                     codec_type: MediaCodecType::AUDIO_SBC,
                     codec_extra: vec![0x11, 0x15, 2, 250],
@@ -188,7 +188,7 @@ impl Controller {
                         info!("SuspendStream was successful");
                         // Only one frequency, channel mode, block length, subband,
                         // and allocation for reconfigure (A2DP 4.3.2)
-                        let generic_capabilities = vec![ServiceCapability::MediaCodec {
+                        let generic_capabilities = [ServiceCapability::MediaCodec {
                             media_type: MediaType::Audio,
                             codec_type: MediaCodecType::AUDIO_SBC,
                             codec_extra: vec![0x11, 0x15, 2, 250],

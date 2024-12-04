@@ -603,6 +603,7 @@ impl ServiceLevelConnection {
         request
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Matches the incoming message to a procedure. Returns the procedure identifier
     /// for the given `command` or Error if the command couldn't be matched.
     fn match_command_to_procedure(

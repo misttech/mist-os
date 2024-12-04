@@ -134,8 +134,7 @@ impl Peer {
         capabilities: &[ServiceCapability],
     ) -> impl Future<Output = Result<()>> {
         assert!(!capabilities.is_empty(), "must set at least one capability");
-        let mut params: Vec<u8> = Vec::new();
-        params.resize(capabilities.iter().fold(2, |a, x| a + x.encoded_len()), 0);
+        let mut params: Vec<u8> = vec![0; capabilities.iter().fold(2, |a, x| a + x.encoded_len())];
         params[0] = stream_id.to_msg();
         params[1] = local_stream_id.to_msg();
         let mut idx = 2;
@@ -181,8 +180,7 @@ impl Peer {
         capabilities: &[ServiceCapability],
     ) -> impl Future<Output = Result<()>> {
         assert!(!capabilities.is_empty(), "must set at least one capability");
-        let mut params: Vec<u8> = Vec::new();
-        params.resize(capabilities.iter().fold(1, |a, x| a + x.encoded_len()), 0);
+        let mut params: Vec<u8> = vec![0; capabilities.iter().fold(1, |a, x| a + x.encoded_len())];
         params[0] = stream_id.to_msg();
         let mut idx = 1;
         for capability in capabilities {

@@ -77,8 +77,7 @@ impl AudioSession {
         codec: CodecId,
     ) -> AudioError {
         // Pre-allocate the packet vector and reuse to avoid allocating for every packet.
-        let mut packet: Vec<u8> = Vec::with_capacity(60); // SCO has 60 byte packets
-        packet.resize(60, 0);
+        let packet: Vec<u8> = vec![0; 60]; // SCO has 60 byte packets
         let mut request =
             bredr::ScoConnectionWriteRequest { data: Some(packet), ..Default::default() };
 

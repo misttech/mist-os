@@ -41,14 +41,11 @@ async fn peer_manager_listener(
                 match peer_map.write().entry(peer_id.value.to_string()) {
                     Entry::Occupied(mut entry) => {
                         let _ = entry.insert(peer);
-                        println!("Known peer connected with id: {}", peer_id.value.to_string())
+                        println!("Known peer connected with id: {}", peer_id.value)
                     }
                     Entry::Vacant(entry) => {
                         let _ = entry.insert(peer);
-                        println!(
-                            "Inserted device into PeerFactoryMap with id: {}",
-                            peer_id.value.to_string()
-                        );
+                        println!("Inserted device into PeerFactoryMap with id: {}", peer_id.value);
                     }
                 };
                 // Establish channel with the given peer_id and server endpoint.

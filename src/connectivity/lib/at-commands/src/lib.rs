@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
+
 /// Export all the lowlevel types in one module to simplify generated code.
 mod lowlevel {
     mod arguments;

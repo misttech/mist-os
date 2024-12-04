@@ -156,6 +156,7 @@ impl TryFrom<&di::DeviceIdentificationRecord> for DIRecord {
 }
 
 impl From<&DIRecord> for bredr::ServiceDefinition {
+    #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
     fn from(src: &DIRecord) -> bredr::ServiceDefinition {
         let mut attributes = Vec::new();
 
