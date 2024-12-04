@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::component_model::{BuildAnalyzerModelError, Child};
+use crate::component_model::{BuildAnalyzerModelError, Child, DynamicDictionaryConfig};
 use crate::component_sandbox::{
     build_capability_sourced_capabilities_dictionary, build_framework_dictionary,
     build_root_component_input, static_children_component_output_dictionary_routers,
@@ -62,6 +62,7 @@ impl ComponentInstanceForAnalyzer {
         policy: GlobalPolicyChecker,
         id_index: Arc<component_id_index::Index>,
         runner_registry: RunnerRegistry,
+        dynamic_dictionaries: Arc<DynamicDictionaryConfig>,
     ) -> Arc<Self> {
         let environment = EnvironmentForAnalyzer::new_root(
             runner_registry.clone(),
@@ -84,6 +85,7 @@ impl ComponentInstanceForAnalyzer {
             id_index,
             environment,
             root_component_input,
+            dynamic_dictionaries,
         )
     }
 
@@ -95,6 +97,7 @@ impl ComponentInstanceForAnalyzer {
         parent: Arc<Self>,
         policy: GlobalPolicyChecker,
         id_index: Arc<component_id_index::Index>,
+        dynamic_dictionaries: Arc<DynamicDictionaryConfig>,
     ) -> Result<Arc<Self>, BuildAnalyzerModelError> {
         let environment = EnvironmentForAnalyzer::new_for_child(&parent, child)?;
         let child_name = ChildName::try_new(
@@ -133,6 +136,7 @@ impl ComponentInstanceForAnalyzer {
             id_index,
             environment,
             input,
+            dynamic_dictionaries,
         ))
     }
 
@@ -146,6 +150,7 @@ impl ComponentInstanceForAnalyzer {
         component_id_index: Arc<component_id_index::Index>,
         environment: Arc<EnvironmentForAnalyzer>,
         input: ComponentInput,
+        dynamic_dictionaries: Arc<DynamicDictionaryConfig>,
     ) -> Arc<Self> {
         let self_ = Arc::new(Self {
             moniker: moniker,
@@ -161,8 +166,11 @@ impl ComponentInstanceForAnalyzer {
         });
         let children_component_output_dictionary_routers =
             static_children_component_output_dictionary_routers(&self_, &decl);
-        let (program_output_dict, declared_dictionaries) =
-            build_program_output_dictionary(&self_, &decl, &ProgramOutputGenerator {});
+        let (program_output_dict, declared_dictionaries) = build_program_output_dictionary(
+            &self_,
+            &decl,
+            &ProgramOutputGenerator { dynamic_dictionaries },
+        );
         #[derive(Clone)]
         struct NullErrorReporter {}
         #[async_trait]
@@ -379,6 +387,7 @@ mod tests {
             GlobalPolicyChecker::default(),
             Arc::new(component_id_index::Index::default()),
             RunnerRegistry::default(),
+            Arc::new(DynamicDictionaryConfig::default()),
         );
 
         assert!(instance.lock_resolved_state().now_or_never().is_some())

@@ -7,8 +7,10 @@ use anyhow::{anyhow, Context, Result};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::engine::Engine as _;
 use cm_config::RuntimeConfig;
-use cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer;
-use cm_rust::{ComponentDecl, FidlIntoNative, RegistrationSource, RunnerRegistration};
+use cm_fidl_analyzer::component_model::{DynamicConfig, ModelBuilderForAnalyzer};
+use cm_rust::{
+    CapabilityTypeName, ComponentDecl, FidlIntoNative, RegistrationSource, RunnerRegistration,
+};
 use cm_types::{Name, Url};
 use config_encoder::ConfigFields;
 use fidl::unpersist;
@@ -56,6 +58,17 @@ pub struct DynamicComponent {
 #[derive(Deserialize, Serialize)]
 pub struct ComponentTreeConfig {
     pub dynamic_components: HashMap<Moniker, DynamicComponent>,
+    #[serde(default)]
+    /// Defines the capabilities that are OK to be present in dynamic dictionaries exposed by
+    /// components. Maps from moniker to a map from dictionary name to capabilities that may be
+    /// routed from that dynamic dictionary.
+    pub dynamic_dictionaries: HashMap<Moniker, HashMap<Name, DictionaryCapabilities>>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub enum DictionaryCapabilities {
+    #[serde(rename = "protocols")]
+    Protocols(Vec<Name>),
 }
 
 #[derive(Default)]
@@ -200,13 +213,10 @@ impl V2ComponentModelDataCollector {
         RunnerRegistry::from_decl(&runners)
     }
 
-    fn load_dynamic_components(
-        component_tree_config_path: &Option<PathBuf>,
-    ) -> Result<HashMap<Moniker, (AbsoluteComponentUrl, Option<Name>)>> {
-        if component_tree_config_path.is_none() {
-            return Ok(HashMap::new());
-        }
-        let component_tree_config_path = component_tree_config_path.as_ref().unwrap();
+    fn load_dynamic_config(component_tree_config_path: &Option<PathBuf>) -> Result<DynamicConfig> {
+        let Some(component_tree_config_path) = component_tree_config_path else {
+            return Ok(DynamicConfig::default());
+        };
 
         let mut component_tree_config_file = File::open(component_tree_config_path)
             .context("Failed to open component tree configuration file")?;
@@ -215,11 +225,24 @@ impl V2ComponentModelDataCollector {
                 .context("Failed to parse component tree configuration file")?;
 
         let mut dynamic_components = HashMap::new();
-        for (moniker, dynamic_component) in component_tree_config.dynamic_components.into_iter() {
+        for (moniker, dynamic_component) in component_tree_config.dynamic_components {
             dynamic_components
                 .insert(moniker, (dynamic_component.url, dynamic_component.environment));
         }
-        Ok(dynamic_components)
+
+        let mut dynamic_dictionaries = HashMap::new();
+        for (moniker, dynamic_dictionary) in component_tree_config.dynamic_dictionaries {
+            let map: &mut HashMap<Name, Vec<(CapabilityTypeName, Name)>> =
+                dynamic_dictionaries.entry(moniker).or_default();
+            for (dictionary_name, capabilities) in dynamic_dictionary {
+                map.entry(dictionary_name).or_default().extend(match capabilities {
+                    DictionaryCapabilities::Protocols(protocols) => protocols
+                        .into_iter()
+                        .map(|protocol_name| (CapabilityTypeName::Protocol, protocol_name)),
+                });
+            }
+        }
+        Ok(DynamicConfig { components: dynamic_components, dictionaries: dynamic_dictionaries })
     }
 
     pub fn collect(&self, model: Arc<DataModel>) -> Result<()> {
@@ -241,11 +264,10 @@ impl V2ComponentModelDataCollector {
             "V2ComponentModelDataCollector: Found v2 component declarations",
         );
 
-        let dynamic_components =
-            Self::load_dynamic_components(&model.config().component_tree_config_path)?;
+        let dynamic_config = Self::load_dynamic_config(&model.config().component_tree_config_path)?;
         let runner_registry = self.make_builtin_runner_registry(&runtime_config);
-        let build_result = builder.build_with_dynamic_components(
-            dynamic_components,
+        let build_result = builder.build_with_dynamic_config(
+            dynamic_config,
             decls_by_url,
             Arc::new(runtime_config),
             Arc::new(component_id_index),

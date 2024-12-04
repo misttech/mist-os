@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::component_instance::ComponentInstanceForAnalyzer;
+use crate::component_model::DynamicDictionaryConfig;
 use ::routing::bedrock::program_output_dict;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::bedrock::with_policy_check::WithPolicyCheck;
@@ -18,7 +19,7 @@ use ::routing::policy::GlobalPolicyChecker;
 use ::routing::DictExt;
 use async_trait::async_trait;
 use cm_config::RuntimeConfig;
-use cm_rust::{CapabilityTypeName, ComponentDecl};
+use cm_rust::{CapabilityTypeName, ComponentDecl, DeliveryType, DictionaryDecl, ProtocolDecl};
 use cm_types::Path;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use futures::{future, FutureExt};
@@ -172,7 +173,64 @@ pub fn build_capability_sourced_capabilities_dictionary(
     output
 }
 
-pub struct ProgramOutputGenerator {}
+pub struct ProgramOutputGenerator {
+    pub dynamic_dictionaries: Arc<DynamicDictionaryConfig>,
+}
+
+impl ProgramOutputGenerator {
+    fn maybe_route_dynamic_dict(
+        dynamic_dictionaries: &Arc<DynamicDictionaryConfig>,
+        component: &WeakComponentInstanceInterface<ComponentInstanceForAnalyzer>,
+        capability: &ComponentCapability,
+    ) -> Result<RouterResponse<Dict>, RouterError> {
+        let ComponentCapability::Dictionary(DictionaryDecl { name: requested_name, .. }) =
+            capability
+        else {
+            return Err(RouterError::NotFound(Arc::new(
+                RoutingError::BedrockWrongCapabilityType {
+                    actual: capability.type_name().to_string(),
+                    expected: CapabilityTypeName::Dictionary.to_string(),
+                    moniker: component.moniker.clone().into(),
+                },
+            )));
+        };
+        let Some(configs) = dynamic_dictionaries.get(&component.moniker) else {
+            return Err(RouterError::NotFound(Arc::new(
+                RoutingError::DynamicDictionariesNotAllowed {
+                    moniker: component.moniker.clone().into(),
+                },
+            )));
+        };
+        let Some((_, capabilities)) = configs.into_iter().find(|(name, _)| *name == requested_name)
+        else {
+            return Err(RouterError::NotFound(Arc::new(
+                RoutingError::DynamicDictionariesNotAllowed {
+                    moniker: component.moniker.clone().into(),
+                },
+            )));
+        };
+        let dict = Dict::new();
+        for (capability_type, capability_name) in capabilities {
+            match capability_type {
+                    CapabilityTypeName::Protocol => {
+                        let router = new_debug_only_specific_router::<Connector>(
+                            CapabilitySource::Component(ComponentSource {
+                                capability: ComponentCapability::from(ProtocolDecl {
+                                    name: capability_name.clone(),
+                                    source_path: None,
+                                    delivery: DeliveryType::Immediate,
+                                }),
+                                moniker: component.moniker.clone(),
+                            }),
+                        );
+                        dict.insert_capability(&capability_name, router.into()).expect("can insert to dict");
+                    }
+                    _ => unreachable!("Only protocol capabilities are supported through scrutinity in dynamic dicts at the moment"),
+                }
+        }
+        Ok(RouterResponse::<Dict>::Capability(dict))
+    }
+}
 
 impl program_output_dict::ProgramOutputGenerator<ComponentInstanceForAnalyzer>
     for ProgramOutputGenerator
@@ -183,10 +241,15 @@ impl program_output_dict::ProgramOutputGenerator<ComponentInstanceForAnalyzer>
         _relative_path: Path,
         capability: ComponentCapability,
     ) -> Router<Dict> {
-        new_debug_only_specific_router::<Dict>(CapabilitySource::Component(ComponentSource {
-            capability,
-            moniker: component.moniker,
-        }))
+        let dynamic_dictionaries = self.dynamic_dictionaries.clone();
+        Router::<Dict>::new(move |_request: Option<Request>, _debug: bool| {
+            future::ready(Self::maybe_route_dynamic_dict(
+                &dynamic_dictionaries,
+                &component,
+                &capability,
+            ))
+            .boxed()
+        })
     }
 
     fn new_outgoing_dir_connector_router(

@@ -12,7 +12,7 @@ use cm_config::{
 };
 use cm_fidl_analyzer::component_instance::ComponentInstanceForAnalyzer;
 use cm_fidl_analyzer::component_model::{
-    AnalyzerModelError, ComponentModelForAnalyzer, ModelBuilderForAnalyzer,
+    AnalyzerModelError, ComponentModelForAnalyzer, DynamicConfig, ModelBuilderForAnalyzer,
 };
 use cm_fidl_analyzer::environment::{BOOT_RESOLVER_NAME, BOOT_SCHEME};
 use cm_fidl_analyzer::route::{TargetDecl, VerifyRouteResult};
@@ -65,6 +65,7 @@ pub struct RoutingTestBuilderForAnalyzer {
     debug_capability_policy: HashMap<DebugCapabilityKey, HashSet<DebugCapabilityAllowlistEntry>>,
     component_id_index_path: Option<Utf8PathBuf>,
     builtin_boot_resolver: component_internal::BuiltinBootResolver,
+    dynamic_config: DynamicConfig,
 }
 
 impl RoutingTestBuilderForAnalyzer {
@@ -90,7 +91,12 @@ impl RoutingTestBuilderForAnalyzer {
             debug_capability_policy: HashMap::new(),
             component_id_index_path: None,
             builtin_boot_resolver: component_internal::BuiltinBootResolver::None,
+            dynamic_config: DynamicConfig::default(),
         }
+    }
+
+    fn set_dynamic_config(&mut self, config: DynamicConfig) {
+        self.dynamic_config = config;
     }
 }
 
@@ -116,6 +122,7 @@ impl RoutingTestModelBuilder for RoutingTestBuilderForAnalyzer {
             debug_capability_policy: HashMap::new(),
             component_id_index_path: None,
             builtin_boot_resolver: component_internal::BuiltinBootResolver::None,
+            dynamic_config: DynamicConfig::default(),
         }
     }
 
@@ -180,12 +187,14 @@ impl RoutingTestModelBuilder for RoutingTestBuilderForAnalyzer {
         };
         config.builtin_boot_resolver = self.builtin_boot_resolver;
 
-        let build_model_result = ModelBuilderForAnalyzer::new(self.root_url).build(
-            self.decls_by_url,
-            Arc::new(config),
-            Arc::new(component_id_index),
-            RunnerRegistry::from_decl(&self.builtin_runner_registrations),
-        );
+        let build_model_result = ModelBuilderForAnalyzer::new(self.root_url)
+            .build_with_dynamic_config(
+                self.dynamic_config,
+                self.decls_by_url,
+                Arc::new(config),
+                Arc::new(component_id_index),
+                RunnerRegistry::from_decl(&self.builtin_runner_registrations),
+            );
         let model = build_model_result.model.expect("failed to build ComponentModelForAnalyzer");
         RoutingTestForAnalyzer { model }
     }
@@ -529,6 +538,7 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use maplit::hashmap;
     use routing_test_helpers::instantiate_common_routing_tests;
 
     instantiate_common_routing_tests! { RoutingTestBuilderForAnalyzer }
@@ -2109,5 +2119,99 @@ mod tests {
         let protocols =
             route_maps.get(&CapabilityTypeName::Protocol).expect("expected protocol results");
         assert_eq!(protocols, &vec![]);
+    }
+
+    ///    a
+    ///   /  \
+    ///  b    c
+    ///
+    /// a: Offers dictionary "test-dict" from "b" to "c".
+    /// b: Exposes a dynamically filled dictionary "test-dict"
+    /// c: Uses the dynamically placed protocol "fuchsia.foo.Bar" from the "test-dict"
+    #[fuchsia::test]
+    async fn validate_routes_with_dynamic_dictionaries() {
+        const DICT_NAME: &str = "test-dict";
+        const ROUTER_PATH: &str = "/svc/fuchsia.component.sandbox.DictionaryRouter";
+        const PROTOCOL_NAME: &str = "fuchsia.foo.Bar";
+        const PROTOCOL_NOT_IN_CONFIG: &str = "fuchsia.foo.NotInConfig";
+
+        let components = vec![
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child_default("b")
+                    .child_default("c")
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name(PROTOCOL_NAME)
+                            .from_dictionary(DICT_NAME)
+                            .source_static_child("b")
+                            .target_static_child("c"),
+                    )
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name(PROTOCOL_NOT_IN_CONFIG)
+                            .from_dictionary(DICT_NAME)
+                            .source_static_child("b")
+                            .target_static_child("c"),
+                    )
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .capability(CapabilityBuilder::dictionary().name(DICT_NAME).path(ROUTER_PATH))
+                    .expose(ExposeBuilder::dictionary().name(DICT_NAME).source(ExposeSource::Self_))
+                    .build(),
+            ),
+            (
+                "c",
+                ComponentDeclBuilder::new()
+                    .use_(
+                        UseBuilder::protocol()
+                            .name(PROTOCOL_NAME)
+                            .source(UseSource::Parent)
+                            .build(),
+                    )
+                    .use_(
+                        UseBuilder::protocol()
+                            .name(PROTOCOL_NOT_IN_CONFIG)
+                            .source(UseSource::Parent)
+                            .build(),
+                    )
+                    .build(),
+            ),
+        ];
+        let mut builder = RoutingTestBuilderForAnalyzer::new("a", components.clone());
+        let b_moniker: Moniker = vec!["b"].try_into().unwrap();
+        builder.set_dynamic_config(DynamicConfig {
+            dictionaries: hashmap! {
+                b_moniker => hashmap! {
+                    cm_types::Name::new(DICT_NAME).unwrap() => vec![
+                        (CapabilityTypeName::Protocol, cm_types::Name::new(PROTOCOL_NAME).unwrap()),
+                    ],
+                }
+            },
+            ..DynamicConfig::default()
+        });
+        let model = builder.build().await;
+        model
+            .check_use(
+                vec!["c"].try_into().unwrap(),
+                CheckUse::Protocol {
+                    path: format!("/svc/{PROTOCOL_NAME}").parse().unwrap(),
+                    expected_res: ExpectedResult::Ok,
+                },
+            )
+            .await;
+        model
+            .check_use(
+                vec!["c"].try_into().unwrap(),
+                CheckUse::Protocol {
+                    path: format!("/svc/{PROTOCOL_NOT_IN_CONFIG}").parse().unwrap(),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
+                },
+            )
+            .await;
     }
 }

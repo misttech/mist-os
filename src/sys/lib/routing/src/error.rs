@@ -272,6 +272,9 @@ pub enum RoutingError {
     )]
     DictionariesNotSupported { moniker: Moniker, cap_type: CapabilityTypeName },
 
+    #[error("dynamic dictionaries are not allowed at component `{moniker}`")]
+    DynamicDictionariesNotAllowed { moniker: Moniker },
+
     #[error("the capability does not support member access at `{moniker}`")]
     BedrockMemberAccessUnsupported { moniker: ExtendedMoniker },
 
@@ -343,7 +346,8 @@ impl Explain for RoutingError {
     /// Convert this error into its approximate `zx::Status` equivalent.
     fn as_zx_status(&self) -> zx::Status {
         match self {
-            RoutingError::UseFromRootEnvironmentNotAllowed { .. } => zx::Status::ACCESS_DENIED,
+            RoutingError::UseFromRootEnvironmentNotAllowed { .. }
+            | RoutingError::DynamicDictionariesNotAllowed { .. } => zx::Status::ACCESS_DENIED,
             RoutingError::StorageFromChildExposeNotFound { .. }
             | RoutingError::ComponentNotInIdIndex { .. }
             | RoutingError::UseFromComponentManagerNotFound { .. }
@@ -427,6 +431,7 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::UseFromEnvironmentNotFound { moniker, .. }
             | RoutingError::UseFromParentNotFound { moniker, .. }
             | RoutingError::UseFromRootEnvironmentNotAllowed { moniker, .. }
+            | RoutingError::DynamicDictionariesNotAllowed { moniker, .. }
             | RoutingError::RouteSourceShutdown { moniker }
             | RoutingError::UseFromSelfNotFound { moniker, .. }
             | RoutingError::MissingPorcelainType { moniker, .. } => moniker.into(),
