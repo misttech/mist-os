@@ -66,6 +66,10 @@ def main():
         required=True,
     )
     parser.add_argument(
+        "--fuchsia-source-dir",
+        help="Path to the Fuchsia source directory (autodetected)",
+    )
+    parser.add_argument(
         "--source-dir",
         help="Path to the library's source directory",
         required=True,
@@ -96,11 +100,14 @@ def main():
 
     # Find source_root from library source_dir, i.e. do not assume
     # that the build directory is two levels down the source root
-    source_root = build_dir
-    while not os.path.exists(os.path.join(source_root, ".jiri_manifest")):
-        source_root = os.path.dirname(source_root)
-        if source_root in ("", "/"):
-            parser.error("Cannot find Fuchsia source directory!")
+    if args.fuchsia_source_dir:
+        source_root = args.fuchsia_source_dir
+    else:
+        source_root = build_dir
+        while not os.path.exists(os.path.join(source_root, ".jiri_manifest")):
+            source_root = os.path.dirname(source_root)
+            if source_root in ("", "/"):
+                parser.error("Cannot find Fuchsia source directory!")
 
     third_party_dir = os.path.join(source_root, "third_party")
 
