@@ -26,18 +26,6 @@
         event_code: 26,
     },
     {
-        name: "Camera",
-        process: "camera_device.*\\.cm|driver_host:pdev:05:04:15",
-        vmo: "",
-        event_code: 38,
-    },
-    {
-        name: "Weave",
-        process: "weave.*",
-        vmo: "",
-        event_code: 57,
-    },
-    {
         name: "Storage",
         process: "fshost\\.cm|fxfs-crypt\\.cm|fxfs\\.cm|memfs\\.cm|decompressor-sandbox\\.cm",
         vmo: "",
