@@ -89,7 +89,7 @@ pub async fn get_remote_proxy(
                     ffx::TargetConnectionError::KeyVerificationFailure
                     | ffx::TargetConnectionError::InvalidArgument
                     | ffx::TargetConnectionError::PermissionDenied => {
-                        break (Err(anyhow::Error::new(e)))
+                        break Err(anyhow::Error::new(e))
                     }
                     _ => {
                         let retry_info =
@@ -139,7 +139,7 @@ async fn get_remote_proxy_impl(
                         target_proxy_fut.await?;
                         return Err(e.into());
                     }
-                    Ok(r) => break(r),
+                    Ok(r) => break r,
                 }
             }
             res = target_proxy_fut => res?,
