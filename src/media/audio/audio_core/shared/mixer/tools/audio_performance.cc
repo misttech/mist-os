@@ -201,7 +201,7 @@ std::string AudioPerformance::MixerConfig::ToPerftestFormat() const {
 }
 
 std::string AudioPerformance::MixerConfig::ToPerftestFormatForCreation() const {
-  return fxl::StringPrintf("%s", ToPerftestFormat().c_str());
+  return fxl::StringPrintf("Creation/%s", ToPerftestFormat().c_str());
 }
 
 std::string AudioPerformance::MixerConfig::ToPerftestFormatForMixing() const {
@@ -221,7 +221,7 @@ std::string AudioPerformance::MixerConfig::ToPerftestFormatForMixing() const {
       break;
   }
 
-  return fxl::StringPrintf("%s/%s%c", ToPerftestFormat().c_str(), gain.c_str(),
+  return fxl::StringPrintf("Mixing/%s/%s%c", ToPerftestFormat().c_str(), gain.c_str(),
                            (accumulate ? '+' : '-'));
 }
 
@@ -269,7 +269,7 @@ std::string AudioPerformance::OutputProducerConfig::ToPerftestFormat() const {
       break;
   }
 
-  return fxl::StringPrintf("%s/%s/Channels_%u", format.c_str(), range.c_str(), num_chans);
+  return fxl::StringPrintf("Output/%s/%s/Channels_%u", format.c_str(), range.c_str(), num_chans);
 }
 
 void AudioPerformance::DisplayMixerCreationLegend() {
@@ -309,7 +309,7 @@ void AudioPerformance::ProfileMixerCreation(const std::vector<MixerConfig>& conf
 void AudioPerformance::ProfileMixerCreation(const MixerConfig& cfg, const Limits& limits,
                                             perftest::ResultsSet* results) {
   auto* result =
-      results ? results->AddTestCase("fuchsia.audio.mixer_creation",
+      results ? results->AddTestCase("fuchsia.audio.mixer",
                                      cfg.ToPerftestFormatForCreation().c_str(), "nanoseconds")
               : nullptr;
   Stats cold_cache(result);
@@ -470,7 +470,7 @@ void AudioPerformance::ProfileMixing(const MixerConfig& cfg, const Limits& limit
   mixer->gain.SetDestGain(media_audio::kUnityGainDb);
   auto source_frames_fixed = Fixed(source_frames);
 
-  Stats stats(results ? results->AddTestCase("fuchsia.audio.mixing",
+  Stats stats(results ? results->AddTestCase("fuchsia.audio.mixer",
                                              cfg.ToPerftestFormatForMixing().c_str(), "nanoseconds")
                       : nullptr);
 
@@ -578,8 +578,8 @@ void AudioPerformance::ProfileMixOutput(const OutputProducerConfig& cfg, const L
   int32_t num_samples = frame_count * cfg.num_chans;
   auto dest = std::make_unique<SampleT[]>(num_samples);
 
-  Stats stats(results ? results->AddTestCase("fuchsia.audio.mixer_output",
-                                             cfg.ToPerftestFormat().c_str(), "nanoseconds")
+  Stats stats(results ? results->AddTestCase("fuchsia.audio.mixer", cfg.ToPerftestFormat().c_str(),
+                                             "nanoseconds")
                       : nullptr);
 
   if (cfg.output_range == OutputSourceRange::Silence) {
