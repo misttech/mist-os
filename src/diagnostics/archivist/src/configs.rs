@@ -126,11 +126,6 @@ impl PipelineConfig {
             node.record(errors);
         }
     }
-
-    /// Returns true if this pipeline config had errors.
-    pub fn has_error(&self) -> bool {
-        !self.errors.is_empty()
-    }
 }
 
 /// Validates a static selector against rules that apply specifically to a static selector and
@@ -160,8 +155,6 @@ mod tests {
 
         let config = PipelineConfig::from_directory("config/missing", EmptyBehavior::Disable);
 
-        assert!(config.has_error());
-
         let inspector = inspect::Inspector::default();
         config.record_to_inspect(inspector.root());
         assert_data_tree!(inspector, root: {
@@ -187,8 +180,6 @@ mod tests {
         fs::write(config_path.join("bad.cfg"), "This file fails to parse").unwrap();
 
         let mut config = PipelineConfig::from_directory(&config_path, EmptyBehavior::Disable);
-
-        assert!(config.has_error());
 
         let inspector = inspect::Inspector::default();
         config.record_to_inspect(inspector.root());
@@ -223,8 +214,6 @@ mod tests {
 
         let mut config = PipelineConfig::from_directory(&config_path, EmptyBehavior::Disable);
 
-        assert!(!config.has_error());
-
         let inspector = inspect::Inspector::default();
         config.record_to_inspect(inspector.root());
         assert_data_tree!(inspector, root: {
@@ -253,8 +242,6 @@ mod tests {
 
         let mut config = PipelineConfig::from_directory(&config_path, EmptyBehavior::DoNotFilter);
 
-        assert!(!config.has_error());
-
         let inspector = inspect::Inspector::default();
         config.record_to_inspect(inspector.root());
         assert_data_tree!(inspector, root: {
@@ -281,8 +268,6 @@ mod tests {
             .unwrap();
 
         let mut config = PipelineConfig::from_directory(&config_path, EmptyBehavior::Disable);
-
-        assert!(!config.has_error());
 
         let inspector = inspect::Inspector::default();
         config.record_to_inspect(inspector.root());
@@ -312,8 +297,6 @@ mod tests {
         fs::write(config_path.join("ok.cfg"), "core/b:root:status").unwrap();
 
         let mut config = PipelineConfig::from_directory(&config_path, EmptyBehavior::Disable);
-
-        assert!(config.has_error());
 
         let inspector = inspect::Inspector::default();
         config.record_to_inspect(inspector.root());

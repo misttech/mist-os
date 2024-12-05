@@ -54,7 +54,9 @@ impl ArchivistRealmFactory {
             .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
                 name: "fuchsia.diagnostics.PipelinesPath".parse()?,
                 value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String(
-                    config.pipelines_path.unwrap_or("/pkg/data/config".to_string()),
+                    config
+                        .pipelines_path
+                        .unwrap_or("/pkg/data/config/pipelines/default".to_string()),
                 )),
             }))
             .await?;
@@ -112,6 +114,7 @@ impl ArchivistRealmFactory {
             .capability(Capability::protocol::<flogger::LogSinkMarker>())
             .capability(Capability::protocol::<finspect::InspectSinkMarker>())
             .capability(Capability::protocol::<flogger::LogMarker>());
+
         let mut self_to_archivist = Route::new()
             .capability(Capability::configuration("fuchsia.diagnostics.ComponentInitialInterests"))
             .capability(Capability::configuration("fuchsia.diagnostics.EnableKlog"))

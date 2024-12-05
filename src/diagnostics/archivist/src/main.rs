@@ -12,7 +12,7 @@ use archivist_lib::archivist::Archivist;
 use archivist_lib::component_lifecycle;
 use archivist_lib::severity_filter::KlogSeverityFilter;
 use diagnostics_log::PublishOptions;
-use fuchsia_async as fasync;
+use fuchsia_component::client;
 use fuchsia_component::server::{MissingStartupHandle, ServiceFs};
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
@@ -21,6 +21,7 @@ use tracing_subscriber::fmt::format::{self, FormatEvent, FormatFields};
 use tracing_subscriber::fmt::FmtContext;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::registry::LookupSpan;
+use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 const INSPECTOR_SIZE: usize = 2 * 1024 * 1024 /* 2MB */;
 
@@ -52,8 +53,10 @@ async fn async_main(config: Config) -> Result<(), Error> {
 
     let mut fs = ServiceFs::new();
     fs.serve_connection(fidl::endpoints::ServerEnd::new(zx::Channel::from(startup_handle)))?;
+    let component_store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>()
+        .context("connect to factory")?;
     let lifecycle_requests = component_lifecycle::take_lifecycle_request_stream();
-    archivist.run(fs, is_embedded, lifecycle_requests).await?;
+    archivist.run(fs, is_embedded, component_store, lifecycle_requests).await?;
 
     Ok(())
 }

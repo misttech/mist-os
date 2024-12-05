@@ -12,9 +12,6 @@
 
             // Archivist reports metrics for feedback pipeline.
             "bootstrap/archivist:root/archive_accessor_stats/feedback:*",
-
-            // Archivist reports metrics for legacy metrics pipeline.
-            "bootstrap/archivist:root/archive_accessor_stats/legacy_metrics:*",
         ],
     },
 }

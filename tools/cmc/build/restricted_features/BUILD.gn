@@ -11,6 +11,8 @@ group("structured_config") {
 group("dynamic_dictionaries") {
   visibility = [
     "//examples/components/dictionaries/*",
+    "//src/diagnostics/archivist:*",
+    "//src/diagnostics/archivist/tests/integration/realm_factory:*",
     "//src/sys/component_manager/tests/*",
   ]
 }

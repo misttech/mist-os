@@ -20,13 +20,12 @@
     ],
     capabilities: [
         {
+            // TODO(https://fxbug.dev/342196300): remove this once everyone is extracting the
+            // protocols from the dictionary.
             protocol: [
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.host.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.host.LegacyMetricsArchiveAccessor",
-                "fuchsia.diagnostics.host.LoWPANArchiveAccessor",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-                "fuchsia.diagnostics.LoWPANArchiveAccessor",
+                "fuchsia.diagnostics.ArchiveAccessor.feedback",
+                "fuchsia.diagnostics.ArchiveAccessor.legacy_metrics",
+                "fuchsia.diagnostics.ArchiveAccessor.lowpan",
             ],
         },
     ],
@@ -62,16 +61,29 @@
         },
     ],
     expose: [
+        // TODO(https://fxbug.dev/342196300): remove this once everyone is extracting the
+        // protocols from the dictionary.
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor.legacy_metrics",
+            from: "self/diagnostics-accessors",
+            as: "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
+        },
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor.feedback",
+            from: "self/diagnostics-accessors",
+            as: "fuchsia.diagnostics.FeedbackArchiveAccessor",
+        },
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor.lowpan",
+            from: "self/diagnostics-accessors",
+            as: "fuchsia.diagnostics.LoWPANArchiveAccessor",
+        },
         {
             protocol: [
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.host.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.host.LegacyMetricsArchiveAccessor",
-                "fuchsia.diagnostics.host.LoWPANArchiveAccessor",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-                "fuchsia.diagnostics.LoWPANArchiveAccessor",
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.diagnostics.host.ArchiveAccessor",
             ],
-            from: "self",
+            from: "self/diagnostics-accessors",
         },
     ],
 }

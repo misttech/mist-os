@@ -33,6 +33,7 @@ rustc_library("lib") {
     ":logmessage_measure_tape",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host_rust",
     "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
@@ -47,6 +48,7 @@ rustc_library("lib") {
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/derive",
     "//src/lib/diagnostics/inspect/format/rust",
+    "//src/lib/sandbox",
 
     # Archivist needs to use InspectSink from itself, so it does not
     # include the normal inspect/client.shard.cml.
@@ -153,6 +155,7 @@ archivist_optimized_binary("bin") {
   deps = [
     ":archivist-config",
     ":lib",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/log/rust",
@@ -183,6 +186,7 @@ fuchsia_component_manifest("root-manifest") {
   component_name = "archivist"
   required_offers = {
   }
+  restricted_features = [ "dynamic_dictionaries" ]
 }
 
 fuchsia_component("component") {
@@ -198,6 +202,7 @@ fuchsia_component("component") {
 fuchsia_component_manifest("archivist-for-embedding-manifest") {
   manifest = "meta/archivist-for-embedding.cml"
   component_name = "archivist-for-embedding"
+  restricted_features = [ "dynamic_dictionaries" ]
 }
 
 fuchsia_component("archivist-for-embedding-component") {
