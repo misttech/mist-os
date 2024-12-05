@@ -6,8 +6,12 @@
 //!
 //! See [`crate::igmp`] and [`crate::icmp::mld`] for implementations.
 
+use core::borrow::Borrow;
 use core::fmt::Debug;
 use core::time::Duration;
+
+use net_types::ip::IpAddress;
+use net_types::MulticastAddr;
 
 /// Creates a bitmask of [n] bits, [n] must be <= 31.
 /// E.g. for n = 12 yields 0xFFF.
@@ -261,5 +265,42 @@ impl QRV {
 impl From<QRV> for u8 {
     fn from(qrv: QRV) -> u8 {
         qrv.0
+    }
+}
+
+/// A trait abstracting a multicast group record in MLDv2 or IGMPv3.
+///
+/// This trait facilitates the nested iterators required for implementing group
+/// records (iterator of groups, each of which with an iterator of sources)
+/// without propagating the inner iterator types far up.
+///
+/// An implementation for tuples of `(group, record_type, iterator)` is
+/// provided.
+pub trait GmpReportGroupRecord<A: IpAddress> {
+    /// Returns the multicast group this report refers to.
+    fn group(&self) -> MulticastAddr<A>;
+
+    /// Returns record type to insert in the record entry.
+    fn record_type(&self) -> GroupRecordType;
+
+    /// Returns an iterator over the sources in the report.
+    fn sources(&self) -> impl Iterator<Item: Borrow<A>> + '_;
+}
+
+impl<A, I> GmpReportGroupRecord<A> for (MulticastAddr<A>, GroupRecordType, I)
+where
+    A: IpAddress,
+    I: Iterator<Item: Borrow<A>> + Clone,
+{
+    fn group(&self) -> MulticastAddr<A> {
+        self.0
+    }
+
+    fn record_type(&self) -> GroupRecordType {
+        self.1
+    }
+
+    fn sources(&self) -> impl Iterator<Item: Borrow<A>> + '_ {
+        self.2.clone()
     }
 }

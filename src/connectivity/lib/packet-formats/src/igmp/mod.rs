@@ -185,11 +185,15 @@ impl<B, M: MessageType<B>> IgmpPacketBuilder<B, M> {
     }
 }
 
+const fn total_header_size<F>() -> usize {
+    mem::size_of::<HeaderPrefix>() + mem::size_of::<F>()
+}
+
 // All messages that do not have a VariableBody,
 // can have an InnerPacketBuilder impl.
 impl<B, M: MessageType<B, VariableBody = ()>> InnerPacketBuilder for IgmpPacketBuilder<B, M> {
     fn bytes_len(&self) -> usize {
-        mem::size_of::<HeaderPrefix>() + mem::size_of::<M::FixedHeader>()
+        total_header_size::<M::FixedHeader>()
     }
 
     fn serialize(&self, buffer: &mut [u8]) {
@@ -203,12 +207,7 @@ where
     M::VariableBody: IgmpNonEmptyBody,
 {
     fn constraints(&self) -> PacketConstraints {
-        PacketConstraints::new(
-            mem::size_of::<M::FixedHeader>() + mem::size_of::<HeaderPrefix>(),
-            0,
-            0,
-            core::usize::MAX,
-        )
+        PacketConstraints::new(total_header_size::<M::FixedHeader>(), 0, 0, core::usize::MAX)
     }
 
     fn serialize(

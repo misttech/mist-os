@@ -21,7 +21,7 @@ use zerocopy::byteorder::network_endian::U16;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 use crate::error::{ParseError, ParseResult, UnrecognizedProtocolCode};
-use crate::gmp::{LinExpConversion, OverflowError};
+use crate::gmp::{GmpReportGroupRecord, LinExpConversion, OverflowError};
 use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpPacketRaw, IcmpUnusedCode, MessageBody};
 
 // TODO(https://github.com/google/zerocopy/issues/1528): Use std::convert::Infallible.
@@ -541,7 +541,7 @@ impl<I> Mldv2ReportMessageBuilder<I> {
 
 impl<I> InnerPacketBuilder for Mldv2ReportMessageBuilder<I>
 where
-    I: Iterator<Item: Mldv2ReportGroupRecord> + Clone,
+    I: Iterator<Item: GmpReportGroupRecord<Ipv6Addr>> + Clone,
 {
     fn bytes_len(&self) -> usize {
         core::mem::size_of::<Mldv2ReportHeader>()
@@ -584,43 +584,6 @@ where
             *number_of_sources = source_count.into();
         }
         *num_mcast_addr_records = mcast_count.into();
-    }
-}
-
-/// A trait abstracting every multicast group record in an
-/// `Mldv2ReportMessageBuilder`.
-///
-/// This trait facilitates the nested iterators required for implementing group
-/// records (iterator of groups, each of which with an iterator of sources)
-/// without propagating the inner iterator types far up.
-///
-/// An implementation for tuples of `(group, record_type, iterator)` is
-/// provided.
-pub trait Mldv2ReportGroupRecord {
-    /// Returns the multicast group this report refers to.
-    fn group(&self) -> MulticastAddr<Ipv6Addr>;
-
-    /// Returns record type to insert in the record entry.
-    fn record_type(&self) -> Mldv2MulticastRecordType;
-
-    /// Returns an iterator over the sources in the report.
-    fn sources(&self) -> impl Iterator<Item: Borrow<Ipv6Addr>> + '_;
-}
-
-impl<I> Mldv2ReportGroupRecord for (MulticastAddr<Ipv6Addr>, Mldv2MulticastRecordType, I)
-where
-    I: Iterator<Item: Borrow<Ipv6Addr>> + Clone,
-{
-    fn group(&self) -> MulticastAddr<Ipv6Addr> {
-        self.0
-    }
-
-    fn record_type(&self) -> Mldv2MulticastRecordType {
-        self.1
-    }
-
-    fn sources(&self) -> impl Iterator<Item: Borrow<Ipv6Addr>> + '_ {
-        self.2.clone()
     }
 }
 
