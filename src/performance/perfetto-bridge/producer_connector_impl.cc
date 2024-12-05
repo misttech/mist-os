@@ -12,7 +12,6 @@
 #include <lib/fdio/io.h>
 #include <lib/fit/include/lib/fit/function.h>
 #include <lib/fit/result.h>
-#include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/errors.h>
 

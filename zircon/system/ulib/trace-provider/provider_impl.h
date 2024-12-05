@@ -6,7 +6,6 @@
 #define ZIRCON_SYSTEM_ULIB_TRACE_PROVIDER_PROVIDER_IMPL_H_
 
 #include <fidl/fuchsia.tracing.provider/cpp/wire.h>
-#include <lib/async/cpp/executor.h>
 #include <lib/trace-provider/provider.h>
 
 // Provide a definition for the opaque type declared in provider.h.
@@ -45,8 +44,6 @@ class TraceProviderImpl final : public trace_provider_t,
   async_dispatcher_t* const dispatcher_;
   ProviderConfig provider_config_;
   trace::GetKnownCategoriesCallback get_known_categories_callback_;
-
-  async::Executor executor_;
 
   TraceProviderImpl(const TraceProviderImpl&) = delete;
   TraceProviderImpl(TraceProviderImpl&&) = delete;

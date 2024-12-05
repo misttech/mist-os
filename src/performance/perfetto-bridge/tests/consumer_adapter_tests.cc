@@ -24,7 +24,6 @@
 #include <rapidjson/document.h>
 
 #include "lib/trace-provider/provider.h"
-#include "src/lib/fxl/synchronization/thread_annotations.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/performance/perfetto-bridge/consumer_adapter.h"
 

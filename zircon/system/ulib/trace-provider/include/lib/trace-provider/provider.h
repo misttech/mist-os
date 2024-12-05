@@ -140,7 +140,6 @@ __END_CDECLS
 #ifdef __cplusplus
 
 #include <lib/fit/function.h>
-#include <lib/fpromise/promise.h>
 #include <lib/zx/channel.h>
 
 #include <memory>
@@ -170,7 +169,7 @@ struct KnownCategoryHash {
   }
 };
 
-using GetKnownCategoriesCallback = fit::function<fpromise::promise<std::vector<KnownCategory>>()>;
+using GetKnownCategoriesCallback = fit::function<std::vector<KnownCategory>()>;
 
 // Convenience RAII wrapper for creating and destroying a trace provider.
 class TraceProvider {

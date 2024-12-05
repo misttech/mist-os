@@ -8,8 +8,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/trace-provider/provider.h>
 
-#include <memory>
-#include <sstream>
 #include <string>
 #include <utility>
 
@@ -17,7 +15,6 @@
 
 #include "lib/fidl/cpp/wire/channel.h"
 #include "lib/fit/internal/result.h"
-#include "lib/trace-engine/types.h"
 #include "zxtest/base/parameterized-value.h"
 #include "zxtest/base/values.h"
 
@@ -131,32 +128,15 @@ TEST_F(ProviderTest, GetKnownCategoriesDefault) {
   loop_.RunUntilIdle();
 }
 
-TEST_F(ProviderTest, GetKnownCategoriesFromSetCallbackErrorPromise) {
-  loop_.RunUntilIdle();
-
-  provider_->SetGetKnownCategoriesCallback([]() {
-    return fpromise::make_result_promise<std::vector<trace::KnownCategory>>(fpromise::error());
-  });
-
-  ASSERT_TRUE(manager_->provider_client().has_value());
-  manager_->provider_client().value()->GetKnownCategories().Then(
-      [](fidl::Result<::fuchsia_tracing_provider::Provider::GetKnownCategories>& result) {
-        ASSERT_TRUE(result.is_ok());
-        ASSERT_EQ(0, result->categories().size());
-      });
-  // Wait for the fidl callbacks to complete.
-  loop_.RunUntilIdle();
-}
-
 TEST_F(ProviderTest, GetKnownCategoriesFromSetCallback) {
   loop_.RunUntilIdle();
 
   provider_->SetGetKnownCategoriesCallback([]() {
-    return fpromise::make_ok_promise(std::vector<trace::KnownCategory>{
+    return std::vector<trace::KnownCategory>{
         {.name = "foo"},
         {.name = "bar"},
         {.name = "baz", .description = "description"},
-    });
+    };
   });
 
   ASSERT_TRUE(manager_->provider_client().has_value());

@@ -17,8 +17,7 @@ int main(int argc, const char** argv) {
     return 1;
 
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), "ktrace_provider");
-  trace_provider.SetGetKnownCategoriesCallback(
-      []() { return fpromise::make_ok_promise(ktrace_provider::GetKnownCategories()); });
+  trace_provider.SetGetKnownCategoriesCallback(ktrace_provider::GetKnownCategories);
 
   ktrace_provider::App app(command_line);
   loop.Run();
