@@ -64,7 +64,7 @@
         },
         {
             protocol: "fuchsia.diagnostics.ArchiveAccessor",
-            from: "#archivist",
+            from: "#archivist/diagnostics-accessors",
             to: "#reader",
         },
     ],
