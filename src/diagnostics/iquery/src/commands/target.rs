@@ -5,18 +5,14 @@
 use crate::commands::types::DiagnosticsProvider;
 use crate::commands::utils::*;
 use crate::types::Error;
-use anyhow::anyhow;
-use component_debug::dirs::*;
 use diagnostics_data::{Data, DiagnosticsData};
 use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, ArchiveAccessorProxy, Selector};
-use fidl_fuchsia_io::DirectoryProxy;
 use fidl_fuchsia_sys2 as fsys2;
-use fuchsia_component::client;
 use moniker::Moniker;
 
-static ROOT_ARCHIVIST: &str = "bootstrap/archivist";
+const ROOT_ARCHIVIST: &str = "bootstrap/archivist";
 
 pub struct ArchiveAccessorProvider {
     query_proxy: fsys2::RealmQueryProxy,
@@ -72,63 +68,16 @@ pub async fn connect_to_accessor_selector(
             let Ok(moniker) = Moniker::try_from(component) else {
                 return Err(Error::invalid_accessor(s));
             };
-            connect_accessor(&moniker, accessor_name, query_proxy).await
+            connect_accessor::<ArchiveAccessorMarker>(&moniker, accessor_name, &query_proxy).await
         }
         None => {
             let moniker = Moniker::try_from(ROOT_ARCHIVIST).unwrap();
-            connect_accessor(&moniker, ArchiveAccessorMarker::PROTOCOL_NAME, query_proxy).await
+            connect_accessor::<ArchiveAccessorMarker>(
+                &moniker,
+                ArchiveAccessorMarker::PROTOCOL_NAME,
+                &query_proxy,
+            )
+            .await
         }
-    }
-}
-
-// Use the provided `Selector` and depending on the selector,
-// opens the `expose` directory and return the proxy to it.
-async fn get_dir_proxy(
-    moniker: &Moniker,
-    proxy: &fsys2::RealmQueryProxy,
-) -> Result<DirectoryProxy, Error> {
-    let directory_proxy = open_instance_dir_root_readable(moniker, OpenDirType::Exposed, proxy)
-        .await
-        .map_err(|e| Error::CommunicatingWith("RealmQuery".to_owned(), anyhow!("{:?}", e)))?;
-    Ok(directory_proxy)
-}
-
-/// Attempt to connect to the `fuchsia.diagnostics.*ArchiveAccessor` with the selector
-/// specified.
-pub async fn connect_accessor(
-    moniker: &Moniker,
-    accessor_name: &str,
-    proxy: &fsys2::RealmQueryProxy,
-) -> Result<ArchiveAccessorProxy, Error> {
-    let directory_proxy = get_dir_proxy(moniker, proxy).await?;
-    let proxy = client::connect_to_named_protocol_at_dir_root::<ArchiveAccessorMarker>(
-        &directory_proxy,
-        accessor_name,
-    )
-    .map_err(|e| Error::ConnectToProtocol(accessor_name.to_string(), anyhow!("{:?}", e)))?;
-    Ok(proxy)
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use assert_matches::assert_matches;
-    use iquery_test_support::MockRealmQuery;
-    use std::rc::Rc;
-
-    #[fuchsia::test]
-    async fn test_get_dir_proxy_selector_bad_component() {
-        let fake_realm_query = Rc::new(MockRealmQuery::default());
-        let proxy = Rc::clone(&fake_realm_query).get_proxy().await;
-        let moniker = Moniker::try_from("bad/component").unwrap();
-        assert_matches!(get_dir_proxy(&moniker, &proxy).await, Err(_));
-    }
-
-    #[fuchsia::test]
-    async fn test_get_dir_proxy_ok() {
-        let fake_realm_query = Rc::new(MockRealmQuery::default());
-        let proxy = Rc::clone(&fake_realm_query).get_proxy().await;
-        let moniker = Moniker::try_from("example/component").unwrap();
-        assert_matches!(get_dir_proxy(&moniker, &proxy).await, Ok(_));
     }
 }

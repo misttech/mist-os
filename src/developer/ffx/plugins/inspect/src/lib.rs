@@ -86,7 +86,7 @@ where
     let realm_query = rcs::root_realm_query(&rcs_proxy, std::time::Duration::from_secs(15))
         .await
         .map_err(|e| anyhow!(ffx_error!("Failed to connect to realm query: {e}")))?;
-    let provider = HostArchiveReader::new(diagnostics_proxy, rcs_proxy, realm_query);
+    let provider = HostArchiveReader::new(diagnostics_proxy, realm_query);
     let result = cmd.execute(&provider).await.map_err(|e| anyhow!(ffx_error!("{}", e)))?;
     let result = InspectOutput::from(result);
     if writer.is_machine() {

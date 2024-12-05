@@ -4,15 +4,14 @@
 
 use anyhow::anyhow;
 use diagnostics_data::Data;
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::ClientSelectorConfiguration::{SelectAll, Selectors};
 use fidl_fuchsia_diagnostics::{Format, Selector, SelectorArgument, StreamParameters};
 use fidl_fuchsia_diagnostics_host::{ArchiveAccessorMarker, ArchiveAccessorProxy};
-use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_sys2 as fsys2;
 use futures::AsyncReadExt;
-use iquery::commands::{get_accessor_selectors, DiagnosticsProvider};
+use iquery::commands::{connect_accessor, get_accessor_selectors, DiagnosticsProvider};
 use iquery::types::Error;
+use moniker::Moniker;
 use serde::Deserialize;
 use std::borrow::Cow;
 
@@ -25,7 +24,6 @@ enum OneOrMany<T> {
 
 pub struct HostArchiveReader {
     diagnostics_proxy: ArchiveAccessorProxy,
-    rcs_proxy: RemoteControlProxy,
     query_proxy: fsys2::RealmQueryProxy,
 }
 
@@ -34,28 +32,18 @@ fn add_host_before_last_dot(input: &str) -> Result<String, Error> {
     Ok(format!("{}.host.{}", rest, last))
 }
 
-struct MonikerAndProtocol<'a> {
-    protocol: &'a str,
-    moniker: &'a str,
-}
-
-impl<'a> TryFrom<&'a str> for MonikerAndProtocol<'a> {
-    type Error = Error;
-
-    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
-        s.rsplit_once(":")
-            .map(|(moniker, protocol)| MonikerAndProtocol { moniker, protocol })
-            .ok_or_else(|| Error::invalid_accessor(s))
-    }
+fn moniker_and_protocol(s: &str) -> Result<(Moniker, &str), Error> {
+    let (moniker, protocol) = s.rsplit_once(":").ok_or_else(|| Error::invalid_accessor(s))?;
+    let moniker = Moniker::try_from(moniker).map_err(|_| Error::invalid_accessor(s))?;
+    Ok((moniker, protocol))
 }
 
 impl HostArchiveReader {
     pub fn new(
         diagnostics_proxy: ArchiveAccessorProxy,
-        rcs_proxy: RemoteControlProxy,
         query_proxy: fsys2::RealmQueryProxy,
     ) -> Self {
-        Self { diagnostics_proxy, rcs_proxy, query_proxy }
+        Self { diagnostics_proxy, query_proxy }
     }
 
     pub async fn snapshot_diagnostics_data<D>(
@@ -76,18 +64,14 @@ impl HostArchiveReader {
         let accessor = match accessor.as_deref() {
             Some(s) => {
                 let s = add_host_before_last_dot(s)?;
-                let moniker_and_protocol = MonikerAndProtocol::try_from(s.as_str())?;
-                let (client, server) = fidl::endpoints::create_endpoints::<ArchiveAccessorMarker>();
-                self.rcs_proxy
-                    .deprecated_open_capability(
-                        &format!("{}", moniker_and_protocol.moniker),
-                        fsys2::OpenDirType::ExposedDir,
-                        &moniker_and_protocol.protocol,
-                        server.into_channel(),
-                        OpenFlags::empty(),
-                    )
-                    .await??;
-                Cow::Owned(client.into_proxy())
+                let (moniker, protocol) = moniker_and_protocol(s.as_str())?;
+                let proxy = connect_accessor::<ArchiveAccessorMarker>(
+                    &moniker,
+                    protocol,
+                    &self.query_proxy,
+                )
+                .await?;
+                Cow::Owned(proxy)
             }
             None => Cow::Borrowed(&self.diagnostics_proxy),
         };
@@ -104,7 +88,7 @@ impl HostArchiveReader {
 
         let _ = accessor.stream_diagnostics(&params, server).await.map_err(|s| {
             Error::IOError(
-                "call diagnostics_proxy".into(),
+                "call ArchiveAccessor".into(),
                 anyhow!("failure setting up diagnostics stream: {:?}", s),
             )
         })?;

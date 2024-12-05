@@ -45,7 +45,7 @@ pub async fn execute(
         let realm_query = rcs::root_realm_query(&rcs_proxy, std::time::Duration::from_secs(15))
             .await
             .map_err(|e| anyhow!(ffx_error!("Failed to connect to realm query: {e}")))?;
-        let provider = HostArchiveReader::new(diagnostics_proxy, rcs_proxy, realm_query);
+        let provider = HostArchiveReader::new(diagnostics_proxy, realm_query);
         provider.snapshot::<Inspect>(cmd.accessor_path.as_deref(), std::iter::empty()).await?
     };
     let moniker = match cmd.moniker {
