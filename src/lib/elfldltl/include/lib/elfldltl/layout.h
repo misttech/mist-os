@@ -43,6 +43,19 @@ struct LocalAbiTraits;
 template <typename T, typename... AnyOfThese>
 inline constexpr bool kIsAnyOf = (std::is_same_v<T, AnyOfThese> || ...);
 
+template <template <typename> typename Template>
+struct IsTemplateHelper {
+  template <typename T>
+  static constexpr bool kIsTemplate = false;
+
+  template <typename T>
+  static constexpr bool kIsTemplate<Template<T>> = true;
+};
+
+template <typename T, template <typename> typename... AnyOfThese>
+inline constexpr bool kIsAnyOfTemplate =
+    (IsTemplateHelper<AnyOfThese>::template kIsTemplate<T> || ...);
+
 // The basic types and some structure layouts are identical across bit width
 // (ElfClass).  This base class handles differences in byte order (ElfData).
 template <ElfData Data>
@@ -445,16 +458,24 @@ struct Elf : private Layout<Class, Data> {
     Addend addend;
   };
 
+  // Usually GOT entries are address-sized, so 32 bits for ILP32.
+  // But on x86-64 ILP32, they are instead register-sized (64 bits).
+  template <ElfMachine Machine = ElfMachine::kNative>
+  using GotEntry = std::conditional_t<Machine == ElfMachine::kX86_64, Xword, Addr>;
+
   // When the compiler generates a call to __tls_get_addr, the linker
   // generates two corresponding dynamic relocation entries applying to
   // adjacent GOT slots that form a pair describing what module and symbol
   // resolved the reference at dynamic link time.  The first slot holds the
   // module ID, a 1-origin index.  The second slot holds the offset from
   // that module's PT_TLS segment.
-  struct TlsGetAddrGot {
-    Addr tls_modid;  // R_*_DTPMOD* et al relocations set this.
-    Addr offset;     // R_*_DTPOFF* et al relocations set this.
+  template <typename GotEntry>
+  struct TlsGetAddrGotLayout {
+    GotEntry tls_modid;  // R_*_DTPMOD* et al relocations set this.
+    GotEntry offset;     // R_*_DTPOFF* et al relocations set this.
   };
+  template <ElfMachine Machine = ElfMachine::kNative>
+  using TlsGetAddrGot = TlsGetAddrGotLayout<GotEntry<Machine>>;
 
   // When the compiler generates a TLSDESC callback, the linker generates a
   // single corresponding dynamic relocation entry that applies to a pair of
@@ -468,10 +489,13 @@ struct Elf : private Layout<Class, Data> {
   // of the relocation's symbol plus addend.  (For static TLS, that offset will
   // be the same in every thread.  For dynamic TLS, it will be the difference
   // of unrelated pointers that recovers an uncorrelated per-thread address.)
-  struct TlsDescGot {
-    Addr function;
-    Addr value;
+  template <typename GotEntry>
+  struct TlsDescGotLayout {
+    GotEntry function;
+    GotEntry value;
   };
+  template <ElfMachine Machine = ElfMachine::kNative>
+  using TlsDescGot = TlsDescGotLayout<GotEntry<Machine>>;
 
   // These are declared in svr4-abi.h rather than there.  These are not
   // formally parts of the ELF format, but rather de facto standard ABI types
@@ -497,8 +521,9 @@ struct Elf : private Layout<Class, Data> {
   // copying between address spaces or pointer formats.  This is defined
   // primarily for the benefit of <lib/ld/remote-abi-transcriber.h>, which see.
   template <typename T>
-  static constexpr bool kIsLayout = kIsAnyOf<T, Ehdr, Shdr, Nhdr, Phdr, Dyn, Sym, Rel, Rela,
-                                             TlsGetAddrGot, TlsDescGot, TlsLayout<Elf>>;
+  static constexpr bool kIsLayout =
+      kIsAnyOf<T, Ehdr, Shdr, Nhdr, Phdr, Dyn, Sym, Rel, Rela, TlsLayout<Elf>> ||
+      kIsAnyOfTemplate<T, TlsGetAddrGotLayout, TlsDescGotLayout>;
 };
 
 template <ElfData Data = ElfData::kNative>

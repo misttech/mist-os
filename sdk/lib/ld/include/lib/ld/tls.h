@@ -72,7 +72,7 @@ struct Abi<Elf, AbiTraits>::TlsModule {
 // old-style TLS.  The implementation in libc or libdl or suchlike can use the
 // `_ld_abi.static_tls_offsets` data to handle TLS module IDs in the
 // initial-exec set, e.g. via ld::TlsInitialExecOffset (see below).
-extern "C" void* __tls_get_addr(const elfldltl::Elf<>::TlsGetAddrGot& got);
+extern "C" void* __tls_get_addr(const elfldltl::Elf<>::TlsGetAddrGot<>& got);
 
 // The standard symbol name with hash value cached statically.
 inline constexpr elfldltl::SymbolName kTlsGetAddrSymbol{"__tls_get_addr"};

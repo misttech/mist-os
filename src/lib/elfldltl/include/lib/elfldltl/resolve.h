@@ -55,11 +55,10 @@ namespace elfldltl {
 //
 template <class Module, typename TlsDescResolver>
 struct ResolverDefinition {
-  using Elf = typename std::decay_t<decltype(std::declval<Module>().symbol_info())>::Elf;
-  using Addr = typename Elf::Addr;
-  using Addend = typename Elf::Addend;
-  using Sym = typename Elf::Sym;
-  using TlsDescGot = typename Elf::TlsDescGot;
+  using Elf = std::decay_t<decltype(std::declval<Module>().symbol_info())>::Elf;
+  using Addr = Elf::Addr;
+  using Addend = Elf::Addend;
+  using Sym = Elf::Sym;
 
   static constexpr ResolverDefinition UndefinedWeak(TlsDescResolver* tlsdesc_resolver = nullptr) {
     static_assert(ResolverDefinition{}.undefined_weak());
@@ -91,13 +90,13 @@ struct ResolverDefinition {
   }
 
   template <typename T = TlsDescResolver, typename = std::enable_if_t<std::is_invocable_v<T>>>
-  constexpr TlsDescGot tls_desc_undefined_weak() const {
+  constexpr auto tls_desc_undefined_weak() const {
     return (*tlsdesc_resolver_)();
   }
 
   template <typename T = TlsDescResolver,
             typename = std::enable_if_t<std::is_invocable_v<T, Addend>>>
-  constexpr TlsDescGot tls_desc_undefined_weak(Addend addend) const {
+  constexpr auto tls_desc_undefined_weak(Addend addend) const {
     return (*tlsdesc_resolver_)(addend);
   }
 

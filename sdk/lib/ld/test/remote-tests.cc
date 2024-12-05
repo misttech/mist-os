@@ -887,9 +887,11 @@ TEST_F(LdRemoteTests, PerfectSymbolFilterElf32) {
 
 TEST_F(LdRemoteTests, ForeignMachine) {
   using ForeignElf = elfldltl::Elf32<elfldltl::ElfData::k2Lsb>;
-  using ForeignLinker = ld::RemoteDynamicLinker<ForeignElf>;
   constexpr elfldltl::ElfMachine kForeignMachine = elfldltl::ElfMachine::kArm;
   constexpr uint32_t kForeignPageSize = 0x1000;
+
+  using ForeignLinker =
+      ld::RemoteDynamicLinker<ForeignElf, ld::RemoteLoadZygote::kNo, kForeignMachine>;
 
   // Init() creates the process where the test modules will be loaded, and
   // provides its root VMAR.  The modules understand only a 32-bit address
@@ -925,8 +927,8 @@ TEST_F(LdRemoteTests, ForeignMachine) {
 
   auto diag = elfldltl::testing::ExpectOkDiagnostics();
   ForeignLinker linker;
-  linker.set_abi_stub(
-      ld::RemoteAbiStub<ForeignElf>::Create(diag, GetLibVmo("ld-stub.so"), kForeignPageSize));
+  linker.set_abi_stub(ld::RemoteAbiStub<ForeignElf, kForeignMachine>::Create(
+      diag, GetLibVmo("ld-stub.so"), kForeignPageSize));
   ASSERT_TRUE(linker.abi_stub());
 
   // The non-Fuchsia executable gets packaged under lib/ in the test data.
@@ -953,7 +955,7 @@ TEST_F(LdRemoteTests, ForeignMachine) {
   set_stack_size(linker.main_stack_size());
 
   // Now it can be relocated for the foreign machine.
-  EXPECT_TRUE(linker.Relocate<kForeignMachine>(diag));
+  EXPECT_TRUE(linker.Relocate(diag));
 
   // It can even be loaded.  But it can't be run.
   ASSERT_TRUE(linker.Load(diag));

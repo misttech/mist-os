@@ -269,7 +269,7 @@ class LinkingSession<Loader>::SessionModule
   using Phdr = Elf::Phdr;
   using Dyn = Elf::Dyn;
   using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StaticVector<ld::kMaxSegments>::Container>;
-  using TlsDescGot = Elf::TlsDescGot;
+  using TlsDescGot = Elf::TlsDescGot<>;
 
   // This is the observer used to collect DT_NEEDED offsets from the dynamic phdr.
   static const constexpr std::string_view kNeededError{"DT_NEEDED offsets"};

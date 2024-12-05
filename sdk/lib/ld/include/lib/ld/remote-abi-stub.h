@@ -51,7 +51,7 @@ namespace ld {
 // the stub dynamic linker used at runtime came from the same ld library source
 // tree as this class.
 
-template <class Elf = elfldltl::Elf<>>
+template <class Elf = elfldltl::Elf<>, elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative>
 class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
  public:
   // Once created, the RemoteAbiStub only needs to be used as const.
@@ -64,7 +64,7 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
   using RemoteModule = RemoteDecodedModule<Elf>;
   using RemoteModulePtr = typename RemoteModule::Ptr;
   using LocalAbi = abi::Abi<Elf>;
-  using TlsDescResolver = ld::StaticTlsDescResolver<Elf>;
+  using TlsDescResolver = ld::StaticTlsDescResolver<Elf, Machine>;
   using TlsdescRuntimeHooks = typename TlsDescResolver::RuntimeHooks;
 
   RemoteAbiStub() = default;

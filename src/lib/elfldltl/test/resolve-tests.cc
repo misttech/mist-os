@@ -123,7 +123,7 @@ constexpr elfldltl::SymbolName kWeakBothSymbol("weak_both"sv);
 
 template <class Elf>
 struct NoTlsdesc {
-  using TlsDescGot = typename Elf::TlsDescGot;
+  using TlsDescGot = Elf::template TlsDescGot<>;
 
   constexpr TlsDescGot operator()() const { return {}; }
 

@@ -28,18 +28,18 @@ namespace ld {
 // before laying out the remote address space; Finish is called after address
 // space layout is known, to finalize the data.
 
-template <class RemoteModule>
+template <class RemoteModule, elfldltl::ElfMachine Machine>
 class RemoteAbi {
  public:
   using Elf = typename RemoteModule::Elf;
-  using AbiStubPtr = typename RemoteAbiStub<Elf>::Ptr;
 
   using size_type = typename Elf::size_type;
   using Addr = typename Elf::Addr;
   using TlsLayout = elfldltl::TlsLayout<Elf>;
 
-  using AbiStub = RemoteAbiStub<Elf>;
-  using ModuleList = typename RemoteModule::List;
+  using AbiStub = RemoteAbiStub<Elf, Machine>;
+  using AbiStubPtr = AbiStub::Ptr;
+  using ModuleList = RemoteModule::List;
 
   using LocalAbi = abi::Abi<Elf>;
   using LocalAbiModule = typename LocalAbi::Module;
