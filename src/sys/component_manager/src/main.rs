@@ -24,6 +24,9 @@ use tracing::{error, info};
 use zx::JobCriticalOptions;
 use {fidl_fuchsia_component_internal as finternal, fuchsia_async as fasync};
 
+#[cfg(feature = "tracing")]
+use cm_config::TraceProvider;
+
 mod bedrock;
 mod bootfs;
 mod builtin;
@@ -78,7 +81,9 @@ fn main() {
     }
 
     #[cfg(feature = "tracing")]
-    fuchsia_trace_provider::trace_provider_create_with_fdio();
+    if runtime_config.trace_provider == TraceProvider::Namespace {
+        fuchsia_trace_provider::trace_provider_create_with_fdio();
+    }
 
     let run_root_fut = async move {
         let mut builtin_environment = match build_environment(runtime_config, bootfs_svc).await {

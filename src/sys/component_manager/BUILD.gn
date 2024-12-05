@@ -294,13 +294,16 @@ rustc_binary("bin") {
 }
 
 rustc_binary("bin_with_tracing") {
-  output_name = "component_manager_eng"
+  output_name = "component_manager_with_tracing"
   forward_variables_from(_component_manager_bin, "*")
   configs += configs_to_remove
   configs -= configs_to_remove
   configs += configs_to_add
   features = [ "tracing" ]
-  deps += [ "//src/lib/trace/rust:trace-provider" ]
+  deps += [
+    "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
+    "//src/lib/trace/rust:trace-provider",
+  ]
 }
 
 # This v2 component bundles component manager with a config suitable for running

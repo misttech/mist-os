@@ -111,6 +111,7 @@ impl PlatformCapability {
 #[serde(deny_unknown_fields)]
 struct Config {
     debug: Option<bool>,
+    trace_provider: Option<TraceProvider>,
     list_children_batch_size: Option<u32>,
     security_policy: Option<SecurityPolicy>,
     namespace_capabilities: Option<Vec<cml::Capability>>,
@@ -200,6 +201,15 @@ pub enum VmexSource {
 }
 
 symmetrical_enums!(VmexSource, component_internal::VmexSource, SystemResource, Namespace);
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum TraceProvider {
+    Namespace,
+    RootExposed,
+}
+
+symmetrical_enums!(TraceProvider, component_internal::TraceProvider, Namespace, RootExposed);
 
 #[derive(Deserialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -439,6 +449,7 @@ impl TryFrom<Config> for component_internal::Config {
 
         Ok(Self {
             debug: config.debug,
+            trace_provider: config.trace_provider.map(Into::into),
             enable_introspection: config.enable_introspection,
             use_builtin_process_launcher: config.use_builtin_process_launcher,
             maintain_utc_clock: config.maintain_utc_clock,
@@ -567,6 +578,7 @@ impl Config {
     fn merge(self, another: Config) -> Result<Self, Error> {
         Ok(Config {
             debug: merge_field!(self, another, debug),
+            trace_provider: merge_field!(self, another, trace_provider),
             enable_introspection: merge_field!(self, another, enable_introspection),
             use_builtin_process_launcher: merge_field!(self, another, use_builtin_process_launcher),
             maintain_utc_clock: merge_field!(self, another, maintain_utc_clock),
@@ -827,6 +839,7 @@ mod tests {
     fn test_compile() {
         let input = r#"{
             debug: true,
+            trace_provider: "namespace",
             enable_introspection: true,
             list_children_batch_size: 123,
             maintain_utc_clock: false,
@@ -904,6 +917,7 @@ mod tests {
             config,
             component_internal::Config {
                 debug: Some(true),
+                trace_provider: Some(component_internal::TraceProvider::Namespace),
                 enable_introspection: Some(true),
                 maintain_utc_clock: Some(false),
                 use_builtin_process_launcher: Some(true),

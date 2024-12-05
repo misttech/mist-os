@@ -5,7 +5,7 @@
     include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
-        binary: "bin/component_manager_eng",
+        binary: "bin/component_manager_with_tracing",
         args: [
             "--config",
             "/pkg/data/component_manager_config",
