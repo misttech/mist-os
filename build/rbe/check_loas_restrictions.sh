@@ -26,7 +26,11 @@ EOF
 }
 
 function error() {
-  echo "[$script_base]" "$@"
+  >&2 echo "[$script_base]" "$@"
+}
+
+function fatal() {
+  >&2 echo "[$script_base]" "$@"
   exit 1
 }
 
@@ -37,7 +41,7 @@ do
   case "$opt" in
     -h|--help) usage ; exit ;;
     -v|--verbose) verbose=1 ;;
-    *) error "Unknown option $opt" ;;
+    *) fatal "Unknown option $opt" ;;
   esac
 done
 
@@ -46,18 +50,23 @@ function vmsg() {
 }
 
 # No gcert, no LOAS
-which gcert > /dev/null || error "gcert not found."
+which gcert > /dev/null || fatal "gcert not found."
+which gcertstatus > /dev/null || fatal "gcertstatus not found."
 
 # Renew certificate if needed (interactive).
 # To force re-auth for a fresh certificate, run 'loas_destroy' first.
 gcertstatus > /dev/null || gcert || {
   error "Failed to renew LOAS2 certificate."
+  echo "restricted"
+  exit 0
 }
 
 # Note: accessing BinFS (/google/bin) requires LOAS.
 readonly cred_printer=/google/bin/releases/prodsec/tools/credential_printer
 test -x "$cred_printer" || {
   error "Unable to access $cred_printer.  See go/binfs-glinux-workstations."
+  echo "restricted"
+  exit 0
 }
 
 "$cred_printer" > /dev/null 2>&1 || {
@@ -72,7 +81,7 @@ creds_file=
 case "$OSTYPE" in
   linux*) creds_file="/run/credentials-cache/loas-$USER/cookies/$USER.loas2credentials" ;;  # assuming gLinux
   darwin*) creds_file="/var/run/credentials-cache/loas-$USER/cookies/$USER.loas2credentials" ;;  # assuming gMac
-  *) error "Unhandled OS: $OSTYPE" ;;
+  *) fatal "Unhandled OS: $OSTYPE" ;;
 esac
 vmsg "Examining credentials file: $creds_file"
 
