@@ -41,6 +41,20 @@ fbl::RefPtr<FsContext> create_test_fs_context(const fbl::RefPtr<Kernel>& kernel,
   return FsContext::New(Namespace::New(create_fs(kernel)));
 }
 
+template <typename CreateFsFn>
+ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
+create_kernel_task_and_unlocked_with_fs(
+    CreateFsFn&& create_fs /*,security_server: Arc<SecurityServer>*/) {
+  auto kernel = create_test_kernel();
+  auto fs = create_fs(kernel);
+  auto fs_context = create_test_fs_context(kernel, [&fs](const fbl::RefPtr<Kernel>&) {
+    auto clone = fs;
+    return clone;
+  });
+  auto init_task = create_test_init_task(kernel, fs_context);
+  return ktl::pair(kernel, testing::AutoReleasableTask::From(ktl::move(init_task)));
+}
+
 }  // namespace
 
 TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsContext> fs) {
@@ -72,20 +86,6 @@ TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsCont
   return ktl::move(init_task.value());
 }
 
-template <typename CreateFsFn>
-ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
-create_kernel_task_and_unlocked_with_fs_and_selinux(
-    CreateFsFn&& create_fs /*,security_server: Arc<SecurityServer>*/) {
-  auto kernel = create_test_kernel();
-  auto fs = create_fs(kernel);
-  auto fs_context =
-      create_test_fs_context(kernel, [&fs](const fbl::RefPtr<Kernel>&) { return fs; });
-  auto init_task = create_test_init_task(kernel, fs_context);
-  // security::file_system_resolve_security(&init_task, &fs)
-  //       .expect("Failed to resolve root filesystem labeling");
-  return ktl::pair(kernel, testing::AutoReleasableTask::From(ktl::move(init_task)));
-}
-
 /// Create a FileSystemHandle for use in testing.
 ///
 /// Open "/boot" and returns an FsContext rooted in that directory.
@@ -104,18 +104,17 @@ FileSystemHandle create_bootfs_current_zbi(const fbl::RefPtr<Kernel>& kernel) {
 
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked_with_bootfs() {
-  return create_kernel_task_and_unlocked_with_fs_and_selinux(create_bootfs);
+  return create_kernel_task_and_unlocked_with_fs(create_bootfs);
 }
 
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked_with_bootfs_current_zbi() {
-  return create_kernel_task_and_unlocked_with_fs_and_selinux(create_bootfs_current_zbi);
+  return create_kernel_task_and_unlocked_with_fs(create_bootfs_current_zbi);
 }
 
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked() {
-  return create_kernel_task_and_unlocked_with_fs_and_selinux(
-      [](const fbl::RefPtr<Kernel>& kernel) -> FileSystemHandle { return TmpFs::new_fs(kernel); });
+  return create_kernel_task_and_unlocked_with_fs(TmpFs::new_fs);
 }
 
 ktl::pair<fbl::RefPtr<Kernel>, AutoReleasableTask> create_kernel_and_task() {
