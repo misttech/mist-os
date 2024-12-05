@@ -560,7 +560,6 @@ if (is_host) {
       "//src/developer/ffx/plugins/debug:sdk",
       "//src/developer/ffx/plugins/driver:sdk",
       "//src/developer/ffx/plugins/emulator:sdk",
-      "//src/developer/ffx/plugins/emulator:uefi_internal",
       "//src/developer/ffx/plugins/fuzz:sdk",
       "//src/developer/ffx/plugins/inspect:sdk",
       "//src/developer/ffx/plugins/log:sdk",
@@ -606,6 +605,7 @@ if (is_host) {
       "//src/developer/ffx/plugins/emulator:aemu_internal",
       "//src/developer/ffx/plugins/emulator:crosvm_internal",
       "//src/developer/ffx/plugins/emulator:qemu_internal",
+      "//src/developer/ffx/plugins/emulator:uefi_internal",
     ]
   }
 } else {
