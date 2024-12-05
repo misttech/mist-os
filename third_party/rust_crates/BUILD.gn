@@ -527,7 +527,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("mock-omaha-server") {
-  public_deps = [ ":mock-omaha-server-v0_3_1" ]
+  public_deps = [ ":mock-omaha-server-v0_3_3" ]
 }
 
 group("mockall") {
@@ -8838,20 +8838,20 @@ rust_library("miow-v0_3_7") {
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
-license("mock-omaha-server-v0_3_1.license") {
+license("mock-omaha-server-v0_3_3.license") {
   public_package_name = "mock_omaha_server"
   license_files = [
-    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/LICENSE-BSD",
-    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.3/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.3/LICENSE-MIT",
   ]
 }
 
-rust_library("mock-omaha-server-v0_3_1") {
+rust_library("mock-omaha-server-v0_3_3") {
   crate_name = "mock_omaha_server"
   crate_root =
-      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/src/lib.rs"
-  output_name = "mock_omaha_server-29204b63f404bb37"
+      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.3/src/lib.rs"
+  output_name = "mock_omaha_server-194573524e7fddb1"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -8883,14 +8883,14 @@ rust_library("mock-omaha-server-v0_3_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=29204b63f404bb37",
-    "-Cextra-filename=-29204b63f404bb37",
+    "-Cmetadata=194573524e7fddb1",
+    "-Cextra-filename=-194573524e7fddb1",
     "--cfg=fasync",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":mock-omaha-server-v0_3_1.license" ]
+  applicable_licenses = [ ":mock-omaha-server-v0_3_3.license" ]
 }
 
 license("mockall-v0_9_0.license") {

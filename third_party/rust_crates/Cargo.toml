@@ -145,7 +145,7 @@ md-5 = "0.10.5"
 memchr = "2.7.1"
 memoffset = "0.7.1"
 miniz_oxide = "0.3.6"
-mock-omaha-server = { version = "0.3.1", default-features = false }
+mock-omaha-server = { version = "0.3.3", default-features = false }
 mockall = "0.9"
 munge = "0.4.1"
 nix = "0.26.2"
@@ -639,7 +639,7 @@ rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cf
 [gn.package.mime_guess."2.0.5"]
 env_vars = ["MIME_TYPES_GENERATED_PATH=../../../compat/mime_guess/mime_types_generated.rs"]
 
-[gn.package.mock-omaha-server."0.3.1"]
+[gn.package.mock-omaha-server."0.3.3"]
 rustflags = ["--cfg=fasync"]
 deps = [
   "//src/lib/fuchsia-async",
@@ -648,7 +648,7 @@ deps = [
   "//third_party/rust_crates:argh"
 ]
 
-[gn.package.mock-omaha-server."0.3.1".platform."cfg(not(target_os = \"fuchsia\"))"]
+[gn.package.mock-omaha-server."0.3.3".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
   "//third_party/rust_crates:async-net",
   "//third_party/rust_crates:tokio",
