@@ -46,9 +46,9 @@ template("bad_signature_update") {
 
     # This size was found by building and viewing the actual size in the error.
     if (use_fxfs_blob) {
-      assembly_fxfs_image_size_bytes = 73564160
+      assembly_fxfs_image_size_bytes = 78807040
     } else {
-      fvm_truncate_to_length = 73564160
+      fvm_truncate_to_length = 78807040
     }
   }
 
