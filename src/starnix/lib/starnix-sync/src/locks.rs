@@ -85,7 +85,11 @@ impl<T: fmt::Debug, L: LockAfter<UninterruptibleLock>> fmt::Debug for OrderedMut
 
 impl<T, L: LockAfter<UninterruptibleLock>> LockFor<L> for OrderedMutex<T, L> {
     type Data = T;
-    type Guard<'a> = MutexGuard<'a, T> where T: 'a, L: 'a;
+    type Guard<'a>
+        = MutexGuard<'a, T>
+    where
+        T: 'a,
+        L: 'a;
     fn lock(&self) -> Self::Guard<'_> {
         self.mutex.lock()
     }
@@ -149,8 +153,16 @@ impl<T: fmt::Debug, L: LockAfter<UninterruptibleLock>> fmt::Debug for OrderedRwL
 
 impl<T, L: LockAfter<UninterruptibleLock>> RwLockFor<L> for OrderedRwLock<T, L> {
     type Data = T;
-    type ReadGuard<'a> = RwLockReadGuard<'a, T> where T: 'a, L: 'a;
-    type WriteGuard<'a> = RwLockWriteGuard<'a, T> where T: 'a, L: 'a;
+    type ReadGuard<'a>
+        = RwLockReadGuard<'a, T>
+    where
+        T: 'a,
+        L: 'a;
+    type WriteGuard<'a>
+        = RwLockWriteGuard<'a, T>
+    where
+        T: 'a,
+        L: 'a;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
         self.rwlock.read()
     }
@@ -258,7 +270,7 @@ mod test {
         let _b: OrderedMutex<u16, B> = OrderedMutex::new(30);
         let c: OrderedMutex<u32, C> = OrderedMutex::new(45);
 
-        let mut locked = Unlocked::new();
+        let mut locked = unsafe { Unlocked::new() };
 
         let (a_data, mut next_locked) = a.lock_and(&mut locked);
         let c_data = c.lock(&mut next_locked);
@@ -276,7 +288,7 @@ mod test {
         let _e: OrderedRwLock<u16, E> = OrderedRwLock::new(30);
         let f: OrderedRwLock<u32, F> = OrderedRwLock::new(45);
 
-        let mut locked = Unlocked::new();
+        let mut locked = unsafe { Unlocked::new() };
         {
             let (d_data, mut next_locked) = d.write_and(&mut locked);
             let f_data = f.read(&mut next_locked);
@@ -305,7 +317,7 @@ mod test {
     fn test_lock_both() {
         let a1: OrderedMutex<u8, A> = OrderedMutex::new(15);
         let a2: OrderedMutex<u8, A> = OrderedMutex::new(30);
-        let mut locked = Unlocked::new();
+        let mut locked = unsafe { Unlocked::new() };
         {
             let (a1_data, a2_data, _) = lock_both(&mut locked, &a1, &a2);
             assert_eq!(&*a1_data, &15);

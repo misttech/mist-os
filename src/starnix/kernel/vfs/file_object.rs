@@ -1783,7 +1783,7 @@ impl FileObject {
             }
             // TODO(https://fxbug.dev/333540469): write_fn should take L: LockBefore<FsNodeAppend>,
             // but FileOpsCore must be after FsNodeAppend
-            let mut locked = Unlocked::new();
+            let mut locked = unsafe { Unlocked::new() };
             let mut offset = self.offset.lock();
             let bytes_written = if self.flags().contains(OpenFlags::APPEND) {
                 let (_guard, mut locked) =
@@ -1824,7 +1824,7 @@ impl FileObject {
         self.write_fn(locked, current_task, |_locked| {
             // TODO(https://fxbug.dev/333540469): write_fn should take L: LockBefore<FsNodeAppend>,
             // but FileOpsCore must be after FsNodeAppend
-            let mut locked = Unlocked::new();
+            let mut locked = unsafe { Unlocked::new() };
             let (_guard, mut locked) =
                 self.node().append_lock.read_and(&mut locked, current_task)?;
 

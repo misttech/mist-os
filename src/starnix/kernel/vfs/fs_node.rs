@@ -1241,7 +1241,7 @@ impl FsNode {
             };
             #[cfg(any(test, debug_assertions))]
             {
-                let mut locked = Unlocked::new();
+                let mut locked = unsafe { Unlocked::new() };
                 let _l1 = result.append_lock.read_for_lock_ordering(&mut locked);
                 let _l2 = result.info.read();
                 let _l3 = result.flock_info.lock();

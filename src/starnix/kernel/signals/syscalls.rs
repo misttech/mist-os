@@ -1805,7 +1805,7 @@ mod tests {
             let task = task.weak_task();
             move || {
                 // Create child
-                let mut locked = Unlocked::new();
+                let mut locked = unsafe { Unlocked::new() };
                 let task = task.upgrade().expect("task must be alive");
                 let child: AutoReleasableTask = child.into();
                 // Wait for the main thread to be blocked on waiting for a child.

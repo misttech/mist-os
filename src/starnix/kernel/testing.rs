@@ -118,7 +118,7 @@ fn spawn_kernel_and_run_internal<F>(callback: F, security_server: Option<Arc<Sec
 where
     F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) + Send + Sync + 'static,
 {
-    let mut locked = Unlocked::new();
+    let mut locked = unsafe { Unlocked::new() };
     let kernel = create_test_kernel(&mut locked, security_server);
     let fs = create_test_fs_context(&mut locked, &kernel, TmpFs::new_fs);
     let init_task = create_test_init_task(&mut locked, &kernel, fs);
@@ -216,7 +216,7 @@ fn create_test_init_task(
 fn create_kernel_task_and_unlocked_with_fs<'l>(
     create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
-    let mut locked = Unlocked::new();
+    let mut locked = unsafe { Unlocked::new() };
     let kernel = create_test_kernel(&mut locked, None);
     let fs = create_fs(&kernel);
     let fs_context = create_test_fs_context(&mut locked, &kernel, |_| fs.clone());
@@ -545,7 +545,8 @@ impl From<TaskBuilder> for AutoReleasableTask {
 
 impl Drop for AutoReleasableTask {
     fn drop(&mut self) {
-        let mut locked = Unlocked::new(); // TODO(mariagl): Find a way to avoid creating a new locked context here.
+        // TODO(mariagl): Find a way to avoid creating a new locked context here.
+        let mut locked = unsafe { Unlocked::new() };
         self.0.take().unwrap().release(&mut locked);
     }
 }

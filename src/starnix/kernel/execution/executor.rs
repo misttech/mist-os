@@ -309,7 +309,8 @@ fn process_restricted_exit(
     // We just received control back from r-space, start measuring time in normal mode.
     profiling_guard.pivot("NormalMode");
 
-    let mut locked = Unlocked::new(); // We can't hold any locks entering restricted mode so we can't be holding any locks on exit.
+    // We can't hold any locks entering restricted mode so we can't be holding any locks on exit.
+    let mut locked = unsafe { Unlocked::new() };
 
     // Copy the register state out of the VMO.
     restricted_state.read_state(state);
@@ -491,6 +492,9 @@ where
     // `process_handle`.
     let (sender, receiver) = sync_channel::<TaskBuilder>(1);
     let result = std::thread::Builder::new().name("user-thread".to_string()).spawn(move || {
+        // It's safe to create a new lock context since we are on a new thread.
+        let mut locked = unsafe { Unlocked::new() };
+
         // Note, cross-process shared resources allocated in this function that aren't freed by the
         // Zircon kernel upon thread and/or process termination (like mappings in the shared region)
         // should be freed using the delayed finalizer mechanism and Task drop.
@@ -498,10 +502,7 @@ where
             .recv()
             .expect("caller should always send task builder before disconnecting")
             .into();
-        let pre_run_result = {
-            let mut locked = Unlocked::new();
-            pre_run(&mut locked, &mut current_task)
-        };
+        let pre_run_result = { pre_run(&mut locked, &mut current_task) };
         if pre_run_result.is_err() {
             log_error!("Pre run failed from {pre_run_result:?}. The task will not be run.");
 
@@ -534,7 +535,6 @@ where
             // Map the restricted state VMO and arrange for it to be unmapped later.
             let exit_status = match RestrictedState::from_vmo(state_vmo) {
                 Ok(restricted_state) => {
-                    let mut locked = Unlocked::new();
                     match run_task(&mut locked, &mut current_task, restricted_state) {
                         Ok(ok) => ok,
                         Err(error) => {
@@ -555,7 +555,6 @@ where
 
         // `release` must be called as the absolute last action on this thread to ensure that
         // any deferred release are done before it.
-        let mut locked = Unlocked::new();
         current_task.release(&mut locked);
 
         // Ensure that no releasables are registered after this point as we unwind the stack.
@@ -959,7 +958,7 @@ mod tests {
         let thread = std::thread::spawn({
             let task = task.weak_task();
             move || {
-                let mut locked = Unlocked::new();
+                let mut locked = unsafe { Unlocked::new() };
                 let task = task.upgrade().expect("task must be alive");
                 // Wait for the task to have a waiter.
                 while !task.read().is_blocked() {
