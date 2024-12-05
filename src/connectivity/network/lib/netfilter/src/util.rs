@@ -8,6 +8,7 @@ use fidl_fuchsia_net as net;
 
 use crate::grammar::{Error, Rule};
 
+#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 pub(crate) fn parse_invertible_subnet(pair: Pair<'_, Rule>) -> Result<(net::Subnet, bool), Error> {
     assert_eq!(pair.as_rule(), Rule::invertible_subnet);
     let mut inner = pair.into_inner();
@@ -24,6 +25,7 @@ pub(crate) fn parse_invertible_subnet(pair: Pair<'_, Rule>) -> Result<(net::Subn
     Ok((subnet, invert_match))
 }
 
+#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 pub(crate) fn parse_subnet(pair: Pair<'_, Rule>) -> Result<net::Subnet, Error> {
     assert_eq!(pair.as_rule(), Rule::subnet);
     let mut inner = pair.into_inner();
@@ -33,6 +35,7 @@ pub(crate) fn parse_subnet(pair: Pair<'_, Rule>) -> Result<net::Subnet, Error> {
     Ok(net::Subnet { addr, prefix_len })
 }
 
+#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 pub(crate) fn parse_ipaddr(pair: Pair<'_, Rule>) -> Result<net::IpAddress, Error> {
     assert_eq!(pair.as_rule(), Rule::ipaddr);
     let pair = pair.into_inner().next().unwrap();
@@ -47,11 +50,13 @@ pub(crate) fn parse_ipaddr(pair: Pair<'_, Rule>) -> Result<net::IpAddress, Error
     }
 }
 
+#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 pub(crate) fn parse_prefix_len(pair: Pair<'_, Rule>) -> Result<u8, Error> {
     assert_eq!(pair.as_rule(), Rule::prefix_len);
     pair.as_str().parse::<u8>().map_err(Error::Num)
 }
 
+#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 pub(crate) fn parse_port_num(pair: Pair<'_, Rule>) -> Result<u16, Error> {
     pair.as_str().parse::<u16>().map_err(Error::Num)
 }

@@ -179,7 +179,7 @@ impl Stash {
 
     /// Loads a map of `OptionCode`s to `DhcpOption`s from data stored in `fuchsia.stash`.
     pub async fn load_options(&self) -> Result<HashMap<OptionCode, DhcpOption>, StashError> {
-        let val = self.proxy.get_value(&OPTIONS_KEY.to_string()).await?;
+        let val = self.proxy.get_value(OPTIONS_KEY).await?;
         let val = match val {
             Some(v) => v,
             None => return Ok(HashMap::new()),
@@ -203,7 +203,7 @@ impl Stash {
     pub async fn load_parameters(&self) -> Result<ServerParameters, StashError> {
         let val = self
             .proxy
-            .get_value(&PARAMETERS_KEY.to_string())
+            .get_value(PARAMETERS_KEY)
             .await?
             .ok_or(StashError::MissingValue(PARAMETERS_KEY.to_string()))?;
         match *val {
