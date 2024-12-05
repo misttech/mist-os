@@ -247,7 +247,25 @@ rewrapper_env=(
 
 case "$loas_type" in
   skip) ;;
-  restricted)
+  unrestricted)
+    # Eligible to use credential helper to refresh OAuth from LOAS.
+    gcertstatus --check_remaining=2h > /dev/null || gcert || {
+      echo "Please run gcert to get a valid LOAS certificate."
+      exit 1
+    }
+    # There may be an reclient bootstrap bug where passing
+    # reproxy config options does not get forwarded properly,
+    # but concatenating configs together works.
+    configs+=( "$gcertauth_config" )
+    ;;
+  *)  # including 'restricted'
+    [[ "$loas_type" == restricted ]] || {
+      cat <<EOF
+Warning: Unexpected loas_type: '$loas_type'
+Proceeding as if type is "restricted".
+File a go/fuchsia-build-bug, including a go/paste link of: sh -x $check_loas_script
+EOF
+    }
     # Can only use OAuth tokens directly, using gcloud authentication.
     gcloud="$(which gcloud)" || {
       cat <<EOF
@@ -272,18 +290,6 @@ EOF
       exit 1
     }
     ;;
-  unrestricted)
-    # Eligible to use credential helper to refresh OAuth from LOAS.
-    gcertstatus --check_remaining=2h > /dev/null || gcert || {
-      echo "Please run gcert to get a valid LOAS certificate."
-      exit 1
-    }
-    # There may be an reclient bootstrap bug where passing
-    # reproxy config options does not get forwarded properly,
-    # but concatenating configs together works.
-    configs+=( "$gcertauth_config" )
-    ;;
-  *) echo "Unexpected loas_type: '$loas_type'"; exit 1 ;;
 esac
 
 # If configured, collect reproxy logs.
