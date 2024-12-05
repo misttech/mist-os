@@ -960,13 +960,22 @@ mod tests {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.diagnostics.ArchiveAccessor"))
                     .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                     .from(&archivist)
                     .to(Ref::parent()),
             )
             .await
-            .expect("added routes from archivist to parent");
+            .expect("routed LogSink from archivist to parent");
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("fuchsia.diagnostics.ArchiveAccessor"))
+                    .from_dictionary("diagnostics-accessors")
+                    .from(&archivist)
+                    .to(Ref::parent()),
+            )
+            .await
+            .expect("routed ArchiveAccessor from archivist to parent");
         builder
     }
 
