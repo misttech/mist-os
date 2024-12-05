@@ -281,7 +281,6 @@ fuchsia_sdk_repository(
     # LINT.IfChange
     local_sdk_version_file = "//:fuchsia_build_generated/fuchsia_sdk.hash",
     # LINT.ThenChange(scripts/update_workspace.py)
-    fuchsia_api_level_override = "HEAD",
     buildifier = "//:prebuilt/third_party/buildifier/%s/buildifier" % fuchsia_host_tag,
 )
 
@@ -296,7 +295,6 @@ fuchsia_sdk_repository(
     # LINT.ThenChange(scripts/update_workspace.py)
     parent_sdk = "@fuchsia_sdk",
     parent_sdk_local_paths = ["@fuchsia_in_tree_idk"],
-    fuchsia_api_level_override = "HEAD",
 )
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
