@@ -17,6 +17,7 @@
 #include <lib/ld/load-module.h>
 #include <lib/ld/load.h>
 
+#include <fbl/recycler.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
@@ -57,10 +58,152 @@ namespace ld {
 // elfldltl::SegmentWithVmo::AlignSegments with a separate VMO.  Any new VMO
 // becomes immutable (with no ZX_RIGHT_WRITE on the only handle) once its final
 // partial page has been zeroed.
+template <class Elf = elfldltl::Elf<>>
+class RemoteDecodedModule;
 
 // This is a shorthand for the <lib/elfldltl/container.h> wrappers used here.
 template <typename T>
 using RemoteContainer = elfldltl::StdContainer<std::vector>::Container<T>;
+
+// This is the common base class of all RemoteDecodedModule instantiations.
+// Its pointers can be used to store pointers to the specific derived types
+// with type erasure.  The specific instantiation type can be recovered safely
+// from this type if only objects returned by RemoteDecodedModule::Create, and
+// thus pre-vetted for matching some ELF format or other, are used.
+class RemoteDecodedFile : public fbl::RefCounted<RemoteDecodedFile>,
+                          public fbl::Recyclable<RemoteDecodedFile> {
+ public:
+  using Ptr = fbl::RefPtr<const RemoteDecodedFile>;
+
+  // The VMO can be used or borrowed during the lifetime of this object.
+  const zx::vmo& vmo() const { return vmo_; }
+
+  // This maps the file in so that mapped_vmo() can be used.
+  zx::result<> Init() { return mapped_vmo_.Init(vmo_.borrow()); }
+
+  // After Init, this is the File API object with the file's contents.
+  const elfldltl::MappedVmoFile& mapped_vmo() const { return mapped_vmo_; }
+
+  // If this is an ld::RemoteDecodedModule<Elf> object, return a RefPtr to it.
+  // Otherwise return a null RefPtr.
+  template <class Elf>
+  fbl::RefPtr<const RemoteDecodedModule<Elf>> GetIf() const {
+    using Ehdr = Elf::Ehdr;
+
+    std::optional read_ehdr = mapped_vmo_.ReadArray<Ehdr>(0, 1);
+    if (!read_ehdr) [[unlikely]] {
+      return nullptr;
+    }
+
+    const Ehdr& ehdr = read_ehdr->front();
+    if (ehdr.elfclass != Elf::kClass || ehdr.elfdata != Elf::kData) {
+      return nullptr;
+    }
+
+    return fbl::RefPtr{static_cast<const RemoteDecodedModule<Elf>*>(this)};
+  }
+
+  // This is the same, but if it returns a null pointer then the Diagnostics
+  // object will report the same failure details that would come from this same
+  // VMO being passed to ld::RemoteDecodedModule<Elf>::Create.
+  template <class Elf, class Diagnostics>
+  fbl::RefPtr<const RemoteDecodedModule<Elf>> GetIf(Diagnostics& diag) const {
+    using Ehdr = Elf::Ehdr;
+
+    std::optional read_ehdr = mapped_vmo_.ReadArray<Ehdr>(0, 1);
+    if (!read_ehdr) [[unlikely]] {
+      diag.FormatError("not an ELF file");
+      return nullptr;
+    }
+
+    const Ehdr& ehdr = read_ehdr->front();
+    if (!ehdr.Valid(diag)) {
+      return nullptr;
+    }
+
+    return fbl::RefPtr{static_cast<const RemoteDecodedModule<Elf>*>(this)};
+  }
+
+  // Call visitor with whichever ld::RemoteDecodedModule<...>::Ptr it is.
+  // The visitor must be callable with all four possible instantiations.
+  template <typename T>
+  decltype(auto) VisitAnyLayout(T&& visitor) const {
+    return OnLayout([&]<class Elf>() -> decltype(auto) {
+      return std::forward<T>(visitor)(
+          fbl::RefPtr{static_cast<const RemoteDecodedModule<Elf>*>(this)});
+    });
+  }
+
+  // Call visitor with whichever ld::RemoteDecodedModule<...>::Ptr it is for
+  // Elf32 or Elf64, but presume the ElfData (byte order).  The visitor must be
+  // callable with both Elf32<Data> and Elf64<Data> instantiations.
+  template <elfldltl::ElfData Data = elfldltl::ElfData::kNative, typename T>
+  decltype(auto) VisitAnyClass(T&& visitor) const {
+    return OnClass([&]<elfldltl::ElfClass Class>() -> decltype(auto) {
+      using Elf = elfldltl::Elf<Class, Data>;
+      return std::forward<T>(visitor)(
+          fbl::RefPtr{static_cast<const RemoteDecodedModule<Elf>*>(this)});
+    });
+  }
+
+ protected:
+  explicit RemoteDecodedFile(zx::vmo vmo) : vmo_(std::move(vmo)) {}
+
+  ~RemoteDecodedFile() = default;
+
+ private:
+  friend fbl::Recyclable<RemoteDecodedFile>;
+
+  static constexpr uint32_t kClassOffset = offsetof(elfldltl::Elf<>::Ehdr, elfclass);
+  static constexpr uint32_t kDataOffset = offsetof(elfldltl::Elf<>::Ehdr, elfdata);
+
+  template <class... Elf>
+  struct CheckIdentLayout {
+    static constexpr bool value =  // All formats have this layout in common.
+        ((offsetof(Elf::Ehdr, elfclass) == kClassOffset) && ...) &&
+        ((offsetof(Elf::Ehdr, elfdata) == kDataOffset) && ...);
+  };
+  static_assert(elfldltl::AllFormats<CheckIdentLayout>::value);
+
+  constexpr decltype(auto) OnClass(auto&& f) const {
+    std::span<const std::byte> image = mapped_vmo_.image();
+    switch (static_cast<elfldltl::ElfClass>(image[kClassOffset])) {
+      case elfldltl::ElfClass::k32:
+        return f.template operator()<elfldltl::ElfClass::k32>();
+      case elfldltl::ElfClass::k64:
+        return f.template operator()<elfldltl::ElfClass::k64>();
+    }
+  }
+
+  constexpr decltype(auto) OnData(auto&& f) const {
+    std::span<const std::byte> image = mapped_vmo_.image();
+    switch (static_cast<elfldltl::ElfData>(image[kDataOffset])) {
+      case elfldltl::ElfData::k2Lsb:
+        return f.template operator()<elfldltl::ElfData::k2Lsb>();
+      case elfldltl::ElfData::k2Msb:
+        return f.template operator()<elfldltl::ElfData::k2Msb>();
+    }
+  }
+
+  constexpr decltype(auto) OnLayout(auto&& f) const {
+    return OnClass([&]<elfldltl::ElfClass Class>() -> decltype(auto) {
+      return OnData([&]<elfldltl::ElfData Data>() -> decltype(auto) {
+        return f.template operator()<elfldltl::Elf<Class, Data>>();
+      });
+    });
+  }
+
+  // The fbl::Recyclable machinery means this will be called when the last
+  // RefPtr to this object dies.  The actual object is of a derived type so the
+  // correct pointer type must be used in delete.  So this uses the Visit
+  // machinery to get the right type, avoiding the need for a virtual
+  // destructor (and thus any vtable at all) in this class.
+  inline void fbl_recycle();
+
+  elfldltl::MappedVmoFile mapped_vmo_;
+  zx::vmo vmo_;
+};
+static_assert(fbl::internal::has_fbl_recycle_v<RemoteDecodedFile>);
 
 // This is an implementation detail of RemoteDecodedModule, below.
 template <class Elf>
@@ -68,9 +211,8 @@ using RemoteDecodedModuleBase =
     DecodedModule<Elf, RemoteContainer, AbiModuleInline::kYes, DecodedModuleRelocInfo::kYes,
                   elfldltl::SegmentWithVmo::Copy>;
 
-template <class Elf = elfldltl::Elf<>>
-class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
-                            public fbl::RefCounted<RemoteDecodedModule<Elf>> {
+template <class Elf>
+class RemoteDecodedModule : public RemoteDecodedFile, public RemoteDecodedModuleBase<Elf> {
  public:
   // ld::RemoteDecodedModule is usually used only via const pointer.
   // Only the Init method is called on a mutable ld::RemoteDecodedModule.
@@ -110,24 +252,27 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
   // RemoteDecodedModule is move-constructible and move-assignable.
   RemoteDecodedModule(RemoteDecodedModule&&) = default;
 
-  // After construction, Init should be called to do the actual decoding.
-  explicit RemoteDecodedModule(zx::vmo vmo) : vmo_(std::move(vmo)) {}
-
   RemoteDecodedModule& operator=(RemoteDecodedModule&&) = default;
 
-  // The VMO can be used or borrowed during the lifetime of this object.
-  // Before Init, this is the only method that will return non-empty data.
-  const zx::vmo& vmo() const { return vmo_; }
+  // This upcasts to an ld::RemoteDecodedFile::Ptr (with its own reference).
+  RemoteDecodedFile::Ptr AsFile() const {
+    return RemoteDecodedFile::Ptr{static_cast<const RemoteDecodedFile*>(this)};
+  }
 
-  // After Init, this is the File API object with the file's contents.
-  const elfldltl::MappedVmoFile& mapped_vmo() const { return mapped_vmo_; }
-
-  // After Init, this has the information relevant for a main executable.
+  // This has the information relevant for a main executable.
   const ExecInfo& exec_info() const { return exec_info_; }
 
-  // After Init, this reports the e_machine field.  Decoding does not care
-  // which machine it's for, but consuming it likely will.
-  elfldltl::ElfMachine machine() const { return machine_; }
+  // This reports the e_machine field.  Decoding does not care which machine
+  // it's for, but consuming it likely will.
+  elfldltl::ElfMachine machine() const { return ehdr().machine; }
+
+  // This yields the whole Ehdr for the file.
+  const Ehdr& ehdr() const {
+    // This doesn't bother with either a ReadMemory call or any span operations
+    // to assert on the sizes because the data was already vetted in Init.
+    // There's no need to re-check the image bounds.
+    return *reinterpret_cast<const Ehdr*>(mapped_vmo().image().data());
+  }
 
   // After Init, this is the list of direct DT_NEEDED dependencies in this
   // object.  Each element's .str() / .c_str() pointers point into the mapped
@@ -148,6 +293,26 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     return decoded;
   }
 
+  // Create and return a memory-adaptor object that serves as a wrapper around
+  // this module's LoadInfo and MappedVmoFile.  This is used to translate
+  // vaddrs into file-relative offsets in order to read from the VMO.
+  MetadataMemory metadata_memory() const {
+    return MetadataMemory{
+        this->load_info(),
+        // The DirectMemory API expects a mutable *this just because it's the
+        // API exemplar and toolkit pieces shouldn't presume a Memory API
+        // object is usable as const&.  But MappedVmoFile in fact is all const
+        // after Init.
+        const_cast<elfldltl::MappedVmoFile&>(mapped_vmo()),
+    };
+  }
+
+ private:
+  friend fbl::internal::MakeRefCountedHelper<RemoteDecodedModule>;
+
+  // After construction, Init should be called to do the actual decoding.
+  explicit RemoteDecodedModule(zx::vmo vmo) : RemoteDecodedFile(std::move(vmo)) {}
+
   // Initialize the module from the provided VMO, representing either the
   // binary or shared library to be loaded.  Create the data structures that
   // make the VMO readable, and scan and decode its phdrs to set and return
@@ -158,7 +323,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
   // already been examined and found to be invalid.
   template <class Diagnostics>
   bool Init(Diagnostics& diag, size_type page_size) {
-    if (auto status = mapped_vmo_.Init(vmo_.borrow()); status.is_error()) {
+    if (auto status = RemoteDecodedFile::Init(); status.is_error()) {
       // Return true if the Diagnostics object did too, but there is no way to
       // keep going if the file data didn't get mapped in.
       return diag.SystemError("cannot map VMO file", elfldltl::ZirconError{status.status_value()});
@@ -168,7 +333,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     // the mapped file image.
     constexpr elfldltl::NoArrayFromFile<Phdr> kNoPhdrAllocator;
     auto headers =
-        elfldltl::LoadHeadersFromFile<Elf>(diag, mapped_vmo_, kNoPhdrAllocator, std::nullopt);
+        elfldltl::LoadHeadersFromFile<Elf>(diag, mapped_vmo(), kNoPhdrAllocator, std::nullopt);
     if (!headers) [[unlikely]] {
       // TODO(mcgrathr): LoadHeadersFromFile doesn't propagate Diagnostics
       // return value on failure.
@@ -188,7 +353,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     constexpr elfldltl::NoArrayFromFile<std::byte> kNoBuildIdAllocator;
     auto result = DecodeModulePhdrs<Elf>(  //
         diag, phdrs, this->load_info().GetPhdrObserver(page_size),
-        PhdrFileBuildIdObserver<Elf>(mapped_vmo_, kNoBuildIdAllocator, this->module()));
+        PhdrFileBuildIdObserver<Elf>(mapped_vmo(), kNoBuildIdAllocator, this->module()));
     if (!result) [[unlikely]] {
       // DecodeModulePhdrs only fails if Diagnostics said to give up.
       return false;
@@ -197,7 +362,6 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     auto [dyn_phdr, tls_phdr, relro_phdr, stack_size] = *result;
 
     exec_info_ = {.relative_entry = ehdr.entry, .stack_size = stack_size};
-    machine_ = ehdr.machine;
 
     // Apply RELRO protection before segments are aligned & equipped with VMOs.
     if (!this->load_info().ApplyRelro(diag, relro_phdr, page_size, false)) [[unlikely]] {
@@ -209,7 +373,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     // per-segment VMOs created for partial-page zeroing become immutable.
     // Only copy-on-write clones of them will have relocations or other
     // mutations applied or be mapped writable in any process.
-    if (!elfldltl::SegmentWithVmo::AlignSegments(diag, this->load_info(), vmo_.borrow(), page_size,
+    if (!elfldltl::SegmentWithVmo::AlignSegments(diag, this->load_info(), vmo().borrow(), page_size,
                                                  true)) [[unlikely]] {
       // AlignSegments only fails if Diagnostics said to give up.
       return false;
@@ -246,27 +410,17 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     return true;
   }
 
-  // Create and return a memory-adaptor object that serves as a wrapper around
-  // this module's LoadInfo and MappedVmoFile.  This is used to translate
-  // vaddrs into file-relative offsets in order to read from the VMO.
-  MetadataMemory metadata_memory() const {
-    return MetadataMemory{
-        this->load_info(),
-        // The DirectMemory API expects a mutable *this just because it's the
-        // API exemplar and toolkit pieces shouldn't presume a Memory API
-        // object is usable as const&.  But MappedVmoFile in fact is all const
-        // after Init.
-        const_cast<elfldltl::MappedVmoFile&>(mapped_vmo_),
-    };
-  }
-
- private:
-  elfldltl::MappedVmoFile mapped_vmo_;
   NeededList needed_;
   ExecInfo exec_info_;
-  zx::vmo vmo_;
-  elfldltl::ElfMachine machine_ = elfldltl::ElfMachine::kNone;
 };
+
+// This must be defined outside the class once RemoteDecodedModule is complete.
+inline void RemoteDecodedFile::fbl_recycle() {
+  OnLayout([this]<class Elf>() {
+    using Decoded = RemoteDecodedModule<Elf>;
+    delete static_cast<Decoded*>(this);
+  });
+}
 
 }  // namespace ld
 

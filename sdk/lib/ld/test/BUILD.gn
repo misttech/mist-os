@@ -109,12 +109,7 @@ source_set("load-tests") {
       "//zircon/system/ulib/zx",
     ]
 
-    # LdRemoteTests.RemotePerfectSymbolFilterTestElf32 needs an Elf32 object,
-    # but it doesn't really matter what machine or OS it's for.  The Elf32
-    # target that conveniently works out of the box is armv7-linux-gnu.
-    # LdRemoteTests.ForeignMachine expects it to be ET_ARM in particular.
-    elf32_tc = "//build/toolchain:linux_arm"
-    data_deps += [ "modules:symbol-filter-elf32.fuchsia-test-data($elf32_tc)" ]
+    data_deps += [ ":remote-tests.test-data" ]
   } else {
     sources += [
       "ld-load-tests-posix-base.cc",
@@ -206,6 +201,28 @@ user_basic_redirect("load-tests.load-sets.basic") {
     "modules:indirect-deps.in-process.load-set",
     "modules:indirect-deps.load-set",
   ]
+}
+
+if (is_fuchsia) {
+  resource("remote-tests.test-data") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    sources = [
+      "data/32be",
+      "data/32le",
+      "data/64be",
+      "data/64le",
+    ]
+    outputs = [ "lib/test/{{source_file_part}}" ]
+
+    # LdRemoteTests.RemotePerfectSymbolFilterTestElf32 needs an Elf32 object,
+    # but it doesn't really matter what machine or OS it's for.  The Elf32
+    # target that conveniently works out of the box is armv7-linux-gnu.
+    # LdRemoteTests.ForeignMachine expects it to be ET_ARM in particular.
+    elf32_tc = "//build/toolchain:linux_arm"
+    data_deps = [ "modules:symbol-filter-elf32.fuchsia-test-data($elf32_tc)" ]
+  }
 }
 
 source_set("test-chdir-guard") {

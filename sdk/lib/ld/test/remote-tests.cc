@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/elfldltl/testing/diagnostics.h>
+#include <lib/elfldltl/testing/get-test-data.h>
 #include <lib/ld/remote-abi-stub.h>
 #include <lib/ld/remote-dynamic-linker.h>
 #include <lib/ld/remote-perfect-symbol-filter.h>
@@ -961,6 +962,117 @@ TEST_F(LdRemoteTests, ForeignMachine) {
   ASSERT_TRUE(linker.Load(diag));
 
   ExpectLog("");
+}
+
+template <class... Elf>
+struct OnEachLayout {
+  void operator()(auto&& f) const { (f.template operator()<Elf>(), ...); }
+};
+
+constexpr auto OnAllLayouts = elfldltl::AllFormats<OnEachLayout>{};
+
+template <class Elf>
+struct RemoteDecodedFileTest {
+  using size_type = Elf::size_type;
+  using Decoded = ld::RemoteDecodedModule<Elf>;
+  using DecodedPtr = Decoded::Ptr;
+
+  static constexpr size_type kPageSize = 0x1000;
+
+  static zx::vmo TestData() {
+    std::string name = "test/";
+    switch (Elf::kClass) {
+      case elfldltl::ElfClass::k32:
+        name += "32";
+        break;
+      case elfldltl::ElfClass::k64:
+        name += "64";
+        break;
+    }
+    switch (Elf::kData) {
+      case elfldltl::ElfData::k2Lsb:
+        name += "le";
+        break;
+      case elfldltl::ElfData::k2Msb:
+        name += "be";
+        break;
+    }
+    return elfldltl::testing::GetTestLibVmo(name);
+  }
+
+  static void Test() {
+    zx::vmo vmo;
+    ASSERT_NO_FATAL_FAILURE(vmo = TestData());
+
+    elfldltl::testing::ExpectOkDiagnostics diag;
+    DecodedPtr decoded = Decoded::Create(diag, std::move(vmo), kPageSize);
+    ASSERT_TRUE(decoded);
+
+    // Any sort of ld::RemoteDecodedModule<...>::Ptr can be upcast to a generic
+    // ld::RemoteDecodedFile::Ptr, but not implicitly.
+    ld::RemoteDecodedFile::Ptr file = decoded->AsFile();
+
+    // ld::RemoteDecodedFile::GetIf can downcast for the right format.
+    OnAllLayouts([&file, &decoded]<class Layout>() {
+      using LayoutPtr = ld::RemoteDecodedModule<Layout>::Ptr;
+      LayoutPtr as_layout = file->GetIf<Layout>();
+      if constexpr (std::is_same_v<Layout, Elf>) {
+        EXPECT_TRUE(as_layout);
+        EXPECT_EQ(as_layout, decoded);
+      } else {
+        EXPECT_FALSE(as_layout);
+
+        // The GetIf overload taking a Diagnostics object will report why.
+        if constexpr (Elf::kClass != Layout::kClass && Elf::kData != Layout::kData) {
+          elfldltl::testing::ExpectedErrorList diag{
+              elfldltl::testing::ExpectReport{"wrong ELF class (bit-width)"},
+              elfldltl::testing::ExpectReport{"wrong byte order"},
+          };
+          as_layout = file->GetIf<Layout>(diag);
+          EXPECT_FALSE(as_layout);
+        } else if constexpr (Elf::kClass != Layout::kClass) {
+          elfldltl::testing::ExpectedErrorList diag{
+              elfldltl::testing::ExpectReport{"wrong ELF class (bit-width)"},
+          };
+          as_layout = file->GetIf<Layout>(diag);
+          EXPECT_FALSE(as_layout);
+        } else {
+          elfldltl::testing::ExpectedErrorList diag{
+              elfldltl::testing::ExpectReport{"wrong byte order"},
+          };
+          as_layout = file->GetIf<Layout>(diag);
+          EXPECT_FALSE(as_layout);
+        }
+      }
+    });
+
+    // ld::RemoteDecodedFile::VisitAnyLayout should invoke the lambda with the
+    // right type even though it was upcast before.
+    file->VisitAnyLayout([decoded]<class SomePtr>(const SomePtr& ptr) {
+      if constexpr (std::is_same_v<SomePtr, DecodedPtr>) {
+        EXPECT_EQ(ptr, decoded);
+      } else {
+        ADD_FAILURE();
+      }
+    });
+
+    // ld::RemoteDecodedFile::VisitAnyClass should invoke the lambda with the
+    // right type even though it was upcast before.
+    file->VisitAnyClass<Elf::kData>([decoded]<class SomePtr>(const SomePtr& ptr) {
+      if constexpr (std::is_same_v<SomePtr, DecodedPtr>) {
+        EXPECT_EQ(ptr, decoded);
+      } else {
+        ADD_FAILURE();
+      }
+    });
+  }
+};
+
+TEST_F(LdRemoteTests, RemoteDecodedFile) {
+  constexpr auto test = []<class Elf>() {
+    ASSERT_NO_FATAL_FAILURE(RemoteDecodedFileTest<Elf>::Test());
+  };
+  OnAllLayouts(test);
 }
 
 }  // namespace

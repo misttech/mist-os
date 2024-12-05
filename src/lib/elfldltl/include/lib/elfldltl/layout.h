@@ -309,9 +309,12 @@ struct Elf : private Layout<Class, Data> {
       return check(magic == kMagic, "not an ELF file"sv) &&
              check(elfclass == Class, "wrong ELF class (bit-width)"sv) &&
              check(elfdata == Data, "wrong byte order"sv) &&
-             check(version == ElfVersion::kCurrent, "wrong e_version value"sv) &&
-             check(ehsize == sizeof(Ehdr), "wrong e_ehsize value"sv) &&
-             check(ident_version == ElfVersion::kCurrent, "wrong EI_VERSION value"sv) && valid;
+             check(ident_version == ElfVersion::kCurrent, "wrong EI_VERSION value"sv) &&
+             // The remaining checks rely on correct class and byte order to
+             // decode the values meaningfully, so reporting mismatches is
+             // redundant after mismatches in the single-byte values.
+             valid && check(version == ElfVersion::kCurrent, "wrong e_version value"sv) &&
+             check(ehsize == sizeof(Ehdr), "wrong e_ehsize value"sv) && valid;
     }
 
     constexpr bool Loadable(std::optional<ElfMachine> target = ElfMachine::kNative) const {

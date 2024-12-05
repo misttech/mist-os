@@ -55,6 +55,32 @@ class MappedVmoFile : public DirectMemory {
 
   ~MappedVmoFile();
 
+  // The DirectMemory methods are non-const so that things tested with
+  // DirectMemory don't assume const-ness that the Memory API doesn't require.
+  // But they actually have const-safe behavior, and it's convenient for
+  // MappedVmoFile to be usable as const.
+
+  template <typename T>
+  auto ReadFromFile(size_t offset) const {
+    return const_cast<MappedVmoFile*>(this)->DirectMemory::ReadFromFile<T>(offset);
+  }
+
+  template <typename T, typename Allocator>
+  auto ReadArrayFromFile(size_t offset, Allocator&& allocator, size_t count) const {
+    return const_cast<MappedVmoFile*>(this)->DirectMemory::ReadArrayFromFile<T>(
+        offset, std::forward<Allocator>(allocator), count);
+  }
+
+  template <typename T>
+  auto ReadArray(uintptr_t ptr, size_t count) const {
+    return const_cast<MappedVmoFile*>(this)->DirectMemory::ReadArray<T>(ptr, count);
+  }
+
+  template <typename T>
+  auto ReadArray(uintptr_t ptr) const {
+    return const_cast<MappedVmoFile*>(this)->DirectMemory::ReadArray<T>(ptr);
+  }
+
  private:
   // Make this private so it can't be used.
   using DirectMemory::set_image;
