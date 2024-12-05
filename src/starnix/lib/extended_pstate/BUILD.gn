@@ -27,10 +27,7 @@ rustc_library("lib") {
 
   sources = [ "src/lib.rs" ]
 
-  deps = [
-    "//third_party/rust_crates:once_cell",
-    "//third_party/rust_crates:static_assertions",
-  ]
+  deps = [ "//third_party/rust_crates:static_assertions" ]
 
   test_deps = [ "//src/lib/fuchsia" ]
 

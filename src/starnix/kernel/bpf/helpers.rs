@@ -16,9 +16,9 @@ use linux_uapi::{
     bpf_func_id_BPF_FUNC_skb_load_bytes_relative, bpf_func_id_BPF_FUNC_trace_printk, bpf_sock,
     uref,
 };
-use once_cell::sync::Lazy;
 use starnix_logging::track_stub;
 use starnix_sync::{BpfHelperOps, Locked};
+use std::sync::LazyLock;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub struct HelperFunctionContext<'a> {
@@ -298,7 +298,7 @@ pub struct SkBuf {
     pub data_end: uref<u8>,
 }
 
-pub static SK_BUF_MAPPING: Lazy<StructMapping> = Lazy::new(|| StructMapping {
+pub static SK_BUF_MAPPING: LazyLock<StructMapping> = LazyLock::new(|| StructMapping {
     memory_id: SK_BUF_ID.clone(),
     fields: vec![
         FieldMapping {

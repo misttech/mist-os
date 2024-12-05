@@ -22,7 +22,6 @@ rustc_library("perfetto-consumer") {
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:prost",
   ]
 }

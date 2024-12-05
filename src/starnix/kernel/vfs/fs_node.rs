@@ -21,7 +21,6 @@ use crate::vfs::{
 use bitflags::bitflags;
 use fuchsia_runtime::UtcInstant;
 use linux_uapi::XATTR_SECURITY_PREFIX;
-use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore, Locked, Mutex,
@@ -49,7 +48,7 @@ use starnix_uapi::{
     STATX_MTIME, STATX_NLINK, STATX_SIZE, STATX_UID, STATX__RESERVED, XATTR_USER_PREFIX,
 };
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, OnceLock, Weak};
 use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -143,7 +142,7 @@ pub struct FsNode {
     pub fifo: Option<PipeHandle>,
 
     /// The UNIX domain socket bound to this node, if any.
-    bound_socket: OnceCell<SocketHandle>,
+    bound_socket: OnceLock<SocketHandle>,
 
     /// A RwLock to synchronize append operations for this node.
     ///
@@ -168,7 +167,7 @@ pub struct FsNode {
     /// Whether this node can be linked into a directory.
     ///
     /// Only set for nodes created with `O_TMPFILE`.
-    link_behavior: OnceCell<FsNodeLinkBehavior>,
+    link_behavior: OnceLock<FsNodeLinkBehavior>,
 
     /// Tracks lock state for this file.
     pub write_guard_state: Mutex<FileWriteGuardState>,

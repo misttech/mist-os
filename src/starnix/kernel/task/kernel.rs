@@ -51,7 +51,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, from_status_like_fdio};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicU16, AtomicU8};
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, OnceLock, Weak};
 use zx::AsHandleRef;
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
@@ -133,27 +133,27 @@ pub struct Kernel {
     pub cmdline: BString,
 
     // Owned by anon_node.rs
-    pub anon_fs: OnceCell<FileSystemHandle>,
+    pub anon_fs: OnceLock<FileSystemHandle>,
     // Owned by pipe.rs
-    pub pipe_fs: OnceCell<FileSystemHandle>,
+    pub pipe_fs: OnceLock<FileSystemHandle>,
     // Owned by socket.rs
-    pub socket_fs: OnceCell<FileSystemHandle>,
+    pub socket_fs: OnceLock<FileSystemHandle>,
     // Owned by devtmpfs.rs
-    pub dev_tmp_fs: OnceCell<FileSystemHandle>,
+    pub dev_tmp_fs: OnceLock<FileSystemHandle>,
     // Owned by devpts.rs
-    pub dev_pts_fs: OnceCell<FileSystemHandle>,
+    pub dev_pts_fs: OnceLock<FileSystemHandle>,
     // Owned by procfs.rs
-    pub proc_fs: OnceCell<FileSystemHandle>,
+    pub proc_fs: OnceLock<FileSystemHandle>,
     // Owned by sysfs.rs
-    pub sys_fs: OnceCell<FileSystemHandle>,
+    pub sys_fs: OnceLock<FileSystemHandle>,
     // Owned by security/selinux_hooks/fs.rs
     pub selinux_fs: OnceCell<FileSystemHandle>,
     // Owned by nmfs.rs
-    pub nmfs: OnceCell<FileSystemHandle>,
+    pub nmfs: OnceLock<FileSystemHandle>,
     // Global state held by the Linux Security Modules subsystem.
     pub security_state: security::KernelState,
     // Owned by tracefs/fs.rs
-    pub trace_fs: OnceCell<FileSystemHandle>,
+    pub trace_fs: OnceLock<FileSystemHandle>,
 
     /// The registry of device drivers.
     pub device_registry: DeviceRegistry,
@@ -171,7 +171,7 @@ pub struct Kernel {
     /// to pass boot parameters to the bootloader.  Since Starnix is acting as a de-facto bootloader
     /// for Android, we need to be able to peek into these messages.
     /// Note that this might never be initialized (if the "misc" device never gets registered).
-    pub bootloader_message_store: OnceCell<AndroidBootloaderMessageStore>,
+    pub bootloader_message_store: OnceLock<AndroidBootloaderMessageStore>,
 
     /// A `Framebuffer` that can be used to display a view in the workstation UI. If the container
     /// specifies the `framebuffer` feature this framebuffer will be registered as a device.
@@ -213,10 +213,10 @@ pub struct Kernel {
     pub swap_files: OrderedMutex<Vec<FileHandle>, KernelSwapFiles>,
 
     /// The implementation of generic Netlink protocol families.
-    generic_netlink: OnceCell<GenericNetlink<NetlinkToClientSender<GenericMessage>>>,
+    generic_netlink: OnceLock<GenericNetlink<NetlinkToClientSender<GenericMessage>>>,
 
     /// The implementation of networking-related Netlink protocol families.
-    network_netlink: OnceCell<Netlink<NetlinkSenderReceiverProvider>>,
+    network_netlink: OnceLock<Netlink<NetlinkSenderReceiverProvider>>,
 
     /// Inspect instrumentation for this kernel instance.
     pub inspect_node: fuchsia_inspect::Node,
@@ -383,7 +383,7 @@ impl Kernel {
             container_svc,
             container_data_dir,
             remote_block_device_registry: Default::default(),
-            bootloader_message_store: OnceCell::new(),
+            bootloader_message_store: OnceLock::new(),
             framebuffer,
             binders: Default::default(),
             iptables: OrderedRwLock::new(IpTables::new()),
@@ -393,8 +393,8 @@ impl Kernel {
             vdso_arch32: Vdso::new_arch32(),
             netstack_devices: Arc::default(),
             swap_files: Default::default(),
-            generic_netlink: OnceCell::new(),
-            network_netlink: OnceCell::new(),
+            generic_netlink: OnceLock::new(),
+            network_netlink: OnceLock::new(),
             inspect_node,
             actions_logged: AtomicU16::new(0),
             suspend_resume_manager: Default::default(),

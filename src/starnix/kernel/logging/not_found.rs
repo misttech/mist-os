@@ -5,11 +5,11 @@
 use bstr::BString;
 use fuchsia_inspect::Inspector;
 use futures::future::BoxFuture;
-use once_cell::sync::Lazy;
 use regex::bytes::Regex;
 use starnix_sync::Mutex;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
+use std::sync::LazyLock;
 
 /// Path prefixes for which Starnix is responsible.
 const DESIRED_PATH_PREFIXES: &[&str] = &["/dev/", "/proc/", "/sys/"];
@@ -46,8 +46,8 @@ const IGNORED_PATH_PREFIXES: &[&str] = &[
 /// filesystems.
 const NUMBER_DEDUPER: &str = r#"(block/[A-Za-z]+|cpu|proc/|pid_|uid_|task|task/)\d+"#;
 
-static NOT_FOUND_COUNTS: Lazy<Mutex<HashMap<BString, u64>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static NOT_FOUND_COUNTS: LazyLock<Mutex<HashMap<BString, u64>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 pub fn track_file_not_found(path: BString) {
     if DESIRED_PATH_PREFIXES.iter().any(|&prefix| path.starts_with(prefix.as_bytes())) {

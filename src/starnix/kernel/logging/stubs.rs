@@ -4,13 +4,13 @@
 
 use fuchsia_inspect::Inspector;
 use futures::future::BoxFuture;
-use once_cell::sync::Lazy;
 use starnix_sync::Mutex;
 use std::collections::HashMap;
 use std::panic::Location;
+use std::sync::LazyLock;
 
-static STUB_COUNTS: Lazy<Mutex<HashMap<Invocation, Counts>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static STUB_COUNTS: LazyLock<Mutex<HashMap<Invocation, Counts>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[macro_export]
 macro_rules! track_stub {

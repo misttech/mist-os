@@ -17,7 +17,6 @@ use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use macro_rules_attribute::apply;
-use once_cell::sync::OnceCell;
 use starnix_logging::{log_debug, log_warn, set_zx_name};
 use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock, TaskRelease};
 use starnix_types::ownership::{
@@ -41,7 +40,7 @@ use starnix_uapi::{
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::{cmp, fmt};
 use zx::{
     AsHandleRef, Signals, Task as _, {self as zx},
@@ -928,7 +927,7 @@ pub struct Task {
     pub seccomp_filter_state: SeccompState,
 
     /// Used to ensure that all logs related to this task carry the same metadata about the task.
-    logging_span: OnceCell<starnix_logging::Span>,
+    logging_span: OnceLock<starnix_logging::Span>,
 
     /// Tell you whether you are tracing syscall entry / exit without a lock.
     pub trace_syscalls: AtomicBool,
@@ -1095,7 +1094,7 @@ impl Task {
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,
-            logging_span: OnceCell::new(),
+            logging_span: OnceLock::new(),
             trace_syscalls: AtomicBool::new(false),
             proc_pid_directory_cache: Mutex::new(None),
             security_state,

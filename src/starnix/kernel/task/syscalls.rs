@@ -14,7 +14,6 @@ use crate::vfs::{
     FdNumber, FileHandle, MountNamespaceFile, PidFdFileObject, UserBuffersOutputBuffer,
     VecOutputBuffer,
 };
-use once_cell::sync::Lazy;
 use starnix_logging::{log_error, log_info, log_trace, set_zx_name, track_stub};
 use starnix_sync::{Locked, RwLock, Unlocked};
 use starnix_syscalls::SyscallResult;
@@ -54,7 +53,7 @@ use starnix_uapi::{
 use static_assertions::const_assert;
 use std::cmp;
 use std::ffi::CString;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub fn do_clone(
@@ -1744,7 +1743,7 @@ struct KcmpParams {
     shuffle: usize,
 }
 
-static KCMP_PARAMS: Lazy<KcmpParams> = Lazy::new(|| {
+static KCMP_PARAMS: LazyLock<KcmpParams> = LazyLock::new(|| {
     let mut params = KcmpParams::default();
     zx::cprng_draw(params.as_mut_bytes());
     // Ensure the shuffle is odd so that multiplying a usize by this value is a permutation.

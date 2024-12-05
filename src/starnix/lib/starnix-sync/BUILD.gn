@@ -20,7 +20,6 @@ rustc_library("starnix-sync") {
     "//src/lib/fuchsia-sync",
     "//src/starnix/lib/starnix-sync/lock_ordering_macro",
     "//third_party/rust_crates:lock_api",
-    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:tracing-mutex",
   ]

@@ -8,12 +8,12 @@ use fidl_fuchsia_ui_input::MediaButtonsEvent;
 use fidl_fuchsia_ui_pointer::{
     EventPhase as FidlEventPhase, TouchEvent as FidlTouchEvent, TouchPointerSample,
 };
-use once_cell::sync::Lazy;
 use starnix_logging::log_warn;
 use starnix_types::time::{time_from_timeval, timeval_from_time};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{error, uapi};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::sync::LazyLock;
 use {fidl_fuchsia_input_report as fir, fidl_fuchsia_ui_input3 as fuiinput};
 
 type SlotId = usize;
@@ -862,7 +862,7 @@ impl LinuxKeyboardEventParser {
     }
 }
 
-static KEY_MAP: Lazy<KeyMap> = Lazy::new(|| init_key_map());
+static KEY_MAP: LazyLock<KeyMap> = LazyLock::new(|| init_key_map());
 
 /// linux <-> fuchsia key map allow search from 2 way.
 pub struct KeyMap {

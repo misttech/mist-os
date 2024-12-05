@@ -7,7 +7,6 @@ use crate::vfs::OutputBuffer;
 use diagnostics_data::{Data, Logs, Severity};
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fuchsia_component::client::connect_to_protocol_sync;
-use once_cell::sync::OnceCell;
 use serde::Deserialize;
 use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::auth::{CAP_SYSLOG, CAP_SYS_ADMIN};
@@ -16,13 +15,13 @@ use starnix_uapi::vfs::FdEvents;
 use std::cmp;
 use std::collections::VecDeque;
 use std::io::{self, Write};
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, OnceLock};
 
 const BUFFER_SIZE: i32 = 1_049_000;
 
 #[derive(Default)]
 pub struct Syslog {
-    syscall_subscription: OnceCell<Mutex<LogSubscription>>,
+    syscall_subscription: OnceLock<Mutex<LogSubscription>>,
 }
 
 impl Syslog {

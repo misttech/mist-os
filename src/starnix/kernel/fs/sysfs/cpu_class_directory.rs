@@ -36,7 +36,7 @@ impl FsNodeOps for CpuClassDirectory {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        static CPUS: once_cell::sync::OnceCell<Vec<String>> = once_cell::sync::OnceCell::new();
+        static CPUS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
 
         let cpus = CPUS.get_or_init(|| {
             let num = zx::system_get_num_cpus();

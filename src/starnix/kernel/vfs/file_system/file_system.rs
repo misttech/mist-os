@@ -14,7 +14,6 @@ use crate::vfs::{
     WeakFsNodeHandle,
 };
 use linked_hash_map::LinkedHashMap;
-use once_cell::sync::OnceCell;
 use ref_cast::RefCast;
 use smallvec::SmallVec;
 use starnix_lifecycle::AtomicU64Counter;
@@ -27,14 +26,14 @@ use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::{error, ino_t, statfs};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, OnceLock, Weak};
 
 pub const DEFAULT_LRU_CAPACITY: usize = 32;
 
 /// A file system that can be mounted in a namespace.
 pub struct FileSystem {
     pub kernel: Weak<Kernel>,
-    root: OnceCell<DirEntryHandle>,
+    root: OnceLock<DirEntryHandle>,
     next_node_id: AtomicU64Counter,
     ops: Box<dyn FileSystemOps>,
 
@@ -143,7 +142,7 @@ impl FileSystem {
 
         let file_system = Arc::new(FileSystem {
             kernel: Arc::downgrade(kernel),
-            root: OnceCell::new(),
+            root: OnceLock::new(),
             next_node_id: AtomicU64Counter::new(1),
             ops: Box::new(ops),
             options,

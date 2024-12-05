@@ -7,18 +7,17 @@ use crate::mm::memory::MemoryObject;
 use crate::mm::PAGE_SIZE;
 use crate::time::utc::update_utc_clock;
 use fuchsia_runtime::{UtcClockTransform, UtcInstant};
-use once_cell::sync::Lazy;
 use process_builder::elf_parse;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio, uapi};
 use std::mem::size_of;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use fidl_fuchsia_io as fio;
 
-static VVAR_SIZE: Lazy<usize> = Lazy::new(|| *PAGE_SIZE as usize);
-pub static ZX_TIME_VALUES_MEMORY: Lazy<Arc<MemoryObject>> = Lazy::new(|| {
+static VVAR_SIZE: LazyLock<usize> = LazyLock::new(|| *PAGE_SIZE as usize);
+pub static ZX_TIME_VALUES_MEMORY: LazyLock<Arc<MemoryObject>> = LazyLock::new(|| {
     load_time_values_memory().expect(
         "Could not find time values VMO! Please ensure /boot/kernel was routed to the starnix kernel.",
     )

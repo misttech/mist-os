@@ -54,7 +54,6 @@ rustc_library("input") {
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:bit-vec",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
   ]

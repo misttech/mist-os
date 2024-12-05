@@ -19,7 +19,6 @@ use bitflags::bitflags;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
 use starnix_types::arch::ArchWidth;
 
-use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 use range_map::RangeMap;
 use smallvec::SmallVec;
@@ -52,7 +51,7 @@ use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut, Range};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
@@ -95,7 +94,7 @@ const ASLR_32_RANDOM_BITS: usize = 8;
 const MAX_STACK_SIZE: usize = 512 * 1024 * 1024;
 
 fn usercopy() -> Option<&'static usercopy::Usercopy> {
-    static USERCOPY: Lazy<Option<usercopy::Usercopy>> = Lazy::new(|| {
+    static USERCOPY: LazyLock<Option<usercopy::Usercopy>> = LazyLock::new(|| {
         // We do not create shared processes in unit tests.
         if UNIFIED_ASPACES_ENABLED {
             // ASUMPTION: All Starnix managed Linux processes have the same
@@ -106,7 +105,7 @@ fn usercopy() -> Option<&'static usercopy::Usercopy> {
         }
     });
 
-    Lazy::force(&USERCOPY).as_ref()
+    LazyLock::force(&USERCOPY).as_ref()
 }
 
 /// Provides an implementation for zxio's `zxio_maybe_faultable_copy` that supports
@@ -135,7 +134,7 @@ pub unsafe fn zxio_maybe_faultable_copy_impl(
     }
 }
 
-pub static PAGE_SIZE: Lazy<u64> = Lazy::new(|| zx::system_get_page_size() as u64);
+pub static PAGE_SIZE: LazyLock<u64> = LazyLock::new(|| zx::system_get_page_size() as u64);
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

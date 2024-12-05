@@ -17,7 +17,6 @@ use crate::vfs::{
 };
 
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
@@ -35,7 +34,7 @@ use starnix_uapi::{
 };
 use std::borrow::Cow;
 use std::ffi::CString;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 /// TaskDirectory delegates most of its operations to StaticDirectory, but we need to override
 /// FileOps::as_pid so that these directories can be used in places that expect a pidfd.
@@ -471,8 +470,8 @@ impl FsNodeOps for NsDirectory {
         let task = Task::from_weak(&self.task)?;
         if let Some(id) = elements.next() {
             // The name starts with {namespace}:, check that it matches {namespace}:[id]
-            static NS_IDENTIFIER_RE: Lazy<Regex> =
-                Lazy::new(|| Regex::new("^\\[[0-9]+\\]$").unwrap());
+            static NS_IDENTIFIER_RE: LazyLock<Regex> =
+                LazyLock::new(|| Regex::new("^\\[[0-9]+\\]$").unwrap());
             if !NS_IDENTIFIER_RE.is_match(id) {
                 return error!(ENOENT);
             }

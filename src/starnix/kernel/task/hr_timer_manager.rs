@@ -6,7 +6,6 @@ use fidl::endpoints::Proxy;
 use fuchsia_inspect::ArrayProperty;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use futures::FutureExt;
-use once_cell::sync::OnceCell;
 use starnix_logging::{log_debug, log_error, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
@@ -16,7 +15,7 @@ use {fidl_fuchsia_hardware_hrtimer as fhrtimer, fuchsia_async as fasync};
 
 use std::collections::BinaryHeap;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, OnceLock, Weak};
 
 use crate::power::{
     clear_wake_proxy_signal, create_proxy_for_wake_events, set_wake_proxy_signal, OnWakeOps,
@@ -165,7 +164,7 @@ pub struct HrTimerManager {
 
     /// The channel sender that notifies the worker thread that HrTimer driver needs to be
     /// (re)started with a new deadline.
-    start_next_sender: OnceCell<Sender<()>>,
+    start_next_sender: OnceLock<Sender<()>>,
 }
 pub type HrTimerManagerHandle = Arc<HrTimerManager>;
 

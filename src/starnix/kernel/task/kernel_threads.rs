@@ -6,7 +6,6 @@ use crate::dynamic_thread_spawner::DynamicThreadSpawner;
 use crate::task::{CurrentTask, Kernel, Task, ThreadGroup};
 use fragile::Fragile;
 use fuchsia_async as fasync;
-use once_cell::sync::OnceCell;
 use pin_project::pin_project;
 use starnix_sync::{Locked, Unlocked};
 use starnix_types::ownership::{OwnedRef, TempRef, WeakRef};
@@ -17,7 +16,7 @@ use std::ffi::CString;
 use std::future::Future;
 use std::ops::DerefMut;
 use std::pin::Pin;
-use std::sync::Weak;
+use std::sync::{OnceLock, Weak};
 use std::task::{Context, Poll};
 
 /// The threads that the kernel runs internally.
@@ -35,10 +34,10 @@ pub struct KernelThreads {
     ehandle: fasync::EHandle,
 
     /// The thread pool to spawn blocking calls to.
-    spawner: OnceCell<DynamicThreadSpawner>,
+    spawner: OnceLock<DynamicThreadSpawner>,
 
     /// Information about the main system task that is bound to the kernel main thread.
-    system_task: OnceCell<SystemTask>,
+    system_task: OnceLock<SystemTask>,
 
     /// A `RefCell` containing an `Unlocked` state for the lock ordering purposes.
     unlocked_for_async: UnlockedForAsync,
