@@ -91,7 +91,7 @@ impl SidTable {
         let index = if let Some(index) = existing {
             *index
         } else {
-            self.policy.validate_security_context(&security_context)?;
+            self.policy.validate_security_context(security_context)?;
             let index = self.entries.len();
             self.entries.push(Entry::Valid { security_context: security_context.clone() });
             index

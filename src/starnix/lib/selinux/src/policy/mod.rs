@@ -49,7 +49,7 @@ pub struct RoleId(NonZeroU32);
 pub struct TypeId(NonZeroU32);
 
 /// Identifies a sensitivity level within a policy.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub struct SensitivityId(NonZeroU32);
 
 /// Identifies a security category within a policy.
