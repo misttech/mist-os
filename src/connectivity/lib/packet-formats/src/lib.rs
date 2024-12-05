@@ -64,6 +64,7 @@ mod macros;
 pub mod arp;
 pub mod error;
 pub mod ethernet;
+pub mod gmp;
 pub mod icmp;
 pub mod igmp;
 pub mod ip;

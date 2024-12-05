@@ -13,8 +13,7 @@ use zerocopy::byteorder::network_endian::U16;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 use super::{
-    parse_v3_possible_floating_point, peek_message_type, IgmpMessage, IgmpNonEmptyBody,
-    IgmpResponseTimeV2, IgmpResponseTimeV3,
+    peek_message_type, IgmpMessage, IgmpNonEmptyBody, IgmpResponseTimeV2, IgmpResponseTimeV3,
 };
 use crate::error::{ParseError, UnrecognizedProtocolCode};
 use crate::igmp::MessageType;
@@ -112,22 +111,8 @@ pub struct MembershipQueryData {
 }
 
 impl MembershipQueryData {
-    // TODO(rheacock): Remove `allow(dead_code)` when these are used outside of
-    // tests or other dead code.
-    #[allow(dead_code)]
     const S_FLAG: u8 = (1 << 3);
-    #[allow(dead_code)]
     const QRV_MSK: u8 = 0x07;
-
-    /// The default querier robustness variable, as defined in
-    /// [RFC 3376 section 8.1].
-    ///
-    /// [RFC 3376 section 8.1]: https://tools.ietf.org/html/rfc3376#section-8.1
-    pub(crate) const _DEFAULT_QRV: u8 = 2;
-    /// The default Query Interval, as defined in [RFC 3376 section 8.2].
-    ///
-    /// [RFC 3376 section 8.2]: https://tools.ietf.org/html/rfc3376#section-8.2
-    pub const DEFAULT_QUERY_INTERVAL: core::time::Duration = core::time::Duration::from_secs(1250);
 
     /// Returns the the number of sources.
     pub fn number_of_sources(self) -> u16 {
@@ -175,9 +160,26 @@ impl MembershipQueryData {
     pub fn querier_query_interval(self) -> core::time::Duration {
         // qqic is represented in a packed floating point format and interpreted
         // as units of seconds.
-        core::time::Duration::from_secs(parse_v3_possible_floating_point(self.qqic).into())
+        Igmpv3QQIC::from(self.qqic).into()
     }
 }
+
+/// QRV (Querier's Robustness Variable) defined
+/// in [RFC 3376 section 4.1.6].
+///
+/// Aliased to shared GMP implementation for convenience.
+///
+/// [RFC 3376 section 4.1.6]:
+///     https://datatracker.ietf.org/doc/html/rfc3376#section-4.1.6
+pub type Igmpv3QRV = crate::gmp::QRV;
+
+/// QQIC (Querier's Query Interval Code) defined in [RFC 3376 section 4.1.7].
+///
+/// Aliased to shared GMP implementation for convenience.
+///
+/// [RFC 3376 section 4.1.7]:
+///     https://datatracker.ietf.org/doc/html/rfc3376#section-4.1.7
+pub type Igmpv3QQIC = crate::gmp::QQIC;
 
 /// IGMPv3 Membership Query message.
 ///
@@ -239,21 +241,13 @@ impl MembershipReportV3Data {
     }
 }
 
-create_protocol_enum!(
-    /// Group Record Types as defined in [RFC 3376 section 4.2.12]
-    ///
-    /// [RFC 3376 section 4.2.12]: https://tools.ietf.org/html/rfc3376#section-4.2.12
-    #[allow(missing_docs)]
-    #[derive(PartialEq, Copy, Clone)]
-    pub enum IgmpGroupRecordType: u8 {
-        ModeIsInclude, 0x01, "Mode Is Include";
-        ModeIsExclude, 0x02, "Mode Is Exclude";
-        ChangeToIncludeMode, 0x03, "Change To Include Mode";
-        ChangeToExcludeMode, 0x04, "Change To Exclude Mode";
-        AllowNewSources, 0x05, "Allow New Sources";
-        BlockOldSources, 0x06, "Block Old Sources";
-    }
-);
+/// Group Record Types as defined in [RFC 3376 section 4.2.12]
+///
+/// Aliased to shared GMP implementation for convenience.
+///
+/// [RFC 3376 section 4.2.12]:
+///     https://tools.ietf.org/html/rfc3376#section-4.2.12
+pub type IgmpGroupRecordType = crate::gmp::GroupRecordType;
 
 /// Fixed information for IGMPv3 Membership Report's Group Records.
 ///

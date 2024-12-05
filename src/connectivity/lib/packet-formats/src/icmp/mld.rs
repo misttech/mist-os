@@ -21,6 +21,7 @@ use zerocopy::byteorder::network_endian::U16;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 use crate::error::{ParseError, ParseResult, UnrecognizedProtocolCode};
+use crate::gmp::{LinExpConversion, OverflowError};
 use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpPacketRaw, IcmpUnusedCode, MessageBody};
 
 // TODO(https://github.com/google/zerocopy/issues/1528): Use std::convert::Infallible.
@@ -63,21 +64,13 @@ pub enum MldPacketRaw<B: SplitByteSlice> {
     MulticastListenerReportV2(IcmpPacketRaw<Ipv6, B, MulticastListenerReportV2>),
 }
 
-create_protocol_enum!(
-    /// Multicast Record Types as defined in [RFC 3810 section 5.2.12]
-    ///
-    /// [RFC 3810 section 5.2.12]: https://www.rfc-editor.org/rfc/rfc3810#section-5.2.12
-    #[allow(missing_docs)]
-    #[derive(PartialEq, Copy, Clone)]
-    pub enum Mldv2MulticastRecordType: u8 {
-        ModeIsInclude, 0x01, "Mode Is Include";
-        ModeIsExclude, 0x02, "Mode Is Exclude";
-        ChangeToIncludeMode, 0x03, "Change To Include Mode";
-        ChangeToExcludeMode, 0x04, "Change To Exclude Mode";
-        AllowNewSources, 0x05, "Allow New Sources";
-        BlockOldSources, 0x06, "Block Old Sources";
-    }
-);
+/// Multicast Record Types as defined in [RFC 3810 section 5.2.12].
+///
+/// Aliased to shared GMP implementation for convenience.
+///
+/// [RFC 3810 section 5.2.12]:
+///     https://www.rfc-editor.org/rfc/rfc3810#section-5.2.12
+pub type Mldv2MulticastRecordType = crate::gmp::GroupRecordType;
 
 /// Fixed information for an MLDv2 Report's Multicast Record, per
 /// [RFC 3810 section 5.2].
@@ -274,19 +267,6 @@ pub struct MulticastListenerReport;
 #[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned, Copy, Clone, Debug)]
 pub struct MulticastListenerDone;
 
-/// MLD Errors.
-#[derive(Debug, PartialEq)]
-pub enum MldError {
-    /// Raised when `MaxRespCode` cannot fit in `u16`.
-    MaxRespCodeOverflow,
-    /// Raised when a duration cannot be exactly expressed with a MaxRespCode. This can happen when
-    /// the exponential mapping from MLDv2 is used. For an example see [RFC 3810 section 5.1].
-    /// This error is not used for MLDv1.
-    ///
-    /// [RFC 3810 section 5.1]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1
-    MaxRespCodeLossyConversion,
-}
-
 /// The trait for all MLDv1 Messages.
 pub trait Mldv1MessageType {
     /// The type used to represent maximum response delay.
@@ -307,117 +287,6 @@ pub trait Mldv1MessageType {
 pub trait IcmpMldv1MessageType:
     Mldv1MessageType + IcmpMessage<Ipv6, Code = IcmpUnusedCode>
 {
-}
-
-/// Creates a bitmask of [n] bits, [n] must be <= 31.
-/// E.g. for n = 12 yields 0xFFF.
-const fn bitmask(n: u8) -> u32 {
-    (1 << n) - 1
-}
-
-/// The trait converts a code to a floating point value: in a linear fashion up to [SWITCHPOINT]
-/// and then using a floating point representation to allow the conversion of larger values.
-/// In MLD and IGMP there are different codes that follow this pattern, e.g. QQIC, ResponseDelay
-/// ([RFC 3376 section 4.1], [RFC 3810 section 5.1]), which all convert a code with the following
-/// underlying structure:
-///
-///       0    NUM_EXP_BITS       NUM_MANT_BITS
-///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-///      |X|      exp      |          mant         |
-///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-///
-/// This trait simplifies the implementation by providing methods to perform the conversion.
-///
-/// [RFC 3376 section 4.1]: https://datatracker.ietf.org/doc/html/rfc3376#section-4.1
-/// [RFC 3810 section 5.1]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1
-// TODO(https://fxbug.dev/42071006): extract the trait in a common file to use it for for IGMPv3.
-pub trait LinExpConversion<C: Debug + core::cmp::PartialEq + Copy + Clone>:
-    Into<C> + Copy + Clone
-{
-    // Specified by Implementors
-    /// Number of bits used for the mantissa.
-    const NUM_MANT_BITS: u8;
-    /// Number of bits used for the exponent.
-    const NUM_EXP_BITS: u8;
-    /// Perform a lossy conversion from the `C` type.
-    /// Not all values in `C` can be exactly represented using the code and they will be rounded to
-    /// a code that represents a value close the provided one.
-    fn lossy_try_from(value: C) -> Result<Self, MldError>;
-
-    // Provided for Implementors
-    /// How much the exponent needs to be incremented when performing the exponential conversion.
-    const EXP_INCR: u32 = 3;
-    /// Bitmask for the mantissa.
-    const MANT_BITMASK: u32 = bitmask(Self::NUM_MANT_BITS);
-    /// Bitmask for the exponent.
-    const EXP_BITMASK: u32 = bitmask(Self::NUM_EXP_BITS);
-    /// First value for which we start the exponential conversion.
-    const SWITCHPOINT: u32 = 0x1 << (Self::NUM_MANT_BITS + Self::NUM_EXP_BITS);
-    /// Prefix for capturing the mantissa.
-    const MANT_PREFIX: u32 = 0x1 << Self::NUM_MANT_BITS;
-    /// Maximum value the code supports.
-    const MAX_VALUE: u32 =
-        (Self::MANT_BITMASK | Self::MANT_PREFIX) << (Self::EXP_INCR + Self::EXP_BITMASK);
-
-    /// Converts the provided code to a value: in a linear way until [Self::SWITCHPOINT] and using
-    /// a floating representation for larger values.
-    fn to_expanded(code: u16) -> u32 {
-        let code = code.into();
-        if code < Self::SWITCHPOINT {
-            code
-        } else {
-            let mant = code & Self::MANT_BITMASK;
-            let exp = (code >> Self::NUM_MANT_BITS) & Self::EXP_BITMASK;
-            (mant | Self::MANT_PREFIX) << (Self::EXP_INCR + exp)
-        }
-    }
-
-    /// Performs a lossy conversion from [value].
-    ///
-    /// The function will always succeed for values within the valid range. However, the code might
-    /// not exactly represent the provided input. E.g. a value of `MAX_VALUE - 1` cannot be exactly
-    /// represented with a corresponding code, due the exponential representation. However, the
-    /// function will be able to provide a code representing a value close to the provided one.
-    ///
-    /// If stronger guarantees are needed consider using [exact_try_from_expanded].
-    fn lossy_try_from_expanded(value: u32) -> Result<u16, MldError> {
-        if value > Self::MAX_VALUE {
-            Err(MldError::MaxRespCodeOverflow)
-        } else if value < Self::SWITCHPOINT {
-            // Given that Value is < Self::SWITCHPOINT, unwrapping here is safe.
-            let code = value.try_into().unwrap();
-            Ok(code)
-        } else {
-            let msb = (u32::BITS - value.leading_zeros()) - 1;
-            let exp = msb - u32::from(Self::NUM_MANT_BITS);
-            let mant = (value >> exp) & Self::MANT_BITMASK;
-            // Unwrap guaranteed by the structure of the built int:
-            let code = (Self::SWITCHPOINT | ((exp - Self::EXP_INCR) << Self::NUM_MANT_BITS) | mant)
-                .try_into()
-                .unwrap();
-            Ok(code)
-        }
-    }
-
-    /// Performs an exact conversion from [value].
-    ///
-    /// The function will succeed only for values within the valid range that can be exactly
-    /// represented by the produced code. E.g. a value of FLOATING_POINT_MAX_VALUE - 1 cannot be
-    /// exactly represented with a corresponding, code due the exponential representation. In this
-    /// case, the function will return an error.
-    ///
-    /// If a lossy conversion can be tolerated consider using [lossy_try_from_expanded].
-    fn exact_try_from(value: C) -> Result<Self, MldError>
-    where
-        Self: core::marker::Sized,
-    {
-        let res = Self::lossy_try_from(value)?;
-        if value == res.into() {
-            Ok(res)
-        } else {
-            Err(MldError::MaxRespCodeLossyConversion)
-        }
-    }
 }
 
 /// The trait for MLD codes that can be further interpreted using different methods e.g. QQIC.
@@ -462,11 +331,9 @@ impl From<Mldv1ResponseDelay> for Duration {
 }
 
 impl TryFrom<Duration> for Mldv1ResponseDelay {
-    type Error = MldError;
+    type Error = OverflowError;
     fn try_from(period: Duration) -> Result<Self, Self::Error> {
-        Ok(Mldv1ResponseDelay(
-            u16::try_from(period.as_millis()).map_err(|_| MldError::MaxRespCodeOverflow)?,
-        ))
+        Ok(Mldv1ResponseDelay(u16::try_from(period.as_millis()).map_err(|_| OverflowError)?))
     }
 }
 
@@ -769,11 +636,9 @@ impl LinExpConversion<Duration> for Mldv2ResponseDelay {
     const NUM_MANT_BITS: u8 = 12;
     const NUM_EXP_BITS: u8 = 3;
 
-    fn lossy_try_from(value: Duration) -> Result<Self, MldError> {
-        let millis: u32 =
-            value.as_millis().try_into().map_err(|_| MldError::MaxRespCodeOverflow)?;
-        let code = Self::lossy_try_from_expanded(millis)?;
-        Ok(Self(code))
+    fn lossy_try_from(value: Duration) -> Result<Self, OverflowError> {
+        let millis: u32 = value.as_millis().try_into().map_err(|_| OverflowError)?;
+        Self::lossy_try_from_expanded(millis).map(Self)
     }
 }
 
@@ -795,65 +660,29 @@ impl From<Mldv2ResponseDelay> for Duration {
 
 /// QRV (Querier's Robustness Variable) used in Queryv2 messages, defined in
 /// [RFC 3810 section 5.1.8].
-/// [RFC 3810 section 5.1.8]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.8
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub struct Mldv2QRV(u8);
-
-impl Mldv2QRV {
-    const QRV_MAX: u8 = 7;
-
-    /// Returns the Querier's Robustness Variable
-    /// From [RFC 3810 section 5.1.8]: If the Querier's [Robustness Variable] exceeds 7 (the
-    /// maximum value of the QRV field), the QRV field is set to zero.
-    /// [RFC 3810 section 5.1.8]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.8
-    pub fn new(robustness_value: u8) -> Self {
-        if robustness_value > Self::QRV_MAX {
-            return Mldv2QRV(0);
-        }
-        Mldv2QRV(robustness_value)
-    }
-}
-
-impl From<Mldv2QRV> for u8 {
-    fn from(qrv: Mldv2QRV) -> u8 {
-        qrv.0
-    }
-}
+///
+/// Aliased to shared GMP implementation for convenience.
+///
+/// [RFC 3810 section 5.1.8]:
+///     https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.8
+pub type Mldv2QRV = crate::gmp::QRV;
 
 /// QQIC (Querier's Query Interval Code) used in Queryv2 messages, defined in
 /// [RFC 3810 section 5.1.9].
 ///
-/// [RFC 3810 section 5.1.9]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.9
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub struct Mldv2QQIC(u8);
+/// Aliased to shared GMP implementation for convenience.
+///
+/// [RFC 3810 section 5.1.9]:
+///     https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.9
+pub type Mldv2QQIC = crate::gmp::QQIC;
 
 impl MaxCode<u8> for Mldv2QQIC {
     fn as_code(self) -> u8 {
-        self.0
+        self.into()
     }
 
     fn from_code(code: u8) -> Self {
-        Mldv2QQIC(code)
-    }
-}
-
-impl LinExpConversion<Duration> for Mldv2QQIC {
-    const NUM_MANT_BITS: u8 = 4;
-    const NUM_EXP_BITS: u8 = 3;
-
-    fn lossy_try_from(value: Duration) -> Result<Self, MldError> {
-        let secs: u32 = value.as_secs().try_into().map_err(|_| MldError::MaxRespCodeOverflow)?;
-        let code = Self::lossy_try_from_expanded(secs)?
-            .try_into()
-            .map_err(|_| MldError::MaxRespCodeOverflow)?;
-        Ok(Self(code))
-    }
-}
-
-impl From<Mldv2QQIC> for Duration {
-    fn from(code: Mldv2QQIC) -> Self {
-        let secs: u64 = Mldv2QQIC::to_expanded(code.0.into()).into();
-        Duration::from_secs(secs)
+        code.into()
     }
 }
 
@@ -907,12 +736,11 @@ pub struct Mldv2QueryMessageHeader {
 
 impl Mldv2QueryMessageHeader {
     const S_FLAG_MASK: u8 = (1 << 3);
-
     const QRV_MASK: u8 = 0x07;
 
-    /// Gets the response delay value.
-    pub fn max_response_delay(&self) -> Duration {
-        Mldv2ResponseDelay(self.max_response_code.get()).into()
+    /// Gets the response delay for this query.
+    pub fn max_response_delay(&self) -> Mldv2ResponseDelay {
+        Mldv2ResponseDelay(self.max_response_code.get())
     }
 
     /// Returns the number of sources.
@@ -932,7 +760,7 @@ impl Mldv2QueryMessageHeader {
 
     /// Returns the Querier's Query Interval Code.
     pub fn querier_query_interval(self) -> Duration {
-        Mldv2QQIC(self.qqic).into()
+        Mldv2QQIC::from(self.qqic).into()
     }
 }
 
@@ -998,6 +826,7 @@ mod tests {
     use packet::{ParseBuffer, Serializer};
 
     use super::*;
+    use crate::gmp::ExactConversionError;
     use crate::icmp::{IcmpPacketBuilder, IcmpParseArgs};
     use crate::ip::Ipv6Proto;
     use crate::ipv6::ext_hdrs::{
@@ -1461,21 +1290,18 @@ mod tests {
     #[test]
     fn test_mld_parse_and_serialize_response_delay_v2_errors() {
         let duration = Duration::from_millis((Mldv2ResponseDelay::MAX_VALUE + 1).into());
-        assert_eq!(
-            Mldv2ResponseDelay::lossy_try_from(duration),
-            Err(MldError::MaxRespCodeOverflow)
-        );
+        assert_eq!(Mldv2ResponseDelay::lossy_try_from(duration), Err(OverflowError));
 
         let duration = Duration::from_millis((Mldv2ResponseDelay::MAX_VALUE + 1).into());
         assert_eq!(
             Mldv2ResponseDelay::exact_try_from(duration),
-            Err(MldError::MaxRespCodeOverflow)
+            Err(ExactConversionError::Overflow)
         );
 
         let duration = Duration::from_millis((Mldv2ResponseDelay::MAX_VALUE - 1).into());
         assert_eq!(
             Mldv2ResponseDelay::exact_try_from(duration),
-            Err(MldError::MaxRespCodeLossyConversion)
+            Err(ExactConversionError::NotExact)
         );
     }
 
@@ -1523,12 +1349,12 @@ mod tests {
     #[test]
     fn test_mld_parse_and_serialize_response_qqic_v2_errors() {
         let duration = Duration::from_secs((Mldv2QQIC::MAX_VALUE + 1).into());
-        assert_eq!(Mldv2QQIC::lossy_try_from(duration), Err(MldError::MaxRespCodeOverflow));
+        assert_eq!(Mldv2QQIC::lossy_try_from(duration), Err(OverflowError));
 
         let duration = Duration::from_secs((Mldv2QQIC::MAX_VALUE + 1).into());
-        assert_eq!(Mldv2QQIC::exact_try_from(duration), Err(MldError::MaxRespCodeOverflow));
+        assert_eq!(Mldv2QQIC::exact_try_from(duration), Err(ExactConversionError::Overflow));
 
         let duration = Duration::from_secs((Mldv2QQIC::MAX_VALUE - 1).into());
-        assert_eq!(Mldv2QQIC::exact_try_from(duration), Err(MldError::MaxRespCodeLossyConversion));
+        assert_eq!(Mldv2QQIC::exact_try_from(duration), Err(ExactConversionError::NotExact));
     }
 }
