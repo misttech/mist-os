@@ -5,8 +5,10 @@
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_wlan_common::WlanMacRole;
 use fidl_fuchsia_wlan_device_service::{
-    CreateIfaceRequest, DestroyIfaceRequest, DeviceMonitorProxy, QueryIfaceResponse,
+    DestroyIfaceRequest, DeviceMonitorCreateIfaceRequest, DeviceMonitorCreateIfaceResponse,
+    DeviceMonitorProxy, QueryIfaceResponse,
 };
+use tracing::info;
 
 use ieee80211::{MacAddr, MacAddrBytes};
 
@@ -33,7 +35,7 @@ pub async fn get_first_iface(
     if wlan_iface_ids.len() == 0 {
         return Err(format_err!("No wlan interface found"));
     }
-    tracing::info!("Found {} wlan iface entries", wlan_iface_ids.len());
+    info!("Found {} wlan iface entries", wlan_iface_ids.len());
     for iface_id in wlan_iface_ids {
         let iface_info = query_iface(monitor_proxy, iface_id).await?;
 
@@ -56,22 +58,24 @@ pub async fn create_iface(
     monitor_proxy: &DeviceMonitorProxy,
     phy_id: u16,
     role: WlanMacRole,
-    sta_addr: MacAddr,
+    sta_address: MacAddr,
 ) -> Result<u16, Error> {
-    let req = CreateIfaceRequest { phy_id, role, sta_addr: sta_addr.to_array() };
+    let req = DeviceMonitorCreateIfaceRequest {
+        phy_id: Some(phy_id),
+        role: Some(role),
+        sta_address: Some(sta_address.to_array()),
+        ..Default::default()
+    };
 
-    let response = monitor_proxy.create_iface(&req).await.context("Error creating iface")?;
-
-    zx::Status::ok(response.0)
-        .map_err(|e| return anyhow::anyhow!("Create iface returned non-OK status: {}", e))?;
-
-    match response.1 {
-        Some(resp) => {
-            let iface_id = resp.iface_id;
-            tracing::info!("Created iface {:?}", iface_id);
+    match monitor_proxy.create_iface(&req).await.context("FIDL error creating iface")? {
+        Err(e) => Err(format_err!("Error creating iface: {:?}", e)),
+        Ok(DeviceMonitorCreateIfaceResponse { iface_id: None, .. }) => {
+            Err(format_err!("Create iface completed without returning an iface id"))
+        }
+        Ok(DeviceMonitorCreateIfaceResponse { iface_id: Some(iface_id), .. }) => {
+            info!("Created iface {:?}", iface_id);
             Ok(iface_id)
         }
-        None => Err(format_err!("No iface id returned")),
     }
 }
 
@@ -80,7 +84,7 @@ pub async fn destroy_iface(monitor_proxy: &DeviceMonitorProxy, iface_id: u16) ->
 
     let response = monitor_proxy.destroy_iface(&req).await.context("Error destroying iface")?;
     zx::Status::ok(response).context("Destroy iface returned non-OK status")?;
-    Ok(tracing::info!("Destroyed iface {:?}", iface_id))
+    Ok(info!("Destroyed iface {:?}", iface_id))
 }
 
 async fn query_iface(
@@ -107,7 +111,8 @@ mod tests {
     use super::*;
     use fidl_fuchsia_wlan_common::WlanMacRole;
     use fidl_fuchsia_wlan_device_service::{
-        CreateIfaceResponse, DeviceMonitorMarker, DeviceMonitorRequest, DeviceMonitorRequestStream,
+        DeviceMonitorCreateIfaceResponse, DeviceMonitorMarker, DeviceMonitorRequest,
+        DeviceMonitorRequestStream,
     };
     use fuchsia_async::TestExecutor;
     use futures::task::Poll;
@@ -164,17 +169,18 @@ mod tests {
     pub fn respond_to_create_iface_request(
         exec: &mut TestExecutor,
         req_stream: &mut DeviceMonitorRequestStream,
-        fake_status: i32,
-        fake_iface_id: u16,
+        fake_response: Result<u16, i32>,
     ) {
         let req = exec.run_until_stalled(&mut req_stream.next());
         let responder = assert_variant !(
             req,
-            Poll::Ready(Some(Ok(DeviceMonitorRequest::CreateIface{req : _, responder})))
+            Poll::Ready(Some(Ok(DeviceMonitorRequest::CreateIface{responder, ..})))
             => responder);
 
-        let response = CreateIfaceResponse { iface_id: fake_iface_id };
-        responder.send(fake_status, Some(&response)).expect("sending fake response with iface id");
+        let fake_response = fake_response.map_ok(|fake_iface_id| {
+            DeviceMonitorCreateIfaceResponse { iface_id: Some(fake_iface_id), ..Default::default() }
+        });
+        responder.send(fake_response).expect("sending fake response with iface id");
     }
 
     #[test]
@@ -233,7 +239,7 @@ mod tests {
         let mut iface_id_fut = pin!(iface_id_fut);
 
         assert_variant!(exec.run_until_stalled(&mut iface_id_fut), Poll::Pending);
-        respond_to_create_iface_request(&mut exec, &mut req_stream, zx::sys::ZX_OK, 15);
+        respond_to_create_iface_request(&mut exec, &mut req_stream, Ok(15));
 
         let iface_id = exec.run_singlethreaded(&mut iface_id_fut).expect("should get an iface id");
 
@@ -248,7 +254,7 @@ mod tests {
         let mut iface_id_fut = pin!(iface_id_fut);
 
         assert_variant!(exec.run_until_stalled(&mut iface_id_fut), Poll::Pending);
-        respond_to_create_iface_request(&mut exec, &mut req_stream, zx::sys::ZX_ERR_INTERNAL, 15);
+        respond_to_create_iface_request(&mut exec, &mut req_stream, Err(zx::sys::ZX_ERR_INTERNAL));
 
         let err = exec.run_singlethreaded(&mut iface_id_fut).expect_err("Should get an error");
         assert!(format!("{}", err).contains("INTERNAL"));

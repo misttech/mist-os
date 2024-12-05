@@ -398,14 +398,19 @@ fn prepare_client_interface(
     assert_variant!(
         iface_creation_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::CreateIface {
-            req: fidl_fuchsia_wlan_device_service::CreateIfaceRequest {
-                phy_id: TEST_PHY_ID, role: fidl_common::WlanMacRole::Client, sta_addr: [0, 0, 0, 0, 0, 0]
+            payload: fidl_fuchsia_wlan_device_service::DeviceMonitorCreateIfaceRequest {
+                phy_id: Some(TEST_PHY_ID),
+                role: Some(fidl_common::WlanMacRole::Client),
+                sta_address: Some([0, 0, 0, 0, 0, 0]),
+                ..
             },
             responder
         })) => {
             assert!(responder.send(
-                zx::sys::ZX_OK,
-                Some(&fidl_fuchsia_wlan_device_service::CreateIfaceResponse {iface_id: TEST_CLIENT_IFACE_ID})
+                Ok(&fidl_fuchsia_wlan_device_service::DeviceMonitorCreateIfaceResponse {
+                    iface_id: Some(TEST_CLIENT_IFACE_ID),
+                    ..Default::default()
+                })
             ).is_ok());
         }
     );
@@ -1887,15 +1892,20 @@ fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
     assert_variant!(
         iface_creation_req,
         Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::CreateIface {
-            req: fidl_fuchsia_wlan_device_service::CreateIfaceRequest {
-                phy_id, role: fidl_common::WlanMacRole::Client, sta_addr: [0, 0, 0, 0, 0, 0]
+            payload: fidl_fuchsia_wlan_device_service::DeviceMonitorCreateIfaceRequest {
+                phy_id: Some(phy_id),
+                role: Some(fidl_common::WlanMacRole::Client),
+                sta_address: Some([0, 0, 0, 0, 0, 0]),
+                ..
             },
             responder
         })) => {
             assert_eq!(phy_id, expected_phy_id);
             assert!(responder.send(
-                zx::sys::ZX_OK,
-                Some(&fidl_fuchsia_wlan_device_service::CreateIfaceResponse {iface_id: expected_iface_id})
+                Ok(&fidl_fuchsia_wlan_device_service::DeviceMonitorCreateIfaceResponse {
+                    iface_id: Some(expected_iface_id),
+                    ..Default::default()
+                })
             ).is_ok());
         }
     );

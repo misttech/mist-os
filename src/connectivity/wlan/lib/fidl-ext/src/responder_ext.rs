@@ -8,10 +8,10 @@ use fidl_fuchsia_wlan_softmac as fidl_softmac;
 
 /// Defines an abstract ResponderExt trait usually implemented using the impl_responder_ext!() macro.
 pub trait ResponderExt {
-    type Response;
+    type Response<'a>;
     const REQUEST_NAME: &'static str;
 
-    fn send(self, response: Self::Response) -> Result<(), fidl::Error>;
+    fn send(self, response: Self::Response<'_>) -> Result<(), fidl::Error>;
 
     /// Returns an success value containing all unpacked fields and the responder, or an error value
     /// if any of the values in `fields` is missing.
@@ -31,14 +31,14 @@ pub trait ResponderExt {
     ///       |e| (e.context(format_err!("Unable to start.")), Error::UnableToStart),
     ///   )?;
     /// ```
-    fn unpack_fields_or_else_send<T, F>(
+    fn unpack_fields_or_else_send<'a, T, F>(
         self,
         fields: T,
         f: F,
     ) -> Result<(T::Unpacked, Self), anyhow::Error>
     where
         T: TryUnpack<Error = anyhow::Error>,
-        F: FnOnce() -> Self::Response,
+        F: FnOnce() -> Self::Response<'a>,
         Self: Sized,
     {
         match fields.try_unpack() {
@@ -57,28 +57,41 @@ pub trait ResponderExt {
     fn unpack_fields_or_respond<T>(self, fields: T) -> Result<(T::Unpacked, Self), anyhow::Error>
     where
         T: TryUnpack<Error = anyhow::Error>,
-        Self: ResponderExt<Response = ()> + Sized,
+        Self: for<'a> ResponderExt<Response<'a> = ()> + Sized,
     {
         self.unpack_fields_or_else_send(fields, || ())
     }
 }
 
+impl ResponderExt for fidl_fuchsia_wlan_device_service::DeviceMonitorCreateIfaceResponder {
+    type Response<'a> = Result<
+        &'a fidl_fuchsia_wlan_device_service::DeviceMonitorCreateIfaceResponse,
+        fidl_fuchsia_wlan_device_service::DeviceMonitorError,
+    >;
+    const REQUEST_NAME: &'static str =
+        stringify!(fidl_fuchsia_wlan_device_service::DeviceMonitorCreateIfaceRequest);
+
+    fn send(self, response: Self::Response<'_>) -> Result<(), fidl::Error> {
+        Self::send(self, response)
+    }
+}
+
 impl ResponderExt for fidl_softmac::WlanSoftmacIfcBridgeNotifyScanCompleteResponder {
-    type Response = ();
+    type Response<'a> = ();
     const REQUEST_NAME: &'static str =
         stringify!(fidl_softmac::WlanSoftmacIfcBaseNotifyScanCompleteRequest);
 
-    fn send(self, _: Self::Response) -> Result<(), fidl::Error> {
+    fn send(self, _: Self::Response<'_>) -> Result<(), fidl::Error> {
         Self::send(self)
     }
 }
 
 impl ResponderExt for fidl_softmac::WlanSoftmacIfcBridgeReportTxResultResponder {
-    type Response = ();
+    type Response<'a> = ();
     const REQUEST_NAME: &'static str =
         stringify!(fidl_softmac::WlanSoftmacIfcBaseReportTxResultRequest);
 
-    fn send(self, _: Self::Response) -> Result<(), fidl::Error> {
+    fn send(self, _: Self::Response<'_>) -> Result<(), fidl::Error> {
         Self::send(self)
     }
 }

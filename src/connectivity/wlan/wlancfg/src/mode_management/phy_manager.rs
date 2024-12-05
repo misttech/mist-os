@@ -296,42 +296,39 @@ impl PhyManager {
         role: fidl_common::WlanMacRole,
         sta_addr: MacAddr,
     ) -> Result<u16, PhyManagerError> {
-        let request =
-            fidl_service::CreateIfaceRequest { phy_id, role, sta_addr: sta_addr.to_array() };
+        let request = fidl_service::DeviceMonitorCreateIfaceRequest {
+            phy_id: Some(phy_id),
+            role: Some(role),
+            sta_address: Some(sta_addr.to_array()),
+            ..Default::default()
+        };
 
-        let create_iface_response = match self.device_monitor.create_iface(&request).await {
+        let response = self.device_monitor.create_iface(&request).await;
+        let result = match response {
             Err(e) => {
                 warn!("Failed to create iface: phy {}, FIDL error {:?}", phy_id, e);
                 Err(PhyManagerError::IfaceCreateFailure)
             }
-            Ok((status, iface_response)) => {
-                // Ensure that the CreateIface call
-                // 1. Did not return a non-ok status
-                // 2. Resulted in an interface ID
-                if zx::ok(status).is_err() {
-                    warn!("create iface failed for PHY {}: {:?}", phy_id, status);
-                    Err(PhyManagerError::IfaceCreateFailure)
-                } else {
-                    match iface_response {
-                        Some(response) => Ok(response.iface_id),
-                        None => {
-                            warn!(
-                                "create iface succeeded but did not provide iface ID for PHY {}",
-                                phy_id
-                            );
-                            Err(PhyManagerError::IfaceCreateFailure)
-                        }
-                    }
-                }
+            Ok(Err(e)) => {
+                warn!("Failed to create iface: phy {}, error {:?}", phy_id, e);
+                Err(PhyManagerError::IfaceCreateFailure)
             }
+            Ok(Ok(fidl_service::DeviceMonitorCreateIfaceResponse { iface_id: None, .. })) => {
+                warn!("Failed to create iface. No iface ID received: phy {}", phy_id);
+                Err(PhyManagerError::IfaceCreateFailure)
+            }
+            Ok(Ok(fidl_service::DeviceMonitorCreateIfaceResponse {
+                iface_id: Some(iface_id),
+                ..
+            })) => Ok(iface_id),
         };
 
-        if create_iface_response.is_err() {
+        if result.is_err() {
             self.record_defect(Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id }));
-            return create_iface_response;
+            return result;
         }
         self.telemetry_sender.send(TelemetryEvent::IfaceCreationResult(Ok(())));
-        create_iface_response
+        result
     }
 }
 
@@ -1166,19 +1163,19 @@ mod tests {
             exec.run_until_stalled(&mut server.next()),
             Poll::Ready(Some(Ok(
                 fidl_service::DeviceMonitorRequest::CreateIface {
-                    req: _,
                     responder,
+                    ..
                 }
             ))) => {
                 match iface_id {
                     Some(iface_id) => responder.send(
-                        ZX_OK,
-                        Some(&fidl_service::CreateIfaceResponse {
-                            iface_id,
+                        Ok(&fidl_service::DeviceMonitorCreateIfaceResponse {
+                            iface_id: Some(iface_id),
+                            ..Default::default()
                         })
                     )
                     .expect("sending fake iface id"),
-                    None => responder.send(ZX_ERR_NOT_FOUND, None).expect("sending fake response with none")
+                    None => responder.send(Err(fidl_service::DeviceMonitorError::unknown())).expect("sending fake response with none")
                 }
             }
         );
@@ -2983,14 +2980,17 @@ mod tests {
             exec.run_until_stalled(&mut test_values.monitor_stream.next()),
             Poll::Ready(Some(Ok(
                 fidl_service::DeviceMonitorRequest::CreateIface {
-                    req,
+                    payload,
                     responder,
                 }
             ))) => {
-                let requested_mac: MacAddr = req.sta_addr.into();
+                let requested_mac: MacAddr = payload.sta_address.unwrap().into();
                 assert_eq!(requested_mac, mac);
-                let response = fidl_service::CreateIfaceResponse { iface_id: fake_iface_id };
-                responder.send(ZX_OK, Some(&response)).expect("sending fake iface id");
+                let response = fidl_service::DeviceMonitorCreateIfaceResponse {
+                    iface_id: Some(fake_iface_id),
+                    ..Default::default()
+                };
+                responder.send(Ok(&response)).expect("sending fake iface id");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut get_ap_future), Poll::Ready(_));
@@ -3033,13 +3033,16 @@ mod tests {
             exec.run_until_stalled(&mut test_values.monitor_stream.next()),
             Poll::Ready(Some(Ok(
                 fidl_service::DeviceMonitorRequest::CreateIface {
-                    req,
+                    payload,
                     responder,
                 }
             ))) => {
-                assert_eq!(req.sta_addr, ieee80211::NULL_ADDR.to_array());
-                let response = fidl_service::CreateIfaceResponse { iface_id: fake_iface_id };
-                responder.send(ZX_OK, Some(&response)).expect("sending fake iface id");
+                assert_eq!(payload.sta_address, Some(ieee80211::NULL_ADDR.to_array()));
+                let response = fidl_service::DeviceMonitorCreateIfaceResponse {
+                    iface_id: Some(fake_iface_id),
+                    ..Default::default()
+                };
+                responder.send(Ok(&response)).expect("sending fake iface id");
             }
         );
         // Expect an iface security support query, and send back a response
@@ -3488,12 +3491,15 @@ mod tests {
                 exec.run_until_stalled(&mut test_values.monitor_stream.next()),
                 Poll::Ready(Some(Ok(
                     fidl_service::DeviceMonitorRequest::CreateIface {
-                        req,
+                        payload,
                         responder,
                     }
                 ))) => {
-                    let response =fidl_service::CreateIfaceResponse { iface_id: req.phy_id };
-                    responder.send(ZX_OK, Some(&response)).expect("sending fake iface id");
+                    let response = fidl_service::DeviceMonitorCreateIfaceResponse {
+                        iface_id: Some(payload.phy_id.unwrap()),
+                        ..Default::default()
+                    };
+                    responder.send(Ok(&response)).expect("sending fake iface id");
 
                     assert_variant!(exec.run_until_stalled(&mut recovery_fut), Poll::Pending);
 
@@ -3573,24 +3579,25 @@ mod tests {
                     exec.run_until_stalled(&mut test_values.monitor_stream.next()),
                     Poll::Ready(Some(Ok(
                         fidl_service::DeviceMonitorRequest::CreateIface {
-                            req,
+                            payload,
                             responder,
                         }
                     ))) => {
-                        let iface_id = req.phy_id;
-                        let response = fidl_service::CreateIfaceResponse { iface_id };
+                        let iface_id = payload.phy_id.unwrap();
+                        let response = fidl_service::DeviceMonitorCreateIfaceResponse {
+                            iface_id: Some(iface_id),
+                            ..Default::default()
+                        };
 
                         // As noted above, let the requests for 0 and 2 "fail" and let the request
                         // for PHY 1 succeed.
-                        let result_code = match req.phy_id {
+                        match payload.phy_id.unwrap() {
                             1 => {
                                 created_iface_id = Some(iface_id);
-                                ZX_OK
+                                responder.send(Ok(&response)).expect("sending fake iface id")
                             },
-                            _ => ZX_ERR_NOT_FOUND,
+                            _ => responder.send(Err(fidl_service::DeviceMonitorError::unknown())).expect("sending fake iface id"),
                         };
-
-                        responder.send(result_code, Some(&response)).expect("sending fake iface id");
                     }
                 );
 

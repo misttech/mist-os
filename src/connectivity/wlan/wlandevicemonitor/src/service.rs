@@ -12,9 +12,11 @@ use fidl_fuchsia_wlan_device_service::{self as fidl_svc, DeviceMonitorRequest};
 use futures::channel::mpsc;
 use futures::stream::FuturesUnordered;
 use futures::{select, StreamExt, TryStreamExt};
+use ieee80211::{MacAddr, MacAddrBytes};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tracing::{error, info, warn};
+use wlan_fidl_ext::{ResponderExt, WithName};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device as fidl_dev,
     fidl_fuchsia_wlan_sme as fidl_sme,
@@ -76,11 +78,30 @@ pub(crate) async fn serve_monitor_requests(
             }
             DeviceMonitorRequest::GetPowerSaveMode { phy_id, responder } => responder
                 .send(get_power_save_mode(&phys, phy_id).await.as_ref().map_err(|s| s.into_raw())),
-            DeviceMonitorRequest::CreateIface { req, responder } => {
+            DeviceMonitorRequest::CreateIface { payload, responder } => {
+                let ((phy_id, role, sta_address), responder) = match responder
+                    .unpack_fields_or_else_send(
+                        (
+                            payload.phy_id.with_name("phy_id"),
+                            payload.role.with_name("role"),
+                            payload.sta_address.with_name("sta_address"),
+                        ),
+                        || Err(fidl_svc::DeviceMonitorError::unknown()),
+                    ) {
+                    Err(e) => {
+                        warn!("Failed to create iface: {:?}", e);
+                        continue;
+                    }
+                    Ok(x) => x,
+                };
+                let sta_address = MacAddr::from(sta_address);
+
                 match create_iface(
                     &new_iface_sink,
                     &phys,
-                    req,
+                    phy_id,
+                    role,
+                    sta_address,
                     &iface_counter,
                     &cfg,
                     Arc::clone(&ifaces_tree),
@@ -97,10 +118,16 @@ pub(crate) async fn serve_monitor_requests(
                             },
                         );
 
-                        let resp = fidl_svc::CreateIfaceResponse { iface_id: new_iface.id };
-                        responder.send(zx::sys::ZX_OK, Some(&resp))
+                        let resp = fidl_svc::DeviceMonitorCreateIfaceResponse {
+                            iface_id: Some(new_iface.id),
+                            ..Default::default()
+                        };
+                        responder.send(Ok(&resp))
                     }
-                    Err(status) => responder.send(status.into_raw(), None),
+                    Err(status) => {
+                        warn!("Failed to create iface: {}", status);
+                        responder.send(Err(fidl_svc::DeviceMonitorError::unknown()))
+                    }
                 }
             }
             DeviceMonitorRequest::QueryIface { iface_id, responder } => {
@@ -324,13 +351,14 @@ async fn get_supported_mac_roles(
 async fn create_iface(
     new_iface_sink: &mpsc::UnboundedSender<NewIface>,
     phys: &PhyMap,
-    req: fidl_svc::CreateIfaceRequest,
+    phy_id: u16,
+    role: fidl_common::WlanMacRole,
+    sta_address: MacAddr,
     iface_counter: &Arc<IfaceCounter>,
     cfg: &wlandevicemonitor_config::Config,
     ifaces_tree: Arc<IfacesTree>,
 ) -> Result<NewIface, zx::Status> {
-    let phy_id = req.phy_id;
-    let phy = phys.get(&req.phy_id).ok_or(zx::Status::NOT_FOUND)?;
+    let phy = phys.get(&phy_id).ok_or(zx::Status::NOT_FOUND)?;
 
     // Create the bootstrap channel. This channel is only used for initial communication
     // with the USME device.
@@ -357,9 +385,9 @@ async fn create_iface(
     // the bootstrap to it. The USME device will then read the config and GenericSme channel,
     // and continue to listen to requests via the GenericSme channel.
     let phy_req = fidl_dev::CreateIfaceRequest {
-        role: req.role,
+        role,
         mlme_channel: Some(usme_bootstrap_server.into_channel()),
-        init_sta_addr: req.sta_addr,
+        init_sta_addr: sta_address.to_array(),
     };
     let phy_assigned_iface_id = phy
         .proxy
@@ -563,7 +591,7 @@ mod tests {
     use fuchsia_inspect::Inspector;
     use futures::future::BoxFuture;
     use futures::task::Poll;
-    use ieee80211::{MacAddrBytes, NULL_ADDR};
+    use ieee80211::NULL_ADDR;
     use std::convert::Infallible;
     use std::pin::pin;
     use test_case::test_case;
@@ -1461,98 +1489,233 @@ mod tests {
         assert_eq!(3, iface_counter.next_iface_id());
     }
 
-    #[test_case(false, false; "CreateIface without MAC succeeds")]
-    #[test_case(true, false; "CreateIface with MAC succeeds")]
-    #[test_case(false, true; "CreateIface fails on interface creation")]
-    fn test_create_iface(with_mac: bool, create_iface_fails: bool) {
+    #[test_case([0, 1, 2, 3, 4, 5]; "MAC 00:01:02:03:04:05")]
+    #[test_case(NULL_ADDR.to_array(); "MAC 00:00:00:00:00:00")]
+    fn create_iface_succeeds(sta_address: [u8; 6]) {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
+        let service_fut = serve_monitor_requests(
+            test_values.monitor_req_stream,
+            test_values.phys.clone(),
+            test_values.ifaces,
+            test_values.watcher_service,
+            test_values.new_iface_sink,
+            test_values.iface_counter,
+            test_values.ifaces_tree,
+            fake_wlandevicemonitor_config(),
+        );
+        let mut service_fut = pin!(service_fut);
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
+        // Request the list of available ifaces.
+        let list_fut = test_values.monitor_proxy.list_ifaces();
+        let mut list_fut = pin!(list_fut);
+        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+
+        // Progress the service loop.
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
+        // The future to list the ifaces should complete and no ifaces should be present.
+        assert_variant!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
+            assert!(ifaces.is_empty())
+        });
 
         let (phy, mut phy_stream) = fake_phy();
-        test_values.phys.insert(10, phy);
+        let phy_id = 10;
+        test_values.phys.insert(phy_id, phy);
 
-        let iface_counter = Arc::new(IfaceCounter::new());
-        let inspector = Inspector::default();
-        let ifaces_tree = Arc::new(IfacesTree::new(inspector.clone()));
+        let create_iface_fut =
+            test_values.monitor_proxy.create_iface(&fidl_svc::DeviceMonitorCreateIfaceRequest {
+                phy_id: Some(phy_id),
+                role: Some(fidl_wlan_common::WlanMacRole::Client),
+                sta_address: Some(sta_address),
+                ..Default::default()
+            });
+        let mut create_iface_fut = pin!(create_iface_fut);
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
-        // Initiate a CreateIface request. The returned future should not be able
-        // to produce a result immediately
-        let create_fut = super::create_iface(
-            &test_values.new_iface_sink,
-            &test_values.phys,
-            fidl_svc::CreateIfaceRequest {
-                phy_id: 10,
-                role: fidl_wlan_common::WlanMacRole::Client,
-                sta_addr: if with_mac { [0, 1, 2, 3, 4, 5] } else { NULL_ADDR.to_array() },
-            },
-            &iface_counter,
-            &wlandevicemonitor_config::Config { wep_supported: true, wpa1_supported: true },
-            ifaces_tree,
-        );
-        let mut create_fut = pin!(create_fut);
-        assert_variant!(exec.run_until_stalled(&mut create_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut create_iface_fut), Poll::Pending);
 
-        // Validate the PHY request
         let bootstrap_channel = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
-            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
-                assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
+        Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
+            assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
+            assert_eq!(req.init_sta_addr, sta_address);
+            responder.send(Ok(123)).expect("failed to send iface id");
+            req.mlme_channel.expect("no MLME channel")
+        });
 
-                if with_mac {
-                    assert_eq!(req.init_sta_addr, [0, 1, 2, 3, 4, 5]);
-                }
-
-                if create_iface_fails {
-                    responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED)).expect("failed to send iface_id");
-                } else {
-                    responder.send(Ok(123)).expect("failed to send iface id");
-                };
-
-                req.mlme_channel
-            }
-        );
-
-        // If this case should fail on interface creation, the future should complete here with an
-        // error.
-        if create_iface_fails {
-            assert_variant!(
-                exec.run_until_stalled(&mut create_fut),
-                Poll::Ready(Err(zx::Status::NOT_SUPPORTED))
-            );
-            return;
-        }
-
-        if let Some(channel) = bootstrap_channel {
-            let bootstrap_server =
-                fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(channel);
-            let mut bootstrap_stream = bootstrap_server.into_stream();
-
-            let responder = assert_variant!(
-                exec.run_until_stalled(&mut bootstrap_stream.next()),
-                Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
-                    responder, ..
-                }))) => responder);
-            responder
-                .send(inspector.duplicate_vmo().unwrap())
-                .expect("Failed to send bootstrap result");
-        }
+        // Complete the USME bootstrap.
+        let mut bootstrap_stream =
+            fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(bootstrap_channel)
+                .into_stream();
+        assert_variant!(
+            exec.run_until_stalled(&mut bootstrap_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
+                responder, ..
+            }))) => responder
+                .send(test_values.inspector.duplicate_vmo().unwrap())
+                .expect("Failed to send bootstrap result"));
 
         // The original future should resolve into a response.
-        assert_variant!(exec.run_until_stalled(&mut create_fut),
-            Poll::Ready(response) => {
-                let response = response.expect("CreateIface failed unexpectedly");
-                assert_eq!(0, response.id);
-                assert_eq!(
-                    device::PhyOwnership { phy_id: 10, phy_assigned_id: 123 },
-                    response.phy_ownership
-                );
-            }
-        );
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut create_iface_fut),
+        Poll::Ready(Ok(Ok(response))) => {
+            assert_eq!(Some(0), response.iface_id);
+        });
 
         // The new interface should be pushed into the new iface stream.
         assert_variant!(
             exec.run_until_stalled(&mut test_values.new_iface_stream.next()),
-            Poll::Ready(Some(NewIface { .. })),
+            Poll::Ready(Some(NewIface {
+                id: 0,
+                phy_ownership: device::PhyOwnership { phy_id: 10, phy_assigned_id: 123 },
+                ..
+            }))
         );
+
+        // Request the list of available ifaces.
+        let list_fut = test_values.monitor_proxy.list_ifaces();
+        let mut list_fut = pin!(list_fut);
+        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+
+        // Progress the service loop.
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
+        // The future to list the ifaces should complete and the iface should be present.
+        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(mut ifaces)) => {
+            ifaces.sort();
+            assert_eq!(vec![0], ifaces);
+        });
+    }
+
+    #[fuchsia::test]
+    fn create_iface_fails_on_error_from_phy() {
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let service_fut = serve_monitor_requests(
+            test_values.monitor_req_stream,
+            test_values.phys.clone(),
+            test_values.ifaces,
+            test_values.watcher_service,
+            test_values.new_iface_sink,
+            test_values.iface_counter,
+            test_values.ifaces_tree,
+            fake_wlandevicemonitor_config(),
+        );
+        let mut service_fut = pin!(service_fut);
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
+        // Request the list of available ifaces.
+        let list_fut = test_values.monitor_proxy.list_ifaces();
+        let mut list_fut = pin!(list_fut);
+        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+
+        // Progress the service loop.
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
+        // The future to list the ifaces should complete and no ifaces should be present.
+        assert_variant!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
+            assert!(ifaces.is_empty())
+        });
+
+        let (phy, mut phy_stream) = fake_phy();
+        let phy_id = 10;
+        test_values.phys.insert(phy_id, phy);
+        let sta_address = [0, 1, 2, 3, 4, 5];
+
+        let create_iface_fut =
+            test_values.monitor_proxy.create_iface(&fidl_svc::DeviceMonitorCreateIfaceRequest {
+                phy_id: Some(phy_id),
+                role: Some(fidl_wlan_common::WlanMacRole::Client),
+                sta_address: Some(sta_address),
+                ..Default::default()
+            });
+        let mut create_iface_fut = pin!(create_iface_fut);
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
+        assert_variant!(exec.run_until_stalled(&mut create_iface_fut), Poll::Pending);
+
+        let _ = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+        Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
+            assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
+            assert_eq!(req.init_sta_addr, sta_address);
+            responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED)).expect("failed to send iface_id");
+            req.mlme_channel.expect("no MLME channel")
+        });
+
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut create_iface_fut),
+            Poll::Ready(Ok(Err(e))) => assert_eq!(e, fidl_svc::DeviceMonitorError::unknown())
+        );
+    }
+
+    #[fuchsia::test]
+    fn create_iface_fails_when_fields_are_missing_from_request() {
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let service_fut = serve_monitor_requests(
+            test_values.monitor_req_stream,
+            test_values.phys.clone(),
+            test_values.ifaces,
+            test_values.watcher_service,
+            test_values.new_iface_sink,
+            test_values.iface_counter,
+            test_values.ifaces_tree,
+            fake_wlandevicemonitor_config(),
+        );
+        let mut service_fut = pin!(service_fut);
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
+        // Request the list of available ifaces.
+        let list_fut = test_values.monitor_proxy.list_ifaces();
+        let mut list_fut = pin!(list_fut);
+        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
+
+        // Progress the service loop.
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
+        // The future to list the ifaces should complete and no ifaces should be present.
+        assert_variant!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
+            assert!(ifaces.is_empty())
+        });
+
+        let (phy, mut phy_stream) = fake_phy();
+        let phy_id = 10;
+        test_values.phys.insert(phy_id, phy);
+
+        // Iterate through create iface requests that are each missing one field and verify an
+        // error is returned for each request.
+        for request in [
+            fidl_svc::DeviceMonitorCreateIfaceRequest {
+                phy_id: None,
+                role: Some(fidl_wlan_common::WlanMacRole::Client),
+                sta_address: Some([0, 1, 2, 3, 4, 5]),
+                ..Default::default()
+            },
+            fidl_svc::DeviceMonitorCreateIfaceRequest {
+                phy_id: Some(phy_id),
+                role: None,
+                sta_address: Some([0, 1, 2, 3, 4, 5]),
+                ..Default::default()
+            },
+            fidl_svc::DeviceMonitorCreateIfaceRequest {
+                phy_id: Some(phy_id),
+                role: Some(fidl_wlan_common::WlanMacRole::Client),
+                sta_address: None,
+                ..Default::default()
+            },
+        ] {
+            let create_iface_fut = test_values.monitor_proxy.create_iface(&request);
+            let mut create_iface_fut = pin!(create_iface_fut);
+            assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
+            assert_variant!(
+                exec.run_until_stalled(&mut create_iface_fut),
+                Poll::Ready(Ok(Err(e))) => assert_eq!(e, fidl_svc::DeviceMonitorError::unknown())
+            );
+            assert_variant!(exec.run_until_stalled(&mut phy_stream.next()), Poll::Pending);
+        }
     }
 
     #[fuchsia::test]
@@ -1589,15 +1752,17 @@ mod tests {
         let phy_id = 10;
         test_values.phys.insert(phy_id, phy);
 
-        for (sta_addr, phy_assigned_iface_id, sme_assigned_iface_id) in
+        for (sta_address, phy_assigned_iface_id, sme_assigned_iface_id) in
             [([0x0, 0x1, 0x2, 0x3, 0x4, 0x5], 123, 0), ([0x6, 0x7, 0x8, 0x9, 0xa, 0xb], 0x123, 1)]
         {
-            let create_iface_fut =
-                test_values.monitor_proxy.create_iface(&fidl_svc::CreateIfaceRequest {
-                    phy_id,
-                    role: fidl_wlan_common::WlanMacRole::Client,
-                    sta_addr,
-                });
+            let create_iface_fut = test_values.monitor_proxy.create_iface(
+                &fidl_svc::DeviceMonitorCreateIfaceRequest {
+                    phy_id: Some(phy_id),
+                    role: Some(fidl_wlan_common::WlanMacRole::Client),
+                    sta_address: Some(sta_address),
+                    ..Default::default()
+                },
+            );
             let mut create_iface_fut = pin!(create_iface_fut);
             assert_variant!(exec.run_until_stalled(&mut create_iface_fut), Poll::Pending);
             assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
@@ -1606,7 +1771,7 @@ mod tests {
             let bootstrap_channel = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
                 assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
-                assert_eq!(req.init_sta_addr, sta_addr);
+                assert_eq!(req.init_sta_addr, sta_address);
                 responder.send(Ok(phy_assigned_iface_id)).expect("failed to send iface id");
                 req.mlme_channel.expect("no MLME channel")
             });
@@ -1626,13 +1791,22 @@ mod tests {
             // The original future should resolve into a response.
             assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
             assert_variant!(exec.run_until_stalled(&mut create_iface_fut),
-            Poll::Ready(Ok((zx::sys::ZX_OK, Some(response)))) => {
-                assert_eq!(sme_assigned_iface_id, response.iface_id);
+            Poll::Ready(Ok(Ok(response))) => {
+                assert_eq!(Some(sme_assigned_iface_id), response.iface_id);
             });
 
+            // The new interface should be pushed into the new iface stream.
             assert_variant!(
                 exec.run_until_stalled(&mut test_values.new_iface_stream.next()),
-                Poll::Ready(Some(NewIface { .. })),
+                Poll::Ready(Some(NewIface {
+                    id,
+                    phy_ownership,
+                    ..
+                })) => {
+                    assert_eq!(sme_assigned_iface_id, id);
+                    assert_eq!(phy_assigned_iface_id, phy_ownership.phy_assigned_id);
+                    assert_eq!(phy_id, phy_ownership.phy_id);
+                },
             );
         }
 
@@ -1662,11 +1836,9 @@ mod tests {
         let fut = super::create_iface(
             &test_values.new_iface_sink,
             &test_values.phys,
-            fidl_svc::CreateIfaceRequest {
-                phy_id: 10,
-                role: fidl_wlan_common::WlanMacRole::Client,
-                sta_addr: NULL_ADDR.to_array(),
-            },
+            10,
+            fidl_wlan_common::WlanMacRole::Client,
+            NULL_ADDR,
             &iface_counter,
             &wlandevicemonitor_config::Config { wep_supported: true, wpa1_supported: true },
             ifaces_tree,

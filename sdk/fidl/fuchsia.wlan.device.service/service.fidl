@@ -23,16 +23,6 @@ type QueryIfaceResponse = struct {
     sta_addr ieee80211.MacAddr;
 };
 
-type CreateIfaceRequest = struct {
-    phy_id uint16;
-    role fuchsia.wlan.common.WlanMacRole;
-    sta_addr ieee80211.MacAddr;
-};
-
-type CreateIfaceResponse = struct {
-    iface_id uint16;
-};
-
 type DestroyIfaceRequest = struct {
     iface_id uint16;
 };
@@ -89,6 +79,8 @@ closed protocol DeviceWatcher {
     });
 };
 
+type DeviceMonitorError = flexible enum {};
+
 @discoverable
 closed protocol DeviceMonitor {
     // Phy methods
@@ -139,12 +131,13 @@ closed protocol DeviceMonitor {
     }) error int32;
 
     // Iface methods
-    strict CreateIface(struct {
-        req CreateIfaceRequest;
-    }) -> (struct {
-        status int32;
-        resp box<CreateIfaceResponse>;
-    });
+    strict CreateIface(table {
+        1: phy_id uint16;
+        2: role fuchsia.wlan.common.WlanMacRole;
+        3: sta_address ieee80211.MacAddr;
+    }) -> (table {
+        1: iface_id uint16;
+    }) error DeviceMonitorError;
     strict QueryIface(struct {
         iface_id uint16;
     }) -> (struct {

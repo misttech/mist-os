@@ -91,55 +91,55 @@ impl RequestFxResponder {
 }
 
 impl ResponderExt for RequestAxResponder {
-    type Response = ();
+    type Response<'a> = ();
     const REQUEST_NAME: &'static str = stringify!(RequestAx);
 
-    fn send(self, _: Self::Response) -> Result<(), fidl::Error> {
+    fn send<'a>(self, _: Self::Response<'a>) -> Result<(), fidl::Error> {
         Self::send(self)
     }
 }
 
 impl ResponderExt for RequestBxResponder {
-    type Response = ();
+    type Response<'a> = ();
     const REQUEST_NAME: &'static str = stringify!(RequestBx);
 
-    fn send(self, _: Self::Response) -> Result<(), fidl::Error> {
+    fn send<'a>(self, _: Self::Response<'a>) -> Result<(), fidl::Error> {
         Self::send(self)
     }
 }
 
 impl ResponderExt for RequestCxResponder {
-    type Response = Result<u64, u64>;
+    type Response<'a> = Result<u64, u64>;
     const REQUEST_NAME: &'static str = stringify!(RequestCx);
 
-    fn send(self, response: Self::Response) -> Result<(), fidl::Error> {
+    fn send<'a>(self, response: Self::Response<'a>) -> Result<(), fidl::Error> {
         Self::send(self, response)
     }
 }
 
 impl ResponderExt for RequestDxResponder {
-    type Response = Result<(), zx::Status>;
+    type Response<'a> = Result<(), zx::Status>;
     const REQUEST_NAME: &'static str = stringify!(RequestDx);
 
-    fn send(self, response: Self::Response) -> Result<(), fidl::Error> {
+    fn send<'a>(self, response: Self::Response<'a>) -> Result<(), fidl::Error> {
         Self::send(self, response)
     }
 }
 
 impl ResponderExt for RequestExResponder {
-    type Response = ();
+    type Response<'a> = ();
     const REQUEST_NAME: &'static str = stringify!(RequestEx);
 
-    fn send(self, _: Self::Response) -> Result<(), fidl::Error> {
+    fn send<'a>(self, _: Self::Response<'a>) -> Result<(), fidl::Error> {
         Self::send(self)
     }
 }
 
 impl ResponderExt for RequestFxResponder {
-    type Response = Result<(), zx::Status>;
+    type Response<'a> = Result<(), zx::Status>;
     const REQUEST_NAME: &'static str = stringify!(RequestFx);
 
-    fn send(self, response: Self::Response) -> Result<(), fidl::Error> {
+    fn send<'a>(self, response: Self::Response<'a>) -> Result<(), fidl::Error> {
         Self::send(self, response)
     }
 }
