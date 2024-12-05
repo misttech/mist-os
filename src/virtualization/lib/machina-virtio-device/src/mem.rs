@@ -130,7 +130,7 @@ mod tests {
             // Validate that there is a mapping of the right size.
             assert!(get_maps()?
                 .into_iter()
-                .find(|info| match info.details {
+                .find(|info| match info.details() {
                     zx::MapDetails::Mapping(map) => {
                         map.vmo_koid == koid && info.base == base && info.size >= size
                     }
@@ -155,10 +155,8 @@ mod tests {
         // validate that the mapping has gone away and that our VMO is not mapped anywhere at all.
         assert!(get_maps()?
             .into_iter()
-            .filter_map(|x| x.details.as_mapping())
-            .find(|map| map.vmo_koid == koid)
+            .find(|x| x.details().as_mapping().map_or(false, |map| map.vmo_koid == koid))
             .is_none());
-
         Ok(())
     }
 }

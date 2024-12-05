@@ -71,7 +71,7 @@ assoc_values!(Topic, [
 
 /// Query information about a zircon object. Returns a valid slice and any remaining capacity on
 /// success, along with a count of how many infos the kernel had available.
-fn object_get_info<'a, Q: ObjectQuery>(
+pub(crate) fn object_get_info<'a, Q: ObjectQuery>(
     handle: HandleRef<'_>,
     out: &'a mut [MaybeUninit<Q::InfoTy>],
 ) -> Result<(&'a mut [Q::InfoTy], &'a mut [MaybeUninit<Q::InfoTy>], usize), Status>

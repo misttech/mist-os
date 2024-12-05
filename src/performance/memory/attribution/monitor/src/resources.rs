@@ -302,8 +302,7 @@ impl KernelResources {
 
             let mut mappings = Vec::new();
             for info_map in info_maps {
-                if let zx::MapDetails::Mapping(details) = info_map.details {
-                    // SAFETY: the type is of type MAPPING, so the union contains the mapping information.
+                if let zx::MapDetails::Mapping(details) = info_map.details() {
                     mappings.push(fplugin::Mapping {
                         vmo: Some(details.vmo_koid.raw_koid()),
                         address_base: Some(info_map.base.try_into().unwrap()),
@@ -449,32 +448,31 @@ mod tests {
         committed_bytes: u64,
         populated_bytes: u64,
     ) -> zx::VmoInfo {
-        zx::VmoInfo {
-            koid: zx::Koid::from_raw(koid),
-            name: zx::Name::from_bytes_lossy(name.as_bytes()),
-            size_bytes: populated_bytes,
-            parent_koid: zx::Koid::from_raw(parent),
-            num_children: 0,
-            num_mappings: 0,
-            share_count: 0,
-            flags: zx::VmoInfoFlags::empty(),
-            committed_bytes,
-            handle_rights: zx::Rights::empty(),
-            cache_policy: zx::CachePolicy::Unknown,
-            metadata_bytes: 0,
-            committed_change_events: 0,
-            populated_bytes,
-            committed_private_bytes: committed_bytes,
-            populated_private_bytes: populated_bytes,
-            committed_scaled_bytes: committed_bytes,
-            populated_scaled_bytes: populated_bytes,
-            committed_fractional_scaled_bytes: 0,
-            populated_fractional_scaled_bytes: 0,
-        }
+        let mut vmo_info: zx::VmoInfo = Default::default();
+        vmo_info.koid = zx::Koid::from_raw(koid);
+        vmo_info.name = zx::Name::from_bytes_lossy(name.as_bytes());
+        vmo_info.size_bytes = populated_bytes;
+        vmo_info.parent_koid = zx::Koid::from_raw(parent);
+        vmo_info.committed_bytes = committed_bytes;
+        vmo_info.populated_bytes = populated_bytes;
+        vmo_info.committed_private_bytes = committed_bytes;
+        vmo_info.populated_private_bytes = populated_bytes;
+        vmo_info.committed_scaled_bytes = committed_bytes;
+        vmo_info.populated_scaled_bytes = populated_bytes;
+        vmo_info
     }
 
     #[test]
     fn test_gather_resources() {
+        let mut mapping31_details = zx::MappingDetails::default();
+        mapping31_details.mmu_flags = zx::VmarFlagsExtended::PERM_READ;
+        mapping31_details.vmo_koid = zx::Koid::from_raw(211);
+        mapping31_details.committed_bytes = 100;
+        mapping31_details.populated_bytes = 100;
+        mapping31_details.committed_private_bytes = 100;
+        mapping31_details.populated_private_bytes = 100;
+        mapping31_details.committed_scaled_bytes = 100;
+        mapping31_details.populated_scaled_bytes = 100;
         let root_job = Box::new(FakeJob::new(
             0,
             "root",
@@ -504,25 +502,14 @@ mod tests {
                             31,
                             "proc31",
                             vec![],
-                            vec![zx::MapInfo {
-                                name: zx::Name::from_bytes_lossy("mapping31".as_bytes()),
-                                base: 0x1200,
-                                size: 1024,
-                                depth: 2,
-                                details: zx::MapDetails::Mapping(zx::MappingDetails {
-                                    mmu_flags: zx::VmarFlagsExtended::PERM_READ,
-                                    vmo_koid: zx::Koid::from_raw(211),
-                                    vmo_offset: 0,
-                                    committed_bytes: 100,
-                                    populated_bytes: 100,
-                                    committed_private_bytes: 100,
-                                    populated_private_bytes: 100,
-                                    committed_scaled_bytes: 100,
-                                    populated_scaled_bytes: 100,
-                                    committed_fractional_scaled_bytes: 0,
-                                    populated_fractional_scaled_bytes: 0,
-                                }),
-                            }],
+                            vec![zx::MapInfo::new(
+                                zx::Name::from_bytes_lossy("mapping31".as_bytes()),
+                                0x1200,
+                                1024,
+                                2,
+                                zx::MapDetails::Mapping(&mapping31_details),
+                            )
+                            .unwrap()],
                         )],
                     )],
                     vec![FakeProcess::new(

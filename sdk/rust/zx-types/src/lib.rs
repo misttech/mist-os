@@ -564,13 +564,10 @@ multiconst!(u32, [
 /// padding is added. This is important for security since implicit padding bytes are not always
 /// safely initialized. These explicit padding fields are mirrored in the Rust struct definitions
 /// to minimize the opportunities for mistakes and inconsistencies.
-///
-/// This type is private to ensure that users of "raw" types don't inspect untyped padding bytes
-/// on their own.
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, Default)]
 #[cfg_attr(feature = "zerocopy", derive(FromBytes, Immutable, IntoBytes))]
-struct PadByte(u8);
+pub struct PadByte(u8);
 
 impl PartialEq for PadByte {
     fn eq(&self, _other: &Self) -> bool {
@@ -1828,7 +1825,9 @@ multiconst!(u32, [
 
 // Don't use struct_decl_macro, wrapper is different.
 #[repr(C)]
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, KnownLayout, FromBytes, Immutable)]
+#[derive(
+    Default, Debug, Copy, Clone, Eq, PartialEq, KnownLayout, FromBytes, Immutable, IntoBytes,
+)]
 pub struct zx_info_vmo_t {
     pub koid: zx_koid_t,
     pub name: [u8; ZX_MAX_NAME_LEN],
@@ -2063,7 +2062,7 @@ multiconst!(zx_info_maps_type_t, [
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-    #[derive(zerocopy::FromBytes, zerocopy::Immutable)]
+    #[derive(zerocopy::FromBytes, zerocopy::Immutable, IntoBytes)]
     pub struct <zx_info_maps_mapping_t> {
         pub mmu_flags: zx_vm_option_t,
         padding1: [PadByte; 4],

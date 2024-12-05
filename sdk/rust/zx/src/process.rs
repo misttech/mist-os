@@ -6,9 +6,9 @@
 
 use crate::sys::{self as sys, zx_handle_t, zx_time_t, ZX_OBJ_TYPE_UPPER_BOUND};
 use crate::{
-    object_get_info_single, object_get_info_vec, object_get_property, object_set_property, ok,
-    AsHandleRef, Handle, HandleBased, HandleRef, Koid, MapInfo, ObjectQuery, Property,
-    PropertyQuery, Rights, Status, Task, Thread, Topic, VmoInfo,
+    object_get_info, object_get_info_single, object_get_info_vec, object_get_property,
+    object_set_property, ok, AsHandleRef, Handle, HandleBased, HandleRef, Koid, MapInfo,
+    ObjectQuery, Property, PropertyQuery, Rights, Status, Task, Thread, Topic, VmoInfo,
 };
 use bitflags::bitflags;
 use std::mem::MaybeUninit;
@@ -106,13 +106,13 @@ unsafe impl ObjectQuery for TaskStatsInfo {
 struct ProcessMapsInfo;
 unsafe impl ObjectQuery for ProcessMapsInfo {
     const TOPIC: Topic = Topic::PROCESS_MAPS;
-    type InfoTy = sys::zx_info_maps_t;
+    type InfoTy = MapInfo;
 }
 
 struct ProcessVmoInfo;
 unsafe impl ObjectQuery for ProcessVmoInfo {
     const TOPIC: Topic = Topic::PROCESS_VMOS;
-    type InfoTy = sys::zx_info_vmo_t;
+    type InfoTy = VmoInfo;
 }
 
 sys::zx_info_process_handle_stats_t!(ProcessHandleStats);
@@ -273,14 +273,7 @@ impl Process {
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_PROCESS_MAPS topic.
     pub fn info_maps_vec(&self) -> Result<Vec<MapInfo>, Status> {
-        object_get_info_vec::<ProcessMapsInfo>(self.as_handle_ref())?
-            .into_iter()
-            .map(|i| {
-                // SAFETY: these values were written by the kernel which is the requirement for this
-                // function.
-                unsafe { MapInfo::from_raw(i) }
-            })
-            .collect::<Result<Vec<_>, _>>()
+        object_get_info_vec::<ProcessMapsInfo>(self.as_handle_ref())
     }
 
     /// Exit the current process with the given return code.
@@ -321,7 +314,31 @@ impl Process {
     /// syscall for the ZX_INFO_PROCESS_VMO topic.
     pub fn info_vmos_vec(&self) -> Result<Vec<VmoInfo>, Status> {
         let raw_info = object_get_info_vec::<ProcessVmoInfo>(self.as_handle_ref())?;
-        Ok(raw_info.into_iter().map(|info| info.into()).collect())
+        Ok(raw_info)
+    }
+
+    /// Wraps the
+    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
+    /// syscall for the ZX_INFO_PROCESS_MAPS topic. Contrarily to [Process::info_vmos_vec], this
+    /// method ensures that no intermediate copy of the data is made, at the price of a less
+    /// convenient interface.
+    pub fn info_maps<'a>(
+        &self,
+        info_out: &'a mut [std::mem::MaybeUninit<MapInfo>],
+    ) -> Result<(&'a mut [MapInfo], &'a mut [std::mem::MaybeUninit<MapInfo>], usize), Status> {
+        object_get_info::<ProcessMapsInfo>(self.as_handle_ref(), info_out)
+    }
+
+    /// Wraps the
+    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
+    /// syscall for the ZX_INFO_PROCESS_VMO topic. Contrarily to [Process::info_vmos_vec], this
+    /// method ensures that no intermediate copy of the data is made, at the price of a less
+    /// convenient interface.
+    pub fn info_vmos<'a>(
+        &self,
+        info_out: &'a mut [std::mem::MaybeUninit<VmoInfo>],
+    ) -> Result<(&'a mut [VmoInfo], &'a mut [std::mem::MaybeUninit<VmoInfo>], usize), Status> {
+        object_get_info::<ProcessVmoInfo>(self.as_handle_ref(), info_out)
     }
 }
 
@@ -334,6 +351,7 @@ mod tests {
     // "real" zx::Process that we need to use.
     use assert_matches::assert_matches;
     use std::ffi::CString;
+    use std::mem::MaybeUninit;
     use zx::{
         sys, system_get_page_size, AsHandleRef, Handle, Instant, MapDetails, ProcessInfo,
         ProcessInfoFlags, ProcessOptions, Signals, Task, TaskStatsInfo, VmarFlags, Vmo,
@@ -467,12 +485,29 @@ mod tests {
             .map(0, &vmo, 0, system_get_page_size() as usize, VmarFlags::PERM_READ)
             .unwrap();
 
-        let info = process.info_maps_vec().unwrap();
+        // Querying a single info. As we know there are at least two mappings this is guaranteed to
+        // not return all of them.
+        let mut data = vec![MaybeUninit::uninit(); 1];
+        let (returned, _, available) = process.info_maps(&mut data).unwrap();
+        assert_eq!(returned.len(), 1);
+        assert!(available > 0);
+
+        // Add some slack to the total to account for mappings created as a result of the heap
+        // allocation in Vec.
+        let total = available + 10;
+
+        // Allocate and retrieve all of the mappings.
+        let mut data = vec![MaybeUninit::uninit(); total];
+
+        let (info, _, available) = process.info_maps(&mut data).unwrap();
+
+        // Ensure we fail if some mappings are missing.
+        assert_eq!(info.len(), available);
 
         // We should find our two mappings in the info.
         let count = info
             .iter()
-            .filter(|info| match info.details {
+            .filter(|info| match info.details() {
                 MapDetails::Mapping(d) => d.vmo_koid == vmo_koid,
                 _ => false,
             })
@@ -508,7 +543,7 @@ mod tests {
         // We should find our two mappings in the info.
         let count = info
             .iter()
-            .filter(|info| match info.details {
+            .filter(|info| match info.details() {
                 MapDetails::Mapping(d) => d.vmo_koid == vmo_koid,
                 _ => false,
             })
@@ -521,6 +556,25 @@ mod tests {
             root_vmar.unmap(map1, system_get_page_size() as usize).unwrap();
             root_vmar.unmap(map2, system_get_page_size() as usize).unwrap();
         }
+    }
+
+    #[test]
+    fn info_vmos() {
+        let process = fuchsia_runtime::process_self();
+
+        // Create two mappings so we know what to expect from our test calls.
+        let vmo = Vmo::create(system_get_page_size() as u64).unwrap();
+        let vmo_koid = vmo.get_koid().unwrap();
+
+        let mut data = vec![MaybeUninit::uninit(); 2048];
+        let (info, _, available) = process.info_vmos(&mut data).unwrap();
+
+        // Ensure we fail if some vmos are missing, so we can adjust the buffer size.
+        assert_eq!(info.len(), available);
+
+        // We should find our two mappings in the info.
+        let count = info.iter().filter(|map| map.koid == vmo_koid).count();
+        assert_eq!(count, 1);
     }
 
     #[test]

@@ -364,7 +364,7 @@ fn find_mapping_in_range(
 ) -> bool {
     let maps = process.info_maps_vec().unwrap();
     for map in maps {
-        match map.details {
+        match map.details() {
             MapDetails::Mapping(info) => {
                 if predicate(&map, &info) {
                     return true;

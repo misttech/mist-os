@@ -126,3 +126,41 @@ macro_rules! assoc_values {
         }
     }
 }
+
+/// Declare a struct that needs to be statically aligned with another, equivalent struct. The syntax
+/// is the following:
+/// rust```
+/// static_assert_align! (
+///     #[derive(Trait1, Trait2)]
+///     <other_aligned_struct> pub struct MyStruct {
+///         field_1 <equivalent_field1_on_other_struct>: bool,
+///         field_2 <equivalent_field2_on_other_struct>: u32,
+///         special_field_3: [u8; 10],  // This field will be ignored when comparing alignment.
+///     }
+/// );
+/// ```
+macro_rules! static_assert_align {
+    (
+        $(#[$attrs:meta])* <$equivalent:ty> $vis:vis struct $struct_name:ident {
+            $($field_vis:vis $field_ident:ident $(<$field_eq:ident>)?: $field_type:ty,)*
+        }
+    ) => {
+        $(#[$attrs])* $vis struct $struct_name {
+            $($field_vis $field_ident: $field_type,)*
+        }
+
+        static_assertions::assert_eq_size!($struct_name, $equivalent);
+        $(_static_assert_one_field!($struct_name, $field_ident, $equivalent $(, $field_eq)?);)*
+    }
+}
+
+/// Internal macro used by [static_assert_align].
+macro_rules! _static_assert_one_field {
+    ($struct_1:ty, $field_1:ident, $struct_2:ty) => {};
+    ($struct_1:ty, $field_1:ident, $struct_2:ty, $field_2:ident) => {
+        static_assertions::const_assert_eq!(
+            std::mem::offset_of!($struct_1, $field_1),
+            std::mem::offset_of!($struct_2, $field_2)
+        );
+    };
+}
