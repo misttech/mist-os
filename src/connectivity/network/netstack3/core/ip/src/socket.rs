@@ -9,7 +9,7 @@ use core::convert::Infallible;
 use core::num::NonZeroU8;
 
 use log::error;
-use net_types::ip::{Ip, IpVersionMarker, Ipv6Addr, Ipv6SourceAddr, Mtu};
+use net_types::ip::{Ip, IpVersionMarker, Ipv6Addr, Mtu};
 use net_types::{MulticastAddress, ScopeableAddress, SpecifiedAddr};
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
@@ -1067,11 +1067,18 @@ pub(crate) mod ipv6_source_address_selection {
     /// addresses on all devices. The algorithm works by iterating over
     /// `addresses` and selecting the address which is most preferred according
     /// to a set of selection criteria.
-    pub fn select_ipv6_source_address<'a, D: PartialEq, I: Iterator<Item = SasCandidate<D>>>(
+    pub fn select_ipv6_source_address<
+        'a,
+        D: PartialEq,
+        A,
+        I: Iterator<Item = A>,
+        F: FnMut(&A) -> SasCandidate<D>,
+    >(
         remote_ip: Option<SpecifiedAddr<Ipv6Addr>>,
         outbound_device: &D,
         addresses: I,
-    ) -> Ipv6SourceAddr {
+        mut get_candidate: F,
+    ) -> Option<A> {
         // Source address selection as defined in RFC 6724 Section 5.
         //
         // The algorithm operates by defining a partial ordering on available
@@ -1083,20 +1090,18 @@ pub(crate) mod ipv6_source_address_selection {
         // rule must be consulted, and so on until all of the rules are
         // exhausted.
 
-        let addr = addresses
+        addresses
+            .map(|item| {
+                let candidate = get_candidate(&item);
+                (item, candidate)
+            })
             // Tentative addresses are not considered available to the source
             // selection algorithm.
-            .filter(
-                |SasCandidate { addr_sub: _, assigned, deprecated: _, device: _, temporary: _ }| {
-                    *assigned
-                },
-            )
-            .max_by(|a, b| select_ipv6_source_address_cmp(remote_ip, outbound_device, a, b))
-            .map(|SasCandidate { addr_sub, .. }| addr_sub.addr());
-        match addr {
-            Some(addr) => Ipv6SourceAddr::Unicast(addr),
-            None => Ipv6SourceAddr::Unspecified,
-        }
+            .filter(|(_, candidate)| candidate.assigned)
+            .max_by(|(_, a), (_, b)| {
+                select_ipv6_source_address_cmp(remote_ip, outbound_device, a, b)
+            })
+            .map(|(item, _candidate)| item)
     }
 
     /// Comparison operator used by `select_ipv6_source_address`.
