@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
             name: "test_suite",
@@ -23,14 +26,6 @@
             ],
             from: "#test_realm_factory",
             to: "#test_suite",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#test_realm_factory",
-                "#test_suite",
-            ],
         },
         {
             storage: "data",

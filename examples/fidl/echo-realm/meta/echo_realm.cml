@@ -38,6 +38,11 @@
             from: "#echo_server",
             to: "#echo_client",
         },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "all",
+        },
 
         // Route diagnostics support to both children.
         {

@@ -48,6 +48,14 @@
             to: "self/diagnostics",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [
+                "#archivist",
+                "#reader",
+            ],
+        },
+        {
             protocol: "fuchsia.inspect.InspectSink",
             from: "#archivist",
             to: "self/diagnostics",
@@ -55,7 +63,7 @@
         {
             dictionary: "diagnostics",
             from: "self",
-            to: "#routing-tests",
+            to: [ "#routing-tests" ],
         },
         {
             event_stream: "capability_requested",

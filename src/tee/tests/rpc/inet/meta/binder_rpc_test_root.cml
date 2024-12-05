@@ -26,6 +26,11 @@
                 "#netstack",
             ],
         },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "all",
+        },
     ],
     expose: [
         {

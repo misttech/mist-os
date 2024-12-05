@@ -19,6 +19,11 @@
             from: "#server",
             to: "#client",
         },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "all",
+        },
 
         // Route diagnostics support to all children.
         {

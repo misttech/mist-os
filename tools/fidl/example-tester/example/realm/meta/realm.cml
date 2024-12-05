@@ -31,6 +31,11 @@
             from: "#proxy",
             to: "#client",
         },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "all",
+        },
 
         // Route logging support to all children.
         {
