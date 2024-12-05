@@ -32,7 +32,7 @@
 #include "src/ui/lib/escher/util/hasher.h"
 #include "src/ui/lib/escher/vk/shader_module.h"
 
-#include "third_party/spirv-cross/spirv_cross.hpp"
+#include <spirv_cross.hpp>
 
 namespace escher {
 namespace impl {

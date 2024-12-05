@@ -33,7 +33,7 @@
 // ESCHER_USE_RUNTIME_GLSL is false, GN will check the validity of this include
 // and find that it shouldn't be allowed, since there is no shaderc when that
 // macro is false. "nogncheck" prevents this.
-#include "third_party/shaderc/libshaderc/include/shaderc/shaderc.hpp"  // nogncheck
+#include <shaderc/shaderc.hpp>  // nogncheck
 #endif
 
 #include <chrono>
@@ -527,9 +527,9 @@ VK_TEST_F(ShaderProgramTest, PipelineBuilder) {
   // Test that we can create pipelines using a VkPipelineCache, and that creating the "same"
   // pipeline twice does not result in a second invocation of the StorePipelineCacheDataCallback.
 
-  // TODO(https://fxbug.dev/42126688): SwiftShader ICD doesn't store cached pipeline to disk correctly.
-  // So we disabled all the EXPECT checks on SwiftShader. We need to remove this
-  // after the bug is solved.
+  // TODO(https://fxbug.dev/42126688): SwiftShader ICD doesn't store cached pipeline to disk
+  // correctly. So we disabled all the EXPECT checks on SwiftShader. We need to remove this after
+  // the bug is solved.
   {
     // Keeps track of the number of times that a newly-built pipeline results in updated
     // cache data, which the application should persist to disk.
@@ -678,8 +678,8 @@ bool TestRenderPassSubpasses(RenderPassInfo* rp, vk::Rect2D render_area,
   TestMultipleSubpassHelper(rp, color_info, depth_stencil_info,
                             msaa_texture ? &msaa_info : nullptr);
 
-  // TODO(https://fxbug.dev/42119565): Can we get away sharing image views across multiple RenderPassInfo
-  // structs?
+  // TODO(https://fxbug.dev/42119565): Can we get away sharing image views across multiple
+  // RenderPassInfo structs?
   ImageViewPtr output_image_view =
       allocator ? allocator->ObtainImageView(output_image) : ImageView::New(output_image);
 

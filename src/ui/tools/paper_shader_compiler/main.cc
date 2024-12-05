@@ -16,7 +16,7 @@
 #include "src/ui/lib/escher/shaders/util/spirv_file_util.h"
 #include "src/ui/lib/escher/vk/shader_program.h"
 
-#include "third_party/shaderc/libshaderc/include/shaderc/shaderc.hpp"
+#include <shaderc/shaderc.hpp>  // nogncheck
 
 namespace escher {
 
