@@ -289,7 +289,7 @@ group("wlan_core_vim3_unstable_tests") {
   ]
 }
 
-group("wlan_core_vim3_staging_sl4f_tests") {
+group("wlan_core_vim3_staging_tests") {
   testonly = true
   public_deps = [ ":wlan_core_vim3_unstable_tests" ]
 }
