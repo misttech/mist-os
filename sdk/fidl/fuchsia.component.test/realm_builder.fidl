@@ -614,6 +614,24 @@ closed protocol Realm {
         child_realm server_end:Realm;
     }) -> () error RealmBuilderError;
 
+    /// Adds a child realm which can be built with the client end of
+    /// `child_realm`, and whose contents are initialized from `decl`.
+    @available(added=NEXT)
+    strict AddChildRealmFromDecl(resource struct {
+        /// The name of the child realm that is being added.
+        name fuchsia.component.name;
+
+        /// The component's declaration.
+        decl fuchsia.component.decl.Component;
+
+        /// Additional properties for the child.
+        options ChildOptions;
+
+        /// The server end of the `Realm` channel that will be used to build the
+        /// sub-realm.
+        child_realm server_end:Realm;
+    }) -> () error RealmBuilderError;
+
 
     /// Returns the component decl for the given component. `name` must refer to
     /// a component that is one of the following:

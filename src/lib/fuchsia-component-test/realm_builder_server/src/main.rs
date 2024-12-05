@@ -493,6 +493,30 @@ impl Realm {
                         }
                     }
                 }
+                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                fidl_fuchsia_component_test::RealmRequest::AddChildRealmFromDecl {
+                    name,
+                    decl,
+                    options,
+                    child_realm,
+                    responder,
+                } => {
+                    if self.realm_has_been_built.load(Ordering::Relaxed) {
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        continue;
+                    }
+
+                    match self
+                        .add_child_realm_from_decl(name.clone(), decl, options, child_realm)
+                        .await
+                    {
+                        Ok(()) => responder.send(Ok(()))?,
+                        Err(err) => {
+                            warn!(method = "Realm.AddChildRealmFromDecl", message = %err);
+                            responder.send(Err(err.into()))?;
+                        }
+                    }
+                }
                 ftest::RealmRequest::GetComponentDecl { name, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
                         responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
@@ -767,6 +791,24 @@ impl Realm {
         child_realm_server_end: ServerEnd<ftest::RealmMarker>,
     ) -> Result<(), RealmBuilderError> {
         let node = RealmNode2::load_from_pkg(&relative_url, Clone::clone(&self.pkg_dir)).await?;
+        self.add_child_realm_with_node(name, options, child_realm_server_end, node).await
+    }
+
+    #[allow(unused)]
+    async fn add_child_realm_from_decl(
+        &self,
+        name: String,
+        decl: fcdecl::Component,
+        options: ftest::ChildOptions,
+        child_realm_server_end: ServerEnd<ftest::RealmMarker>,
+    ) -> Result<(), RealmBuilderError> {
+        if let Err(e) = cm_fidl_validator::validate(&decl) {
+            return Err(RealmBuilderError::InvalidComponentDeclWithName(
+                name,
+                to_tabulated_string(e),
+            ));
+        }
+        let node = RealmNode2::new_from_decl(decl.fidl_into_native(), true);
         self.add_child_realm_with_node(name, options, child_realm_server_end, node).await
     }
 

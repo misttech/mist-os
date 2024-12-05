@@ -1185,6 +1185,16 @@ impl RealmBuilder {
         self.root_realm.add_child_realm_from_relative_url(name, relative_url, options).await
     }
 
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    pub async fn add_child_realm_from_decl(
+        &self,
+        name: impl Into<String>,
+        decl: cm_rust::ComponentDecl,
+        options: ChildOptions,
+    ) -> Result<SubRealmBuilder, Error> {
+        self.root_realm.add_child_realm_from_decl(name, decl, options).await
+    }
+
     /// Adds a new component with a local implementation to the realm
     pub async fn add_local_child(
         &self,
@@ -1368,6 +1378,33 @@ impl SubRealmBuilder {
             .add_child_realm_from_relative_url(
                 &name,
                 &relative_url.into(),
+                &options.into(),
+                child_realm_server_end,
+            )
+            .await??;
+
+        let mut child_path = self.realm_path.clone();
+        child_path.push(name);
+        Ok(SubRealmBuilder {
+            realm_proxy: child_realm_proxy,
+            realm_path: child_path,
+            local_component_runner_builder: self.local_component_runner_builder.clone(),
+        })
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    pub async fn add_child_realm_from_decl(
+        &self,
+        name: impl Into<String>,
+        decl: cm_rust::ComponentDecl,
+        options: ChildOptions,
+    ) -> Result<SubRealmBuilder, Error> {
+        let name: String = name.into();
+        let (child_realm_proxy, child_realm_server_end) = create_proxy::<ftest::RealmMarker>();
+        self.realm_proxy
+            .add_child_realm_from_decl(
+                &name,
+                &decl.native_into_fidl(),
                 &options.into(),
                 child_realm_server_end,
             )
@@ -2676,6 +2713,12 @@ mod tests {
             options: ftest::ChildOptions,
             receive_requests: mpsc::UnboundedReceiver<ServerRequest>,
         },
+        AddChildRealmFromDecl {
+            name: String,
+            decl: fdecl::Component,
+            options: ftest::ChildOptions,
+            receive_requests: mpsc::UnboundedReceiver<ServerRequest>,
+        },
         GetComponentDecl {
             name: String,
         },
@@ -2784,6 +2827,32 @@ mod tests {
                             .send(ServerRequest::AddChildRealmFromRelativeUrl {
                                 name,
                                 relative_url,
+                                options,
+                                receive_requests,
+                            })
+                            .await
+                            .unwrap();
+
+                        let child_realm_stream = child_realm.into_stream();
+                        child_realm_streams.push(fasync::Task::spawn(async move {
+                            handle_realm_stream(child_realm_stream, child_realm_report_requests)
+                                .await
+                        }));
+                        responder.send(Ok(())).unwrap();
+                    }
+                    ftest::RealmRequest::AddChildRealmFromDecl {
+                        name,
+                        decl,
+                        options,
+                        child_realm,
+                        responder,
+                    } => {
+                        let (child_realm_report_requests, receive_requests) = mpsc::unbounded();
+
+                        report_requests
+                            .send(ServerRequest::AddChildRealmFromDecl {
+                                name,
+                                decl,
                                 options,
                                 receive_requests,
                             })
@@ -2999,6 +3068,28 @@ mod tests {
         }
     }
 
+    fn assert_add_child_realm_from_decl(
+        receive_server_requests: &mut mpsc::UnboundedReceiver<ServerRequest>,
+        expected_name: &str,
+        expected_decl: &fdecl::Component,
+        expected_options: ftest::ChildOptions,
+    ) -> mpsc::UnboundedReceiver<ServerRequest> {
+        match receive_server_requests.next().now_or_never() {
+            Some(Some(ServerRequest::AddChildRealmFromDecl {
+                name,
+                decl,
+                options,
+                receive_requests,
+            })) if &name == expected_name
+                && options == expected_options
+                && decl == *expected_decl =>
+            {
+                receive_requests
+            }
+            req => panic!("match failed, received unexpected server request: {:?}", req),
+        }
+    }
+
     fn assert_read_only_directory(
         receive_server_requests: &mut mpsc::UnboundedReceiver<ServerRequest>,
         expected_directory_name: &str,
@@ -3084,6 +3175,11 @@ mod tests {
             .await
             .unwrap();
         let _child_d = child_realm_c.add_child("d", "test://d", ChildOptions::new()).await.unwrap();
+        let child_realm_e = builder
+            .add_child_realm_from_decl("e", cm_rust::ComponentDecl::default(), ChildOptions::new())
+            .await
+            .unwrap();
+        let _child_f = child_realm_e.add_child("f", "test://f", ChildOptions::new()).await.unwrap();
 
         let mut receive_sub_realm_requests =
             assert_add_child_realm(&mut receive_server_requests, "a", ChildOptions::new().into());
@@ -3104,6 +3200,19 @@ mod tests {
             receive_sub_realm_requests.next().await,
             Some(ServerRequest::AddChild { name, url, options })
                 if &name == "d" && &url == "test://d" && options == ChildOptions::new().into()
+        );
+        assert_matches!(receive_sub_realm_requests.next().now_or_never(), None);
+
+        let mut receive_sub_realm_requests = assert_add_child_realm_from_decl(
+            &mut receive_server_requests,
+            "e",
+            &fdecl::Component::default(),
+            ChildOptions::new().into(),
+        );
+        assert_matches!(
+            receive_sub_realm_requests.next().await,
+            Some(ServerRequest::AddChild { name, url, options })
+                if &name == "f" && &url == "test://f" && options == ChildOptions::new().into()
         );
         assert_matches!(receive_sub_realm_requests.next().now_or_never(), None);
         assert_matches!(receive_server_requests.next().now_or_never(), None);
