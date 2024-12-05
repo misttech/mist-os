@@ -128,11 +128,11 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     test_config.mode = display::ToBanjoDisplayMode(timing);
 
     uint32_t display_cfg_result;
-    client_composition_opcode_t layer_result = 0;
+    layer_composition_operations_t layer_result = 0;
     size_t display_layer_results_count;
     display_cfg_result = engine_driver_client_->CheckConfiguration(
         test_configs, 1, &layer_result,
-        /*client_composition_opcodes_count=*/1, &display_layer_results_count);
+        /*layer_composition_operations_count=*/1, &display_layer_results_count);
     if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
       fbl::AllocChecker ac;
       info->edid->timings.push_back(timing, &ac);

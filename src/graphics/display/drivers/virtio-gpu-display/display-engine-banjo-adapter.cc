@@ -118,16 +118,16 @@ void DisplayEngineBanjoAdapter::DisplayEngineReleaseImage(uint64_t banjo_image_h
 
 config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration(
     const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
-    client_composition_opcode_t* out_client_composition_opcodes_list,
-    size_t out_client_composition_opcodes_size, size_t* out_client_composition_opcodes_actual) {
+    layer_composition_operations_t* out_layer_composition_operations_list,
+    size_t out_layer_composition_operations_size, size_t* out_layer_composition_operations_actual) {
   cpp20::span<const display_config_t> banjo_display_configs(banjo_display_configs_array,
                                                             banjo_display_configs_count);
-  cpp20::span<client_composition_opcode_t> out_client_composition_opcodes(
-      out_client_composition_opcodes_list, out_client_composition_opcodes_size);
-  std::fill(out_client_composition_opcodes.begin(), out_client_composition_opcodes.end(), 0);
+  cpp20::span<layer_composition_operations_t> out_layer_composition_operations(
+      out_layer_composition_operations_list, out_layer_composition_operations_size);
+  std::fill(out_layer_composition_operations.begin(), out_layer_composition_operations.end(), 0);
 
-  if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = 0;
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = 0;
   }
 
   // The display coordinator currently uses zero-display configs to blank all
@@ -147,9 +147,9 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   cpp20::span<const layer_t> banjo_layers(banjo_display_config.layer_list,
                                           banjo_display_config.layer_count);
 
-  ZX_DEBUG_ASSERT(out_client_composition_opcodes.size() >= banjo_layers.size());
-  if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = banjo_layers.size();
+  ZX_DEBUG_ASSERT(out_layer_composition_operations.size() >= banjo_layers.size());
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = banjo_layers.size();
   }
 
   // The display coordinator currently uses zero-display configs to blank a
@@ -161,16 +161,16 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   // This adapter does not currently support multi-layer configurations. This
   // restriction will be lifted in the near future.
   if (banjo_layers.size() > 1) {
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
     for (size_t i = 1; i < banjo_layers.size(); ++i) {
-      out_client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+      out_layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
     }
     return CONFIG_CHECK_RESULT_OK;
   }
 
   // This adapter does not currently support color correction.
   if (banjo_display_config.cc_flags != 0) {
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION;
+    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION;
     return CONFIG_CHECK_RESULT_OK;
   }
 
@@ -182,8 +182,8 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   cpp20::span<const display::DriverLayer> layers(&layer, 1);
 
   return engine_.CheckConfiguration(display::ToDisplayId(banjo_display_config.display_id), layers,
-                                    out_client_composition_opcodes,
-                                    out_client_composition_opcodes_actual);
+                                    out_layer_composition_operations,
+                                    out_layer_composition_operations_actual);
 }
 
 void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(

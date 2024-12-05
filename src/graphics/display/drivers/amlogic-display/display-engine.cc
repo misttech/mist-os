@@ -432,10 +432,10 @@ void DisplayEngine::DisplayEngineReleaseImage(uint64_t image_handle) {
 
 config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     const display_config_t* display_configs, size_t display_count,
-    client_composition_opcode_t* out_client_composition_opcodes_list,
-    size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
-  if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = 0;
+    layer_composition_operations_t* out_layer_composition_operations_list,
+    size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = 0;
   }
   if (display_count != 1) {
     ZX_DEBUG_ASSERT(display_count == 0);
@@ -461,12 +461,12 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
 
   bool success = true;
 
-  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= display_configs[0].layer_count);
-  cpp20::span<client_composition_opcode_t> client_composition_opcodes(
-      out_client_composition_opcodes_list, display_configs[0].layer_count);
-  std::fill(client_composition_opcodes.begin(), client_composition_opcodes.end(), 0);
-  if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = client_composition_opcodes.size();
+  ZX_DEBUG_ASSERT(layer_composition_operations_count >= display_configs[0].layer_count);
+  cpp20::span<layer_composition_operations_t> layer_composition_operations(
+      out_layer_composition_operations_list, display_configs[0].layer_count);
+  std::fill(layer_composition_operations.begin(), layer_composition_operations.end(), 0);
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = layer_composition_operations.size();
   }
 
   if (display_configs[0].layer_count > 1) {
@@ -505,7 +505,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
 
     if (layer.alpha_mode == ALPHA_PREMULTIPLIED) {
       // we don't support pre-multiplied alpha mode
-      client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
+      layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_ALPHA;
     }
     success = layer.image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY &&
               layer.image_metadata.width == width && layer.image_metadata.height == height &&
@@ -513,9 +513,9 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
               memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) == 0;
   }
   if (!success) {
-    client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+    layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
     for (unsigned i = 1; i < display_configs[0].layer_count; i++) {
-      client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+      layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
     }
   }
   return CONFIG_CHECK_RESULT_OK;

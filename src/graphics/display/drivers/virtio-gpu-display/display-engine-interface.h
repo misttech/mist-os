@@ -58,8 +58,8 @@ class DisplayEngineInterface {
   // TODO(costan): Switch from Banjo to FIDL or api-types-cpp types.
   virtual config_check_result_t CheckConfiguration(
       display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
-      size_t* out_client_composition_opcodes_actual) = 0;
+      cpp20::span<layer_composition_operations_t> out_layer_composition_operations,
+      size_t* out_layer_composition_operations_actual) = 0;
 
   virtual void ApplyConfiguration(display::DisplayId display_id,
                                   cpp20::span<const display::DriverLayer> layers,

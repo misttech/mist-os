@@ -187,13 +187,13 @@ void DisplayEngine::ReleaseImage(display::DriverImageId image_id) {
 
 config_check_result_t DisplayEngine::CheckConfiguration(
     display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
-    cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
-    size_t* out_client_composition_opcodes_actual) {
+    cpp20::span<layer_composition_operations_t> out_layer_composition_operations,
+    size_t* out_layer_composition_operations_actual) {
   ZX_DEBUG_ASSERT(display_id == kDisplayId);
 
-  ZX_DEBUG_ASSERT(out_client_composition_opcodes.size() >= layers.size());
-  ZX_DEBUG_ASSERT(!out_client_composition_opcodes_actual ||
-                  *out_client_composition_opcodes_actual == layers.size());
+  ZX_DEBUG_ASSERT(out_layer_composition_operations.size() >= layers.size());
+  ZX_DEBUG_ASSERT(!out_layer_composition_operations_actual ||
+                  *out_layer_composition_operations_actual == layers.size());
 
   ZX_DEBUG_ASSERT(layers.size() == 1);
 
@@ -207,23 +207,23 @@ config_check_result_t DisplayEngine::CheckConfiguration(
 
   if (layer.display_destination() != display_area) {
     // TODO(costan): Doesn't seem right?
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
     return CONFIG_CHECK_RESULT_OK;
   }
   if (layer.image_source() != layer.display_destination()) {
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
+    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
     return CONFIG_CHECK_RESULT_OK;
   }
   if (layer.image_metadata().dimensions() != layer.image_source().dimensions()) {
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_SRC_FRAME;
+    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_SRC_FRAME;
     return CONFIG_CHECK_RESULT_OK;
   }
   if (layer.alpha_mode() != display::AlphaMode::kDisable) {
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_TRANSFORM;
+    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
     return CONFIG_CHECK_RESULT_OK;
   }
   if (layer.image_source_transformation() != display::CoordinateTransformation::kIdentity) {
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_TRANSFORM;
+    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
     return CONFIG_CHECK_RESULT_OK;
   }
 

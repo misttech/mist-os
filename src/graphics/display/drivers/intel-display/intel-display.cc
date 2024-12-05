@@ -1452,16 +1452,16 @@ void Controller::DoPipeBufferReallocation(
 
 bool Controller::CheckDisplayLimits(
     cpp20::span<const display_config_t> banjo_display_configs,
-    cpp20::span<client_composition_opcode_t> client_composition_opcodes) {
-  int client_composition_opcodes_offset = 0;
+    cpp20::span<layer_composition_operations_t> layer_composition_operations) {
+  int layer_composition_operations_offset = 0;
   for (unsigned i = 0; i < banjo_display_configs.size(); i++) {
     const display_config_t& banjo_display_config = banjo_display_configs[i];
-    ZX_DEBUG_ASSERT(client_composition_opcodes.size() >=
-                    client_composition_opcodes_offset + banjo_display_config.layer_count);
-    cpp20::span<client_composition_opcode_t> current_display_client_composition_opcodes =
-        client_composition_opcodes.subspan(client_composition_opcodes_offset,
-                                           banjo_display_config.layer_count);
-    client_composition_opcodes_offset += banjo_display_config.layer_count;
+    ZX_DEBUG_ASSERT(layer_composition_operations.size() >=
+                    layer_composition_operations_offset + banjo_display_config.layer_count);
+    cpp20::span<layer_composition_operations_t> current_display_layer_composition_operations =
+        layer_composition_operations.subspan(layer_composition_operations_offset,
+                                             banjo_display_config.layer_count);
+    layer_composition_operations_offset += banjo_display_config.layer_count;
 
     const display::DisplayTiming display_timing =
         display::ToDisplayTiming(banjo_display_config.mode);
@@ -1546,7 +1546,8 @@ bool Controller::CheckDisplayLimits(
 
         if (src_height > layer.display_destination.height ||
             src_width > layer.display_destination.width) {
-          current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
+          current_display_layer_composition_operations[j] |=
+              LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
         }
       }
     }
@@ -1559,12 +1560,12 @@ bool Controller::CheckDisplayLimits(
 
 config_check_result_t Controller::DisplayEngineCheckConfiguration(
     const display_config_t* banjo_display_configs, size_t display_config_count,
-    client_composition_opcode_t* out_client_composition_opcodes_list,
-    size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
+    layer_composition_operations_t* out_layer_composition_operations_list,
+    size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
   fbl::AutoLock lock(&display_lock_);
 
-  if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = 0;
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = 0;
   }
 
   cpp20::span banjo_display_configs_span(banjo_display_configs, display_config_count);
@@ -1582,25 +1583,25 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
   int total_layer_count = std::accumulate(
       banjo_display_configs, banjo_display_configs + display_config_count, 0,
       [](int total, const display_config_t& config) { return total += config.layer_count; });
-  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= static_cast<size_t>(total_layer_count));
-  cpp20::span<client_composition_opcode_t> client_composition_opcodes(
-      out_client_composition_opcodes_list, total_layer_count);
-  std::fill(client_composition_opcodes.begin(), client_composition_opcodes.end(), 0);
-  if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = total_layer_count;
+  ZX_DEBUG_ASSERT(layer_composition_operations_count >= static_cast<size_t>(total_layer_count));
+  cpp20::span<layer_composition_operations_t> layer_composition_operations(
+      out_layer_composition_operations_list, total_layer_count);
+  std::fill(layer_composition_operations.begin(), layer_composition_operations.end(), 0);
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = total_layer_count;
   }
 
-  if (!CheckDisplayLimits(banjo_display_configs_span, client_composition_opcodes)) {
+  if (!CheckDisplayLimits(banjo_display_configs_span, layer_composition_operations)) {
     return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
-  int client_composition_opcodes_offset = 0;
+  int layer_composition_operations_offset = 0;
   for (unsigned i = 0; i < banjo_display_configs_span.size(); i++) {
     const display_config_t& banjo_display_config = banjo_display_configs_span[i];
-    cpp20::span<client_composition_opcode_t> current_display_client_composition_opcodes =
-        client_composition_opcodes.subspan(client_composition_opcodes_offset,
-                                           banjo_display_config.layer_count);
-    client_composition_opcodes_offset += banjo_display_config.layer_count;
+    cpp20::span<layer_composition_operations_t> current_display_layer_composition_operations =
+        layer_composition_operations.subspan(layer_composition_operations_offset,
+                                             banjo_display_config.layer_count);
+    layer_composition_operations_offset += banjo_display_config.layer_count;
 
     const display::DisplayId display_id = display::ToDisplayId(banjo_display_config.display_id);
     DisplayDevice* display = nullptr;
@@ -1647,12 +1648,13 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
           // Linear and x tiled images don't support 90/270 rotation
           if (layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
               layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
-            current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
+            current_display_layer_composition_operations[j] |=
+                LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
           }
         } else if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY &&
                    layer.image_source_transformation != COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
           // Cover unsupported rotations
-          current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
+          current_display_layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
         }
 
         uint32_t src_width, src_height;
@@ -1700,7 +1702,8 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
               src_height < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
               max_width < layer.display_destination.width ||
               max_height < layer.display_destination.height) {
-            current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
+            current_display_layer_composition_operations[j] |=
+                LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
           } else {
             total_scalers_needed += scalers_needed;
           }
@@ -1709,21 +1712,21 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
       }
 
       if (j != 0) {
-        current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_IMAGE;
+        current_display_layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
       }
       const auto format =
           static_cast<fuchsia_images2::wire::PixelFormat>(layer.fallback_color.format);
       if (format != fuchsia_images2::wire::PixelFormat::kB8G8R8A8 &&
           format != fuchsia_images2::wire::PixelFormat::kR8G8B8A8) {
-        current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_IMAGE;
+        current_display_layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
       }
       break;
     }
 
     if (merge_all) {
-      current_display_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+      current_display_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
       for (unsigned j = 1; j < banjo_display_config.layer_count; j++) {
-        current_display_client_composition_opcodes[j] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+        current_display_layer_composition_operations[j] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
       }
     }
   }
@@ -1742,21 +1745,21 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
       ZX_ASSERT(pipe->in_use());  // If the allocation failed, it should be in use
       display::DisplayId pipe_attached_display_id = pipe->attached_display_id();
 
-      int client_composition_opcodes_offset = 0;
+      int layer_composition_operations_offset = 0;
       for (unsigned i = 0; i < display_config_count; i++) {
-        cpp20::span<client_composition_opcode_t> current_display_client_composition_opcodes =
-            client_composition_opcodes.subspan(client_composition_opcodes_offset,
-                                               banjo_display_configs[i].layer_count);
-        client_composition_opcodes_offset += banjo_display_configs[i].layer_count;
+        cpp20::span<layer_composition_operations_t> current_display_layer_composition_operations =
+            layer_composition_operations.subspan(layer_composition_operations_offset,
+                                                 banjo_display_configs[i].layer_count);
+        layer_composition_operations_offset += banjo_display_configs[i].layer_count;
 
         display::DisplayId display_id = display::ToDisplayId(banjo_display_configs[i].display_id);
         if (display_id != pipe_attached_display_id) {
           continue;
         }
 
-        current_display_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+        current_display_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
         for (unsigned j = 1; j < banjo_display_configs[i].layer_count; j++) {
-          current_display_client_composition_opcodes[j] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+          current_display_layer_composition_operations[j] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
         }
         break;
       }
