@@ -58,7 +58,7 @@ use {
     fuchsia_async as fasync,
 };
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct KernelFeatures {
     pub bpf_v2: bool,
 
@@ -82,6 +82,21 @@ pub struct KernelFeatures {
     /// This controls whether or not the default framebuffer background is black or colorful, to
     /// aid debugging.
     pub enable_visual_debugging: bool,
+
+    /// The default seclabel that is applied to components that are run in this kernel.
+    ///
+    /// Components can override this by setting the `seclabel` field in their program block.
+    pub default_seclabel: Option<String>,
+
+    /// The default fsseclabel that is applied to components that are run in this kernel.
+    ///
+    /// Components can override this by setting the `fsseclabel` field in their program block.
+    pub default_fsseclabel: Option<String>,
+
+    /// The default uid that is applied to components that are run in this kernel.
+    ///
+    /// Components can override this by setting the `uid` field in their program block.
+    pub default_uid: u32,
 }
 
 /// Contains an fscrypt wrapping key id.

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::Config;
+
 use anyhow::{anyhow, Context, Error};
 use bstr::BString;
 
@@ -89,6 +91,9 @@ impl Features {
                         io_uring,
                         error_on_failed_reboot,
                         enable_visual_debugging,
+                        default_uid,
+                        default_seclabel,
+                        default_fsseclabel,
                     },
                 selinux,
                 ashmem,
@@ -143,6 +148,15 @@ impl Features {
                     kernel_node.record_bool("io_uring", *io_uring);
                     kernel_node.record_bool("error_on_failed_reboot", *error_on_failed_reboot);
                     kernel_node.record_bool("enable_visual_debugging", *enable_visual_debugging);
+                    kernel_node.record_int("default_uid", (*default_uid).into());
+                    kernel_node.record_string(
+                        "default_seclabel",
+                        default_seclabel.as_deref().unwrap_or_default(),
+                    );
+                    kernel_node.record_string(
+                        "default_fsseclabel",
+                        default_fsseclabel.as_ref().map_or("", |s| s),
+                    );
                 });
             }
         });
@@ -153,11 +167,11 @@ impl Features {
 ///
 /// Returns an error if parsing fails, or if an unsupported feature is present in `features`.
 pub fn parse_features(
-    entries: &Vec<String>,
+    config: &Config,
     structured_config: &starnix_kernel_structured_config::Config,
 ) -> Result<Features, Error> {
     let mut features = Features::default();
-    for entry in entries {
+    for entry in &config.features {
         let (raw_flag, raw_args) =
             entry.split_once(':').map(|(f, a)| (f, Some(a.to_string()))).unwrap_or((entry, None));
         match (raw_flag, raw_args) {
@@ -210,6 +224,9 @@ pub fn parse_features(
     if structured_config.ui_visual_debugging_level > 0 {
         features.kernel.enable_visual_debugging = true;
     }
+
+    features.kernel.default_uid = config.default_uid;
+    features.kernel.default_seclabel = config.default_seclabel.clone();
 
     Ok(features)
 }

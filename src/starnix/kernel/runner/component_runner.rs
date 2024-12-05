@@ -82,7 +82,12 @@ pub async fn start_component(
 
     // If the component specifies a filesystem security label then it will be applied to all files
     // in all directories mounted from the component's namespace.
-    let mount_seclabel = get_program_string(&start_info, "fsseclabel");
+    let mount_seclabel = {
+        match get_program_string(&start_info, "fsseclabel") {
+            Some(s) => Some(s),
+            None => system_task.kernel().features.default_fsseclabel.as_deref(),
+        }
+    };
 
     let mut maybe_pkg = None;
     let mut maybe_svc = None;
@@ -158,7 +163,13 @@ pub async fn start_component(
         .ok_or_else(|| anyhow!("Missing \"binary\" in manifest"))?;
     let binary_path = CString::new(binary_path.to_owned())?;
 
-    let uid = get_program_string(&start_info, "uid").unwrap_or("42").parse()?;
+    let uid = {
+        if let Some(component_uid) = get_program_string(&start_info, "uid") {
+            component_uid.parse()?
+        } else {
+            system_task.kernel().features.default_uid
+        }
+    };
     let mut credentials = Credentials::with_ids(uid, uid);
     if let Some(caps) = get_program_strvec(&start_info, "capabilities")? {
         let mut capabilities = Capabilities::empty();
@@ -178,10 +189,14 @@ pub async fn start_component(
     );
 
     let security_context = {
-        let s = get_program_string(&start_info, "seclabel");
-        match s {
+        match get_program_string(&start_info, "seclabel") {
             Some(s) => Some(CString::new(s.to_owned())?),
-            None => None,
+            None => system_task
+                .kernel()
+                .features
+                .default_seclabel
+                .as_ref()
+                .map(|s| CString::new(s.clone()).expect("seclabel cstring")),
         }
     };
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
