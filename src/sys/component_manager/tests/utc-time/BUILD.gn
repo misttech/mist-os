@@ -117,7 +117,7 @@ fuchsia_component("component_manager") {
   testonly = true
   deps = [
     ":component_manager_config",
-    "//src/sys/component_manager:bin_eng",
+    "//src/sys/component_manager:bin_with_tracing",
   ]
   manifest = "//src/sys/component_manager/meta/component_manager.cml"
 }

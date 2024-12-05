@@ -206,7 +206,7 @@ fuchsia_test_package("fuchsia-component-test-tests") {
 
 fuchsia_component("component_manager_expose_dir_rights") {
   testonly = true
-  deps = [ "//src/sys/component_manager:bin_eng" ]
+  deps = [ "//src/sys/component_manager:bin_with_tracing" ]
   manifest = "meta/component_manager_expose_dir_rights.cml"
 }
 

@@ -111,7 +111,7 @@ use vfs::directory::entry::OpenRequest;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
-use zx::{self as zx, Resource};
+use zx::{self, Resource};
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,

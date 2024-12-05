@@ -77,11 +77,8 @@ fn main() {
         info!("Component manager was started with boot defaults");
     }
 
-    #[cfg(eng)]
-    {
-        fuchsia_trace_provider::trace_provider_create_with_fdio();
-        info!("Component manager tracing is on");
-    }
+    #[cfg(feature = "tracing")]
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
 
     let run_root_fut = async move {
         let mut builtin_environment = match build_environment(runtime_config, bootfs_svc).await {

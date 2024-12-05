@@ -281,10 +281,6 @@ _component_manager_bin = {
   ]
 }
 
-config("eng_mode") {
-  rustflags = [ "--cfg=eng" ]
-}
-
 rustc_binary("bin") {
   output_name = "component_manager"
   forward_variables_from(_component_manager_bin, "*")
@@ -292,21 +288,19 @@ rustc_binary("bin") {
   configs -= configs_to_remove
   configs += configs_to_add
   assert_no_deps += [
-    # For tracing support, :bin_eng is required
+    # For tracing support, :bin_with_tracing is required
     "//src/lib/trace/rust:trace-provider",
   ]
 }
 
-rustc_binary("bin_eng") {
-  testonly = true
+rustc_binary("bin_with_tracing") {
   output_name = "component_manager_eng"
   forward_variables_from(_component_manager_bin, "*")
   configs += configs_to_remove
   configs -= configs_to_remove
   configs += configs_to_add
-
+  features = [ "tracing" ]
   deps += [ "//src/lib/trace/rust:trace-provider" ]
-  configs += [ ":eng_mode" ]
 }
 
 # This v2 component bundles component manager with a config suitable for running
@@ -314,7 +308,7 @@ rustc_binary("bin_eng") {
 fuchsia_component("component-manager-realm-builder-cmp") {
   testonly = true
   deps = [
-    ":bin_eng",
+    ":bin_with_tracing",
     ":component_manager_realm_builder_config",
   ]
   component_name = "component_manager"
@@ -326,7 +320,7 @@ fuchsia_component("component-manager-realm-builder-cmp") {
 fuchsia_component("component-manager-realm-builder-debug-cmp") {
   testonly = true
   deps = [
-    ":bin_eng",
+    ":bin_with_tracing",
     ":component_id_index_for_debug_config",
     ":component_manager_realm_builder_debug_config",
   ]

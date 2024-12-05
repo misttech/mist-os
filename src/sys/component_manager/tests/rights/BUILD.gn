@@ -190,7 +190,7 @@ fuchsia_component("component_manager_for_rights_test") {
   testonly = true
   deps = [
     ":component_manager_config",
-    "//src/sys/component_manager:bin_eng",
+    "//src/sys/component_manager:bin_with_tracing",
   ]
   manifest = "meta/component_manager_for_rights_test.cml"
 }
