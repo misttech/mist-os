@@ -16,6 +16,9 @@ template("spinel_vk_target") {
   _spinel_include_dir = "${_compute_dir}/spinel/include"
   _spinel_vk_dir = "${_spinel_dir}/platforms/vk"
 
+  # Location of Vulkan ecosystem repos.
+  _vulkan_header_dir = "//third_party/Vulkan-Headers"
+
   #
   # struct_sources
   #
@@ -29,8 +32,8 @@ template("spinel_vk_target") {
     "${_spinel_vk_dir}/target.h",
     "${_spinel_vk_dir}/target_init_group_sizes.h",
     "${_spinel_vk_dir}/target_requirements.h",
-    "//third_party/Vulkan-Headers/include/vulkan/vk_platform.h",
-    "//third_party/Vulkan-Headers/include/vulkan/vulkan_core.h",
+    "${_vulkan_header_dir}/include/vulkan/vk_platform.h",
+    "${_vulkan_header_dir}/include/vulkan/vulkan_core.h",
     "config.h",
     "header.c",
   ]
@@ -47,7 +50,7 @@ template("spinel_vk_target") {
     _spinel_dir,
     _spinel_include_dir,
     _spinel_vk_dir,
-    "//third_party/Vulkan-Headers/include",
+    "${_vulkan_header_dir}/include",
   ]
 
   if (defined(invoker.struct_include_dirs)) {
