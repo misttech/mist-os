@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
 #include <lib/io-buffer/phys-iter.h>
+#include <lib/zx/eventpair.h>
 
 #include <usb/request-cpp.h>
 #include <usb/request-fidl.h>
@@ -32,7 +33,8 @@ class EndpointServer : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoi
                       UnregisterVmosCompleter::Sync& completer) final;
 
   // Completes a request.
-  void RequestComplete(zx_status_t status, size_t actual, RequestVariant request);
+  void RequestComplete(zx_status_t status, size_t actual, RequestVariant request,
+                       std::optional<zx::eventpair> wake_lease = std::nullopt);
 
   // Gets all the iterators for a request.
   zx::result<std::vector<io_buffer::PhysIter>> get_iter(RequestVariant& req,

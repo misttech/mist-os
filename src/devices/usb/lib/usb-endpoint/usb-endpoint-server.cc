@@ -154,7 +154,8 @@ void EndpointServer::UnregisterVmos(UnregisterVmosRequest& request,
   completer.Reply({std::move(failed_vmo_ids), std::move(errors)});
 }
 
-void EndpointServer::RequestComplete(zx_status_t status, size_t actual, RequestVariant request) {
+void EndpointServer::RequestComplete(zx_status_t status, size_t actual, RequestVariant request,
+                                     std::optional<zx::eventpair> wake_lease) {
   if (std::holds_alternative<usb::BorrowedRequest<void>>(request)) {
     std::get<usb::BorrowedRequest<void>>(request).Complete(status, actual);
     return;
@@ -165,7 +166,8 @@ void EndpointServer::RequestComplete(zx_status_t status, size_t actual, RequestV
   completions_.emplace_back(std::move(fuchsia_hardware_usb_endpoint::Completion()
                                           .request(req.take_request())
                                           .status(status)
-                                          .transfer_size(actual)));
+                                          .transfer_size(actual)
+                                          .wake_lease(std::move(wake_lease))));
   if (defer_completion && status == ZX_OK) {
     return;
   }
