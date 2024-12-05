@@ -3,8 +3,15 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <sys/fsuid.h>
+#include <sys/inotify.h>
 #include <sys/prctl.h>
+#include <sys/signalfd.h>
+#include <sys/socket.h>
+#include <sys/syscall.h>
+#include <sys/timerfd.h>
 #include <unistd.h>
 
 #include <filesystem>
@@ -20,7 +27,9 @@
 
 namespace {
 
+using testing::AnyOf;
 using testing::ContainsRegex;
+using testing::Eq;
 using testing::MatchesRegex;
 
 class ProcUptimeTest : public ProcTestBase {
@@ -449,6 +458,146 @@ TEST_F(ProcfsTest, VmStatFile) {
   EXPECT_THAT(content, ContainsRegex("(\n|^)nr_active_file [0-9]+\n"));
   EXPECT_THAT(content, ContainsRegex("(\n|^)pgscan_direct [0-9]+\n"));
   EXPECT_THAT(content, ContainsRegex("(\n|^)pgscan_kswapd [0-9]+\n"));
+}
+
+class ProcSelfFdTest : public ProcTestBase {
+ protected:
+  std::string read_fd_link(int fd) {
+    constexpr char kProcSelfFdFormat[] = "/proc/self/fd/%d";
+    std::string path = fxl::StringPrintf(kProcSelfFdFormat, fd);
+
+    std::string links_to(PATH_MAX, 0);
+    ssize_t result = SAFE_SYSCALL(readlink(path.c_str(), links_to.data(), links_to.capacity()));
+    if (result < 0) {
+      return fxl::StringPrintf("readlink() failed: %s", strerror(errno));
+    }
+
+    links_to.resize(result);
+    return links_to;
+  }
+
+  std::string expected_name(const char* kind, int fd) {
+    struct stat stat_buf;
+    if (SAFE_SYSCALL(fstat(fd, &stat_buf)) != 0) {
+      return fxl::StringPrintf("fstat() failed: %s", strerror(errno));
+    }
+    return fxl::StringPrintf("%s:[%lu]", kind, stat_buf.st_ino);
+  }
+};
+
+// Validate naming of anonymous pipes as reported via "/proc/self/fd".
+TEST_F(ProcSelfFdTest, AnonymousPipeFdName) {
+  int pipes[2];
+  ASSERT_EQ(SAFE_SYSCALL(pipe2(pipes, 0)), 0) << "pipe() failed:" << strerror(errno);
+  fbl::unique_fd pipe_a(pipes[0]);
+  fbl::unique_fd pipe_b(pipes[1]);
+
+  EXPECT_EQ(read_fd_link(pipe_a.get()), expected_name("pipe", pipe_a.get()));
+  EXPECT_EQ(read_fd_link(pipe_b.get()), expected_name("pipe", pipe_b.get()));
+}
+
+// Validate naming of sockets as reported via "/proc/self/fd".
+TEST_F(ProcSelfFdTest, SocketFdName) {
+  fbl::unique_fd sock(SAFE_SYSCALL(socket(AF_UNIX, SOCK_STREAM, 0)));
+  ASSERT_TRUE(sock.is_valid()) << "socket() failed:" << strerror(errno);
+
+  EXPECT_EQ(read_fd_link(sock.get()), expected_name("socket", sock.get()));
+}
+
+// Validate naming of memory file descriptors as reported via "/proc/self/fd".
+TEST_F(ProcSelfFdTest, MemFdName) {
+  constexpr char kMemFdName[] = "just_a_test_mem_fd";
+  fbl::unique_fd mem_fd(SAFE_SYSCALL(memfd_create(kMemFdName, 0)));
+  ASSERT_TRUE(mem_fd.is_valid()) << "memfd_create() failed:" << strerror(errno);
+
+  EXPECT_EQ(read_fd_link(mem_fd.get()), fxl::StringPrintf("/memfd:%s (deleted)", kMemFdName));
+}
+
+// Validate naming of timerfd descriptors as reported via "/proc/self/fd".
+TEST_F(ProcSelfFdTest, TimerFdName) {
+  fbl::unique_fd timer_fd(SAFE_SYSCALL(timerfd_create(CLOCK_MONOTONIC, 0)));
+  ASSERT_TRUE(timer_fd.is_valid()) << "timerfd_create() failed:" << strerror(errno);
+
+  EXPECT_EQ(read_fd_link(timer_fd.get()), "anon_inode:[timerfd]");
+}
+
+// Validate naming of signalfd descriptors as reported via "/proc/self/fd".
+TEST_F(ProcSelfFdTest, SignalFdName) {
+  sigset_t mask;
+  ASSERT_EQ(sigemptyset(&mask), 0);
+  ASSERT_EQ(sigaddset(&mask, SIGHUP), 0);
+  fbl::unique_fd signal_fd(SAFE_SYSCALL(signalfd(-1, &mask, 0)));
+  ASSERT_TRUE(signal_fd.is_valid()) << "signalfd_create() failed:" << strerror(errno);
+
+  EXPECT_EQ(read_fd_link(signal_fd.get()), "anon_inode:[signalfd]");
+}
+
+// Validate naming of pidfd descriptors as reported via "/proc/self/fd".
+TEST_F(ProcSelfFdTest, PidFdName) {
+  fbl::unique_fd pid_fd(SAFE_SYSCALL(static_cast<int>(syscall(SYS_pidfd_open, getpid(), 0))));
+  ASSERT_TRUE(pid_fd.is_valid()) << "syscall(SYS_pidfd_open) failed:" << strerror(errno);
+
+  std::string result = read_fd_link(pid_fd.get());
+  EXPECT_THAT(result, AnyOf(Eq(expected_name("pidfd", pid_fd.get())), Eq("anon_inode:[pidfd]")));
+}
+
+// Validate naming of inotify descriptors as reported via "/proc/self/fd".
+TEST_F(ProcSelfFdTest, InotifyFdName) {
+  fbl::unique_fd inotify_fd(SAFE_SYSCALL(inotify_init()));
+  ASSERT_TRUE(inotify_fd.is_valid()) << "inotify_init() failed:" << strerror(errno);
+
+  EXPECT_EQ(read_fd_link(inotify_fd.get()), "anon_inode:inotify");
+}
+
+// Validate naming of epoll descriptors as reported via "/proc/self/fd".
+TEST_F(ProcSelfFdTest, EpollFdName) {
+  fbl::unique_fd epoll_fd(SAFE_SYSCALL(epoll_create1(0)));
+  ASSERT_TRUE(epoll_fd.is_valid()) << "epoll_create1() failed:" << strerror(errno);
+
+  EXPECT_EQ(read_fd_link(epoll_fd.get()), "anon_inode:[eventpoll]");
+}
+
+// Validate naming of eventfd descriptors as reported via "/proc/self/fd".
+TEST_F(ProcSelfFdTest, EventFdName) {
+  fbl::unique_fd event_fd(SAFE_SYSCALL(eventfd(0, 0)));
+  ASSERT_TRUE(event_fd.is_valid()) << "eventfd() failed:" << strerror(errno);
+
+  EXPECT_EQ(read_fd_link(event_fd.get()), "anon_inode:[eventfd]");
+}
+
+// Validate naming of normal (still file-system linked) descriptors as reported via "/proc/self/fd".
+TEST_F(ProcSelfFdTest, PathFdName) {
+  constexpr char kTmpPath[] = "/tmp";
+  fbl::unique_fd tmp_fd(SAFE_SYSCALL(open(kTmpPath, O_RDONLY)));
+  ASSERT_TRUE(tmp_fd.is_valid()) << "open(tmp) failed:" << strerror(errno);
+
+  EXPECT_EQ(read_fd_link(tmp_fd.get()), kTmpPath);
+}
+
+// Validate naming of O_TMPFILE descriptors as reported via "/proc/self/fd".
+TEST_F(ProcSelfFdTest, TmpFileFdName) {
+  constexpr char kTmpPath[] = "/tmp";
+  fbl::unique_fd tmpfile_fd(SAFE_SYSCALL(open(kTmpPath, O_RDWR | O_TMPFILE)));
+  ASSERT_TRUE(tmpfile_fd.is_valid()) << "open(tmpfile) failed:" << strerror(errno);
+
+  std::string result = read_fd_link(tmpfile_fd.get());
+  EXPECT_TRUE(result.starts_with(kTmpPath)) << " target: " << result;
+  EXPECT_TRUE(result.ends_with(" (deleted)")) << " target: " << result;
+}
+
+// Validate naming of a file that is created, and opened, but then unlinked.
+TEST_F(ProcSelfFdTest, OpenedAndUnlinkedFileFdName) {
+  std::string filename("/tmp/procfs_test_file:XXXXXX");
+  fbl::unique_fd fd(SAFE_SYSCALL(mkstemp(filename.data())));
+  ASSERT_TRUE(fd.is_valid()) << "mkstemp() failed:" << strerror(errno);
+
+  std::string result = read_fd_link(fd.get());
+  EXPECT_EQ(result, filename);
+
+  ASSERT_EQ(SAFE_SYSCALL(unlink(filename.data())), 0) << "unlink() failed:" << strerror(errno);
+
+  result = read_fd_link(fd.get());
+  EXPECT_EQ(result, filename + " (deleted)");
 }
 
 }  // namespace
