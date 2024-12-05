@@ -15,9 +15,6 @@
     program: {
         runner: "elf",
         binary: "bin/test_manager",
-
-        // Subscribe to component lifecycle events
-        lifecycle: { stop_event: "notify" },
     },
     children: [
         {
