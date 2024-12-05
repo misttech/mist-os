@@ -31,10 +31,7 @@
 
 #elif defined(__arm__)
 
-.thumb
-
 .function _ld_tlsdesc_runtime_static, global, retain=TLSDESC_RETAIN
-  .fnstart
   .tlsdesc.cfi
   .tlsdesc.lsda kStatic
 
@@ -46,7 +43,6 @@
   .cfi_undefined r0
 
   bx lr
-  .fnend
 .end_function
 
 #elif defined(__x86_64__)

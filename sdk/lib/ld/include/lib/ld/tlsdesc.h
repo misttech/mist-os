@@ -130,9 +130,8 @@ tlsdesc.value_offset = 4
 .macro .tlsdesc.cfi
   // Almost all registers are preserved from the caller.  The integer set does
   // not include LR or SP, which .cfi_startproc covered.
-  // TODO(mcgrathr): add .cfi.all_* for aarch32 in lib/arch
-//.cfi.all_integer .cfi_same_value
-//.cfi.all_vectorfp .cfi_same_value
+  .cfi.all_integer .cfi_same_value
+  .cfi.all_vectorfp .cfi_same_value
 .endm
 
 #elif defined(__riscv)
