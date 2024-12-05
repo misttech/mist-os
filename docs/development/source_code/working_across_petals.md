@@ -11,7 +11,7 @@ in Flutter or Go requires either a [soft transition](#soft-transitions)
 Note that some petals may not be part of a regular Fuchsia checkout.
 For example, although the Go runtime is part of third_party/go, other consumers
 of the  Fuchsia SDK may be developed elsewhere (e.g. the
-[Flutter Engine](https://github.com/flutter/engine) is developed on Github).
+[Flutter Engine](https://github.com/flutter/engine) is developed on GitHub).
 
 ## Terminology
 
