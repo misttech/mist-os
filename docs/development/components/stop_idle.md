@@ -72,8 +72,8 @@ uploading. Hence we have adapted it to stop when idle once configured as such.
 - **Hanging-gets**: if your component is the server or client of a hanging-get
   FIDL method, it will be challenging to preserve that connection because the
   FIDL bindings don't have a way to save and restore information about
-  in-progress calls. You may convert that FIDL method to an event and and a
-  one-way ack.
+  in-progress calls. You may convert that FIDL method to an event and a one-way
+  ack.
 
 - **Directories**: if you component serves directory protocols, it will be
   challenging to preserve that connection because directories are usually served
