@@ -9,9 +9,13 @@
 
 namespace timekeeper {
 
-// The type used to measure UTC time. This is API compatible with the UTC
-// type previously defined by Zircon.
-using time_utc = zx::basic_time<1>;
+// The bogus clock ID for the clock on the UTC timeline. Chosen to be a fairly
+// unlikely to be used elsewhere (it's a date), but makes time_utc distinct
+// from other clock types lurking in Fuchsia.
+static constexpr zx_clock_t kUtcClockId = 20241204;
+
+// The type used to measure UTC time.
+using time_utc = zx::basic_time<kUtcClockId>;
 
 // Abstraction over the clock.
 //
