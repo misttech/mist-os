@@ -187,6 +187,10 @@ _proto_compile_list=(
   $(walk_proto_imports api/log/log.proto)
 )
 popd
+pushd "$PROTOBUF_SRC"
+# Just build all of these instead of trying to infer the minimal set.
+_proto_compile_list+=( google/protobuf/*.proto )
+popd
 
 # Subset of these protos are in third_party/protobuf/src.
 proto_compile_list=(
@@ -194,10 +198,12 @@ proto_compile_list=(
 )
 
 # NOTE: These generated *_pb2.py are NOT checked-in.
+# If this list gets too long, we could parallelize the protoc.
 echo "Compiling $DESTDIR protos to Python"
 for proto in "${proto_compile_list[@]}"
 do
   case "$proto" in
+    google/protobuf/*unittest*.proto) ;; # ignore
     google/protobuf/*)
       # Generate third_party/protobuf/src -> third_party/protobuf/python.
       echo "  $proto (to $PROTOBUF_DEST) ..."
