@@ -59,22 +59,25 @@ def get_fuchsia_api_level(ctx):
     return ctx.attr._fuchsia_api_level[FuchsiaAPILevelInfo].level
 
 def fail_missing_api_level(name):
-    fail("'{}' does not have a valid API level set. Valid API levels are {}".format(name, [lvl.api_level for lvl in get_fuchsia_api_levels()]))
+    fail("'{}' does not have a valid API level set. Valid API levels are {}".format(name, _valid_api_level_names()))
 
-def _valid_api_levels(ctx):
-    levels = [entry.api_level for entry in get_fuchsia_api_levels()]
+def _valid_api_level_names():
+    """ Returns a list of strings containing the names of the API levels supported by the SDK.
+    """
 
-    # The unset level is still valid since it can indicate that the user did
-    # not set the value. If we don't do this then we have no way of knowing if the
-    # user passed the flag along or not.
-    return levels + [""]
+    # The returned list is sorted alphabetically, which is not reader-friendly.
+    return [entry.api_level for entry in get_fuchsia_api_levels()]
 
 def _fuchsia_api_level_impl(ctx):
     raw_level = ctx.build_setting_value
-    if raw_level not in _valid_api_levels(ctx):
-        fail("ERROR: {} is not a valid API level. API level should be one of {}".format(
+
+    # Allow the empty string here even though it is not a supported level.
+    # TODO(https://fxbug.dev/354047162): Clarify the purpose of allowing the
+    # empty string, which was first added in https://fxrev.dev/926337.
+    if raw_level != "" and raw_level not in _valid_api_level_names():
+        fail('ERROR: "{}" is not an API level supported by this SDK. API level should be one of {}'.format(
             raw_level,
-            _valid_api_levels(ctx),
+            _valid_api_level_names(),
         ))
 
     return FuchsiaAPILevelInfo(

@@ -95,7 +95,7 @@ def _test_level_setting_failures():
     level_setting_failure_test(
         name = "test_setting_unknown_string",
         target_under_test = ":unknown_string",
-        expected_failure_message = "SOMETHING is not a valid API level",
+        expected_failure_message = '"SOMETHING" is not an API level supported by this SDK. API level should be one of ["',
         tags = ["manual"],
     )
 
@@ -107,7 +107,7 @@ def _test_level_setting_failures():
     level_setting_failure_test(
         name = "test_unsupported",
         target_under_test = ":unsupported_level",
-        expected_failure_message = "900 is not a valid API level",
+        expected_failure_message = '"900" is not an API level supported by this SDK. API level should be one of ["',
         tags = ["manual"],
     )
 
