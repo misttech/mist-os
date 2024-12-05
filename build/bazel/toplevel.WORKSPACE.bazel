@@ -76,6 +76,11 @@ local_repository(
     path = "third_party/bazel_rules_python",
 )
 
+# buildifier: disable=load-on-top
+load("@rules_python//python:repositories.bzl", "py_repositories")
+
+py_repositories()
+
 local_repository(
     name = "rules_proto",
     path = "third_party/bazel_rules_proto",
