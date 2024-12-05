@@ -57,8 +57,7 @@ def _fuchsia_package_checker_test_impl(ctx):
         args.append("--bind_bytecode={}".format(ctx.attr.bind_bytecode))
 
     # append the subpackages
-    if ctx.attr.expected_abi_revision:
-        args.extend(["--subpackages={}".format(s) for s in ctx.attr.expected_subpackages])
+    args.extend(["--subpackages={}".format(s) for s in ctx.attr.expected_subpackages])
 
     # append the expected ABI revision
     args.extend(["--abi-revision={}".format(ctx.attr.expected_abi_revision)])
@@ -124,7 +123,7 @@ fuchsia_package_checker_test = rule(
         ),
         "expected_abi_revision": attr.string(
             doc = "ABI revision we should find in the package, as a string-wrapped hexadecimal integer.",
-            mandatory = False,
+            mandatory = True,
         ),
         "_package_checker": attr.label(
             default = "//tools:package_checker",
