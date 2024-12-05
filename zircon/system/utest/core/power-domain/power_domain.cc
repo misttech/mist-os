@@ -13,7 +13,9 @@
 #include <zircon/errors.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls.h>
+#include <zircon/syscalls/object.h>
 #include <zircon/syscalls/port.h>
+#include <zircon/syscalls/resource.h>
 #include <zircon/syscalls/types.h>
 #include <zircon/system/public/zircon/errors.h>
 #include <zircon/system/public/zircon/syscalls-next.h>
@@ -21,8 +23,12 @@
 
 #include <concepts>
 #include <cstdint>
+#include <cstdlib>
+#include <limits>
 #include <utility>
 
+#include <zxtest/base/test.h>
+#include <zxtest/cpp/assert.h>
 #include <zxtest/zxtest.h>
 
 #include "../needs-next.h"
@@ -486,6 +492,202 @@ TEST_F(SetPowerStateTest, UpdatePowerLevelWithPortWithoutRead) {
   zx::port p2;
   ASSERT_OK(p_.duplicate(ZX_DEFAULT_PORT_RIGHTS & ~ZX_RIGHT_READ, &p2));
   ASSERT_STATUS(zx_system_set_processor_power_state(p2.get(), &pstate), ZX_ERR_ACCESS_DENIED);
+}
+
+zx::resource GetInfoResource() {
+  auto rsrc = standalone::GetSystemResource();
+  auto info_rsrc = standalone::GetSystemResourceWithBase(rsrc, ZX_RSRC_SYSTEM_INFO_BASE);
+  ZX_ASSERT(info_rsrc.is_ok());
+  return std::move(info_rsrc).value();
+}
+
+TEST(GetPowerDomainInfo, NoDomainRegistered) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
+  auto info_rsrc = GetInfoResource();
+  size_t actual = 12345;
+  size_t available = 12345;
+  ASSERT_OK(
+      zx_object_get_info(info_rsrc.get(), ZX_INFO_POWER_DOMAINS, nullptr, 0, &actual, &available));
+  EXPECT_EQ(actual, 0);
+  EXPECT_EQ(available, 0);
+
+  // With buffer.
+  std::array<zx_power_domain_info_t, 10> buff = {};
+  ASSERT_OK(zx_object_get_info(info_rsrc.get(), ZX_INFO_POWER_DOMAINS, buff.data(),
+                               buff.size() * sizeof(zx_power_domain_info_t), &actual, &available));
+  EXPECT_EQ(actual, 0);
+  EXPECT_EQ(available, 0);
+}
+
+TEST(GetPowerDomainInfo, OneDomainRegistered) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
+
+  auto info_rsrc = GetInfoResource();
+  zx::port p;
+  ASSERT_OK(zx::port::create(0, &p));
+  auto rsrc = standalone::GetSystemResource();
+  ASSERT_TRUE(rsrc->is_valid());
+  auto [levels, transitions] = GetModel();
+  auto domain = GetDomainWithDefaultCpus(123);
+
+  ASSERT_OK(zx_system_set_processor_power_domain(rsrc->get(), 0, &domain, p.get(), levels.data(),
+                                                 levels.size(), transitions.data(),
+                                                 transitions.size()));
+  auto cleanup = Cleanup(domain.domain_id);
+
+  size_t actual = 12345;
+  size_t available = 12345;
+  ASSERT_OK(
+      zx_object_get_info(info_rsrc.get(), ZX_INFO_POWER_DOMAINS, nullptr, 0, &actual, &available));
+  EXPECT_EQ(actual, 0);
+  EXPECT_EQ(available, 1);
+
+  // With Bigger buffer.
+  std::array<zx_power_domain_info_t, 10> buff = {};
+  ASSERT_OK(zx_object_get_info(info_rsrc.get(), ZX_INFO_POWER_DOMAINS, buff.data(),
+                               buff.size() * sizeof(zx_power_domain_info_t), &actual, &available));
+  EXPECT_EQ(available, 1);
+  ASSERT_EQ(actual, 1);
+
+  auto& reg_domain = buff[0];
+  EXPECT_EQ(reg_domain.domain_id, domain.domain_id);
+  EXPECT_TRUE(memcmp(reg_domain.cpus.mask, domain.cpus.mask, sizeof(domain.cpus.mask)) == 0);
+  EXPECT_EQ(reg_domain.idle_power_levels, 1);
+  EXPECT_EQ(reg_domain.active_power_levels, 1);
+
+  // With smaller buffer.
+  ASSERT_OK(zx_object_get_info(info_rsrc.get(), ZX_INFO_POWER_DOMAINS, buff.data(), 0, &actual,
+                               &available));
+  EXPECT_EQ(available, 1);
+  ASSERT_EQ(actual, 0);
+}
+
+TEST(GetPowerDomainInfo, MultipleDomainRegistered) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
+
+  if (zx_system_get_num_cpus() < 2) {
+    ZXTEST_SKIP("Require at least 2 CPUs.\n");
+  }
+
+  auto info_rsrc = GetInfoResource();
+  zx::port p;
+  ASSERT_OK(zx::port::create(0, &p));
+  auto rsrc = standalone::GetSystemResource();
+  ASSERT_TRUE(rsrc->is_valid());
+  auto [levels, transitions] = GetModel();
+  auto domain = MakeDomain(123, 0);
+
+  ASSERT_OK(zx_system_set_processor_power_domain(rsrc->get(), 0, &domain, p.get(), levels.data(),
+                                                 levels.size(), transitions.data(),
+                                                 transitions.size()));
+  auto cleanup = Cleanup(domain.domain_id);
+
+  auto domain_2 = MakeDomain(1234, 1);
+
+  ASSERT_OK(zx_system_set_processor_power_domain(rsrc->get(), 0, &domain_2, p.get(), levels.data(),
+                                                 levels.size(), transitions.data(),
+                                                 transitions.size()));
+  auto cleanup_2 = Cleanup(domain_2.domain_id);
+
+  size_t actual = 12345;
+  size_t available = 12345;
+  ASSERT_OK(
+      zx_object_get_info(info_rsrc.get(), ZX_INFO_POWER_DOMAINS, nullptr, 0, &actual, &available));
+  EXPECT_EQ(actual, 0);
+  EXPECT_EQ(available, 2);
+
+  auto check_domain = [&](zx_power_domain_info_t& domain_info) {
+    if (domain_info.domain_id == domain.domain_id) {
+      EXPECT_EQ(domain_info.domain_id, domain.domain_id);
+      EXPECT_TRUE(memcmp(domain_info.cpus.mask, domain.cpus.mask, sizeof(domain.cpus.mask)) == 0);
+      EXPECT_EQ(domain_info.idle_power_levels, 1);
+      EXPECT_EQ(domain_info.active_power_levels, 1);
+      return;
+    }
+    if (domain_info.domain_id == domain_2.domain_id) {
+      EXPECT_EQ(domain_info.domain_id, domain_2.domain_id);
+      EXPECT_TRUE(memcmp(domain_info.cpus.mask, domain_2.cpus.mask, sizeof(domain_2.cpus.mask)) ==
+                  0);
+      EXPECT_EQ(domain_info.idle_power_levels, 1);
+      EXPECT_EQ(domain_info.active_power_levels, 1);
+      return;
+    }
+    FAIL("Unknown Power Domain ID: %zu\n", static_cast<size_t>(domain_info.domain_id));
+  };
+
+  // With bigger buffer.
+  std::array<zx_power_domain_info_t, 10> buff = {};
+  ASSERT_OK(zx_object_get_info(info_rsrc.get(), ZX_INFO_POWER_DOMAINS, buff.data(),
+                               buff.size() * sizeof(zx_power_domain_info_t), &actual, &available));
+  EXPECT_EQ(available, 2);
+  ASSERT_EQ(actual, 2);
+
+  check_domain(buff[0]);
+  check_domain(buff[1]);
+
+  // Smaller buffer
+  ASSERT_OK(zx_object_get_info(info_rsrc.get(), ZX_INFO_POWER_DOMAINS, buff.data(),
+                               sizeof(zx_power_domain_info_t), &actual, &available));
+  EXPECT_EQ(available, 2);
+  ASSERT_EQ(actual, 1);
+
+  check_domain(buff[0]);
+}
+
+TEST(GetPowerDomainInfo, BadHandle) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
+  size_t actual = 12345;
+  size_t available = 12345;
+
+  // Invalid.
+  ASSERT_STATUS(
+      zx_object_get_info(ZX_HANDLE_INVALID, ZX_INFO_POWER_DOMAINS, nullptr, 0, &actual, &available),
+      ZX_ERR_BAD_HANDLE);
+
+  // System resource but wrong base.
+  auto sys_rsrc = standalone::GetSystemResource();
+  auto wrong_rsrc_base = standalone::GetSystemResourceWithBase(sys_rsrc, ZX_RSRC_SYSTEM_CPU_BASE);
+  ASSERT_OK(wrong_rsrc_base);
+  ASSERT_STATUS(zx_object_get_info(wrong_rsrc_base->get(), ZX_INFO_POWER_DOMAINS, nullptr, 0,
+                                   &actual, &available),
+                ZX_ERR_OUT_OF_RANGE);
+
+  zx::event e;
+  ASSERT_OK(zx::event::create(0, &e));
+
+  // Wrong type
+  ASSERT_STATUS(zx_object_get_info(e.get(), ZX_INFO_POWER_DOMAINS, nullptr, 0, &actual, &available),
+                ZX_ERR_WRONG_TYPE);
+}
+
+TEST(GetPowerDomainInfo, BadBuffer) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
+  auto info_rsrc = GetInfoResource();
+  zx::port p;
+  ASSERT_OK(zx::port::create(0, &p));
+  auto rsrc = standalone::GetSystemResource();
+  ASSERT_TRUE(rsrc->is_valid());
+  auto [levels, transitions] = GetModel();
+  auto domain = GetDomainWithDefaultCpus(123);
+
+  ASSERT_OK(zx_system_set_processor_power_domain(rsrc->get(), 0, &domain, p.get(), levels.data(),
+                                                 levels.size(), transitions.data(),
+                                                 transitions.size()));
+  auto cleanup = Cleanup(domain.domain_id);
+
+  size_t actual = 12345;
+  size_t available = 12345;
+
+  // Bad buffer ptr.
+  ASSERT_STATUS(
+      zx_object_get_info(info_rsrc.get(), ZX_INFO_POWER_DOMAINS, reinterpret_cast<void*>(0x01),
+                         sizeof(zx_power_domain_info_t), &actual, &available),
+      ZX_ERR_INVALID_ARGS);
+
+  // Non zero sized buffer that is too small to hold an entry, this is probably a programming error.
+  ASSERT_STATUS(zx_object_get_info(info_rsrc.get(), ZX_INFO_POWER_DOMAINS,
+                                   reinterpret_cast<void*>(0x01), 1, &actual, &available),
+                ZX_ERR_BUFFER_TOO_SMALL);
 }
 
 }  // namespace

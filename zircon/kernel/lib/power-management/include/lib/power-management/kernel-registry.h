@@ -34,6 +34,12 @@ class KernelPowerDomainRegistry {
                                              power_management::ControlInterface interface,
                                              uint64_t arg);
 
+  template <typename V>
+  static void Visit(V&& v) {
+    Guard<Mutex> guard(registry_lock_::Get());
+    registry_.Visit(ktl::forward<V>(v));
+  }
+
  private:
   static PowerDomainRegistry registry_ TA_GUARDED(registry_lock_::Get());
 };
