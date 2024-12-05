@@ -7,7 +7,7 @@ use derivative::Derivative;
 use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_auto_persist::{self as auto_persist, AutoPersist};
-use fuchsia_inspect_contrib::id_enum::{inspect_record_id_enum, IdEnum};
+use fuchsia_inspect_contrib::id_enum::IdEnum;
 use fuchsia_inspect_contrib::nodes::{BoundedListNode, LruCacheNode};
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log};
 use fuchsia_inspect_derive::Unit;
@@ -16,16 +16,15 @@ use std::sync::Arc;
 use strum_macros::{Display, EnumIter};
 use windowed_stats::experimental::clock::Timed;
 use windowed_stats::experimental::series::interpolation::{Constant, LastSample};
+use windowed_stats::experimental::series::metadata::{BitSetMap, BitSetNode};
 use windowed_stats::experimental::series::statistic::Union;
 use windowed_stats::experimental::series::{SamplingProfile, TimeMatrix};
-use windowed_stats::experimental::serve::{
-    InspectedTimeMatrix, InspectedTimeMatrixMetadata, TimeMatrixClient,
-};
+use windowed_stats::experimental::serve::{InspectedTimeMatrix, TimeMatrixClient};
 use wlan_common::bss::BssDescription;
 use wlan_common::channel::Channel;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-    wlan_legacy_metrics_registry as metrics,
+    wlan_legacy_metrics_registry as metrics, zx,
 };
 
 const INSPECT_CONNECT_EVENTS_LIMIT: usize = 10;
@@ -288,14 +287,12 @@ struct InspectMetadataNode {
 }
 
 impl InspectMetadataNode {
-    const WLAN_CONNECTIVITY_STATES: &'static str = "wlan_connectivity_states";
     const CONNECTED_NETWORKS: &'static str = "connected_networks";
     const DISCONNECT_SOURCES: &'static str = "disconnect_sources";
 
     fn new(inspect_node: &InspectNode) -> Self {
-        inspect_record_id_enum::<ConnectionState>(inspect_node, "wlan_connectivity_states");
-        let connected_networks = inspect_node.create_child("connected_networks");
-        let disconnect_sources = inspect_node.create_child("disconnect_sources");
+        let connected_networks = inspect_node.create_child(Self::CONNECTED_NETWORKS);
+        let disconnect_sources = inspect_node.create_child(Self::DISCONNECT_SOURCES);
         Self {
             connected_networks: LruCacheNode::new(
                 connected_networks,
@@ -318,51 +315,50 @@ struct ConnectDisconnectTimeSeries {
 }
 
 impl ConnectDisconnectTimeSeries {
-    pub fn new(manager: &TimeMatrixClient, inspect_metadata_path: &str) -> Self {
-        let wlan_connectivity_states = manager.inspect_time_matrix_with_metadata(
+    pub fn new(client: &TimeMatrixClient, inspect_metadata_path: &str) -> Self {
+        let wlan_connectivity_states = client.inspect_time_matrix_with_metadata(
             "wlan_connectivity_states",
             TimeMatrix::<Union<u64>, LastSample>::new(
                 SamplingProfile::highly_granular(),
                 LastSample::or(0),
             ),
-            InspectedTimeMatrixMetadata::default().with_bit_mapping(format!(
-                "{inspect_metadata_path}/{}",
-                InspectMetadataNode::WLAN_CONNECTIVITY_STATES
-            )),
+            BitSetMap::from_ordered(["idle", "disconnected", "connected"]),
         );
-        let connected_networks = manager.inspect_time_matrix_with_metadata(
+        let connected_networks = client.inspect_time_matrix_with_metadata(
             "connected_networks",
             TimeMatrix::<Union<u64>, Constant>::new(
                 SamplingProfile::granular(),
                 Constant::default(),
             ),
-            InspectedTimeMatrixMetadata::default().with_bit_mapping(format!(
-                "{inspect_metadata_path}/{}",
+            BitSetNode::from_path(format!(
+                "{}/{}",
+                inspect_metadata_path,
                 InspectMetadataNode::CONNECTED_NETWORKS
             )),
         );
-        let disconnected_networks = manager.inspect_time_matrix_with_metadata(
+        let disconnected_networks = client.inspect_time_matrix_with_metadata(
             "disconnected_networks",
             TimeMatrix::<Union<u64>, Constant>::new(
                 SamplingProfile::granular(),
                 Constant::default(),
             ),
-            InspectedTimeMatrixMetadata::default()
-                // `disconnected_networks` uses the same bit_mapping as `connected_networks`
-                .with_bit_mapping(format!(
-                    "{inspect_metadata_path}/{}",
-                    InspectMetadataNode::CONNECTED_NETWORKS
-                )),
+            // This time matrix shares its bit labels with `connected_networks`.
+            BitSetNode::from_path(format!(
+                "{}/{}",
+                inspect_metadata_path,
+                InspectMetadataNode::CONNECTED_NETWORKS
+            )),
         );
-        let disconnect_sources = manager.inspect_time_matrix_with_metadata(
+        let disconnect_sources = client.inspect_time_matrix_with_metadata(
             "disconnect_sources",
             TimeMatrix::<Union<u64>, Constant>::new(
                 SamplingProfile::granular(),
                 Constant::default(),
             ),
-            InspectedTimeMatrixMetadata::default().with_bit_mapping(format!(
-                "{inspect_metadata_path}/{}",
-                InspectMetadataNode::DISCONNECT_SOURCES
+            BitSetNode::from_path(format!(
+                "{}/{}",
+                inspect_metadata_path,
+                InspectMetadataNode::DISCONNECT_SOURCES,
             )),
         );
         Self {
@@ -399,39 +395,75 @@ mod tests {
     use ieee80211_testutils::{BSSID_REGEX, SSID_REGEX};
     use rand::Rng;
     use std::pin::pin;
-    use windowed_stats::experimental::serve::serve_time_matrix_inspection;
+    use windowed_stats::experimental::serve;
     use windowed_stats::experimental::testing::{MockTimeMatrix, TimeMatrixCall};
     use wlan_common::channel::{Cbw, Channel};
     use wlan_common::{fake_bss_description, random_bss_description};
 
     #[fuchsia::test]
-    fn test_inspect_metadata_initialized() {
-        let mut test_helper = setup_test();
-        let time_series = MockConnectDisconnectTimeSeries::default();
-        let _logger = ConnectDisconnectLogger::new_helper(
-            test_helper.cobalt_1dot1_proxy.clone(),
-            &test_helper.inspect_node,
-            &test_helper.inspect_metadata_node,
-            test_helper.persistence_sender.clone(),
-            time_series.build(),
+    fn log_connect_attempt_then_inspect_data_tree_contains_time_matrix_metadata() {
+        let mut harness = setup_test();
+
+        let (client, _server) = serve::serve_time_matrix_inspection(
+            harness.inspect_node.create_child("wlan_connect_disconnect"),
+        );
+        let logger = ConnectDisconnectLogger::new(
+            harness.cobalt_1dot1_proxy.clone(),
+            &harness.inspect_node,
+            &harness.inspect_metadata_node,
+            &harness.inspect_metadata_path,
+            harness.persistence_sender.clone(),
+            &client,
+        );
+        let bss = random_bss_description!();
+        let mut log_connect_attempt =
+            pin!(logger.log_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss));
+        assert!(
+            harness.run_until_stalled_drain_cobalt_events(&mut log_connect_attempt).is_ready(),
+            "`log_connect_attempt` did not complete",
         );
 
-        let data = test_helper.get_inspect_data_tree();
-        assert_data_tree!(data, root: contains {
-            test_stats: contains {
-                metadata: contains {
-                    wlan_connectivity_states: {
-                        "0": "Idle",
-                        "1": "Disconnected",
-                        "2": "Connected",
-                    }
-                }
+        let tree = harness.get_inspect_data_tree();
+        assert_data_tree!(
+            tree,
+            root: contains {
+                test_stats: contains {
+                    wlan_connect_disconnect: contains {
+                        wlan_connectivity_states: {
+                            "type": "bitset",
+                            "data": AnyBytesProperty,
+                            metadata: {
+                                index: {
+                                    "0": "idle",
+                                    "1": "disconnected",
+                                    "2": "connected",
+                                },
+                            },
+                        },
+                        connected_networks: {
+                            "type": "bitset",
+                            "data": AnyBytesProperty,
+                            metadata: {
+                                "index_node_path": "root/test_stats/metadata/connected_networks",
+                            },
+                        },
+                        disconnected_networks: {
+                            "type": "bitset",
+                            "data": AnyBytesProperty,
+                            metadata: {
+                                "index_node_path": "root/test_stats/metadata/connected_networks",
+                            },
+                        },
+                        disconnect_sources: {
+                            "type": "bitset",
+                            "data": AnyBytesProperty,
+                            metadata: {
+                                "index_node_path": "root/test_stats/metadata/disconnect_sources",
+                            },
+                        },
+                    },
+                },
             }
-        });
-
-        assert_eq!(
-            &time_series.wlan_connectivity_states.drain_calls()[..],
-            &[TimeMatrixCall::Fold(Timed::now(1 << 0))]
         );
     }
 
@@ -461,11 +493,6 @@ mod tests {
         assert_data_tree!(data, root: contains {
             test_stats: contains {
                 metadata: contains {
-                    wlan_connectivity_states: {
-                        "0": "Idle",
-                        "1": "Disconnected",
-                        "2": "Connected",
-                    },
                     connected_networks: contains {
                         "0": {
                             "@time": AnyNumericProperty,
@@ -498,8 +525,9 @@ mod tests {
     #[fuchsia::test]
     fn test_log_connect_attempt_cobalt() {
         let mut test_helper = setup_test();
-        let (time_matrix_client, _fut) =
-            serve_time_matrix_inspection(test_helper.inspect_node.create_child("time_series"));
+        let (time_matrix_client, _fut) = serve::serve_time_matrix_inspection(
+            test_helper.inspect_node.create_child("time_series"),
+        );
         let logger = ConnectDisconnectLogger::new(
             test_helper.cobalt_1dot1_proxy.clone(),
             &test_helper.inspect_node,
@@ -572,11 +600,6 @@ mod tests {
         assert_data_tree!(data, root: contains {
             test_stats: contains {
                 metadata: {
-                    wlan_connectivity_states: {
-                        "0": "Idle",
-                        "1": "Disconnected",
-                        "2": "Connected",
-                    },
                     connected_networks: {
                         "0": {
                             "@time": AnyNumericProperty,

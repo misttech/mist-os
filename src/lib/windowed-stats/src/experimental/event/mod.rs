@@ -385,7 +385,8 @@ mod tests {
     use crate::experimental::event::harness::{self, ReactorExt as _};
     use crate::experimental::event::{self, DataEvent, Event, Reactor, SuspendEvent, SystemEvent};
     use crate::experimental::series::interpolation::LastSample;
-    use crate::experimental::series::statistic::{Max, Sum};
+    use crate::experimental::series::metadata::BitSetMap;
+    use crate::experimental::series::statistic::{Max, Sum, Union};
     use crate::experimental::series::SamplingProfile;
     use crate::experimental::serve;
 
@@ -529,6 +530,57 @@ mod tests {
                     tx_retried_sum: {
                         "type": "gauge",
                         "data": AnyBytesProperty,
+                    },
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn construct_reactor_with_metadata_then_inspect_data_tree_contains_metadata() {
+        use Connectivity::Idle;
+
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        #[repr(u64)]
+        enum Connectivity {
+            Idle = 1 << 0,
+            Disconnected = 1 << 1,
+            Connected = 1 << 2,
+        }
+
+        let mut executor = harness::executor_at_time_zero();
+        let (inspector, node) = harness::inspector_and_test_node();
+
+        let (client, server) = serve::serve_time_matrix_inspection(node);
+        let mut server = pin!(server);
+        let _reactor = event::on_data_record::<Connectivity, _>(event::map_data_record(
+            |connectivity| connectivity as u64,
+            event::sample_data_record(Union::<u64>::default())
+                .with_metadata(BitSetMap::from_ordered(["idle", "disconnected", "connected"]))
+                .in_time_matrix::<LastSample>(
+                    &client,
+                    "connectivity",
+                    SamplingProfile::granular(),
+                    LastSample::or(Idle as u64),
+                ),
+        ));
+
+        executor.set_fake_time(harness::TIME_ONE_SECOND);
+        harness::assert_inspect_time_matrix_server_polls_pending(&mut executor, &mut server);
+        assert_data_tree!(
+            inspector,
+            root: contains {
+                event_test_node: {
+                    connectivity: {
+                        "type": "bitset",
+                        "data": AnyBytesProperty,
+                        metadata: {
+                            index: {
+                                "0": "idle",
+                                "1": "disconnected",
+                                "2": "connected",
+                            }
+                        }
                     },
                 },
             }

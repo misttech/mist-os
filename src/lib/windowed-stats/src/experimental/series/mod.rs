@@ -9,6 +9,7 @@ mod interval;
 pub(crate) mod buffer;
 
 pub mod interpolation;
+pub mod metadata;
 pub mod statistic;
 
 use derivative::Derivative;
@@ -29,6 +30,7 @@ use crate::experimental::series::buffer::{
 use crate::experimental::series::interpolation::{
     Constant, Interpolation, InterpolationFor, InterpolationState, LastAggregation, LastSample,
 };
+use crate::experimental::series::metadata::{BitSetIndex, Metadata};
 use crate::experimental::series::statistic::{OverflowError, PostAggregation, Statistic};
 use crate::experimental::Vec1;
 
@@ -108,7 +110,7 @@ pub trait MatrixSampler<T>:
 /// Data semantics determine how statistics are interpreted and time series are aggregated and
 /// buffered.
 pub trait DataSemantic {
-    type Metadata;
+    type Metadata: Metadata;
 
     fn display() -> impl Display;
 }
@@ -180,6 +182,9 @@ impl DataSemantic for Gauge {
     }
 }
 
+// TODO(https://fxbug.dev/375255178): Spell "bit set" consistently. `BitSet` suggests `bit_set` and
+//                                    "bit set", but there are notably some instances of "bitset",
+//                                    which instead suggests `Bitset` and `bitset`.
 /// A set of Boolean values.
 ///
 /// Bit sets are analogous to indicator lamps in a vehicle.
@@ -195,7 +200,7 @@ where
 }
 
 impl DataSemantic for BitSet {
-    type Metadata = ();
+    type Metadata = BitSetIndex;
 
     fn display() -> impl Display {
         "bitset"
