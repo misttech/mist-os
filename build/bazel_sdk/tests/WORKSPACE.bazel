@@ -46,7 +46,10 @@ fuchsia_sdk_repository(
     name = "fuchsia_sdk",
 )
 
-register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
+# Register the fuchsia_sdk toolchain
+load("@rules_fuchsia//fuchsia/private:fuchsia_toolchains.bzl", "register_fuchsia_sdk_toolchain")
+
+register_fuchsia_sdk_toolchain()
 
 register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
 

@@ -5,9 +5,10 @@
 # buildifier: disable=module-docstring
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shell_wrapper_provider")
+load("@rules_fuchsia//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_package_checker_test_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     package_info = ctx.attr.package_under_test[FuchsiaPackageInfo]
     meta_far = package_info.meta_far
 
@@ -77,7 +78,7 @@ fuchsia_package_checker_test = rule(
     doc = """Validate the generated package.""",
     test = True,
     implementation = _fuchsia_package_checker_test_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "package_under_test": attr.label(
             doc = "Built Package.",

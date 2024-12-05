@@ -9,9 +9,10 @@ load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_args", "get_ffx_assembly_inputs")
 load(":providers.bzl", "FuchsiaSizeCheckerInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_package_size_check_impl(ctx):
-    fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
     manifests = ",".join([pkg[FuchsiaPackageInfo].package_manifest.path for pkg in ctx.attr.packages])
 
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
@@ -87,7 +88,7 @@ fuchsia_package_size_check = rule(
     doc = """Create a size report for a set of fuchsia packages.""",
     implementation = _fuchsia_package_size_check_impl,
     provides = [FuchsiaSizeCheckerInfo],
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "size_report_name": attr.string(
             doc = "The name to add to the size report for viewing in Gerrit.",

@@ -295,6 +295,8 @@ class BazelRepositoryMap(object):
             / "build/bazel/local_repositories/rules_java",
             "remote_coverage_tools": fuchsia_source_dir
             / "build/bazel/local_repositories/remote_coverage_tools",
+            "rules_fuchsia": fuchsia_source_dir
+            / "build/bazel_sdk/bazel_rules_fuchsia",
         }
 
         if fuchsia_sdk_dir:

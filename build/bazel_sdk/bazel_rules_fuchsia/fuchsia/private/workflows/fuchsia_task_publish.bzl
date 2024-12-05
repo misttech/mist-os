@@ -7,9 +7,10 @@
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageGroupInfo", "FuchsiaPackageInfo")
 load(":fuchsia_task.bzl", "fuchsia_task_rule")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     far_files = [
         pkg.far_file
         for dep in ctx.attr.packages
@@ -40,7 +41,7 @@ def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
 ) = fuchsia_task_rule(
     implementation = _fuchsia_task_publish_impl,
     doc = """A workflow task that publishes multiple fuchsia packages.""",
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "packages": attr.label_list(
             doc = "The packages to publish.",

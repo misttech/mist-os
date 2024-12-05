@@ -7,6 +7,7 @@
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 # buildifier: disable=module-docstring
 load(
@@ -175,7 +176,7 @@ def _fuchsia_prebuilt_product_configuration_impl(ctx):
 _fuchsia_prebuilt_product_configuration = rule(
     doc = "Use a prebuilt product configuration directory for hybrid assembly.",
     implementation = _fuchsia_prebuilt_product_configuration_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "product_config": attr.label(
             doc = "The product assembly input artifacts directory containing the product config.",
@@ -196,7 +197,7 @@ _fuchsia_prebuilt_product_configuration = rule(
 _fuchsia_product_configuration = rule(
     doc = """Generates a product configuration file.""",
     implementation = _fuchsia_product_configuration_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "product_config": attr.string(
             doc = "Raw json config. Used as a base template for the config.",

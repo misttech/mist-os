@@ -5,9 +5,10 @@
 """Defines the fuchsia_prebuilt_lacewing_test build rule."""
 
 load(":utils.bzl", "wrap_executable")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_prebuilt_lacewing_test_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     py_toolchain = ctx.toolchains["@rules_python//python:toolchain_type"]
     if not py_toolchain.py3_runtime:
         fail("A Bazel python3 runtime is required, and none was configured!")
@@ -36,8 +37,7 @@ def _fuchsia_prebuilt_lacewing_test_impl(ctx):
 fuchsia_prebuilt_lacewing_test = rule(
     doc = "Defines a prebuilt lacewing test.",
     implementation = _fuchsia_prebuilt_lacewing_test_impl,
-    toolchains = [
-        "@fuchsia_sdk//fuchsia:toolchain",
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION + [
         "@rules_python//python:toolchain_type",
     ],
     attrs = {

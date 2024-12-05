@@ -13,9 +13,10 @@ load(
     "FuchsiaUpdatePackageInfo",
 )
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_update_package_impl(ctx):
-    fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
     partitions_configuration = ctx.attr.partitions_config[FuchsiaPartitionsConfigInfo]
     system_a_out = ctx.attr.main[FuchsiaProductImageInfo].images_out
 
@@ -81,7 +82,7 @@ def _fuchsia_update_package_impl(ctx):
 fuchsia_update_package = rule(
     doc = """Declares a Fuchsia update package.""",
     implementation = _fuchsia_update_package_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     provides = [FuchsiaUpdatePackageInfo],
     attrs = {
         "main": attr.label(

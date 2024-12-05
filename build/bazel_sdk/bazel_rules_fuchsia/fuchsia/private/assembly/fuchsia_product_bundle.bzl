@@ -27,6 +27,7 @@ load(
     "FuchsiaVirtualDeviceInfo",
 )
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 DELIVERY_BLOB_TYPE = struct(
     UNCOMPRESSED = "0",
@@ -561,7 +562,7 @@ def _extract_structured_config(ctx, ffx_invocation, ffx_scrutiny_inputs, pb_out_
     return [structured_config, depfile]
 
 def _build_fuchsia_product_bundle_impl(ctx):
-    fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
     partitions_configuration = ctx.attr.partitions_config[FuchsiaPartitionsConfigInfo]
     system_a_out = ctx.attr.main[FuchsiaProductImageInfo].images_out
     ffx_tool = fuchsia_toolchain.ffx
@@ -719,7 +720,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
 _build_fuchsia_product_bundle = rule(
     doc = """Create a product bundle (PB) for flashing, emulating, or updating a Fuchsia product to a target device.""",
     implementation = _build_fuchsia_product_bundle_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     executable = True,
     attrs = {
         "board_name": attr.string(

@@ -9,6 +9,7 @@ load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_args", "get_ffx_assembly_inputs")
 load(":providers.bzl", "FuchsiaProductImageInfo", "FuchsiaSizeCheckerInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 # Command for running ffx assembly size-check product.
 _SIZE_CHECKER_RUNNER_SH = """
@@ -31,7 +32,7 @@ mkdir -p $FFX_ISOLATE_DIR
 
 def _fuchsia_product_size_check_impl(ctx):
     images_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
-    fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
 
     size_file = ctx.actions.declare_file(ctx.label.name + "_size_breakdown.txt")
     size_report_product_file = ctx.actions.declare_file(ctx.label.name + "_size_report_product.json")
@@ -81,7 +82,7 @@ fuchsia_product_size_check = rule(
     doc = """Create a size summary of an image.""",
     implementation = _fuchsia_product_size_check_impl,
     provides = [FuchsiaSizeCheckerInfo],
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "product_image": attr.label(
             doc = "fuchsia_product target to check the size of.",

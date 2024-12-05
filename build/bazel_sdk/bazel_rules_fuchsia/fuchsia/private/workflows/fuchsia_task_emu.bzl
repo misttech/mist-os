@@ -8,9 +8,10 @@ load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_shell_task.bzl", "shell_task_rule")
 load(":fuchsia_task_download.bzl", "get_product_bundle_dir")
 load(":providers.bzl", "FuchsiaProductBundleInfo")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_task_emu_impl(ctx, make_shell_task):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     pb_path = get_product_bundle_dir(ctx)
     return make_shell_task(
         command = [
@@ -31,7 +32,7 @@ def _fuchsia_task_emu_impl(ctx, make_shell_task):
 
 _fuchsia_task_emu, _fuchsia_task_emu_for_test, fuchsia_task_emu = shell_task_rule(
     doc = """Start emulator using product bundle.""",
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     implementation = _fuchsia_task_emu_impl,
     attrs = {
         "product_bundle": attr.label(

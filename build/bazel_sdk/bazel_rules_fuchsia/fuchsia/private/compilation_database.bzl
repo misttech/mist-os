@@ -13,6 +13,7 @@ load(
 # buildifier: disable=module-docstring
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION")
 
 _CC_RULES = [
     "cc_library",
@@ -215,7 +216,7 @@ def _compilation_db_rule_impl(ctx):
 
 _clangd_compilation_database = rule(
     implementation = _compilation_db_rule_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "output_base": attr.string(
             default = "__OUTPUT_BASE__",

@@ -13,6 +13,7 @@ load(":fuchsia_fidl_cc_library.bzl", "fuchsia_fidl_cc_library")
 load(":fuchsia_fidl_library.bzl", "fuchsia_fidl_library")
 load(":providers.bzl", "FuchsiaComponentManifestInfo", "FuchsiaPackageResourcesInfo", "FuchsiaStructuredConfigInfo")
 load(":utils.bzl", "make_resource_struct")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 #####
 # cvf
@@ -20,7 +21,7 @@ load(":utils.bzl", "make_resource_struct")
 
 def _cvf_impl(ctx):
     compiled_output = ctx.actions.declare_file(ctx.attr.name + ".cvf")
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     ctx.actions.run(
         executable = sdk.configc,
         arguments = [
@@ -58,7 +59,7 @@ _cvf = rule(
       (This is a translation of the cvf template defined in
       //tools/configc/build/config.gni.)
     """,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     implementation = _cvf_impl,
     attrs = {
         "cm_label": attr.label(
@@ -80,7 +81,7 @@ _cvf = rule(
 ###############################
 
 def _fidl_config_client_lib_source_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     source_file = ctx.actions.declare_file(ctx.attr.name + ".fidl")
     ctx.actions.run(
         executable = sdk.configc,
@@ -107,7 +108,7 @@ _fidl_config_client_lib_source = rule(
       //tools/configc/build/config.gni.)
     """,
     implementation = _fidl_config_client_lib_source_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "cm_label": attr.label(
             doc = """Target that generates the compiled manifest,
@@ -127,7 +128,7 @@ _fidl_config_client_lib_source = rule(
 ###############################
 
 def _cpp_config_client_lib_source_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     namespace = ctx.attr.namespace if ctx.attr.namespace else ctx.attr.name
     cc_source_file = ctx.actions.declare_file(ctx.attr.namespace + ".cc")
     h_source_file = ctx.actions.declare_file(ctx.attr.namespace + ".h")
@@ -160,7 +161,7 @@ _cpp_config_client_lib_source = rule(
       //tools/configc/build/config.gni.)
     """,
     implementation = _cpp_config_client_lib_source_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "cm_label": attr.label(
             doc = """Target that generates the compiled manifest,

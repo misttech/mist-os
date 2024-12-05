@@ -3,6 +3,7 @@
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":providers.bzl", "FuchsiaBindLibraryInfo", "FuchsiaPackageResourcesInfo")
 load(":utils.bzl", "make_resource_struct", "wrap_executable")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 _COMMON_ATTR = {
     "rules": attr.label(
@@ -41,7 +42,7 @@ def _process_bindc_args(ctx):
 
 def _fuchsia_driver_bind_bytecode_impl(ctx):
     args = _process_bindc_args(ctx)
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     ctx.actions.run(
         executable = sdk.bindc,
         arguments = [
@@ -69,7 +70,7 @@ def _fuchsia_driver_bind_bytecode_impl(ctx):
 
 fuchsia_driver_bind_bytecode = rule(
     implementation = _fuchsia_driver_bind_bytecode_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "output": attr.output(
             mandatory = True,
@@ -79,7 +80,7 @@ fuchsia_driver_bind_bytecode = rule(
 
 def _fuchsia_driver_bind_bytecode_test_impl(ctx):
     args = _process_bindc_args(ctx)
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     executable, runfiles = wrap_executable(
         ctx,
         sdk.bindc.path,
@@ -105,7 +106,7 @@ def _fuchsia_driver_bind_bytecode_test_impl(ctx):
 fuchsia_driver_bind_bytecode_test = rule(
     implementation = _fuchsia_driver_bind_bytecode_test_impl,
     test = True,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "tests": attr.label(
             doc = "Path to the test_spec file",

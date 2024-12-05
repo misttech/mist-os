@@ -2,10 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
+
 # buildifier: disable=module-docstring
 # buildifier: disable=function-docstring
 def _sdk_host_tool_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     file = getattr(sdk, ctx.label.name)
     exe = ctx.actions.declare_file(ctx.label.name + "_wrap.sh")
     ctx.actions.write(exe, """
@@ -32,7 +34,7 @@ sdk_host_tool = rule(
     sdk_host_tool(name = "ffx")
     ```
     """,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     executable = True,
     attrs = {
         "_sdk_runfiles": attr.label(

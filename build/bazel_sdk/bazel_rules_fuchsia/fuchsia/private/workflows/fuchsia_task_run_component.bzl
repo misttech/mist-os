@@ -7,9 +7,10 @@
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_task.bzl", "fuchsia_task_rule")
 load(":providers.bzl", "FuchsiaPackageInfo")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     repo = ctx.attr.repository
     package = getattr(ctx.attr.package[FuchsiaPackageInfo], "package_name", "{{PACKAGE_NAME}}")
     package_manifest = ctx.attr.package[FuchsiaPackageInfo].package_manifest
@@ -96,7 +97,7 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
     fuchsia_task_run_component,
 ) = fuchsia_task_rule(
     implementation = _fuchsia_task_run_component_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "repository": attr.string(
             doc = "The repository that has the published package.",
