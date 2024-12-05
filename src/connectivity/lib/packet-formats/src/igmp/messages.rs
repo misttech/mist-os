@@ -18,7 +18,7 @@ use super::{
     peek_message_type, IgmpMessage, IgmpNonEmptyBody, IgmpResponseTimeV2, IgmpResponseTimeV3,
 };
 use crate::error::{ParseError, UnrecognizedProtocolCode};
-use crate::gmp::GmpReportGroupRecord;
+use crate::gmp::{GmpReportGroupRecord, InvalidConstraintsError};
 use crate::igmp::{IgmpPacketBuilder, MessageType};
 
 create_protocol_enum!(
@@ -586,6 +586,42 @@ impl<I> IgmpMembershipReportV3Builder<I> {
     const HEADER_SIZE: usize = super::total_header_size::<MembershipReportV3Data>();
 }
 
+impl<I> IgmpMembershipReportV3Builder<I>
+where
+    I: Iterator<Item: GmpReportGroupRecord<Ipv4Addr> + Clone> + Clone,
+{
+    /// Transform this builder into an iterator of builders with a given
+    /// `max_len` for each generated packet.
+    ///
+    /// `max_len` is the maximum length each builder yielded by the returned
+    /// iterator can have. The groups used to create this builder are split into
+    /// multiple reports in order to meet this length. Note that this length
+    /// does _not_ account for the IP header, but it accounts for the entire
+    /// IGMP packet.
+    ///
+    /// Returns `Err` if `max_len` is not large enough to meet minimal
+    /// constraints for each report.
+    pub fn with_len_limits(
+        self,
+        max_len: usize,
+    ) -> Result<
+        impl Iterator<
+            Item = IgmpMembershipReportV3Builder<
+                impl Iterator<Item: GmpReportGroupRecord<Ipv4Addr>> + Clone,
+            >,
+        >,
+        InvalidConstraintsError,
+    > {
+        let Self { groups } = self;
+        crate::gmp::group_record_split_iterator(
+            max_len.saturating_sub(Self::HEADER_SIZE),
+            core::mem::size_of::<GroupRecordHeader>(),
+            groups,
+        )
+        .map(|iter| iter.map(|groups| IgmpMembershipReportV3Builder { groups }))
+    }
+}
+
 impl<I> InnerPacketBuilder for IgmpMembershipReportV3Builder<I>
 where
     I: Iterator<Item: GmpReportGroupRecord<Ipv4Addr>> + Clone,
@@ -652,6 +688,9 @@ mod tests {
     use super::*;
     use crate::igmp::testdata::*;
     use crate::igmp::IgmpMaxRespCode;
+    use crate::ip::Ipv4Proto;
+    use crate::ipv4::options::Ipv4Option;
+    use crate::ipv4::{Ipv4Packet, Ipv4PacketBuilder, Ipv4PacketBuilderWithOptions};
     use crate::testutil::set_logger_for_test;
 
     const ALL_BUFFERS: [&[u8]; 6] = [
@@ -816,7 +855,7 @@ mod tests {
     }
 
     #[test]
-    fn membership_query_v3_report_builder() {
+    fn membership_report_v3_builder() {
         set_logger_for_test();
         use igmp_reports::v3::*;
         let builder = IgmpMembershipReportV3Builder::new(
@@ -835,6 +874,164 @@ mod tests {
         );
         let serialized = builder.into_serializer().serialize_vec_outer().unwrap().unwrap_b();
         assert_eq!(serialized.as_ref(), MEMBER_REPORT);
+    }
+
+    // Test that our maximum sources accounting matches an equivalent example
+    // in RFC 3376 section 4.1.8:
+    //
+    //  For example, on an Ethernet with an MTU of 1500 octets, the IP header
+    //  including the Router Alert option consumes 24 octets, and the IGMP
+    //  fields up to including the Number of Sources (N) field consume 12
+    //  octets, leaving 1464 octets for source addresses, which limits the
+    //  number of source addresses to 366 (1464/4).
+    //
+    // This example is for queries, reports have 8 octets of IGMP headers + 8
+    // octets of group record header, hence (1500 - 24 - 16)/4 = 365.
+    #[test]
+    fn membership_report_v3_split_many_sources() {
+        use igmp_reports::v3::*;
+        use packet::PacketBuilder;
+        const ETH_MTU: usize = 1500;
+        const MAX_SOURCES: usize = 365;
+
+        let src = Ipv4Addr::new(SRC_1_1);
+        let ip_builder = Ipv4PacketBuilderWithOptions::new(
+            Ipv4PacketBuilder::new(src, src, 1, Ipv4Proto::Igmp),
+            &[Ipv4Option::RouterAlert { data: 0 }],
+        )
+        .unwrap();
+        let ip_header = ip_builder.constraints().header_len();
+
+        let src_ip = |i: usize| Ipv4Addr::new([10, 0, (i >> 8) as u8, i as u8]);
+        let group_addr = MulticastAddr::new(Ipv4Addr::new(MULTICAST_ADDR_1)).unwrap();
+        let reports = IgmpMembershipReportV3Builder::new(
+            [(
+                group_addr,
+                IgmpGroupRecordType::ModeIsInclude,
+                (0..MAX_SOURCES).into_iter().map(|i| src_ip(i)),
+            )]
+            .into_iter(),
+        )
+        .with_len_limits(ETH_MTU - ip_header)
+        .unwrap();
+
+        let mut reports = reports.map(|builder| {
+            builder
+                .into_serializer()
+                .encapsulate(ip_builder.clone())
+                .serialize_vec_outer()
+                .unwrap_or_else(|(err, _)| panic!("{err:?}"))
+                .unwrap_b()
+                .into_inner()
+        });
+        // We can generate a report at exactly ETH_MTU.
+        let serialized = reports.next().unwrap();
+        assert_eq!(serialized.len(), ETH_MTU);
+
+        let mut buffer = &serialized[..];
+        let _ip = buffer.parse_with::<_, Ipv4Packet<_>>(()).unwrap();
+        let igmp = buffer.parse::<IgmpMessage<_, IgmpMembershipReportV3>>().unwrap();
+        let mut groups = igmp.body.iter();
+        let group = groups.next().expect("has group");
+        assert_eq!(group.header.multicast_address, group_addr.get());
+        assert_eq!(usize::from(group.header.number_of_sources()), MAX_SOURCES);
+        assert_eq!(group.sources().len(), MAX_SOURCES);
+        for (i, addr) in group.sources().iter().enumerate() {
+            assert_eq!(*addr, src_ip(i));
+        }
+        assert_eq!(groups.next().map(|r| r.header.multicast_address), None);
+
+        // Only one report is generated.
+        assert_eq!(reports.next(), None);
+
+        let reports = IgmpMembershipReportV3Builder::new(
+            [(
+                group_addr,
+                IgmpGroupRecordType::ModeIsInclude,
+                core::iter::repeat(src).take(MAX_SOURCES + 1),
+            )]
+            .into_iter(),
+        )
+        .with_len_limits(ETH_MTU - ip_header)
+        .unwrap();
+        // 2 reports are generated with one extra source.
+        assert_eq!(
+            reports
+                .map(|r| r.groups.map(|group| group.sources().count()).collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+            vec![vec![MAX_SOURCES], vec![1]]
+        );
+    }
+
+    // Like membership_report_v3_split_many_sources but we calculate how many
+    // groups with no sources specified we can have in the same 1500 Ethernet
+    // MTU.
+    //
+    // * 24 bytes for IPv4 header + router alert option.
+    // * 8 bytes for IGMP header + report up to number of groups.
+    // * 8 bytes per group with no sources.
+    //
+    // So we should be able to fit (1500 - 24 - 8)/8 = 183.5 groups. 183
+    // groups result in a a 1496 byte-long message.
+    #[test]
+    fn membership_report_v3_split_many_groups() {
+        use igmp_reports::v3::*;
+        use packet::PacketBuilder;
+
+        const ETH_MTU: usize = 1500;
+        const EXPECT_SERIALIZED: usize = 1496;
+        const MAX_GROUPS: usize = 183;
+
+        let src = Ipv4Addr::new(SRC_1_1);
+        let ip_builder = Ipv4PacketBuilderWithOptions::new(
+            Ipv4PacketBuilder::new(src, src, 1, Ipv4Proto::Igmp),
+            &[Ipv4Option::RouterAlert { data: 0 }],
+        )
+        .unwrap();
+        let ip_header = ip_builder.constraints().header_len();
+
+        let group_ip = |i: usize| {
+            MulticastAddr::new(Ipv4Addr::new([224, 0, (i >> 8) as u8, i as u8])).unwrap()
+        };
+        let reports = IgmpMembershipReportV3Builder::new((0..MAX_GROUPS).into_iter().map(|i| {
+            (group_ip(i), IgmpGroupRecordType::ModeIsExclude, core::iter::empty::<Ipv4Addr>())
+        }))
+        .with_len_limits(ETH_MTU - ip_header)
+        .unwrap();
+
+        let mut reports = reports.map(|builder| {
+            builder
+                .into_serializer()
+                .encapsulate(ip_builder.clone())
+                .serialize_vec_outer()
+                .unwrap_or_else(|(err, _)| panic!("{err:?}"))
+                .unwrap_b()
+                .into_inner()
+        });
+        // We can generate a report at exactly ETH_MTU.
+        let serialized = reports.next().unwrap();
+        assert_eq!(serialized.len(), EXPECT_SERIALIZED);
+
+        let mut buffer = &serialized[..];
+        let _ip = buffer.parse_with::<_, Ipv4Packet<_>>(()).unwrap();
+        let igmp = buffer.parse::<IgmpMessage<_, IgmpMembershipReportV3>>().unwrap();
+        assert_eq!(usize::from(igmp.header.number_of_group_records.get()), MAX_GROUPS);
+        for (i, group) in igmp.body.iter().enumerate() {
+            assert_eq!(group.header.multicast_address, group_ip(i).get());
+            assert_eq!(group.header.number_of_sources.get(), 0);
+        }
+
+        // Only one report is generated.
+        assert_eq!(reports.next(), None);
+
+        let reports =
+            IgmpMembershipReportV3Builder::new((0..MAX_GROUPS + 1).into_iter().map(|i| {
+                (group_ip(i), IgmpGroupRecordType::ModeIsExclude, core::iter::empty::<Ipv4Addr>())
+            }))
+            .with_len_limits(ETH_MTU - ip_header)
+            .unwrap();
+        // 2 reports are generated with one extra source.
+        assert_eq!(reports.map(|r| r.groups.count()).collect::<Vec<_>>(), vec![MAX_GROUPS, 1]);
     }
 
     #[test]

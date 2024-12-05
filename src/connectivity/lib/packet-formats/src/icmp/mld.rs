@@ -21,7 +21,7 @@ use zerocopy::byteorder::network_endian::U16;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 use crate::error::{ParseError, ParseResult, UnrecognizedProtocolCode};
-use crate::gmp::{GmpReportGroupRecord, LinExpConversion, OverflowError};
+use crate::gmp::{GmpReportGroupRecord, InvalidConstraintsError, LinExpConversion, OverflowError};
 use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpPacketRaw, IcmpUnusedCode, MessageBody};
 
 // TODO(https://github.com/google/zerocopy/issues/1528): Use std::convert::Infallible.
@@ -539,6 +539,41 @@ impl<I> Mldv2ReportMessageBuilder<I> {
     }
 }
 
+impl<I> Mldv2ReportMessageBuilder<I>
+where
+    I: Iterator<Item: GmpReportGroupRecord<Ipv6Addr> + Clone> + Clone,
+{
+    /// Transform this builder into an iterator of builders with a given
+    /// `max_len` for each generated packet.
+    ///
+    /// `max_len` is the maximum length each builder yielded by the returned
+    /// iterator can have. The groups used to create this builder are split into
+    /// multiple reports in order to meet this length. Note that this length
+    /// does _not_ account for the IP *or* the shared ICMP header.
+    ///
+    /// Returns `Err` if `max_len` is not large enough to meet minimal
+    /// constraints for each report.
+    pub fn with_len_limits(
+        self,
+        max_len: usize,
+    ) -> Result<
+        impl Iterator<
+            Item = Mldv2ReportMessageBuilder<
+                impl Iterator<Item: GmpReportGroupRecord<Ipv6Addr>> + Clone,
+            >,
+        >,
+        InvalidConstraintsError,
+    > {
+        let Self { groups } = self;
+        crate::gmp::group_record_split_iterator(
+            max_len.saturating_sub(core::mem::size_of::<Mldv2ReportHeader>()),
+            core::mem::size_of::<Mldv2ReportRecordHeader>(),
+            groups,
+        )
+        .map(|iter| iter.map(|groups| Mldv2ReportMessageBuilder { groups }))
+    }
+}
+
 impl<I> InnerPacketBuilder for Mldv2ReportMessageBuilder<I>
 where
     I: Iterator<Item: GmpReportGroupRecord<Ipv6Addr>> + Clone,
@@ -787,6 +822,7 @@ impl_icmp_message!(
 mod tests {
 
     use packet::{ParseBuffer, Serializer};
+    use test_case::test_case;
 
     use super::*;
     use crate::gmp::ExactConversionError;
@@ -796,7 +832,6 @@ mod tests {
         ExtensionHeaderOptionAction, HopByHopOption, HopByHopOptionData, Ipv6ExtensionHeaderData,
     };
     use crate::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder, Ipv6PacketBuilderWithHbhOptions};
-    use test_case::test_case;
 
     fn serialize_to_bytes<B: SplitByteSlice + Debug, M: IcmpMessage<Ipv6> + Debug>(
         src_ip: Ipv6Addr,
@@ -1205,6 +1240,189 @@ mod tests {
             .unwrap();
 
         check_mld_report_v2(&icmp, RECORDS_HEADERS, RECORDS_SOURCES);
+    }
+
+    // Test that our maximum sources accounting matches an equivalent example in
+    // RFC 3810 section 5.1.10:
+    //
+    //  For example, on an Ethernet link with an MTU of 1500 octets, the IPv6
+    //  header (40 octets) together with the Hop-By-Hop Extension Header (8
+    //  octets) that includes the Router Alert option consume 48 octets; the MLD
+    //  fields up to the Number of Sources (N) field consume 28 octets; thus,
+    //  there are 1424 octets left for source addresses, which limits the number
+    //  of source addresses to 89 (1424/16)
+    //
+    // This example is for queries, but reports have the same prefix length so
+    // we can use the same numbers.
+    #[test]
+    fn report_v2_split_many_sources() {
+        use crate::testdata::mld_router_report_v2::*;
+        use packet::PacketBuilder;
+
+        const ETH_MTU: usize = 1500;
+        const MAX_SOURCES: usize = 89;
+
+        let ip_builder = Ipv6PacketBuilderWithHbhOptions::new(
+            Ipv6PacketBuilder::new(SRC_IP, DST_IP, 1, Ipv6Proto::Icmpv6),
+            &[HopByHopOption {
+                action: ExtensionHeaderOptionAction::SkipAndContinue,
+                mutable: false,
+                data: HopByHopOptionData::RouterAlert { data: 0 },
+            }],
+        )
+        .unwrap();
+        let icmp_builder =
+            IcmpPacketBuilder::new(SRC_IP, DST_IP, IcmpUnusedCode, MulticastListenerReportV2);
+
+        let avail_len = ETH_MTU
+            - ip_builder.constraints().header_len()
+            - icmp_builder.constraints().header_len();
+
+        let src_ip = |i: usize| Ipv6Addr::new([0x2000, 0, 0, 0, 0, 0, 0, i as u16]);
+        let group_addr = MulticastAddr::new(RECORDS_HEADERS[0].1).unwrap();
+        let reports = Mldv2ReportMessageBuilder::new(
+            [(
+                group_addr,
+                Mldv2MulticastRecordType::ModeIsInclude,
+                (0..MAX_SOURCES).into_iter().map(|i| src_ip(i)),
+            )]
+            .into_iter(),
+        )
+        .with_len_limits(avail_len)
+        .unwrap();
+
+        let mut reports = reports.map(|builder| {
+            builder
+                .into_serializer()
+                .encapsulate(icmp_builder.clone())
+                .encapsulate(ip_builder.clone())
+                .serialize_vec_outer()
+                .unwrap_or_else(|(err, _)| panic!("{err:?}"))
+                .unwrap_b()
+                .into_inner()
+        });
+        // We can generate a report at exactly ETH_MTU.
+        let serialized = reports.next().unwrap();
+        assert_eq!(serialized.len(), ETH_MTU);
+        let mut buffer = &serialized[..];
+        let ip = buffer.parse_with::<_, Ipv6Packet<_>>(()).unwrap();
+        check_ip(&ip, SRC_IP, DST_IP);
+        let icmp = buffer
+            .parse_with::<_, IcmpPacket<_, _, MulticastListenerReportV2>>(IcmpParseArgs::new(
+                SRC_IP, DST_IP,
+            ))
+            .unwrap();
+
+        let mut groups = icmp.body().iter_multicast_records();
+        let group = groups.next().expect("has group");
+        assert_eq!(group.header.multicast_address, group_addr.get());
+        assert_eq!(usize::from(group.header.number_of_sources()), MAX_SOURCES);
+        assert_eq!(group.sources().len(), MAX_SOURCES);
+        for (i, addr) in group.sources().iter().enumerate() {
+            assert_eq!(*addr, src_ip(i));
+        }
+        assert_eq!(groups.next().map(|r| r.header.multicast_address), None);
+        // Only one report is generated.
+        assert_eq!(reports.next(), None);
+
+        let reports = Mldv2ReportMessageBuilder::new(
+            [(
+                group_addr,
+                Mldv2MulticastRecordType::ModeIsInclude,
+                core::iter::repeat(SRC_IP).take(MAX_SOURCES + 1),
+            )]
+            .into_iter(),
+        )
+        .with_len_limits(avail_len)
+        .unwrap();
+        // 2 reports are generated with one extra source.
+        assert_eq!(
+            reports
+                .map(|r| r.groups.map(|group| group.sources().count()).collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+            vec![vec![MAX_SOURCES], vec![1]]
+        );
+    }
+
+    // Like report_v2_split_many_sources but we calculate how many groups with
+    // no sources specified we can have in the same 1500 Ethernet MTU.
+    //
+    // * 48 bytes for IPv6 header + Hop-by-Hop router alert.
+    // * 8 bytes for ICMPv6 header + report up to number of groups.
+    // * 20 bytes per group with no sources.
+    //
+    // So we should be able to fit (1500 - 48 - 8)/20 = 72.2 groups. 72
+    // groups result in a a 1496 byte-long message.
+    #[test]
+    fn report_v2_split_many_groups() {
+        use crate::testdata::mld_router_report_v2::*;
+        use packet::PacketBuilder;
+
+        const ETH_MTU: usize = 1500;
+        const EXPECT_SERIALIZED: usize = 1496;
+        const MAX_GROUPS: usize = 72;
+
+        let ip_builder = Ipv6PacketBuilderWithHbhOptions::new(
+            Ipv6PacketBuilder::new(SRC_IP, DST_IP, 1, Ipv6Proto::Icmpv6),
+            &[HopByHopOption {
+                action: ExtensionHeaderOptionAction::SkipAndContinue,
+                mutable: false,
+                data: HopByHopOptionData::RouterAlert { data: 0 },
+            }],
+        )
+        .unwrap();
+        let icmp_builder =
+            IcmpPacketBuilder::new(SRC_IP, DST_IP, IcmpUnusedCode, MulticastListenerReportV2);
+
+        let avail_len = ETH_MTU
+            - ip_builder.constraints().header_len()
+            - icmp_builder.constraints().header_len();
+
+        let group_ip = |i: usize| {
+            MulticastAddr::new(Ipv6Addr::new([0xff02, 0, 0, 0, 0, 0, 0, i as u16])).unwrap()
+        };
+        let reports = Mldv2ReportMessageBuilder::new((0..MAX_GROUPS).into_iter().map(|i| {
+            (group_ip(i), Mldv2MulticastRecordType::ModeIsExclude, core::iter::empty::<Ipv6Addr>())
+        }))
+        .with_len_limits(avail_len)
+        .unwrap();
+
+        let mut reports = reports.map(|builder| {
+            builder
+                .into_serializer()
+                .encapsulate(icmp_builder.clone())
+                .encapsulate(ip_builder.clone())
+                .serialize_vec_outer()
+                .unwrap_or_else(|(err, _)| panic!("{err:?}"))
+                .unwrap_b()
+                .into_inner()
+        });
+        // We can generate a report at exactly ETH_MTU.
+        let serialized = reports.next().unwrap();
+        assert_eq!(serialized.len(), EXPECT_SERIALIZED);
+        let mut buffer = &serialized[..];
+        let ip = buffer.parse_with::<_, Ipv6Packet<_>>(()).unwrap();
+        check_ip(&ip, SRC_IP, DST_IP);
+        let icmp = buffer
+            .parse_with::<_, IcmpPacket<_, _, MulticastListenerReportV2>>(IcmpParseArgs::new(
+                SRC_IP, DST_IP,
+            ))
+            .unwrap();
+        assert_eq!(usize::from(icmp.body().header().num_mcast_addr_records()), MAX_GROUPS);
+        for (i, group) in icmp.body().iter_multicast_records().enumerate() {
+            assert_eq!(group.header.number_of_sources.get(), 0);
+            assert_eq!(group.header.multicast_addr(), &group_ip(i).get());
+        }
+        // Only one report is generated.
+        assert_eq!(reports.next(), None);
+
+        let reports = Mldv2ReportMessageBuilder::new((0..MAX_GROUPS + 1).into_iter().map(|i| {
+            (group_ip(i), Mldv2MulticastRecordType::ModeIsExclude, core::iter::empty::<Ipv6Addr>())
+        }))
+        .with_len_limits(avail_len)
+        .unwrap();
+        // 2 reports are generated with one extra group.
+        assert_eq!(reports.map(|r| r.groups.count()).collect::<Vec<_>>(), vec![MAX_GROUPS, 1]);
     }
 
     #[test]

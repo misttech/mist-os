@@ -17,6 +17,7 @@ _common_deps = [
   "//third_party/rust_crates:arrayvec",
   "//third_party/rust_crates:byteorder",
   "//third_party/rust_crates:derivative",
+  "//third_party/rust_crates:either",
   "//third_party/rust_crates:log",
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:zerocopy",
