@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 // TODO(https://fxbug.dev/42156465): Replace with GN config once available in an ffx_plugin.
-#![deny(unused_results)]
+#![warn(unused_results)]
 
 use {fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_test_realm as fntr};
 

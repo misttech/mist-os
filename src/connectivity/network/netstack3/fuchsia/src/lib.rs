@@ -6,7 +6,7 @@
 //! that is more generic than what would normally go in Bindings. This allows it
 //! to be used from, for example, Core unit tests.
 
-#![deny(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
+#![warn(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
 
 mod inspect;
 

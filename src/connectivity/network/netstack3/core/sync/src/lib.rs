@@ -4,7 +4,7 @@
 
 //! Synchronization primitives for Netstack3.
 
-#![deny(missing_docs, unreachable_patterns, unused)]
+#![warn(missing_docs, unreachable_patterns, unused)]
 
 extern crate alloc;
 

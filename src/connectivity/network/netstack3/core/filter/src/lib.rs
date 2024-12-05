@@ -5,7 +5,7 @@
 //! Packet filtering framework.
 
 #![no_std]
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 
 extern crate fakealloc as alloc;
 

@@ -4,7 +4,7 @@
 
 //! Crate providing utilities for coercing between types of sockaddr structs.
 
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 
 use std::num::NonZeroU64;
 

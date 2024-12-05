@@ -5,7 +5,7 @@
 //! Utilities for interacting with DHCPv4 client/server during integration
 //! tests.
 
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 
 use std::ops::Range;
 

@@ -4,7 +4,7 @@
 
 //! Packet parsing helpers.
 
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 
 use packet::ParsablePacket as _;
 

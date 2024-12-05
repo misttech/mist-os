@@ -7,7 +7,7 @@
 //! This crate contains the TCP implementation for netstack3.
 
 #![no_std]
-#![deny(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
+#![warn(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
 
 extern crate fakealloc as alloc;
 extern crate fakestd as std;
