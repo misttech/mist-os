@@ -7,8 +7,8 @@
 #include <fuchsia/hardware/block/c/banjo.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
+#include <lib/virtio/driver_utils.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
@@ -28,8 +28,7 @@
 #include <fbl/auto_lock.h>
 #include <pretty/hexdump.h>
 
-#include "src/devices/block/lib/common/include/common-dfv1.h"
-#include "src/devices/bus/lib/virtio/trace.h"
+#include "src/devices/block/lib/common/include/common.h"
 
 #define LOCAL_TRACE 0
 
@@ -55,13 +54,11 @@ void BlockDevice::txn_complete(block_txn_t* txn, zx_status_t status) {
   txn->completion_cb(txn->cookie, status, &txn->op);
 }
 
-// DDK level ops
-
 void BlockDevice::BlockImplQuery(block_info_t* info, size_t* bopsz) {
   memset(info, 0, sizeof(*info));
   info->block_size = GetBlockSize();
   info->block_count = GetBlockCount();
-  info->max_transfer_size = static_cast<uint32_t>(kPageSize * (ring_size - 2));
+  info->max_transfer_size = static_cast<uint32_t>(kPageSize * (kRingSize - 2));
   if (supports_discard_) {
     info->flags |= FLAG_TRIM_SUPPORT;
   }
@@ -82,18 +79,8 @@ void BlockDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback comp
   SignalWorker(txn);
 }
 
-zx_status_t BlockDevice::DdkGetProtocol(uint32_t proto_id, void* out) {
-  auto* proto = static_cast<ddk::AnyProtocol*>(out);
-  proto->ctx = this;
-  if (proto_id == ZX_PROTOCOL_BLOCK_IMPL) {
-    proto->ops = &block_impl_protocol_ops_;
-    return ZX_OK;
-  }
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-BlockDevice::BlockDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backend> backend)
-    : virtio::Device(std::move(bti), std::move(backend)), DeviceType(bus_device) {
+BlockDevice::BlockDevice(zx::bti bti, std::unique_ptr<Backend> backend, fdf::Logger& logger)
+    : virtio::Device(std::move(bti), std::move(backend)), logger_(logger) {
   sync_completion_reset(&txn_signal_);
   sync_completion_reset(&worker_signal_);
   for (auto& time : blk_req_start_timestamps_) {
@@ -113,59 +100,59 @@ zx_status_t BlockDevice::Init() {
   if (config_.blk_size == 0)
     config_.blk_size = 512;
 
-  zxlogf(DEBUG, "capacity %#" PRIx64 "", config_.capacity);
-  zxlogf(DEBUG, "size_max %#x", config_.size_max);
-  zxlogf(DEBUG, "seg_max  %#x", config_.seg_max);
-  zxlogf(DEBUG, "blk_size %#x", config_.blk_size);
+  FDF_LOG(DEBUG, "capacity %#" PRIx64 "", config_.capacity);
+  FDF_LOG(DEBUG, "size_max %#x", config_.size_max);
+  FDF_LOG(DEBUG, "seg_max  %#x", config_.seg_max);
+  FDF_LOG(DEBUG, "blk_size %#x", config_.blk_size);
 
   DriverStatusAck();
 
   uint64_t features = DeviceFeaturesSupported();
   if (!(features & VIRTIO_F_VERSION_1)) {
     // Declaring non-support until there is a need in the future.
-    zxlogf(ERROR, "Legacy virtio interface is not supported by this driver");
+    FDF_LOG(ERROR, "Legacy virtio interface is not supported by this driver");
     return ZX_ERR_NOT_SUPPORTED;
   }
   if (features & VIRTIO_BLK_F_DISCARD) {
-    zxlogf(INFO, "virtio device supports discard");
+    FDF_LOG(INFO, "virtio device supports discard");
     supports_discard_ = true;
   }
   features &= (VIRTIO_F_VERSION_1 | VIRTIO_BLK_F_DISCARD);
   DriverFeaturesAck(features);
   if (zx_status_t status = DeviceStatusFeaturesOk(); status != ZX_OK) {
-    zxlogf(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
     return status;
   }
 
   // Allocate the main vring.
-  auto err = vring_.Init(0, ring_size);
+  auto err = vring_.Init(0, kRingSize);
   if (err < 0) {
-    zxlogf(ERROR, "failed to allocate vring");
+    FDF_LOG(ERROR, "failed to allocate vring");
     return err;
   }
 
   // Allocate a queue of block requests.
-  size_t size = sizeof(virtio_blk_req_t) * blk_req_count + sizeof(uint8_t) * blk_req_count;
+  size_t size = sizeof(virtio_blk_req_t) * kBlkReqCount + sizeof(uint8_t) * kBlkReqCount;
 
   auto buffer_factory = dma_buffer::CreateBufferFactory();
   const size_t buffer_size = fbl::round_up(size, zx_system_get_page_size());
   zx_status_t status = buffer_factory->CreateContiguous(bti_, buffer_size, 0, &blk_req_buf_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "cannot alloc blk_req buffers: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "cannot alloc blk_req buffers: %s", zx_status_get_string(status));
     return status;
   }
   blk_req_ = static_cast<virtio_blk_req_t*>(blk_req_buf_->virt());
 
-  zxlogf(TRACE, "allocated blk request at %p, physical address %#" PRIxPTR "", blk_req_,
-         blk_req_buf_->phys());
+  FDF_LOG(TRACE, "allocated blk request at %p, physical address %#" PRIxPTR "", blk_req_,
+          blk_req_buf_->phys());
 
   // Responses are 32 words at the end of the allocated block.
-  blk_res_pa_ = blk_req_buf_->phys() + sizeof(virtio_blk_req_t) * blk_req_count;
+  blk_res_pa_ = blk_req_buf_->phys() + sizeof(virtio_blk_req_t) * kBlkReqCount;
   blk_res_ = reinterpret_cast<uint8_t*>(
-      (reinterpret_cast<uintptr_t>(blk_req_) + sizeof(virtio_blk_req_t) * blk_req_count));
+      (reinterpret_cast<uintptr_t>(blk_req_) + sizeof(virtio_blk_req_t) * kBlkReqCount));
 
-  zxlogf(TRACE, "allocated blk responses at %p, physical address %#" PRIxPTR "", blk_res_,
-         blk_res_pa_);
+  FDF_LOG(TRACE, "allocated blk responses at %p, physical address %#" PRIxPTR "", blk_res_,
+          blk_res_pa_);
 
   StartIrqThread();
   DriverStatusOk();
@@ -191,30 +178,19 @@ zx_status_t BlockDevice::Init() {
   if (ret != thrd_success) {
     return ZX_ERR_INTERNAL;
   }
-
-  // Initialize and publish the zx_device.
-  status = DdkAdd("virtio-block");
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to run DdkAdd: %s", zx_status_get_string(status));
-    return status;
-  }
-
   return ZX_OK;
 }
 
-void BlockDevice::DdkRelease() {
-  thrd_join(watchdog_thread_, nullptr);
-  thrd_join(worker_thread_, nullptr);
-  virtio::Device::Release();
-}
-
-void BlockDevice::DdkUnbind(ddk::UnbindTxn txn) {
+void BlockDevice::Release() {
   watchdog_shutdown_.store(true);
   sync_completion_signal(&watchdog_signal_);
   worker_shutdown_.store(true);
   sync_completion_signal(&worker_signal_);
   sync_completion_signal(&txn_signal_);
-  txn.Reply();
+
+  thrd_join(watchdog_thread_, nullptr);
+  thrd_join(worker_thread_, nullptr);
+  virtio::Device::Release();
 }
 
 void BlockDevice::IrqRingUpdate() {
@@ -227,7 +203,7 @@ void BlockDevice::IrqRingUpdate() {
       std::lock_guard<std::mutex> lock(ring_lock_);
       for (;;) {
         int next;
-        if (zxlog_level_enabled(TRACE)) {
+        if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
           virtio_dump_desc(desc);
         }
         if (desc->flags & VRING_DESC_F_NEXT) {
@@ -254,7 +230,7 @@ void BlockDevice::IrqRingUpdate() {
       // Search our pending txn list to see if this completes it.
       list_for_every_entry (&pending_txn_list_, txn, block_txn_t, node) {
         if (txn->desc == head_desc) {
-          zxlogf(TRACE, "completes txn %p", txn);
+          FDF_LOG(TRACE, "completes txn %p", txn);
           status = blk_res_[txn->req_index];
 
           free_blk_req(txn->req_index);
@@ -297,15 +273,15 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   {
     std::lock_guard<std::mutex> lock(txn_lock_);
     req_index = alloc_blk_req();
-    if (req_index >= blk_req_count) {
-      zxlogf(TRACE, "too many block requests queued (%zu)!", req_index);
+    if (req_index >= kBlkReqCount) {
+      FDF_LOG(TRACE, "too many block requests queued (%zu)!", req_index);
       return ZX_ERR_NO_RESOURCES;
     }
     if (type == VIRTIO_BLK_T_DISCARD) {
       // A second descriptor needs to be allocated for discard requests.
       discard_req_index = alloc_blk_req();
-      if (*discard_req_index >= blk_req_count) {
-        zxlogf(TRACE, "too many block requests queued (%zu)!", *discard_req_index);
+      if (*discard_req_index >= kBlkReqCount) {
+        FDF_LOG(TRACE, "too many block requests queued (%zu)!", *discard_req_index);
         free_blk_req(req_index);
         return ZX_ERR_NO_RESOURCES;
       }
@@ -320,8 +296,8 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   } else {
     req->sector = txn->op.rw.offset_dev;
   }
-  zxlogf(TRACE, "blk_req type %u ioprio %u sector %" PRIu64 "", req->type, req->ioprio,
-         req->sector);
+  FDF_LOG(TRACE, "blk_req type %u ioprio %u sector %" PRIu64 "", req->type, req->ioprio,
+          req->sector);
 
   if (type == VIRTIO_BLK_T_DISCARD) {
     // NOTE: if we decide to later send multiple virtio_blk_discard_write_zeroes at once, we must
@@ -331,14 +307,14 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
         reinterpret_cast<virtio_blk_discard_write_zeroes_t*>(&blk_req_[req_index]);
     req->sector = txn->op.rw.offset_dev;
     req->num_sectors = txn->op.rw.length;
-    zxlogf(TRACE, "blk_dwz_req sector %" PRIu64 " num_sectors %" PRIu32, req->sector,
-           req->num_sectors);
+    FDF_LOG(TRACE, "blk_dwz_req sector %" PRIu64 " num_sectors %" PRIu32, req->sector,
+            req->num_sectors);
   }
   // Save the request indexes so we can free them when we complete the transfer.
   txn->req_index = req_index;
   txn->discard_req_index = discard_req_index;
 
-  zxlogf(TRACE, "page count %lu", pagecount);
+  FDF_LOG(TRACE, "page count %lu", pagecount);
 
   // Put together a transfer.
   uint16_t i;
@@ -350,7 +326,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
     desc = vring_.AllocDescChain(num_descriptors, &i);
   }
   if (!desc) {
-    zxlogf(TRACE, "failed to allocate descriptor chain of length %zu", 2u + pagecount);
+    FDF_LOG(TRACE, "failed to allocate descriptor chain of length %zu", 2u + pagecount);
     std::lock_guard<std::mutex> lock(txn_lock_);
     free_blk_req(req_index);
     if (discard_req_index) {
@@ -359,7 +335,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
     return ZX_ERR_NO_RESOURCES;
   }
 
-  zxlogf(TRACE, "after alloc chain desc %p, i %u", desc, i);
+  FDF_LOG(TRACE, "after alloc chain desc %p, i %u", desc, i);
 
   // Point the txn at this head descriptor.
   txn->desc = desc;
@@ -368,7 +344,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   desc->addr = blk_req_buf_->phys() + req_index * sizeof(virtio_blk_req_t);
   desc->len = sizeof(virtio_blk_req_t);
   desc->flags = VRING_DESC_F_NEXT;
-  if (zxlog_level_enabled(TRACE)) {
+  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
     virtio_dump_desc(desc);
   }
 
@@ -390,7 +366,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
       }
     }
     desc->flags = VRING_DESC_F_NEXT;
-    zxlogf(TRACE, "pa %#lx, len %#x", desc->addr, desc->len);
+    FDF_LOG(TRACE, "pa %#lx, len %#x", desc->addr, desc->len);
 
     // Mark buffer as write-only if its a block read.
     if (type == VIRTIO_BLK_T_IN) {
@@ -399,7 +375,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
 
     bytes -= desc->len;
   }
-  if (zxlog_level_enabled(TRACE)) {
+  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
     virtio_dump_desc(desc);
   }
   assert(bytes == 0);
@@ -409,7 +385,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
     desc->addr = blk_req_buf_->phys() + *discard_req_index * sizeof(virtio_blk_req_t);
     desc->len = sizeof(virtio_blk_discard_write_zeroes_t);
     desc->flags = VRING_DESC_F_NEXT;
-    if (zxlog_level_enabled(TRACE)) {
+    if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
       virtio_dump_desc(desc);
     }
   }
@@ -419,7 +395,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   desc->addr = blk_res_pa_ + req_index;
   desc->len = 1;
   desc->flags = VRING_DESC_F_WRITE;
-  if (zxlog_level_enabled(TRACE)) {
+  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
     virtio_dump_desc(desc);
   }
 
@@ -441,7 +417,7 @@ static zx_status_t pin_pages(zx_handle_t bti, block_txn_t* txn, size_t bytes, zx
   size_t pin_size = ZX_ROUNDUP(suboffset + bytes, kPageSize);
   *num_pages = pin_size / kPageSize;
   if (*num_pages > MAX_SCATTER) {
-    zxlogf(ERROR, "transaction too large");
+    FDF_LOG(ERROR, "transaction too large");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -449,7 +425,7 @@ static zx_status_t pin_pages(zx_handle_t bti, block_txn_t* txn, size_t bytes, zx
   zx_status_t status = zx_bti_pin(bti, ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, vmo, aligned_offset,
                                   pin_size, pages, *num_pages, &txn->pmt);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "could not pin pages: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "could not pin pages: %s", zx_status_get_string(status));
     return ZX_ERR_INTERNAL;
   }
 
@@ -462,7 +438,8 @@ void BlockDevice::SignalWorker(block_txn_t* txn) {
     case BLOCK_OPCODE_READ:
     case BLOCK_OPCODE_WRITE:
     case BLOCK_OPCODE_TRIM:
-      if (zx_status_t status = block::CheckIoRange(txn->op.rw, config_.capacity); status != ZX_OK) {
+      if (zx_status_t status = block::CheckIoRange(txn->op.rw, config_.capacity, logger());
+          status != ZX_OK) {
         txn_complete(txn, status);
         return;
       }
@@ -470,10 +447,10 @@ void BlockDevice::SignalWorker(block_txn_t* txn) {
         txn_complete(txn, ZX_ERR_NOT_SUPPORTED);
         return;
       }
-      zxlogf(TRACE, "txn %p, opcode %#x\n", txn, txn->op.command.opcode);
+      FDF_LOG(TRACE, "txn %p, opcode %#x\n", txn, txn->op.command.opcode);
       break;
     case BLOCK_OPCODE_FLUSH:
-      zxlogf(TRACE, "txn %p, opcode FLUSH\n", txn);
+      FDF_LOG(TRACE, "txn %p, opcode FLUSH\n", txn);
       break;
     default:
       txn_complete(txn, ZX_ERR_NOT_SUPPORTED);
@@ -508,7 +485,7 @@ void BlockDevice::WorkerThread() {
       continue;
     }
 
-    zxlogf(TRACE, "WorkerThread handling txn %p", txn);
+    FDF_LOG(TRACE, "WorkerThread handling txn %p", txn);
 
     uint32_t type;
     bool do_flush = false;
@@ -561,12 +538,12 @@ void BlockDevice::WorkerThread() {
         list_add_tail(&pending_txn_list_, &txn->node);
         vring_.SubmitChain(idx);
         vring_.Kick();
-        zxlogf(TRACE, "WorkerThread submitted txn %p", txn);
+        FDF_LOG(TRACE, "WorkerThread submitted txn %p", txn);
         break;
       }
 
       if (cannot_fail) {
-        zxlogf(ERROR, "failed to queue txn to hw: %s", zx_status_get_string(status));
+        FDF_LOG(ERROR, "failed to queue txn to hw: %s", zx_status_get_string(status));
         {
           std::lock_guard<std::mutex> lock(txn_lock_);
           free_blk_req(txn->req_index);
@@ -623,7 +600,7 @@ void BlockDevice::WatchdogThread() {
           // Round down to the interval
           zx::duration latency = ((now - start_time) / kWatchdogInterval) * kWatchdogInterval;
           // LINT.IfChange(watchdog_tefmo)
-          zxlogf(WARNING, "txn %d has not completed after %" PRIu64 "s!", idx, latency.to_secs());
+          FDF_LOG(WARNING, "txn %d has not completed after %" PRIu64 "s!", idx, latency.to_secs());
           // LINT.ThenChange(/tools/testing/tefmocheck/string_in_log_check.go:watchdog_tefmo)
         }
         idx += 1;
@@ -670,6 +647,104 @@ void BlockDevice::CleanupPendingTxns() {
     }
     list_delete(&txn->node);
     txn_complete(txn, ZX_ERR_IO_NOT_PRESENT);
+  }
+}
+
+zx::result<> BlockDriver::Start() {
+  {
+    compat::DeviceServer::BanjoConfig banjo_config;
+    banjo_config.callbacks[ZX_PROTOCOL_BLOCK_IMPL] = block_impl_server_.callback();
+    zx::result<> result =
+        compat_server_.Initialize(incoming(), outgoing(), node_name(), name(),
+                                  compat::ForwardMetadata::None(), std::move(banjo_config));
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
+
+  zx::result device = CreateBlockDevice();
+  if (device.is_error()) {
+    return device.take_error();
+  }
+  block_device_ = std::move(*device);
+
+  zx_status_t status = block_device_->Init();
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  parent_node_.Bind(std::move(node()));
+
+  auto [controller_client_end, controller_server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+
+  node_controller_.Bind(std::move(controller_client_end));
+
+  fidl::Arena arena;
+
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
+  properties[0] = fdf::MakeProperty(arena, bind_fuchsia::PROTOCOL,
+                                    static_cast<uint32_t>(ZX_PROTOCOL_BLOCK_IMPL));
+
+  std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
+
+  const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                        .name(arena, name())
+                        .offers2(arena, std::move(offers))
+                        .properties(properties)
+                        .Build();
+
+  auto result = parent_node_->AddChild(args, std::move(controller_server_end), {});
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
+    return zx::error(result.status());
+  }
+  return zx::ok();
+}
+
+zx::result<std::unique_ptr<BlockDevice>> BlockDriver::CreateBlockDevice() {
+  zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_client_result =
+      incoming()->Connect<fuchsia_hardware_pci::Service::Device>();
+  if (pci_client_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to get pci client: %s", pci_client_result.status_string());
+    return pci_client_result.take_error();
+  }
+
+  zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> bti_and_backend_result =
+      virtio::GetBtiAndBackend(ddk::Pci(std::move(pci_client_result).value()));
+  if (!bti_and_backend_result.is_ok()) {
+    FDF_LOG(ERROR, "GetBtiAndBackend failed: %s", bti_and_backend_result.status_string());
+    return bti_and_backend_result.take_error();
+  }
+  auto [bti, backend] = std::move(bti_and_backend_result).value();
+
+  return zx::ok(std::make_unique<BlockDevice>(std::move(bti), std::move(backend), logger()));
+}
+
+void BlockDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
+  if (block_device_) {
+    block_device_->Release();
+  }
+  completer(zx::ok());
+}
+
+void BlockDriver::BlockImplQuery(block_info_t* info, size_t* bopsz) {
+  if (block_device_) {
+    block_device_->BlockImplQuery(info, bopsz);
+  } else {
+    FDF_LOG(ERROR, "BlockImplQuery called for driver that has not been started.");
+    memset(info, 0, sizeof(*info));
+    *bopsz = 0;
+  }
+}
+
+void BlockDriver::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completion_cb,
+                                 void* cookie) {
+  if (block_device_) {
+    block_device_->BlockImplQueue(bop, completion_cb, cookie);
+  } else {
+    FDF_LOG(ERROR, "BlockImplQueue called for driver that has not been started.");
+    completion_cb(cookie, ZX_ERR_BAD_STATE, bop);
   }
 }
 

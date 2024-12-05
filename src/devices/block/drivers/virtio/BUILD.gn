@@ -27,9 +27,7 @@ fuchsia_cc_driver("virtio_block-driver") {
   deps = [
     ":block_lib",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//src/devices/bus/lib/virtio",
-    "//src/devices/lib/driver",
-    "//src/lib/ddktl",
+    "//src/devices/bus/lib/virtio:virtio-dfv2",
   ]
 }
 
@@ -53,10 +51,12 @@ source_set("block_lib") {
   sources = [ "block.cc" ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//src/devices/block/lib/common:common-dfv1",
-    "//src/devices/bus/lib/virtio",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/devices/block/lib/common",
+    "//src/devices/bus/lib/virtio:virtio-dfv2",
     "//src/devices/lib/dma-buffer",
-    "//src/lib/ddktl",
     "//src/lib/listnode",
   ]
 }
@@ -124,12 +124,12 @@ test("virtio-block-test-bin") {
   sources = [ "block_test.cc" ]
   deps = [
     ":block_lib",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//src/devices/bus/lib/virtio",
+    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:minimal_compat_environment",
+    "//src/devices/bus/lib/virtio:virtio-dfv2",
     "//src/devices/testing/fake-bti",
-    "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 

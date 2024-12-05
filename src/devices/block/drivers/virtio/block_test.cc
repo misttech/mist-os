@@ -4,6 +4,9 @@
 
 #include "block.h"
 
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/testing/cpp/driver_test.h>
+#include <lib/driver/testing/cpp/minimal_compat_environment.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/sync/completion.h>
 #include <lib/virtio/backends/fake.h>
@@ -12,9 +15,9 @@
 #include <cstdint>
 #include <memory>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
-#include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
@@ -60,7 +63,7 @@ class FakeBackendForBlock : public virtio::FakeBackend {
     fake_bti_pinned_vmo_info_t vmos[16];
     size_t count;
     ASSERT_OK(fake_bti_get_pinned_vmos(fake_bti_, vmos, 16, &count));
-    ASSERT_LE(2, count);
+    ASSERT_LE(size_t{2}, count);
 
     union __PACKED Used {
       vring_used head;
@@ -105,12 +108,12 @@ class FakeBackendForBlock : public virtio::FakeBackend {
       // The second-last descriptor describes the first page of data transfer (the first descriptor
       // is the head descriptor).
       if (data_descriptor_idx != UINT16_MAX) {
-        ASSERT_EQ(data_descriptor_idx, count - 1,
-                  "The second-last descriptor should point to data");
+        ZX_ASSERT_MSG(data_descriptor_idx == count - 1,
+                      "The second-last descriptor should point to data");
       }
 
       // It should be the status descriptor.
-      ASSERT_EQ(1, desc->len);
+      ASSERT_EQ(uint32_t{1}, desc->len);
 
       // This assumes the results are in the second VMO.
       size_t offset = vmos[1].offset + desc->addr - FAKE_BTI_PHYS_ADDR;
@@ -189,40 +192,50 @@ class FakeBackendForBlock : public virtio::FakeBackend {
   uint8_t status_ = VIRTIO_BLK_S_OK;
 };
 
-TEST(BlockTest, InitSuccess) {
-  zx::bti bti(ZX_HANDLE_INVALID);
-  ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
-  std::unique_ptr<virtio::Backend> backend = std::make_unique<FakeBackendForBlock>(bti.get());
+class TestBlockDriver : public virtio::BlockDriver {
+ public:
+  // Modify to configure the behaviour of this test driver.
+  static uint8_t backend_status_;
 
-  std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  virtio::BlockDevice block(fake_parent.get(), std::move(bti), std::move(backend));
-  ASSERT_EQ(block.Init(), ZX_OK);
-  block.DdkAsyncRemove();
-  mock_ddk::ReleaseFlaggedDevices(fake_parent.get());
-}
+  TestBlockDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : BlockDriver(std::move(start_args), std::move(dispatcher)) {}
+
+ protected:
+  zx::result<std::unique_ptr<virtio::BlockDevice>> CreateBlockDevice() override {
+    zx::bti bti(ZX_HANDLE_INVALID);
+    zx_status_t status = fake_bti_create(bti.reset_and_get_address());
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    auto backend = std::make_unique<FakeBackendForBlock>(bti.get());
+    backend->set_status(backend_status_);
+
+    return zx::ok(
+        std::make_unique<virtio::BlockDevice>(std::move(bti), std::move(backend), logger()));
+  }
+};
+
+uint8_t TestBlockDriver::backend_status_;
+
+class TestConfig final {
+ public:
+  using DriverType = TestBlockDriver;
+  using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
+};
 
 // Provides control primitives for tests that issue IO requests to the device.
-class BlockDeviceTest : public zxtest::Test {
+class BlockDriverTest : public ::testing::Test {
  public:
-  ~BlockDeviceTest() {}
-
-  void InitDevice(uint8_t status = VIRTIO_BLK_S_OK) {
-    zx::bti bti(ZX_HANDLE_INVALID);
-    ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
-    auto backend = std::make_unique<FakeBackendForBlock>(bti.get());
-    backend->set_status(status);
-
-    fake_root_ = MockDevice::FakeRootParent();
-    device_ =
-        std::make_unique<virtio::BlockDevice>(fake_root_.get(), std::move(bti), std::move(backend));
-    ASSERT_EQ(device_->Init(), ZX_OK);
-    device_->BlockImplQuery(&info_, &operation_size_);
+  void StartDriver(uint8_t status = VIRTIO_BLK_S_OK) {
+    TestBlockDriver::backend_status_ = status;
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
-
-  void RemoveDevice() {
-    device_->DdkAsyncRemove();
-    mock_ddk::ReleaseFlaggedDevices(fake_root_.get());
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
+  fdf_testing::ForegroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
 
   virtio::block_txn_t TestReadCommand(uint32_t tranfser_blocks = 1) {
     virtio::block_txn_t txn;
@@ -242,7 +255,7 @@ class BlockDeviceTest : public zxtest::Test {
   }
 
   static void CompletionCb(void* cookie, zx_status_t status, block_op_t* op) {
-    BlockDeviceTest* operation = reinterpret_cast<BlockDeviceTest*>(cookie);
+    BlockDriverTest* operation = reinterpret_cast<BlockDriverTest*>(cookie);
     operation->operation_status_ = status;
     sync_completion_signal(&operation->event_);
   }
@@ -257,83 +270,78 @@ class BlockDeviceTest : public zxtest::Test {
 
  protected:
   std::unique_ptr<virtio::BlockDevice> device_;
-  block_info_t info_;
-  size_t operation_size_;
 
  private:
+  fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
   sync_completion_t event_;
-  std::shared_ptr<MockDevice> fake_root_;
   zx_status_t operation_status_;
 };
 
 // Tests trivial attempts to queue one operation.
-TEST_F(BlockDeviceTest, QueueOne) {
-  InitDevice();
+TEST_F(BlockDriverTest, QueueOne) {
+  StartDriver();
 
   virtio::block_txn_t txn = TestReadCommand(0);
-  device_->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn), &BlockDeviceTest::CompletionCb,
-                          this);
+  driver_test().driver()->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn),
+                                         &BlockDriverTest::CompletionCb, this);
   ASSERT_TRUE(Wait());
   ASSERT_EQ(ZX_ERR_OUT_OF_RANGE, OperationStatus());
 
   txn = TestReadCommand(kCapacity * 10);
-  device_->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn), &BlockDeviceTest::CompletionCb,
-                          this);
+  driver_test().driver()->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn),
+                                         &BlockDriverTest::CompletionCb, this);
   ASSERT_TRUE(Wait());
   ASSERT_EQ(ZX_ERR_OUT_OF_RANGE, OperationStatus());
-
-  RemoveDevice();
 }
 
-TEST_F(BlockDeviceTest, CheckQuery) {
-  InitDevice();
-  ASSERT_EQ(info_.block_size, kBlkSize);
-  ASSERT_EQ(info_.block_count, kCapacity);
-  ASSERT_GE(info_.max_transfer_size, zx_system_get_page_size());
-  ASSERT_GT(operation_size_, sizeof(block_op_t));
-  RemoveDevice();
+TEST_F(BlockDriverTest, CheckQuery) {
+  StartDriver();
+
+  block_info_t info;
+  size_t operation_size;
+  driver_test().driver()->BlockImplQuery(&info, &operation_size);
+  ASSERT_EQ(info.block_size, kBlkSize);
+  ASSERT_EQ(info.block_count, kCapacity);
+  ASSERT_GE(info.max_transfer_size, zx_system_get_page_size());
+  ASSERT_GT(operation_size, sizeof(block_op_t));
 }
 
-TEST_F(BlockDeviceTest, ReadOk) {
-  InitDevice();
+TEST_F(BlockDriverTest, ReadOk) {
+  StartDriver();
 
   virtio::block_txn_t txn = TestReadCommand();
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
   txn.op.rw.vmo = vmo.get();
-  device_->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn), &BlockDeviceTest::CompletionCb,
-                          this);
+  driver_test().driver()->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn),
+                                         &BlockDriverTest::CompletionCb, this);
   ASSERT_TRUE(Wait());
   ASSERT_EQ(ZX_OK, OperationStatus());
-
-  RemoveDevice();
 }
 
-TEST_F(BlockDeviceTest, ReadError) {
-  InitDevice(VIRTIO_BLK_S_IOERR);
+TEST_F(BlockDriverTest, ReadError) {
+  StartDriver(VIRTIO_BLK_S_IOERR);
 
   virtio::block_txn_t txn = TestReadCommand();
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
   txn.op.rw.vmo = vmo.get();
-  device_->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn), &BlockDeviceTest::CompletionCb,
-                          this);
+  driver_test().driver()->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn),
+                                         &BlockDriverTest::CompletionCb, this);
   ASSERT_TRUE(Wait());
   ASSERT_EQ(ZX_ERR_IO, OperationStatus());
-
-  RemoveDevice();
 }
 
-TEST_F(BlockDeviceTest, Trim) {
-  InitDevice();
+TEST_F(BlockDriverTest, Trim) {
+  StartDriver();
 
   virtio::block_txn_t txn = TestTrimCommand();
-  device_->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn), &BlockDeviceTest::CompletionCb,
-                          this);
+  driver_test().driver()->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn),
+                                         &BlockDriverTest::CompletionCb, this);
   ASSERT_TRUE(Wait());
   ASSERT_OK(OperationStatus());
-
-  RemoveDevice();
 }
+
+FUCHSIA_DRIVER_EXPORT(TestBlockDriver);
 
 }  // anonymous namespace
