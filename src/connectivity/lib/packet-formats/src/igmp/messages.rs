@@ -225,6 +225,29 @@ impl<B> MessageType<B> for IgmpMembershipQueryV3 {
     }
 }
 
+impl<B: SplitByteSlice> IgmpMessage<B, IgmpMembershipQueryV3> {
+    /// Reinterprets this [`IgmpMembershipQueryV3`] message as an
+    /// [`IgmpMembershipQueryV2`] message.
+    ///
+    /// Given this crate parses the version separately, users desiring to
+    /// operate in IGMPv2 or IGMPv1 modes *SHOULD* reinterpret V3 queries as the
+    /// older version.
+    ///
+    /// See [RFC 3376 section 7.2.1] and [RFC 2236 section 2.5].
+    ///
+    /// [RFC 3376 section 7.2.1]:
+    ///     https://datatracker.ietf.org/doc/html/rfc3376#section-7.2.1
+    /// [RFC 2236 section 2.5]:
+    ///     https://datatracker.ietf.org/doc/html/rfc2236#section-2.5
+    pub fn as_v2_query(&self) -> IgmpMessage<&[u8], IgmpMembershipQueryV2> {
+        let Self { prefix, header, body: _ } = self;
+        // Unwraps are okay here, we know the sizes and alignments must fit.
+        let prefix = Ref::from_bytes(prefix.as_bytes()).unwrap();
+        let (header, _rest) = Ref::from_prefix(header.as_bytes()).unwrap();
+        IgmpMessage { prefix, header, body: () }
+    }
+}
+
 /// Fixed information in IGMPv3 Membership Reports.
 ///
 /// A `MembershipReportV3Data` struct represents the fixed data in IGMPv3
@@ -799,6 +822,11 @@ mod tests {
             );
             assert_eq!(igmp.body.len(), igmp_router_queries::v3::NUMBER_OF_SOURCES as usize);
             assert_eq!(igmp.body[0], Ipv4Addr::new(igmp_router_queries::v3::SOURCE));
+
+            // When interpreted as a v2 query we should get the same values.
+            let v2 = igmp.as_v2_query();
+            assert_eq!(v2.prefix.max_resp_code, igmp_router_queries::v3::MAX_RESP_CODE);
+            assert_eq!(*(v2.header), Ipv4Addr::new(igmp_router_queries::v3::GROUP_ADDRESS));
         });
     }
 

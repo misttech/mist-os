@@ -782,6 +782,27 @@ impl<B: SplitByteSlice> Mldv2QueryBody<B> {
     pub fn sources(&self) -> &[Ipv6Addr] {
         self.sources.deref()
     }
+
+    /// Reinterprets this [`Mldv2QueryBody`] message as an
+    /// [`Mldv1Body`] message in an MLDv1 query.
+    ///
+    /// Given this crate parses the version separately, users desiring to
+    /// operate in MLDv1 mode *SHOULD* reinterpret V2 queries as the
+    /// older version.
+    ///
+    /// See [RFC 3810 section 8.2.1] and [RFC 2236 section 2.5].
+    ///
+    /// [RFC 3810 section 8.2.1]:
+    ///     https://datatracker.ietf.org/doc/html/rfc3810#section-8.2.1
+    /// [RFC 2710 section 3.7]:
+    ///     https://datatracker.ietf.org/doc/html/rfc2710#section-3.7
+    pub fn as_v1_query(&self) -> Mldv1Body<&[u8]> {
+        let Self { header, sources: _ } = self;
+        // This unwrap is okay because we know Mldv1Message is effectively the
+        // prefix within Mldv2QueryBody.
+        let (msg, _rest) = Ref::from_prefix(header.as_bytes()).unwrap();
+        Mldv1Body(msg)
+    }
 }
 
 impl<B: SplitByteSlice> MessageBody for Mldv2QueryBody<B> {
@@ -994,6 +1015,11 @@ mod tests {
         for (expected, actual) in sources.iter().zip(icmp.message_body.sources.into_iter()) {
             assert_eq!(actual, expected);
         }
+
+        // When interpreted as a v1 body we should get valid results.
+        let Mldv1Body(v1) = icmp.message_body.as_v1_query();
+        assert_eq!(v1.max_response_delay.get(), max_resp_code);
+        assert_eq!(v1.group_addr, group_addr);
     }
 
     fn check_mld_report_v2<
