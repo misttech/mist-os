@@ -20,6 +20,7 @@
         {
             protocol: [
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.BootControl",
                 "test.sagcontrol.State",
             ],
         },
@@ -29,7 +30,10 @@
             protocol: [ "fuchsia.power.broker.Topology" ],
         },
         {
-            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+            protocol: [
+                "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.BootControl",
+            ],
             from: "#system-activity-governor",
         },
         {
@@ -60,15 +64,14 @@
     ],
     expose: [
         {
-            protocol: [
-                "fuchsia.power.system.ActivityGovernor",
-                "test.sagcontrol.State",
-            ],
+            protocol: [ "test.sagcontrol.State" ],
             from: "self",
         },
         {
             protocol: [
                 "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.BootControl",
                 "fuchsia.power.system.CpuElementManager",
             ],
             from: "#system-activity-governor",

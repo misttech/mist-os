@@ -4,7 +4,6 @@
 
 use anyhow::Result;
 use async_utils::hanging_get::server::HangingGet;
-use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fidl_fuchsia_power_system::{self as fsystem, ApplicationActivityLevel, ExecutionStateLevel};
 use fuchsia_component::client as fclient;
@@ -200,41 +199,32 @@ impl SystemActivityGovernorControl {
 
     pub async fn run(self: Rc<Self>, fs: &mut ServiceFs<ServiceObjLocal<'_, ()>>) {
         let this = self;
-        fs.dir("svc")
-            .add_fidl_service(move |mut stream: fctrl::StateRequestStream| {
-                let this = this.clone();
-                fasync::Task::local(async move {
-                    let sub = this.hanging_get.borrow_mut().new_subscriber();
-                    while let Ok(Some(request)) = stream.try_next().await {
-                        match request {
-                            fctrl::StateRequest::Set { responder, payload } => {
-                                let result = this.update_sag_state(payload).await;
-                                let _ = responder.send(result);
-                            }
-                            fctrl::StateRequest::Get { responder } => {
-                                let _ = responder.send(&*this.current_state.lock().await);
-                            }
-                            fctrl::StateRequest::Watch { responder } => {
-                                if let Err(error) = sub.register(responder) {
-                                    tracing::warn!(?error, "Failed to register for Watch call");
-                                }
-                            }
-                            fctrl::StateRequest::_UnknownMethod { ordinal, .. } => {
-                                tracing::warn!(?ordinal, "Unknown StateRequest method");
+        fs.dir("svc").add_fidl_service(move |mut stream: fctrl::StateRequestStream| {
+            let this = this.clone();
+            fasync::Task::local(async move {
+                let sub = this.hanging_get.borrow_mut().new_subscriber();
+                while let Ok(Some(request)) = stream.try_next().await {
+                    match request {
+                        fctrl::StateRequest::Set { responder, payload } => {
+                            let result = this.update_sag_state(payload).await;
+                            let _ = responder.send(result);
+                        }
+                        fctrl::StateRequest::Get { responder } => {
+                            let _ = responder.send(&*this.current_state.lock().await);
+                        }
+                        fctrl::StateRequest::Watch { responder } => {
+                            if let Err(error) = sub.register(responder) {
+                                tracing::warn!(?error, "Failed to register for Watch call");
                             }
                         }
+                        fctrl::StateRequest::_UnknownMethod { ordinal, .. } => {
+                            tracing::warn!(?ordinal, "Unknown StateRequest method");
+                        }
                     }
-                })
-                .detach();
+                }
             })
-            .add_service_connector(
-                move |server_end: ServerEnd<fsystem::ActivityGovernorMarker>| {
-                    fclient::connect_channel_to_protocol::<fsystem::ActivityGovernorMarker>(
-                        server_end.into_channel(),
-                    )
-                    .unwrap();
-                },
-            );
+            .detach();
+        });
     }
 
     async fn handle_application_activity_changes(
