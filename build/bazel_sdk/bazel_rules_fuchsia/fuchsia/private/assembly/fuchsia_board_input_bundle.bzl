@@ -187,10 +187,6 @@ fuchsia_board_input_bundle = rule(
             default = [],
             allow_files = True,
         ),
-        "_sdk_manifest": attr.label(
-            allow_single_file = True,
-            default = "@fuchsia_sdk//:meta/manifest.json",
-        ),
     } | COMPATIBILITY.HOST_ATTRS,
 )
 

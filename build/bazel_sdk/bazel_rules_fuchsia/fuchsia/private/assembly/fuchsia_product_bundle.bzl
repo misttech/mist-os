@@ -603,7 +603,6 @@ def _build_fuchsia_product_bundle_impl(ctx):
         "PARTITIONS_PATH": partitions_configuration.config.path,
         "SYSTEM_A_MANIFEST": system_a_out.path + "/images.json",
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
-        "SDK_ROOT": ctx.attr._sdk_manifest.label.workspace_root,
         "SIZE_REPORT": size_report.path,
     }
 
@@ -782,10 +781,6 @@ _build_fuchsia_product_bundle = rule(
             doc = "Default virtual device to run when none is specified.",
             providers = [FuchsiaVirtualDeviceInfo],
             default = None,
-        ),
-        "_sdk_manifest": attr.label(
-            allow_single_file = True,
-            default = "@fuchsia_sdk//:meta/manifest.json",
         ),
         "_rebase_flash_manifest": attr.label(
             default = "//fuchsia/tools:rebase_flash_manifest",

@@ -12,7 +12,7 @@ ignore_policy = struct(
     rule_attributes = {
         "fuchsia_component_manifest": ["_sdk_coverage_shard"],
         "_build_fuchsia_package": ["_fuchsia_sdk_debug_symbols"],
-        "_build_fuchsia_product_bundle": ["update_version_file", "_sdk_manifest"],
+        "_build_fuchsia_product_bundle": ["update_version_file"],
     },
 
     # These rules will be ignored:

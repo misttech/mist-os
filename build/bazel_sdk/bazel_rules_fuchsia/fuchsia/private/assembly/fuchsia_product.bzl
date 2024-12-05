@@ -208,10 +208,6 @@ _fuchsia_product_assembly = rule(
             default = "error",
             values = ["error", "warning"],
         ),
-        "_sdk_manifest": attr.label(
-            allow_single_file = True,
-            default = "@fuchsia_sdk//:meta/manifest.json",
-        ),
         "_create_package_manifest_list": attr.label(
             default = "//fuchsia/tools:create_package_manifest_list",
             executable = True,
@@ -289,10 +285,6 @@ _fuchsia_product_create_system = rule(
             doc = "A fuchsia_product_assembly target.",
             providers = [FuchsiaProductAssemblyInfo],
             mandatory = True,
-        ),
-        "_sdk_manifest": attr.label(
-            allow_single_file = True,
-            default = "@fuchsia_sdk//:meta/manifest.json",
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )
