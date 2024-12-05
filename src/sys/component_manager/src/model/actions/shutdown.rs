@@ -24,7 +24,6 @@ use moniker::ChildName;
 use std::collections::{HashMap, HashSet};
 use std::pin::pin;
 use std::sync::Arc;
-use std::time::Duration;
 use std::{fmt, iter};
 use tracing::*;
 
@@ -264,7 +263,7 @@ pub async fn do_shutdown(
     component: &Arc<ComponentInstance>,
     shutdown_type: ShutdownType,
 ) -> Result<(), ActionError> {
-    const WATCHDOG_TIMEOUT_SECS: u64 = 15;
+    const WATCHDOG_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(15);
 
     // Keep logs short to preserve as much as possible in the crash report
     // NS: Shutdown of {moniker} was no-op
@@ -309,9 +308,10 @@ pub async fn do_shutdown(
     }
 
     let watchdog_fut = pin!(async {
-        fasync::Timer::new(Duration::from_secs(WATCHDOG_TIMEOUT_SECS)).await;
-        info!("=PS {}", component.moniker);
-        std::future::pending::<()>().await;
+        let mut interval = fasync::Interval::new(WATCHDOG_INTERVAL);
+        while let Some(_) = interval.next().await {
+            info!("=PS {}", component.moniker);
+        }
     });
     let mut watchdog_fut = watchdog_fut.fuse();
     let shutdown_fut = pin!(component.stop_instance_internal(true));
