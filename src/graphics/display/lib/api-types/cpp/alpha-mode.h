@@ -9,6 +9,8 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <zircon/assert.h>
 
+#include <cstdint>
+
 namespace display {
 
 // Equivalent to the FIDL type [`fuchsia.hardware.display.types/AlphaMode`].

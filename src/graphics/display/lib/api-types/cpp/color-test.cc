@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/image-format/image_format.h>
 
+#include <cstdint>
 #include <initializer_list>
 
 #include <gmock/gmock.h>

@@ -11,7 +11,6 @@
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
-#include <algorithm>
 #include <array>
 #include <cinttypes>
 #include <cstdint>
