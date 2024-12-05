@@ -6,6 +6,7 @@
 #define SRC_UI_INPUT_DRIVERS_HID_INPUT_REPORT_INPUT_REPORT_H_
 
 #include <fidl/fuchsia.hardware.input/cpp/wire.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zx/result.h>
@@ -43,6 +44,11 @@ class InputReport : public fidl::WireServer<fuchsia_input_report::InputDevice>,
                         SetFeatureReportCompleter::Sync& completer) override;
   void GetInputReport(GetInputReportRequestView request,
                       GetInputReportCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_input_report::InputDevice> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    fdf::warn("Unexpected fidl method invoked: {}", metadata.method_ordinal);
+  }
 
   // For testing.
   sync_completion_t& next_reader_wait() { return next_reader_wait_; }

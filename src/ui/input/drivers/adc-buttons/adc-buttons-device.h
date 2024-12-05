@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.adc/cpp/fidl.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/async/cpp/task.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/input_report_reader/reader.h>
 
 #include <set>
@@ -55,6 +56,11 @@ class AdcButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevi
   void GetInputReport(GetInputReportRequestView request,
                       GetInputReportCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_input_report::InputDevice> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    fdf::warn("Unexpected fidl method invoked: {}", metadata.method_ordinal);
   }
 
  private:

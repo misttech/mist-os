@@ -345,7 +345,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.input.report/InputDevice",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {

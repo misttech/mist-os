@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/debug.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/input_report_reader/reader.h>
 #include <lib/inspect/contrib/cpp/bounded_list_node.h>
@@ -94,6 +95,11 @@ class Tcs3400Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
                         SetFeatureReportCompleter::Sync& completer) override;
   void GetInputReport(GetInputReportRequestView request,
                       GetInputReportCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_input_report::InputDevice> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    zxlogf(WARNING, "Unexpected fidl method invoked: %ld", metadata.method_ordinal);
+  }
 
   // Visible for testing.
   void WaitForNextReader();

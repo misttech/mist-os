@@ -49,6 +49,7 @@ class FakeInputDevice final : public fuchsia::input::report::InputDevice {
   }
   void GetInputReport(::fuchsia::input::report::DeviceType device_type,
                       GetInputReportCallback callback) override;
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {}
 
  private:
   friend class FakeInputReportsReader;

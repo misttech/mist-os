@@ -11,6 +11,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/irq.h>
+#include <lib/ddk/debug.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/input_report_reader/reader.h>
@@ -102,6 +103,11 @@ class Gt6853Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_IN
                         SetFeatureReportCompleter::Sync& completer) override;
   void GetInputReport(GetInputReportRequestView request,
                       GetInputReportCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_input_report::InputDevice> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    zxlogf(WARNING, "Unexpected fidl method invoked: %ld", metadata.method_ordinal);
+  }
 
   // Visible for testing.
   void WaitForNextReader();
