@@ -78,6 +78,77 @@ pub struct Features {
     pub nanohub: bool,
 }
 
+impl Features {
+    pub fn record_inspect(&self, parent_node: &fuchsia_inspect::Node) {
+        parent_node.record_child("features", |inspect_node| match self {
+            Features {
+                kernel:
+                    KernelFeatures {
+                        bpf_v2,
+                        enable_suid,
+                        io_uring,
+                        error_on_failed_reboot,
+                        enable_visual_debugging,
+                    },
+                selinux,
+                ashmem,
+                framebuffer,
+                gralloc,
+                magma,
+                gfxstream,
+                container,
+                test_data,
+                custom_artifacts,
+                android_serialno,
+                self_profile,
+                aspect_ratio,
+                perfetto,
+                android_fdr,
+                rootfs_rw,
+                network_manager,
+                nanohub,
+            } => {
+                inspect_node.record_bool("selinux", *selinux);
+                inspect_node.record_bool("ashmem", *ashmem);
+                inspect_node.record_bool("framebuffer", *framebuffer);
+                inspect_node.record_bool("gralloc", *gralloc);
+                inspect_node.record_bool("magma", *magma);
+                inspect_node.record_bool("gfxstream", *gfxstream);
+                inspect_node.record_bool("container", *container);
+                inspect_node.record_bool("test_data", *test_data);
+                inspect_node.record_bool("custom_artifacts", *custom_artifacts);
+                inspect_node.record_bool("android_serialno", *android_serialno);
+                inspect_node.record_bool("self_profile", *self_profile);
+                inspect_node.record_string(
+                    "aspect_ratio",
+                    aspect_ratio
+                        .as_ref()
+                        .map(|aspect_ratio| {
+                            format!("width: {} height: {}", aspect_ratio.width, aspect_ratio.height)
+                        })
+                        .unwrap_or_default(),
+                );
+                inspect_node.record_string(
+                    "perfetto",
+                    perfetto.as_ref().map(|p| p.to_string()).unwrap_or_default(),
+                );
+                inspect_node.record_bool("android_fdr", *android_fdr);
+                inspect_node.record_bool("rootfs_rw", *rootfs_rw);
+                inspect_node.record_bool("network_manager", *network_manager);
+                inspect_node.record_bool("nanohub", *nanohub);
+
+                inspect_node.record_child("kernel", |kernel_node| {
+                    kernel_node.record_bool("bpf_v2", *bpf_v2);
+                    kernel_node.record_bool("enable_suid", *enable_suid);
+                    kernel_node.record_bool("io_uring", *io_uring);
+                    kernel_node.record_bool("error_on_failed_reboot", *error_on_failed_reboot);
+                    kernel_node.record_bool("enable_visual_debugging", *enable_visual_debugging);
+                });
+            }
+        });
+    }
+}
+
 /// Parses all the featurse in `entries`.
 ///
 /// Returns an error if parsing fails, or if an unsupported feature is present in `features`.

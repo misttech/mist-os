@@ -473,6 +473,9 @@ async fn create_container(
     let crash_reporter = connect_to_protocol::<CrashReporterMarker>().unwrap();
 
     let node = inspect::component::inspector().root().create_child("container");
+    let kernel_node = node.create_child("kernel");
+    features.record_inspect(&kernel_node);
+
     let security_state = security::kernel_init_security(features.selinux);
     let kernel = Kernel::new(
         kernel_cmdline,
@@ -481,7 +484,7 @@ async fn create_container(
         data_dir,
         role_manager,
         Some(crash_reporter),
-        node.create_child("kernel"),
+        kernel_node,
         features.aspect_ratio.as_ref(),
         security_state,
     )
