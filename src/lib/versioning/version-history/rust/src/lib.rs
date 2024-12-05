@@ -367,7 +367,14 @@ impl VersionHistory {
     /// care which. The returned [Version] will be consistent within a given
     /// build, but may change from build to build.
     pub fn get_example_supported_version_for_tests(&self) -> Version {
-        self.runnable_versions().last().unwrap()
+        self.runnable_versions()
+            .filter(|v| {
+                v.api_level != ApiLevel::NEXT
+                    && v.api_level != ApiLevel::HEAD
+                    && v.api_level != ApiLevel::PLATFORM
+            })
+            .last()
+            .unwrap()
     }
 
     /// Check whether the platform supports building components that target the
@@ -1134,16 +1141,17 @@ The following API levels are supported: 5, 6, 7, NEXT, HEAD, PLATFORM"
             0xFF01_8C4D_000B_4751.into()
         );
         assert_eq!(
+            FAKE_VERSION_HISTORY.get_misleading_version_for_ffx(),
+            FAKE_VERSION_HISTORY.versions[3].clone()
+        );
+        assert_eq!(FAKE_VERSION_HISTORY.get_misleading_version_for_ffx().api_level, 7.into());
+        assert_eq!(
             FAKE_VERSION_HISTORY.get_example_supported_version_for_tests(),
-            FAKE_VERSION_HISTORY.versions[FAKE_VERSION_HISTORY.versions.len() - 1].clone()
+            FAKE_VERSION_HISTORY.versions[FAKE_VERSION_HISTORY.versions.len() - 4].clone()
         );
         assert_eq!(
             FAKE_VERSION_HISTORY.get_example_supported_version_for_tests().api_level,
-            ApiLevel::PLATFORM
-        );
-        assert_eq!(
-            FAKE_VERSION_HISTORY.get_misleading_version_for_ffx(),
-            FAKE_VERSION_HISTORY.versions[3].clone()
+            7.into()
         );
     }
 
