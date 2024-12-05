@@ -269,9 +269,9 @@ modification. Test rebuilding works as follows (with overrides listed inline).
 - **All selected tests are rebuilt by calling `fx build <targets>`
   for each `fx test` invocation.**
   - Use `--[no-]build` to toggle this behavior.
-- **If selected tests are in the "base packages" for your build
-  (specified using `fx set --with-base`), the `updates` package
-  will be built and an OTA will be performed.**
+- **If selected tests are in a specified package for your build
+  (specified using `fx set --with-test`), the `updates` package
+  is built and an OTA will be performed.**
   - Use `--[no-]updateifinbase` to toggle this behavior.
   - Warning: OTA will fail when targeting an emulator.
 

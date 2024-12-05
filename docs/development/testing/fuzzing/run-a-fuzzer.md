@@ -89,7 +89,7 @@ fuzzer and reattach to it later.
 Note: if `attach` reports that the component cannot be found or cannot be resolved, check that the
 component is available to the [component resolver][component-resolvers]. Typically this means
 ensuring [`fx serve`][fx-serve] is running or including your fuzzer in the
-[base image][package-deployment-options] via `fx set ... --with-base <package>`.
+[base image][package-deployment-options].
 
 Several of the commands represent long-running workflows. These include the most important command,
 `run`, which performs coverage-guided fuzzing. These also include `try`, `cleanse`, `minimize`, and
