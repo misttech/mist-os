@@ -10,7 +10,7 @@ load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shel
 
 def _driver_binary_test_impl(ctx):
     # We normally strip the binary when we do our packaging but we don't need to
-    # create an entire fuchsia package to run this test so we just strip it here.
+    # create an entire Fuchsia package to run this test so we just strip it here.
     resource = struct(
         src = ctx.files.driver[0],
         dest = "__not_needed__",
@@ -42,6 +42,9 @@ driver_binary_test = rule(
     test = True,
     implementation = _driver_binary_test_impl,
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
+
+    # As noted in the implementation, we are not creating a Fuchsia package, so
+    # we need to specify the transition ourselves.
     cfg = fuchsia_transition,
     attrs = {
         "driver": attr.label(
