@@ -18,6 +18,7 @@ fuchsia_fidl_library(
         "cpp_wire",
         "cpp_driver_wire",
         "cpp_driver",
+        "cpp_testing",
     ],
     library = "{{name}}",
     deps = [
