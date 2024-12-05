@@ -62,10 +62,7 @@ def fail_missing_api_level(name):
     fail("'{}' does not have a valid API level set. Valid API levels are {}".format(name, [lvl.api_level for lvl in get_fuchsia_api_levels()]))
 
 def _valid_api_levels(ctx):
-    if getattr(ctx.attr, "valid_api_levels_for_test", None):
-        levels = ctx.attr.valid_api_levels_for_test
-    else:
-        levels = [entry.api_level for entry in get_fuchsia_api_levels()]
+    levels = [entry.api_level for entry in get_fuchsia_api_levels()]
 
     # The unset level is still valid since it can indicate that the user did
     # not set the value. If we don't do this then we have no way of knowing if the
@@ -93,14 +90,6 @@ fuchsia_api_level = rule(
     """,
     implementation = _fuchsia_api_level_impl,
     build_setting = config.string(flag = True),
-    attrs = {
-        "valid_api_levels_for_test": attr.string_list(
-            doc = """A set of levels to use for testing.
-
-            This attr should not be used outside of a testing environment.""",
-            default = [],
-        ),
-    },
 )
 
 def _verify_cc_head_api_level_impl(ctx):
@@ -109,7 +98,7 @@ def _verify_cc_head_api_level_impl(ctx):
 
     if get_fuchsia_api_level(ctx) != "HEAD":
         fail("You are trying to use an unstable API in a stable package.\n" +
-             "You must target HEAD in order to use this library: " + ctx.attr.library_name)
+             "You must target \"HEAD\" in order to use this library: " + ctx.attr.library_name)
 
     return DefaultInfo(
         files = depset([f]),
@@ -122,7 +111,7 @@ verify_cc_head_api_level = rule(
     This rule should only be used by the generated cc_library rules for sdk
     elements. It will create an empty c++ file which can be added to the srcs
     of the cc_library. The check will look at the Fuchsia API level and fail if
-    it is not head.
+    it is not "HEAD".
     """,
     attrs = {
         "library_name": attr.string(mandatory = True),

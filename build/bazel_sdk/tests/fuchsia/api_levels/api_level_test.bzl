@@ -6,6 +6,7 @@
 
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("@fuchsia_sdk//fuchsia/private:fuchsia_api_level.bzl", "FuchsiaAPILevelInfo", "fuchsia_api_level")
+load("//test_utils:api_levels.bzl", "some_valid_numerical_api_level_as_string")
 
 def _level_setting_test_impl(ctx):
     env = analysistest.begin(ctx)
@@ -32,20 +33,30 @@ def _make_test_fuchsia_api_level(name, level):
     fuchsia_api_level(
         name = name,
         build_setting_default = level,
-        # Use levels that we know will never be in the SDK
-        valid_api_levels_for_test = ["1", "2", "3"],
     )
 
 def _test_level_setting():
     _make_test_fuchsia_api_level(
         name = "supported",
-        level = "2",
+        level = some_valid_numerical_api_level_as_string(),
     )
 
     level_setting_test(
         name = "test_setting_supported",
         target_under_test = ":supported",
-        expected_level = "2",
+        expected_level = some_valid_numerical_api_level_as_string(),
+        tags = ["manual"],
+    )
+
+    _make_test_fuchsia_api_level(
+        name = "head",
+        level = "HEAD",
+    )
+
+    level_setting_test(
+        name = "test_setting_head",
+        target_under_test = ":head",
+        expected_level = "HEAD",
         tags = ["manual"],
     )
 
@@ -77,14 +88,14 @@ level_setting_failure_test = analysistest.make(
 
 def _test_level_setting_failures():
     _make_test_fuchsia_api_level(
-        name = "head",
-        level = "HEAD",
+        name = "unknown_string",
+        level = "SOMETHING",
     )
 
     level_setting_failure_test(
-        name = "test_setting_head",
-        target_under_test = ":head",
-        expected_failure_message = "HEAD is not a valid API level",
+        name = "test_setting_unknown_string",
+        target_under_test = ":unknown_string",
+        expected_failure_message = "SOMETHING is not a valid API level",
         tags = ["manual"],
     )
 
@@ -109,10 +120,11 @@ def fuchsia_api_level_test_suite(name, **kwargs):
         tests = [
             # _test_level_setting tests
             ":test_setting_supported",
+            ":test_setting_head",
             ":test_unset",
 
             # _test_level_setting_failures tests
-            ":test_setting_head",
+            ":test_setting_unknown_string",
             ":test_unsupported",
         ],
         **kwargs
