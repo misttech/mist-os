@@ -112,7 +112,7 @@ differences about things to look out for in each language.
       You should see an output like:
 
       ```none {:.devsite-disable-click-to-copy}\
-      ▶ 0 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point::λ(…) • archivist.rs:547
+      ▶ 0 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::test_entry_point::λ(…) • archivist.rs:547
         1 core::future::future::«impl»::poll<…>(…) • future/future.rs:123
         2 fuchsia_async::test_support::«impl»::run_singlethreaded::λ::λ(…) • test_support.rs:27
         3 fuchsia_async::test_support::«impl»::run_singlethreaded::λ::λ(…) • test_support.rs:122
@@ -128,8 +128,8 @@ differences about things to look out for in each language.
         13 fuchsia_async::test_support::«impl»::run_singlethreaded(…) • test_support.rs:117
         14 fuchsia_async::test_support::run_singlethreaded_test<…>(…) • test_support.rs:227
         15 fuchsia::test_singlethreaded<…>(…) • fuchsia/src/lib.rs:195
-        16 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log() • archivist.rs:524
-        17 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::λ(…) • archivist.rs:525
+        16 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log() • archivist.rs:524
+        17 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::λ(…) • archivist.rs:525
         18 core::ops::function::FnOnce::call_once<…>(…) • fuchsia-third_party-rust/library/core/src/ops/function.rs:250
         19 core::ops::function::FnOnce::call_once<…>(…) • library/core/src/ops/function.rs:250 (inline)
         20 test::__rust_begin_short_backtrace<…>(…) • library/test/src/lib.rs:625
@@ -169,7 +169,7 @@ differences about things to look out for in each language.
 
       ```none {:.devsite-disable-click-to-copy}
       Thread 1 state="Core Dump" koid=14450503 name=""
-      ▶ 0 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point::λ(…) • archivist.rs:547
+      ▶ 0 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::test_entry_point::λ(…) • archivist.rs:547
       ```
 
   1. List the frames of each thread, but with more detailed information,
@@ -188,7 +188,7 @@ differences about things to look out for in each language.
 
       ```none {:.devsite-disable-click-to-copy}
       Thread 1 state="Core Dump" koid=14450503 name=""
-      ▶ 0 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point::λ(…) • archivist.rs:547
+      ▶ 0 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::test_entry_point::λ(…) • archivist.rs:547
             (*)0x5c626904e0 ➔ Context{waker: (*)0x5c626904c8, local_waker: (*)0x5c626904c8, ext: AssertUnwindSafe<core::task::wake::ExtData>(…), _marker: PhantomData<fn(&())->&()>, _marker2: PhantomData<*mut()>}
         1 core::future::future::«impl»::poll<…>(…) • future/future.rs:123
             self = Pin<&mut core::pin::Pin<alloc…>{__pointer: (*)0xa2987a4580}
@@ -228,8 +228,8 @@ differences about things to look out for in each language.
             test = <Unavailable>
         15 fuchsia::test_singlethreaded<…>(…) • fuchsia/src/lib.rs:195
             f = <Register rdi not available.>
-        16 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log() • archivist.rs:524
-        17 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::λ(…) • archivist.rs:525
+        16 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log() • archivist.rs:524
+        17 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::λ(…) • archivist.rs:525
             (*)0x5c62690bde ➔ λ
         18 core::ops::function::FnOnce::call_once<…>(…) • fuchsia-third_party-rust/library/core/src/ops/function.rs:250
             λ
@@ -241,7 +241,7 @@ differences about things to look out for in each language.
             f = <Register rsi not available.>
         21 test::run_test_in_spawned_subprocess(…) • library/test/src/lib.rs:753
             desc = <Register rdi not available.>
-            runnable_test = Static(&core::ops::function::FnOnce::call_once<archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::{closure_env#0}, ()>)
+            runnable_test = Static(&core::ops::function::FnOnce::call_once<archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::{closure_env#0}, ()>)
         22 test::test_main_static_abort(…) • library/test/src/lib.rs:199
             tests = <Unavailable>
         23 archivist_lib_lib_test::main() • archivist/src/lib.rs:1
@@ -316,7 +316,7 @@ differences about things to look out for in each language.
       You should see an output like:
 
       ```none {:.devsite-disable-click-to-copy}
-      ▶ 0 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point::λ(…) • archivist.rs:547
+      ▶ 0 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::test_entry_point::λ(…) • archivist.rs:547
         1 core::future::future::«impl»::poll<…>(…) • future/future.rs:123
         2 fuchsia_async::test_support::«impl»::run_singlethreaded::λ::λ(…) • test_support.rs:27
         3 fuchsia_async::test_support::«impl»::run_singlethreaded::λ::λ(…) • test_support.rs:122
@@ -332,8 +332,8 @@ differences about things to look out for in each language.
         13 fuchsia_async::test_support::«impl»::run_singlethreaded(…) • test_support.rs:117
         14 fuchsia_async::test_support::run_singlethreaded_test<…>(…) • test_support.rs:227
         15 fuchsia::test_singlethreaded<…>(…) • fuchsia/src/lib.rs:195
-        16 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log() • archivist.rs:524
-        17 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::λ(…) • archivist.rs:525
+        16 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log() • archivist.rs:524
+        17 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::λ(…) • archivist.rs:525
         18 core::ops::function::FnOnce::call_once<…>(…) • fuchsia-third_party-rust/library/core/src/ops/function.rs:250
         19 core::ops::function::FnOnce::call_once<…>(…) • library/core/src/ops/function.rs:250 (inline)
         20 test::__rust_begin_short_backtrace<…>(…) • library/test/src/lib.rs:625
@@ -367,7 +367,7 @@ differences about things to look out for in each language.
       You should see an output like:
 
       ```none {:.devsite-disable-click-to-copy}
-      archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point::λ(…) • archivist.rs:547
+      archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::test_entry_point::λ(…) • archivist.rs:547
       ```
 
   1. To see additional lines of code from the current frame, use `list`:

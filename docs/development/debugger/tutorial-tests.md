@@ -107,14 +107,14 @@ the `fx test` command with `zxdb`.
   Command: fx ffx test run --max-severity-logs WARN --break-on-failure fuchsia-pkg://fuchsia.com/archivist-tests?hash=9a531e48fe82d86edef22f86f7e9b819d18a7d678f0823912d9224dd91f8926f#meta/archivist-unittests.cm
   Running test 'fuchsia-pkg://fuchsia.com/archivist-tests?hash=9a531e48fe82d86edef22f86f7e9b819d18a7d678f0823912d9224dd91f8926f#meta/archivist-unittests.cm'
 
-  [RUNNING] archivist::tests::can_log_and_retrive_log
-  [101430.272555][5631048][5631050][<root>][can_log_and_retrive_log] WARN: Failed to create event source for log sink requests err=Error connecting to protocol path: /events/log_sink_requested_event_stream
+  [RUNNING] archivist::tests::can_log_and_retrieve_log
+  [101430.272555][5631048][5631050][<root>][can_log_and_retrieve_log] WARN: Failed to create event source for log sink requests err=Error connecting to protocol path: /events/log_sink_requested_event_stream
 
   Caused by:
       NOT_FOUND
-  [101430.277339][5631048][5631050][<root>][can_log_and_retrive_log] WARN: Failed to create event source for InspectSink requests err=Error connecting to protocol path: /events/inspect_sink_requested_event_stream
-  [101430.336160][5631048][5631050][<root>][can_log_and_retrive_log] INFO: archivist: Entering core loop.
-  [101430.395986][5631048][5631050][<root>][can_log_and_retrive_log] ERROR: [src/lib/diagnostics/log/rust/src/lib.rs(62)] PANIC info=panicked at ../../src/diagnostics/archivist/src/archivist.rs:544:9:
+  [101430.277339][5631048][5631050][<root>][can_log_and_retrieve_log] WARN: Failed to create event source for InspectSink requests err=Error connecting to protocol path: /events/inspect_sink_requested_event_stream
+  [101430.336160][5631048][5631050][<root>][can_log_and_retrieve_log] INFO: archivist: Entering core loop.
+  [101430.395986][5631048][5631050][<root>][can_log_and_retrieve_log] ERROR: [src/lib/diagnostics/log/rust/src/lib.rs(62)] PANIC info=panicked at ../../src/diagnostics/archivist/src/archivist.rs:544:9:
   assertion `left == right` failed
     left: ["my msg1", "my msg2"]
    right: ["my msg1", "my msg3"]
@@ -126,7 +126,7 @@ the `fx test` command with `zxdb`.
   ▶ 538         assert_eq!(expected, actual);
     539
     540         // can log after killing log sink proxy
-  🛑 process 9 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point::λ(core::task::wake::Context*) • archivist.rs:538
+  🛑 process 9 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::test_entry_point::λ(core::task::wake::Context*) • archivist.rs:538
   [zxdb]
   ```
 
@@ -205,7 +205,7 @@ the `fx test` command with `zxdb`.
     14 core::panicking::panic_fmt(…) • library/core/src/panicking.rs:72
     15 core::panicking::assert_failed_inner(…) • library/core/src/panicking.rs:402
     16 core::panicking::assert_failed<…>(…) • /b/s/w/ir/x/w/fuchsia-third_party-rust/library/core/src/panicking.rs:357
-  ▶ 17 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point::λ(…) • archivist.rs:544
+  ▶ 17 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::test_entry_point::λ(…) • archivist.rs:544
     18 core::future::future::«impl»::poll<…>(…) • future/future.rs:123
     19 fuchsia_async::test_support::«impl»::run_singlethreaded::λ::λ(…) • test_support.rs:26
     20 fuchsia_async::test_support::«impl»::run_singlethreaded::λ::λ(…) • test_support.rs:121
@@ -221,8 +221,8 @@ the `fx test` command with `zxdb`.
     30 fuchsia_async::test_support::«impl»::run_singlethreaded(…) • test_support.rs:116
     31 fuchsia_async::test_support::run_singlethreaded_test<…>(…) • test_support.rs:226
     32 fuchsia::test_singlethreaded<…>(…) • fuchsia/src/lib.rs:188
-    33 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log() • archivist.rs:519
-    34 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::λ(…) • archivist.rs:520
+    33 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log() • archivist.rs:519
+    34 archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::λ(…) • archivist.rs:520
     35 core::ops::function::FnOnce::call_once<…>(…) • /b/s/w/ir/x/w/fuchsia-third_party-rust/library/core/src/ops/function.rs:250
     36 core::ops::function::FnOnce::call_once<…>(…) • library/core/src/ops/function.rs:250 (inline)
     37 test::__rust_begin_short_backtrace<…>(…) • library/test/src/lib.rs:621
@@ -240,7 +240,7 @@ the `fx test` command with `zxdb`.
   Task(id = 0)
   └─ fuchsia_async::test_support::«impl»::run_singlethreaded::λ • test_support.rs:122
      └─ fuchsia_async::test_support::«impl»::run_singlethreaded::λ • test_support.rs:27
-        └─ archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point • archivist.rs:546
+        └─ archivist_lib_lib_test::archivist::tests::can_log_and_retrieve_log::test_entry_point • archivist.rs:546
            └─ futures_util::stream::stream::next::Next
   Task(id = 1)
   └─ diagnostics_log::fuchsia::filter::«impl»::listen_to_interest_changes • fuchsia/filter.rs:77
@@ -363,12 +363,12 @@ the `fx test` command with `zxdb`.
 
   <...fx test output continues...>
 
-  Failed tests: archivist::tests::can_log_and_retrive_log
+  Failed tests: archivist::tests::can_log_and_retrieve_log
   122 out of 123 tests passed...
 
   Test fuchsia-pkg://fuchsia.com/archivist-tests?hash=8bcb30a2bfb923a4b42d1f0ea590af613ab0b1aa1ac67ada56ae4d325f3330a0#meta/archivist-unittests.cm produced unexpected high-severity logs:
   ----------------xxxxx----------------
-  [105255.347070][5853309][5853311][<root>][can_log_and_retrive_log] ERROR: [src/lib/diagnostics/log/rust/src/lib.rs(62)] PANIC info=panicked at ../../src/diagnostics/archivist/src/archivist.rs:544:9:
+  [105255.347070][5853309][5853311][<root>][can_log_and_retrieve_log] ERROR: [src/lib/diagnostics/log/rust/src/lib.rs(62)] PANIC info=panicked at ../../src/diagnostics/archivist/src/archivist.rs:544:9:
   assertion `left == right` failed
     left: ["my msg1", "my msg2"]
    right: ["my msg1", "my msg3"]
@@ -417,7 +417,7 @@ the `fx test` command with `zxdb`.
   [RUNNING]	accessor::tests::socket_writer_does_not_handle_cbor
   [RUNNING]	accessor::tests::socket_writer_handles_closed_socket
   [RUNNING]	accessor::tests::socket_writer_handles_text
-  [RUNNING]	archivist::tests::can_log_and_retrive_log
+  [RUNNING]	archivist::tests::can_log_and_retrieve_log
   [PASSED]	accessor::tests::socket_writer_handles_text
   [RUNNING]	archivist::tests::log_from_multiple_sock
   [PASSED]	accessor::tests::socket_writer_does_not_handle_cbor
