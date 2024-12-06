@@ -764,14 +764,12 @@ pub(super) fn check_file_ioctl_access(
 
 /// If `fs_node` is in a filesystem without xattr support, returns the xattr name for the security
 /// label (i.e. "security.selinux"). Otherwise returns None.
-pub(super) fn fs_node_listsecurity(
-    security_server: &SecurityServer,
-    fs_node: &FsNode,
-) -> Option<FsString> {
-    if security_server.filesystem_supports_xattr(fs_node.fs().name().into()) {
-        return None;
+pub(super) fn fs_node_listsecurity(fs_node: &FsNode) -> Option<FsString> {
+    if fs_node.fs().security_state.state.supports_xattr() {
+        None
+    } else {
+        Some(XATTR_NAME_SELINUX.to_bytes().into())
     }
-    return Some(XATTR_NAME_SELINUX.to_bytes().into());
 }
 
 /// Returns the Security Context corresponding to the SID with which `FsNode`
@@ -1232,6 +1230,17 @@ impl FileSystemState {
             mount_options,
             pending_entries: HashSet::new(),
         }))
+    }
+
+    /// Returns true if this `FileSystemState` is labeled with `fs_use_xattr` and thus supports
+    /// xattr.
+    fn supports_xattr(&self) -> bool {
+        if let FileSystemLabelState::Labeled { label } = &mut *self.0.lock() {
+            if let FileSystemLabelingScheme::FsUse { fs_use_type, .. } = label.scheme {
+                return fs_use_type == FsUseType::Xattr;
+            }
+        }
+        return false;
     }
 }
 
