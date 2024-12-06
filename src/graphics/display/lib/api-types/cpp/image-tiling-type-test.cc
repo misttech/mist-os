@@ -58,6 +58,13 @@ TEST(ImageTilingTypeTest, ToImageTilingTypeWithFidlValue) {
             ImageTilingType(fuchsia_hardware_display_types::wire::kImageTilingTypeCapture));
 }
 
+TEST(ImageTilingTypeTest, ValueForLogging) {
+  EXPECT_EQ(static_cast<uint32_t>(fuchsia_hardware_display_types::wire::kImageTilingTypeLinear),
+            ImageTilingType::kLinear.ValueForLogging());
+  EXPECT_EQ(static_cast<uint32_t>(fuchsia_hardware_display_types::wire::kImageTilingTypeCapture),
+            ImageTilingType::kCapture.ValueForLogging());
+}
+
 TEST(ImageTilingTypeTest, BanjoConversionRoundtrip) {
   EXPECT_EQ(ImageTilingType::kLinear, ImageTilingType(ImageTilingType::kLinear.ToBanjo()));
   EXPECT_EQ(ImageTilingType::kCapture, ImageTilingType(ImageTilingType::kCapture.ToBanjo()));

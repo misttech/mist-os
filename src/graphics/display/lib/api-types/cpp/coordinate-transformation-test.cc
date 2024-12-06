@@ -58,6 +58,12 @@ TEST(CoordinateTransformationTest, ToCoordinateTransformationWithFidlValue) {
   EXPECT_EQ(CoordinateTransformation::kReflectY, transformation);
 }
 
+TEST(CoordinateTransformationTest, ValueForLogging) {
+  EXPECT_EQ(static_cast<uint32_t>(
+                fuchsia_hardware_display_types::wire::CoordinateTransformation::kReflectY),
+            CoordinateTransformation::kReflectY.ValueForLogging());
+}
+
 TEST(CoordinateTransformationTest, BanjoConversionRoundtrip) {
   EXPECT_EQ(CoordinateTransformation::kReflectY,
             CoordinateTransformation(CoordinateTransformation::kReflectY.ToBanjo()));

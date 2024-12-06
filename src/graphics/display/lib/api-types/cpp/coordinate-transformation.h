@@ -41,10 +41,11 @@ class CoordinateTransformation {
   constexpr fuchsia_hardware_display_types::wire::CoordinateTransformation ToFidl() const;
   constexpr coordinate_transformation_t ToBanjo() const;
 
-  // Raw numerical value.
+  // Raw numerical value of the equivalent FIDL value.
   //
   // This is intended to be used for developer-facing output, such as logging
-  // and Inspect. The values are not guaranteed to have any stable semantics.
+  // and Inspect. The values have the same stability guarantees as the
+  // equivalent FIDL type.
   constexpr uint32_t ValueForLogging() const;
 
   static const CoordinateTransformation kIdentity;
