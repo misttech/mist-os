@@ -188,7 +188,7 @@ fuchsia_product_bundle(
     virtual_devices = [
         "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
         "//build/bazel/assembly/virtual_devices:x64-emu-min",
-        "//build/bazel/assembly/virtual_devices:x64-emu-large",
+        "//build/bazel/assembly/virtual_devices:x64-emu-extra-large",
     ],
 )
 
@@ -219,7 +219,7 @@ fuchsia_product_bundle(
     virtual_devices = [
         "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
         "//build/bazel/assembly/virtual_devices:x64-emu-min",
-        "//build/bazel/assembly/virtual_devices:x64-emu-large",
+        "//build/bazel/assembly/virtual_devices:x64-emu-extra-large",
     ],
 )
 
@@ -250,7 +250,7 @@ fuchsia_product_bundle(
     virtual_devices = [
         "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
         "//build/bazel/assembly/virtual_devices:x64-emu-min",
-        "//build/bazel/assembly/virtual_devices:x64-emu-large",
+        "//build/bazel/assembly/virtual_devices:x64-emu-extra-large",
     ],
 )
 
@@ -281,7 +281,7 @@ fuchsia_product_bundle(
     virtual_devices = [
         "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
         "//build/bazel/assembly/virtual_devices:x64-emu-min",
-        "//build/bazel/assembly/virtual_devices:x64-emu-large",
+        "//build/bazel/assembly/virtual_devices:x64-emu-extra-large",
     ],
 )
 
@@ -312,7 +312,7 @@ fuchsia_product_bundle(
     virtual_devices = [
         "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
         "//build/bazel/assembly/virtual_devices:arm64-emu-min",
-        "//build/bazel/assembly/virtual_devices:arm64-emu-large",
+        "//build/bazel/assembly/virtual_devices:arm64-emu-extra-large",
     ],
 )
 
@@ -343,7 +343,7 @@ fuchsia_product_bundle(
     virtual_devices = [
         "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
         "//build/bazel/assembly/virtual_devices:arm64-emu-min",
-        "//build/bazel/assembly/virtual_devices:arm64-emu-large",
+        "//build/bazel/assembly/virtual_devices:arm64-emu-extra-large",
     ],
 )
 
@@ -374,7 +374,7 @@ fuchsia_product_bundle(
     virtual_devices = [
         "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
         "//build/bazel/assembly/virtual_devices:arm64-emu-min",
-        "//build/bazel/assembly/virtual_devices:arm64-emu-large",
+        "//build/bazel/assembly/virtual_devices:arm64-emu-extra-large",
     ],
 )
 
@@ -405,7 +405,7 @@ fuchsia_product_bundle(
     virtual_devices = [
         "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
         "//build/bazel/assembly/virtual_devices:arm64-emu-min",
-        "//build/bazel/assembly/virtual_devices:arm64-emu-large",
+        "//build/bazel/assembly/virtual_devices:arm64-emu-extra-large",
     ],
 )
 
@@ -436,7 +436,7 @@ fuchsia_product_bundle(
     virtual_devices = [
         "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
         "//build/bazel/assembly/virtual_devices:arm64-emu-min",
-        "//build/bazel/assembly/virtual_devices:arm64-emu-large",
+        "//build/bazel/assembly/virtual_devices:arm64-emu-extra-large",
     ],
 )
 
@@ -467,7 +467,7 @@ fuchsia_product_bundle(
     virtual_devices = [
         "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
         "//build/bazel/assembly/virtual_devices:arm64-emu-min",
-        "//build/bazel/assembly/virtual_devices:arm64-emu-large",
+        "//build/bazel/assembly/virtual_devices:arm64-emu-extra-large",
     ],
 )
 
@@ -516,7 +516,7 @@ fuchsia_product_bundle(
     virtual_devices = [
         "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
         "//build/bazel/assembly/virtual_devices:arm64-emu-min",
-        "//build/bazel/assembly/virtual_devices:arm64-emu-large",
+        "//build/bazel/assembly/virtual_devices:arm64-emu-extra-large",
     ],
 )
 
@@ -572,6 +572,6 @@ fuchsia_product_bundle(
     virtual_devices = [
         "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
         "//build/bazel/assembly/virtual_devices:arm64-emu-min",
-        "//build/bazel/assembly/virtual_devices:arm64-emu-large",
+        "//build/bazel/assembly/virtual_devices:arm64-emu-extra-large",
     ],
 )

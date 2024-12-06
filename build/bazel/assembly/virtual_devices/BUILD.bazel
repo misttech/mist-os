@@ -34,6 +34,18 @@ package(default_visibility = ["//visibility:public"])
             window_height_px = 800,
             window_width_px = 1280,
         ),
+        fuchsia_virtual_device(
+            name = "{}-emu-extra-large".format(cpu),
+            arch = arch,
+            cpu_count = 8,
+            description = "Large configuration for running this product",
+            device_name = "{}-emu-large".format(cpu),
+            memory_quantity = 28,
+            memory_unit = "gigabytes",
+            storage_quantity = 10,
+            window_height_px = 800,
+            window_width_px = 1280,
+        ),
     )
     for (cpu, arch) in [
         (
