@@ -902,7 +902,7 @@ impl PagedObjectHandle {
         let _flush_guard = fs.lock_manager().write_lock(keys).await;
         // Allocate extends the file if the range is beyond the current file size, so update the
         // stream size in that case as well.
-        if self.handle.get_size() < range.end {
+        if self.vmo.get_stream_size()? < range.end {
             let vmo = self.vmo.temp_clone();
             // Similar to truncate above, this unblock is to break an executor ordering deadlock
             // situation. Vmo::set_stream_size() may trigger a blocking call back into Fxfs on the
@@ -3029,6 +3029,57 @@ mod tests {
             .map_err(zx::Status::from_raw)
             .unwrap();
         file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_allocate_existing_data_no_sync() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let contents = vec![1; 10000];
+        fuchsia_fs::file::write(&file, &contents).await.unwrap();
+        {
+            assert_eq!(
+                file.seek(fio::SeekOrigin::Start, 0)
+                    .await
+                    .unwrap()
+                    .map_err(zx::Status::from_raw)
+                    .unwrap(),
+                0
+            );
+            let data = fuchsia_fs::file::read(&file).await.unwrap();
+            assert_eq!(contents.len(), data.len());
+            assert_eq!(&contents, &data);
+        }
+        file.allocate(1000, 5000, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        {
+            assert_eq!(
+                file.seek(fio::SeekOrigin::Start, 0)
+                    .await
+                    .unwrap()
+                    .map_err(zx::Status::from_raw)
+                    .unwrap(),
+                0
+            );
+            let data = fuchsia_fs::file::read(&file).await.unwrap();
+            assert_eq!(contents.len(), data.len());
+            assert_eq!(&contents, &data);
+        }
 
         fixture.close().await;
     }
