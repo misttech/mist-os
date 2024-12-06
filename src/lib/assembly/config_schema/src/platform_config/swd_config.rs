@@ -64,7 +64,7 @@ pub enum VerificationFailureAction {
 #[derive(
     Default, Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
 )]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[serde(default, deny_unknown_fields, rename_all = "snake_case")]
 pub struct OtaConfigs {
     /// Deserializes to the ChannelConfig struct defined by SWD in
     /// //src/sys/pkg/lib/channel-config
@@ -76,10 +76,8 @@ pub struct OtaConfigs {
     /// used
     pub server_url: Option<ServerUrl>,
 
-    #[serde(default)]
     pub policy_config: PolicyConfig,
 
-    #[serde(default)]
     pub include_empty_eager_config: bool,
 }
 

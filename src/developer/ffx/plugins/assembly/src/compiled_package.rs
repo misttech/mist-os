@@ -67,15 +67,13 @@ impl CompiledPackageBuilder {
             );
         }
 
-        if let Some(bootfs_package) = entry.bootfs_package {
-            match self.bootfs_package {
-                Some(existing_value) => {
-                    if bootfs_package != existing_value {
-                        bail!("CompiledPackageDefinitions are inconsistent about if '{name}' is a bootfs package.");
-                    }
+        match self.bootfs_package {
+            Some(existing_value) => {
+                if entry.bootfs_package != existing_value {
+                    bail!("CompiledPackageDefinitions are inconsistent about if '{name}' is a bootfs package.");
                 }
-                None => self.bootfs_package = Some(bootfs_package),
             }
+            None => self.bootfs_package = Some(entry.bootfs_package),
         }
 
         // Add the static package contents
@@ -278,7 +276,7 @@ mod tests {
                     destination: "file1".into()
                 }],
                 includes_dir: None,
-                bootfs_package: Default::default(),
+                bootfs_package: Some(false),
             }
         );
     }

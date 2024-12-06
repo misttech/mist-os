@@ -10,10 +10,9 @@ use serde::{Deserialize, Serialize};
 #[derive(
     Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
 )]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct RecoveryConfig {
     /// Whether to include the factory-reset-trigger package.
-    #[serde(default)]
     pub factory_reset_trigger: bool,
 
     /// Which system_recovery implementation to include
@@ -22,19 +21,16 @@ pub struct RecoveryConfig {
     /// The path to the logo for the recovery process to use.
     ///
     /// This must be a rive file (.riv).
-    #[serde(default)]
     #[file_relative_paths]
     pub logo: Option<FileRelativePathBuf>,
 
     /// The path to the instructions to display.
     ///
     /// This file must be raw text for displaying.
-    #[serde(default)]
     #[file_relative_paths]
     pub instructions: Option<FileRelativePathBuf>,
 
     /// Perform a managed-mode check before doing an FDR.
-    #[serde(default)]
     pub check_for_managed_mode: bool,
 }
 

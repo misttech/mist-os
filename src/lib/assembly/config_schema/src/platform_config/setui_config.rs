@@ -23,26 +23,21 @@ pub enum ICUType {
 
 /// Platform configuration options for the input area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct SetUiConfig {
     /// If set, the setui config is added to the product configuration.
-    #[serde(default)]
     pub use_icu: ICUType,
 
     /// If set, uses the setui configured with camera settings.  Else uses
     /// setui without camera.
-    #[serde(default)]
     pub with_camera: bool,
 
-    #[serde(default)]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub display: Option<Utf8PathBuf>,
 
-    #[serde(default)]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub interface: Option<Utf8PathBuf>,
 
-    #[serde(default)]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub agent: Option<Utf8PathBuf>,
 }

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the input area.
 #[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields, default)]
+#[serde(default, deny_unknown_fields)]
 pub struct TimekeeperConfig {
     /// The time to wait until retrying to sample the pull time source,
     /// expressed in seconds.

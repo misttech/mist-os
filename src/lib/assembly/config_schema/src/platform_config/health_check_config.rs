@@ -9,9 +9,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// `verify_components` are capable of blocking an update if they do not report a healthy status.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct HealthCheckConfig {
-    #[serde(default)]
     pub verify_components: Vec<VerifyComponent>,
 }
 

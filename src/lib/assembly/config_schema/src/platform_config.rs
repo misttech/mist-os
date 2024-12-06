@@ -219,11 +219,11 @@ pub struct PlatformConfig {
 /// The standard (default) level is `Minimal`. It is the level that should be
 /// used by products' main system.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum FeatureSupportLevel {
     /// THIS IS FOR TESTING AND MIGRATIONS ONLY!
     ///
     /// It creates an assembly with no platform.
-    #[serde(rename = "empty")]
     Empty,
 
     /// This is a small build of fuchsia which is not meant to support
@@ -231,7 +231,6 @@ pub enum FeatureSupportLevel {
     /// memory constrained environments where fuchsia does not need to driver a
     /// large amount of hardware. It includes a minimal subset of bootstrap and
     /// doesn't bring in any of core.
-    #[serde(rename = "embeddable")]
     Embeddable,
 
     /// Bootable, but serial-only.  This is only the `/bootstrap` realm.  No
@@ -239,13 +238,11 @@ pub enum FeatureSupportLevel {
     /// systems created by assembly, and is primarily used for board-level bringup.
     ///
     /// https://fuchsia.dev/fuchsia-src/development/build/build_system/bringup
-    #[serde(rename = "bootstrap")]
     Bootstrap,
 
     /// This is the smallest configuration that includes the `/core` realm, and
     /// is best suited for utility-type systems such as recovery.  The "main"
     /// system for a product should not use this, and instead use the default.
-    #[serde(rename = "utility")]
     Utility,
 
     /// This is the smallest "full Fuchsia" configuration.  This has a netstack,
@@ -253,7 +250,6 @@ pub enum FeatureSupportLevel {
     /// ship a production-level product.
     ///
     /// This is the default level unless otherwise specified.
-    #[serde(rename = "standard")]
     #[default]
     Standard,
 }
@@ -265,14 +261,10 @@ pub enum FeatureSupportLevel {
 /// change the platform packages placed into the assembled product image.
 ///
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum BuildType {
-    #[serde(rename = "eng")]
     Eng,
-
-    #[serde(rename = "userdebug")]
     UserDebug,
-
-    #[serde(rename = "user")]
     User,
 }
 

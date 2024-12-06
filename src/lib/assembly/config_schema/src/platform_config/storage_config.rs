@@ -11,32 +11,25 @@ use serde::{Deserialize, Serialize};
 #[derive(
     Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
 )]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct StorageConfig {
     /// DEPRECATED.  To be removed.
-    #[serde(default)]
     pub live_usb_enabled: bool,
 
-    #[serde(default)]
     #[file_relative_paths]
     pub component_id_index: ComponentIdIndexConfig,
 
-    #[serde(default)]
     pub factory_data: FactoryDataConfig,
 
-    #[serde(default)]
     pub filesystems: ProductFilesystemConfig,
 
-    // Prevents fshost from binding to detected block devices.
-    /// If unset, an internally defined system default is used.
-    pub disable_automount: Option<bool>,
+    /// Prevents fshost from binding to detected block devices.
+    pub disable_automount: bool,
 
     /// Enables storage-host.  See RFC (https://fxrev.dev/1077832) for details.
-    #[serde(default)]
     pub storage_host_enabled: bool,
 
     /// Enable the automatic garbage collection of mutable storage.
-    #[serde(default)]
     pub mutable_storage_garbage_collection: bool,
 }
 
@@ -49,9 +42,9 @@ pub struct StorageConfig {
 #[derive(
     Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
 )]
+#[serde(default)]
 pub struct ComponentIdIndexConfig {
     /// An optional index to use for product-provided components.
-    #[serde(default)]
     #[file_relative_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub product_index: Option<FileRelativePathBuf>,
@@ -59,7 +52,7 @@ pub struct ComponentIdIndexConfig {
 
 /// Platform configuration options for the factory data store.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
 pub struct FactoryDataConfig {
-    #[serde(default)]
     pub enabled: bool,
 }

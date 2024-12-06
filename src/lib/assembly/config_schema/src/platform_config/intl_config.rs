@@ -42,16 +42,14 @@ impl std::fmt::Display for Type {
 
 /// Platform configuration options for the input area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct IntlConfig {
     /// The intl configuration type in use.  If unspecified, the Type::Default
     /// will be used on Standard systems, and Type::None on Utility and Bootstrp
     /// systems.
-    #[serde(default)]
     pub config_type: Option<Type>,
 
     /// Should assembly include the zoneinfo files, in addition to the
     /// "regular" ICU time zone data.
-    #[serde(default)]
     pub include_zoneinfo_files: bool,
 }

@@ -202,10 +202,8 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             Config::new(ConfigValueType::Bool, fxfs_blob.into()),
         )?;
 
-        let disable_automount = match storage_config.disable_automount {
-            Some(disable_automount) => Config::new(ConfigValueType::Bool, disable_automount.into()),
-            None => Config::new_void(),
-        };
+        let disable_automount =
+            Config::new(ConfigValueType::Bool, storage_config.disable_automount.into());
         let algorithm = match &storage_config.filesystems.blobfs_write_compression_algorithm {
             Some(algorithm) => Config::new(
                 ConfigValueType::String { max_size: 20 },

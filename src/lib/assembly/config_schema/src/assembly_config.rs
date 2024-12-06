@@ -28,6 +28,7 @@ pub struct AssemblyConfig {
     #[file_relative_paths]
     pub platform: PlatformConfig,
     #[file_relative_paths]
+    #[serde(default)]
     pub product: ProductConfig,
     #[serde(default)]
     pub file_relative_paths: bool,
@@ -55,74 +56,60 @@ pub type ShellCommands = BTreeMap<PackageName, BTreeSet<PackageInternalPathBuf>>
 
 /// A bundle of inputs to be used in the assembly of a product.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct AssemblyInputBundle {
     /// The parameters that specify which kernel to put into the ZBI.
     pub kernel: Option<PartialKernelConfig>,
 
     /// The qemu kernel to use when starting the emulator.
-    #[serde(default)]
     pub qemu_kernel: Option<Utf8PathBuf>,
 
     /// The list of additional boot args to add.
-    #[serde(default)]
     pub boot_args: Vec<String>,
 
     /// The packages that are in the bootfs package list, which are
     /// added to the BOOTFS in the ZBI.
-    #[serde(default)]
     pub bootfs_packages: Vec<Utf8PathBuf>,
 
     /// The set of files to be placed in BOOTFS in the ZBI.
-    #[serde(default)]
     pub bootfs_files: Vec<FileEntry<String>>,
 
     /// Package entries that internally specify their package set, instead of being grouped
     /// separately.
-    #[serde(default)]
     pub packages: Vec<PackageDetails>,
 
     /// Entries for the `config_data` package.
-    #[serde(default)]
     pub config_data: BTreeMap<String, Vec<FileEntry<String>>>,
 
     /// The blobs index of the AIB.  This currently isn't used by product
     /// assembly, as the package manifests contain the same information.
-    #[serde(default)]
     pub blobs: Vec<Utf8PathBuf>,
 
     /// Configuration of base driver packages. Driver packages should not be
     /// listed in the base package list and will be included automatically.
-    #[serde(default)]
     pub base_drivers: Vec<DriverDetails>,
 
     /// Configuration of boot driver packages. Driver packages should not be
     /// listed in the bootfs package list and will be included automatically.
-    #[serde(default)]
     pub boot_drivers: Vec<DriverDetails>,
 
     /// Map of the names of packages that contain shell commands to the list of
     /// commands within each.
-    #[serde(default)]
     pub bootfs_shell_commands: ShellCommands,
 
     /// Map of the names of packages that contain shell commands to the list of
     /// commands within each.
-    #[serde(default)]
     pub shell_commands: ShellCommands,
 
     /// Packages to create dynamically as part of the Assembly process.
     #[file_relative_paths]
-    #[serde(default)]
     pub packages_to_compile: Vec<CompiledPackageDefinition>,
 
     /// A package that includes files to include in bootfs.
-    #[serde(default)]
     pub bootfs_files_package: Option<Utf8PathBuf>,
 
     /// A list of memory buckets to pass to memory monitor.
     #[file_relative_paths]
-    #[serde(default)]
     pub memory_buckets: Vec<FileRelativePathBuf>,
 }
 
@@ -151,7 +138,7 @@ pub struct CompiledPackageDefinition {
     /// Whether the contents of this package should go into bootfs.
     /// Gated by allowlist -- please use this as a base package if possible.
     #[serde(default)]
-    pub bootfs_package: Option<bool>,
+    pub bootfs_package: bool,
 }
 
 /// Contents of a compiled component. The contents provided by all

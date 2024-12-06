@@ -15,21 +15,15 @@ pub use diagnostics_log_types::Severity;
 
 /// Diagnostics configuration options for the diagnostics area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct DiagnosticsConfig {
-    #[serde(default)]
     pub archivist: Option<ArchivistConfig>,
     /// The set of pipeline config files to supply to archivist.
-    #[serde(default)]
     pub archivist_pipelines: Vec<ArchivistPipeline>,
-    #[serde(default)]
     pub additional_serial_log_components: Vec<String>,
-    #[serde(default)]
     pub sampler: SamplerConfig,
-    #[serde(default)]
     pub memory_monitor: MemoryMonitorConfig,
     /// The set of log levels components will receive as their initial interest.
-    #[serde(default)]
     pub component_log_initial_interests: Vec<ComponentInitialInterest>,
 }
 
@@ -113,44 +107,36 @@ impl From<PipelineType> for String {
 
 /// Diagnostics configuration options for the sampler configuration area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct SamplerConfig {
     /// The metrics configs to pass to sampler.
-    #[serde(default)]
     #[schemars(schema_with = "crate::vec_path_schema")]
     pub metrics_configs: Vec<Utf8PathBuf>,
     /// The fire configs to pass to sampler.
-    #[serde(default)]
     #[schemars(schema_with = "crate::vec_path_schema")]
     pub fire_configs: Vec<Utf8PathBuf>,
 }
 
 /// Diagnostics configuration options for the memory monitor configuration area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct MemoryMonitorConfig {
     /// The memory buckets config file to provide to memory monitor.
-    #[serde(default)]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub buckets: Option<Utf8PathBuf>,
     /// Control whether a pressure change should trigger a capture.
-    #[serde(default)]
-    pub capture_on_pressure_change: Option<bool>,
+    pub capture_on_pressure_change: bool,
     /// Expected delay between scheduled captures upon imminent OOM, in
     /// seconds.
-    #[serde(default)]
     pub imminent_oom_capture_delay_s: Option<u32>,
     /// Expected delay between scheduled captures when the memory
     /// pressure is critical, in seconds.
-    #[serde(default)]
     pub critical_capture_delay_s: Option<u32>,
     /// Expected delay between scheduled captures when the memory
     /// pressure is abnormal, in seconds.
-    #[serde(default)]
     pub warning_capture_delay_s: Option<u32>,
     /// Expected delay between scheduled captures when the memory
     /// pressure is normal, in seconds.
-    #[serde(default)]
     pub normal_capture_delay_s: Option<u32>,
 }
 

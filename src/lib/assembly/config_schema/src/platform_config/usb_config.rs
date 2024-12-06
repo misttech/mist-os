@@ -7,18 +7,16 @@ use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for usb.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct UsbConfig {
-    #[serde(default)]
     /// Set this if the platform has a USB peripheral device that needs to be configured.
     pub peripheral: UsbPeripheralConfig,
 }
 
 /// Configure how the USB peripheral subsystem should work.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct UsbPeripheralConfig {
-    #[serde(default)]
     /// Optional list of functions that will be published by the USB peripheral driver.
     /// See |UsbPeripheralFunction| for the list of supported functions.
     /// If this is `None`, |UsbPeripheralFunction::Cdc| shall be set as the default.

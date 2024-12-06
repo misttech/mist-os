@@ -9,67 +9,53 @@ use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the UI area.
 #[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct PlatformUiConfig {
     /// Whether UI should be enabled on the product.
-    #[serde(default)]
     pub enabled: bool,
 
     /// The sensor config to provide to the input pipeline.
-    #[serde(default)]
     #[schemars(schema_with = "crate::option_path_schema")]
     pub sensor_config: Option<Utf8PathBuf>,
 
     /// The minimum frame duration for frame scheduler.
-    #[serde(default)]
     pub frame_scheduler_min_predicted_frame_duration_in_us: u64,
 
     /// Scenic shifts focus from view to view as the user interacts with the UI.
     /// Set to false for Smart displays, as they use a different programmatic focus change scheme.
-    #[serde(default)]
     pub pointer_auto_focus: bool,
 
     /// Scenic attempts to delegate composition of client images to the display controller, with
     /// GPU/Vulkan composition as the fallback. If false, GPU/Vulkan composition is always used.
-    #[serde(default)]
     pub display_composition: bool,
 
     /// The relevant input device bindings from which to install appropriate
     /// input handlers. Default to an empty set.
-    #[serde(default)]
     pub supported_input_devices: Vec<InputDeviceType>,
 
     // The rotation of the display, counter-clockwise, in 90-degree increments.
-    #[serde(default)]
     pub display_rotation: u64,
 
     // TODO(132584): change to float when supported in structured config.
     // The density of the display, in pixels per mm.
-    #[serde(default)]
     pub display_pixel_density: String,
 
     // The expected viewing distance for the display.
-    #[serde(default)]
     pub viewing_distance: ViewingDistance,
 
     /// Whether to include brightness manager, and the relevant configs.
-    #[serde(default)]
     pub brightness_manager: Option<BrightnessManager>,
 
     /// Set with_synthetic_device_support true to include input-helper to ui.
-    #[serde(default)]
     pub with_synthetic_device_support: bool,
 
     /// The renderer Scenic should use.
-    #[serde(default)]
     pub renderer: RendererType,
 
     // The constraints on the display mode
-    #[serde(default)]
     pub display_mode: DisplayModeConfig,
 
     /// Set visual_debugging_level to enable visual debugging features.
-    #[serde(default)]
     pub visual_debugging_level: VisualDebuggingLevel,
 }
 
@@ -146,18 +132,15 @@ impl AsRef<str> for ViewingDistance {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct DisplayModeConfig {
     /// The constraints on the display mode horizontal resolution, in pixels.
-    #[serde(default)]
     pub horizontal_resolution_px_range: UnsignedIntegerRangeInclusive,
 
     /// The constraints on the display mode vertical resolution, in pixels.
-    #[serde(default)]
     pub vertical_resolution_px_range: UnsignedIntegerRangeInclusive,
 
     /// The constraints on the display mode refresh rate, in millihertz (10^-3 Hz).
-    #[serde(default)]
     pub refresh_rate_millihertz_range: UnsignedIntegerRangeInclusive,
 }
 

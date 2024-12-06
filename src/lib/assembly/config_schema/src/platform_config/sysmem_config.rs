@@ -25,19 +25,17 @@ pub enum MemorySize {
 #[derive(
     Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
 )]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct PlatformSysmemConfig {
     /// Overrides the board-driver-specified size for sysmem's contiguous memory
     /// pool. The default value is 5% if not set by board or platform config.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
     pub contiguous_memory_size: Option<MemorySize>,
 
     /// Overrides the board-driver-specified size for sysmem's default protected
     /// memory pool. The default value is 0 if not set by board or platform
     /// config.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
     pub protected_memory_size: Option<MemorySize>,
 
     /// If true, sysmem will treat a fraction of currently-unused pages as guard
@@ -49,9 +47,7 @@ pub struct PlatformSysmemConfig {
     /// timers by default. When true, on detection of an improperly written
     /// page, sysmem will attempt to log debug info re. allocations that
     /// previously used the page.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    pub contiguous_guard_pages_unused: Option<bool>,
+    pub contiguous_guard_pages_unused: bool,
 
     /// Optional ordered list of files, each of which contains a persistent fidl
     /// ['fuchsia.sysmem2.FormatCosts'].
@@ -70,7 +66,6 @@ pub struct PlatformSysmemConfig {
     /// platform_config::PlatformConfig.sysmem field are logically after entries
     /// in BoardProvidedConfig.sysmem_format_costs field.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
     #[file_relative_paths]
     #[schemars(schema_with = "crate::vec_path_schema")]
     pub format_costs: Vec<FileRelativePathBuf>,
@@ -82,19 +77,17 @@ pub struct PlatformSysmemConfig {
 /// PlatformSysmemConfig. See also BoardProvidedConfig.sysmem_format_costs which
 /// can also be specified for the board.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct BoardSysmemConfig {
     /// Overrides the board-driver-specified size for sysmem's contiguous memory
     /// pool. The default value is 5% if not set by board or platform config.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
     pub contiguous_memory_size: Option<MemorySize>,
 
     /// Overrides the board-driver-specified size for sysmem's default protected
     /// memory pool. The default value is 0 if not set by board or platform
     /// config.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
     pub protected_memory_size: Option<MemorySize>,
 
     /// If true, sysmem will treat a fraction of currently-unused pages as guard
@@ -106,7 +99,5 @@ pub struct BoardSysmemConfig {
     /// timers by default. When true, on detection of an improperly written
     /// page, sysmem will attempt to log debug info re. allocations that
     /// previously used the page.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    pub contiguous_guard_pages_unused: Option<bool>,
+    pub contiguous_guard_pages_unused: bool,
 }
