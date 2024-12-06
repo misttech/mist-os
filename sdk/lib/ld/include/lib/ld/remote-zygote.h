@@ -82,11 +82,11 @@ namespace ld {
 // A zygote of either type can be spliced into a zygote that uses zx::vmo.
 enum class RemoteZygoteVmo : bool { kVmo = false, kDecodedPtr = true };
 
-// This is the type returned by ld::RuntimeDynamicLinker::Insert() on success,
-// usually used via the ld::RuntimeDynamicLinker::Domain alias.  Each time an
-// ld::RuntimeDynamicLinker object is inserted into a zygote, Insert() returns
-// this object to describe that dynamic linking domain.  This provides the
-// absolute runtime addresses for the root module's entry point and for the
+// This is the type returned by ld::RemoteZygote::Insert() on success.  It's
+// usually used via the ld::RemoteZygote::Domain alias (see below).  Each time
+// an ld::RuntimeDynamicLinker object is inserted into a zygote, Insert()
+// returns this object to describe that dynamic linking domain.  This provides
+// the absolute runtime addresses for the root module's entry point and for the
 // root passive ABI data structures; and the stack size request from the root
 // module.  These are all the details usually needed either to launch a main
 // executable, or to assimilate a new linking domain via its passive ABI and/or
