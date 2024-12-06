@@ -15,11 +15,16 @@
 using ArchLowerPagingTraits = arch::X86FourLevelPagingTraits;
 using ArchUpperPagingTraits = ArchLowerPagingTraits;
 
-inline constexpr arch::X86PagingTraitsBase::MemoryType kArchNormalMemoryType = {};
-inline constexpr arch::X86PagingTraitsBase::MemoryType ArchMmioMemoryType() { return {}; }
+constexpr arch::X86PagingTraitsBase::MemoryType kArchNormalMemoryType = {};
+constexpr arch::X86PagingTraitsBase::MemoryType ArchMmioMemoryType() { return {}; }
 
 inline auto ArchCreatePagingState() {
-  return arch::X86PagingTraitsBase::SystemState::Create(hwreg::X86MsrIo{}, arch::BootCpuidIo{});
+  auto state =
+      arch::X86PagingTraitsBase::SystemState::Create(hwreg::X86MsrIo{}, arch::BootCpuidIo{});
+  // TODO(https://fxbug.dev/382573743): The kernel proper's paging code does
+  // not yet support 1GiB pages.
+  state.page1gb = false;
+  return state;
 }
 
 #endif  // ZIRCON_KERNEL_ARCH_X86_PHYS_INCLUDE_PHYS_ARCH_ADDRESS_SPACE_H_
