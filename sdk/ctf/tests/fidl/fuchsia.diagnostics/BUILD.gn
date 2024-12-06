@@ -130,11 +130,13 @@ ctf_fuchsia_package("fuchsia-diagnostics-log-tests") {
 fuchsia_test_component("fuchsia-diagnostics-tests-root") {
   manifest = "meta/fuchsia-diagnostics-tests-root.cml"
   test_type = "ctf"
+  deps = [ "//sdk/lib/driver_test_realm:static" ]
 }
 
 fuchsia_test_component("fuchsia-diagnostics-log-tests-root") {
   manifest = "meta/fuchsia-diagnostics-log-tests-root.cml"
   test_type = "ctf"
+  deps = [ "//sdk/lib/driver_test_realm:static" ]
 }
 
 fuchsia_test_package("fuchsia-diagnostics-tests-latest") {
