@@ -338,13 +338,10 @@ impl SessionManagerPowerTest {
             realm.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
         let (namespace, server_end) = create_endpoints::<fio::DirectoryMarker>();
         realm_query
-            .open(
+            .open_directory(
                 "session-manager/session:session",
                 fsys2::OpenDirType::NamespaceDir,
-                fio::OpenFlags::empty(),
-                fio::ModeType::empty(),
-                ".",
-                server_end.into_channel().into(),
+                server_end,
             )
             .await
             .unwrap()
