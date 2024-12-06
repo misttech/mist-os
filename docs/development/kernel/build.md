@@ -17,7 +17,8 @@ product assembly:
 ### Specifying options locally
 
 For local development, a list of strings that should be appended to the kernel
-command line can be specified as part of [assembly developer overrides](https://go/fuchsia-assembly-overrides).
+command line can be specified as part of
+[assembly developer overrides](http://go/fuchsia-assembly-overrides).
 
 This takes two steps:
 
