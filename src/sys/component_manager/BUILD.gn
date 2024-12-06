@@ -97,7 +97,6 @@ _component_manager_bin = {
     "//src/sys/lib/cm_types",
     "//src/sys/lib/component_id_index",
     "//src/sys/lib/config_encoder",
-    "//src/sys/lib/elf_runner",
     "//src/sys/lib/fidl-fuchsia-component-abi-ext",
     "//src/sys/lib/fuchsia-bootfs",
     "//src/sys/lib/fuchsia-zbi",
@@ -287,6 +286,7 @@ rustc_binary("bin") {
   configs += configs_to_remove
   configs -= configs_to_remove
   configs += configs_to_add
+  deps += [ "//src/sys/lib/elf_runner" ]
   assert_no_deps += [
     # For tracing support, :bin_with_tracing is required
     "//src/lib/trace/rust:trace-provider",
@@ -303,6 +303,7 @@ rustc_binary("bin_with_tracing") {
   deps += [
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
     "//src/lib/trace/rust:trace-provider",
+    "//src/sys/lib/elf_runner:elf_runner_with_tracing",
   ]
 }
 
