@@ -1208,4 +1208,20 @@ TEST(Mmap, HintRoundedDownIfMisaligned) {
   ASSERT_EQ(munmap(hint_result, page_size), 0);
 }
 
+TEST(Mmap, FixedAddressTooLow) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* low_addr = reinterpret_cast<void*>(page_size);
+  void* addr = mmap(low_addr, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+  ASSERT_EQ(addr, MAP_FAILED);
+}
+
+TEST(Mmap, HintedAddressTooLow) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* low_addr = reinterpret_cast<void*>(page_size);
+  void* addr = mmap(low_addr, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(addr, MAP_FAILED);
+  ASSERT_NE(addr, low_addr);
+  ASSERT_EQ(munmap(addr, page_size), 0);
+}
+
 }  // namespace

@@ -752,10 +752,10 @@ fn map_in_vmar(
     profile_duration!("MapInVmar");
     let mut profile = ProfileDuration::enter("MapInVmarArgs");
 
-    let base_addr = UserAddress::from_ptr(vmar_info.base);
-    let (vmar_offset, vmar_extra_flags) = match addr {
-        SelectedAddress::Fixed(addr) => (addr - base_addr, zx::VmarFlags::SPECIFIC),
-        SelectedAddress::FixedOverwrite(addr) => (addr - base_addr, ZX_VM_SPECIFIC_OVERWRITE),
+    let vmar_offset = addr.addr().checked_sub(vmar_info.base).ok_or_else(|| errno!(ENOMEM))?;
+    let vmar_extra_flags = match addr {
+        SelectedAddress::Fixed(_) => zx::VmarFlags::SPECIFIC,
+        SelectedAddress::FixedOverwrite(_) => ZX_VM_SPECIFIC_OVERWRITE,
     };
 
     if populate {
@@ -784,7 +784,7 @@ fn map_in_vmar(
         | vmar_maybe_map_range;
 
     profile.pivot("VmarMapSyscall");
-    let map_result = memory.map_in_vmar(vmar, vmar_offset, memory_offset, length, vmar_flags);
+    let map_result = memory.map_in_vmar(vmar, vmar_offset.ptr(), memory_offset, length, vmar_flags);
     let mapped_addr = map_result.map_err(MemoryManager::get_errno_for_map_err)?;
 
     Ok(UserAddress::from_ptr(mapped_addr))
@@ -915,9 +915,14 @@ impl MemoryManagerState {
         }
     }
 
-    // Accept the hint if the range is unused and does not wrap around.
+    // Accept the hint if the range is unused and within the range available for mapping.
     fn is_hint_acceptable(&self, hint_addr: UserAddress, length: usize) -> bool {
         let Some(hint_end) = hint_addr.checked_add(length) else {
+            return false;
+        };
+        if !RESTRICTED_ASPACE_RANGE.contains(&hint_addr.ptr())
+            || !RESTRICTED_ASPACE_RANGE.contains(&hint_end.ptr())
+        {
             return false;
         };
         self.get_occupied_address_ranges(&(hint_addr..hint_end)).next().is_none()
@@ -4180,7 +4185,6 @@ enum SelectedAddress {
 }
 
 impl SelectedAddress {
-    #[cfg(feature = "alternate_anon_allocs")]
     fn addr(&self) -> UserAddress {
         match self {
             SelectedAddress::Fixed(addr) => *addr,
