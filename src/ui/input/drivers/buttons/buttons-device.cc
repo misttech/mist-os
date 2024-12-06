@@ -142,7 +142,7 @@ int ButtonsDevice::Thread() {
       uint32_t type = static_cast<uint32_t>(packet.key - kPortKeyInterruptStart);
       if (gpios_[type].config.type == BUTTONS_GPIO_TYPE_INTERRUPT) {
         const zx::duration kLeaseTimeout = zx::msec(100);
-        wake_lease_.AcquireWakeLease(kLeaseTimeout);
+        wake_lease_.HandleInterrupt(kLeaseTimeout);
 
         // We need to reconfigure the GPIO to catch the opposite polarity.
         auto reconfig_result = ReconfigurePolarity(type, packet.key);

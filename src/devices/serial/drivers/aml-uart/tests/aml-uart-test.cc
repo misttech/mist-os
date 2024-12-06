@@ -43,6 +43,8 @@ class FakeSystemActivityGovernor
 
   bool HasActiveWakeLease() const { return !active_wake_leases_.empty(); }
 
+  bool OnSuspendStarted() const { return on_suspend_started_; }
+
   void TakeWakeLease(TakeWakeLeaseRequest& /* ignored */,
                      TakeWakeLeaseCompleter::Sync& completer) override {
     LeaseToken client_token, server_token;
@@ -68,6 +70,14 @@ class FakeSystemActivityGovernor
     completer.Reply(std::move(client_token));
   }
 
+  void RegisterListener(RegisterListenerRequest& request,
+                        RegisterListenerCompleter::Sync& completer) override {
+    listener_client_.Bind(std::move(request.listener().value()),
+                          fdf::Dispatcher::GetCurrent()->async_dispatcher());
+    listener_client_->OnSuspendStarted().Then([this](auto unused) { on_suspend_started_ = true; });
+    completer.Reply();
+  }
+
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     ADD_FAILURE() << name << " is not implemented";
   }
@@ -77,6 +87,8 @@ class FakeSystemActivityGovernor
 
  private:
   zx::event wake_handling_;
+  bool on_suspend_started_ = false;
+  fidl::Client<fuchsia_power_system::ActivityGovernorListener> listener_client_;
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
   std::unordered_map<zx_handle_t, LeaseToken> active_wake_leases_;
   std::vector<std::unique_ptr<async::WaitOnce>> wait_once_tasks_;

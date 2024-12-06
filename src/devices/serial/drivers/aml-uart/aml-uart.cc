@@ -374,7 +374,7 @@ void AmlUart::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_
   }
   if (wake_lease_.has_value()) {
     constexpr zx::duration kPowerLeaseTimeout = zx::msec(300);
-    wake_lease_->AcquireWakeLease(kPowerLeaseTimeout);
+    wake_lease_->HandleInterrupt(kPowerLeaseTimeout);
   }
 
   auto uart_status = Status::Get().ReadFrom(&mmio_);

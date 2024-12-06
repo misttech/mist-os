@@ -4,6 +4,7 @@
 
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/power/cpp/wake-lease.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/clock.h>
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
@@ -16,6 +17,23 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name
     : dispatcher_(dispatcher), lease_name_(lease_name), log_(log) {
   if (sag_client) {
     sag_client_.Bind(std::move(sag_client));
+
+    auto [client_end, server_end] =
+        fidl::Endpoints<fuchsia_power_system::ActivityGovernorListener>::Create();
+    fidl::Arena arena;
+    fidl::WireResult result = sag_client_->RegisterListener(
+        fuchsia_power_system::wire::ActivityGovernorRegisterListenerRequest::Builder(arena)
+            .listener(std::move(client_end))
+            .Build());
+    if (!result.ok()) {
+      if (log_) {
+        fdf::warn("Failed to register for sag state listener: {}", result.error());
+      }
+      ResetSagClient();
+    } else {
+      listener_binding_.emplace(dispatcher_, std::move(server_end), this,
+                                [this](fidl::UnbindInfo unused) { ResetSagClient(); });
+    }
   }
 
   if (parent_node) {
@@ -27,6 +45,14 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name
     wake_lease_last_refreshed_timestamp_ =
         parent_node->CreateUint("Wake Lease Last Refreshed Timestamp (ns)", 0);
   }
+}
+
+bool WakeLease::HandleInterrupt(zx::duration timeout) {
+  // Only acquire a wake lease if the system state is appropriate.
+  if (!system_suspended_) {
+    return false;
+  }
+  return AcquireWakeLease(timeout);
 }
 
 bool WakeLease::AcquireWakeLease(zx::duration timeout) {
@@ -43,19 +69,17 @@ bool WakeLease::AcquireWakeLease(zx::duration timeout) {
     auto result_lease = sag_client_->TakeWakeLease(fidl::StringView::FromExternal(lease_name_));
     if (!result_lease.ok()) {
       if (log_) {
-        FDF_LOG(
-            WARNING,
-            "Failed to take wake lease, system may incorrectly enter suspend: %s. Will not attempt again.",
-            result_lease.status_string());
+        fdf::warn(
+            "Failed to take wake lease, system may incorrectly enter suspend: {}. Will not attempt again.",
+            result_lease.error());
       }
-      sag_client_ = {};
-      wake_lease_grabbable_.Set(false);
+      ResetSagClient();
       return false;
     }
 
     lease_ = std::move(result_lease->token);
     if (log_) {
-      FDF_LOG(INFO, "Created a wake lease due to recent wake event.");
+      fdf::info("Created a wake lease due to recent wake event.");
     }
     auto now = zx::clock::get_monotonic().get();
     wake_lease_last_acquired_timestamp_.Set(now);
@@ -64,21 +88,52 @@ bool WakeLease::AcquireWakeLease(zx::duration timeout) {
     wake_lease_held_.Set(true);
   }
 
-  lease_task_.PostDelayed(dispatcher_, timeout);
+  if (lease_) {
+    lease_task_.PostDelayed(dispatcher_, timeout);
+  }
   return true;
 }
 
 zx::eventpair WakeLease::TakeWakeLease() {
   lease_task_.Cancel();
+  wake_lease_held_.Set(false);
   return std::move(lease_);
+}
+
+void WakeLease::OnResume(OnResumeCompleter::Sync& completer) {
+  system_suspended_ = false;
+  completer.Reply();
+}
+
+void WakeLease::OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) {
+  system_suspended_ = true;
+  completer.Reply();
+}
+
+void WakeLease::OnSuspendFail(OnSuspendFailCompleter::Sync& completer) {
+  system_suspended_ = false;
+  completer.Reply();
+}
+
+void WakeLease::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernorListener> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  if (log_) {
+    fdf::warn("Encountered unexpected method: {}", metadata.method_ordinal);
+  }
 }
 
 void WakeLease::HandleTimeout() {
   if (log_) {
-    FDF_LOG(INFO, "Dropping the wake lease due to not receiving any wake events.");
+    fdf::info("Dropping the wake lease due to not receiving any wake events.");
   }
   lease_.reset();
   wake_lease_held_.Set(false);
+}
+
+void WakeLease::ResetSagClient() {
+  sag_client_ = {};
+  wake_lease_grabbable_.Set(false);
 }
 
 }  // namespace fdf_power
