@@ -55,7 +55,14 @@
 
 #include "../kernel_priv.h"
 
-// #include <ktl/enforce.h>
+namespace ktl {
+
+using std::addressof;
+using std::destroy_at;
+
+}  // namespace ktl
+
+#include <ktl/enforce.h>
 
 #include <linux/resource.h>
 #include <linux/sched.h>
@@ -355,7 +362,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
           return fit::error(errno(EINVAL));
         }
         weak_original_parent = *thread_group_state_inner->parent_;
-        std::destroy_at(std::addressof(thread_group_state_inner));
+        ktl::destroy_at(ktl::addressof(thread_group_state_inner));
         original_parent = weak_original_parent.upgrade();
         return fit::ok(ktl::move(original_parent->Write()));
       }
@@ -401,7 +408,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     // Drop the lock on this task before entering `create_zircon_process`, because it will
     // take a lock on the new thread group, and locks on thread groups have a higher
     // priority than locks on the task in the thread group.
-    std::destroy_at(std::addressof(state));
+    ktl::destroy_at(ktl::addressof(state));
     auto signal_actions = [&]() -> fbl::RefPtr<SignalActions> {
       if (clone_sighand) {
         return task_->thread_group_->signal_actions_;
@@ -432,7 +439,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     if (!clone_thread) {
       pids->add_thread_group(child->thread_group_);
     }
-    std::destroy_at(std::addressof(pids));
+    ktl::destroy_at(ktl::addressof(pids));
 
     // Child lock must be taken before this lock. Drop the lock on the task, take a writable
     // lock on the child and take the current state back.
