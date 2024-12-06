@@ -157,7 +157,7 @@ TEST_F(LogSourceTest, WritesToSink) {
   stubs::DiagnosticsArchive archive(std::make_unique<stubs::DiagnosticsBatchIteratorDelayedBatches>(
       dispatcher(), batches, kTimeWaitForLimitedLogs, kArchivePeriod));
 
-  InjectServiceProvider(&archive, "fuchsia.diagnostics.FeedbackArchiveAccessor");
+  InjectServiceProvider(&archive, "fuchsia.diagnostics.ArchiveAccessor.feedback");
 
   source.Start();
   RunLoopFor(kTimeWaitForLimitedLogs);
@@ -219,7 +219,7 @@ TEST_F(LogSourceTest, NotifyInterruptionOnStop) {
   stubs::DiagnosticsArchive archive(std::make_unique<stubs::DiagnosticsBatchIteratorDelayedBatches>(
       dispatcher(), batches, kTimeWaitForLimitedLogs, kArchivePeriod));
 
-  InjectServiceProvider(&archive, "fuchsia.diagnostics.FeedbackArchiveAccessor");
+  InjectServiceProvider(&archive, "fuchsia.diagnostics.ArchiveAccessor.feedback");
 
   source.Start();
   RunLoopFor(kTimeWaitForLimitedLogs);
@@ -251,7 +251,7 @@ TEST_F(LogSourceTest, NotifyInterruptionArchive) {
 
   stubs::DiagnosticsArchiveClosesArchiveConnection archive;
 
-  InjectServiceProvider(&archive, "fuchsia.diagnostics.FeedbackArchiveAccessor");
+  InjectServiceProvider(&archive, "fuchsia.diagnostics.ArchiveAccessor.feedback");
 
   source.Start();
   RunLoopUntilIdle();
@@ -265,7 +265,7 @@ TEST_F(LogSourceTest, NotifyInterruptionIterator) {
 
   stubs::DiagnosticsArchiveClosesIteratorConnection archive;
 
-  InjectServiceProvider(&archive, "fuchsia.diagnostics.FeedbackArchiveAccessor");
+  InjectServiceProvider(&archive, "fuchsia.diagnostics.ArchiveAccessor.feedback");
 
   source.Start();
   RunLoopUntilIdle();
@@ -280,7 +280,7 @@ TEST_F(LogSourceTest, ReconnectsOnSafeAfterInterruption) {
   stubs::DiagnosticsArchiveClosesFirstIteratorConnection archive(
       std::make_unique<stubs::DiagnosticsBatchIteratorNeverResponds>());
 
-  InjectServiceProvider(&archive, "fuchsia.diagnostics.FeedbackArchiveAccessor");
+  InjectServiceProvider(&archive, "fuchsia.diagnostics.ArchiveAccessor.feedback");
 
   source.Start();
   RunLoopUntilIdle();
@@ -299,7 +299,7 @@ TEST_F(LogSourceTest, DoesNotReconnectsOnNotSafeAfterInterruption) {
   stubs::DiagnosticsArchiveClosesFirstIteratorConnection archive(
       std::make_unique<stubs::DiagnosticsBatchIteratorNeverResponds>());
 
-  InjectServiceProvider(&archive, "fuchsia.diagnostics.FeedbackArchiveAccessor");
+  InjectServiceProvider(&archive, "fuchsia.diagnostics.ArchiveAccessor.feedback");
 
   source.Start();
   RunLoopUntilIdle();

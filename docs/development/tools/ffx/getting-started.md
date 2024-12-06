@@ -318,12 +318,12 @@ Instance ID: None
  [✓]  config-data                          N/A
 
       Exposed Capability                   Error
- [✓]  fuchsia.diagnostics.FeedbackArchive  N/A
-      Accessor
- [✓]  fuchsia.diagnostics.LegacyMetricsAr  N/A
-      chiveAccessor
- [✓]  fuchsia.diagnostics.LoWPANArchiveAc  N/A
-      cessor
+ [✓]  fuchsia.diagnostics.ArchiveAccessor  N/A
+      feedback
+ [✓]  fuchsia.diagnostics.ArchiveAccessor  N/A
+      .legacy_metrics
+ [✓]  fuchsia.diagnostics.ArchiveAccessor  N/A
+      .lowpan
  [✓]  diagnostics                          N/A
  [✓]  fuchsia.diagnostics.ArchiveAccessor  N/A
  [✓]  fuchsia.diagnostics.LogSettings      N/A

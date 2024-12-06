@@ -35,7 +35,6 @@
         {
             protocol: "fuchsia.diagnostics.ArchiveAccessor.feedback",
             from: "parent/diagnostics-accessors",
-            as: "fuchsia.diagnostics.FeedbackArchiveAccessor",
             to: "#feedback",
         },
         {

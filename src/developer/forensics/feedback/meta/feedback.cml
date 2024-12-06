@@ -27,7 +27,7 @@
         {
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.ArchiveAccessor.feedback",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.hwinfo.Board",
                 "fuchsia.hwinfo.Product",

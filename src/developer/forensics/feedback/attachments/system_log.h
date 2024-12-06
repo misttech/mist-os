@@ -88,7 +88,7 @@ class LogBuffer : public feedback_data::LogSink {
 // The system log is streamed and buffered on the first call to Get and continues streaming until
 // |active_period_| past the end of the call elapses.
 //
-// fuchsia.diagnostics.FeedbackArchiveAccessor is expected to be in |services|.
+// fuchsia.diagnostics.ArchiveAccessor.feedback is expected to be in |services|.
 class SystemLog : public AttachmentProvider {
  public:
   SystemLog(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,

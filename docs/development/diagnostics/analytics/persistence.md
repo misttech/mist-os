@@ -39,8 +39,8 @@ backoff is activated.
 
 ### Allowlist your data {#allowlist-data}
 
-Persistence reads from `FeedbackArchiveAccessor`, so you'll need to have your
-Inspect data allowlisted in a config file for that pipeline.
+Persistence reads from `fuchsia.diagnostics.ArchiveAccessor.feedback`, so you'll
+need to have your Inspect data allowlisted in a config file for that pipeline.
 
 ## Configure Persistence {#configure}
 

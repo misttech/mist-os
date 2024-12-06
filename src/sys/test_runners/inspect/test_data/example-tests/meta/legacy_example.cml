@@ -4,7 +4,7 @@
 {
     include: [ "//src/sys/test_runners/inspect/default.shard.cml" ],
     program: {
-        // Read from the LegacyMetricsArchiveAccessor
+        // Read from the fuchsia.diagnostics.ArchiveAccessor.legacy_metrics
         accessor: "LEGACY",
         timeout_seconds: "5",
         cases: [

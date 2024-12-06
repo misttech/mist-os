@@ -111,9 +111,9 @@ $ {{ '<strong>' }}cd exposed{{ '</strong>' }}
 $ {{ '<strong>' }}ls{{ '</strong>' }}
 diagnostics
 fuchsia.diagnostics.ArchiveAccessor
-fuchsia.diagnostics.FeedbackArchiveAccessor
-fuchsia.diagnostics.LegacyMetricsArchiveAccessor
-fuchsia.diagnostics.LoWPANArchiveAccessor
+fuchsia.diagnostics.ArchiveAccessor.feedback
+fuchsia.diagnostics.ArchiveAccessor.legacy_metrics
+fuchsia.diagnostics.ArchiveAccessor.lowpan
 fuchsia.diagnostics.LogSettings
 fuchsia.logger.Log
 fuchsia.logger.LogSink
@@ -135,9 +135,9 @@ svc
 $ {{ '<strong>' }}cd svc{{ '</strong>' }}
 $ {{ '<strong>' }}ls{{ '</strong>' }}
 fuchsia.diagnostics.ArchiveAccessor
-fuchsia.diagnostics.FeedbackArchiveAccessor
-fuchsia.diagnostics.LegacyMetricsArchiveAccessor
-fuchsia.diagnostics.LoWPANArchiveAccessor
+fuchsia.diagnostics.ArchiveAccessor.feedback
+fuchsia.diagnostics.ArchiveAccessor.legacy_metrics
+fuchsia.diagnostics.ArchiveAccessor.lowpan
 fuchsia.diagnostics.LogSettings
 fuchsia.logger.Log
 ```
