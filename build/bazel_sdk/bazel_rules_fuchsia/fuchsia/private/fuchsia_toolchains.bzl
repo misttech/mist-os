@@ -11,8 +11,7 @@ def _fuchsia_toolchain_decl_impl(ctx):
         content = """
 toolchain(
   name = "{toolchain_name}",
-#   toolchain = "{toolchain_path}",
-  toolchain = "@fuchsia_sdk//:fuchsia_toolchain_info",
+  toolchain = "{toolchain_path}",
   toolchain_type = "@rules_fuchsia//fuchsia:toolchain",
   visibility = ["//visibility:public"],
 )
@@ -55,7 +54,7 @@ FUCHSIA_TOOLCHAIN_DEFINITION = [
 
 def register_fuchsia_sdk_toolchain(
         name = "fuchsia_sdk_toolchain_decl",
-        toolchain_path = "@fuchsia_sdk//:fuchsia_toolchain_sdk"):
+        toolchain_path = "@fuchsia_sdk//:fuchsia_toolchain_info"):
     """ Registers the fuchsia sdk toolchain.
 
     This method should be called in your WORKSPACE file to register the fuchsia
