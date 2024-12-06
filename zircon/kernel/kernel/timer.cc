@@ -109,7 +109,7 @@ zx_ticks_t TimerQueue::ConvertBootTimeToRawTicks(zx_instant_boot_t boot) {
   }
   const zx_ticks_t deadline_boot_ticks =
       timer_get_ticks_to_time_ratio().Inverse().Scale<affine::Ratio::Round::Up>(boot);
-  return deadline_boot_ticks - timer_get_boot_ticks_offset();
+  return zx_ticks_sub_ticks(deadline_boot_ticks, timer_get_boot_ticks_offset());
 }
 
 void TimerQueue::UpdatePlatformTimer() {
