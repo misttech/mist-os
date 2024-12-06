@@ -318,7 +318,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
     return InitializeProvidedGptDevice(devices, svc_root, block_controller);
   }
 
-  std::vector<std::unique_ptr<GptDevicePartitioner>> candidate_gpts;
+  std::vector<std::tuple<std::unique_ptr<GptDevicePartitioner>, std::string>> candidate_gpts;
   if (storage_host_enabled) {
     // Fshost takes care of finding the GPT block device.
     zx::result gpt_device_source = BlockDevices::CreateFromPartitionService(svc_root);
@@ -345,7 +345,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
     auto partitioner = WrapUnique(new GptDevicePartitioner(std::move(*gpt_device_source), svc_root,
                                                            info->value()->block_count,
                                                            info->value()->block_size, {}, {}));
-    candidate_gpts.push_back(std::move(partitioner));
+    candidate_gpts.emplace_back(std::move(partitioner), "<from fshost>");
   } else {
     zx::result gpt_devices = FindGptDevices(devices.devfs_root());
     if (gpt_devices.is_error()) {
@@ -383,7 +383,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
       auto partitioner = WrapUnique(new GptDevicePartitioner(
           devices.Duplicate(), svc_root, info->value()->info.block_count,
           info->value()->info.block_size, std::move(result.value()), std::move(controller)));
-      candidate_gpts.push_back(std::move(partitioner));
+      candidate_gpts.emplace_back(std::move(partitioner), gpt_device.topological_path);
     }
   }
 
@@ -397,22 +397,27 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
   if (candidate_gpts.size() == 1) {
     // If there's only one GPT, but it's missing the necessary partitions, bubble that up so the
     // caller can decide whether to reset the partition tables.
-    partitioner = std::move(candidate_gpts[0]);
-    if (partitioner->FindPartition(IsFvmOrAndroidPartition).is_error()) {
+    partitioner = std::move(std::get<0>(candidate_gpts[0]));
+    if (zx::result find = partitioner->FindPartition(IsFvmOrAndroidPartition); find.is_error()) {
+      if (find.status_value() != ZX_ERR_NOT_FOUND) {
+        ERROR("Failed to look up FVM partition in GPT: %s\n", find.status_string());
+      }
       ERROR(
           "Unable to find a GPT on this device with the expected partitions.\n"
           "Attempting to reinitialize partition tables; this will only work on netbooted devices!\n"
-          "If this fails, please run init-partition-tables to re-initialize the device.\n");
+          "If this fails, please run init-partition-tables to re-initialize the device.\n"
+          "Device path: %s\n",
+          std::get<1>(candidate_gpts[0]).c_str());
       initialize_partition_tables = true;
     }
   } else {
     for (auto& candidate : candidate_gpts) {
-      if (candidate->FindPartition(IsFvmOrAndroidPartition).is_ok()) {
+      if (std::get<0>(candidate)->FindPartition(IsFvmOrAndroidPartition).is_ok()) {
         if (partitioner) {
           ERROR("Found multiple block devices with valid GPTs. Unsuppported.\n");
           return zx::error(ZX_ERR_NOT_SUPPORTED);
         }
-        partitioner = std::move(candidate);
+        partitioner = std::move(std::get<0>(candidate));
       }
     }
   }
@@ -523,6 +528,7 @@ GptDevicePartitioner::FindPartitionLegacy(FilterCallback filter) const {
       }
       zx::result part = BlockPartitionClient::Create(std::move(status.value()));
       if (part.is_error()) {
+        ERROR("Failed to create partition client: %s\n", part.status_string());
         return part.take_error();
       }
       return zx::ok(FindPartitionDetailsResult{std::move(*part), i});
