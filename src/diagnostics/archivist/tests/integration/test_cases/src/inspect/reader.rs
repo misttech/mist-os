@@ -2,19 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::test_topology;
+use crate::{test_topology, utils};
 use anyhow::Error;
 use diagnostics_assertions::{assert_data_tree, assert_json_diff, AnyProperty};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use difference::assert_diff;
-use fidl_fuchsia_archivist_test as ftest;
-use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, ArchiveAccessorProxy};
 use realm_proxy_client::RealmProxyClient;
+use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
 
 const MONIKER_KEY: &str = "moniker";
 const METADATA_KEY: &str = "metadata";
 const TIMESTAMP_KEY: &str = "timestamp";
 const TEST_ARCHIVIST_MONIKER: &str = "archivist";
+
+const FEEDBACK_PIPELINE: &str = "feedback";
+const LOWPAN_PIPELINE: &str = "lowpan";
 
 static UNIFIED_SINGLE_VALUE_GOLDEN: &str =
     include_str!("../../test_data/unified_reader_single_value_golden.json");
@@ -26,9 +28,6 @@ static PIPELINE_SINGLE_VALUE_GOLDEN: &str =
 static PIPELINE_ALL_GOLDEN: &str = include_str!("../../test_data/pipeline_reader_all_golden.json");
 static PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN: &str =
     include_str!("../../test_data/pipeline_reader_nonoverlapping_selectors_golden.json");
-
-const LOWPAN_ARCHIVE_ACCESSOR_NAME: &str = "fuchsia.diagnostics.LoWPANArchiveAccessor";
-const FEEDBACK_ARCHIVE_ACCESSOR_NAME: &str = "fuchsia.diagnostics.FeedbackArchiveAccessor";
 
 #[fuchsia::test]
 async fn read_components_inspect() {
@@ -49,7 +48,7 @@ async fn read_components_inspect() {
 
     writer.set_health_ok().await.unwrap();
 
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     let data = ArchiveReader::new()
         .with_archive(accessor)
         .add_selector("child:root")
@@ -98,7 +97,7 @@ async fn read_same_named_trees_from_single_component() {
     writer1.record_string("prop1", "val1").await.unwrap();
     writer2.record_string("prop2", "val2").await.unwrap();
 
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     let data = ArchiveReader::new()
         .with_archive(accessor)
         .add_selector("child:root")
@@ -147,7 +146,7 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
 
     writer.record_int("int", 3).await?;
 
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await?;
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     let data = ArchiveReader::new()
         .with_archive(accessor)
         .with_batch_retrieval_timeout_seconds(10)
@@ -195,7 +194,7 @@ async fn read_components_single_selector() -> Result<(), Error> {
 
     writer_b.set_health_ok().await.unwrap();
 
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await?;
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     let data = ArchiveReader::new()
         .with_archive(accessor)
         .add_selector("child_a:root")
@@ -236,7 +235,7 @@ async fn unified_reader() -> Result<(), Error> {
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     // The following hierarchies are expected:
     //  - puppet1: 1 hierarchy published with InspectSink
     //  - archivist: archivist own hierarchy
@@ -245,7 +244,7 @@ async fn unified_reader() -> Result<(), Error> {
         .await;
 
     // Then verify that from the expected data, we can retrieve one specific value.
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     retrieve_and_validate_results(
         accessor,
         vec!["puppet*:*:lazy-*"],
@@ -256,7 +255,7 @@ async fn unified_reader() -> Result<(), Error> {
     .await;
 
     // Then verify that subtree selection retrieves all trees under and including root.
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     retrieve_and_validate_results(
         accessor,
         vec!["puppet*:root"],
@@ -268,7 +267,7 @@ async fn unified_reader() -> Result<(), Error> {
 
     // Then verify that a selector with a correct moniker, but no resolved nodes
     // produces no data.
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     retrieve_and_validate_results(
         accessor,
         vec!["puppet*:root/non-existent-node:bloop"],
@@ -306,11 +305,11 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
-    let accessor = connect_to_feedback_accessor(&realm_proxy).await;
+    let accessor = utils::connect_accessor(&realm_proxy, FEEDBACK_PIPELINE).await;
     retrieve_and_validate_results(accessor, Vec::new(), PIPELINE_ALL_GOLDEN, 1).await;
 
     // Then verify that from the expected data, we can retrieve one specific value.
-    let accessor = connect_to_feedback_accessor(&realm_proxy).await;
+    let accessor = utils::connect_accessor(&realm_proxy, FEEDBACK_PIPELINE).await;
     retrieve_and_validate_results(
         accessor,
         vec!["test_component:*:lazy-*"],
@@ -320,13 +319,13 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
     .await;
 
     // Then verify that subtree selection retrieves all trees under and including root.
-    let accessor = connect_to_feedback_accessor(&realm_proxy).await;
+    let accessor = utils::connect_accessor(&realm_proxy, FEEDBACK_PIPELINE).await;
     retrieve_and_validate_results(accessor, vec!["test_component:root"], PIPELINE_ALL_GOLDEN, 1)
         .await;
 
     // Then verify that client selectors dont override the static selectors provided
     // to the archivist.
-    let accessor = connect_to_feedback_accessor(&realm_proxy).await;
+    let accessor = utils::connect_accessor(&realm_proxy, FEEDBACK_PIPELINE).await;
     retrieve_and_validate_results(
         accessor,
         vec![r"test_component:root:array\:0x15"],
@@ -335,7 +334,7 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
     )
     .await;
 
-    assert!(pipeline_is_filtered(realm_proxy, 1, FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(pipeline_is_filtered(realm_proxy, 1, FEEDBACK_PIPELINE).await);
 
     Ok(())
 }
@@ -364,7 +363,7 @@ async fn feedback_disabled_pipeline() -> Result<(), Error> {
 
     writer.emit_example_inspect_data().await.unwrap();
 
-    assert!(!pipeline_is_filtered(realm_proxy, 2, FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(!pipeline_is_filtered(realm_proxy, 2, FEEDBACK_PIPELINE).await);
 
     Ok(())
 }
@@ -388,7 +387,7 @@ async fn feedback_pipeline_missing_selectors() -> Result<(), Error> {
 
     writer.emit_example_inspect_data().await.unwrap();
 
-    assert!(!pipeline_is_filtered(realm_proxy, 2, FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(!pipeline_is_filtered(realm_proxy, 2, FEEDBACK_PIPELINE).await);
 
     Ok(())
 }
@@ -417,11 +416,11 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
-    let accessor = connect_to_lowpan_accessor(&realm_proxy).await;
+    let accessor = utils::connect_accessor(&realm_proxy, LOWPAN_PIPELINE).await;
     retrieve_and_validate_results(accessor, Vec::new(), PIPELINE_ALL_GOLDEN, 1).await;
 
     // Then verify that from the expected data, we can retrieve one specific value.
-    let accessor = connect_to_lowpan_accessor(&realm_proxy).await;
+    let accessor = utils::connect_accessor(&realm_proxy, LOWPAN_PIPELINE).await;
     retrieve_and_validate_results(
         accessor,
         vec!["test_component:*:lazy-*"],
@@ -431,13 +430,13 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     .await;
 
     // Then verify that subtree selection retrieves all trees under and including root.
-    let accessor = connect_to_lowpan_accessor(&realm_proxy).await;
+    let accessor = utils::connect_accessor(&realm_proxy, LOWPAN_PIPELINE).await;
     retrieve_and_validate_results(accessor, vec!["test_component:root"], PIPELINE_ALL_GOLDEN, 1)
         .await;
 
     // Then verify that client selectors dont override the static selectors provided
     // to the archivist.
-    let accessor = connect_to_lowpan_accessor(&realm_proxy).await;
+    let accessor = utils::connect_accessor(&realm_proxy, LOWPAN_PIPELINE).await;
     retrieve_and_validate_results(
         accessor,
         vec![r"test_component:root:array\:0x15"],
@@ -446,23 +445,9 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     )
     .await;
 
-    assert!(pipeline_is_filtered(realm_proxy, 1, LOWPAN_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(pipeline_is_filtered(realm_proxy, 1, LOWPAN_PIPELINE).await);
 
     Ok(())
-}
-
-async fn connect_to_feedback_accessor(realm_proxy: &RealmProxyClient) -> ArchiveAccessorProxy {
-    realm_proxy
-        .connect_to_named_protocol::<ArchiveAccessorMarker>(FEEDBACK_ARCHIVE_ACCESSOR_NAME)
-        .await
-        .unwrap()
-}
-
-async fn connect_to_lowpan_accessor(realm_proxy: &RealmProxyClient) -> ArchiveAccessorProxy {
-    realm_proxy
-        .connect_to_named_protocol::<ArchiveAccessorMarker>(LOWPAN_ARCHIVE_ACCESSOR_NAME)
-        .await
-        .unwrap()
 }
 
 // Loop indefinitely snapshotting the archive until we get the expected number of
@@ -472,7 +457,7 @@ async fn connect_to_lowpan_accessor(realm_proxy: &RealmProxyClient) -> ArchiveAc
 // If the expected number of hierarchies is 0, set a 10-second timeout to ensure nothing is
 // received.
 async fn retrieve_and_validate_results(
-    accessor: ArchiveAccessorProxy,
+    accessor: fdiagnostics::ArchiveAccessorProxy,
     custom_selectors: Vec<&str>,
     golden: &str,
     expected_results_count: usize,
@@ -541,10 +526,9 @@ fn process_results_for_comparison(results: serde_json::Value) -> serde_json::Val
 async fn pipeline_is_filtered(
     realm: RealmProxyClient,
     expected_results_count: usize,
-    accessor_name: &str,
+    pipeline_name: &str,
 ) -> bool {
-    let archive_accessor =
-        realm.connect_to_named_protocol::<ArchiveAccessorMarker>(accessor_name).await.unwrap();
+    let archive_accessor = utils::connect_accessor(&realm, pipeline_name).await;
 
     let pipeline_results = ArchiveReader::new()
         .with_archive(archive_accessor)
@@ -553,7 +537,7 @@ async fn pipeline_is_filtered(
         .await
         .expect("got result");
 
-    let all_archive_accessor = realm.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let all_archive_accessor = utils::connect_accessor(&realm, utils::ALL_PIPELINE).await;
 
     let all_results = ArchiveReader::new()
         .with_archive(all_archive_accessor)

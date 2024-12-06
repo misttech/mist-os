@@ -11,8 +11,8 @@ use fuchsia_component_test::{
 use tracing::warn;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_diagnostics as fdiagnostics,
-    fidl_fuchsia_diagnostics_host as fdiagnostics_host, fidl_fuchsia_inspect as finspect,
-    fidl_fuchsia_logger as flogger, fidl_fuchsia_tracing_provider as ftracing,
+    fidl_fuchsia_inspect as finspect, fidl_fuchsia_logger as flogger,
+    fidl_fuchsia_tracing_provider as ftracing,
 };
 
 const ARCHIVIST_URL: &str = "#meta/archivist.cm";
@@ -105,6 +105,7 @@ impl ArchivistRealmFactory {
             .capability(Capability::protocol::<fboot::ReadOnlyLogMarker>());
         // LINT.ThenChange(//src/diagnostics/archivist/testing/realm-factory/meta/realm-factory.cml)
         let archivist_to_parent = Route::new()
+            .capability(Capability::dictionary("diagnostics-accessors"))
             .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
             .capability(Capability::protocol::<fdiagnostics::LogStreamMarker>())
             .capability(Capability::protocol::<flogger::LogSinkMarker>())
@@ -143,48 +144,6 @@ impl ArchivistRealmFactory {
         builder.add_route(self_to_archivist.clone().from(Ref::self_()).to(&test_realm)).await?;
         test_realm.add_route(parent_to_archivist.from(Ref::parent()).to(&archivist)).await?;
         test_realm.add_route(self_to_archivist.from(Ref::parent()).to(&archivist)).await?;
-
-        test_realm
-            .add_route(
-                Route::new()
-                    .capability(Capability::dictionary("diagnostics-accessors"))
-                    .from(&archivist)
-                    .to(Ref::parent()),
-            )
-            .await?;
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::dictionary("diagnostics-accessors"))
-                    .from(&test_realm)
-                    .to(Ref::parent()),
-            )
-            .await?;
-
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
-                    .capability(Capability::protocol::<fdiagnostics_host::ArchiveAccessorMarker>())
-                    .capability(
-                        Capability::protocol_by_name(format!(
-                            "{}.feedback",
-                            fdiagnostics::ArchiveAccessorMarker::PROTOCOL_NAME
-                        ))
-                        .as_("fuchsia.diagnostics.FeedbackArchiveAccessor"),
-                    )
-                    .capability(
-                        Capability::protocol_by_name(format!(
-                            "{}.lowpan",
-                            fdiagnostics::ArchiveAccessorMarker::PROTOCOL_NAME
-                        ))
-                        .as_("fuchsia.diagnostics.LoWPANArchiveAccessor"),
-                    )
-                    .from_dictionary("diagnostics-accessors")
-                    .from(&test_realm)
-                    .to(Ref::parent()),
-            )
-            .await?;
 
         test_realm
             .add_route(archivist_to_parent.clone().from(&archivist).to(Ref::parent()))

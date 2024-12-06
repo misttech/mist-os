@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::test_topology;
+use crate::{test_topology, utils};
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_archivist_test as ftest;
-use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 use realm_proxy_client::RealmProxyClient;
 use std::collections::HashSet;
 
@@ -53,7 +52,7 @@ async fn read_components_recursive_glob() {
     exposed_inspect.push(expose_nested_inspect(&realm_proxy, "child_b", "nested_one").await);
     exposed_inspect.push(expose_nested_inspect(&realm_proxy, "child_b", "nested_two").await);
 
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     let data_vec = ArchiveReader::new()
         .add_selector("child_a/**:root")
         .with_archive(accessor)
@@ -119,7 +118,7 @@ async fn read_components_subtree_with_recursive_glob() {
         "child_a/nested_two".try_into().unwrap(),
     ]);
 
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     let data_vec = ArchiveReader::new()
         .add_selector("child_a/**:root")
         .add_selector("child_a:root")

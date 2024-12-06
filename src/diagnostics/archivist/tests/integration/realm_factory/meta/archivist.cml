@@ -10,14 +10,6 @@
     program: {
         binary: "bin/archivist",
     },
-    capabilities: [
-        {
-            protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor.feedback",
-                "fuchsia.diagnostics.ArchiveAccessor.lowpan",
-            ],
-        },
-    ],
     use: [
         {
             protocol: [ "fuchsia.boot.ReadOnlyLog" ],
@@ -40,18 +32,6 @@
             availability: "optional",
             type: "string",
             max_size: 256,
-        },
-    ],
-    expose: [
-        {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor.feedback",
-            from: "self/diagnostics-accessors",
-            as: "fuchsia.diagnostics.FeedbackArchiveAccessor",
-        },
-        {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor.lowpan",
-            from: "self/diagnostics-accessors",
-            as: "fuchsia.diagnostics.LoWPANArchiveAccessor",
         },
     ],
 }

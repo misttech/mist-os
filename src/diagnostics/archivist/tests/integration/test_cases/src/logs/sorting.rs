@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::test_topology;
+use crate::{test_topology, utils};
 use diagnostics_data::{Data, ExtendedMoniker, Logs};
 use diagnostics_reader::{ArchiveReader, Subscription};
 use futures::StreamExt;
@@ -81,8 +81,7 @@ struct Listener {
 
 impl Listener {
     async fn new(realm_proxy: &RealmProxyClient) -> Self {
-        let accessor =
-            realm_proxy.connect_to_protocol::<fdiagnostics::ArchiveAccessorMarker>().await.unwrap();
+        let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
         let stream = ArchiveReader::new()
             .with_archive(accessor)
             .snapshot_then_subscribe::<Logs>()
@@ -111,8 +110,7 @@ async fn check_log_snapshot(
     realm_proxy: &RealmProxyClient,
     expected_dump: &[(i64, ExtendedMoniker)],
 ) {
-    let accessor =
-        realm_proxy.connect_to_protocol::<fdiagnostics::ArchiveAccessorMarker>().await.unwrap();
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     let logs = ArchiveReader::new().with_archive(accessor).snapshot::<Logs>().await.unwrap();
     let result = logs
         .into_iter()

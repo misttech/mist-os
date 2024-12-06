@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::test_topology;
+use crate::{test_topology, utils};
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_data::{InspectData, InspectHandleName};
 use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
-use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 use realm_proxy_client::RealmProxyClient;
 use {fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync};
 
@@ -88,7 +87,7 @@ async fn escrow_inspect_data() {
 }
 
 async fn read_data(realm_proxy: &RealmProxyClient, retry: RetryConfig) -> Vec<InspectData> {
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     ArchiveReader::new()
         .with_archive(accessor)
         .add_selector(format!("{PUPPET_NAME}:root"))
