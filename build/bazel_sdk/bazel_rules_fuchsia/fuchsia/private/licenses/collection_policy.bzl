@@ -37,10 +37,11 @@ ignore_policy = struct(
     # are not actually known to `rules_fuchsia` (this module).
     workspaces = bool_dict([
         "bazel_tools",
-        "fuchsia_clang",  # TODO(95670): clang bazel defs should provide licenses.
-        "fuchsia_sdk",  # TODO(130784): sdk atoms should provide licenses.
-        "internal_sdk",  # TODO(130784): sdk atoms should provide licenses.
+        "fuchsia_clang",  # TODO(https://fxbug.dev/42177702): clang bazel defs should provide licenses.
+        "fuchsia_sdk",  # TODO(https://fxbug.dev/42081016): sdk atoms should provide licenses.
+        "internal_sdk",  # TODO(https://fxbug.dev/42081016): sdk atoms should provide licenses.
         "assembly_developer_overrides",  # Local development overrides don't provide licenses.
+        "rules_fuchsia",  # TODO(https://fxbug.dev/42081016): sdk rules should provide licenses.
     ]),
 
     # Anything withing these package will be ignored:
