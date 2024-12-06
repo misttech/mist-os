@@ -608,12 +608,12 @@ void PmmNode::InitReservedRange(const memalloc::Range& range) {
   dprintf(INFO, "PMM: reserved [%#" PRIx64 ", %#" PRIx64 "): %.*s\n", range.addr, range.end(),
           static_cast<int>(what.size()), what.data());
 
-  // Wire and then merge into the main reserved list.
-  //
-  // TODO(https://fxbug.dev/42164859): vm_page_state::MMU for page tables.
+  // Update state and then merge into the main reserved list.
+  vm_page_state state =
+      range.type == memalloc::Type::kKernelPageTables ? vm_page_state::MMU : vm_page_state::WIRED;
   vm_page_t* p;
   list_for_every_entry (&reserved, p, vm_page_t, queue_node) {
-    p->set_state(vm_page_state::WIRED);
+    p->set_state(state);
   }
 
   list_node_t* list;

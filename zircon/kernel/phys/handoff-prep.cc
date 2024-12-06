@@ -172,6 +172,7 @@ void HandoffPrep::SetMemory() {
       // The allocations that should survive into the hand-off.
       case memalloc::Type::kDataZbi:
       case memalloc::Type::kKernel:
+      case memalloc::Type::kKernelPageTables:
       case memalloc::Type::kPhysDebugdata:
       case memalloc::Type::kPeripheral:
       case memalloc::Type::kPhysLog:
@@ -181,6 +182,12 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kUserboot:
       case memalloc::Type::kVdso:
         return type;
+
+      // The identity map needs to be installed at the time of hand-off, but
+      // shouldn't actually be used by the kernel after that; mark it for
+      // clean-up.
+      case memalloc::Type::kTemporaryIdentityPageTables:
+        return memalloc::Type::kTemporaryPhysHandoff;
 
       // An NVRAM range should no longer be treated like normal RAM. The kernel
       // will access it through PhysHandoff::nvram via its own mapping for it.

@@ -10,6 +10,7 @@
 #include <debug.h>
 #include <inttypes.h>
 #include <lib/arch/riscv64/feature.h>
+#include <lib/arch/riscv64/page-table.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/counters.h>
 #include <lib/fit/defer.h>
@@ -61,8 +62,9 @@ uint64_t kernel_relocated_base = kArchHandoffVirtualAddress;
 // when kernel only threads are active.
 alignas(PAGE_SIZE) pte_t riscv64_kernel_translation_table[RISCV64_MMU_PT_ENTRIES];
 
-// A copy of the above table with memory identity mapped at 0.
-alignas(PAGE_SIZE) pte_t riscv64_kernel_bootstrap_translation_table[RISCV64_MMU_PT_ENTRIES];
+// The physical address of a copy of the above table with memory identity
+// mapped at 0, stored for loading from secondary CPUs.
+paddr_t riscv64_kernel_bootstrap_translation_table_phys;
 
 namespace {
 
@@ -1676,23 +1678,27 @@ void riscv64_mmu_early_init() {
   riscv_asid_mask = (riscv64_csr_read(satp) >> RISCV64_SATP_ASID_SHIFT) & RISCV64_SATP_ASID_MASK;
   riscv64_csr_write(satp, satp_orig);
 
+  paddr_t bootstrap_root_paddr = (satp & RISCV64_SATP_PPN_MASK) << PAGE_SIZE_SHIFT;
+  pte_t* bootstrap_translation_table =
+      reinterpret_cast<pte_t*>(paddr_to_physmap(bootstrap_root_paddr));
+
   // Fill in all of the unused top level page table pointers for the kernel half of the kernel
   // top level table. These entries will be copied to all new address spaces, thus ensuring the
   // top level entries are synchronized.
   for (size_t i = RISCV64_MMU_PT_KERNEL_BASE_INDEX; i < RISCV64_MMU_PT_ENTRIES; i++) {
-    if (!riscv64_pte_is_valid(riscv64_kernel_bootstrap_translation_table[i])) {
+    if (!riscv64_pte_is_valid(bootstrap_translation_table[i])) {
       paddr_t pt_paddr = kernel_virt_to_phys(
           riscv64_kernel_top_level_page_tables[i - RISCV64_MMU_PT_KERNEL_BASE_INDEX]);
 
       LTRACEF("RISCV: MMU allocating top level page table for slot %zu, pa %#lx\n", i, pt_paddr);
 
       pte_t pte = mmu_non_leaf_pte(pt_paddr, true);
-      update_pte(&riscv64_kernel_bootstrap_translation_table[i], pte);
+      update_pte(&bootstrap_translation_table[i], pte);
     }
   }
 
   // Make a copy of our bootstrap table with the identity map present in the user part.
-  memcpy(riscv64_kernel_translation_table, riscv64_kernel_bootstrap_translation_table, PAGE_SIZE);
+  memcpy(riscv64_kernel_translation_table, bootstrap_translation_table, PAGE_SIZE);
 
   // Zero the bottom of the kernel page table to remove any left over boot mappings.
   memset(riscv64_kernel_translation_table, 0, PAGE_SIZE / 2);
