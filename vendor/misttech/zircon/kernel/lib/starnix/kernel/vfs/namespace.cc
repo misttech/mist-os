@@ -30,22 +30,59 @@
 
 namespace starnix {
 
+namespace {
+
+// A file that represents a mount namespace.
+class MountNamespaceFile : public FileOps {
+ public:
+  // impl FileOps for MountNamespaceFile
+  fileops_impl_nonseekable();
+  fileops_impl_dataless();
+  fileops_impl_noop_sync();
+
+  explicit MountNamespaceFile(fbl::RefPtr<Namespace> ns) : namespace_(ktl::move(ns)) {}
+
+ private:
+  fbl::RefPtr<Namespace> namespace_;
+};
+
+}  // namespace
+
 fbl::RefPtr<Namespace> Namespace::New(FileSystemHandle fs) {
-  return Namespace::new_with_flags(ktl::move(fs), MountFlags::empty());
+  return Namespace::new_with_flags(fs, MountFlags::empty());
 }
 
 fbl::RefPtr<Namespace> Namespace::new_with_flags(FileSystemHandle fs, MountFlags flags) {
   auto kernel = fs->kernel_.Lock();
   ASSERT_MSG(kernel, "can't create namespace without a kernel");
-
+  auto root_mount = Mount::New(WhatToMount::Fs(fs), MountFlags::empty());
   fbl::AllocChecker ac;
-  auto handle = fbl::AdoptRef(new (&ac) Namespace(
-      Mount::New(WhatToMount::Fs(fs), MountFlags::empty()), kernel->next_namespace_id_.next()));
+  auto handle = fbl::AdoptRef(new (&ac) Namespace(root_mount, kernel->get_next_namespace_id()));
   ZX_ASSERT(ac.check());
   return handle;
 }
 
 NamespaceNode Namespace::root() { return root_mount_->root(); }
+
+fbl::RefPtr<Namespace> Namespace::clone_namespace() const {
+  auto kernel = root_mount_->fs_->kernel_.Lock();
+  ASSERT_MSG(kernel, "can't clone namespace without a kernel");
+  fbl::AllocChecker ac;
+  auto handle = fbl::AdoptRef(
+      new (&ac) Namespace(root_mount_->clone_mount_recursive(), kernel->get_next_namespace_id()));
+  ZX_ASSERT(ac.check());
+  return handle;
+}
+
+fit::result<Errno, ktl::unique_ptr<FileOps>> Namespace::create_file_ops(
+    const FsNode& node, const CurrentTask& current_task, OpenFlags flags) const {
+  fbl::AllocChecker ac;
+  auto ptr = new (&ac) MountNamespaceFile(fbl::RefPtr<Namespace>(const_cast<Namespace*>(this)));
+  if (!ac.check()) {
+    return fit::error(errno(ENOMEM));
+  }
+  return fit::ok(ktl::unique_ptr<MountNamespaceFile>(ptr));
+}
 
 Namespace::Namespace(MountHandle root_mount, uint64_t id)
     : root_mount_(ktl::move(root_mount)), id_(id) {

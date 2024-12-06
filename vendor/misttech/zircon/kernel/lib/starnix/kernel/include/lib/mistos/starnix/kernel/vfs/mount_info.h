@@ -37,7 +37,6 @@ struct MountInfo {
   fit::result<Errno> check_readonly_filesystem();
 
   // C++
- public:
   ktl::optional<MountHandle> operator*() const;
 
   ~MountInfo();

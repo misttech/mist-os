@@ -202,9 +202,19 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   /// The syslog manager.
   // pub syslog: Syslog,
 
+  /// All mounts.
+  Mounts mounts_;
+
  public:
   /// impl Kernel
   static fit::result<zx_status_t, fbl::RefPtr<Kernel>> New(const ktl::string_view& cmdline);
+
+  /// impl Kernel (namespace.rs)
+  uint64_t get_next_mount_id() { return next_mount_id_.next(); }
+
+  uint64_t get_next_peer_group_id() { return next_peer_group_id_.next(); }
+
+  uint64_t get_next_namespace_id() { return next_namespace_id_.next(); }
 
   // C++
   ~Kernel();

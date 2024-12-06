@@ -32,6 +32,7 @@ namespace starnix {
 class CurrentTask;
 class DirEntry;
 class FsNode;
+class Mounts;
 
 using DirEntryHandle = fbl::RefPtr<DirEntry>;
 using FsNodeHandle = fbl::RefPtr<FsNode>;
@@ -59,8 +60,8 @@ struct DirEntryState {
   /// Whether this directory entry has been removed from the tree.
   bool is_dead;
 
-  /// The number of filesystem mounted on the directory entry.
-  uint32_t mount_count;
+  /// Whether the entry has filesystems mounted on top of it.
+  bool has_mounts;
 };
 
 class DirEntryOps {
@@ -200,28 +201,21 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
 
       auto create_child = [&](CreateNodeFn&& create_fn)
           -> fit::result<Errno, ktl::pair<DirEntryHandle, CreationResult<CreateNodeFn>>> {
-        auto find_or_create_node = [&](CreateNodeFn&& create_fn)
-            -> fit::result<Errno, ktl::pair<FsNodeHandle, CreationResult<CreateNodeFn>>> {
-          // Before creating the child, check for existence.
+        // Before creating the child, check for existence.
+        auto node_and_create_result =
+            [&]() -> fit::result<Errno, ktl::pair<FsNodeHandle, CreationResult<CreateNodeFn>>> {
           auto lookup_result = entry_->node_->lookup(current_task, mount, name);
           if (lookup_result.is_ok()) {
             return fit::ok(
                 ktl::pair(lookup_result.value(), CreationResult<CreateNodeFn>(create_fn)));
-          } else {
-            if (lookup_result.error_value().error_code() == ENOENT) {
-              if (auto create_fn_result = create_fn(entry_->node_, mount, name);
-                  create_fn_result.is_error()) {
-                return create_fn_result.take_error();
-              } else {
-                return fit::ok(ktl::pair(create_fn_result.value(), Created()));
-              }
-            } else {
-              return lookup_result.take_error();
-            }
           }
-        }(create_fn)_EP(find_or_create_node);
-
-        auto [node, create_result] = find_or_create_node.value();
+          if (lookup_result.error_value().error_code() == ENOENT) {
+            auto create_fn_result = create_fn(entry_->node_, mount, name) _EP(create_fn_result);
+            return fit::ok(ktl::pair(create_fn_result.value(), Created()));
+          }
+          return lookup_result.take_error();
+        }() _EP(node_and_create_result);
+        auto [node, create_result] = node_and_create_result.value();
 
         ASSERT_MSG((node->info()->mode & FileMode::IFMT) != FileMode::EMPTY,
                    "FsNode initialization did not populate the FileMode in FsNodeInfo.");
@@ -240,34 +234,28 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
 
       auto result =
           [&]() -> fit::result<Errno, ktl::pair<DirEntryHandle, CreationResult<CreateNodeFn>>> {
-        if (auto it = children_->find(name); it == children_->end()) {
+        auto it = children_->find(name);
+        if (it == children_->end()) {
           // Vacant
-          if (auto result = create_child(create_fn); result.is_error()) {
-            return result.take_error();
-          } else {
-            auto [child, create_result] = result.value();
-            children_->insert(child->weak_factory_.GetWeakPtr());
-            return fit::ok(ktl::pair(child, create_result));
-          }
-        } else {
-          // Occupied
-          // It's possible that the upgrade will succeed this time around because we dropped
-          // the read lock before acquiring the write lock. Another thread might have
-          // populated this entry while we were not holding any locks.
-          auto child = it.CopyPointer().Lock();
-          if (child) {
-            child->node_->fs()->did_access_dir_entry(child);
-            return fit::ok(ktl::pair(child, CreationResult<CreateNodeFn>(create_fn)));
-          }
-
-          if (auto result = create_child(create_fn); result.is_error()) {
-            return result.take_error();
-          } else {
-            auto [new_child, create_result] = result.value();
-            children_->insert(new_child->weak_factory_.GetWeakPtr());
-            return fit::ok(ktl::pair(new_child, create_result));
-          }
+          auto result = create_child(create_fn) _EP(result);
+          auto [child, create_result] = result.value();
+          children_->insert(child->weak_factory_.GetWeakPtr());
+          return fit::ok(ktl::pair(child, create_result));
         }
+        // Occupied
+        // It's possible that the upgrade will succeed this time around because we dropped
+        // the read lock before acquiring the write lock. Another thread might have
+        // populated this entry while we were not holding any locks.
+        auto child = it.CopyPointer().Lock();
+        if (child) {
+          child->node_->fs()->did_access_dir_entry(child);
+          return fit::ok(ktl::pair(child, CreationResult<CreateNodeFn>(create_fn)));
+        }
+
+        auto result = create_child(create_fn) _EP(result);
+        auto [new_child, create_result] = result.value();
+        children_->insert(new_child->weak_factory_.GetWeakPtr());
+        return fit::ok(ktl::pair(new_child, create_result));
       }() _EP(result);
 
       auto [child, create_result] = result.value();
@@ -286,6 +274,16 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
   /// namespace might have a different name for the point in the namespace at
   /// which this node is mounted.
   FsString local_name() const;
+
+  /// The parent DirEntry object.
+  ///
+  /// Returns None if this DirEntry is the root of its file system.
+  ///
+  /// Be aware that the root of one file system might be mounted as a child
+  /// in another file system. For that reason, consider walking the
+  /// NamespaceNode tree (which understands mounts) rather than the DirEntry
+  /// tree.
+  ktl::optional<DirEntryHandle> parent() const;
 
   /// The parent DirEntry object or this DirEntry if this entry is the root.
   ///
@@ -369,7 +367,6 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
       return fit::error(errno(EINVAL));
     }
     auto result = get_or_create_child(current_task, mount, name, fn) _EP(result);
-
     auto [entry, exists] = result.value();
     if (!exists) {
       // An entry was created. Update the ctime and mtime of this directory.
@@ -390,6 +387,29 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
   fit::result<Errno, DirEntryHandle> create_dir_for_testing(const CurrentTask& current_task,
                                                             const FsStr& name);
 
+  /// Creates an anonymous file.
+  ///
+  /// The FileMode::IFMT of the FileMode is always FileMode::IFREG.
+  ///
+  /// Used by O_TMPFILE.
+  fit::result<Errno, DirEntryHandle> create_tmpfile(const CurrentTask& current_task,
+                                                    const MountInfo& mount, FileMode mode,
+                                                    FsCred owner, OpenFlags flags);
+
+  /*fit::result<Errno, void> unlink(const CurrentTask& current_task, const MountInfo& mount,
+                                 const FsStr& name, UnlinkKind kind, bool must_be_directory);*/
+
+  /// Destroy this directory entry.
+  ///
+  /// Notice that this method takes `self` by value to destroy this reference.
+  /// Destroy this directory entry.
+  ///
+  /// Notice that this method takes `self` by value to destroy this reference.
+  void destroy(const Mounts& mounts) &&;
+
+  /// Returns whether this entry is a descendant of |other|.
+  bool is_descendant_of(const DirEntryHandle& other) const;
+
   template <typename CreateNodeFn>
   fit::result<Errno, ktl::pair<DirEntryHandle, bool>> get_or_create_child(
       const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,
@@ -407,70 +427,66 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
 
     // Check if the child is already in children. In that case, we can
     // simply return the child and we do not need to call init_fn.
-    auto optional_child = [&name, &children = this->children_]() -> ktl::optional<DirEntryHandle> {
-      auto children_lock = children.Read();
+    auto child = [&]() -> ktl::optional<DirEntryHandle> {
+      auto children_lock = children_.Read();
       auto it = children_lock->find(name);
       if (it != children_lock->end()) {
-        auto child = it.CopyPointer().Lock();
-        if (child) {
-          return child;
+        auto strong_child = it.CopyPointer().Lock();
+        if (strong_child) {
+          return strong_child;
         }
       }
       return ktl::nullopt;
     }();
 
-    auto result =
+    auto child_and_create_result =
         [&]() -> fit::result<Errno, ktl::pair<DirEntryHandle, CreationResult<CreateNodeFn>>> {
-      if (optional_child.has_value()) {
-        auto c = optional_child.value();
+      if (child.has_value()) {
+        auto c = child.value();
         c->node_->fs()->did_access_dir_entry(c);
         return fit::ok(ktl::pair(c, CreationResult<CreateNodeFn>(create_fn)));
-      } else {
-        auto result =
-            lock_children().get_or_create_child(current_task, mount, name, create_fn) _EP(result);
-        auto [c, cr] = result.value();
-        c->node_->fs()->purge_old_entries();
-        return fit::ok(ktl::pair(c, ktl::move(cr)));
       }
-    }() _EP(result);
+      auto result =
+          lock_children().get_or_create_child(current_task, mount, name, create_fn) _EP(result);
+      auto [c, cr] = result.value();
+      c->node_->fs()->purge_old_entries();
+      return fit::ok(ktl::pair(c, ktl::move(cr)));
+    }() _EP(child_and_create_result);
 
-    auto [child, cr] = result.value();
+    auto [new_child, create_result] = child_and_create_result.value();
     auto new_result = [&]() -> fit::result<Errno, ktl::pair<DirEntryHandle, bool>> {
       return ktl::visit(
           overloaded{
               [&](const Created&) -> fit::result<Errno, ktl::pair<DirEntryHandle, bool>> {
-                return fit::ok(ktl::pair(child, false));
+                return fit::ok(ktl::pair(new_child, false));
               },
               [&](const Existed<CreateNodeFn>& e)
                   -> fit::result<Errno, ktl::pair<DirEntryHandle, bool>> {
-                auto revalidate_result = child->ops_->revalidate(current_task, *child);
-                if (revalidate_result.is_error()) {
-                  return revalidate_result.take_error();
-                }
+                auto revalidate_result =
+                    new_child->ops_->revalidate(current_task, *new_child) _EP(revalidate_result);
 
                 if (revalidate_result.value()) {
-                  return fit::ok(ktl::pair(child, true));
-                } else {
-                  this->internal_remove_child(child.get());
-                  // child.destroy(&current_task.kernel().mounts);
-                  auto result = lock_children().get_or_create_child(current_task, mount, name,
-                                                                    e.create_fn) _EP(result);
-                  auto [c, cr2] = result.value();
-                  c->node_->fs()->purge_old_entries();
-
-                  return fit::ok(ktl::pair(
-                      c, ktl::visit(
-                             overloaded{[](const Created&) -> bool { return false; },
-                                        [](const Existed<CreateNodeFn>) -> bool { return true; }},
-                             cr2.variant_)));
+                  return fit::ok(ktl::pair(new_child, true));
                 }
+                this->internal_remove_child(new_child.get());
+                // child.destroy(&current_task.kernel().mounts);
+                auto result = lock_children().get_or_create_child(current_task, mount, name,
+                                                                  e.create_fn) _EP(result);
+                auto [local_child, local_create_result] = result.value();
+                local_child->node_->fs()->purge_old_entries();
+
+                return fit::ok(ktl::pair(
+                    local_child,
+                    ktl::visit(overloaded{[](const Created&) -> bool { return false; },
+                                          [](const Existed<CreateNodeFn>) -> bool { return true; }},
+                               local_create_result.variant_)));
               },
           },
-          cr.variant_);
+          create_result.variant_);
     }() _EP(new_result);
 
-    auto [child2, exists] = new_result.value();
-    return fit::ok(ktl::pair(child2, exists));
+    auto [return_child, exists] = new_result.value();
+    return fit::ok(ktl::pair(return_child, exists));
   }
 
   /// This function is only useful for tests and has some oddities.
@@ -485,8 +501,78 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
  private:
   void internal_remove_child(DirEntry* child);
 
-  // C++
+#if 0
+  /// Notifies watchers on the current node and its parent about an event.
+  void notify(InotifyMask event_mask) {
+    notify_watchers(event_mask, is_dead());
+  }
+
+  /// Notifies watchers on the current node and its parent about an event.
+  ///
+  /// Used for FSNOTIFY_EVENT_INODE events, which ignore IN_EXCL_UNLINK.
+  void notify_ignoring_excl_unlink(InotifyMask event_mask) {
+    // We pretend that this directory entry is not dead to ignore IN_EXCL_UNLINK.
+    notify_watchers(event_mask, false);
+  }
+
+  void notify_watchers(InotifyMask event_mask, bool is_dead) {
+    auto mode = node_->info()->mode;
+    if (auto parent = state_.Read()->parent) {
+      parent->node_->watchers.notify(event_mask, 0, local_name(), mode, is_dead);
+    }
+    node_->watchers.notify(event_mask, 0, FsStr(), mode, is_dead);
+  }
+
+  /// Notifies parents about creation, and notifies current node about link_count change.
+  void notify_creation() {
+    auto mode = node_->info()->mode;
+    if (fbl::RefPtr<DirEntry>::GetRefCount(this) > 1) {
+      // Notify about link change only if there is already a hardlink.
+      node_->watchers.notify(InotifyMask::ATTRIB, 0, FsStr(), mode, false);
+    }
+    if (auto parent = state_.Read()->parent) {
+      parent->node_->watchers.notify(InotifyMask::CREATE, 0, local_name(), mode, false);
+    }
+  }
+
+  /// Notifies watchers on the current node about deletion if this is the
+  /// last hardlink, and drops the DirEntryHandle kept by Inotify.
+  /// Parent is also notified about deletion.
+  void notify_deletion() {
+    auto mode = node_->info()->mode;
+    if (!FileMode::is_dir(mode)) {
+      // Linux notifies link count change for non-directories.
+      node_->watchers.notify(InotifyMask::ATTRIB, 0, FsStr(), mode, false);
+    }
+
+    if (auto parent = state_.Read()->parent) {
+      parent->node_->watchers.notify(InotifyMask::DELETE, 0, local_name(), mode, false);
+    }
+
+    // This check is incorrect if there's another hard link to this FsNode that isn't in
+    // memory at the moment.
+    if (fbl::RefPtr<DirEntry>::GetRefCount(this) == 1) {
+      node_->watchers.notify(InotifyMask::DELETE_SELF, 0, FsStr(), mode, false);
+    }
+  }
+#endif
+
  public:
+  /// Returns true if this entry has mounts.
+  bool has_mounts() const;
+
+  /// Records whether or not the entry has mounts.
+  void set_has_mounts(bool v);
+
+ private:
+  /// Verifies this directory has nothing mounted on it.
+  fit::result<Errno> require_no_mounts(const MountInfo& parent_mount);
+
+ public:
+  // impl fmt::Debug for DirEntry
+  mtl::BString debug() const;
+
+  // C++
   /// The Drop trait for DirEntry removes the entry from the child list of the
   /// parent entry, which means we cannot drop DirEntry objects while holding a
   /// lock on the parent's child list.

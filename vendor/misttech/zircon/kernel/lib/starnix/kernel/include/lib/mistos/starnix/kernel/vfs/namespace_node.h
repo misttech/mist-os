@@ -133,7 +133,7 @@ class NamespaceNode {
   /// Will return an existing node unless `flags` contains `OpenFlags::EXCL`.
   fit::result<Errno, NamespaceNode> open_create_node(const CurrentTask& current_task,
                                                      const FsStr& name, FileMode mode,
-                                                     DeviceType dev, OpenFlags flags);
+                                                     DeviceType dev, OpenFlags flags) const;
 
   /// Create a node in the file system.
   ///
@@ -141,7 +141,7 @@ class NamespaceNode {
   ///
   /// Does not return an existing node.
   fit::result<Errno, NamespaceNode> create_node(const CurrentTask& current_task, const FsStr& name,
-                                                FileMode mode, DeviceType dev);
+                                                FileMode mode, DeviceType dev) const;
 
   /// Creates an anonymous file.
   ///
@@ -214,6 +214,9 @@ class NamespaceNode {
   fit::result<Errno> check_access(const CurrentTask& current_task, Access access) const;
 
   fit::result<Errno> truncate(const CurrentTask& current_task, uint64_t length) const;
+
+  // impl fmt::Debug for NamespaceNode
+  mtl::BString debug() const;
 
   // C++
   // NamespaceNode(const NamespaceNode& other);

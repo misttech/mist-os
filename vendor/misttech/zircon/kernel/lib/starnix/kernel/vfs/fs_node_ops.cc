@@ -8,11 +8,6 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix_uapi/errors.h>
-#include <trace.h>
-
-#include "../kernel_priv.h"
-
-#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
@@ -23,8 +18,8 @@ fit::result<Errno, FsNodeHandle> FsNodeOps::lookup(const FsNode& node,
                                                    const FsStr& name) const {
   // The default implementation here is suitable for filesystems that have permanent entries;
   // entries that already exist will get found in the cache and shouldn't get this far.
-  LTRACEF("ENOENT name=[%.*s]\n", static_cast<int>(name.length()), name.data());
-  return fit::error(errno(ENOENT));
+  return fit::error(
+      errno(ENOENT, mtl::format("looking for %.*s", static_cast<int>(name.length()), name.data())));
 }
 
 fit::result<Errno, FsNodeHandle> FsNodeOps::create_tmpfile(const FsNode& node,

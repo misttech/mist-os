@@ -150,6 +150,13 @@ void FileSystem::did_access_dir_entry(const DirEntryHandle& entry) { LTRACE; }
 
 void FileSystem::purge_old_entries() { LTRACE; }
 
-DirEntryHandle FileSystem::root() { return root_.get(); }
+FsStr FileSystem::name() const { return ops_->name(); }
+
+DirEntryHandle FileSystem::root() {
+  auto root = root_.get();
+  ZX_ASSERT_MSG(root, "FileSystem %.*s has no root", static_cast<int>(name().size()),
+                name().data());
+  return root;
+}
 
 }  // namespace starnix

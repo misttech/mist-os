@@ -7,6 +7,7 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_NAMESPACE_H_
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/device_type.h>
@@ -32,7 +33,7 @@ using FileSystemHandle = fbl::RefPtr<FileSystem>;
 // A mount namespace.
 //
 // The namespace records at which entries filesystems are mounted.
-class Namespace : public fbl::RefCounted<Namespace> {
+class Namespace : public fbl::RefCounted<Namespace>, public FsNodeOps {
  private:
   MountHandle root_mount_;
 
@@ -40,13 +41,21 @@ class Namespace : public fbl::RefCounted<Namespace> {
   // Unique ID of this namespace.
   uint64_t id_;
 
- public:
   // impl Namespace
   static fbl::RefPtr<Namespace> New(FileSystemHandle fs);
 
   static fbl::RefPtr<Namespace> new_with_flags(FileSystemHandle fs, MountFlags flags);
 
   NamespaceNode root();
+
+  fbl::RefPtr<Namespace> clone_namespace() const;
+
+  // impl FsNodeOps for Arc<Namespace>
+  fs_node_impl_not_dir();
+
+  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const FsNode& node,
+                                                               const CurrentTask& current_task,
+                                                               OpenFlags flags) const override;
 
  public:
   // C++

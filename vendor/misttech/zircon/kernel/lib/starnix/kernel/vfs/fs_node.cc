@@ -151,6 +151,7 @@ fit::result<Errno, ktl::unique_ptr<FileOps>> FsNode::open(const CurrentTask& cur
 
 fit::result<Errno, FsNodeHandle> FsNode::lookup(const CurrentTask& current_task,
                                                 const MountInfo& mount, const FsStr& name) const {
+  LTRACEF("name[%.*s]\n", static_cast<int>(name.size()), name.data());
   // self.check_access(current_task, mount, Access::EXEC)?;
   return ops_->lookup(*this, current_task, name);
 }
