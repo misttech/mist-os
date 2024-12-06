@@ -178,12 +178,23 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
     // TODO(costan): Add an error code that indicates invalid input.
     return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
-  display::DriverLayer layer(banjo_layers[0]);
-  cpp20::span<const display::DriverLayer> layers(&layer, 1);
+  display::DriverLayer layer0(banjo_layers[0]);
+  cpp20::span<const display::DriverLayer> layers(&layer0, 1);
+  display::LayerCompositionOperations layer0_composition_operations;
+  cpp20::span<display::LayerCompositionOperations> layer_composition_operations(
+      &layer0_composition_operations, 1);
 
-  return engine_.CheckConfiguration(display::ToDisplayId(banjo_display_config.display_id), layers,
-                                    out_layer_composition_operations,
-                                    out_layer_composition_operations_actual);
+  bool is_supported_configuration = engine_.CheckConfiguration(
+      display::ToDisplayId(banjo_display_config.display_id), layers, layer_composition_operations);
+  if (is_supported_configuration) {
+    return CONFIG_CHECK_RESULT_OK;
+  }
+
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = 1;
+  }
+  out_layer_composition_operations[0] = layer0_composition_operations.ToBanjo();
+  return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
 }
 
 void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(

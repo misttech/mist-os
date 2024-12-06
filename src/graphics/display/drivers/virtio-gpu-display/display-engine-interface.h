@@ -6,8 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_INTERFACE_H_
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-// TODO(https://fxbug.dev/42079190): Switch from Banjo to FIDL or api-types-cpp types.
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/zx/result.h>
 
 #include <cstdint>
@@ -20,6 +18,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 
 namespace virtio_display {
 
@@ -55,11 +54,15 @@ class DisplayEngineInterface {
       display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) = 0;
   virtual void ReleaseImage(display::DriverImageId driver_image_id) = 0;
 
-  // TODO(costan): Switch from Banjo to FIDL or api-types-cpp types.
-  virtual config_check_result_t CheckConfiguration(
+  // `layer_composition_operations_buffer` must have the same size as `layers`. All
+  // the elements must be empty (`display::LayerCompositionOperations::kNoOperations`).
+  //
+  // Returns true if the configuration is acceptable to the driver. If false,
+  // `layer_composition_operations` must be set to a sequence of operations that
+  // are likely to yield an acceptable configuration.
+  virtual bool CheckConfiguration(
       display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<layer_composition_operations_t> out_layer_composition_operations,
-      size_t* out_layer_composition_operations_actual) = 0;
+      cpp20::span<display::LayerCompositionOperations> layer_composition_operations) = 0;
 
   virtual void ApplyConfiguration(display::DisplayId display_id,
                                   cpp20::span<const display::DriverLayer> layers,

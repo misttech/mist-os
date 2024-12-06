@@ -73,10 +73,9 @@ class DisplayEngine final : public DisplayEngineInterface {
   zx::result<display::DriverCaptureImageId> ImportImageForCapture(
       display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override;
   void ReleaseImage(display::DriverImageId image_id) override;
-  config_check_result_t CheckConfiguration(
+  bool CheckConfiguration(
       display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<layer_composition_operations_t> out_layer_composition_operations,
-      size_t* out_layer_composition_operations_actual) override;
+      cpp20::span<display::LayerCompositionOperations> layer_composition_operations) override;
   void ApplyConfiguration(display::DisplayId display_id,
                           cpp20::span<const display::DriverLayer> layers,
                           display::ConfigStamp config_stamp) override;
