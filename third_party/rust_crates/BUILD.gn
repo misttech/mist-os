@@ -83,20 +83,8 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
-if (!(current_os == "fuchsia")) {
-  group("async-io") {
-    public_deps = [ ":async-io-v1_12_0" ]
-  }
-}
-
 group("async-lock") {
   public_deps = [ ":async-lock-v2_6_0" ]
-}
-
-if (!(current_os == "fuchsia")) {
-  group("async-net") {
-    public_deps = [ ":async-net-v1_7_0" ]
-  }
 }
 
 group("async-ringbuf") {
@@ -2080,51 +2068,6 @@ rust_library("async-fs-v1_6_0") {
   applicable_licenses = [ ":async-fs-v1_6_0.license" ]
 }
 
-license("async-io-v1_12_0.license") {
-  public_package_name = "async_io"
-  license_files = [
-    "//third_party/rust_crates/forks/async-io/LICENSE-APACHE",
-    "//third_party/rust_crates/forks/async-io/LICENSE-MIT",
-  ]
-}
-
-rust_library("async-io-v1_12_0") {
-  crate_name = "async_io"
-  crate_root = "//third_party/rust_crates/forks/async-io/src/lib.rs"
-  output_name = "async_io-8cea39e881d5ae1e"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":async-lock-v2_6_0" ]
-  deps += [ ":concurrent-queue-v2_5_0" ]
-  deps += [ ":futures-lite-v1_11_3" ]
-  deps += [ ":log-v0_4_22" ]
-  deps += [ ":parking-v2_0_0" ]
-  deps += [ ":polling-v2_4_0" ]
-  deps += [ ":slab-v0_4_7" ]
-  deps += [ ":socket2-v0_4_4" ]
-  deps += [ ":waker-fn-v1_1_0" ]
-  if (true) {
-    deps += [ ":libc-v0_2_158" ]
-  }
-  if (false) {
-    deps += [ ":windows-sys-v0_42_0" ]
-  }
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=8cea39e881d5ae1e",
-    "-Cextra-filename=-8cea39e881d5ae1e",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":async-io-v1_12_0.license" ]
-}
-
 license("async-lock-v2_6_0.license") {
   public_package_name = "async_lock"
   license_files = [
@@ -2155,39 +2098,6 @@ rust_library("async-lock-v2_6_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":async-lock-v2_6_0.license" ]
-}
-
-license("async-net-v1_7_0.license") {
-  public_package_name = "async_net"
-  license_files = [
-    "//third_party/rust_crates/vendor/async-net-1.7.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/async-net-1.7.0/LICENSE-MIT",
-  ]
-}
-
-rust_library("async-net-v1_7_0") {
-  crate_name = "async_net"
-  crate_root = "//third_party/rust_crates/vendor/async-net-1.7.0/src/lib.rs"
-  output_name = "async_net-40ebfd6a451158cd"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":async-io-v1_12_0" ]
-  deps += [ ":blocking-v1_3_0" ]
-  deps += [ ":futures-lite-v1_11_3" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=40ebfd6a451158cd",
-    "-Cextra-filename=-40ebfd6a451158cd",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":async-net-v1_7_0.license" ]
 }
 
 license("async-ringbuf-v0_3_1.license") {
@@ -8874,7 +8784,6 @@ rust_library("mock-omaha-server-v0_3_3") {
   deps += [ "//src/lib/fuchsia-sync" ]
   deps += [ "//third_party/rust_crates:argh" ]
   if (!(current_os == "fuchsia")) {
-    deps += [ "//third_party/rust_crates:async-net" ]
     deps += [ "//third_party/rust_crates:tokio" ]
   }
 
@@ -10917,47 +10826,6 @@ rust_library("podio-v0_1_6") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":podio-v0_1_6.license" ]
-}
-
-license("polling-v2_4_0.license") {
-  public_package_name = "polling"
-  license_files = [
-    "//third_party/rust_crates/vendor/polling-2.4.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/polling-2.4.0/LICENSE-MIT",
-  ]
-}
-
-rust_library("polling-v2_4_0") {
-  crate_name = "polling"
-  crate_root = "//third_party/rust_crates/vendor/polling-2.4.0/src/lib.rs"
-  output_name = "polling-8f57c54a6963efb"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":log-v0_4_22" ]
-  if (true || current_os == "fuchsia" || false) {
-    deps += [ ":libc-v0_2_158" ]
-  }
-  if (false) {
-    deps += [ ":wepoll-ffi-v0_1_2" ]
-    deps += [ ":winapi-v0_3_9" ]
-  }
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=8f57c54a6963efb",
-    "-Cextra-filename=-8f57c54a6963efb",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"std\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":polling-v2_4_0.license" ]
 }
 
 license("polyval-v0_6_0.license") {
@@ -15014,43 +14882,6 @@ rust_library("smallvec-v1_13_1") {
   applicable_licenses = [ ":smallvec-v1_13_1.license" ]
 }
 
-license("socket2-v0_4_4.license") {
-  public_package_name = "socket2"
-  license_files = [
-    "//third_party/rust_crates/vendor/socket2-0.4.4/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/socket2-0.4.4/LICENSE-MIT",
-  ]
-}
-
-rust_library("socket2-v0_4_4") {
-  crate_name = "socket2"
-  crate_root = "//third_party/rust_crates/vendor/socket2-0.4.4/src/lib.rs"
-  output_name = "socket2-eb52e051ac66cd02"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  if (true) {
-    deps += [ ":libc-v0_2_158" ]
-  }
-  if (false) {
-    deps += [ ":winapi-v0_3_9" ]
-  }
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=eb52e051ac66cd02",
-    "-Cextra-filename=-eb52e051ac66cd02",
-    "--cfg=feature=\"all\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":socket2-v0_4_4.license" ]
-}
-
 license("socket2-v0_5_5.license") {
   public_package_name = "socket2"
   license_files = [
@@ -18318,29 +18149,6 @@ rust_library("rustls-webpki-v0_101_6") {
   applicable_licenses = [ ":rustls-webpki-v0_101_6.license" ]
 }
 
-rust_library("wepoll-ffi-v0_1_2") {
-  crate_name = "wepoll_ffi"
-  crate_root = "//third_party/rust_crates/empty/wepoll-ffi/src/lib.rs"
-  output_name = "wepoll_ffi-3e7f08283fc3bd91"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=3e7f08283fc3bd91",
-    "-Cextra-filename=-3e7f08283fc3bd91",
-    "--cfg=feature=\"null-overlapped-wakeups-patch\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
-}
-
 license("which-v4_0_2.license") {
   public_package_name = "which"
   license_files = [ "//third_party/rust_crates/vendor/which-4.0.2/LICENSE.txt" ]
@@ -18393,7 +18201,6 @@ rust_library("winapi-v0_3_9") {
     "--cfg=feature=\"handleapi\"",
     "--cfg=feature=\"in6addr\"",
     "--cfg=feature=\"inaddr\"",
-    "--cfg=feature=\"ioapiset\"",
     "--cfg=feature=\"lmcons\"",
     "--cfg=feature=\"minschannel\"",
     "--cfg=feature=\"minwinbase\"",
@@ -18421,8 +18228,6 @@ rust_library("winapi-v0_3_9") {
     "--cfg=feature=\"winnt\"",
     "--cfg=feature=\"winsock2\"",
     "--cfg=feature=\"winuser\"",
-    "--cfg=feature=\"ws2ipdef\"",
-    "--cfg=feature=\"ws2tcpip\"",
     "--cfg=feature=\"wtypesbase\"",
   ]
 
@@ -18494,29 +18299,6 @@ rust_library("windows-core-v0_52_0") {
     "--edition=2015",
     "-Cmetadata=fe71282da1ff9567",
     "-Cextra-filename=-fe71282da1ff9567",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
-}
-
-rust_library("windows-sys-v0_42_0") {
-  crate_name = "windows_sys"
-  crate_root = "//third_party/rust_crates/empty/windows-sys-0.42.0/src/lib.rs"
-  output_name = "windows_sys-c774e6555c42216d"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=c774e6555c42216d",
-    "-Cextra-filename=-c774e6555c42216d",
-    "--cfg=feature=\"Win32_Networking_WinSock\"",
   ]
 
   visibility = [ ":*" ]
