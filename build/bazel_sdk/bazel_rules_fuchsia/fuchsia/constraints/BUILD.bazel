@@ -5,7 +5,7 @@
 # Constraints and platforms for Fuchsia.
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
+load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
 load(":target_compatibility.bzl", "COMPATIBILITY", "define_host_can_build_fuchsia_flag")
 
 package(

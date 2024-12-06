@@ -144,12 +144,4 @@ sdk_host_tool(name = "far")
 
 sdk_host_tool(name = "funnel")
 
-# All of the starlark files that are exported for documentation.
-filegroup(
-    name = "bzl_srcs",
-    srcs = glob(["*.bzl"]),
-    visibility = ["//fuchsia:__pkg__"],
-)
-
-
 {{__FUCHSIA_SDK_INCLUDE__}}

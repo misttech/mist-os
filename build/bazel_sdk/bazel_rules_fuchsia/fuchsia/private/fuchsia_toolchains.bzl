@@ -34,6 +34,7 @@ def get_fuchsia_sdk_toolchain(ctx):
 
     Args:
         ctx: The rule context.
+
     Returns:
         The fuchsia sdk tool chain.
     """
