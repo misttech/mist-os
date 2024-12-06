@@ -22,7 +22,7 @@ use vfs::directory::helper::DirectlyMutable;
 use {fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fuchsia_async as fasync};
 
 #[fasync::run_singlethreaded]
-pub async fn main() {
+pub async fn main() -> std::process::ExitCode {
     // Start by getting the Netstack version we should use.
     let current_boot_version = {
         let migration =
@@ -139,4 +139,8 @@ pub async fn main() {
         .await
         .expect("failed to observe process termination signals");
     println!("netstack exited unexpectedly with {signals:?}");
+
+    // TODO(https://fxbug.dev/380897722) Inherit the exit code of the proxied netstack process once
+    // netstack supports clean shutdown.
+    std::process::ExitCode::FAILURE
 }
