@@ -56,8 +56,7 @@ pub enum AssertVmoContentError {
 pub fn assert_vmo_content(vmo: &fidl::Vmo, expected: &[u8]) -> Result<(), AssertVmoContentError> {
     let size =
         vmo.get_content_size().map_err(AssertVmoContentError::GetContentSizeFailed)? as usize;
-    let mut buffer = Vec::with_capacity(size);
-    buffer.resize(size, 0);
+    let mut buffer = vec![0; size];
     vmo.read(&mut buffer, 0).map_err(AssertVmoContentError::VmoReadFailed)?;
     if buffer != expected {
         Err(AssertVmoContentError::UnexpectedContent(buffer))

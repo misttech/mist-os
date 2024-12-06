@@ -49,8 +49,8 @@ impl BlockClient for FakeBlockClient {
         let mut inner = self.inner.lock().unwrap();
         // 0 is a sentinel value
         for id in 1..u16::MAX {
-            if !inner.vmo_registry.contains_key(&id) {
-                inner.vmo_registry.insert(id, vmo);
+            if let std::collections::btree_map::Entry::Vacant(e) = inner.vmo_registry.entry(id) {
+                e.insert(vmo);
                 return Ok(VmoId::new(id));
             }
         }

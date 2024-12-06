@@ -101,7 +101,7 @@ impl Parse for AttributeArgs {
                 break;
             } else if input.peek(Ident) {
                 let ident: Ident = input.parse()?;
-                if ident.to_string() != "name" {
+                if ident != "name" {
                     return Err(syn::Error::new(
                         ident.span(),
                         format!("unknown argument: {}", ident),
