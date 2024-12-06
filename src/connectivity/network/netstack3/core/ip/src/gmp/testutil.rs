@@ -10,7 +10,7 @@ use core::convert::Infallible as Never;
 use core::time::Duration;
 
 use net_declare::{net_ip_v4, net_ip_v6};
-use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::MulticastAddr;
 use netstack3_base::testutil::{FakeBindingsCtx, FakeDeviceId, FakeWeakDeviceId};
 use netstack3_base::{
@@ -165,6 +165,33 @@ pub(super) fn new_context_with_mode<I: IpExt>(mode: GmpMode) -> FakeCtx<I> {
         core_ctx.gmp.mode = mode;
         core_ctx
     })
+}
+
+pub(super) struct FakeV1Query<I: Ip> {
+    pub group_addr: I::Addr,
+    pub max_response_time: Duration,
+}
+
+impl<I: Ip> gmp::v1::QueryMessage<I> for FakeV1Query<I> {
+    fn group_addr(&self) -> I::Addr {
+        self.group_addr
+    }
+
+    fn max_response_time(&self) -> Duration {
+        self.max_response_time
+    }
+}
+
+pub(super) struct FakeV2Query<I: Ip> {
+    pub group_addr: I::Addr,
+    pub max_response_time: Duration,
+}
+
+impl<I: Ip> gmp::v2::QueryMessage<I> for FakeV2Query<I> {
+    fn as_v1(&self) -> impl gmp::v1::QueryMessage<I> + '_ {
+        let Self { group_addr, max_response_time, .. } = self;
+        FakeV1Query { group_addr: *group_addr, max_response_time: *max_response_time }
+    }
 }
 
 /// Extension trait so IP-independent tests can be written.

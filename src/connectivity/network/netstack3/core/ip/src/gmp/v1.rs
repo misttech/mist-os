@@ -18,7 +18,7 @@ use rand::Rng;
 
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpContext, GmpContextInner, GmpGroupState, GmpMode, GmpStateRef,
-    GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt, NotAMemberErr,
+    GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt, NotAMemberErr, QueryTarget,
 };
 
 /// Timers installed by GMP v1.
@@ -559,23 +559,26 @@ where
     })
 }
 
-/// The group targeted in a query message.
-pub(super) enum QueryTarget<A> {
-    Unspecified,
-    Specified(MulticastAddr<A>),
+/// A trait abstracting GMP v1 query messages.
+pub(super) trait QueryMessage<I: Ip> {
+    /// Returns the group address in the query.
+    fn group_addr(&self) -> I::Addr;
+
+    /// Returns tha maximum response time for the query.
+    fn max_response_time(&self) -> Duration;
 }
 
-pub(super) fn handle_query_message<I, BC, CC>(
+pub(super) fn handle_query_message<I, CC, BC, Q>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    target: QueryTarget<I::Addr>,
-    max_response_time: Duration,
+    query: &Q,
 ) -> Result<(), NotAMemberErr<I>>
 where
     BC: GmpBindingsContext,
     CC: GmpContext<I, BC>,
     I: IpExt,
+    Q: QueryMessage<I>,
 {
     core_ctx.with_gmp_state_mut_and_ctx(device, |mut core_ctx, mut state| {
         // Always enter v1 compatibility mode if we see a v1 message.
@@ -602,54 +605,75 @@ where
         if state.gmp.mode.is_v1_compat() {
             gmp::schedule_v1_compat(bindings_ctx, state.as_mut())
         }
-
-        let GmpStateRef { enabled: _, groups, gmp, config } = state;
-
-        let now = bindings_ctx.now();
-
-        let iter = match target {
-            QueryTarget::Unspecified => {
-                either::Either::Left(groups.iter_mut().map(|(addr, state)| (*addr, state)))
-            }
-            QueryTarget::Specified(group_addr) => either::Either::Right(core::iter::once((
-                group_addr,
-                groups.get_mut(&group_addr).ok_or_else(|| NotAMemberErr(*group_addr))?,
-            ))),
-        };
-
-        for (group_addr, state) in iter {
-            let QueryReceivedActions { generic, protocol_specific } = state
-                .v1_mut()
-                .query_received(&mut bindings_ctx.rng(), max_response_time, now, config);
-            let send_msg = generic.and_then(|generic| match generic {
-                QueryReceivedGenericAction::ScheduleTimer(delay) => {
-                    let _: Option<(BC::Instant, ())> = gmp.timers.schedule_after(
-                        bindings_ctx,
-                        DelayedReportTimerId(group_addr).into(),
-                        (),
-                        delay,
-                    );
-                    None
-                }
-                QueryReceivedGenericAction::StopTimerAndSendReport => {
-                    let _: Option<(BC::Instant, ())> =
-                        gmp.timers.cancel(bindings_ctx, &DelayedReportTimerId(group_addr).into());
-                    Some(GmpMessageType::Report)
-                }
-            });
-
-            // NB: Run actions before sending messages, which allows IGMP to
-            // understand it should be operating in v1 compatibility mode.
-            if let Some(ps_actions) = protocol_specific {
-                core_ctx.run_actions(bindings_ctx, device, ps_actions);
-            }
-            if let Some(msg) = send_msg {
-                core_ctx.send_message_v1(bindings_ctx, device, group_addr, msg);
-            }
-        }
-
-        Ok(())
+        handle_query_message_inner(&mut core_ctx, bindings_ctx, device, state, query)
     })
+}
+
+pub(super) fn handle_query_message_inner<I, CC, BC, T, Q>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    state: GmpStateRef<'_, I, T, BC>,
+    query: &Q,
+) -> Result<(), NotAMemberErr<I>>
+where
+    BC: GmpBindingsContext,
+    CC: GmpContextInner<I, BC, Actions = T::Actions>,
+    T: GmpTypeLayout<I, BC>,
+    I: IpExt,
+    Q: QueryMessage<I>,
+{
+    let GmpStateRef { enabled: _, groups, gmp, config } = state;
+
+    let now = bindings_ctx.now();
+
+    let target = query.group_addr();
+    let target = QueryTarget::new(target).ok_or_else(|| NotAMemberErr(target))?;
+    let iter = match target {
+        QueryTarget::Unspecified => {
+            either::Either::Left(groups.iter_mut().map(|(addr, state)| (*addr, state)))
+        }
+        QueryTarget::Specified(group_addr) => either::Either::Right(core::iter::once((
+            group_addr,
+            groups.get_mut(&group_addr).ok_or_else(|| NotAMemberErr(*group_addr))?,
+        ))),
+    };
+
+    for (group_addr, state) in iter {
+        let QueryReceivedActions { generic, protocol_specific } = state.v1_mut().query_received(
+            &mut bindings_ctx.rng(),
+            query.max_response_time(),
+            now,
+            config,
+        );
+        let send_msg = generic.and_then(|generic| match generic {
+            QueryReceivedGenericAction::ScheduleTimer(delay) => {
+                let _: Option<(BC::Instant, ())> = gmp.timers.schedule_after(
+                    bindings_ctx,
+                    DelayedReportTimerId(group_addr).into(),
+                    (),
+                    delay,
+                );
+                None
+            }
+            QueryReceivedGenericAction::StopTimerAndSendReport => {
+                let _: Option<(BC::Instant, ())> =
+                    gmp.timers.cancel(bindings_ctx, &DelayedReportTimerId(group_addr).into());
+                Some(GmpMessageType::Report)
+            }
+        });
+
+        // NB: Run actions before sending messages, which allows IGMP to
+        // understand it should be operating in v1 compatibility mode.
+        if let Some(ps_actions) = protocol_specific {
+            core_ctx.run_actions(bindings_ctx, device, ps_actions);
+        }
+        if let Some(msg) = send_msg {
+            core_ctx.send_message_v1(bindings_ctx, device, group_addr, msg);
+        }
+    }
+
+    Ok(())
 }
 
 pub(super) fn handle_enabled<I, CC, BC, T>(

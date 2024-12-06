@@ -19,9 +19,10 @@ use netstack3_base::{
 };
 use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, Serializer};
 use packet_formats::igmp::messages::{
-    IgmpLeaveGroup, IgmpMembershipReportV1, IgmpMembershipReportV2, IgmpPacket,
+    IgmpLeaveGroup, IgmpMembershipQueryV2, IgmpMembershipQueryV3, IgmpMembershipReportV1,
+    IgmpMembershipReportV2, IgmpPacket,
 };
-use packet_formats::igmp::{IgmpPacketBuilder, MessageType};
+use packet_formats::igmp::{IgmpMessage, IgmpPacketBuilder, MessageType};
 use packet_formats::ip::Ipv4Proto;
 use packet_formats::ipv4::options::Ipv4Option;
 use packet_formats::ipv4::{
@@ -29,6 +30,7 @@ use packet_formats::ipv4::{
 };
 use packet_formats::utils::NonZeroDuration;
 use thiserror::Error;
+use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
@@ -146,26 +148,15 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::Dev
             Err(_) => {
                 debug!("Cannot parse the incoming IGMP packet, dropping.");
                 return;
-            } // TODO: Do something else here?
+            }
         };
 
         let result = match packet {
             IgmpPacket::MembershipQueryV2(msg) => {
-                let addr = msg.group_addr();
-                SpecifiedAddr::new(addr)
-                    .map_or(Some(gmp::v1::QueryTarget::Unspecified), |addr| {
-                        MulticastAddr::new(addr.get()).map(gmp::v1::QueryTarget::Specified)
-                    })
-                    .map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
-                        gmp::v1::handle_query_message(
-                            self,
-                            bindings_ctx,
-                            device,
-                            group_addr,
-                            msg.max_response_time().into(),
-                        )
-                        .map_err(Into::into)
-                    })
+                gmp::v1::handle_query_message(self, bindings_ctx, device, &msg).map_err(Into::into)
+            }
+            IgmpPacket::MembershipQueryV3(msg) => {
+                gmp::v2::handle_query_message(self, bindings_ctx, device, &msg).map_err(Into::into)
             }
             IgmpPacket::MembershipReportV1(msg) => {
                 let addr = msg.group_addr();
@@ -185,14 +176,30 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::Dev
                 debug!("Hosts are not interested in Leave Group messages");
                 return;
             }
-            IgmpPacket::MembershipQueryV3(_) | IgmpPacket::MembershipReportV3(_) => {
-                debug!("TODO(https://fxbug.dev/42071006): Support IGMPv3");
+            IgmpPacket::MembershipReportV3(_) => {
+                debug!("Hosts are not interested in IGMPv3 report messages");
                 return;
             }
         };
         result.unwrap_or_else(|e| {
             debug!("Error occurred when handling IGMPv2 message: {}", e);
         })
+    }
+}
+
+impl<B: SplitByteSlice> gmp::v1::QueryMessage<Ipv4> for IgmpMessage<B, IgmpMembershipQueryV2> {
+    fn group_addr(&self) -> Ipv4Addr {
+        self.group_addr()
+    }
+
+    fn max_response_time(&self) -> Duration {
+        self.max_response_time().into()
+    }
+}
+
+impl<B: SplitByteSlice> gmp::v2::QueryMessage<Ipv4> for IgmpMessage<B, IgmpMembershipQueryV3> {
+    fn as_v1(&self) -> impl gmp::v1::QueryMessage<Ipv4> + '_ {
+        self.as_v2_query()
     }
 }
 

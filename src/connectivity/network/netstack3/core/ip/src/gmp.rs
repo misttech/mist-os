@@ -335,6 +335,10 @@ impl<I: Ip, D: WeakDeviceIdentifier> GmpTimerId<I, D> {
         let Self { device, _marker: IpVersionMarker { .. } } = self;
         device
     }
+
+    fn new(device: D) -> Self {
+        Self { device, _marker: Default::default() }
+    }
 }
 
 /// The bindings types for GMP.
@@ -384,7 +388,7 @@ impl<I: Ip, BC: GmpBindingsTypes + TimerContext> GmpState<I, BC> {
         Self {
             timers: LocalTimerHeap::new_with_context::<_, CC>(
                 bindings_ctx,
-                GmpTimerId { device, _marker: Default::default() },
+                GmpTimerId::new(device),
             ),
             mode: Default::default(),
             v2_proto: Default::default(),
@@ -717,6 +721,22 @@ fn schedule_v1_compat<I: IpExt, CC: GmpTypeLayout<I, BC>, BC: GmpBindingsContext
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
 struct NotAMemberErr<I: Ip>(I::Addr);
 
+/// The group targeted in a query message.
+enum QueryTarget<A> {
+    Unspecified,
+    Specified(MulticastAddr<A>),
+}
+
+impl<A: IpAddress> QueryTarget<A> {
+    fn new(addr: A) -> Option<Self> {
+        if addr == <A::Version as Ip>::UNSPECIFIED_ADDRESS {
+            Some(Self::Unspecified)
+        } else {
+            MulticastAddr::new(addr).map(Self::Specified)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::vec;
@@ -727,7 +747,7 @@ mod tests {
     use netstack3_base::testutil::{FakeDeviceId, FakeTimerCtxExt, FakeWeakDeviceId};
     use netstack3_base::InstantContext as _;
 
-    use testutil::{FakeCtx, FakeGmpContextInner, TestIpExt};
+    use testutil::{FakeCtx, FakeGmpContextInner, FakeV1Query, TestIpExt};
 
     use super::*;
 
@@ -865,8 +885,10 @@ mod tests {
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &FakeDeviceId,
-                v1::QueryTarget::Specified(I::GROUP_ADDR1),
-                Duration::from_secs(1)
+                &FakeV1Query {
+                    group_addr: I::GROUP_ADDR1.get(),
+                    max_response_time: Duration::from_secs(1)
+                }
             ),
             Err(NotAMemberErr(I::GROUP_ADDR1.get()))
         );
@@ -888,8 +910,10 @@ mod tests {
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &FakeDeviceId,
-                v1::QueryTarget::Specified(I::GROUP_ADDR1),
-                Duration::from_secs(1)
+                &FakeV1Query {
+                    group_addr: I::GROUP_ADDR1.get(),
+                    max_response_time: Duration::from_secs(1)
+                }
             ),
             Err(NotAMemberErr(I::GROUP_ADDR1.get()))
         );
@@ -902,13 +926,7 @@ mod tests {
 
         // Trigger the timer and observe a fallback to v2.
         let timer = bindings_ctx.trigger_next_timer(&mut core_ctx);
-        assert_eq!(
-            timer,
-            Some(GmpTimerId {
-                device: FakeWeakDeviceId(FakeDeviceId),
-                _marker: Default::default()
-            })
-        );
+        assert_eq!(timer, Some(GmpTimerId::new(FakeWeakDeviceId(FakeDeviceId))));
         assert_eq!(core_ctx.gmp.mode, GmpMode::V2);
         // No more timers should exist, no frames are sent out.
         core_ctx.gmp.timers.assert_timers([]);

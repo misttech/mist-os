@@ -19,8 +19,8 @@ use netstack3_filter as filter;
 use packet::serialize::Serializer;
 use packet::InnerPacketBuilder;
 use packet_formats::icmp::mld::{
-    IcmpMldv1MessageType, MldPacket, Mldv1MessageBuilder, MulticastListenerDone,
-    MulticastListenerReport,
+    IcmpMldv1MessageType, MldPacket, Mldv1Body, Mldv1MessageBuilder, Mldv2QueryBody,
+    MulticastListenerDone, MulticastListenerReport,
 };
 use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
 use packet_formats::ip::Ipv6Proto;
@@ -115,28 +115,14 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
         _dst_ip: SpecifiedAddr<Ipv6Addr>,
         packet: MldPacket<B>,
     ) {
-        if let Err(e) = match packet {
+        let result = match packet {
             MldPacket::MulticastListenerQuery(msg) => {
-                let body = msg.body();
-                let addr = body.group_addr;
-                SpecifiedAddr::new(addr)
-                    .map_or(Some(gmp::v1::QueryTarget::Unspecified), |addr| {
-                        MulticastAddr::new(addr.get()).map(gmp::v1::QueryTarget::Specified)
-                    })
-                    .map_or(Err(MldError::NotAMember { addr }), |group_addr| {
-                        gmp::v1::handle_query_message(
-                            self,
-                            bindings_ctx,
-                            device,
-                            group_addr,
-                            body.max_response_delay(),
-                        )
-                        .map_err(Into::into)
-                    })
+                gmp::v1::handle_query_message(self, bindings_ctx, device, msg.body())
+                    .map_err(Into::into)
             }
-            MldPacket::MulticastListenerQueryV2(_msg) => {
-                debug!("TODO(https://fxbug.dev/42071006): Support MLDv2");
-                return;
+            MldPacket::MulticastListenerQueryV2(msg) => {
+                gmp::v2::handle_query_message(self, bindings_ctx, device, msg.body())
+                    .map_err(Into::into)
             }
             MldPacket::MulticastListenerReport(msg) => {
                 let addr = msg.body().group_addr;
@@ -148,17 +134,32 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
                     },
                 )
             }
+            MldPacket::MulticastListenerReportV2(_) => {
+                debug!("Hosts are not interested in MLDv2 report messages");
+                return;
+            }
             MldPacket::MulticastListenerDone(_) => {
                 debug!("Hosts are not interested in Done messages");
                 return;
             }
-            MldPacket::MulticastListenerReportV2(_) => {
-                debug!("TODO(https://fxbug.dev/42071006): Support MLDv2");
-                return;
-            }
-        } {
-            debug!("Error occurred when handling MLD message: {}", e);
-        }
+        };
+        result.unwrap_or_else(|e| debug!("Error occurred when handling MLD message: {}", e));
+    }
+}
+
+impl<B: SplitByteSlice> gmp::v1::QueryMessage<Ipv6> for Mldv1Body<B> {
+    fn group_addr(&self) -> Ipv6Addr {
+        self.group_addr
+    }
+
+    fn max_response_time(&self) -> Duration {
+        self.max_response_delay()
+    }
+}
+
+impl<B: SplitByteSlice> gmp::v2::QueryMessage<Ipv6> for Mldv2QueryBody<B> {
+    fn as_v1(&self) -> impl gmp::v1::QueryMessage<Ipv6> + '_ {
+        self.as_v1_query()
     }
 }
 

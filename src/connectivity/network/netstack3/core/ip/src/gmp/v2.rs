@@ -13,7 +13,10 @@
 use core::num::NonZeroU8;
 
 use const_unwrap::const_unwrap_option;
+use net_types::ip::Ip;
 use packet_formats::utils::NonZeroDuration;
+
+use crate::internal::gmp::{self, GmpBindingsContext, GmpContext, GmpMode, IpExt, NotAMemberErr};
 
 /// The default value for Query Response Interval defined in [RFC 3810
 /// section 9.3] and [RFC 3376 section 8.3].
@@ -132,4 +135,88 @@ pub trait ProtocolConfig {
     /// [RFC 3376 section 8.3]:
     ///     https://datatracker.ietf.org/doc/html/rfc3376#section-8.3
     fn query_response_interval(&self) -> NonZeroDuration;
+}
+
+/// Trait abstracting a GMPv2 query.
+pub(super) trait QueryMessage<I: Ip> {
+    /// Reinterprets this as a v1 query message.
+    fn as_v1(&self) -> impl gmp::v1::QueryMessage<I> + '_;
+}
+
+pub(super) fn handle_query_message<
+    I: IpExt,
+    CC: GmpContext<I, BC>,
+    BC: GmpBindingsContext,
+    Q: QueryMessage<I>,
+>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    query: &Q,
+) -> Result<(), NotAMemberErr<I>> {
+    core_ctx.with_gmp_state_mut_and_ctx(device, |mut core_ctx, state| {
+        match &state.gmp.mode {
+            GmpMode::V1 { .. } => {
+                return gmp::v1::handle_query_message_inner(
+                    &mut core_ctx,
+                    bindings_ctx,
+                    device,
+                    state,
+                    &query.as_v1(),
+                );
+            }
+            GmpMode::V2 => {}
+        }
+        // TODO(https://fxbug.dev/42071006): Handle v2 queries.
+        Ok(())
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use core::time::Duration;
+
+    use assert_matches::assert_matches;
+    use ip_test_macro::ip_test;
+    use net_types::Witness as _;
+    use netstack3_base::testutil::{FakeDeviceId, FakeTimerCtxExt, FakeWeakDeviceId};
+
+    use super::*;
+    use crate::gmp::GmpTimerId;
+    use crate::internal::gmp::testutil::{self, FakeCtx, FakeV2Query, TestIpExt};
+    use crate::internal::gmp::{GmpHandler as _, GroupJoinResult};
+
+    #[ip_test(I)]
+    fn v2_query_handoff_in_v1_mode<I: TestIpExt>() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V1 { compat: true });
+        assert_eq!(
+            core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
+            GroupJoinResult::Joined(())
+        );
+        assert_eq!(
+            bindings_ctx.trigger_next_timer(&mut core_ctx),
+            Some(GmpTimerId::new(FakeWeakDeviceId(FakeDeviceId)))
+        );
+        // v1 group should be idle now.
+        assert_matches!(
+            core_ctx.groups.get(&I::GROUP_ADDR1).unwrap().v1().get_inner(),
+            gmp::v1::MemberState::Idle(_)
+        );
+        handle_query_message(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &FakeDeviceId,
+            &FakeV2Query {
+                group_addr: I::GROUP_ADDR1.get(),
+                max_response_time: Duration::from_secs(1),
+            },
+        )
+        .expect("handle query");
+        // v1 group reacts to the query.
+        assert_matches!(
+            core_ctx.groups.get(&I::GROUP_ADDR1).unwrap().v1().get_inner(),
+            gmp::v1::MemberState::Delaying(_)
+        );
+    }
 }
