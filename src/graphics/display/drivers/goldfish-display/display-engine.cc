@@ -380,6 +380,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   cpp20::span<layer_composition_operations_t> layer_composition_operations(
       out_layer_composition_operations_list, total_layer_count);
 
+  config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
   int layer_composition_operations_offset = 0;
   for (unsigned i = 0; i < display_count; i++) {
     const size_t layer_count = display_configs[i].layer_count;
@@ -423,19 +424,23 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
           // accepts full screen dest frame.
           current_display_layer_composition_operations[0] |=
               LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
+          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         }
         if (memcmp(&layer0.image_source, &image_area, sizeof(rect_u_t)) != 0) {
           current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_SRC_FRAME;
+          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         }
 
         if (layer0.alpha_mode != ALPHA_DISABLE) {
           // Alpha is not supported.
           current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_ALPHA;
+          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         }
 
         if (layer0.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
           // Transformation is not supported.
           current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
+          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         }
       }
       // If there is more than one layer, the rest need to be merged into the base layer.
@@ -444,11 +449,12 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
         for (unsigned j = 1; j < layer_count; j++) {
           current_display_layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
         }
+        check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
       }
     }
   }
 
-  return CONFIG_CHECK_RESULT_OK;
+  return check_result;
 }
 
 zx_status_t DisplayEngine::PresentPrimaryDisplayConfig(const DisplayConfig& display_config) {

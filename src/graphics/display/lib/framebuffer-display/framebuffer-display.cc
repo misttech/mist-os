@@ -318,14 +318,18 @@ config_check_result_t FramebufferDisplay::DisplayEngineCheckConfiguration(
     *out_layer_composition_operations_actual = layer_composition_operations.size();
   }
 
-  bool success = IsBanjoDisplayConfigSupported(display_configs[0]);
-  if (!success) {
+  config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
+  if (!IsBanjoDisplayConfigSupported(display_configs[0])) {
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+  }
+
+  if (check_result == CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG) {
     layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
     for (unsigned i = 1; i < display_configs[0].layer_count; i++) {
       layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
     }
   }
-  return CONFIG_CHECK_RESULT_OK;
+  return check_result;
 }
 
 bool FramebufferDisplay::IsBanjoDisplayConfigSupported(

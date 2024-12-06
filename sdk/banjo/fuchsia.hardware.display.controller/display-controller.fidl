@@ -299,18 +299,13 @@ type DisplayConfig = struct {
     layer vector<Layer>:MAX;
 };
 
+/// Equivalent to the [`fuchsia.hardware.display.types/ConfigResult`] FIDL type.
 type ConfigCheckResult = strict enum : uint32 {
-    /// The display mode configuration is valid. Note that this is distinct from
-    /// whether or not the layer configuration is valid.
     OK = 0;
-    /// Error indicating that the hardware cannot simultaneously support the
-    /// requested number of displays.
-    TOO_MANY = 1;
-    /// Error indicating that the hardware cannot simultaneously support the given
-    /// set of display modes. To support a mode, the display must be able to display
-    /// a single layer with width and height equal to the requested mode and the
-    /// preferred pixel format.
-    UNSUPPORTED_MODES = 2;
+    INVALID_CONFIG = 1;
+    UNSUPPORTED_CONFIG = 2;
+    TOO_MANY = 3;
+    UNSUPPORTED_MODES = 4;
 };
 
 /// Subset of compositing operations on a layer.
@@ -440,8 +435,8 @@ closed protocol DisplayEngine {
         /// Compositing operations that yield a supported configuration.
         ///
         /// This member is only meaningful if `config_check_result` is
-        /// `CONFIG_CHECK_RESULT_OK`. Otherwise, the values are undefined and
-        /// should be ignored.
+        /// `CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG`. Otherwise, the values are
+        /// undefined and should be ignored.
         ///
         /// The compositing operations are specified as an array with one
         /// element for each layer in each `display_config` element. The

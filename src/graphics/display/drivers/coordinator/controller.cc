@@ -127,7 +127,7 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     display_config_t& test_config = test_configs[0];
     test_config.mode = display::ToBanjoDisplayMode(timing);
 
-    uint32_t display_cfg_result;
+    config_check_result_t display_cfg_result;
     layer_composition_operations_t layer_result = 0;
     size_t display_layer_results_count;
     display_cfg_result = engine_driver_client_->CheckConfiguration(

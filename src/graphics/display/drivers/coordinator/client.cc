@@ -42,6 +42,8 @@
 #include <cstring>
 #include <memory>
 #include <optional>
+#include <ranges>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -1023,80 +1025,96 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   }
 
   size_t layer_composition_operations_count_actual;
-  uint32_t display_cfg_result = controller_->engine_driver_client()->CheckConfiguration(
-      configs, config_idx, layer_composition_operations, layer_composition_operations_count,
-      &layer_composition_operations_count_actual);
+  config_check_result_t display_cfg_result =
+      controller_->engine_driver_client()->CheckConfiguration(
+          configs, config_idx, layer_composition_operations, layer_composition_operations_count,
+          &layer_composition_operations_count_actual);
 
-  if (display_cfg_result != CONFIG_CHECK_RESULT_OK) {
-    if (res) {
-      *res = display_cfg_result == CONFIG_CHECK_RESULT_TOO_MANY
-                 ? fhdt::wire::ConfigResult::kTooManyDisplays
-                 : fhdt::wire::ConfigResult::kUnsupportedDisplayModes;
-    }
-    return false;
-  }
-
-  bool layer_fail = false;
-  for (size_t i = 0; i < layer_composition_operations_count_actual; i++) {
-    if (layer_composition_operations[i]) {
-      layer_fail = true;
+  switch (display_cfg_result) {
+    case CONFIG_CHECK_RESULT_OK:
+      if (res) {
+        *res = fhdt::wire::ConfigResult::kOk;
+      }
+      return true;
+    case CONFIG_CHECK_RESULT_INVALID_CONFIG:
+      if (res) {
+        *res = fhdt::wire::ConfigResult::kInvalidConfig;
+      }
+      return false;
+    case CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG:
+      if (res) {
+        *res = fhdt::wire::ConfigResult::kUnsupportedConfig;
+      }
+      // Handle `ops` in the following steps.
       break;
-    }
+    case CONFIG_CHECK_RESULT_TOO_MANY:
+      if (res) {
+        *res = fhdt::wire::ConfigResult::kTooManyDisplays;
+      }
+      return false;
+    case CONFIG_CHECK_RESULT_UNSUPPORTED_MODES:
+      if (res) {
+        *res = fhdt::wire::ConfigResult::kUnsupportedDisplayModes;
+      }
+      return false;
   }
 
-  // Return unless we need to finish constructing the response
-  if (!layer_fail) {
-    return true;
-  }
-  if (!(res && ops)) {
-    return false;
-  }
-  *res = fhdt::wire::ConfigResult::kUnsupportedConfig;
+  ZX_DEBUG_ASSERT(display_cfg_result == CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG);
 
-  // TODO(b/249297195): Once Gerrit IFTTT supports multiple paths, add IFTTT
-  // comments to make sure that any change of type Client in
-  // //sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
-  // will cause the definition of `kAllErrors` to change as well.
-  static constexpr layer_composition_operations_t kAllOperations =
-      LAYER_COMPOSITION_OPERATIONS_USE_IMAGE | LAYER_COMPOSITION_OPERATIONS_MERGE_BASE |
-      LAYER_COMPOSITION_OPERATIONS_MERGE_SRC | LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE |
-      LAYER_COMPOSITION_OPERATIONS_SRC_FRAME | LAYER_COMPOSITION_OPERATIONS_TRANSFORM |
-      LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION | LAYER_COMPOSITION_OPERATIONS_ALPHA;
+  std::span<const layer_composition_operations_t> layer_composition_operations_actual(
+      layer_composition_operations, layer_composition_operations_count_actual);
+  const bool layer_fail =
+      std::ranges::any_of(layer_composition_operations_actual,
+                          [](layer_composition_operations_t ops) { return ops != 0; });
+  ZX_DEBUG_ASSERT_MSG(layer_fail,
+                      "At least one layer must have non-empty LayerCompositionOperations");
 
-  layer_idx = 0;
-  for (auto& display_config : configs_) {
-    if (display_config.pending_layers_.is_empty()) {
-      continue;
-    }
+  if (ops) {
+    // TODO(b/249297195): Once Gerrit IFTTT supports multiple paths, add IFTTT
+    // comments to make sure that any change of type Client in
+    // //sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
+    // will cause the definition of `kAllErrors` to change as well.
+    static constexpr layer_composition_operations_t kAllOperations =
+        LAYER_COMPOSITION_OPERATIONS_USE_IMAGE | LAYER_COMPOSITION_OPERATIONS_MERGE_BASE |
+        LAYER_COMPOSITION_OPERATIONS_MERGE_SRC | LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE |
+        LAYER_COMPOSITION_OPERATIONS_SRC_FRAME | LAYER_COMPOSITION_OPERATIONS_TRANSFORM |
+        LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION | LAYER_COMPOSITION_OPERATIONS_ALPHA;
 
-    bool seen_base = false;
-    for (auto& layer_node : display_config.pending_layers_) {
-      uint32_t composition_operations = kAllOperations & layer_composition_operations[layer_idx];
-      // Fixup the error flags if the driver impl incorrectly set multiple MERGE_BASEs
-      if (composition_operations & LAYER_COMPOSITION_OPERATIONS_MERGE_BASE) {
-        if (seen_base) {
-          composition_operations &= ~LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-          composition_operations |= LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
-        } else {
-          seen_base = true;
-          composition_operations &= ~LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
-        }
+    layer_idx = 0;
+    for (auto& display_config : configs_) {
+      if (display_config.pending_layers_.is_empty()) {
+        continue;
       }
 
-      // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
-      // the client-side ID will have to be looked up in a map.
-      const display::LayerId layer_id(layer_node.layer->id.value());
-
-      for (uint8_t i = 0; i < 32; i++) {
-        if (composition_operations & (1 << i)) {
-          ops->emplace_back(fhd::wire::ClientCompositionOp{
-              .display_id = ToFidlDisplayId(display_config.id),
-              .layer_id = ToFidlLayerId(layer_id),
-              .opcode = static_cast<fhdt::wire::ClientCompositionOpcode>(i),
-          });
+      bool seen_base = false;
+      for (auto& layer_node : display_config.pending_layers_) {
+        uint32_t composition_operations = kAllOperations & layer_composition_operations[layer_idx];
+        // Fixup the error flags if the driver impl incorrectly set multiple MERGE_BASEs
+        if (composition_operations & LAYER_COMPOSITION_OPERATIONS_MERGE_BASE) {
+          if (seen_base) {
+            composition_operations &= ~LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
+            composition_operations |= LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+          } else {
+            seen_base = true;
+            composition_operations &= ~LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+          }
         }
+
+        // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
+        // the client-side ID will have to be looked up in a map.
+        const display::LayerId layer_id(layer_node.layer->id.value());
+
+        for (uint8_t i = 0; i < 32; i++) {
+          if (composition_operations & (1 << i)) {
+            ops->emplace_back(fhd::wire::ClientCompositionOp{
+                .display_id = ToFidlDisplayId(display_config.id),
+                .layer_id = ToFidlLayerId(layer_id),
+                .opcode = static_cast<fhdt::wire::ClientCompositionOpcode>(i),
+            });
+          }
+        }
+        layer_idx++;
       }
-      layer_idx++;
     }
   }
   return false;

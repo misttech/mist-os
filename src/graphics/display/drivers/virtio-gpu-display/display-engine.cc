@@ -205,29 +205,30 @@ config_check_result_t DisplayEngine::CheckConfiguration(
       .height = static_cast<int32_t>(current_display_.scanout_info.geometry.height),
   });
 
+  config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
   if (layer.display_destination() != display_area) {
     // TODO(costan): Doesn't seem right?
-    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-    return CONFIG_CHECK_RESULT_OK;
+    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
   if (layer.image_source() != layer.display_destination()) {
-    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
-    return CONFIG_CHECK_RESULT_OK;
+    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
   if (layer.image_metadata().dimensions() != layer.image_source().dimensions()) {
-    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_SRC_FRAME;
-    return CONFIG_CHECK_RESULT_OK;
+    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_SRC_FRAME;
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
   if (layer.alpha_mode() != display::AlphaMode::kDisable) {
-    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
-    return CONFIG_CHECK_RESULT_OK;
+    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
   if (layer.image_source_transformation() != display::CoordinateTransformation::kIdentity) {
-    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
-    return CONFIG_CHECK_RESULT_OK;
+    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
 
-  return CONFIG_CHECK_RESULT_OK;
+  return check_result;
 }
 
 void DisplayEngine::ApplyConfiguration(display::DisplayId display_id,

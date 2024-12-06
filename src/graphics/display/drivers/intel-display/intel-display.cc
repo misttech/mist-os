@@ -1595,6 +1595,7 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
     return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
+  config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
   int layer_composition_operations_offset = 0;
   for (unsigned i = 0; i < banjo_display_configs_span.size(); i++) {
     const display_config_t& banjo_display_config = banjo_display_configs_span[i];
@@ -1650,11 +1651,13 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
               layer.image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
             current_display_layer_composition_operations[j] |=
                 LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
+            check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
           }
         } else if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY &&
                    layer.image_source_transformation != COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
           // Cover unsupported rotations
           current_display_layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
+          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         }
 
         uint32_t src_width, src_height;
@@ -1704,6 +1707,7 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
               max_height < layer.display_destination.height) {
             current_display_layer_composition_operations[j] |=
                 LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
+            check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
           } else {
             total_scalers_needed += scalers_needed;
           }
@@ -1713,12 +1717,14 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
 
       if (j != 0) {
         current_display_layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
+        check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
       }
       const auto format =
           static_cast<fuchsia_images2::wire::PixelFormat>(layer.fallback_color.format);
       if (format != fuchsia_images2::wire::PixelFormat::kB8G8R8A8 &&
           format != fuchsia_images2::wire::PixelFormat::kR8G8B8A8) {
         current_display_layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
+        check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
       }
       break;
     }
@@ -1728,6 +1734,7 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
       for (unsigned j = 1; j < banjo_display_config.layer_count; j++) {
         current_display_layer_composition_operations[j] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
       }
+      check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
   }
 
@@ -1761,11 +1768,12 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
         for (unsigned j = 1; j < banjo_display_configs[i].layer_count; j++) {
           current_display_layer_composition_operations[j] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
         }
+        check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         break;
       }
     }
   }
-  return CONFIG_CHECK_RESULT_OK;
+  return check_result;
 }
 
 bool Controller::CalculatePipeAllocation(

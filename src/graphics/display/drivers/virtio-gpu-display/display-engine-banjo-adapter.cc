@@ -165,13 +165,13 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
     for (size_t i = 1; i < banjo_layers.size(); ++i) {
       out_layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
     }
-    return CONFIG_CHECK_RESULT_OK;
+    return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
 
   // This adapter does not currently support color correction.
   if (banjo_display_config.cc_flags != 0) {
     out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION;
-    return CONFIG_CHECK_RESULT_OK;
+    return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
 
   if (!display::DriverLayer::IsValid(banjo_layers[0])) {
