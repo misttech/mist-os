@@ -890,7 +890,7 @@ def main() -> int:
     if args.bazel_exec_log_compact:
         args.bazel_exec_log_compact.parent.mkdir(parents=True, exist_ok=True)
         bazel_config_args += [
-            "--experimental_execution_log_compact_file=%s"
+            "--execution_log_compact_file=%s"
             % args.bazel_exec_log_compact.resolve(),
             "--remote_build_event_upload=all",
         ]

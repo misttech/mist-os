@@ -52,7 +52,7 @@ common --experimental_workspace_rules_log_file={workspace_log_file}
 # Log of actions, including remote executions with cache hit/miss status.
 # This results in a zstd-compressed log file (proto: tools.protos.ExecLogEntry),
 # that appears as an invocation artifact named 'execution.log'.
-common:exec_log --experimental_execution_log_compact_file={execution_log_file}
+common:exec_log --execution_log_compact_file={execution_log_file}
 # Need the following to ensure the execution.log is actually uploaded to the RBE CAS.
 # Do not use =all, because that will attempt to upload locally built targets to CAS.
 common:exec_log --remote_build_event_upload=minimal
