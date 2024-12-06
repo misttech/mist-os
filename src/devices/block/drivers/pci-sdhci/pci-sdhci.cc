@@ -109,7 +109,7 @@ uint64_t PciSdhci::SdhciGetQuirks(uint64_t* out_dma_boundary_alignment) {
 
 void PciSdhci::GetQuirks(fdf::Arena& arena, GetQuirksCompleter::Sync& completer) {
   uint64_t dma_boundary_alignment;
-  auto quirks = SdhciGetQuirks(&dma_boundary_alignment);
+  fuchsia_hardware_sdhci::Quirk quirks{SdhciGetQuirks(&dma_boundary_alignment)};
   completer.buffer(arena).Reply(quirks, dma_boundary_alignment);
 }
 
