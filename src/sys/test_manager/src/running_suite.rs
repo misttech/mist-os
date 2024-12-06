@@ -863,17 +863,10 @@ async fn get_realm(
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
-                .from(&archivist)
-                .to(Ref::parent())
-                .to(test_root.clone()),
-        )
-        .await?;
-    wrapper_realm
-        .add_route(
-            Route::new()
                 .capability(Capability::protocol::<
                     fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker,
                 >())
+                .from_dictionary("diagnostics-accessors")
                 .from(&archivist)
                 .to(Ref::parent())
                 .to(test_root.clone()),

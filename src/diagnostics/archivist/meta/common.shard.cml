@@ -16,10 +16,6 @@
         },
         {
             protocol: [
-                // TODO(https://fxbug.dev/342196300): remove this once everyone is extracting the
-                // protocols from the dictionary.
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.diagnostics.LogStream",
                 "fuchsia.inspect.InspectSink",
@@ -68,16 +64,6 @@
         {
             dictionary: "diagnostics-accessors",
             from: "self",
-        },
-
-        // TODO(https://fxbug.dev/342196300): remove this once everyone is extracting the
-        // protocols from the dictionary.
-        {
-            protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.diagnostics.host.ArchiveAccessor",
-            ],
-            from: "self/diagnostics-accessors",
         },
     ],
 }

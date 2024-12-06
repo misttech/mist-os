@@ -9,7 +9,7 @@ use fuchsia_triage::{DiagnosticData, Source};
 use inspect_fetcher::InspectFetcher;
 
 // The capability name for the Inspect reader
-const INSPECT_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.FeedbackArchiveAccessor";
+const INSPECT_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.ArchiveAccessor.feedback";
 
 // Durable connection to Archivist
 #[derive(Debug)]

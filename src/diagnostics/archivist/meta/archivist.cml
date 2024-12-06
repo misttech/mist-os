@@ -18,17 +18,6 @@
             url: "fuchsia-boot:///archivist-pipelines#meta/archivist-pipelines.cm",
         },
     ],
-    capabilities: [
-        {
-            // TODO(https://fxbug.dev/342196300): remove this once everyone is extracting the
-            // protocols from the dictionary.
-            protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor.feedback",
-                "fuchsia.diagnostics.ArchiveAccessor.legacy_metrics",
-                "fuchsia.diagnostics.ArchiveAccessor.lowpan",
-            ],
-        },
-    ],
     use: [
         // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
         {
@@ -58,32 +47,6 @@
             from: "#archivist-pipelines",
             rights: [ "r*" ],
             path: "/config/data",
-        },
-    ],
-    expose: [
-        // TODO(https://fxbug.dev/342196300): remove this once everyone is extracting the
-        // protocols from the dictionary.
-        {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor.legacy_metrics",
-            from: "self/diagnostics-accessors",
-            as: "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-        },
-        {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor.feedback",
-            from: "self/diagnostics-accessors",
-            as: "fuchsia.diagnostics.FeedbackArchiveAccessor",
-        },
-        {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor.lowpan",
-            from: "self/diagnostics-accessors",
-            as: "fuchsia.diagnostics.LoWPANArchiveAccessor",
-        },
-        {
-            protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.diagnostics.host.ArchiveAccessor",
-            ],
-            from: "self/diagnostics-accessors",
         },
     ],
 }

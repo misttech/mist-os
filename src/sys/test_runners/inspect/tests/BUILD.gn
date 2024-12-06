@@ -18,6 +18,7 @@ rustc_test("tests_bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
+    "//src/sys/lib/cm_rust",
     "//src/sys/test_manager:test_lib",
     "//src/sys/test_runners:test_lib",
     "//third_party/rust_crates:anyhow",

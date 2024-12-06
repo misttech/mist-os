@@ -183,7 +183,7 @@
         },
         {
             protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
-            from: "parent",
+            from: "parent/diagnostics-accessors",
             to: [ "#timekeeper" ],
         },
         {

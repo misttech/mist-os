@@ -167,12 +167,7 @@
         {
             protocol: [
                 "fuchsia.device.NameProvider",
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.host.ArchiveAccessor",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.diagnostics.LogSettings",
-                "fuchsia.diagnostics.LoWPANArchiveAccessor",
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.fshost.Admin",
@@ -287,6 +282,11 @@
             from: "#bootstrap",
             to: "#core",
             availability: "optional",
+        },
+        {
+            dictionary: "diagnostics-accessors",
+            from: "#bootstrap",
+            to: "#core",
         },
         {
             dictionary: "toolbox",

@@ -262,8 +262,6 @@
         {
             protocol: [
                 "fuchsia.device.NameProvider",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-                "fuchsia.diagnostics.LoWPANArchiveAccessor",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.kernel.VmexResource",
@@ -420,12 +418,16 @@
         },
         {
             protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.logger.Log",
                 "fuchsia.space.Manager",
                 "fuchsia.sys2.RealmExplorer.root",
                 "fuchsia.sys2.RealmQuery.root",
             ],
+            from: "parent",
+            to: "#session-manager",
+        },
+        {
+            dictionary: "diagnostics-accessors",
             from: "parent",
             to: "#session-manager",
         },

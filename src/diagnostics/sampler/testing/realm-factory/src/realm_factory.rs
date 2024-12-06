@@ -179,7 +179,6 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
     wrapper_realm
         .add_route(
             Route::new()
-                .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
                 .capability(Capability::protocol::<flogger::LogMarker>())
                 .from(&test_case_archivist)
                 .to(&sampler),
@@ -189,7 +188,9 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
+                .from_dictionary("diagnostics-accessors")
                 .from(&test_case_archivist)
+                .to(&sampler)
                 .to(Ref::parent()),
         )
         .await?;

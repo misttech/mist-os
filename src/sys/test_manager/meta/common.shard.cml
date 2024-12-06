@@ -352,23 +352,13 @@
         },
         {
             protocol: "fuchsia.diagnostics.ArchiveAccessor",
-            from: "parent",
+            from: "parent/diagnostics-accessors",
             as: "fuchsia.diagnostics.RealArchiveAccessor",
-            to: [
-                "#inspect_test_runner",
-                "#system-tests",
-            ],
+            to: "#system-tests",
         },
         {
-            protocol: "fuchsia.diagnostics.FeedbackArchiveAccessor",
+            dictionary: "diagnostics-accessors",
             from: "parent",
-            as: "fuchsia.diagnostics.RealFeedbackArchiveAccessor",
-            to: [ "#inspect_test_runner" ],
-        },
-        {
-            protocol: "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-            from: "parent",
-            as: "fuchsia.diagnostics.RealLegacyMetricsArchiveAccessor",
             to: [ "#inspect_test_runner" ],
         },
         {

@@ -16,8 +16,8 @@
             to: "#detect",
         },
         {
-            protocol: [ "fuchsia.diagnostics.FeedbackArchiveAccessor" ],
-            from: "parent",
+            protocol: [ "fuchsia.diagnostics.ArchiveAccessor.feedback" ],
+            from: "parent/diagnostics-accessors",
             to: [ "#detect" ],
         },
         {

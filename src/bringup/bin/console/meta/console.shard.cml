@@ -279,16 +279,14 @@
         {
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
                 "fuchsia.diagnostics.host.ArchiveAccessor",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-                "fuchsia.diagnostics.LogSettings",
             ],
-            from: "#archivist",
+            from: "#archivist/diagnostics-accessors",
             to: "#console-launcher",
         },
         {
             protocol: [
+                "fuchsia.diagnostics.LogSettings",
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.Log",
                 "fuchsia.logger.LogSink",

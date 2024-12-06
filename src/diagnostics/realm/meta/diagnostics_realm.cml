@@ -16,11 +16,13 @@
             to: "all",
         },
         {
-            protocol: [
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.update.Listener",
-            ],
+            protocol: "fuchsia.update.Listener",
             from: "parent",
+            to: [ "#persistence" ],
+        },
+        {
+            protocol: [ "fuchsia.diagnostics.ArchiveAccessor.feedback" ],
+            from: "parent/diagnostics-accessors",
             to: [ "#persistence" ],
         },
         {

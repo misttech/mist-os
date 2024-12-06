@@ -115,8 +115,6 @@
                 "fuchsia.camera3.DeviceWatcher",
                 "fuchsia.cobalt.SystemDataUpdater",
                 "fuchsia.device.NameProvider",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-                "fuchsia.diagnostics.LoWPANArchiveAccessor",
                 "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReportingProductRegister",
                 "fuchsia.feedback.DataProvider",
@@ -497,7 +495,7 @@
             // `#session` collection should not `use` these protocols without
             // first getting a security policy review.
             protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
-            from: "parent",
+            from: "parent/diagnostics-accessors",
             to: [ "#session" ],
             availability: "same_as_target",
         },
@@ -520,6 +518,28 @@
             ],
             from: "parent",
             to: [ "#session" ],
+        },
+        {
+            dictionary: "diagnostics-accessors",
+            from: "parent",
+            to: "#session",
+        },
+
+        // TODO(https://fxbug.dev/342196300): remove these routes once we have refactored sessions
+        // to route from the "diagnostics-accessors" dictionary.
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor.legacy_metrics",
+            from: "parent/diagnostics-accessors",
+            as: "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
+            to: "#session",
+            availability: "same_as_target",
+        },
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor.lowpan",
+            from: "parent/diagnostics-accessors",
+            as: "fuchsia.diagnostics.LoWPANArchiveAccessor",
+            to: "#session",
+            availability: "same_as_target",
         },
         {
             directory: [

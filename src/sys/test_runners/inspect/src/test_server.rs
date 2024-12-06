@@ -90,9 +90,9 @@ impl TestServer {
         };
 
         let svc = match spec.accessor {
-            Accessor::All => "/svc/fuchsia.diagnostics.RealArchiveAccessor",
-            Accessor::Feedback => "/svc/fuchsia.diagnostics.RealFeedbackArchiveAccessor",
-            Accessor::Legacy => "/svc/fuchsia.diagnostics.RealLegacyMetricsArchiveAccessor",
+            Accessor::All => "/svc/fuchsia.diagnostics.ArchiveAccessor",
+            Accessor::Feedback => "/svc/fuchsia.diagnostics.ArchiveAccessor.feedback",
+            Accessor::Legacy => "/svc/fuchsia.diagnostics.ArchiveAccessor.legacy_metrics",
         };
 
         test_stdout!(logs, "Reading `{}` from `{}`", case.key, svc);

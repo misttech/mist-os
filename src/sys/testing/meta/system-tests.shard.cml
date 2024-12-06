@@ -90,7 +90,7 @@
         },
         {
             protocol: "fuchsia.diagnostics.ArchiveAccessor",
-            from: "parent",
+            from: "parent/diagnostics-accessors",
             as: "fuchsia.diagnostics.RealArchiveAccessor",
             to: [ "#system-tests" ],
         },

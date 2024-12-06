@@ -4,9 +4,14 @@
 {
     offer: [
         {
-            protocol: [ "fuchsia.diagnostics.FeedbackArchiveAccessor" ],
+            protocol: "fuchsia.logger.LogSink",
             from: "parent",
-            to: [ "#diagnostics" ],
+            to: "#diagnostics",
+        },
+        {
+            dictionary: "diagnostics-accessors",
+            from: "parent",
+            to: "#diagnostics",
         },
         {
             protocol: [ "fuchsia.update.Listener" ],

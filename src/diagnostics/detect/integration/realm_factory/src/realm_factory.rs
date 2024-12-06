@@ -129,7 +129,7 @@ impl RealmFactory {
                         "fuchsia.feedback.CrashReportingProductRegister",
                     ))
                     .capability(Capability::protocol_by_name(
-                        "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                        "fuchsia.diagnostics.ArchiveAccessor.feedback",
                     ))
                     .capability(
                         Capability::directory("config-data")
@@ -200,7 +200,7 @@ async fn serve_mocks(
             serve_async_detached(stream, MockComponent { sender: Some(event_sender.clone()) });
         })
         .add_fidl_service_at(
-            "fuchsia.diagnostics.FeedbackArchiveAccessor",
+            "fuchsia.diagnostics.ArchiveAccessor.feedback",
             |stream: diagnostics::ArchiveAccessorRequestStream| {
                 FakeArchiveAccessor::new(&inspect_data, Some(Box::new(event_sender.clone())))
                     .serve_async(stream);

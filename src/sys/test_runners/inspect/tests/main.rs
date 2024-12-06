@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
+use cm_rust::{CapabilityDecl, DictionaryDecl};
 use diagnostics_data::{
     hierarchy, Data, DiagnosticsHierarchy, InspectDataBuilder, InspectHandleName, Property,
     Timestamp,
@@ -63,6 +64,14 @@ async fn run_test(
             ChildOptions::new(),
         )
         .await?;
+
+    builder
+        .add_capability(CapabilityDecl::Dictionary(DictionaryDecl {
+            name: "diagnostics-accessors".parse().unwrap(),
+            source_path: None,
+        }))
+        .await
+        .unwrap();
     builder
         .add_route(
             Route::new()
@@ -84,12 +93,20 @@ async fn run_test(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.diagnostics.ArchiveAccessor"))
                 .capability(Capability::protocol_by_name(
-                    "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                    "fuchsia.diagnostics.ArchiveAccessor.feedback",
                 ))
                 .capability(Capability::protocol_by_name(
-                    "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
+                    "fuchsia.diagnostics.ArchiveAccessor.legacy_metrics",
                 ))
                 .from(&fake_archivist)
+                .to(Ref::dictionary("self/diagnostics-accessors")),
+        )
+        .await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::dictionary("diagnostics-accessors"))
+                .from(Ref::self_())
                 .to(&test_manager),
         )
         .await?;
@@ -448,18 +465,18 @@ make_tests!(
     archive_example,
     "fuchsia-pkg://fuchsia.com/inspect-runner-integration-test#meta/archive_example.cm",
     "fuchsia.diagnostics.ArchiveAccessor",
-    "fuchsia.diagnostics.FeedbackArchiveAccessor"
+    "fuchsia.diagnostics.ArchiveAccessor.feedback"
 );
 make_tests!(
     feedback_example,
     "fuchsia-pkg://fuchsia.com/inspect-runner-integration-test#meta/feedback_example.cm",
-    "fuchsia.diagnostics.FeedbackArchiveAccessor",
+    "fuchsia.diagnostics.ArchiveAccessor.feedback",
     "fuchsia.diagnostics.ArchiveAccessor"
 );
 make_tests!(
     legacy_example,
     "fuchsia-pkg://fuchsia.com/inspect-runner-integration-test#meta/legacy_example.cm",
-    "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
+    "fuchsia.diagnostics.ArchiveAccessor.legacy_metrics",
     "fuchsia.diagnostics.ArchiveAccessor"
 );
 
