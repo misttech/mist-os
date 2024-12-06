@@ -7,7 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/runner/config.h>
-#include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/util/error.h>
 
 #include <fbl/ref_ptr.h>
 
@@ -16,7 +16,6 @@ class Kernel;
 class FsContext;
 }  // namespace starnix
 
-using starnix_uapi::Errno;
 namespace starnix_kernel_runner {
 
 struct Container {
@@ -34,9 +33,9 @@ struct Container {
   ~Container();
 };
 
-fit::result<Errno, Container> create_container(const Config& config);
+fit::result<mtl::Error, Container> create_container(const Config& config);
 
-fit::result<zx_status_t, fbl::RefPtr<starnix::FsContext>> create_fs_context(
+fit::result<mtl::Error, fbl::RefPtr<starnix::FsContext>> create_fs_context(
     const fbl::RefPtr<starnix::Kernel>& kernel, const Config& config);
 
 }  // namespace starnix_kernel_runner
