@@ -702,15 +702,16 @@ impl FxFilesystem {
                     () = shutdown_listener.fuse() => return,
                 );
                 let start_time = std::time::Instant::now();
-                info!("Starting trim...");
                 let res = this.do_trim().await;
                 let duration = std::time::Instant::now() - start_time;
+                next_timer = interval.clone();
                 match res {
-                    Ok(bytes_trimmed) => info!("Trimmed {bytes_trimmed} bytes in {duration:?}"),
+                    Ok(bytes_trimmed) => info!(
+                        "Trimmed {bytes_trimmed} bytes in {duration:?}.  Next trim in \
+                        {next_timer:?}",
+                    ),
                     Err(e) => error!(?e, "Failed to trim"),
                 }
-                next_timer = interval.clone();
-                info!("Scheduled next trim after {:?}", next_timer);
             }
         }));
     }
