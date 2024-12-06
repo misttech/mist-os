@@ -282,15 +282,9 @@ class BazelRepositoryMap(object):
 
         # These repository overrides are passed to the Bazel invocation.
         self._overrides: Dict[str, Path] = {
-            "bazel_skylib": fuchsia_source_dir / "third_party/bazel_skylib",
-            "com_google_googletest": fuchsia_source_dir
-            / "third_party/googletest/src",
             "rules_cc": fuchsia_source_dir / "third_party/bazel_rules_cc",
-            "rules_python": fuchsia_source_dir
-            / "third_party/bazel_rules_python",
             "rules_license": fuchsia_source_dir
             / "third_party/bazel_rules_license",
-            "platforms": fuchsia_source_dir / "third_party/bazel_platforms",
             "rules_java": fuchsia_source_dir
             / "build/bazel/local_repositories/rules_java",
             "remote_coverage_tools": fuchsia_source_dir
@@ -311,11 +305,18 @@ class BazelRepositoryMap(object):
         # by the GN build_fuchsia_sdk_repository target which is an input
         # dependency for running this script.
         self._internal_overrides = self._overrides | {
+            "bazel_skylib": fuchsia_source_dir / "third_party/bazel_skylib",
+            "com_google_googletest": fuchsia_source_dir
+            / "third_party/googletest/src",
+            "rules_python": fuchsia_source_dir
+            / "third_party/bazel_rules_python",
+            "platforms": fuchsia_source_dir / "third_party/bazel_platforms",
             "prebuilt_python": self.IGNORED_REPO,
             "fuchsia_clang": self.IGNORED_REPO,
             "bazel_tools": self.IGNORED_REPO,
             "local_config_cc": self.IGNORED_REPO,
             "host_platform": self.IGNORED_REPO,
+            "rules_python_internal": self.IGNORED_REPO,
         }
 
         if not fuchsia_sdk_dir:
