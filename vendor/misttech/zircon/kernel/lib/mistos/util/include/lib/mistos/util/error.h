@@ -19,7 +19,7 @@ class StdError : public ToString {
 
   virtual ktl::optional<const StdError*> source() const { return ktl::nullopt; }
 
-  BString to_string() const override { return "StdError"; }
+  BString to_string() const override { return BString{"StdError"}; }
 };
 
 class Chain {
@@ -157,7 +157,7 @@ class Error : public StdError {
     if (inner_) {
       return inner_->to_string();
     }
-    return "Error";
+    return BString{"Error"};
   }
 
   template <typename Printer>
@@ -201,7 +201,7 @@ namespace ext {
 template <class E>
 class StdError {
  public:
-  StdError(E error) : error_(ktl::move(error)) {}
+  explicit StdError(E error) : error_(ktl::move(error)) {}
 
   template <typename C>
   Error ext_context(C context) {
