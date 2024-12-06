@@ -48,6 +48,7 @@ mod tests {
             "[process-bootstrap]"
         );
         pretty_assertions::assert_eq!(vmo_name_to_digest_name("blob-123"), "[blobs]");
+        pretty_assertions::assert_eq!(vmo_name_to_digest_name("blob-15e0da8e"), "[blobs]");
         pretty_assertions::assert_eq!(
             vmo_name_to_digest_name("inactive-blob-123"),
             "[inactive blobs]"

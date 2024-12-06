@@ -3,11 +3,17 @@
 // found in the LICENSE file.
 
 use crate::attribution_client::AttributionState;
+use fuchsia_trace::duration;
 use std::collections::{HashMap, HashSet};
+use std::mem::MaybeUninit;
+use traces::CATEGORY_MEMORY_CAPTURE;
 use {
     fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_memory_attribution_plugin as fplugin,
 };
+
+const ZX_INFO_CACHE_INITIAL_SIZE: usize = 64;
+const ZX_INFO_CACHE_GROWTH_FACTOR: usize = 2;
 
 /// A structure containing a set of kernel resources (jobs, processes, VMOs), indexed by KOIDs.
 #[derive(Default)]
@@ -20,9 +26,30 @@ pub struct KernelResources {
     /// resource definitions, we give each unique name an identifier, and refer to these
     /// identifiers in the resource definitions
     pub resource_names: HashMap<String, u64>,
+}
+
+#[derive(Default)]
+struct KernelResourcesBuilder {
+    kernel_resources: KernelResources,
     /// Value of the next resource identifier. It should be incremented each time a new name is
     /// inserted in `resource_names``.
     next_resource_name_index: u64,
+}
+
+struct Cache {
+    /// Cache for `zx_info_vmo_t` objects, to speed up related syscalls.
+    vmos_cache: Vec<MaybeUninit<zx::VmoInfo>>,
+    /// Cache for `zx_info_maps_t` objects, to speed up related syscalls.
+    maps_cache: Vec<MaybeUninit<zx::MapInfo>>,
+}
+
+impl Default for Cache {
+    fn default() -> Self {
+        Self {
+            vmos_cache: vec![MaybeUninit::uninit(); ZX_INFO_CACHE_INITIAL_SIZE],
+            maps_cache: vec![MaybeUninit::uninit(); ZX_INFO_CACHE_INITIAL_SIZE],
+        }
+    }
 }
 
 /// Represents whether we should collect information about VMOs or memory maps of a process.
@@ -110,10 +137,17 @@ impl Job for zx::Job {
 pub trait Process {
     /// Returns the name of the process.
     fn get_name(&self) -> Result<zx::Name, zx::Status>;
-    /// Returns information about the VMOs accessible to this process.
-    fn info_vmos_vec(&self) -> Result<Vec<zx::VmoInfo>, zx::Status>;
+
+    fn info_vmos<'a>(
+        &self,
+        output_vector: &'a mut Vec<std::mem::MaybeUninit<zx::VmoInfo>>,
+    ) -> Result<(&'a [zx::VmoInfo], usize), zx::Status>;
+
     /// Returns information about the memory mappings of this process.
-    fn info_maps_vec(&self) -> Result<Vec<zx::MapInfo>, zx::Status>;
+    fn info_maps<'a>(
+        &self,
+        output_vector: &'a mut Vec<std::mem::MaybeUninit<zx::MapInfo>>,
+    ) -> Result<(&'a [zx::MapInfo], usize), zx::Status>;
 }
 
 impl Process for zx::Process {
@@ -121,12 +155,20 @@ impl Process for zx::Process {
         fidl::AsHandleRef::get_name(self)
     }
 
-    fn info_vmos_vec(&self) -> Result<Vec<zx::VmoInfo>, zx::Status> {
-        zx::Process::info_vmos_vec(self)
+    fn info_vmos<'a>(
+        &self,
+        output_vector: &'a mut Vec<std::mem::MaybeUninit<zx::VmoInfo>>,
+    ) -> Result<(&'a [zx::VmoInfo], usize), zx::Status> {
+        let (out, _, available) = zx::Process::info_vmos(self, output_vector)?;
+        Ok((out, available))
     }
 
-    fn info_maps_vec(&self) -> Result<Vec<zx::MapInfo>, zx::Status> {
-        zx::Process::info_maps_vec(self)
+    fn info_maps<'a>(
+        &self,
+        output_vector: &'a mut Vec<std::mem::MaybeUninit<zx::MapInfo>>,
+    ) -> Result<(&'a [zx::MapInfo], usize), zx::Status> {
+        let (out, _, available) = zx::Process::info_maps(self, output_vector)?;
+        Ok((out, available))
     }
 }
 
@@ -135,6 +177,7 @@ impl KernelResources {
         root: &Box<dyn Job>,
         attribution_state: &AttributionState,
     ) -> Result<KernelResources, zx::Status> {
+        duration!(CATEGORY_MEMORY_CAPTURE, c"get_resources");
         // For each process for which we have attribution information, decide what information we
         // need to collect.
         let claimed_resources_iterator =
@@ -160,20 +203,24 @@ impl KernelResources {
                     .or_insert(resource_collection);
                 hashmap
             });
-        let mut kr = KernelResources::default();
+        let mut kr_builder = KernelResourcesBuilder::default();
+        let mut cache = Cache::default();
         let root_job_koid = root.get_koid().unwrap();
-        kr.explore_job(&root_job_koid, &root, &process_collection_requests)?;
-        Ok(kr)
+        kr_builder.explore_job(&mut cache, &root_job_koid, &root, &process_collection_requests)?;
+        Ok(kr_builder.kernel_resources)
     }
+}
 
+impl KernelResourcesBuilder {
     /// Recursively gather memory information from a job.
     fn explore_job(
         &mut self,
+        cache: &mut Cache,
         koid: &zx::Koid,
         job: &Box<dyn Job>,
         process_mapped: &HashMap<zx::Koid, CollectionRequest>,
     ) -> Result<(), zx::Status> {
-        let job_name = job.get_name()?.as_bstr().to_string();
+        let job_name = job.get_name()?;
         let child_jobs = job.children()?;
         let processes = job.processes()?;
 
@@ -191,7 +238,7 @@ impl KernelResources {
                 }
                 Ok(child) => child,
             };
-            self.explore_job(child_job_koid, &child_job, process_mapped)?;
+            self.explore_job(cache, child_job_koid, &child_job, process_mapped)?;
         }
 
         for process_koid in &processes {
@@ -206,6 +253,7 @@ impl KernelResources {
                 Ok(child) => child,
             };
             match self.explore_process(
+                cache,
                 process_koid,
                 child_process,
                 process_mapped.get(process_koid),
@@ -222,7 +270,7 @@ impl KernelResources {
         }
 
         let name_index = self.ensure_resource_name(job_name);
-        self.resources.insert(
+        self.kernel_resources.resources.insert(
             koid.clone(),
             fplugin::Resource {
                 koid: Some(koid.raw_koid()),
@@ -239,12 +287,14 @@ impl KernelResources {
     }
 
     /// Ensures the resource name is registered and returns its index.
-    fn ensure_resource_name(&mut self, resource_name: String) -> u64 {
-        match self.resource_names.get(&resource_name) {
+    fn ensure_resource_name(&mut self, resource_name: zx::Name) -> u64 {
+        match self.kernel_resources.resource_names.get(&resource_name.as_bstr().to_string()) {
             Some(name_index) => *name_index,
             None => {
                 let index = self.next_resource_name_index;
-                self.resource_names.insert(resource_name, index);
+                self.kernel_resources
+                    .resource_names
+                    .insert(resource_name.as_bstr().to_string(), index);
                 self.next_resource_name_index += 1;
                 index
             }
@@ -254,15 +304,28 @@ impl KernelResources {
     /// Gather the memory information of a process.
     fn explore_process(
         &mut self,
+        cache: &mut Cache,
         koid: &zx::Koid,
         process: Box<dyn Process>,
         collection: Option<&CollectionRequest>,
     ) -> Result<(), zx::Status> {
-        let process_name = process.get_name()?.as_bstr().to_string();
+        let process_name = process.get_name()?;
+        let process_name_string = process_name.as_bstr().to_string();
+        duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process", "name" => &*process_name_string);
 
         let vmo_koids = if collection.is_none() || collection.is_some_and(|c| c.collect_vmos) {
-            let info_vmos = process.info_vmos_vec()?;
+            duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:vmos");
+            let (mut info_vmos, available) = process.info_vmos(&mut cache.vmos_cache)?;
 
+            if info_vmos.len() < available {
+                duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:vmos:grow",
+                    "initial_length" => info_vmos.len(), "target_length" => available);
+                cache.vmos_cache =
+                    vec![MaybeUninit::uninit(); available * ZX_INFO_CACHE_GROWTH_FACTOR];
+                (info_vmos, _) = process.info_vmos(&mut cache.vmos_cache)?;
+            }
+
+            duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:vmos:insert");
             let mut vmo_koids = HashSet::with_capacity(info_vmos.len());
             for info_vmo in info_vmos {
                 if !vmo_koids.insert(info_vmo.koid.clone()) {
@@ -270,11 +333,11 @@ impl KernelResources {
                     continue;
                 }
                 // No need to copy the VMO info if we have already seen it.
-                if self.resources.contains_key(&info_vmo.koid) {
+                if self.kernel_resources.resources.contains_key(&info_vmo.koid) {
                     continue;
                 }
-                let name_index = self.ensure_resource_name(info_vmo.name.as_bstr().to_string());
-                self.resources.insert(
+                let name_index = self.ensure_resource_name(info_vmo.name);
+                self.kernel_resources.resources.insert(
                     info_vmo.koid.clone(),
                     fplugin::Resource {
                         koid: Some(info_vmo.koid.raw_koid()),
@@ -298,9 +361,20 @@ impl KernelResources {
         };
 
         let process_maps = if collection.is_some_and(|c| c.collect_maps) {
-            let info_maps = process.info_maps_vec()?;
+            duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps");
+            let (mut info_maps, available) = process.info_maps(&mut cache.maps_cache)?;
 
-            let mut mappings = Vec::new();
+            if info_maps.len() < available {
+                duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps:grow", "initial_length" => info_maps.len(), "target_length" => available);
+                cache.maps_cache =
+                    vec![MaybeUninit::uninit(); available * ZX_INFO_CACHE_GROWTH_FACTOR];
+                (info_maps, _) = process.info_maps(&mut cache.maps_cache)?;
+            }
+
+            duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps:insert");
+            // This overestimates the capacity needed, but it is still better than resizing several
+            // times.
+            let mut mappings = Vec::with_capacity(info_maps.len());
             for info_map in info_maps {
                 if let zx::MapDetails::Mapping(details) = info_map.details() {
                     mappings.push(fplugin::Mapping {
@@ -317,7 +391,7 @@ impl KernelResources {
         };
 
         let name_index = self.ensure_resource_name(process_name);
-        self.resources.insert(
+        self.kernel_resources.resources.insert(
             koid.clone(),
             fplugin::Resource {
                 koid: Some(koid.raw_koid()),
@@ -336,6 +410,7 @@ impl KernelResources {
 
 #[cfg(test)]
 mod tests {
+    use std::mem::MaybeUninit;
     use std::vec;
 
     use crate::attribution_client::{
@@ -432,12 +507,48 @@ mod tests {
             Ok(self.name.clone())
         }
 
-        fn info_vmos_vec(&self) -> Result<Vec<zx::VmoInfo>, zx::Status> {
-            Ok(self.vmos.clone())
+        fn info_vmos<'a>(
+            &self,
+            output_vector: &'a mut Vec<std::mem::MaybeUninit<zx::VmoInfo>>,
+        ) -> Result<(&'a [zx::VmoInfo], usize), zx::Status> {
+            self.vmos.iter().take(output_vector.len()).copied().enumerate().for_each(
+                |(index, vmo)| {
+                    output_vector[index] = MaybeUninit::new(vmo);
+                },
+            );
+
+            let (initialized, _) = output_vector.split_at_mut(self.vmos.len());
+            // TODO(https://fxbug.dev/352398385) switch to MaybeUninit::slice_assume_init_mut
+            // SAFETY: these values have been initialized just above.
+            let initialized = unsafe {
+                std::slice::from_raw_parts_mut(
+                    initialized.as_mut_ptr().cast::<zx::VmoInfo>(),
+                    initialized.len(),
+                )
+            };
+            return Ok((initialized, self.vmos.len()));
         }
 
-        fn info_maps_vec(&self) -> Result<Vec<zx::MapInfo>, zx::Status> {
-            Ok(self.maps.clone())
+        fn info_maps<'a>(
+            &self,
+            output_vector: &'a mut Vec<std::mem::MaybeUninit<zx::MapInfo>>,
+        ) -> Result<(&'a [zx::MapInfo], usize), zx::Status> {
+            self.maps.iter().take(output_vector.len()).copied().enumerate().for_each(
+                |(index, maps)| {
+                    output_vector[index] = MaybeUninit::new(maps);
+                },
+            );
+
+            let (initialized, _) = output_vector.split_at_mut(self.maps.len());
+            // TODO(https://fxbug.dev/352398385) switch to MaybeUninit::slice_assume_init_mut
+            // SAFETY: these values have been initialized just above.
+            let initialized = unsafe {
+                std::slice::from_raw_parts_mut(
+                    initialized.as_mut_ptr().cast::<zx::MapInfo>(),
+                    initialized.len(),
+                )
+            };
+            return Ok((initialized, self.maps.len()));
         }
     }
 

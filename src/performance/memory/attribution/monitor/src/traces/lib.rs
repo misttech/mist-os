@@ -3,3 +3,7 @@
 // found in the LICENSE file.
 pub mod kernel;
 pub mod watcher;
+
+use std::ffi::CStr;
+
+pub const CATEGORY_MEMORY_CAPTURE: &'static CStr = c"memory:capture";
