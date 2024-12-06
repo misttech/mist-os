@@ -152,7 +152,11 @@ fuchsia_test_component("test_manager_stress_test_component") {
 fuchsia_test_package("test_manager_stress_test") {
   test_components = [ ":test_manager_stress_test_component" ]
   deps = [ "test_data:debug_data_spam_test" ]
-
+  test_specs = {
+    # Don't run stress tests in parallel as that can put presure on system
+    # resources on smaller boards/devices.
+    parallel = 1
+  }
   subpackages = [ "//src/sys/test_manager:pkg" ]
 }
 
