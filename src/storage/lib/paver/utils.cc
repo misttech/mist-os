@@ -52,7 +52,7 @@ zx::result<std::unique_ptr<VolumeConnector>> OpenBlockPartition(const paver::Blo
       }
       auto& response = result.value();
       if (response.status != ZX_OK || type_guid != Uuid(response.guid->value.data())) {
-        if (response.status != ZX_OK) {
+        if (response.status != ZX_OK && response.status != ZX_ERR_NOT_SUPPORTED) {
           ERROR("Failed to GetTypeGuid: %s\n", zx_status_get_string(response.status));
         }
         return false;
