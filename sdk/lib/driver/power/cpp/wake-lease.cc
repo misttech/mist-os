@@ -94,6 +94,22 @@ bool WakeLease::AcquireWakeLease(zx::duration timeout) {
   return true;
 }
 
+void WakeLease::DepositWakeLease(zx::eventpair wake_lease, zx::time timeout_deadline) {
+  if (lease_) {
+    if (timeout_deadline < lease_task_.last_deadline()) {
+      // If the current least out lives the new one, don't need to do anything.
+      return;
+    }
+    // If already holding a lease, cancel the current timeout.
+    lease_task_.Cancel();
+  }
+
+  lease_ = std::move(wake_lease);
+  wake_lease_last_refreshed_timestamp_.Set(zx::clock::get_monotonic().get());
+  wake_lease_held_.Set(true);
+  lease_task_.PostForTime(dispatcher_, timeout_deadline);
+}
+
 zx::eventpair WakeLease::TakeWakeLease() {
   lease_task_.Cancel();
   wake_lease_held_.Set(false);

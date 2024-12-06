@@ -39,6 +39,12 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   // rather than at the point this method is called.
   bool AcquireWakeLease(zx::duration timeout);
 
+  // Deposit a wake lease which will automatically be dropped after the specified timeout deadline.
+  // If a lease was already held from an earlier invocation, it will be dropped in favor of the new
+  // lease if the new lease has a later deadline. If the old lease has a later deadline, then the
+  // new lease will be dropped instead.
+  void DepositWakeLease(zx::eventpair wake_lease, zx::time timeout_deadline);
+
   // Cancel timeout and take the wake lease.
   // Note that it's possible for the wake lease to not be valid, so the caller should check it's
   // validity before using.
