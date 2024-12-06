@@ -380,6 +380,7 @@ impl FileSystem {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::sb_statfs(current_task, &self)?;
         let mut locked = locked.cast_locked::<FileOpsCore>();
         let mut stat = self.ops.statfs(&mut locked, self, current_task)?;
         if stat.f_frsize == 0 {

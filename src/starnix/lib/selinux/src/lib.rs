@@ -451,6 +451,8 @@ class_permission_enum! {
         // keep-sorted start
         /// Permission to associate a file to the filesystem.
         Associate("associate"),
+        /// Permission to get filesystem attributes.
+        GetAttr("getattr"),
         /// Permission to remount a filesystem with different flags.
         Remount("remount"),
         /// Permission to unmount a filesystem.

@@ -51,6 +51,17 @@ pub fn sb_mount(
     }
 }
 
+/// Checks if `current_task` has the permission to get information on `fs`.
+pub fn sb_statfs(
+    permission_check: &PermissionCheck<'_>,
+    current_task: &CurrentTask,
+    fs: &FileSystem,
+) -> Result<(), Errno> {
+    let source_sid = current_task.security_state.lock().current_sid;
+    let target_sid = fs_sid(fs)?;
+    check_permission(permission_check, source_sid, target_sid, FileSystemPermission::GetAttr)
+}
+
 /// Checks if `current_task` has the permission to unmount the filesystem mounted on
 /// `node` using the unmount flags `_flags`.
 pub fn sb_umount(

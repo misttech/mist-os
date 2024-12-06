@@ -7,7 +7,7 @@ use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntryHandle, FileHandle, FileObject, FileSystemHandle, FsNode, FsStr, FsString,
+    DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
     NamespaceNode, ValueOrSize, XattrOp,
 };
 use fuchsia_inspect_contrib::profile_duration;
@@ -612,6 +612,19 @@ pub fn sb_mount(
             current_task,
             path,
             flags,
+        )
+    })
+}
+
+/// Checks if `current_task` has the permission to get the filesystem statistics of `fs`.
+/// Corresponds to the `sb_statfs()` LSM hook.
+pub fn sb_statfs(current_task: &CurrentTask, fs: &FileSystem) -> Result<(), Errno> {
+    profile_duration!("security.hooks.sb_statfs");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::superblock::sb_statfs(
+            &security_server.as_permission_check(),
+            current_task,
+            fs,
         )
     })
 }
