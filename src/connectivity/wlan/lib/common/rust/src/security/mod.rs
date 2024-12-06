@@ -451,7 +451,6 @@ impl From<SecurityAuthenticator> for fidl_security::Authentication {
                 use wpa::Authentication::{Enterprise, Personal};
                 use wpa::Wpa::{Wpa1, Wpa2, Wpa3};
 
-                #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336901)
                 let protocol = match (&wpa, wpa.to_credentials()) {
                     (Wpa1 { .. }, _) => fidl_security::Protocol::Wpa1,
                     (Wpa2 { .. }, Personal(_)) => fidl_security::Protocol::Wpa2Personal,

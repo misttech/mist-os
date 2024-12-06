@@ -189,7 +189,6 @@ pub async fn serve(
     let removal_watcher = sme_event_stream.map_ok(|_| ()).try_collect::<()>();
     select! {
         state_machine = state_machine.fuse() => {
-            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336257)
             match state_machine {
                 Ok(v) => {
                     // This should never happen because the `Infallible` type should be impossible

@@ -182,7 +182,6 @@ where
 /// Conversion of general WPA credentials into bare credentials.
 impl From<Credentials> for BareCredentials {
     fn from(credentials: Credentials) -> Self {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336901)
         match credentials {
             Credentials::Personal(personal) => match personal {
                 PersonalCredentials::Passphrase(passphrase) => {
