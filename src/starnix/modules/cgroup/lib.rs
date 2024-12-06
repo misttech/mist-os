@@ -5,6 +5,7 @@
 #![recursion_limit = "512"]
 
 mod cgroup;
+mod freezer;
 mod fs;
 
 pub use fs::*;

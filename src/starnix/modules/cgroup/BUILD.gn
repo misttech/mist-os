@@ -12,6 +12,7 @@ rustc_library("cgroup") {
 
   sources = [
     "cgroup.rs",
+    "freezer.rs",
     "fs.rs",
     "lib.rs",
   ]

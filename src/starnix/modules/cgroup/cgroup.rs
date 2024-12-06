@@ -29,8 +29,11 @@ use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::sync::{Arc, OnceLock, Weak};
 
+use crate::freezer::FreezerFile;
+
 const CONTROLLERS_FILE: &str = "cgroup.controllers";
 const PROCS_FILE: &str = "cgroup.procs";
+const FREEZE_FILE: &str = "cgroup.freeze";
 
 /// Common operations of all cgroups.
 pub trait CgroupOps: Send + Sync + 'static {
@@ -272,6 +275,14 @@ impl Cgroup {
                             current_task,
                             BytesFile::new_node(b"".to_vec()),
                             FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                        ),
+                    ),
+                    (
+                        FREEZE_FILE.into(),
+                        fs.create_node(
+                            current_task,
+                            FreezerFile::new_node(),
+                            FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
                         ),
                     ),
                 ]),

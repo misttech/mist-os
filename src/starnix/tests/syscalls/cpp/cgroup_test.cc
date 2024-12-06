@@ -17,6 +17,7 @@
 
 constexpr char CONTROLLERS_FILE[] = "cgroup.controllers";
 constexpr char PROCS_FILE[] = "cgroup.procs";
+constexpr char FREEZE_FILE[] = "cgroup.freeze";
 
 // Mounts cgroup2 in a temporary directory for each test case, and deletes all cgroups created by
 // `CreateCgroup` at the end of each test.
@@ -28,8 +29,8 @@ class CgroupTest : public ::testing::Test {
       // mounting cgroup requires CAP_SYS_ADMIN.
       GTEST_SKIP() << "requires CAP_SYS_ADMIN to mount cgroup";
     }
-    ASSERT_THAT(mkdir(path().c_str(), 0777), SyscallSucceeds());
-    ASSERT_THAT(mount(nullptr, path().c_str(), "cgroup2", 0, nullptr), SyscallSucceeds());
+    ASSERT_THAT(mkdir(root_path().c_str(), 0777), SyscallSucceeds());
+    ASSERT_THAT(mount(nullptr, root_path().c_str(), "cgroup2", 0, nullptr), SyscallSucceeds());
   }
 
   void TearDown() override {
@@ -44,18 +45,25 @@ class CgroupTest : public ::testing::Test {
     for (auto path = cgroup_paths_.rbegin(); path != cgroup_paths_.rend(); path++) {
       ASSERT_THAT(rmdir(path->c_str()), SyscallSucceeds());
     }
-    ASSERT_THAT(umount(path().c_str()), SyscallSucceeds());
+    ASSERT_THAT(umount(root_path().c_str()), SyscallSucceeds());
   }
 
-  std::string path() { return temp_dir_.path() + "/cgroup"; }
+  std::string root_path() { return temp_dir_.path() + "/cgroup"; }
 
-  static void CheckInterfaceFilesExist(const std::string& path) {
+  void CheckInterfaceFilesExist(const std::string& path) {
+    bool is_root = path == root_path();
     std::string controllers_path = path + "/" + CONTROLLERS_FILE;
     std::string procs_path = path + "/" + PROCS_FILE;
+    std::string freeze_path = path + "/" + FREEZE_FILE;
 
     struct stat buffer;
     ASSERT_THAT(stat(controllers_path.c_str(), &buffer), SyscallSucceeds());
     ASSERT_THAT(stat(procs_path.c_str(), &buffer), SyscallSucceeds());
+    if (is_root) {
+      ASSERT_THAT(stat(freeze_path.c_str(), &buffer), SyscallFailsWithErrno(ENOENT));
+    } else {
+      ASSERT_THAT(stat(freeze_path.c_str(), &buffer), SyscallSucceeds());
+    }
   }
 
   struct ExpectedEntry {
@@ -99,12 +107,12 @@ class CgroupTest : public ::testing::Test {
   test_helper::ScopedTempDir temp_dir_;
 };
 
-TEST_F(CgroupTest, InterfaceFilesForRoot) { CheckInterfaceFilesExist(path()); }
+TEST_F(CgroupTest, InterfaceFilesForRoot) { CheckInterfaceFilesExist(root_path()); }
 
 // This test checks that nodes created as part of cgroups have the same inode each time it is
 // accessed, which is seen on Linux.
 TEST_F(CgroupTest, InodeNumbersAreConsistent) {
-  std::string controllers_path = path() + "/" + CONTROLLERS_FILE;
+  std::string controllers_path = root_path() + "/" + CONTROLLERS_FILE;
   struct stat buffer1, buffer2;
   ASSERT_THAT(stat(controllers_path.c_str(), &buffer1), SyscallSucceeds());
   ASSERT_THAT(stat(controllers_path.c_str(), &buffer2), SyscallSucceeds());
@@ -112,51 +120,51 @@ TEST_F(CgroupTest, InodeNumbersAreConsistent) {
 }
 
 TEST_F(CgroupTest, ReadDir) {
-  CheckDirectoryIncludes(path(), {
-                                     {.name = "cgroup.procs", .type = DT_REG},
-                                     {.name = "cgroup.controllers", .type = DT_REG},
-                                 });
+  CheckDirectoryIncludes(root_path(), {
+                                          {.name = "cgroup.procs", .type = DT_REG},
+                                          {.name = "cgroup.controllers", .type = DT_REG},
+                                      });
 
   std::string child1 = "child1";
-  CreateCgroup(path() + "/" + child1);
-  CheckDirectoryIncludes(path(), {
-                                     {.name = "cgroup.procs", .type = DT_REG},
-                                     {.name = "cgroup.controllers", .type = DT_REG},
-                                     {.name = child1, .type = DT_DIR},
-                                 });
+  CreateCgroup(root_path() + "/" + child1);
+  CheckDirectoryIncludes(root_path(), {
+                                          {.name = "cgroup.procs", .type = DT_REG},
+                                          {.name = "cgroup.controllers", .type = DT_REG},
+                                          {.name = child1, .type = DT_DIR},
+                                      });
 
   std::string child2 = "child2";
-  CreateCgroup(path() + "/" + child2);
-  CheckDirectoryIncludes(path(), {
-                                     {.name = "cgroup.procs", .type = DT_REG},
-                                     {.name = "cgroup.controllers", .type = DT_REG},
-                                     {.name = child1, .type = DT_DIR},
-                                     {.name = child2, .type = DT_DIR},
-                                 });
+  CreateCgroup(root_path() + "/" + child2);
+  CheckDirectoryIncludes(root_path(), {
+                                          {.name = "cgroup.procs", .type = DT_REG},
+                                          {.name = "cgroup.controllers", .type = DT_REG},
+                                          {.name = child1, .type = DT_DIR},
+                                          {.name = child2, .type = DT_DIR},
+                                      });
 }
 
 TEST_F(CgroupTest, CreateSubgroups) {
-  std::string child1_path = path() + "/child1";
+  std::string child1_path = root_path() + "/child1";
   CreateCgroup(child1_path);
   CheckInterfaceFilesExist(child1_path);
 
-  std::string child2_path = path() + "/child2";
+  std::string child2_path = root_path() + "/child2";
   CreateCgroup(child2_path);
   CheckInterfaceFilesExist(child2_path);
 
-  std::string grandchild_path = path() + "/child2/grandchild";
+  std::string grandchild_path = root_path() + "/child2/grandchild";
   CreateCgroup(grandchild_path);
   CheckInterfaceFilesExist(grandchild_path);
 }
 
 TEST_F(CgroupTest, CreateSubgroupAlreadyExists) {
-  std::string child_path = path() + "/child";
+  std::string child_path = root_path() + "/child";
   CreateCgroup(child_path);
   ASSERT_THAT(mkdir(child_path.c_str(), 0777), SyscallFailsWithErrno(EEXIST));
 }
 
 TEST_F(CgroupTest, WriteToInterfaceFileAfterCgroupIsDeleted) {
-  std::string child_path = path() + "/child";
+  std::string child_path = root_path() + "/child";
   std::string child_procs_path = child_path + "/" + PROCS_FILE;
 
   CreateCgroup(child_path);

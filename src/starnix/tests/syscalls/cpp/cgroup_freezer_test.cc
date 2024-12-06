@@ -8,11 +8,11 @@
 
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <string>
 
 #include <gtest/gtest.h>
 
+#include "src/lib/files/file.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 class CgroupFreezerTest : public ::testing::Test {
@@ -85,6 +85,20 @@ class CgroupFreezerTest : public ::testing::Test {
   test_helper::ScopedTempDir temp_dir_;
 };
 
+TEST_F(CgroupFreezerTest, FreezeFileAccess) {
+  std::string freeze_str;
+  EXPECT_TRUE(files::ReadFileToString(freezer_path(), &freeze_str));
+  EXPECT_EQ(freeze_str, "0\n");
+
+  EXPECT_TRUE(files::WriteFile(freezer_path(), "1"));
+  EXPECT_TRUE(files::ReadFileToString(freezer_path(), &freeze_str));
+  EXPECT_EQ(freeze_str, "1\n");
+
+  EXPECT_TRUE(files::WriteFile(freezer_path(), "0"));
+  EXPECT_TRUE(files::ReadFileToString(freezer_path(), &freeze_str));
+  EXPECT_EQ(freeze_str, "0\n");
+}
+
 TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
   pid_t parent_pid = getpid();
   test_helper::ForkHelper fork_helper;
@@ -103,9 +117,7 @@ TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
   test_pids_.push_back(child_pid);
 
   // Write the child PID to the cgroup
-  std::ofstream procs_file(procs_path());
-  procs_file << child_pid;
-  procs_file.close();
+  files::WriteFile(procs_path(), std::to_string(child_pid));
 
   // Set up a signal set to wait for SIGUSR1 which will be sent by the child process
   test_helper::SignalMaskHelper mask_helper;
@@ -116,9 +128,7 @@ TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
   mask_helper.waitForSignal(SIGUSR1);
 
   // Freeze the cgroup
-  std::ofstream freeze_file(freezer_path());
-  freeze_file << 1;
-  freeze_file.close();
+  files::WriteFile(freezer_path(), "1");
   ASSERT_TRUE(wait_freeze_state_changed(true));
 
   // Send signal; frozen child should *not* receive it.
@@ -128,10 +138,8 @@ TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
   EXPECT_THAT(mask_helper.timedWaitForSignal(SIGUSR1, 2), SyscallFailsWithErrno(EAGAIN));
 
   // Unfreeze the child process
-  freeze_file.open(freezer_path());
-  freeze_file << 0;
-  freeze_file.close();
-  EXPECT_TRUE(wait_freeze_state_changed(false));
+  files::WriteFile(freezer_path(), "0");
+  ASSERT_TRUE(wait_freeze_state_changed(false));
 
   // Child will process the last signal after thawed.
   mask_helper.waitForSignal(SIGUSR1);
