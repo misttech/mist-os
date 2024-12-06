@@ -13,7 +13,7 @@ developers significantly that are hard to get in the upstream version.
 
 All Fuchsia-specific changes are performed on the local `fuchsia-rfc-0153`
 branch of our [local Ninja git mirror][fuchsia-mirror]{:.external}, and
-are rebased periodically to make them easy to send as Github pull requests
+are rebased periodically to make them easy to send as GitHub pull requests
 to the upstream project, as described in the
 [Strategy section of the RFC][rfc-strategy].
 
