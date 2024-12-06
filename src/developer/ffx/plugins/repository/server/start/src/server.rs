@@ -7,7 +7,7 @@ use ffx_config::EnvironmentContext;
 use ffx_repository_serve::{get_repo_base_name, serve_impl};
 use ffx_repository_serve_args::ServeCommand;
 use ffx_repository_server_start_args::StartCommand;
-use fho::{bug, user_error, Connector, FfxMain, Result};
+use fho::{bug, user_error, Connector, Deferred, FfxMain, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use pkg::{PkgServerInstanceInfo, PkgServerInstances, ServerMode};
@@ -84,12 +84,14 @@ pub async fn run_foreground_server(
     context: EnvironmentContext,
     target_proxy_connector: Connector<ffx::TargetProxy>,
     rcs_proxy_connector: Connector<RemoteControlProxy>,
+    repos: Deferred<ffx::RepositoryRegistryProxy>,
     w: <ServerStartTool as FfxMain>::Writer,
     mode: ServerMode,
 ) -> Result<()> {
     serve_impl(
         target_proxy_connector,
         rcs_proxy_connector,
+        repos,
         to_serve_command(&start_cmd),
         context,
         w.simple_writer(),
