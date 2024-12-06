@@ -1264,6 +1264,11 @@ config("Wno-deprecated-anon-enum-enum-conversion") {
   ]
 }
 
+config("Wno-newline-eof") {
+  cflags = [ "-Wno-newline-eof" ]
+  visibility = [ "//third_party/github.com/google/cppdap/*" ]
+}
+
 config("symbol_visibility_hidden") {
   # Disable libc++ visibility annotations to make sure that the compiler option
   # has effect on symbols defined in libc++ headers. Note that we don't want to

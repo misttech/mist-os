@@ -32,7 +32,10 @@ static_library("cppdap") {
   cflags = [ "-DCPPDAP_JSON_RAPID" ]
 
   # Suppress warnings that Fuchsia build adds
-  configs += [ "//build/config:Wno-extra-semi" ]
+  configs += [
+    "//build/config:Wno-extra-semi",
+    "//build/config:Wno-newline-eof",
+  ]
 
   public_configs = [ ":includes" ]
 
