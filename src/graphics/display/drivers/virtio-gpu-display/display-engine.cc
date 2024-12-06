@@ -42,6 +42,7 @@
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 #include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
@@ -221,7 +222,7 @@ bool DisplayEngine::CheckConfiguration(
   }
   if (layer.image_source_transformation() != display::CoordinateTransformation::kIdentity) {
     layer_composition_operations[0] = layer_composition_operations[0].WithTransform();
-    is_supported_configuration = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    is_supported_configuration = false;
   }
   return is_supported_configuration;
 }
