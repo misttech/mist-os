@@ -1,0 +1,7 @@
+Name: spirv-headers
+License: Apache 2.0
+License File: LICENSE
+Upstream Git: https://github.com/KhronosGroup/SPIRV-Headers
+Description:
+
+This repository contains machine-readable files for the SPIR-V Registry.
