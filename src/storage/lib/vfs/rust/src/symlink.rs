@@ -182,6 +182,14 @@ impl<T: Symlink> Connection<T> {
                     Ok(info) => responder.send(0, Some(&info))?,
                 }
             }
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            fio::SymlinkRequest::GetFlags2 { responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            fio::SymlinkRequest::SetFlags2 { flags: _, responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
             fio::SymlinkRequest::_UnknownMethod { ordinal, .. } => {
                 tracing::warn!(ordinal, "Received unknown method")
             }

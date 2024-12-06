@@ -397,6 +397,35 @@ open protocol Node {
         s zx.Status;
     });
 
+    /// Queries the flags that apply to this node after it has been opened/created. This method does
+    /// not require any rights.
+    ///
+    /// Note that the final set of flags that apply to the connection may differ from those
+    /// specified with the `fuchsia.io/Directory.Open` request used to create it:
+    ///  - `Flags.PERM_INHERIT_*`: Only applies when determining connection rights.
+    ///  - `Flags.PROTOCOL_*`: Only the protocol of the connection will be present.
+    ///  - `Flags.FLAG_*`: Only applies when opening the resource, not part of the connection.
+    @available(added=HEAD)
+    @selector("fuchsia.io/Node.GetFlags")
+    flexible GetFlags2() -> (struct {
+        flags Flags;
+    }) error zx.Status;
+
+    /// Sets the flags that apply to this node after it has been opened. This method does not
+    /// require any rights.
+    ///
+    /// Only `Flags.FILE_APPEND` is currently supported. Calling this method without any flags will
+    /// clear append mode.
+    ///
+    /// Errors:
+    ///  - `ZX_ERR_NOT_SUPPORTED`: The object does not support this feature or the specified flags.
+    ///  - `ZX_ERR_INVALID_ARGS`: `flags` other than `Flags.FILE_APPEND` were specified.
+    @available(added=HEAD)
+    @selector("fuchsia.io/Node.SetFlags")
+    flexible SetFlags2(struct {
+        flags Flags;
+    }) -> () error zx.Status;
+
     /// Query the filesystem for filesystem-specific information.
     @selector("fuchsia.io.admin/DirectoryAdmin.QueryFilesystem")
     strict QueryFilesystem() -> (struct {
@@ -518,6 +547,7 @@ open protocol Node {
     /// Acquires information about the connection.
     ///
     /// This method does not require any rights.
+    // TODO(https://fxbug.dev/376509077): Remove this method and replace all usages with GetFlags2.
     @selector("fuchsia.io/Node.GetConnectionInfo")
     strict GetConnectionInfo() -> (ConnectionInfo);
 

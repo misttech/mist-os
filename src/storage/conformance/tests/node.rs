@@ -109,6 +109,25 @@ async fn test_set_attr_and_set_flags_on_node() {
 }
 
 #[fuchsia::test]
+async fn test_set_flags2_on_node() {
+    let harness = TestHarness::new().await;
+    let entries = vec![file("file", vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
+    let proxy =
+        dir.open3_node::<fio::NodeMarker>("file", fio::Flags::PROTOCOL_NODE, None).await.unwrap();
+    assert_eq!(
+        zx::Status::ok(
+            proxy
+                .set_flags2(fio::Flags::FILE_APPEND)
+                .await
+                .expect("set_flags2 failed")
+                .unwrap_err()
+        ),
+        Err(zx::Status::NOT_SUPPORTED)
+    );
+}
+
+#[fuchsia::test]
 async fn test_node_clone() {
     let harness = TestHarness::new().await;
     let entries = vec![file("file", vec![])];

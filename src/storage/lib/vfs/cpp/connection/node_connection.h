@@ -73,6 +73,14 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 #endif
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  void GetFlags2(GetFlags2Completer::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void SetFlags2(SetFlags2RequestView request, SetFlags2Completer::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+#endif
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_io::Node>,
                              fidl::UnknownMethodCompleter::Sync&) final {}

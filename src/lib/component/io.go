@@ -190,6 +190,14 @@ func (*Service) SetFlags(fidl.Context, io.OpenFlags) (int32, error) {
 	return int32(zx.ErrNotSupported), nil
 }
 
+func (*Service) GetFlags2(fidl.Context) (io.NodeGetFlags2Result, error) {
+	return io.NodeGetFlags2ResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+func (*Service) SetFlags2(fidl.Context) (io.NodeSetFlags2Result, error) {
+	return io.NodeSetFlags2ResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
 func (*Service) QueryFilesystem(fidl.Context) (int32, *io.FilesystemInfo, error) {
 	return int32(zx.ErrNotSupported), nil, nil
 }
@@ -525,6 +533,14 @@ func (*directoryState) SetFlags(fidl.Context, io.OpenFlags) (int32, error) {
 	return int32(zx.ErrNotSupported), nil
 }
 
+func (*directoryState) GetFlags2(fidl.Context) (io.NodeGetFlags2Result, error) {
+	return io.NodeGetFlags2ResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+func (*directoryState) SetFlags2(fidl.Context) (io.NodeSetFlags2Result, error) {
+	return io.NodeSetFlags2ResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
 func (dirState *directoryState) AdvisoryLock(fidl.Context, io.AdvisoryLockRequest) (io.AdvisoryLockingAdvisoryLockResult, error) {
 	return io.AdvisoryLockingAdvisoryLockResultWithErr(int32(zx.ErrNotSupported)), nil
 }
@@ -837,6 +853,14 @@ func (*fileState) GetFlags(fidl.Context) (int32, io.OpenFlags, error) {
 
 func (*fileState) SetFlags(fidl.Context, io.OpenFlags) (int32, error) {
 	return int32(zx.ErrNotSupported), nil
+}
+
+func (*fileState) GetFlags2(fidl.Context) (io.NodeGetFlags2Result, error) {
+	return io.NodeGetFlags2ResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
+func (*fileState) SetFlags2(fidl.Context) (io.NodeSetFlags2Result, error) {
+	return io.NodeSetFlags2ResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*fileState) QueryFilesystem(fidl.Context) (int32, *io.FilesystemInfo, error) {
