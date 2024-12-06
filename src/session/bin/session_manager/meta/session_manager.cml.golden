@@ -482,24 +482,6 @@
             availability: "same_as_target",
         },
         {
-            // TODO(https://fxbug.dev/42057100): These additional `protocol` offers to the
-            // `#session` collection are only required by the `terminal`
-            // component. `terminal` is launched as a member of the `elements`
-            // collection of the application shell (a descendent of the
-            // workstation session, which is launched as a member of the
-            // `#session` collection). If/when there is a way to route
-            // capabilities to specific descendents (and specific collection
-            // members), these protocols should be routed only to terminal.
-            //
-            // Other (current and future) components launched under the
-            // `#session` collection should not `use` these protocols without
-            // first getting a security policy review.
-            protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
-            from: "parent/diagnostics-accessors",
-            to: [ "#session" ],
-            availability: "same_as_target",
-        },
-        {
             // TODO(https://fxbug.dev/42057100): These additional `directory` offers to
             // the `#session` collection are only required by the `terminal`
             // component. `terminal` is launched as a member of the `elements`
@@ -523,23 +505,6 @@
             dictionary: "diagnostics-accessors",
             from: "parent",
             to: "#session",
-        },
-
-        // TODO(https://fxbug.dev/342196300): remove these routes once we have refactored sessions
-        // to route from the "diagnostics-accessors" dictionary.
-        {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor.legacy_metrics",
-            from: "parent/diagnostics-accessors",
-            as: "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-            to: "#session",
-            availability: "same_as_target",
-        },
-        {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor.lowpan",
-            from: "parent/diagnostics-accessors",
-            as: "fuchsia.diagnostics.LoWPANArchiveAccessor",
-            to: "#session",
-            availability: "same_as_target",
         },
         {
             directory: [
