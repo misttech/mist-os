@@ -515,7 +515,7 @@ fn impl_valid_fidl_table(
                 _ => false,
             })
             .map(|field| {
-                let doc = format!("`{}` is missing.", field.ident.to_string());
+                let doc = format!("`{}` is missing.", field.ident);
                 let camel_case = FidlField::camel_case(field);
                 quote!(
                     #[doc = #doc]

@@ -45,6 +45,7 @@ inline constexpr int kOpenFlagsMask = OpenFlags::kNoload | OpenFlags::kNodelete;
 class RuntimeDynamicLinker {
  public:
   using Soname = elfldltl::Soname<>;
+  using size_type = Elf::size_type;
 
   // Create a RuntimeDynamicLinker with the passed in passive `abi`. The caller
   // is required to pass an AllocChecker and check it to verify the
@@ -106,7 +107,7 @@ class RuntimeDynamicLinker {
 
     // A Module for `file` does not yet exist; create a new LinkingSession
     // to perform the loading and linking of the file and all its dependencies.
-    LinkingSession<Loader> linking_session{modules_};
+    LinkingSession<Loader> linking_session{modules_, max_static_tls_modid_};
 
     if (!linking_session.Link(diag, name, std::forward<RetrieveFile>(retrieve_file))) {
       return diag.take_error();
@@ -159,6 +160,11 @@ class RuntimeDynamicLinker {
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
   ModuleList modules_;
+
+  // The maximum static TLS module id is taken from the ld::abi::Abi<> at
+  // creation and passed to LinkinSessions to be able to detect TLS modules
+  // during relocation.
+  size_type max_static_tls_modid_ = 0;
 };
 
 }  // namespace dl

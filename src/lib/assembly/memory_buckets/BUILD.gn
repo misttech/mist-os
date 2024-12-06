@@ -16,9 +16,11 @@ rustc_library("memory_buckets") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:serde_json",
   ]
-  test_deps = [ "//third_party/rust_crates:tempfile" ]
+  test_deps = [
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tempfile",
+  ]
   sources = [
     "src/lib.rs",
     "src/memory_buckets.rs",

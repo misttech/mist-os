@@ -386,7 +386,7 @@ project.
 
 For example, `@@com_acme_anvil.1.0.3` could be a canonical name for the
 workspace directory identified by `@anvil` in the project's own `BUILD.bazel`
-files, and by `@acme_anvil` when it appears in in an external repository
+files, and by `@acme_anvil` when it appears in an external repository
 (e.g. inside `@foo//:BUILD.bazel`). All three labels would refer to the content
 of the same directory.
 

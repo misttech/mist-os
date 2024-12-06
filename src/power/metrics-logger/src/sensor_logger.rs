@@ -432,7 +432,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
             .is_some_and(|t| time_stamp - t.statistics_start_time >= t.statistics_interval);
 
         let mut trace_args = Vec::new();
-        let mut trace_args_statistics = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+        let mut trace_args_statistics = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
         let mut sensor_names = Vec::new();
         for driver in self.drivers.iter() {

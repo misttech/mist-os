@@ -152,9 +152,9 @@ fn attribution_info_for_kernel(
     ]
 }
 
-struct Config {
+pub struct Config {
     /// The features enabled for this container.
-    features: Vec<String>,
+    pub features: Vec<String>,
 
     /// The command line for the initial process for this container.
     init: Vec<String>,
@@ -195,6 +195,21 @@ struct Config {
     /// The runtime directory of the container, used to provide CF introspection.
     runtime_dir: Option<ServerEnd<fio::DirectoryMarker>>,
 
+    /// The default seclabel that is applied to components that are instantiated in this container.
+    ///
+    /// Components can override this by setting the `seclabel` field in their program block.
+    pub default_seclabel: Option<String>,
+
+    /// The default fsseclabel that is applied to components that are instantiated in this container.
+    ///
+    /// Components can override this by setting the `fsseclabel` field in their program block.
+    pub default_fsseclabel: Option<String>,
+
+    /// The default uid that is applied to components that are instantiated in this container.
+    ///
+    /// Components can override this by setting the `uid` field in their program block.
+    pub default_uid: u32,
+
     /// Component moniker token for the container component. This token is used in various protocols
     /// to uniquely identify a component.
     component_instance: Option<zx::Event>,
@@ -222,15 +237,21 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
 
     let get_string = |key| get_program_string(&start_info, key).unwrap_or_default().to_owned();
 
+    let default_uid = get_program_string(&start_info, "default_uid")
+        .map(|s| s.parse().expect("container default uid"))
+        .unwrap_or(42);
+    let default_seclabel = get_program_string(&start_info, "default_seclabel").map(|s| s.into());
+    let default_fsseclabel =
+        get_program_string(&start_info, "default_fsseclabel").map(|s| s.into());
     let features = get_strvec("features");
     let init = get_strvec("init");
     let kernel_cmdline = get_string("kernel_cmdline");
     let mounts = get_strvec("mounts");
-    let rlimits = get_strvec("rlimits");
     let name = get_string("name");
-    let startup_file_path = get_string("startup_file_path");
     #[cfg(not(feature = "starnix_lite"))]
     let remote_block_devices = get_strvec("remote_block_devices");
+    let rlimits = get_strvec("rlimits");
+    let startup_file_path = get_string("startup_file_path");
 
     let mut ns = start_info.ns.take();
     let pkg_dir = get_ns_entry(&mut ns, "/pkg");
@@ -240,6 +261,9 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
     let component_instance = start_info.component_instance;
 
     Config {
+        default_uid,
+        default_seclabel,
+        default_fsseclabel,
         features,
         init,
         kernel_cmdline,
@@ -470,7 +494,7 @@ async fn create_container(
 
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
 
-    let features = parse_features(&config.features, structured_config)?;
+    let features = parse_features(&config, structured_config)?;
 
     #[cfg(not(feature = "starnix_lite"))]
     let mut kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
@@ -510,15 +534,18 @@ async fn create_container(
     let crash_reporter = connect_to_protocol::<CrashReporterMarker>().unwrap();
 
     let node = inspect::component::inspector().root().create_child("container");
+    let kernel_node = node.create_child("kernel");
+    features.record_inspect(&kernel_node);
+
     let security_state = security::kernel_init_security(features.selinux);
     let kernel = Kernel::new(
         kernel_cmdline,
-        features.kernel,
+        features.kernel.clone(),
         svc_dir,
         data_dir,
         role_manager,
         Some(crash_reporter),
-        node.create_child("kernel"),
+        kernel_node,
         #[cfg(not(feature = "starnix_lite"))]
         features.aspect_ratio.as_ref(),
         security_state,

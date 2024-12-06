@@ -477,7 +477,7 @@ fn netstack_test_inner(
         |TestVariation { params, generics, suffix, attributes }| {
             // We don't need to add an "_" between the name and the suffix here as the suffix
             // will start with one.
-            let test_name_str = format!("{}{}", name.to_string(), suffix);
+            let test_name_str = format!("{}{}", name, suffix);
             let test_name = syn::Ident::new(&test_name_str, Span::call_site());
             let args = make_args(test_name_str);
 

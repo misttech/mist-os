@@ -15,6 +15,7 @@ source_set("perfetto_bridge_lib") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.tracing.perfetto:fuchsia.tracing.perfetto_cpp",
+    "//src/lib/fxl",
     "//third_party/perfetto:libperfetto_client_experimental",
     "//third_party/perfetto/include/perfetto/ext/ipc",
     "//third_party/perfetto/src/base",
@@ -27,11 +28,9 @@ source_set("perfetto_bridge_lib") {
   deps = [
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/fxl:fxl_cli",
     "//third_party/rapidjson",
   ]
 }
@@ -53,12 +52,9 @@ executable("bin") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/fidl/hlcpp",
-    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/fxl:fxl_cli",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-provider",

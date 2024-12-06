@@ -125,6 +125,14 @@ build_metadata_opts=()
 [[ -n "${{FUCHSIA_BAZEL_DISK_CACHE}}" && -z "${{has_remote_config}}" ]] &&
   build_metadata_opts+=(--disk_cache="${{FUCHSIA_BAZEL_DISK_CACHE}}")
 
+# In Corp environments with valid gcert credentials, use the credential helper
+# to automatically exchange LOAS for OAuth (Google Cloud Platform) tokens.
+# This requires less interaction from the user than 'gcloud auth ...'.
+use_gcert_auth=()
+if [[ "$FX_BUILD_LOAS_TYPE" == "unrestricted" ]]
+then use_gcert_auth=(--config=gcertauth)
+fi
+
 # Setting $USER so `bazel` won't fail in environments with fake UIDs. Even if
 # the USER is not actually used. See https://fxbug.dev/42063551#c9.
 # In developer environments, use the real username so that authentication
@@ -140,5 +148,6 @@ cd "${{_WORKSPACE_DIR}}" && USER="$_user" "${{_BAZEL_BIN}}"\
       --output_base="${{_OUTPUT_BASE}}" \
       --output_user_root="${{_OUTPUT_USER_ROOT}}" \
       "$@" \
+      "${{use_gcert_auth[@]}}" \
       "${{build_metadata_opts[@]}}" \
       "${{proxy_overrides[@]}}"

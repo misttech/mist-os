@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
             name: "vulkan_loader",
@@ -16,15 +19,17 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.logger.Log",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fuchsia.logger.Log" ],
             from: "parent",
             to: [
                 "#test_lib_provider",
                 "#vulkan_loader",
             ],
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "all",
         },
         {
             directory: "system-lib",

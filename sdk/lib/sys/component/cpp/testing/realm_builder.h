@@ -150,6 +150,14 @@ class Realm final {
   Realm AddChildRealm(const std::string& child_name,
                       const ChildOptions& options = kDefaultChildOptions);
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  // Create a sub realm as child of this Realm instance initialized with |decl|. The constructed
+  // Realm is returned.
+  Realm AddChildRealmFromDecl(const std::string& child_name,
+                              fuchsia::component::decl::Component& decl,
+                              const ChildOptions& options = kDefaultChildOptions);
+#endif
+
   // Route a capability from one child to another.
   Realm& AddRoute(Route route);
 
@@ -283,6 +291,15 @@ class RealmBuilder final {
   // See |Realm.AddChildRealm| for more details.
   Realm AddChildRealm(const std::string& child_name,
                       const ChildOptions& options = kDefaultChildOptions);
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  // Create a sub realm as child of the root realm initialized with |decl|. The constructed
+  // Realm is returned.
+  // See |Realm.AddChildRealm| for more details.
+  Realm AddChildRealmFromDecl(const std::string& child_name,
+                              fuchsia::component::decl::Component& decl,
+                              const ChildOptions& options = kDefaultChildOptions);
+#endif
 
   // Route a capability for the root realm being constructed.
   // See |Realm.AddRoute| for more details.

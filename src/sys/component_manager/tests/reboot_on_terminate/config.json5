@@ -1,39 +1,16 @@
 {
     debug: false,
-    maintain_utc_clock: false,
-    use_builtin_process_launcher: false,
-    log_destination: "syslog",
     namespace_capabilities: [
         {
             protocol: [
                 "fidl.test.components.Trigger",
-                "fuchsia.process.Launcher",
             ],
         },
     ],
-    builtin_capabilities: [
-        {
-            protocol: [
-                "fuchsia.sys2.CrashIntrospect",
-                "fuchsia.sys2.SystemController",
-                "fuchsia.time.Maintenance",
-            ],
-        },
-        {
-            runner: "builtin_elf_runner",
-        },
-        {
-            runner: "realm_builder",
-        },
-        {
-            resolver: "realm_builder_resolver",
-        },
-    ],
-    realm_builder_resolver_and_runner: "namespace",
     security_policy: {
         child_policy: {
             reboot_on_terminate: [
-                "/realm/critical_child",
+                "/critical_child",
             ],
         },
     },

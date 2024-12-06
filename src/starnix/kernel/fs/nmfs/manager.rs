@@ -9,14 +9,13 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_inspect_derive::{IValue, Inspect, Unit, WithInspect};
 use futures::channel::{mpsc, oneshot};
 use futures::{FutureExt as _, StreamExt as _};
-use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use thiserror::Error;
 
 use fidl_fuchsia_netpol_socketproxy as fnp_socketproxy;
@@ -28,7 +27,7 @@ pub(crate) struct NetworkManager {
     // Timeout for thread-blocking calls to the socketproxy.
     proxy_timeout: zx::MonotonicDuration,
     // Sender for requests to initiate a socketproxy reconnect.
-    initiate_reconnect_sender: OnceCell<mpsc::Sender<()>>,
+    initiate_reconnect_sender: OnceLock<mpsc::Sender<()>>,
     #[inspect(forward)]
     inner: Mutex<IValue<NetworkManagerInner>>,
 }

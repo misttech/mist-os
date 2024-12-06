@@ -72,6 +72,7 @@ impl RepoStopTool {
         if instances.is_empty() {
             return Ok(Some("no running servers".into()));
         }
+        let repo_port = self.cmd.port;
 
         if self.cmd.all {
             // Resolve the daemon proxy if there are daemon instances, otherwise don't.
@@ -86,7 +87,9 @@ impl RepoStopTool {
             }
             return Ok(None);
         } else if let Some(repo_name) = &self.cmd.name {
-            if let Some(instance) = instances.iter().find(|s| &s.name == repo_name) {
+            if let Some(instance) = instances.iter().find(|s| {
+                &s.name == repo_name && (repo_port.is_none() || repo_port.unwrap() == s.port())
+            }) {
                 let repos = if instance.server_mode == ServerMode::Daemon {
                     Some(self.repos.await?)
                 } else {
@@ -97,9 +100,10 @@ impl RepoStopTool {
                 return_user_error!("no running server named {repo_name} is found.");
             }
         } else if let Some(product_bundle) = &self.cmd.product_bundle {
-            if let Some(instance) =
-                instances.iter().find(|s| s.repo_path_display() == product_bundle.to_string())
-            {
+            if let Some(instance) = instances.iter().find(|s| {
+                s.repo_path_display() == *product_bundle
+                    && (repo_port.is_none() || repo_port.unwrap() == s.port())
+            }) {
                 return Self::stop_instance(instance, &None).await;
             } else {
                 return_user_error!(
@@ -118,7 +122,7 @@ impl RepoStopTool {
                 };
                 Self::stop_instance(instance, &repos).await
             },
-            _ => return_user_error!("more than 1 server running. Use --all or specify the name of the server to stop.")
+            _ => return_user_error!("more than 1 server running. Use --all or specify the name and port (if needed) of the server to stop.")
         }
         }
     }
@@ -289,7 +293,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None, product_bundle: None },
+            cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -323,7 +327,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None, product_bundle: None },
+            cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -363,7 +367,12 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: false, name: None, product_bundle: Some(product_bundle_path) },
+            cmd: StopCommand {
+                all: false,
+                name: None,
+                port: None,
+                product_bundle: Some(product_bundle_path),
+            },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -405,7 +414,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None, product_bundle: None },
+            cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -441,7 +450,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None, product_bundle: None },
+            cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -479,7 +488,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None, product_bundle: None },
+            cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -523,7 +532,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None, product_bundle: None },
+            cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -564,7 +573,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: false, name: None, product_bundle: None },
+            cmd: StopCommand { all: false, name: None, port: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -579,7 +588,7 @@ mod tests {
         assert_eq!(stderr, "");
         let expected = CommandStatus::UserError {
             message:
-                "more than 1 server running. Use --all or specify the name of the server to stop."
+                "more than 1 server running. Use --all or specify the name and port (if needed) of the server to stop."
                     .into(),
         };
         assert_eq!(
@@ -614,7 +623,12 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: false, name: Some("default2".into()), product_bundle: None },
+            cmd: StopCommand {
+                all: false,
+                name: Some("default2".into()),
+                port: None,
+                product_bundle: None,
+            },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -660,7 +674,12 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: false, name: Some("default2".into()), product_bundle: None },
+            cmd: StopCommand {
+                all: false,
+                name: Some("default2".into()),
+                port: None,
+                product_bundle: None,
+            },
             repos,
         };
         let buffers = fho::TestBuffers::default();

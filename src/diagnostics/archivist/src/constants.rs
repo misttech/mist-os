@@ -6,22 +6,6 @@
 // on individual lazy nodes/values.
 pub const LAZY_NODE_TIMEOUT_PROPORTION: i64 = 2;
 
-/// Name used by clients to connect to the feedback diagnostics protocol.
-/// This protocol applies static selectors configured under config/data/feedback to
-/// inspect exfiltration.
-pub const FEEDBACK_ARCHIVE_ACCESSOR_NAME: &str = "fuchsia.diagnostics.FeedbackArchiveAccessor";
-
-/// Name used by clients to connect to the legacy metrics diagnostics protocol.
-/// This protocol applies static selectors configured under
-/// config/data/legacy_metrics to inspect exfiltration.
-pub const LEGACY_METRICS_ARCHIVE_ACCESSOR_NAME: &str =
-    "fuchsia.diagnostics.LegacyMetricsArchiveAccessor";
-
-/// Name used by clients to connect to the lowpan diagnostics protocol.
-/// This protocol applies static selectors configured under config/data/lowpan to
-/// inspect exfiltration.
-pub const LOWPAN_ARCHIVE_ACCESSOR_NAME: &str = "fuchsia.diagnostics.LoWPANArchiveAccessor";
-
 /// The maximum number of bytes in a formatted content VMO.
 pub const FORMATTED_CONTENT_CHUNK_SIZE_TARGET: u64 = 1 << 20; // 1 MiB
 

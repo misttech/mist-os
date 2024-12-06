@@ -43,14 +43,15 @@ rustc_library("fuchsia-repo") {
 
   if (is_host) {
     deps += [
+      "//src/developer/ffx/lib/netext:lib",
       "//src/developer/ffx/lib/rcs:lib",
       "//src/lib/fuchsia-fs",
       "//src/lib/gcs",
       "//src/lib/http-sse:http_sse",
       "//src/sys/lib/notify-batch-watcher",
       "//third_party/rust_crates:async-lock",
-      "//third_party/rust_crates:async-net",
       "//third_party/rust_crates:async-trait",
+      "//third_party/rust_crates:derivative",
       "//third_party/rust_crates:notify",
       "//third_party/rust_crates:pin-project",
       "//third_party/rust_crates:tokio",

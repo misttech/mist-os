@@ -91,6 +91,7 @@ fn valid_dev_product(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
     }
 }
 
+#[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
 fn is_fastboot_match(info: &InterfaceInfo) -> bool {
     let mut results = vec![];
 

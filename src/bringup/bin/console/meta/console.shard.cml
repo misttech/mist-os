@@ -193,6 +193,7 @@
             ],
             from: "#pkg-cache",
             to: "#console-launcher",
+            availability: "optional",
             source_availability: "unknown",
         },
         {
@@ -200,6 +201,7 @@
             from: "#pkg-shell-commands",
             as: "base-bin",
             to: "#console-launcher",
+            availability: "optional",
             source_availability: "unknown",
         },
         {
@@ -207,6 +209,7 @@
             from: "#boot-shell-commands",
             as: "boot-bin",
             to: "#console-launcher",
+            availability: "optional",
             source_availability: "unknown",
         },
         {

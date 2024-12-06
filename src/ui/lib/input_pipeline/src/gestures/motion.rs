@@ -41,6 +41,7 @@ struct Winner {
 }
 
 impl InitialContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_finger_contact_contender(
         self: Box<Self>,
         initial_position: Position,
@@ -81,6 +82,7 @@ impl gesture_arena::Contender for InitialContender {
 }
 
 impl FingerContactContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_matched_contender(self: Box<Self>) -> Box<dyn gesture_arena::MatchedContender> {
         Box::new(MatchedContender {})
     }
@@ -118,6 +120,7 @@ impl gesture_arena::Contender for FingerContactContender {
 }
 
 impl MatchedContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_winner(self: Box<Self>, last_position: Position) -> Box<dyn gesture_arena::Winner> {
         Box::new(Winner { last_position })
     }

@@ -8,6 +8,7 @@
     include: [
         "//src/sys/test_runners/rust/default.shard.cml",
         "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
     ],
     program: {
         binary: "bin/arbitrary_realm_test_bin",
@@ -24,12 +25,5 @@
             from: "#child_realm",
         },
         { protocol: "fuchsia.logger.LogSink" },
-    ],
-    offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [ "#child_realm" ],
-        },
     ],
 }

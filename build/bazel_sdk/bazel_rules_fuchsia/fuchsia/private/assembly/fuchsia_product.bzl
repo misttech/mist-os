@@ -18,6 +18,7 @@ load(
     "FuchsiaProductImageInfo",
 )
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 # Base source for running ffx assembly create-system
 _CREATE_SYSTEM_RUNNER_SH_TEMPLATE = """
@@ -45,7 +46,7 @@ def _match_assembly_pattern_string(label, pattern):
         return assembly_pattern == "%s:%s" % (package, label.name)
 
 def _fuchsia_product_assembly_impl(ctx):
-    fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
     platform_artifacts = ctx.attr.platform_artifacts[FuchsiaPlatformArtifactsInfo]
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     platform_aibs_file = ctx.actions.declare_file(ctx.label.name + "_platform_assembly_input_bundles.json")
@@ -178,7 +179,7 @@ def _fuchsia_product_assembly_impl(ctx):
 _fuchsia_product_assembly = rule(
     doc = """Declares a target to product a fully-configured list of artifacts that make up a product.""",
     implementation = _fuchsia_product_assembly_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     provides = [FuchsiaProductAssemblyInfo],
     attrs = {
         "product_config": attr.label(
@@ -207,10 +208,6 @@ _fuchsia_product_assembly = rule(
             default = "error",
             values = ["error", "warning"],
         ),
-        "_sdk_manifest": attr.label(
-            allow_single_file = True,
-            default = "@fuchsia_sdk//:meta/manifest.json",
-        ),
         "_create_package_manifest_list": attr.label(
             default = "//fuchsia/tools:create_package_manifest_list",
             executable = True,
@@ -228,7 +225,7 @@ _fuchsia_product_assembly = rule(
 )
 
 def _fuchsia_product_create_system_impl(ctx):
-    fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
 
     # Assembly create-system
@@ -281,17 +278,13 @@ def _fuchsia_product_create_system_impl(ctx):
 _fuchsia_product_create_system = rule(
     doc = """Declares a target to generate the images for a Fuchsia product.""",
     implementation = _fuchsia_product_create_system_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     provides = [FuchsiaProductImageInfo],
     attrs = {
         "product_assembly": attr.label(
             doc = "A fuchsia_product_assembly target.",
             providers = [FuchsiaProductAssemblyInfo],
             mandatory = True,
-        ),
-        "_sdk_manifest": attr.label(
-            allow_single_file = True,
-            default = "@fuchsia_sdk//:meta/manifest.json",
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )

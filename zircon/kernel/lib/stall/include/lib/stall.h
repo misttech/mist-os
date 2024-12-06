@@ -8,6 +8,7 @@
 
 #include <zircon/types.h>
 
+#include <kernel/mutex.h>
 #include <kernel/spinlock.h>
 #include <kernel/thread.h>
 
@@ -63,6 +64,47 @@ class StallAccumulator {
 
   // Accumulated totals at the time of the last update.
   Stats accumulated_stats_ TA_GUARDED(lock_);
+};
+
+// Maintains system-wide stall stats by periodically aggregating measurements from per-CPU
+// `StallAccumulator`s.
+class StallAggregator {
+ public:
+  struct Stats {
+    // Total monotonic time spent with at least one memory-stalled thread.
+    zx_duration_t stalled_time_some = 0;
+
+    // Total monotonic time spent with all threads memory-stalled.
+    zx_duration_t stalled_time_full = 0;
+  };
+
+  // Gets this class' singleton instance.
+  static StallAggregator *GetStallAggregator() { return &singleton_; }
+
+  // Starts the sampling thread on the singleton instance.
+  static void StartSamplingThread(uint level);
+
+  // Returns the values of the aggregated stats.
+  Stats ReadStats() const;
+
+ private:
+  friend class StallAggregatorTests;
+
+  static StallAggregator singleton_;
+
+  // Aggregates a new set of per-CPU samples. Called periodically by the sampling thread.
+  //
+  // The `iterate_per_cpu_stats` argument is a function that takes a callback and calls it for each
+  // CPU, passing its per-CPU measurements collected since the previous call. It's always
+  // `IteratePerCpuStats` at runtime, except for tests that inject a custom fake data provider.
+  using PerCpuStatsCallback = fit::inline_function<void(const StallAccumulator::Stats &)>;
+  void SampleOnce(
+      fit::inline_function<void(PerCpuStatsCallback)> iterate_per_cpu_stats = IteratePerCpuStats);
+
+  static void IteratePerCpuStats(PerCpuStatsCallback callback);
+
+  mutable DECLARE_CRITICAL_MUTEX(StallAggregator) stats_lock_;
+  Stats stats_ TA_GUARDED(stats_lock_) = {};
 };
 
 #endif  // ZIRCON_KERNEL_LIB_STALL_INCLUDE_LIB_STALL_H_

@@ -8,6 +8,11 @@
 
 #include <arch/interrupt.h>
 #include <kernel/percpu.h>
+#include <lk/init.h>
+
+static constexpr zx_duration_t kSampleInterval = ZX_MSEC(10);
+
+StallAggregator StallAggregator::singleton_;
 
 void StallAccumulator::UpdateWithIrqDisabled(int op_contributors_progressing,
                                              int op_contributors_stalling) {
@@ -113,3 +118,70 @@ void StallAccumulator::ApplyContextSwitch(Thread *current_thread, Thread *next_t
     local_accumulator.UpdateWithIrqDisabled(local_op_progressing, local_op_stalling);
   }
 }
+
+StallAggregator::Stats StallAggregator::ReadStats() const {
+  Guard<CriticalMutex> guard{&stats_lock_};
+  return stats_;
+}
+
+void StallAggregator::SampleOnce(
+    fit::inline_function<void(PerCpuStatsCallback)> iterate_per_cpu_stats) {
+  // Aggregate stats from all CPUs.
+  struct {
+    zx_duration_t weighted_some = 0;
+    zx_duration_t weighted_full = 0;
+    zx_duration_t total_weight = 0;
+  } totals;
+  iterate_per_cpu_stats([&totals](const StallAccumulator::Stats &stats) {
+    totals.weighted_some += stats.total_time_stall_some * stats.total_time_active;
+    totals.weighted_full += stats.total_time_stall_full * stats.total_time_active;
+    totals.total_weight += stats.total_time_active;
+  });
+
+  // Compute weighted average.
+  zx_duration_t delta_some, delta_full;
+  if (totals.total_weight != 0) {
+    delta_some = totals.weighted_some / totals.total_weight;
+    delta_full = totals.weighted_full / totals.total_weight;
+  } else {
+    delta_some = 0;
+    delta_full = 0;
+  }
+
+  // Update stored stats.
+  {
+    Guard<CriticalMutex> guard{&stats_lock_};
+    stats_.stalled_time_some += delta_some;
+    stats_.stalled_time_full += delta_full;
+  }
+}
+
+void StallAggregator::IteratePerCpuStats(PerCpuStatsCallback callback) {
+  percpu::ForEach([callback = std::move(callback)](cpu_num_t cpu_num, percpu *cpu_data) {
+    StallAccumulator &cpu_accum = cpu_data->memory_stall_accumulator;
+    StallAccumulator::Stats stats = cpu_accum.Flush();
+    callback(stats);
+  });
+}
+
+void StallAggregator::StartSamplingThread(uint level) {
+  auto worker_thread = [](void *) {
+    StallAggregator *aggregator = GetStallAggregator();
+    zx_time_t deadline = current_time();
+
+    for (;;) {
+      aggregator->SampleOnce();
+
+      deadline += kSampleInterval;
+      Thread::Current::Sleep(deadline);
+    }
+
+    return 0;
+  };
+
+  Thread *t = Thread::Create("stall-aggregator", worker_thread, nullptr, LOW_PRIORITY);
+  ZX_ASSERT(t != nullptr);
+  t->DetachAndResume();
+}
+
+LK_INIT_HOOK(stall, StallAggregator::StartSamplingThread, LK_INIT_LEVEL_USER)

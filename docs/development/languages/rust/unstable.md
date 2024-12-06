@@ -14,7 +14,7 @@ features, however, are intentionally permanently-unstable features intended for
 internal compiler use. Other features may be removed completely when a better solution
 has been found or when it was determined that the downsides of the feature outweighed the
 advantages. Each feature has an [associated tracking issue on the
-`rust-lang/rust` Github repository][tracking issues].
+`rust-lang/rust` GitHub repository][tracking issues].
 
 ### Our Rust Versioning Process
 
@@ -82,13 +82,13 @@ Reviews are performed by the Rust Working Group.
 Unstable features are tracked by issues filed under the
 [`Rust>unstable`](https://fxbug.dev?q=component:Rust>unstable) component.
 
-[the edition guide]: https://rust-lang-nursery.github.io/edition-guide/editions/index.html
+[the edition guide]: https://rust-lang-nursery.GitHub.io/edition-guide/editions/index.html
 [Rust 2018: an early preview]: https://internals.rust-lang.org/t/rust-2018-an-early-preview/7776
 [Rust 2018: the home stretch]: https://internals.rust-lang.org/t/rust-2018-the-home-stretch/7810
 
 [prebuilts]: https://fuchsia.googlesource.com/integration/+/HEAD/prebuilts
 [rust builder]: https://ci.chromium.org/p/fuchsia/g/rust/console
 [third_party/rust]: https://fuchsia.googlesource.com/third_party/rust/
-[tracking issues]: https://github.com/rust-lang/rust/issues?q=is%3Aopen+is%3Aissue+label%3AC-tracking-issue
+[tracking issues]: https://GitHub.com/rust-lang/rust/issues?q=is%3Aopen+is%3Aissue+label%3AC-tracking-issue
 
 [rust-users@fuchsia.dev]: https://groups.google.com/a/fuchsia.dev/g/rust-users

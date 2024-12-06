@@ -1,5 +1,5 @@
 [
     "archivist",
-    "realm_builder:CHILD_NAME/basic-1",
-    "realm_builder:CHILD_NAME/basic-2"
+    "basic-1",
+    "basic-2"
 ]

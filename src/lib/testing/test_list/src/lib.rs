@@ -99,4 +99,10 @@ pub struct FuchsiaComponentExecutionEntry {
 
     /// The moniker of the realm to to run this test in.
     pub realm: Option<String>,
+
+    /// If true, indicates that test_manager should create no exception channels as it would
+    /// otherwise do to detect panics. Some tests that create exception channels at the job
+    /// level will fail if test_manager creates its customary exception channels.
+    #[serde(default)]
+    pub create_no_exception_channel: bool,
 }

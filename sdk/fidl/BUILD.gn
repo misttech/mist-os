@@ -79,6 +79,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl",
   "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo",
   "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light",
+  "//sdk/fidl/fuchsia.hardware.mailbox:fuchsia.hardware.mailbox",
   "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network",
   "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver",
   "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci",
@@ -92,6 +93,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar",
   "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers",
   "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc",
+  "//sdk/fidl/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci",
   "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio",
   "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc",
   "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial",
@@ -238,9 +240,6 @@ sdk_molecule("fidl") {
   non_sdk_deps = []
   foreach(fidl_library_path, _partner_idk_fidl_libraries_targets_list) {
     deps += [ "${fidl_library_path}_sdk($fidl_toolchain)" ]
-
-    # For completeness, build the underlying libraries too.
-    non_sdk_deps += [ "${fidl_library_path}($fidl_toolchain)" ]
   }
 
   # Ensure that the API compatibility tests run on libraries that require
@@ -310,11 +309,8 @@ sdk_molecule("partner_internal_fidl_libraries_non_sdk_molecule") {
 
   deps = []
   non_sdk_deps = []
-  foreach(fidl_library, _partner_internal_fidl_libraries_targets_list) {
-    deps += [ "${fidl_library}_sdk($fidl_toolchain)" ]
-
-    # For completeness, build the underlying libraries too.
-    non_sdk_deps += [ "${fidl_library}($fidl_toolchain)" ]
+  foreach(fidl_library_path, _partner_internal_fidl_libraries_targets_list) {
+    deps += [ "${fidl_library_path}_sdk($fidl_toolchain)" ]
   }
 }
 

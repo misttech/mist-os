@@ -7,9 +7,7 @@
 
 #include <perftest/results.h>
 
-#include "src/media/audio/audio_core/shared/mixer/gain.h"
 #include "src/media/audio/audio_core/shared/mixer/mixer.h"
-#include "src/media/audio/audio_core/shared/mixer/output_producer.h"
 
 namespace media::audio::tools {
 
@@ -32,8 +30,8 @@ class AudioPerformance {
   // class is static only - prevent attempts to instantiate it
   AudioPerformance() = delete;
 
-  enum class GainType { Mute, Unity, Scaled, Ramped };
-  enum class OutputSourceRange { Silence, OutOfRange, Normal };
+  enum class GainType : uint8_t { Mute, Unity, Scaled, Ramped };
+  enum class OutputSourceRange : uint8_t { Silence, OutOfRange, Normal };
 
   struct Limits {
     zx::duration duration_per_config;
@@ -55,9 +53,10 @@ class AudioPerformance {
     bool operator!=(const MixerConfig& other) const;
 
     std::string ToStringForCreate() const;
-    std::string ToStringForMixer() const;
-    std::string ToPerftestFormatForCreate() const;
-    std::string ToPerftestFormatForMixer() const;
+    std::string ToStringForMixing() const;
+    std::string ToPerftestFormat() const;
+    std::string ToPerftestFormatForCreation() const;
+    std::string ToPerftestFormatForMixing() const;
   };
 
   struct OutputProducerConfig {
@@ -74,10 +73,10 @@ class AudioPerformance {
 
   static void ProfileMixerCreation(const std::vector<MixerConfig>& configs, const Limits& limits,
                                    perftest::ResultsSet* results);
-  static void ProfileMixer(const std::vector<MixerConfig>& configs, const Limits& limits,
-                           perftest::ResultsSet* results);
-  static void ProfileOutputProducer(const std::vector<OutputProducerConfig>& configs,
-                                    const Limits& limits, perftest::ResultsSet* results);
+  static void ProfileMixing(const std::vector<MixerConfig>& configs, const Limits& limits,
+                            perftest::ResultsSet* results);
+  static void ProfileMixOutput(const std::vector<OutputProducerConfig>& configs,
+                               const Limits& limits, perftest::ResultsSet* results);
 
  private:
   static void DisplayMixerCreationLegend();
@@ -85,17 +84,17 @@ class AudioPerformance {
   static void ProfileMixerCreation(const MixerConfig& cfg, const Limits& limits,
                                    perftest::ResultsSet* results);
 
-  static void DisplayMixerLegend();
-  static void DisplayMixerColumnHeader();
+  static void DisplayMixingLegend();
+  static void DisplayMixingColumnHeader();
   template <fuchsia::media::AudioSampleFormat SampleFormat>
-  static void ProfileMixer(const MixerConfig& cfg, const Limits& limits,
-                           perftest::ResultsSet* results);
+  static void ProfileMixing(const MixerConfig& cfg, const Limits& limits,
+                            perftest::ResultsSet* results);
 
-  static void DisplayOutputConfigLegend();
-  static void DisplayOutputColumnHeader();
+  static void DisplayMixOutputConfigLegend();
+  static void DisplayMixOutputColumnHeader();
   template <fuchsia::media::AudioSampleFormat SampleFormat>
-  static void ProfileOutputProducer(const OutputProducerConfig& cfg, const Limits& limits,
-                                    perftest::ResultsSet* results);
+  static void ProfileMixOutput(const OutputProducerConfig& cfg, const Limits& limits,
+                               perftest::ResultsSet* results);
 };
 
 }  // namespace media::audio::tools

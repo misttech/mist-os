@@ -375,8 +375,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
     let mut debug_mode = false;
     if let Some(search) = args.debug_manifest_filter {
         debug_mode = true;
-        manifests =
-            manifests.into_iter().filter(|v| v.to_string_lossy().contains(&search)).collect();
+        manifests.retain(|v| v.to_string_lossy().contains(&search));
     }
     if let Some(limit) = args.debug_manifest_limit {
         debug_mode = true;
@@ -707,7 +706,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
             let output = serde_json::from_slice::<DebugDumpOutput>(&proc.stdout);
             let files = match output {
                 Ok(output) => {
-                    if output.status != "OK".to_string() {
+                    if output.status != *"OK" {
                         debug!("Dumping failed, {}", output.error);
                         eprintln!("Debug info error: {}", output.error);
                         vec![]

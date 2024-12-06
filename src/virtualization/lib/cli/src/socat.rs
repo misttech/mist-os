@@ -19,8 +19,8 @@ pub enum SocatResult {
 impl fmt::Display for SocatResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SocatResult::SocatSuccess(v) => write!(f, "{}", v.to_string()),
-            SocatResult::SocatError(v) => write!(f, "{}", v.to_string()),
+            SocatResult::SocatSuccess(v) => write!(f, "{}", v),
+            SocatResult::SocatError(v) => write!(f, "{}", v),
         }
     }
 }

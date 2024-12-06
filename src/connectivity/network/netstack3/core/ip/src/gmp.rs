@@ -30,17 +30,21 @@ macro_rules! assert_gmp_state {
         assert_gmp_state!(@inner $ctx, $group, crate::internal::gmp::v1::MemberState::Delaying(_));
     };
     (@inner $ctx:expr, $group:expr, $pattern:pat) => {
-        assert!(matches!($ctx.state.groups().get($group).unwrap().inner.as_ref().unwrap(), $pattern))
+        assert!(matches!($ctx.state.groups().get($group).unwrap().v1().inner.as_ref().unwrap(), $pattern))
     };
 }
 
 pub(crate) mod igmp;
 pub(crate) mod mld;
+#[cfg(test)]
+mod testutil;
 mod v1;
+mod v2;
 
 use core::fmt::Debug;
 use core::time::Duration;
 
+use assert_matches::assert_matches;
 use net_types::ip::{Ip, IpAddress, IpVersionMarker};
 use net_types::MulticastAddr;
 use netstack3_base::ref_counted_hash_map::{InsertResult, RefCountedHashMap, RemoveResult};
@@ -237,13 +241,39 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
             if !state.enabled {
                 return;
             }
-            v1::handle_enabled(&mut core_ctx, bindings_ctx, device, state);
+            match &state.gmp.mode {
+                GmpMode::V1 { compat: _ } => {
+                    v1::handle_enabled(&mut core_ctx, bindings_ctx, device, state);
+                }
+                GmpMode::V2 => {
+                    todo!("https://fxbug.dev/42071006 handle GMPv2 enabled")
+                }
+            }
         })
     }
 
     fn gmp_handle_disabled(&mut self, bindings_ctx: &mut BC, device: &Self::DeviceId) {
-        self.with_gmp_state_mut_and_ctx(device, |mut core_ctx, state| {
-            v1::handle_disabled(&mut core_ctx, bindings_ctx, device, state)
+        self.with_gmp_state_mut_and_ctx(device, |mut core_ctx, mut state| {
+            match state.gmp.mode {
+                GmpMode::V1 { compat } => {
+                    v1::handle_disabled(&mut core_ctx, bindings_ctx, device, state.as_mut());
+                    if compat {
+                        enter_mode(
+                            &mut core_ctx,
+                            bindings_ctx,
+                            device,
+                            state.as_mut(),
+                            GmpMode::V2,
+                        );
+                    }
+                }
+                GmpMode::V2 => {
+                    todo!("https://fxbug.dev/42071006 handle GMPv2 disabled")
+                }
+            }
+            // Always reset v2 protocol state when disabled, regardless of which
+            // mode we're in.
+            state.gmp.v2_proto = Default::default();
         })
     }
 
@@ -253,8 +283,13 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
         device: &CC::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> GroupJoinResult {
-        self.with_gmp_state_mut_and_ctx(device, |mut core_ctx, state| {
-            v1::join_group(&mut core_ctx, bindings_ctx, device, group_addr, state)
+        self.with_gmp_state_mut_and_ctx(device, |mut core_ctx, state| match &state.gmp.mode {
+            GmpMode::V1 { compat: _ } => {
+                v1::join_group(&mut core_ctx, bindings_ctx, device, group_addr, state)
+            }
+            GmpMode::V2 => {
+                todo!("https://fxbug.dev/42071006 handle GMPv2 join group")
+            }
         })
     }
 
@@ -264,8 +299,13 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
         device: &CC::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> GroupLeaveResult {
-        self.with_gmp_state_mut_and_ctx(device, |mut core_ctx, state| {
-            v1::leave_group(&mut core_ctx, bindings_ctx, device, group_addr, state)
+        self.with_gmp_state_mut_and_ctx(device, |mut core_ctx, state| match &state.gmp.mode {
+            GmpMode::V1 { compat: _ } => {
+                v1::leave_group(&mut core_ctx, bindings_ctx, device, group_addr, state)
+            }
+            GmpMode::V2 => {
+                todo!("https://fxbug.dev/42071006 handle GMPv2 leave group")
+            }
         })
     }
 }
@@ -285,23 +325,16 @@ fn random_report_timeout<R: Rng>(rng: &mut R, period: Duration) -> Duration {
 
 /// A timer ID for GMP to send a report.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct GmpDelayedReportTimerId<I: Ip, D: WeakDeviceIdentifier> {
+pub struct GmpTimerId<I: Ip, D: WeakDeviceIdentifier> {
     pub(crate) device: D,
     pub(crate) _marker: IpVersionMarker<I>,
 }
 
-impl<I: Ip, D: WeakDeviceIdentifier> GmpDelayedReportTimerId<I, D> {
+impl<I: Ip, D: WeakDeviceIdentifier> GmpTimerId<I, D> {
     fn device_id(&self) -> &D {
         let Self { device, _marker: IpVersionMarker { .. } } = self;
         device
     }
-}
-
-/// A type of GMP message.
-#[derive(Debug)]
-enum GmpMessageType {
-    Report,
-    Leave,
 }
 
 /// The bindings types for GMP.
@@ -318,24 +351,43 @@ pub trait IpExt: Ip {
     fn should_perform_gmp(addr: MulticastAddr<Self::Addr>) -> bool;
 }
 
+/// The timer id kept in [`GmpState`]'s local timer heap.
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+enum TimerIdInner<I: Ip> {
+    /// Timers scheduled by the v1 state machine.
+    V1(v1::DelayedReportTimerId<I>),
+    /// V1 compatibility mode exit timer.
+    V1Compat,
+}
+
+impl<I: Ip> From<v1::DelayedReportTimerId<I>> for TimerIdInner<I> {
+    fn from(value: v1::DelayedReportTimerId<I>) -> Self {
+        Self::V1(value)
+    }
+}
+
 #[cfg_attr(test, derive(Debug))]
 pub struct GmpState<I: Ip, BT: GmpBindingsTypes> {
-    timers: LocalTimerHeap<MulticastAddr<I::Addr>, (), BT>,
+    timers: LocalTimerHeap<TimerIdInner<I>, (), BT>,
+    mode: GmpMode,
+    v2_proto: v2::ProtocolState,
 }
 
 // NB: This block is not bound on GmpBindingsContext because we don't need
 // RngContext to construct GmpState.
 impl<I: Ip, BC: GmpBindingsTypes + TimerContext> GmpState<I, BC> {
     /// Constructs a new `GmpState` for `device`.
-    pub fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<GmpDelayedReportTimerId<I, D>, BC>>(
+    pub fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<GmpTimerId<I, D>, BC>>(
         bindings_ctx: &mut BC,
         device: D,
     ) -> Self {
         Self {
             timers: LocalTimerHeap::new_with_context::<_, CC>(
                 bindings_ctx,
-                GmpDelayedReportTimerId { device, _marker: Default::default() },
+                GmpTimerId { device, _marker: Default::default() },
             ),
+            mode: Default::default(),
+            v2_proto: Default::default(),
         }
     }
 }
@@ -352,17 +404,123 @@ pub struct GmpStateRef<'a, I: IpExt, CC: GmpTypeLayout<I, BT>, BT: GmpBindingsTy
     pub config: &'a CC::Config,
 }
 
+impl<'a, I: IpExt, CC: GmpTypeLayout<I, BT>, BT: GmpBindingsTypes> GmpStateRef<'a, I, CC, BT> {
+    fn as_mut(&mut self) -> GmpStateRef<'_, I, CC, BT> {
+        let Self { enabled, groups, gmp, config } = self;
+        GmpStateRef { enabled: *enabled, groups, gmp, config }
+    }
+}
+
 /// Provides IP-specific associated types for GMP.
 pub trait GmpTypeLayout<I: IpExt, BT: GmpBindingsTypes>: DeviceIdContext<AnyDevice> {
     /// The type for protocol-specific actions.
     type Actions;
     /// The type for protocol-specific configs.
-    type Config: Debug + v1::ProtocolConfig<QuerySpecificActions = Self::Actions>;
+    type Config: Debug
+        + v1::ProtocolConfig<QuerySpecificActions = Self::Actions>
+        + v2::ProtocolConfig;
 }
 
 /// The state kept by each muitlcast group the host is a member of.
-// TODO(https://fxbug.dev/42071006): Update to also carry v2 state.
-pub type GmpGroupState<BT> = v1::GmpStateMachine<<BT as InstantBindingsTypes>::Instant>;
+pub struct GmpGroupState<BT: GmpBindingsTypes> {
+    version_specific: GmpGroupStateByVersion<BT>,
+    // TODO(https://fxbug.dev/381241191): When we support SSM, each group should
+    // keep track of the source interest and filter modes.
+}
+
+impl<BT: GmpBindingsTypes> GmpGroupState<BT> {
+    /// Retrieves a mutable borrow to the v1 state machine value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the state machine is not in the v1 state. When switching
+    /// modes, GMP is responsible for updating all group states to the
+    /// appropriate version.
+    fn v1_mut(&mut self) -> &mut v1::GmpStateMachine<BT::Instant> {
+        match &mut self.version_specific {
+            GmpGroupStateByVersion::V1(v1) => return v1,
+            GmpGroupStateByVersion::V2(_) => {
+                panic!("expected GMP v1")
+            }
+        }
+    }
+
+    /// Like [`GmpGroupState::v1_mut`] but returns a non mutable borrow.
+    #[cfg(test)]
+    fn v1(&self) -> &v1::GmpStateMachine<BT::Instant> {
+        match &self.version_specific {
+            GmpGroupStateByVersion::V1(v1) => v1,
+            GmpGroupStateByVersion::V2(_) => panic!("group not in v1 mode"),
+        }
+    }
+
+    /// Equivalent to [`GmpGroupState::v1_mut`] but drops all remaining state.
+    ///
+    /// # Panics
+    ///
+    /// See [`GmpGroupState::v1`].
+    fn into_v1(self) -> v1::GmpStateMachine<BT::Instant> {
+        let Self { version_specific } = self;
+        match version_specific {
+            GmpGroupStateByVersion::V1(v1) => v1,
+            GmpGroupStateByVersion::V2(_) => panic!("expected GMP v1"),
+        }
+    }
+
+    /// Creates a new `GmpGroupState` with associated v1 state machine.
+    fn new_v1(v1: v1::GmpStateMachine<BT::Instant>) -> Self {
+        Self { version_specific: GmpGroupStateByVersion::V1(v1) }
+    }
+}
+
+/// GMP Compatibility mode.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum GmpMode {
+    /// GMP operating in v1 mode. This is the mode supporting MLDv1 and IGMPv2.
+    V1 {
+        /// Compat indicates v1 mode behavior.
+        ///
+        /// It is `true` if v1 is entered due to receiving a query from a v1
+        /// router. It is `false` if v1 is entered due to administrative action
+        /// (i.e. "forcing" v1 mode).
+        ///
+        /// It effectively controls whether we can revert back to v2 on
+        /// interface disable <-> re-enable.
+        compat: bool,
+    },
+    /// GMP operating in v2 mode. This is the mode supporting MLDv2 and IGMPv3.
+    V2,
+}
+
+impl GmpMode {
+    fn is_v1(&self) -> bool {
+        match self {
+            Self::V1 { .. } => true,
+            Self::V2 => false,
+        }
+    }
+
+    fn is_v1_compat(&self) -> bool {
+        match self {
+            Self::V1 { compat } => *compat,
+            Self::V2 => false,
+        }
+    }
+}
+
+impl Default for GmpMode {
+    fn default() -> Self {
+        // TODO(https://fxbug.dev/42071006): Default to V2 once ready.
+        Self::V1 { compat: false }
+    }
+}
+
+#[cfg_attr(test, derive(derivative::Derivative))]
+#[cfg_attr(test, derivative(Debug(bound = "")))]
+enum GmpGroupStateByVersion<BT: GmpBindingsTypes> {
+    V1(v1::GmpStateMachine<BT::Instant>),
+    V2(v2::GroupState),
+}
 
 /// Provides immutable access to GMP state.
 trait GmpStateContext<I: IpExt, BT: GmpBindingsTypes>: GmpTypeLayout<I, BT> {
@@ -378,8 +536,6 @@ trait GmpStateContext<I: IpExt, BT: GmpBindingsTypes>: GmpTypeLayout<I, BT> {
 ///
 /// This trait implements portions of a group management protocol.
 trait GmpContext<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> + Sized {
-    /// The context-specific error type.
-    type Err;
     /// The inner context given to `with_gmp_state_mut_and_ctx`.
     type Inner<'a>: GmpContextInner<
             I,
@@ -408,9 +564,6 @@ trait GmpContext<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> + Sized
     ) -> O {
         self.with_gmp_state_mut_and_ctx(device, |_core_ctx, state| cb(state))
     }
-
-    /// Returns the context-specific error for not a member.
-    fn not_a_member_err(addr: I::Addr) -> Self::Err;
 }
 
 /// The inner GMP context.
@@ -418,12 +571,12 @@ trait GmpContext<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> + Sized
 /// Provides access to external actions while holding the GMP state lock.
 trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
     /// Sends a GMP message.
-    fn send_message(
+    fn send_message_v1(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
-        msg_type: GmpMessageType,
+        msg_type: v1::GmpMessageType,
     );
 
     /// Runs protocol-specific actions.
@@ -433,8 +586,333 @@ trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
         device: &Self::DeviceId,
         actions: Self::Actions,
     );
+
+    /// Called whenever the GMP mode changes.
+    ///
+    /// `new_mode` is the new mode GMP is operating on.
+    ///
+    /// The caller ensures that the generic GMP state is updated before hand
+    /// (all GMP timers are cleared, GMP state knows about `new_mode`).
+    /// Implementers are expected to only take protocol-specific actions here.
+    /// Notably, IGMP should reset its own IGMPv1 compatibility mode knowledge.
+    fn handle_mode_change(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device: &Self::DeviceId,
+        new_mode: GmpMode,
+    );
 }
 
-trait GmpMessage<I: Ip> {
-    fn group_addr(&self) -> I::Addr;
+fn handle_timer<I, BC, CC>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    timer: GmpTimerId<I, CC::WeakDeviceId>,
+) where
+    BC: GmpBindingsContext,
+    CC: GmpContext<I, BC>,
+    I: IpExt,
+{
+    let GmpTimerId { device, _marker: IpVersionMarker { .. } } = timer;
+    let Some(device) = device.upgrade() else {
+        return;
+    };
+    core_ctx.with_gmp_state_mut_and_ctx(&device, |mut core_ctx, state| {
+        let Some((timer_id, ())) = state.gmp.timers.pop(bindings_ctx) else {
+            return;
+        };
+        match (timer_id, &state.gmp.mode) {
+            (TimerIdInner::V1(v1), GmpMode::V1 { .. }) => {
+                v1::handle_timer(&mut core_ctx, bindings_ctx, &device, state, v1);
+            }
+            (TimerIdInner::V1Compat, GmpMode::V1 { compat: true }) => {
+                enter_mode(&mut core_ctx, bindings_ctx, &device, state, GmpMode::V2);
+            }
+            (TimerIdInner::V1Compat, bad) => {
+                panic!("v1 compat timer fired in non v1 compat mode: {bad:?}")
+            }
+            bad @ (TimerIdInner::V1(_), GmpMode::V2) => {
+                panic!("incompatible timer fired {bad:?}")
+            }
+        }
+    });
+}
+
+/// Enters `mode` in the state referenced by `state`.
+///
+/// Mode changes cause all timers to be canceled, and the group state to be
+/// updated to the appropriate GMP version.
+///
+/// No-op if `new_mode` is current.
+fn enter_mode<
+    I: IpExt,
+    CC: GmpContextInner<I, BC>,
+    BC: GmpBindingsContext,
+    T: GmpTypeLayout<I, BC>,
+>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    state: GmpStateRef<'_, I, T, BC>,
+    new_mode: GmpMode,
+) {
+    match (&mut state.gmp.mode, &new_mode) {
+        (GmpMode::V1 { compat }, GmpMode::V1 { compat: new_compat }) => {
+            // While in v1 mode, we only allow exiting compat mode, not entering
+            // it again. This allows the logic handling v1 queries to always
+            // attempt a v1 compat mode enter, but this change will only be
+            // applied if we are currently in v2.
+            if *new_compat != *compat && !*new_compat {
+                *compat = *new_compat;
+                // Deschedule the compatibility mode exit timer.
+                assert_matches!(
+                    state.gmp.timers.cancel(bindings_ctx, &TimerIdInner::V1Compat),
+                    Some((_, ()))
+                );
+            }
+            return;
+        }
+        (GmpMode::V2, GmpMode::V2) => {
+            // Same mode.
+            return;
+        }
+        (GmpMode::V1 { compat: _ }, GmpMode::V2) => {
+            // Transition to v2.
+            //
+            // Update the group state in each group to a default value which
+            // will not trigger any unsolicited reports and is ready to respond
+            // to incoming queries.
+            for (_, GmpGroupState { version_specific }) in state.groups.iter_mut() {
+                *version_specific =
+                    GmpGroupStateByVersion::V2(v2::GroupState::new_for_mode_transition())
+            }
+        }
+        (GmpMode::V2, GmpMode::V1 { compat: _ }) => {
+            // Transition to v1.
+            //
+            // Update the state machine in each group to the appropriate idle
+            // definition in GMPv1. This is a state with no timers that just
+            // waits to respond to queries.
+            for (_, GmpGroupState { version_specific }) in state.groups.iter_mut() {
+                *version_specific =
+                    GmpGroupStateByVersion::V1(v1::GmpStateMachine::new_for_mode_transition())
+            }
+        }
+    };
+    state.gmp.timers.clear(bindings_ctx);
+    state.gmp.mode = new_mode;
+    core_ctx.handle_mode_change(bindings_ctx, device, new_mode);
+}
+
+fn schedule_v1_compat<I: IpExt, CC: GmpTypeLayout<I, BC>, BC: GmpBindingsContext>(
+    bindings_ctx: &mut BC,
+    state: GmpStateRef<'_, I, CC, BC>,
+) {
+    let GmpStateRef { gmp, config, .. } = state;
+    let timeout = gmp.v2_proto.older_version_querier_present_timeout(config);
+    let _: Option<_> =
+        gmp.timers.schedule_after(bindings_ctx, TimerIdInner::V1Compat, (), timeout.into());
+}
+
+/// Error returned when operating queries but the host is not a member.
+#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
+struct NotAMemberErr<I: Ip>(I::Addr);
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+
+    use assert_matches::assert_matches;
+    use ip_test_macro::ip_test;
+    use net_types::Witness as _;
+    use netstack3_base::testutil::{FakeDeviceId, FakeTimerCtxExt, FakeWeakDeviceId};
+    use netstack3_base::InstantContext as _;
+
+    use testutil::{FakeCtx, FakeGmpContextInner, TestIpExt};
+
+    use super::*;
+
+    #[ip_test(I)]
+    fn mode_change_state_clearing<I: TestIpExt>() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V1 { compat: false });
+
+        assert_eq!(
+            core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
+            GroupJoinResult::Joined(())
+        );
+        // Drop the group join message so we can assert no more messages are
+        // sent after this.
+        core_ctx.inner.v1_messages.clear();
+
+        // We should now have timers installed and v1 state in groups.
+        assert!(core_ctx.gmp.timers.iter().next().is_some());
+        assert_matches!(
+            core_ctx.groups.get(&I::GROUP_ADDR1).unwrap().version_specific,
+            GmpGroupStateByVersion::V1(_)
+        );
+
+        core_ctx.with_gmp_state_mut_and_ctx(&FakeDeviceId, |mut core_ctx, mut state| {
+            enter_mode(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                &FakeDeviceId,
+                state.as_mut(),
+                GmpMode::V2,
+            );
+            assert_eq!(state.gmp.mode, GmpMode::V2);
+        });
+        // Timers were removed and state is now v2.
+        core_ctx.gmp.timers.assert_timers([]);
+        assert_matches!(
+            core_ctx.groups.get(&I::GROUP_ADDR1).unwrap().version_specific,
+            GmpGroupStateByVersion::V2(_)
+        );
+
+        // Moving back moves the state back to v1.
+        core_ctx.with_gmp_state_mut_and_ctx(&FakeDeviceId, |mut core_ctx, mut state| {
+            enter_mode(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                &FakeDeviceId,
+                state.as_mut(),
+                GmpMode::V1 { compat: false },
+            );
+            assert_eq!(state.gmp.mode, GmpMode::V1 { compat: false });
+        });
+        assert_matches!(
+            core_ctx.groups.get(&I::GROUP_ADDR1).unwrap().version_specific,
+            GmpGroupStateByVersion::V1(_)
+        );
+
+        // Throughout we should've generated no traffic.
+        let FakeGmpContextInner { v1_messages } = &core_ctx.inner;
+        assert_eq!(v1_messages, &vec![]);
+    }
+
+    #[ip_test(I)]
+    fn cant_enter_v1_compat<I: TestIpExt>() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V1 { compat: false });
+        core_ctx.with_gmp_state_mut_and_ctx(&FakeDeviceId, |mut core_ctx, mut state| {
+            enter_mode(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                &FakeDeviceId,
+                state.as_mut(),
+                GmpMode::V1 { compat: true },
+            );
+            // Mode doesn't change because we can't go from non compat to
+            // compat.
+            assert_eq!(state.gmp.mode, GmpMode::V1 { compat: false });
+        });
+        // The opposite, however, is allowed.
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V1 { compat: true });
+        // When in compat mode, a compat timer must always be present.
+        assert_eq!(
+            core_ctx.gmp.timers.schedule_after(
+                &mut bindings_ctx,
+                TimerIdInner::V1Compat,
+                (),
+                Duration::from_secs(1)
+            ),
+            None
+        );
+        core_ctx.with_gmp_state_mut_and_ctx(&FakeDeviceId, |mut core_ctx, mut state| {
+            enter_mode(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                &FakeDeviceId,
+                state.as_mut(),
+                GmpMode::V1 { compat: false },
+            );
+            assert_eq!(state.gmp.mode, GmpMode::V1 { compat: false });
+        });
+    }
+
+    #[ip_test(I)]
+    fn disable_exits_compat<I: TestIpExt>() {
+        // Disabling in compat mode returns to v2.
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V1 { compat: true });
+        core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
+        assert_eq!(core_ctx.gmp.mode, GmpMode::V2);
+
+        // Same is not true for not compat v1.
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V1 { compat: false });
+        core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
+        assert_eq!(core_ctx.gmp.mode, GmpMode::V1 { compat: false });
+    }
+
+    #[ip_test(I)]
+    fn disable_clears_v2_state<I: TestIpExt>() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V1 { compat: false });
+        let v2::ProtocolState { robustness_variable, query_interval } = &mut core_ctx.gmp.v2_proto;
+        *robustness_variable = robustness_variable.checked_add(1).unwrap();
+        *query_interval = *query_interval + Duration::from_secs(20);
+        core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
+        assert_eq!(core_ctx.gmp.v2_proto, v2::ProtocolState::default());
+    }
+
+    #[ip_test(I)]
+    fn v1_compat_mode_on_timeout<I: TestIpExt>() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V2);
+        assert_eq!(
+            v1::handle_query_message(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                &FakeDeviceId,
+                v1::QueryTarget::Specified(I::GROUP_ADDR1),
+                Duration::from_secs(1)
+            ),
+            Err(NotAMemberErr(I::GROUP_ADDR1.get()))
+        );
+        // Now in v1 mode and a compat timer is scheduled.
+        assert_eq!(core_ctx.gmp.mode, GmpMode::V1 { compat: true });
+
+        let timeout =
+            core_ctx.gmp.v2_proto.older_version_querier_present_timeout(&core_ctx.config).into();
+        core_ctx.gmp.timers.assert_timers([(
+            TimerIdInner::V1Compat,
+            (),
+            bindings_ctx.now() + timeout,
+        )]);
+
+        // Increment the time and see that the timer updates.
+        bindings_ctx.timers.instant.sleep(timeout / 2);
+        assert_eq!(
+            v1::handle_query_message(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                &FakeDeviceId,
+                v1::QueryTarget::Specified(I::GROUP_ADDR1),
+                Duration::from_secs(1)
+            ),
+            Err(NotAMemberErr(I::GROUP_ADDR1.get()))
+        );
+        assert_eq!(core_ctx.gmp.mode, GmpMode::V1 { compat: true });
+        core_ctx.gmp.timers.assert_timers([(
+            TimerIdInner::V1Compat,
+            (),
+            bindings_ctx.now() + timeout,
+        )]);
+
+        // Trigger the timer and observe a fallback to v2.
+        let timer = bindings_ctx.trigger_next_timer(&mut core_ctx);
+        assert_eq!(
+            timer,
+            Some(GmpTimerId {
+                device: FakeWeakDeviceId(FakeDeviceId),
+                _marker: Default::default()
+            })
+        );
+        assert_eq!(core_ctx.gmp.mode, GmpMode::V2);
+        // No more timers should exist, no frames are sent out.
+        core_ctx.gmp.timers.assert_timers([]);
+        let testutil::FakeGmpContextInner { v1_messages } = &core_ctx.inner;
+        assert_eq!(v1_messages, &vec![]);
+    }
 }

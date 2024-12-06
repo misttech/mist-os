@@ -42,6 +42,8 @@ pub enum StartComponentError {
     LaunchError(#[from] runner::component::LaunchError),
     #[error("invalid start info: {_0}")]
     StartInfoError(#[from] StartInfoError),
+    #[error("failed to create boot clock: {_0}")]
+    BootClockCreateFailed(#[source] zx::Status),
 }
 
 impl StartComponentError {

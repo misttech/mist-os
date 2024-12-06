@@ -9,6 +9,8 @@
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <zircon/assert.h>
 
+#include <cstdint>
+
 namespace display {
 
 namespace {

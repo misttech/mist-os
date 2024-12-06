@@ -38,8 +38,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
 use {
-    fidl_fuchsia_io as fio, fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync,
-    fuchsia_inspect as finspect,
+    fidl_fuchsia_io as fio, fidl_fuchsia_storage_partitions as fpartitions,
+    fuchsia_async as fasync, fuchsia_inspect as finspect,
 };
 
 const INITIAL_SLICE_COUNT: u64 = 1;
@@ -755,7 +755,7 @@ impl Environment for FshostEnvironment {
         }
         let partitions_dir = fuchsia_fs::directory::open_directory(
             &exposed_dir,
-            fstoragehost::PartitionServiceMarker::SERVICE_NAME,
+            fpartitions::PartitionServiceMarker::SERVICE_NAME,
             fuchsia_fs::PERM_READABLE,
         )
         .await

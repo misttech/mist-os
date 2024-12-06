@@ -10,6 +10,7 @@ load(
     "FuchsiaComponentManifestShardCollectionInfo",
     "FuchsiaComponentManifestShardInfo",
 )
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 _COMMON_CMC_ATTRIBUTES = {
     # This is to get the coverage.shard.cml in the SDK, so it can be merged
@@ -67,7 +68,7 @@ fuchsia_component_manifest_shard = rule(
 )
 
 def _compile_component_manifest(ctx, manifest_in, component_name, includes_in):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
 
     # output should have the .cm extension
     manifest_out = ctx.actions.declare_file("meta/{}.cm".format(component_name))
@@ -174,7 +175,7 @@ src file and included in the includes attribute.
 ```
 """,
     implementation = _fuchsia_component_manifest_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "src": attr.label(
             doc = "The source manifest to compile",
@@ -223,7 +224,7 @@ ensure_compiled_component_manifest = rule(
     fuchsia_component macros to ensure that the target that is passed in as the
     manifest gets compiled.
     """,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "dep": attr.label(
             doc = "The dependency to check. This should either be a plain cml file or a fuchsia_component_manifest target.",

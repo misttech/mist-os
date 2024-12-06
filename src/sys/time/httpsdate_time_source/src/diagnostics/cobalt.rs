@@ -162,12 +162,13 @@ mod test {
     use futures::stream::StreamExt;
     use lazy_static::lazy_static;
     use std::collections::HashSet;
+    use fuchsia_runtime::{UtcDuration, UtcInstant};
 
     const TEST_INITIAL_PHASE: Phase = Phase::Initial;
-    const TEST_BOUND_SIZE: zx::BootDuration = zx::BootDuration::from_millis(101);
-    const TEST_STANDARD_DEVIATION: zx::BootDuration = zx::BootDuration::from_millis(20);
+    const TEST_BOUND_SIZE: UtcDuration = UtcDuration::from_millis(101);
+    const TEST_STANDARD_DEVIATION: UtcDuration = UtcDuration::from_millis(20);
     const ONE_MICROS: zx::BootDuration = zx::BootDuration::from_micros(1);
-    const TEST_TIME: zx::BootInstant = zx::BootInstant::from_nanos(123_456_789);
+    const TEST_TIME: UtcInstant = UtcInstant::from_nanos(123_456_789);
     const TEST_RTT_BUCKET: u32 = 2;
     const TEST_RTT_2_BUCKET: u32 = 4;
     const OVERFLOW_RTT: zx::BootDuration = zx::BootDuration::from_seconds(10);
@@ -217,7 +218,7 @@ mod test {
         let (cobalt, event_recv) = diagnostics_for_test();
         cobalt.record(Event::Success(&HttpsSample {
             utc: TEST_TIME,
-            reference: TEST_TIME,
+            reference: zx::BootInstant::from_nanos(TEST_TIME.into_nanos()),
             standard_deviation: TEST_STANDARD_DEVIATION,
             final_bound_size: TEST_BOUND_SIZE,
             polls: vec![Poll::with_round_trip_time(*TEST_RTT)],
@@ -247,7 +248,7 @@ mod test {
         let (cobalt, mut event_recv) = diagnostics_for_test();
         cobalt.record(Event::Success(&HttpsSample {
             utc: TEST_TIME,
-            reference: TEST_TIME,
+            reference: zx::BootInstant::from_nanos(TEST_TIME.into_nanos()),
             standard_deviation: TEST_STANDARD_DEVIATION,
             final_bound_size: TEST_BOUND_SIZE,
             polls: vec![Poll::with_round_trip_time(*TEST_RTT)],
@@ -258,7 +259,7 @@ mod test {
         cobalt.record(Event::Phase(Phase::Converge));
         cobalt.record(Event::Success(&HttpsSample {
             utc: TEST_TIME,
-            reference: TEST_TIME,
+            reference: zx::BootInstant::from_nanos(TEST_TIME.into_nanos()),
             standard_deviation: TEST_STANDARD_DEVIATION,
             final_bound_size: TEST_BOUND_SIZE,
             polls: vec![Poll::with_round_trip_time(*TEST_RTT_2)],
@@ -272,7 +273,7 @@ mod test {
         let (cobalt, event_recv) = diagnostics_for_test();
         cobalt.record(Event::Success(&HttpsSample {
             utc: TEST_TIME,
-            reference: TEST_TIME,
+            reference: zx::BootInstant::from_nanos(TEST_TIME.into_nanos()),
             standard_deviation: TEST_STANDARD_DEVIATION,
             final_bound_size: TEST_BOUND_SIZE,
             polls: vec![
@@ -309,7 +310,7 @@ mod test {
         let (cobalt, event_recv) = diagnostics_for_test();
         cobalt.record(Event::Success(&HttpsSample {
             utc: TEST_TIME,
-            reference: TEST_TIME,
+            reference: zx::BootInstant::from_nanos(TEST_TIME.into_nanos()),
             standard_deviation: TEST_STANDARD_DEVIATION,
             final_bound_size: TEST_BOUND_SIZE,
             polls: vec![Poll { round_trip_time: OVERFLOW_RTT }],

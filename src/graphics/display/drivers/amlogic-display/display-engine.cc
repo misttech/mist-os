@@ -89,7 +89,7 @@ void SetDefaultImageFormatConstraints(fuchsia_images2::wire::PixelFormat format,
                                       fuchsia_sysmem2::wire::ImageFormatConstraints& constraints,
                                       fidl::AnyArena& arena) {
   constraints.Allocate(arena);
-  constraints.set_color_spaces(arena, std::vector{fuchsia_images2::wire::ColorSpace::kSrgb});
+  constraints.set_color_spaces(arena, std::array{fuchsia_images2::wire::ColorSpace::kSrgb});
   constraints.set_pixel_format(format);
   constraints.set_pixel_format_modifier(arena, fuchsia_images2::PixelFormatModifier(modifier));
   constraints.set_bytes_per_row_divisor(kBufferAlignment);
@@ -432,10 +432,10 @@ void DisplayEngine::DisplayEngineReleaseImage(uint64_t image_handle) {
 
 config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     const display_config_t* display_configs, size_t display_count,
-    client_composition_opcode_t* out_client_composition_opcodes_list,
-    size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
-  if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = 0;
+    layer_composition_operations_t* out_layer_composition_operations_list,
+    size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = 0;
   }
   if (display_count != 1) {
     ZX_DEBUG_ASSERT(display_count == 0);
@@ -459,40 +459,40 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     }
   }
 
-  bool success = true;
-
-  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= display_configs[0].layer_count);
-  cpp20::span<client_composition_opcode_t> client_composition_opcodes(
-      out_client_composition_opcodes_list, display_configs[0].layer_count);
-  std::fill(client_composition_opcodes.begin(), client_composition_opcodes.end(), 0);
-  if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = client_composition_opcodes.size();
+  ZX_DEBUG_ASSERT(layer_composition_operations_count >= display_configs[0].layer_count);
+  cpp20::span<layer_composition_operations_t> layer_composition_operations(
+      out_layer_composition_operations_list, display_configs[0].layer_count);
+  std::fill(layer_composition_operations.begin(), layer_composition_operations.end(), 0);
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = layer_composition_operations.size();
   }
 
-  if (display_configs[0].layer_count > 1) {
-    // We only support 1 layer
-    success = false;
-  }
+  config_check_result_t check_result = [&] {
+    if (display_configs[0].layer_count > 1) {
+      // We only support 1 layer
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
 
-  // TODO(https://fxbug.dev/42080882): Move color conversion validation code to a common
-  // library.
-  if (success && display_configs[0].cc_flags) {
-    // Make sure cc values are correct
-    if (display_configs[0].cc_flags & COLOR_CONVERSION_PREOFFSET) {
-      for (float cc_preoffset : display_configs[0].cc_preoffsets) {
-        success = success && cc_preoffset > -1;
-        success = success && cc_preoffset < 1;
+    // TODO(https://fxbug.dev/42080882): Move color conversion validation code to a common
+    // library.
+    if (display_configs[0].cc_flags) {
+      // Make sure cc values are correct
+      if (display_configs[0].cc_flags & COLOR_CONVERSION_PREOFFSET) {
+        for (float cc_preoffset : display_configs[0].cc_preoffsets) {
+          if (cc_preoffset <= -1 || cc_preoffset >= 1) {
+            return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+          }
+        }
+      }
+      if (display_configs[0].cc_flags & COLOR_CONVERSION_POSTOFFSET) {
+        for (float cc_postoffset : display_configs[0].cc_postoffsets) {
+          if (cc_postoffset <= -1 || cc_postoffset >= 1) {
+            return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+          }
+        }
       }
     }
-    if (success && display_configs[0].cc_flags & COLOR_CONVERSION_POSTOFFSET) {
-      for (float cc_postoffset : display_configs[0].cc_postoffsets) {
-        success = success && cc_postoffset > -1;
-        success = success && cc_postoffset < 1;
-      }
-    }
-  }
 
-  if (success) {
     const uint32_t width = display_timing.horizontal_active_px;
     const uint32_t height = display_timing.vertical_active_lines;
 
@@ -505,20 +505,35 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
 
     if (layer.alpha_mode == ALPHA_PREMULTIPLIED) {
       // we don't support pre-multiplied alpha mode
-      client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
+      layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_ALPHA;
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
-    success = layer.image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY &&
-              layer.image_metadata.width == width && layer.image_metadata.height == height &&
-              memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) == 0 &&
-              memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) == 0;
-  }
-  if (!success) {
-    client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+
+    if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+    if (layer.image_metadata.width != width) {
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+    if (layer.image_metadata.height != height) {
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+    if (memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+    if (memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) != 0) {
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+    return CONFIG_CHECK_RESULT_OK;
+  }();
+
+  if (check_result == CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG) {
+    layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
     for (unsigned i = 1; i < display_configs[0].layer_count; i++) {
-      client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+      layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
     }
   }
-  return CONFIG_CHECK_RESULT_OK;
+  return check_result;
 }
 
 void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* display_configs,

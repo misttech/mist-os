@@ -8,6 +8,7 @@ load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "fail_missing_api_level", "get_fuchsia_api_level")
 load(":fuchsia_fidl_cc_library.bzl", "fuchsia_fidl_cc_library", "get_cc_lib_name")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _gather_dependencies(deps):
     info = []
@@ -22,7 +23,7 @@ def _gather_dependencies(deps):
     return info
 
 def _fidl_impl(context):
-    sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(context)
     ir = context.outputs.ir
     library_name = context.attr.library
 
@@ -64,7 +65,7 @@ def _fidl_impl(context):
 
 _fidl_library = rule(
     implementation = _fidl_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "library": attr.string(
             doc = "The name of the FIDL library",

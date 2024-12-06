@@ -13,9 +13,9 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.power.SuspendEnabled" ],
             from: "parent",
             to: "#base-drivers",
-            config: [ "fuchsia.power.SuspendEnabled" ],
         },
         {
             protocol: "fuchsia.tracing.provider.Registry",
@@ -86,6 +86,20 @@
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
             to: "#base-drivers",
+        },
+        {
+            protocol: "fuchsia.component.resolution.Resolver",
+            from: "#pkg-cache",
+            as: "fuchsia.component.resolution.Resolver-base",
+            to: [
+                "#driver_index",
+                "#driver_manager",
+            ],
+
+            // pkg-cache depends on fshost for blobfs and fshost depends transitively on
+            // driver_index and driver_manager, but driver_index and driver_manager don't need base
+            // packages to provide fshost's (transitive) dependencies.
+            dependency: "weak",
         },
     ],
     expose: [

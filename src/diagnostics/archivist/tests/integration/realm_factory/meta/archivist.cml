@@ -13,8 +13,8 @@
     capabilities: [
         {
             protocol: [
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.LoWPANArchiveAccessor",
+                "fuchsia.diagnostics.ArchiveAccessor.feedback",
+                "fuchsia.diagnostics.ArchiveAccessor.lowpan",
             ],
         },
     ],
@@ -44,11 +44,14 @@
     ],
     expose: [
         {
-            protocol: [
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.LoWPANArchiveAccessor",
-            ],
-            from: "self",
+            protocol: "fuchsia.diagnostics.ArchiveAccessor.feedback",
+            from: "self/diagnostics-accessors",
+            as: "fuchsia.diagnostics.FeedbackArchiveAccessor",
+        },
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor.lowpan",
+            from: "self/diagnostics-accessors",
+            as: "fuchsia.diagnostics.LoWPANArchiveAccessor",
         },
     ],
 }

@@ -11,7 +11,13 @@
     },
     capabilities: [
         {
+            dictionary: "diagnostics-accessors",
+            path: "/svc/fuchsia.component.sandbox.DictionaryRouter",
+        },
+        {
             protocol: [
+                // TODO(https://fxbug.dev/342196300): remove this once everyone is extracting the
+                // protocols from the dictionary.
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.LogSettings",
@@ -43,12 +49,14 @@
             protocol: [ "fuchsia.inspect.InspectSink" ],
             from: "self",
         },
+        {
+            protocol: [ "fuchsia.component.sandbox.CapabilityStore" ],
+            from: "framework",
+        },
     ],
     expose: [
         {
             protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.diagnostics.LogStream",
                 "fuchsia.inspect.InspectSink",
@@ -56,6 +64,20 @@
                 "fuchsia.logger.LogSink",
             ],
             from: "self",
+        },
+        {
+            dictionary: "diagnostics-accessors",
+            from: "self",
+        },
+
+        // TODO(https://fxbug.dev/342196300): remove this once everyone is extracting the
+        // protocols from the dictionary.
+        {
+            protocol: [
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.diagnostics.host.ArchiveAccessor",
+            ],
+            from: "self/diagnostics-accessors",
         },
     ],
 }

@@ -14,6 +14,7 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/testing/environments.gni")
 import("//build/toolchain/concurrent_jobs.gni")
+import("//build/tools/json_merge/json_merge.gni")
 import("//tools/fidl/measure-tape/measure_tape.gni")
 
 _component_manager_bin = {
@@ -291,10 +292,6 @@ _component_manager_bin = {
   ]
 }
 
-config("eng_mode") {
-  rustflags = [ "--cfg=eng" ]
-}
-
 rustc_binary("bin") {
   output_name = "component_manager"
   forward_variables_from(_component_manager_bin, "*")
@@ -302,21 +299,22 @@ rustc_binary("bin") {
   configs -= configs_to_remove
   configs += configs_to_add
   assert_no_deps += [
-    # For tracing support, :bin_eng is required
+    # For tracing support, :bin_with_tracing is required
     "//src/lib/trace/rust:trace-provider",
   ]
 }
 
-rustc_binary("bin_eng") {
-  testonly = true
-  output_name = "component_manager_eng"
+rustc_binary("bin_with_tracing") {
+  output_name = "component_manager_with_tracing"
   forward_variables_from(_component_manager_bin, "*")
   configs += configs_to_remove
   configs -= configs_to_remove
   configs += configs_to_add
-
-  deps += [ "//src/lib/trace/rust:trace-provider" ]
-  configs += [ ":eng_mode" ]
+  features = [ "tracing" ]
+  deps += [
+    "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
+    "//src/lib/trace/rust:trace-provider",
+  ]
 }
 
 # This v2 component bundles component manager with a config suitable for running
@@ -324,7 +322,7 @@ rustc_binary("bin_eng") {
 fuchsia_component("component-manager-realm-builder-cmp") {
   testonly = true
   deps = [
-    ":bin_eng",
+    ":bin_with_tracing",
     ":component_manager_realm_builder_config",
   ]
   component_name = "component_manager"
@@ -336,12 +334,12 @@ fuchsia_component("component-manager-realm-builder-cmp") {
 fuchsia_component("component-manager-realm-builder-debug-cmp") {
   testonly = true
   deps = [
-    ":bin_eng",
+    ":bin_with_tracing",
     ":component_id_index_for_debug_config",
     ":component_manager_realm_builder_debug_config",
   ]
   component_name = "component_manager"
-  manifest = "meta/component_manager_debug.cml"
+  manifest = "meta/component_manager.cml"
 }
 
 # This is a low-level action that compiles `elf_runner.cml`
@@ -436,18 +434,19 @@ bootfs_files_for_assembly("bootfs") {
 }
 
 component_config("component_manager_realm_builder_config") {
-  sources = [ "configs/realm_builder_config.json5" ]
-  dest = "data/component_manager_realm_builder_config"
+  sources = [
+    "configs/no_debug.json5",
+    "configs/test_config.base.json5",
+  ]
+  dest = "data/component_manager_config"
 }
 
 component_config("component_manager_realm_builder_debug_config") {
-  sources = [ "configs/realm_builder_debug_config.json5" ]
-  dest = "data/component_manager_realm_builder_debug_config"
-}
-
-component_config("component_manager_realm_builder_passthrough_config") {
-  sources = [ "configs/realm_builder_passthrough_config.json5" ]
-  dest = "data/component_manager_realm_builder_passthrough_config"
+  sources = [
+    "configs/debug.json5",
+    "configs/test_config.base.json5",
+  ]
+  dest = "data/component_manager_config"
 }
 
 component_config("component_manager_bootfs_config") {

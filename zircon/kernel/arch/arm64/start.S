@@ -122,8 +122,10 @@ PhysbootHandoff = _start
     adr_global page_table0, tt_trampoline
     adr_global page_table1, arm64_kernel_translation_table
 
-    // Send secondary cpus over to a waiting spot for the primary to finish.
-    cbnz    cpuid, .Lmmu_enable_secondary
+    // In between here and .Lmmu_enable is where the boot CPU will have set up
+    // the trampoline page tables. If we're a secondary we can jump straight to
+    // enabling paging.
+    cbnz    cpuid, .Lmmu_enable
 
     // When using zbi-start.S, it needs the kernel_vaddr in x0.
     // Use a direct jump there and back so it doesn't need to spill
@@ -210,24 +212,7 @@ ImageFixup = AfterImageFixup
 
     str     tmp2, [page_table0, tmp, lsl #3]  /* tt_trampoline[paddr index] = pt entry */
 
-    /* mark page tables as set up, so secondary cpus can fall through */
-    adr_global tmp, page_tables_not_ready
-    str     wzr, [tmp]
-
-    /* make sure it's flushed */
-    dc      cvac, tmp
-    dmb     sy
-
-    b       .Lpage_tables_ready
-
-.Lmmu_enable_secondary:
-    adr_global tmp, page_tables_not_ready
-    /* trap any secondary cpus until the primary has set up the page tables */
-.Lpage_tables_not_ready:
-    ldr     wtmp2, [tmp]
-    cbnz    wtmp2, .Lpage_tables_not_ready
-.Lpage_tables_ready:
-
+.Lmmu_enable:
     /* set up the mmu */
 
     /* Invalidate the entire TLB */
@@ -353,9 +338,6 @@ END_DATA(kernel_entry_paddr)
 DATA(kernel_entry_ticks)
     .quad -1, -1
 END_DATA(kernel_entry_ticks)
-DATA(page_tables_not_ready)
-    .long       1
-END_DATA(page_tables_not_ready)
 
     .balign 8
 LOCAL_DATA(boot_cpu_fake_arch_thread)

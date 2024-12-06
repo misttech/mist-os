@@ -23,6 +23,7 @@ load(
     "FuchsiaUnstrippedBinaryInfo",
 )
 load(":utils.bzl", "find_cc_toolchain", "forward_providers", "rule_variants")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 KNOWN_PROVIDERS = [
     CcInfo,
@@ -289,7 +290,7 @@ def fuchsia_cc_binary(
 
 # fuchsia_cc_test build rules.
 def _fuchsia_cc_test_manifest_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
 
     # Detect googletest.
     is_gtest = False
@@ -324,7 +325,7 @@ _fuchsia_cc_test_manifest = rule(
     Detects whether gtest is included as a dependency. If it is, the cml file
     will use gtest_runner. Otherwise it will use the elf_test_runner.
     """,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "test_binary_name": attr.string(
             doc = "The test binary's name.",

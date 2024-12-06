@@ -187,6 +187,11 @@ pub struct RunCommand {
     /// no-op and will soon be removed.
     #[argh(switch)]
     pub disable_output_directory: bool,
+
+    /// when set, prevents test_manager from creating exception channels that may confilict
+    /// with those created by the test.
+    #[argh(switch)]
+    pub no_exception_channel: bool,
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]

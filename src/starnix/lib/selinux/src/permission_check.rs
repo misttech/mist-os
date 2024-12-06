@@ -5,7 +5,7 @@
 use crate::access_vector_cache::{Fixed, Locked, Query, DEFAULT_SHARED_SIZE};
 use crate::policy::{AccessVectorComputer, SELINUX_AVD_FLAGS_PERMISSIVE};
 use crate::security_server::SecurityServer;
-use crate::{ClassPermission, Permission, SecurityId};
+use crate::{ClassPermission, FileClass, Permission, SecurityId};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_contrib::profile_duration;
@@ -64,6 +64,15 @@ impl<'a> PermissionCheck<'a> {
     // are exposed via a trait rather than directly by that implementation.
     pub fn security_server(&self) -> &SecurityServer {
         self.security_server
+    }
+
+    pub fn compute_new_file_sid(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        self.access_vector_cache.compute_new_file_sid(source_sid, target_sid, file_class)
     }
 }
 
@@ -173,6 +182,15 @@ mod tests {
         ) -> AccessDecision {
             self.0.query(source_sid, target_sid, target_class)
         }
+
+        fn compute_new_file_sid(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+        ) -> Result<SecurityId, anyhow::Error> {
+            unreachable!();
+        }
     }
 
     impl AccessVectorComputer for DenyAllPermissions {
@@ -198,6 +216,15 @@ mod tests {
             _target_class: AbstractObjectClass,
         ) -> AccessDecision {
             AccessDecision::allow(AccessVector::ALL)
+        }
+
+        fn compute_new_file_sid(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+        ) -> Result<SecurityId, anyhow::Error> {
+            unreachable!();
         }
     }
 

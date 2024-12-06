@@ -6,12 +6,8 @@ use async_trait::async_trait;
 use ffx_config::api::ConfigError;
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_list_args::ListCommand;
-use fho::{
-    bug, daemon_protocol, deferred, Deferred, Error, FfxMain, FfxTool, Result,
-    VerifiedMachineWriter,
-};
-use fidl_fuchsia_developer_ffx as ffx;
-use fidl_fuchsia_developer_ffx_ext::ServerStatus;
+use fho::{bug, Error, FfxMain, FfxTool, Result, VerifiedMachineWriter};
+
 use fidl_fuchsia_pkg_ext::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
 use fuchsia_repo::repository::RepositorySpec;
 use pkg::{PkgServerInfo, PkgServerInstanceInfo, PkgServerInstances, ServerMode};
@@ -105,8 +101,6 @@ pub struct RepoListTool {
     #[command]
     cmd: ListCommand,
     context: EnvironmentContext,
-    #[with(deferred(daemon_protocol()))]
-    repos: Deferred<ffx::RepositoryRegistryProxy>,
 }
 
 fho::embedded_plugin!(RepoListTool);
@@ -147,38 +141,8 @@ impl RepoListTool {
         let instance_root =
             self.context.get("repository.process_dir").map_err(|e: ConfigError| bug!(e))?;
         let mgr = PkgServerInstances::new(instance_root);
-        let mut instances = mgr.list_instances()?;
+        let instances = mgr.list_instances()?;
 
-        // Avoid creating the daemon proxy if it is not needed.
-        let has_daemon = instances.iter().any(|r| r.server_mode == ServerMode::Daemon);
-        if has_daemon {
-            let proxy = self.repos.await.map_err(|e| bug!(e))?;
-            let status = proxy.server_status().await.map_err(|e| bug!(e))?;
-            let status: ServerStatus = ServerStatus::try_from(status).map_err(|e| bug!(e))?.into();
-            instances = instances
-                .iter()
-                .filter(|r| {
-                    if r.server_mode == ServerMode::Daemon {
-                        match status {
-                            ServerStatus::Disabled
-                            | fidl_fuchsia_developer_ffx_ext::ServerStatus::Stopped => {
-                                match mgr.remove_instance(r.name.clone()) {
-                                    Ok(_) => (),
-                                    Err(e) => tracing::error!(
-                                        "could not remove daemon instance data: {e}"
-                                    ),
-                                }
-                                false
-                            }
-                            ServerStatus::Running { .. } => true,
-                        }
-                    } else {
-                        true
-                    }
-                })
-                .map(|r| r.clone())
-                .collect();
-        }
         Ok(instances)
     }
 }
@@ -190,7 +154,7 @@ fn format_text(infos: Vec<PkgServerData>, full: bool) -> String {
             format!(
                 "{name: <30}\t{address}\t{repo_path}",
                 name = info.name,
-                address = info.address.to_string(),
+                address = info.address,
                 repo_path = info.repo_path
             )
         } else {
@@ -199,7 +163,7 @@ fn format_text(infos: Vec<PkgServerData>, full: bool) -> String {
             \tRegistration type: {reg_type:?}\taliases: {aliases:?}\tconflict mode: {mode:?}",
                 name = info.name,
                 pid = info.pid,
-                address = info.address.to_string(),
+                address = info.address,
                 server_mode = info.server_mode,
                 repo_path = info.repo_path,
                 reg_type = info.registration_storage_type,
@@ -217,9 +181,7 @@ mod tests {
     use camino::Utf8PathBuf;
     use ffx_config::ConfigLevel;
     use fho::{Format, TestBuffers};
-    use fidl_fuchsia_developer_ffx::RepositoryRegistryRequest;
     use fidl_fuchsia_pkg_ext::{RepositoryConfigBuilder, RepositoryStorageType};
-    use futures::channel::oneshot::channel;
     use std::collections::BTreeSet;
     use std::net::SocketAddr;
     use std::process;
@@ -235,14 +197,9 @@ mod tests {
             .await
             .expect("Setting process dir");
 
-        let fake_proxy = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
-
-        let repos = Deferred::from_output(Ok(fake_proxy));
-
         let tool = RepoListTool {
             cmd: ListCommand { full: false, names: vec![] },
             context: test_env.context.clone(),
-            repos,
         };
         let buffers = TestBuffers::default();
         let writer = <RepoListTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -268,9 +225,6 @@ mod tests {
         let dir = test_env.context.get("repository.process_dir").expect("process_dir");
         let mgr = PkgServerInstances::new(dir);
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
-        let fake_proxy = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
-
-        let repos = Deferred::from_output(Ok(fake_proxy));
 
         let instance_name = "s1";
         let repo_config =
@@ -295,7 +249,6 @@ mod tests {
         let tool = RepoListTool {
             cmd: ListCommand { full: false, names: vec![] },
             context: test_env.context.clone(),
-            repos,
         };
         let buffers = TestBuffers::default();
         let writer = <RepoListTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -320,9 +273,6 @@ mod tests {
         let dir = test_env.context.get("repository.process_dir").expect("process_dir");
         let mgr = PkgServerInstances::new(dir);
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
-        let fake_proxy = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
-
-        let repos = Deferred::from_output(Ok(fake_proxy));
 
         let instance_name = "s1";
         let repo_config =
@@ -347,7 +297,6 @@ mod tests {
         let tool = RepoListTool {
             cmd: ListCommand { full: true, names: vec![] },
             context: test_env.context.clone(),
-            repos,
         };
         let buffers = TestBuffers::default();
         let writer = <RepoListTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -371,18 +320,6 @@ mod tests {
         let dir = env.context.get("repository.process_dir").expect("process_dir");
         let mgr = PkgServerInstances::new(dir);
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
-
-        let (sender, _receiver) = channel();
-        let mut sender = Some(sender);
-        let fake_proxy = fho::testing::fake_proxy(move |req| match req {
-            RepositoryRegistryRequest::ServerStatus { responder } => {
-                sender.take().unwrap().send(()).unwrap();
-                responder.send(&ServerStatus::Running { address: addr.clone() }.into()).unwrap()
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
-
-        let repos = Deferred::from_output(Ok(fake_proxy));
 
         let instance_name = "s1";
         let repo_config =
@@ -427,7 +364,6 @@ mod tests {
         let tool = RepoListTool {
             cmd: ListCommand { full: false, names: vec!["s1".into()] },
             context: env.context.clone(),
-            repos,
         };
         let buffers = TestBuffers::default();
         let writer = <RepoListTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -453,9 +389,6 @@ mod tests {
         let dir = test_env.context.get("repository.process_dir").expect("process_dir");
         let mgr = PkgServerInstances::new(dir);
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
-        let fake_proxy = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
-
-        let repos = Deferred::from_output(Ok(fake_proxy));
 
         let instance_name = "s1";
         let repo_config =
@@ -480,7 +413,6 @@ mod tests {
         let tool = RepoListTool {
             cmd: ListCommand { full: true, names: vec![] },
             context: test_env.context.clone(),
-            repos,
         };
         let buffers = TestBuffers::default();
         let writer = <RepoListTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);

@@ -5,6 +5,7 @@
 #define SRC_UI_INPUT_DRIVERS_VIRTIO_INPUT_H_
 
 #include <fidl/fuchsia.input.report/cpp/wire.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/virtio/device.h>
@@ -59,6 +60,11 @@ class InputDevice
   void GetInputReport(GetInputReportRequestView request,
                       GetInputReportCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_input_report::InputDevice> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    zxlogf(WARNING, "Unexpected fidl method invoked: %ld", metadata.method_ordinal);
   }
 
  private:

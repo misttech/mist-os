@@ -13,8 +13,7 @@ zx::channel OpenServiceRoot() {
   zx::channel request, service_root;
   if (zx::channel::create(0, &request, &service_root) != ZX_OK)
     return {};
-  if (fdio_open3("/svc", static_cast<uint64_t>(fuchsia::io::PERM_READABLE), request.release()) !=
-      ZX_OK)
+  if (fdio_service_connect("/svc", request.release()) != ZX_OK)
     return {};
   return service_root;
 }

@@ -37,6 +37,7 @@ fn str_to_device_type(src: &str) -> Result<fidl_fuchsia_settings::DeviceType, St
 fn str_to_device_state(src: &str) -> Result<fidl_fuchsia_settings::DeviceState, String> {
     use fidl_fuchsia_settings::ToggleStateFlags;
 
+    #[allow(clippy::manual_try_fold, reason = "mass allow for https://fxbug.dev/381896734")]
     Ok(fidl_fuchsia_settings::DeviceState {
         toggle_flags: Some(src.to_lowercase().split(",").fold(
             Ok(fidl_fuchsia_settings::ToggleStateFlags::empty()),

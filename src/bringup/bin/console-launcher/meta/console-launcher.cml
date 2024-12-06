@@ -23,6 +23,7 @@
             directory: "boot-bin",
             rights: [ "rx*" ],
             path: "/boot-bin",
+            availability: "optional",
         },
         {
             directory: "boot",
@@ -33,16 +34,19 @@
             directory: "blob",
             rights: [ "rw*" ],
             path: "/blob",
+            availability: "optional",
         },
         {
             directory: "root-ssl-certificates",
             rights: [ "r*" ],
             path: "/config/ssl",
+            availability: "optional",
         },
         {
             directory: "data",
             rights: [ "rw*" ],
             path: "/data",
+            availability: "optional",
         },
         {
             directory: "dev-topological",
@@ -53,21 +57,25 @@
             directory: "pkgfs",
             rights: [ "rx*" ],
             path: "/pkgfs",
+            availability: "optional",
         },
         {
             directory: "base-bin",
             rights: [ "rx*" ],
             path: "/bin",
+            availability: "optional",
         },
         {
             directory: "system",
             rights: [ "rx*" ],
             path: "/system",
+            availability: "optional",
         },
         {
             directory: "tmp",
             rights: [ "rw*" ],
             path: "/tmp",
+            availability: "optional",
         },
         {
             // Used by console-launcher itself.

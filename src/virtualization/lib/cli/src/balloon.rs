@@ -92,7 +92,7 @@ impl fmt::Display for BalloonResult {
                     stats.disk_caches.map_or("UNKNOWN".to_string(), |i| i.to_string())
                 ]);
 
-                write!(f, "{}", table.to_string())
+                write!(f, "{}", table)
             }
             BalloonResult::SetComplete(pages) => {
                 write!(f, "Resizing memory balloon to {} pages!", pages)

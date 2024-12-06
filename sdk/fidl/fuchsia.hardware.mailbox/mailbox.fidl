@@ -1,38 +1,24 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+@available(added=HEAD)
 library fuchsia.hardware.mailbox;
 
 using zx;
 
-const MBOX_FIFO_SIZE uint32 = 128; // bytes
-type MboxTx = struct {
-    cmd uint32;
-    tx_buffer vector<uint8>:MBOX_FIFO_SIZE;
-};
-
-type MboxRx = struct {
-    rx_buffer vector<uint8>:MBOX_FIFO_SIZE;
-};
-
+/// `Channel` represents a single mailbox channel that can be used to send messages to a
+/// destination core.
 @discoverable
-closed protocol Device {
-    // |channel| : vendor specific identifier used to communicate with different hardware blocks.
-    strict SendCommand(struct {
-        channel uint8;
-        mdata MboxTx;
+open protocol Channel {
+    /// Writes the message to the mailbox, interrupts the destination core, and (if applicable)
+    /// waits for the destination core to ack the message.
+    ///
+    /// Returns `ZX_ERR_OUT_OF_RANGE` if `message` is larger than what the hardware can support.
+    strict SendMessage(struct {
+        message vector<uint8>:MAX;
     }) -> () error zx.Status;
-
-    // |channel| : vendor specific identifier used to communicate with different hardware blocks.
-    // |rx_len | : rx_len is equal to the number of bytes of the transmitted data MboxTx.tx_buffer.
-    strict ReceiveData(struct {
-        channel uint8;
-        rx_len uint8;
-    }) -> (struct {
-        mdata MboxRx;
-    }) error zx.Status;
 };
 
 service Service {
-    device client_end:Device;
+    channel client_end:Channel;
 };

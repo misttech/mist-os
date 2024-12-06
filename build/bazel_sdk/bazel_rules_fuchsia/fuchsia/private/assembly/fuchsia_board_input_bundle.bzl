@@ -10,9 +10,10 @@ load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(":providers.bzl", "FuchsiaBoardInputBundleInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS", "select_single_file")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_board_input_bundle_impl(ctx):
-    fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
     driver_entries = []
     creation_inputs = []
     for dep in ctx.attr.base_driver_packages:
@@ -134,7 +135,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
 fuchsia_board_input_bundle = rule(
     doc = """Generates a board input bundle.""",
     implementation = _fuchsia_board_input_bundle_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "base_driver_packages": attr.label_list(
             doc = "Base-driver packages to include in board.",
@@ -185,10 +186,6 @@ fuchsia_board_input_bundle = rule(
             doc = "Path to sysmem format costs files",
             default = [],
             allow_files = True,
-        ),
-        "_sdk_manifest": attr.label(
-            allow_single_file = True,
-            default = "@fuchsia_sdk//:meta/manifest.json",
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )

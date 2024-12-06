@@ -135,6 +135,7 @@ mod tests {
                 log_settings: None,
                 build_rule: None,
                 has_generated_manifest: None,
+                create_no_exception_channel: None,
             },
         };
         let execution_entry = FuchsiaComponentExecutionEntry {
@@ -147,6 +148,7 @@ mod tests {
             test_filters: None,
             parallel: Some(10),
             min_severity_logs: None,
+            create_no_exception_channel: false,
         };
 
         let expected_config = TestConfig {

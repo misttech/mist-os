@@ -13,9 +13,12 @@ load(
     "fuchsia_package_resource_group",
 )
 load(
+    "//common:toolchains/clang/feature_flag.bzl",
+    "feature_flag",
+)
+load(
     ":cc_toolchain_config.bzl",
     "cc_toolchain_config",
-    "feature_flag",
 )
 
 licenses(["notice"])

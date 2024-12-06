@@ -38,6 +38,10 @@ pub struct RuntimeConfig {
     /// to events before the root component has started.
     pub debug: bool,
 
+    /// Where to look for the trace provider: normal Namespace, or internal RootExposed.
+    /// This is ignored if tracing is not enabled as a feature.
+    pub trace_provider: TraceProvider,
+
     /// Enables Component Manager's introspection APIs (RealmQuery, RealmExplorer,
     /// RouteValidator, LifecycleController, etc.) for use by components.
     pub enable_introspection: bool,
@@ -432,6 +436,22 @@ impl Default for VmexSource {
     }
 }
 
+/// Where to look for the trace provider.
+/// Defaults to `Namespace`.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum TraceProvider {
+    Namespace,
+    RootExposed,
+}
+
+symmetrical_enums!(TraceProvider, component_internal::TraceProvider, Namespace, RootExposed);
+
+impl Default for TraceProvider {
+    fn default() -> Self {
+        TraceProvider::Namespace
+    }
+}
+
 /// Information about the health checks during the update process.
 #[derive(Debug, PartialEq, Eq, Default, Clone)]
 pub struct HealthCheck {
@@ -471,6 +491,7 @@ impl Default for RuntimeConfig {
             // configuration is present or it fails to load.
             security_policy: Default::default(),
             debug: false,
+            trace_provider: Default::default(),
             enable_introspection: false,
             use_builtin_process_launcher: false,
             maintain_utc_clock: false,
@@ -651,6 +672,8 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
 
         let vmex_source = config.vmex_source.map(VmexSource::from).unwrap_or_default();
 
+        let trace_provider = config.trace_provider.map(TraceProvider::from).unwrap_or_default();
+
         let health_check = config
             .health_check
             .map(HealthCheck::try_from)
@@ -668,6 +691,7 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
                 config.builtin_capabilities,
             )?,
             debug: config.debug.unwrap_or(default.debug),
+            trace_provider,
             enable_introspection: config
                 .enable_introspection
                 .unwrap_or(default.enable_introspection),
@@ -904,6 +928,7 @@ mod tests {
     test_config_ok! {
         all_fields_none => (component_internal::Config {
             debug: None,
+            trace_provider: None,
             enable_introspection: None,
             list_children_batch_size: None,
             security_policy: None,
@@ -918,6 +943,7 @@ mod tests {
         }, RuntimeConfig::default()),
         all_leaf_nodes_none => (component_internal::Config {
             debug: Some(false),
+            trace_provider: Some(component_internal::TraceProvider::Namespace),
             enable_introspection: Some(false),
             list_children_batch_size: Some(5),
             maintain_utc_clock: Some(false),
@@ -942,6 +968,7 @@ mod tests {
             ..Default::default()
         }, RuntimeConfig {
             debug: false,
+            trace_provider: TraceProvider::Namespace,
             enable_introspection: false,
             list_children_batch_size: 5,
             maintain_utc_clock: false,
@@ -951,6 +978,7 @@ mod tests {
         all_fields_some => (
             component_internal::Config {
                 debug: Some(true),
+                trace_provider: Some(component_internal::TraceProvider::RootExposed),
                 enable_introspection: Some(true),
                 list_children_batch_size: Some(42),
                 maintain_utc_clock: Some(true),
@@ -1055,6 +1083,7 @@ mod tests {
                     AllowlistEntryBuilder::new().exact("qux").any_descendant(),
                 ]),
                 debug: true,
+                trace_provider: TraceProvider::RootExposed,
                 enable_introspection: true,
                 list_children_batch_size: 42,
                 maintain_utc_clock: true,
@@ -1182,6 +1211,7 @@ mod tests {
         invalid_job_policy => (
             component_internal::Config {
                 debug: None,
+                trace_provider: None,
                 enable_introspection: None,
                 list_children_batch_size: None,
                 maintain_utc_clock: None,
@@ -1211,6 +1241,7 @@ mod tests {
         invalid_capability_policy_empty_allowlist_cap => (
             component_internal::Config {
                 debug: None,
+                trace_provider: None,
                 enable_introspection: None,
                 list_children_batch_size: None,
                 maintain_utc_clock: None,
@@ -1244,6 +1275,7 @@ mod tests {
         invalid_capability_policy_empty_source_moniker => (
             component_internal::Config {
                 debug: None,
+                trace_provider: None,
                 enable_introspection: None,
                 list_children_batch_size: None,
                 maintain_utc_clock: None,
@@ -1276,6 +1308,7 @@ mod tests {
         invalid_root_component_url => (
             component_internal::Config {
                 debug: None,
+                trace_provider: None,
                 enable_introspection: None,
                 list_children_batch_size: None,
                 maintain_utc_clock: None,
@@ -1299,6 +1332,7 @@ mod tests {
     fn new_from_bytes_valid() -> Result<(), Error> {
         let config = component_internal::Config {
             debug: None,
+            trace_provider: None,
             enable_introspection: None,
             list_children_batch_size: Some(42),
             security_policy: None,

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::roaming::lib::ROAMING_CHANNEL_BUFFER_SIZE;
 use crate::client::roaming::local_roam_manager::RoamManager;
 use crate::client::roaming::roam_monitor::RoamDataSender;
 use crate::client::types;
@@ -588,12 +589,13 @@ impl ConnectedOptions {
         });
 
         // Initialize roam monitor with roam manager service.
-        let (roam_monitor_sender, roam_receiver) =
-            common_options.roam_manager.initialize_roam_monitor(
-                (*ap_state).clone(),
-                network_identifier.clone(),
-                credential.clone(),
-            );
+        let (sender, roam_receiver) = mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
+        let roam_monitor_sender = common_options.roam_manager.initialize_roam_monitor(
+            (*ap_state).clone(),
+            network_identifier.clone(),
+            credential.clone(),
+            sender,
+        );
         Self {
             ap_state,
             multiple_bss_candidates,
@@ -683,11 +685,14 @@ async fn connected_state(
                         fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info } => {
                             options.ap_state.tracked.channel.primary = info.new_channel;
                             // Re-initialize roam monitor for new channel
-                            (options.roam_monitor_sender, options.roam_receiver) =
+                            let (sender, roam_receiver) = mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
+                            options.roam_receiver = roam_receiver;
+                            options.roam_monitor_sender =
                                 common_options.roam_manager.initialize_roam_monitor(
                                     (*options.ap_state).clone(),
                                     options.network_identifier.clone(),
                                     options.credential.clone(),
+                                    sender
                                 );
                             notify_on_channel_switch(&common_options, &options, info);
                             false
@@ -1068,12 +1073,14 @@ fn update_internal_state_on_roam_success(
     options.bss_connect_duration_metric_timer =
         Box::pin(fasync::Timer::new(METRICS_SHORT_CONNECT_DURATION.after_now()));
     // Re-initialize roam monitor for new BSS
-    (options.roam_monitor_sender, options.roam_receiver) =
-        common_options.roam_manager.initialize_roam_monitor(
-            (*options.ap_state).clone(),
-            options.network_identifier.clone(),
-            options.credential.clone(),
-        );
+    let (sender, roam_receiver) = mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
+    options.roam_receiver = roam_receiver;
+    options.roam_monitor_sender = common_options.roam_manager.initialize_roam_monitor(
+        (*options.ap_state).clone(),
+        options.network_identifier.clone(),
+        options.credential.clone(),
+        sender,
+    );
     Ok(())
 }
 

@@ -4,22 +4,26 @@
 
 To build Zircon and run unit tests, run one of the following commands:
 
-```sh
+```posix-terminal
 # Build and run x64.
 fx set bringup.x64 --with-base //bundles/buildbot/bringup
+
 fx build
+
 fx qemu
 
 # Build and run arm64.
 fx set bringup.arm64 --with-base //bundles/buildbot/bringup
+
 fx build
+
 fx qemu
 ```
 
 Once the scripts finish running, you should see the Zircon shell. To run
 userspace tests, use the Zircon shell to run:
 
-```sh
+```posix-terminal
 runtests --all
 ```
 
@@ -28,7 +32,7 @@ system. You can also use `runtests -n <TEST_NAME>` to run one specific test.
 
 To run in-kernel tests, use the Zircon shell to run:
 
-```sh
+```posix-terminal
 k ut all
 ```
 

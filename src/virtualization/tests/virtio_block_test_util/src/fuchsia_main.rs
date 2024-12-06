@@ -87,17 +87,15 @@ async fn main() -> Result<(), anyhow::Error> {
                 .read_at(MutableBufferSlice::Memory(&mut (*data)[..]), device_offset)
                 .await?;
             // TODO(https://github.com/rust-lang/rust/issues/59878): Box<[T]> is not IntoIter.
-            let mismatches = data.to_vec().into_iter().enumerate().try_fold(
-                String::new(),
-                |mut acc, (i, b)| {
+            let mismatches =
+                data.iter().copied().enumerate().try_fold(String::new(), |mut acc, (i, b)| {
                     use std::fmt::Write as _;
 
                     if b != expected {
                         let () = write!(&mut acc, "\n{}:{:b}", i, b)?;
                     }
                     Ok::<_, anyhow::Error>(acc)
-                },
-            )?;
+                })?;
             if !mismatches.is_empty() {
                 Err(anyhow::anyhow!(
                     "offset={} expected={:b} mismatches={}",

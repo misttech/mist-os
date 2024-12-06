@@ -87,6 +87,15 @@ config("compiler") {
   # code is built.
   configs += [ "//build/config/mistos:compiler_fuchsia_api_level" ]
 
+  if (is_gcc) {
+    # This is predefined by Clang but not by GCC.
+    if (current_cpu == "arm64") {
+      defines += [ "__ARM_ACLE=202420" ]
+    } else if (current_cpu == "arm") {
+      defines += [ "__ARM_ACLE=200" ]
+    }
+  }
+
   if (is_fuchsia || is_mistos) {
     # ld.bfd doesn't support -z relro for the targets we use it for.
     if (!is_gcc || linker == "gold") {

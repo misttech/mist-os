@@ -305,6 +305,8 @@ pub struct SystemActivityGovernor {
     /// The lease which hold execution_state at suspending state temporarily
     /// after suspension.
     resume_control_lease: RefCell<Option<fbroker::LeaseControlProxy>>,
+    /// Temporarily holds the boot_contro_leasel
+    booting_lease: Rc<RefCell<Option<fidl::endpoints::ClientEnd<fbroker::LeaseControlMarker>>>>,
 }
 
 impl SystemActivityGovernor {
@@ -438,6 +440,7 @@ impl SystemActivityGovernor {
             waiting_for_es_activation_after_resume: Cell::new(false),
             resume_control_lease: RefCell::new(None),
             is_running_signal: async_lock::OnceCell::new(),
+            booting_lease: Rc::new(RefCell::new(None)),
         }))
     }
 
@@ -462,10 +465,14 @@ impl SystemActivityGovernor {
             lease_status = boot_control_lease.watch_status(lease_status).await.unwrap();
         }
 
+        let booting_lease =
+            boot_control_lease.into_client_end().expect("failed to convert to ClientEnd");
+        let _ = self.booting_lease.borrow_mut().insert(booting_lease);
+
         self.run_application_activity(
             &elements_node,
             &self.inspect_root,
-            boot_control_lease.into_client_end().expect("failed to convert to ClientEnd"),
+            self.booting_lease.clone(),
         );
 
         tracing::info!("Boot control required. Updating boot_control level to active.");
@@ -482,7 +489,9 @@ impl SystemActivityGovernor {
         self: &Rc<Self>,
         inspect_node: &INode,
         root_node: &INode,
-        boot_control_lease: fidl::endpoints::ClientEnd<fbroker::LeaseControlMarker>,
+        boot_control_lease: Rc<
+            RefCell<Option<fidl::endpoints::ClientEnd<fbroker::LeaseControlMarker>>>,
+        >,
     ) {
         let application_activity_node = inspect_node.create_child("application_activity");
         let booting_node = Rc::new(root_node.create_bool("booting", true));
@@ -491,7 +500,6 @@ impl SystemActivityGovernor {
 
         fasync::Task::local(async move {
             let update_fn = Rc::new(basic_update_fn_factory(&this.application_activity));
-            let boot_control_lease = Rc::new(RefCell::new(Some(boot_control_lease)));
 
             run_power_element(
                 this.application_activity.name(),
@@ -704,6 +712,37 @@ impl SystemActivityGovernor {
                 }
                 Err(error) => {
                     tracing::error!(?error, "Error handling ActivityGovernor request stream");
+                }
+            }
+        }
+    }
+
+    pub async fn handle_boot_control_stream(
+        self: Rc<Self>,
+        mut stream: fsystem::BootControlRequestStream,
+    ) {
+        // Before handling requests, ensure power elements are initialized and handlers are running.
+        self.is_running_signal.wait().await;
+
+        while let Ok(Some(request)) = stream.try_next().await {
+            match request {
+                fsystem::BootControlRequest::SetBootComplete { responder } => {
+                    if self.booting_lease.borrow().is_some() {
+                        tracing::info!("System has booted. Dropping boot control lease.");
+                        self.booting_lease.borrow_mut().take();
+                        let res = self
+                            .boot_control
+                            .current_level
+                            .update(BootControlLevel::Inactive.into())
+                            .await;
+                        if let Err(error) = res {
+                            tracing::warn!(?error, "update boot_control level to inactive failed");
+                        }
+                    }
+                    responder.send().unwrap();
+                }
+                fsystem::BootControlRequest::_UnknownMethod { ordinal, .. } => {
+                    tracing::warn!(?ordinal, "Unknown StatsRequest method");
                 }
             }
         }

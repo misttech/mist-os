@@ -9,13 +9,13 @@ pub struct ActionResultFormatter<'a> {
     action_results: &'a ActionResults,
 }
 
-impl<'a> fmt::Display for ActionResultFormatter<'a> {
+impl fmt::Display for ActionResultFormatter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.write_text(f)
     }
 }
 
-impl<'a> ActionResultFormatter<'a> {
+impl ActionResultFormatter<'_> {
     pub fn new(action_results: &ActionResults) -> ActionResultFormatter<'_> {
         ActionResultFormatter { action_results }
     }

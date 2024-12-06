@@ -121,8 +121,8 @@ impl NetstackThreadCount {
 #[derive(Debug, Default, Copy, Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum NetstackVersion {
-    #[default]
     Netstack2,
+    #[default]
     Netstack3,
     NetstackMigration,
 }

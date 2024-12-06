@@ -74,6 +74,7 @@ impl PartialEq for ParsedSelector {
     }
 }
 
+#[allow(clippy::enum_variant_names, reason = "mass allow for https://fxbug.dev/381896734")]
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(r"wildcarded components must be drivers, exactly 'bootstrap/*-drivers\\:*' (double escapes in json), and contain a name filter list: {0:?}")]

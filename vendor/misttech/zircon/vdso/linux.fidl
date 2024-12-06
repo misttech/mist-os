@@ -1,12 +1,17 @@
+// Copyright 2024 The Fuchsia Authors.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// TODO (Herrera) Check how to split syscall definitions
 // Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 library zx;
 
-alias new_utsname = byte;
-alias statx = byte;
-alias stat = byte;
-alias rusage = byte;
+alias NewUtsname = byte;
+alias Statx = byte;
+alias Stat = byte;
+alias Rusage = byte;
 
 //alias Pid = int32;
 @no_protocol_prefix
@@ -64,7 +69,7 @@ closed protocol Linux {
         filename experimental_pointer<uchar>;
         @voidptr
         @out
-        statbuf experimental_pointer<stat>;
+        statbuf experimental_pointer<Stat>;
     }) -> () error int64;
 
     // #5, SYSCALL_DEFINE2(newfstat, unsigned int, fd, struct stat __user *, statbuf)
@@ -72,7 +77,7 @@ closed protocol Linux {
         fd uint32;
         @voidptr
         @out
-        statbuf experimental_pointer<stat>;
+        statbuf experimental_pointer<Stat>;
     }) -> () error int64;
 
     // STUB 6
@@ -301,7 +306,7 @@ closed protocol Linux {
         options int32;
         @voidptr
         @out
-        ru experimental_pointer<rusage>;
+        ru experimental_pointer<Rusage>;
     }) -> () error int64;
 
     // #62, SYSCALL_DEFINE2(kill, pid_t, pid, int, sig)
@@ -314,7 +319,7 @@ closed protocol Linux {
     strict A0063Uname() -> (resource struct {
         @voidptr
         @out
-        name experimental_pointer<new_utsname>;
+        name experimental_pointer<NewUtsname>;
     }) error int64;
 
     // STUB 64
@@ -1185,7 +1190,7 @@ closed protocol Linux {
         mask uint32;
         @out
         @voidptr
-        buffer experimental_pointer<statx>;
+        buffer experimental_pointer<Statx>;
     }) -> () error int64;
 
     // STUB 333

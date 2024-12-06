@@ -28,7 +28,7 @@ async fn component_manager_namespace() {
         .await
         .unwrap();
 
-    let (component_manager_realm, _task) =
+    let component_manager_realm =
         builder.with_nested_component_manager("#meta/component-manager.cm").await.unwrap();
 
     let echo_server = component_manager_realm

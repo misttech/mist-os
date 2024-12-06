@@ -268,20 +268,20 @@ impl<R: Render> Deref for IOwned<R> {
 /// be published.
 pub struct IOwnedMutGuard<'a, R: Render>(&'a mut IOwned<R>);
 
-impl<'a, R: Render> Deref for IOwnedMutGuard<'a, R> {
+impl<R: Render> Deref for IOwnedMutGuard<'_, R> {
     type Target = R::Base;
     fn deref(&self) -> &R::Base {
         &self.0._base
     }
 }
 
-impl<'a, R: Render> DerefMut for IOwnedMutGuard<'a, R> {
+impl<R: Render> DerefMut for IOwnedMutGuard<'_, R> {
     fn deref_mut(&mut self) -> &mut R::Base {
         &mut self.0._base
     }
 }
 
-impl<'a, R: Render> Drop for IOwnedMutGuard<'a, R> {
+impl<R: Render> Drop for IOwnedMutGuard<'_, R> {
     fn drop(&mut self) {
         R::update(&self.0._base, &mut self.0._inspect_data);
     }
@@ -321,7 +321,7 @@ impl<B: fmt::Debug> Render for DebugMarker<B> {
     type Data = StringProperty;
 
     fn create(base: &Self::Base, parent: &Node, name: impl AsRef<str>) -> Self::Data {
-        parent.create_string(name.as_ref(), &format!("{:?}", base))
+        parent.create_string(name.as_ref(), format!("{:?}", base))
     }
 
     fn update(base: &Self::Base, data: &mut Self::Data) {

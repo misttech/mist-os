@@ -22,6 +22,10 @@ type Config = table {
     /// to events before the root component has started.
     1: debug bool;
 
+    /// Where to look for the trace provider. If missing, defaults to TraceProvider::NAMESPACE.
+    /// This is ignored on non-tracing builds.
+    22: trace_provider TraceProvider;
+
     /// How many children, maximum, are returned by a call to `Realm.ChildIterator.next()`.
     2: list_children_batch_size uint32;
 
@@ -91,6 +95,17 @@ type Config = table {
 
     /// Information about the health checks during the update process.
     21: health_check HealthCheck;
+};
+
+/// Where to obtain the trace provider from.
+/// to find the trace provider to register with.
+type TraceProvider = strict enum : uint8 {
+    /// Default. Get it from the normal fuchsia.tracing.provider.Registry.
+    NAMESPACE = 1;
+
+    /// Get it from the root component's exposed directory. It is expected that the root
+    /// component exposes `fuchsia.tracing.provider.Registry` protocol to its parent.
+    ROOT_EXPOSED = 2;
 };
 
 /// Information about the health checks during the update process.

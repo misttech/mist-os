@@ -35,6 +35,14 @@
                 "#echo_server",
             ],
         },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [
+                "#echo_client",
+                "#echo_server",
+            ],
+        },
     ],
 }
 

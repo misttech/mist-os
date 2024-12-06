@@ -194,7 +194,7 @@ impl FvmBuilder {
         for fs in &self.filesystems {
             match fs {
                 Filesystem::BlobFS { path, attributes } => {
-                    append_filesystem(&mut args, path.to_string(), attributes);
+                    append_filesystem(&mut args, path, attributes);
                 }
                 Filesystem::EmptyData => {
                     args.push("--with-empty-data".to_string());

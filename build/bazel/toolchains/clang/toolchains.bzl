@@ -7,10 +7,10 @@ C++ toolchain definitions for Clang.
 """
 
 load(
-    "@fuchsia_sdk_common//common:toolchains/clang/toolchain_utils.bzl",
+    "@rules_fuchsia//common:toolchains/clang/toolchain_utils.bzl",
     "generate_clang_cc_toolchain",
 )
-load("@fuchsia_sdk_common//common/platforms:utils.bzl", "to_bazel_cpu_name", "to_bazel_os_name")
+load("@rules_fuchsia//common/platforms:utils.bzl", "to_bazel_cpu_name", "to_bazel_os_name")
 
 def define_host_prebuilt_clang_cc_toolchains(name, host_os, host_arch):
     """Define host C++ toolchains that target both x64 and arm64 using a prebuilt Clang installation.

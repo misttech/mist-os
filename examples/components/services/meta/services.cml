@@ -43,6 +43,11 @@
                 "#bank_branch",
             ],
         },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "all",
+        },
     ],
     expose: [
         // Forward the test protocol.

@@ -4,11 +4,10 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use std::io::Write;
 
 pub mod resolvers;
 
 #[async_trait(?Send)]
 pub trait FileResolver {
-    async fn get_file<W: Write>(&mut self, writer: &mut W, file: &str) -> Result<String>;
+    async fn get_file(&mut self, file: &str) -> Result<String>;
 }

@@ -69,7 +69,7 @@ async fn write_blob() {
     if cfg!(feature = "storage-host") {
         recursive_wait(
             &fixture.dir(
-                fidl_fuchsia_storagehost::PartitionServiceMarker::SERVICE_NAME,
+                fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
             "part-0",
@@ -137,7 +137,7 @@ async fn write_blob_no_existing_data_partition() {
     if cfg!(feature = "storage-host") {
         recursive_wait(
             &fixture.dir(
-                fidl_fuchsia_storagehost::PartitionServiceMarker::SERVICE_NAME,
+                fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
             "part-0",
@@ -209,7 +209,7 @@ async fn blobfs_formatted() {
     if cfg!(feature = "storage-host") {
         recursive_wait(
             &fixture.dir(
-                fidl_fuchsia_storagehost::PartitionServiceMarker::SERVICE_NAME,
+                fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
             "part-0",
@@ -271,7 +271,7 @@ async fn data_unformatted() {
     if cfg!(feature = "storage-host") {
         recursive_wait(
             &fixture.dir(
-                fidl_fuchsia_storagehost::PartitionServiceMarker::SERVICE_NAME,
+                fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
             "part-0",
@@ -378,7 +378,7 @@ async fn handles_corrupt_fvm() {
     if cfg!(feature = "storage-host") {
         recursive_wait(
             &fixture.dir(
-                fidl_fuchsia_storagehost::PartitionServiceMarker::SERVICE_NAME,
+                fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
             "part-0",

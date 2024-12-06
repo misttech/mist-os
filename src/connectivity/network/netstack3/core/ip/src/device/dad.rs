@@ -12,8 +12,8 @@ use net_types::ip::{Ipv4, Ipv6, Ipv6Addr};
 use net_types::{MulticastAddr, UnicastAddr, Witness as _};
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, DeviceIdContext, EventContext, HandleableTimer,
-    RngContext, StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext,
-    WeakDeviceIdentifier,
+    IpAddressId as _, IpDeviceAddressIdContext, RngContext, StrongDeviceIdentifier as _,
+    TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
 use packet_formats::icmp::ndp::options::{NdpNonce, MIN_NONCE_LENGTH};
 use packet_formats::icmp::ndp::NeighborSolicitation;
@@ -21,9 +21,7 @@ use packet_formats::utils::NonZeroDuration;
 
 use crate::internal::device::nud::DEFAULT_MAX_MULTICAST_SOLICIT;
 use crate::internal::device::state::Ipv6DadState;
-use crate::internal::device::{
-    IpAddressId as _, IpAddressState, IpDeviceAddressIdContext, IpDeviceIpExt, WeakIpAddressId,
-};
+use crate::internal::device::{IpAddressState, IpDeviceIpExt, WeakIpAddressId};
 
 /// A timer ID for duplicate address detection.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
@@ -572,7 +570,8 @@ mod tests {
     use net_types::ip::{AddrSubnet, IpAddress as _};
     use net_types::Witness as _;
     use netstack3_base::testutil::{
-        FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
+        FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeTimerCtxExt as _, FakeWeakAddressId,
+        FakeWeakDeviceId,
     };
     use netstack3_base::{CtxPair, InstantContext as _, SendFrameContext as _, TimerHandler};
     use packet::EmptyBuf;
@@ -580,7 +579,6 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::device::testutil::FakeWeakAddressId;
     use crate::internal::device::Ipv6DeviceAddr;
 
     struct FakeDadAddressContext {
@@ -590,11 +588,6 @@ mod tests {
     }
 
     type FakeAddressCtxImpl = FakeCoreCtx<FakeDadAddressContext, (), FakeDeviceId>;
-
-    impl IpDeviceAddressIdContext<Ipv6> for FakeAddressCtxImpl {
-        type AddressId = AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>;
-        type WeakAddressId = FakeWeakAddressId<AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>>;
-    }
 
     impl DadAddressContext<FakeBindingsCtxImpl> for FakeAddressCtxImpl {
         fn with_address_assigned<O, F: FnOnce(&mut bool) -> O>(
@@ -663,11 +656,6 @@ mod tests {
 
     fn get_address_id(addr: Ipv6Addr) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
         AddrSubnet::new(addr, Ipv6Addr::BYTES * 8).unwrap()
-    }
-
-    impl IpDeviceAddressIdContext<Ipv6> for FakeCoreCtxImpl {
-        type AddressId = AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>;
-        type WeakAddressId = FakeWeakAddressId<AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>>;
     }
 
     impl CoreTimerContext<TestDadTimerId, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
@@ -778,7 +766,7 @@ mod tests {
                     }),
                 })
             });
-        DadHandler::start_duplicate_address_detection(
+        DadHandler::<Ipv6, _>::start_duplicate_address_detection(
             &mut core_ctx,
             &mut bindings_ctx,
             &FakeDeviceId,
@@ -866,7 +854,7 @@ mod tests {
             })
         });
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        DadHandler::start_duplicate_address_detection(
+        DadHandler::<Ipv6, _>::start_duplicate_address_detection(
             core_ctx,
             bindings_ctx,
             &FakeDeviceId,
@@ -918,7 +906,7 @@ mod tests {
                     }),
                 })
             });
-        DadHandler::start_duplicate_address_detection(
+        DadHandler::<Ipv6, _>::start_duplicate_address_detection(
             &mut core_ctx,
             &mut bindings_ctx,
             &FakeDeviceId,
@@ -932,7 +920,7 @@ mod tests {
             RETRANS_TIMER,
         );
 
-        DadHandler::stop_duplicate_address_detection(
+        DadHandler::<Ipv6, _>::stop_duplicate_address_detection(
             &mut core_ctx,
             &mut bindings_ctx,
             &FakeDeviceId,
@@ -979,7 +967,7 @@ mod tests {
         };
 
         assert_eq!(
-            DadHandler::handle_incoming_dad_neighbor_solicitation(
+            DadHandler::<Ipv6, _>::handle_incoming_dad_neighbor_solicitation(
                 core_ctx,
                 bindings_ctx,
                 &FakeDeviceId,
@@ -1017,7 +1005,12 @@ mod tests {
         let addr = get_address_id(DAD_ADDRESS.get());
 
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        DadHandler::start_duplicate_address_detection(core_ctx, bindings_ctx, &FakeDeviceId, &addr);
+        DadHandler::<Ipv6, _>::start_duplicate_address_detection(
+            core_ctx,
+            bindings_ctx,
+            &FakeDeviceId,
+            &addr,
+        );
 
         check_dad(core_ctx, bindings_ctx, 1, None, RETRANS_TIMER);
 
@@ -1037,7 +1030,7 @@ mod tests {
             NdpNonce::from(if looped_back { &sent_nonce } else { &alternative_nonce });
 
         let matched_nonce = assert_matches!(
-            DadHandler::handle_incoming_dad_neighbor_solicitation(
+            DadHandler::<Ipv6, _>::handle_incoming_dad_neighbor_solicitation(
                 core_ctx,
                 bindings_ctx,
                 &FakeDeviceId,

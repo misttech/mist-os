@@ -22,7 +22,6 @@ use crate::vfs::{
     FdNumber, FileHandle, MountNamespaceFile, PidFdFileObject, UserBuffersOutputBuffer,
     VecOutputBuffer,
 };
-use once_cell::sync::Lazy;
 use starnix_logging::{log_error, log_info, log_trace, set_zx_name, track_stub};
 use starnix_sync::{Locked, RwLock, Unlocked};
 use starnix_syscalls::SyscallResult;
@@ -77,7 +76,7 @@ use starnix_uapi::{
 use static_assertions::const_assert;
 use std::cmp;
 use std::ffi::CString;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub fn do_clone(
@@ -1223,13 +1222,14 @@ pub fn sys_setrlimit(
     sys_prlimit64(locked, current_task, 0, resource, user_rlimit, Default::default())
 }
 
-pub fn sys_prlimit64(
+pub fn do_prlimit64(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     user_resource: u32,
-    user_new_limit: UserRef<rlimit>,
-    user_old_limit: UserRef<rlimit>,
+    maybe_new_limit: Option<rlimit>,
+    old_limit: &mut rlimit,
+    has_user_old_limit: bool,
 ) -> Result<(), Errno> {
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
@@ -1254,24 +1254,14 @@ pub fn sys_prlimit64(
         security::task_prlimit(
             current_task,
             &target_task,
-            !user_old_limit.is_null(),
-            !user_new_limit.is_null(),
+            has_user_old_limit,
+            maybe_new_limit.is_some(),
         )?;
     }
 
     let resource = Resource::from_raw(user_resource)?;
 
-    let maybe_new_limit = if !user_new_limit.is_null() {
-        let new_limit = current_task.read_object(user_new_limit)?;
-        if new_limit.rlim_cur > new_limit.rlim_max {
-            return error!(EINVAL);
-        }
-        Some(new_limit)
-    } else {
-        None
-    };
-
-    let old_limit = match resource {
+    *old_limit = match resource {
         // TODO: Integrate Resource::STACK with generic ResourceLimits machinery.
         Resource::STACK => {
             if maybe_new_limit.is_some() {
@@ -1289,6 +1279,37 @@ pub fn sys_prlimit64(
         }
         _ => target_task.thread_group.adjust_rlimits(current_task, resource, maybe_new_limit)?,
     };
+    Ok(())
+}
+
+pub fn sys_prlimit64(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    pid: pid_t,
+    user_resource: u32,
+    user_new_limit: UserRef<rlimit>,
+    user_old_limit: UserRef<rlimit>,
+) -> Result<(), Errno> {
+    let maybe_new_limit = if !user_new_limit.is_null() {
+        let new_limit = current_task.read_object(user_new_limit)?;
+        if new_limit.rlim_cur > new_limit.rlim_max {
+            return error!(EINVAL);
+        }
+        Some(new_limit)
+    } else {
+        None
+    };
+
+    let mut old_limit: rlimit = Default::default();
+    do_prlimit64(
+        locked,
+        current_task,
+        pid,
+        user_resource,
+        maybe_new_limit,
+        &mut old_limit,
+        !user_old_limit.is_null(),
+    )?;
 
     if !user_old_limit.is_null() {
         current_task.write_object(user_old_limit, &old_limit)?;
@@ -1748,7 +1769,7 @@ struct KcmpParams {
     shuffle: usize,
 }
 
-static KCMP_PARAMS: Lazy<KcmpParams> = Lazy::new(|| {
+static KCMP_PARAMS: LazyLock<KcmpParams> = LazyLock::new(|| {
     let mut params = KcmpParams::default();
     zx::cprng_draw(params.as_mut_bytes());
     // Ensure the shuffle is odd so that multiplying a usize by this value is a permutation.

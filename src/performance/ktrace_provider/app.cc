@@ -102,12 +102,12 @@ void RequestKtraceStart(const fidl::SyncClient<fuchsia_tracing_kernel::Controlle
 
 std::vector<trace::KnownCategory> GetKnownCategories() {
   std::vector<trace::KnownCategory> known_categories = {
-      {.name = kRetainCategory},
+      {.name = kRetainCategory,
+       .description = "Retain the previous contents of the buffer instead of clearing it out"},
   };
 
   for (const auto& category : kGroupCategories) {
-    auto& known_category = known_categories.emplace_back();
-    known_category.name = category.name;
+    known_categories.emplace_back(category.name, "");
   }
 
   return known_categories;

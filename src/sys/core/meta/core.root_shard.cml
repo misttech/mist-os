@@ -7,7 +7,6 @@
             name: "core",
             url: "fuchsia-pkg://fuchsia.com/core#meta/core.cm",
             environment: "#core-env",
-            on_terminate: "reboot",
         },
         {
             name: "startup",
@@ -321,6 +320,13 @@
             resolver: "base_resolver",
             from: "#bootstrap",
             to: "#core",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "#core",
+            availability: "optional",
         },
     ],
     environments: [

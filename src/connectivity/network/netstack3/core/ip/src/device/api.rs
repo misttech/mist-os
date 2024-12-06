@@ -15,7 +15,7 @@ use net_types::ip::{
 use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::{
     AnyDevice, ContextPair, DeviceIdContext, DeviceIdentifier as _, EventContext as _, ExistsError,
-    Inspector, Instant, InstantBindingsTypes, NotFoundError, ReferenceNotifiers,
+    Inspector, Instant, InstantBindingsTypes, IpAddressId as _, NotFoundError, ReferenceNotifiers,
     RemoveResourceResult, RemoveResourceResultWithContext,
 };
 use thiserror::Error;
@@ -28,9 +28,8 @@ use crate::internal::device::state::{
     Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddressState,
 };
 use crate::internal::device::{
-    self, AddressRemovedReason, DelIpAddr, IpAddressId as _, IpDeviceAddressContext as _,
-    IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
-    IpDeviceStateContext as _,
+    self, AddressRemovedReason, DelIpAddr, IpDeviceAddressContext as _, IpDeviceBindingsContext,
+    IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceStateContext as _,
 };
 use crate::internal::routing::IpRoutingDeviceContext;
 use crate::internal::types::RawMetric;

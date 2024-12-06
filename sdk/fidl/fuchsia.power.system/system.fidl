@@ -215,11 +215,6 @@ open protocol ActivityGovernor {
     /// Activity 'Active' state. In particular, this blocks suspension of the
     /// hardware platform.
     ///
-    /// Additionally, during a given boot, SAG will not suspend the hardware
-    /// platform until the first time a lease provided by this method is acquired
-    /// and dropped. Due to this effect, clients wishing to block suspension
-    /// should default to using [`TakeWakeLease`].
-    ///
     /// If an error occurs while creating a token for the activity lease, then the
     /// channel to `ActivityGovernor` will be closed by the server and no
     /// response will be returned.
@@ -248,6 +243,14 @@ open protocol ActivityGovernor {
         1: listener client_end:ActivityGovernorListener;
         // TODO(b/315994974): Handle filtering by wakeup reason.
     }) -> ();
+};
+
+/// A service that processes notification about the system boot state.
+@discoverable
+open protocol BootControl {
+    /// Notify the SAG that the system has booted. SAG will not suspend the
+    /// hardware platform until this method is called at least once per boot.
+    flexible SetBootComplete() -> ();
 };
 
 /// A service that provides access to CPU-related power elements.

@@ -82,6 +82,7 @@ const KNOCK_TARGET_TIMEOUT: Duration = Duration::from_secs(6);
 pub(crate) mod comms;
 pub(crate) mod crosvm;
 pub(crate) mod femu;
+pub(crate) mod gpt;
 pub(crate) mod qemu;
 
 const COMMAND_CONSOLE: &str = "./monitor";
@@ -117,8 +118,12 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     ) -> Result<GuestConfig> {
         let mut updated_guest = emu_config.guest.clone();
 
+        // TODO(https://fxbug.dev/380466925): The function should get the context from an argument
+        let env = ffx_config::global_env_context().expect("getting environment context");
+
         // Create the data directory if needed.
-        let mut instance_root: PathBuf = ffx_config::query(config::EMU_INSTANCE_ROOT_DIR)
+        let mut instance_root: PathBuf = env
+            .query(config::EMU_INSTANCE_ROOT_DIR)
             .get_file()
             .await
             .map_err(|e| bug!("Error reading config for instance root: {e}"))?;
@@ -141,7 +146,8 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         }
 
         // If the kernel is an efi image, or has no zbi, skip the zbi processing.
-        let zbi_path = if let Some(zbi_image_path) = &emu_config.guest.zbi_image {
+        let (zbi_path, vbmeta_path) = if let Some(zbi_image_path) = &emu_config.guest.zbi_image {
+            let mut vbmeta_path = None;
             let zbi_path = instance_root
                 .join(zbi_image_path.file_name().ok_or_else(|| bug!("cannot read zbi file name"))?);
 
@@ -153,15 +159,56 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 // to the emulator instance to fail.
             } else {
                 // Add the authorized public keys to the zbi image to enable SSH access to
-                // the guest.
-                Self::embed_boot_data(&zbi_image_path, &zbi_path)
+                // the guest. Also, in the GPT case, bake in the kernel command line parameters.
+                let kernel_cmdline = if emu_config.guest.is_gpt() {
+                    let c = emu_config.flags.kernel_args.join("\n");
+                    tracing::debug!("Using kernel parameters in the ZBI: {}", c);
+                    Some(c)
+                } else {
+                    None
+                };
+                Self::embed_boot_data(&zbi_image_path, &zbi_path, kernel_cmdline)
                     .await
                     .map_err(|e| bug!("cannot embed boot data: {e}"))?;
+                tracing::debug!(
+                    "Staging {:?} into {:?} and embedding SSH keys",
+                    zbi_image_path,
+                    zbi_path
+                );
+                match (
+                    &emu_config.guest.vbmeta_key_file,
+                    &emu_config.guest.vbmeta_key_metadata_file,
+                    &emu_config.guest.disk_image,
+                ) {
+                    (Some(zbi_key_file), Some(zbi_key_metadata_file), Some(DiskImage::Gpt(_))) => {
+                        let vbmeta_out_path = instance_root.join("zircon.vbmeta");
+                        Self::generate_vbmeta(
+                            &zbi_key_file,
+                            &zbi_key_metadata_file,
+                            &zbi_path,
+                            &vbmeta_out_path,
+                        )
+                        .await?;
+                        vbmeta_path = Some(vbmeta_out_path);
+                    }
+                    (zbi_key_file, zbi_key_metadata_file, Some(DiskImage::Gpt(_))) => {
+                        return_user_error!(
+                            "Both PEM key (provided: {:?}) and the corresponding metadata file (provided: {:?}) are required.",
+                            zbi_key_file,
+                            zbi_key_metadata_file
+                        );
+                    }
+                    (_, _, _) => {
+                        tracing::debug!(
+                            "Generation of new vbmeta for the modified ZBI not required."
+                        );
+                    }
+                };
             }
-            Some(zbi_path)
+            (Some(zbi_path), vbmeta_path)
         } else {
             tracing::debug!("Skipping zbi staging; no zbi file in product bundle.");
-            None
+            (None, None)
         };
 
         if let Some(disk_image) = &emu_config.guest.disk_image {
@@ -222,21 +269,23 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         })?;
                     }
                     // FAT does not need to be resized.
-                    DiskImage::Fat(_) => (),
+                    // GPT images are resized during staging when calling into make_fuchsia_vol.
+                    DiskImage::Fat(_) | DiskImage::Gpt(_) => (),
                 };
             }
             // Update the guest config to reference the staged disk image.
             updated_guest.disk_image = match disk_image {
+                DiskImage::Fat(_) => Some(disk_image.clone()),
                 DiskImage::Fvm(_) => Some(DiskImage::Fvm(dest_path)),
                 DiskImage::Fxfs(_) => Some(DiskImage::Fxfs(dest_path)),
-                DiskImage::Fat(_) => Some(disk_image.clone()),
+                DiskImage::Gpt(_) => Some(DiskImage::Gpt(instance_root.join("gpt_disk.img"))),
             };
         } else {
             updated_guest.disk_image = None;
         }
 
         updated_guest.zbi_image = zbi_path;
-        if emu_config.guest.is_efi() {
+        if emu_config.guest.is_efi() || emu_config.guest.is_gpt() {
             let dest = instance_root.join("OVMF_VARS.fd");
             if !dest.exists() {
                 fs::copy(&emu_config.guest.ovmf_vars, &dest).map_err(|e| {
@@ -248,6 +297,54 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             }
             updated_guest.ovmf_vars = dest;
         }
+
+        if emu_config.guest.is_gpt() {
+            let zedboot_cmdline_path = instance_root.join("zedboot_cmdline");
+            if zedboot_cmdline_path.exists() && reuse {
+                tracing::debug!(
+                    "Using existing file for {:?}",
+                    zedboot_cmdline_path.file_name().unwrap()
+                );
+            } else {
+                let c = emu_config.flags.kernel_args.join("\n");
+                gpt::write_zedboot_cmdline(&zedboot_cmdline_path, Some(&c))?;
+            }
+            let gpt_image_path = if let Some(ref p) = updated_guest.disk_image {
+                p.to_path_buf()
+            } else {
+                return_bug!("No path for the GPT disk image found.");
+            };
+            if gpt_image_path.exists() && reuse {
+                tracing::debug!(
+                    "Using existing file for {:?}",
+                    gpt_image_path.file_name().unwrap()
+                );
+            } else {
+                let product_path = if let Some(ref path) = emu_config.guest.product_bundle_path {
+                    path
+                } else {
+                    &PathBuf::new()
+                };
+                let mut image = gpt::FuchsiaFullDiskImageBuilder::new();
+                image = image
+                    .arch(emu_config.device.cpu.architecture)
+                    .cmdline(&zedboot_cmdline_path)
+                    .output_path(&gpt_image_path)
+                    .mkfs_msdosfs_path(&get_host_tool("mkfs-msdosfs").await?)
+                    .product_bundle(product_path)
+                    .resize(gpt::DEFAULT_IMAGE_SIZE)
+                    .use_fxfs(true)
+                    .vbmeta(vbmeta_path)
+                    .zbi(updated_guest.zbi_image);
+                image.build(&env).await?;
+            }
+            // Since the one multi-partition GPT image is passed to qemu, no kernel and zbi images
+            // are required to boot the emulator.
+            updated_guest.kernel_image = None;
+            updated_guest.zbi_image = None;
+            updated_guest.is_gpt = true;
+        }
+
         Ok(updated_guest)
     }
 
@@ -273,10 +370,14 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         Ok(())
     }
 
-    /// embed_boot_data adds authorized_keys for ssh access to the zbi boot image file.
-    /// If mdns_info is Some(), it is also added. This mdns configuration is
-    /// read by Fuchsia mdns service and used instead of the default configuration.
-    async fn embed_boot_data(src: &PathBuf, dest: &PathBuf) -> Result<()> {
+    /// embed_boot_data adds relevant data for the interaction between the booted VM and ffx.
+    /// Currently, these are:
+    /// - Authorized_keys for ssh access to the zbi boot image file.
+    /// - mdns_info if present. This mdns configuration is read by Fuchsia mdns service and used
+    ///   instead of the default configuration.
+    /// - kernel commandline if present. This is currently needed for GPT images to pass kernel
+    ///   parameters, as zedboot is not passing them through.
+    async fn embed_boot_data(src: &PathBuf, dest: &PathBuf, cmdline: Option<String>) -> Result<()> {
         let zbi_tool = get_host_tool(config::ZBI_HOST_TOOL)
             .await
             .map_err(|e| bug!("ZBI tool is missing: {e}"))?;
@@ -302,6 +403,12 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         let mut zbi_command = Command::new(zbi_tool);
         zbi_command.arg("-o").arg(dest).arg("--replace").arg(src).arg("-e").arg(replace_str);
 
+        let cmdline_file = NamedTempFile::new().map_err(|e| bug! {"{e}"})?;
+        if let Some(c) = cmdline {
+            fs::write(&cmdline_file, c).map_err(|e| bug!("{e}"))?;
+            zbi_command.arg("--type=cmdline").arg(&cmdline_file.path());
+        }
+
         // added last.
         zbi_command.arg("--type=entropy:64").arg("/dev/urandom");
 
@@ -317,9 +424,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     }
 
     // generate_vbmeta creates a signed vbmeta file for a given key, metadata and ZBI file
-    // TODO(https://fxbug.dev/369410009): Booting into a GPT with a motified ZBI needs a re-signed
-    // vbmeta image. This function will be used to generate the vbmeta.
-    #[allow(dead_code)]
     async fn generate_vbmeta(
         key_path: &PathBuf,
         metadata_path: &PathBuf,
@@ -389,9 +493,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         let name = emu_config.runtime.name.clone();
         let reuse = emu_config.runtime.reuse;
 
-        emu_config.guest = Self::stage_image_files(&name, emu_config, reuse)
-            .await
-            .map_err(|e| bug!("could not stage image files: {e}"))?;
+        emu_config.guest = Self::stage_image_files(&name, emu_config, reuse).await?;
 
         // This is done to avoid running emu in the same directory as the kernel or other files
         // that are used by qemu. If the multiboot.bin file is in the current directory, it does
@@ -804,7 +906,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         "execute": "human-monitor-command",
                         "arguments": { "command-line": "info usernet"}
                     })
-                    .to_string()
                 ))
                 .map_err(|e| bug!("Error writing info usernet: {e}"))?;
         }
@@ -902,6 +1003,7 @@ mod tests {
         DataAmount, DataUnits, EmulatorInstanceData, EmulatorInstanceInfo, EmulatorInstances,
         EngineType, PortMapping,
     };
+    use ffx_config::environment::EnvironmentKind;
     use ffx_config::{ConfigLevel, TestEnv};
     use serde::{Deserialize, Serialize};
     use std::io::Read;
@@ -937,11 +1039,14 @@ mod tests {
     const ORIGINAL_PADDED: &str = "THIS_STRING\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
     const UPDATED: &str = "THAT_VALUE*";
     const UPDATED_PADDED: &str = "THAT_VALUE*\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+    const VBMETA_TEST_KEY: &str = include_str!("../../test_data/testkey_atx_psk.pem");
+    const VBMETA_TEST_KEY_METADATA: &[u8] = include_bytes!("../../test_data/atx_metadata.bin");
 
-    #[derive(Copy, Clone)]
+    #[derive(Copy, Clone, PartialEq)]
     enum DiskImageFormat {
         Fvm,
         Fxfs,
+        Gpt,
     }
 
     impl DiskImageFormat {
@@ -949,6 +1054,7 @@ mod tests {
             match self {
                 Self::Fvm => DiskImage::Fvm(path.as_ref().to_path_buf()),
                 Self::Fxfs => DiskImage::Fxfs(path.as_ref().to_path_buf()),
+                Self::Gpt => DiskImage::Gpt(path.as_ref().to_path_buf()),
             }
         }
     }
@@ -1042,6 +1148,7 @@ mod tests {
 
         let kernel_path = root.join("kernel");
         let zbi_path = root.join("zbi");
+        let ovmf_path = root.join("OVMF_VARS.fd");
         let disk_image_path = disk_image_format.as_disk_image(root.join("disk"));
 
         let _ = fs::File::options()
@@ -1057,6 +1164,11 @@ mod tests {
         let _ = fs::File::options()
             .write(true)
             .create(true)
+            .open(&ovmf_path)
+            .map_err(|e| bug!("cannot create test ovmf_vars file: {e}"))?;
+        let _ = fs::File::options()
+            .write(true)
+            .create(true)
             .open(&*disk_image_path)
             .map_err(|e| bug!("cannot create test disk image file: {e}"))?;
 
@@ -1067,6 +1179,7 @@ mod tests {
 
         guest.kernel_image = Some(kernel_path);
         guest.zbi_image = Some(zbi_path);
+        guest.ovmf_vars = ovmf_path;
         guest.disk_image = Some(disk_image_path);
 
         // Set the paths to use for the SSH keys
@@ -1103,26 +1216,72 @@ mod tests {
         emu_config.device.storage = DataAmount { quantity: 32, units: DataUnits::Bytes };
 
         let root = setup(&env.context, &mut emu_config.guest, &temp, disk_image_format).await?;
+        fs::create_dir_all(&root.join(instance_name)).expect("create test-instance dir");
+
+        let tempdir = temp.into_path();
+        emu_config.guest.vbmeta_key_file = Some(tempdir.join("atx_psk.pem"));
+        emu_config.guest.vbmeta_key_metadata_file = Some(tempdir.join("avb_atx_metadata.bin"));
+        fs::write(emu_config.guest.vbmeta_key_file.as_ref().unwrap(), VBMETA_TEST_KEY)
+            .map_err(|e| bug!("cannot write test key file: {e}"))?;
+        fs::write(
+            emu_config.guest.vbmeta_key_metadata_file.as_ref().unwrap(),
+            VBMETA_TEST_KEY_METADATA,
+        )
+        .map_err(|e| bug!("cannot write test key metadata file: {e}"))?;
 
         write_to(&emu_config.guest.kernel_image.clone().expect("test kernel filename"), ORIGINAL)
             .map_err(|e| bug!("cannot write original value to kernel file: {e}"))?;
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
             .map_err(|e| bug!("cannot write original value to disk image file: {e}"))?;
+        // Need to place a fake zbi file in the `test-instance` because fake_zbi does not actually
+        // stage the file into this dir when it is called, but vbmeta signing requires the file
+        // to exist.
+        fs::write(&root.join(instance_name).join("zbi"), ORIGINAL)
+            .map_err(|e| bug!("cannot write fake zbi file: {e}"))?;
 
         let updated =
             <TestEngine as QemuBasedEngine>::stage_image_files(instance_name, &emu_config, false)
                 .await;
 
+        // Staging of GPT images is only expected work when mkfs-msdosfs is guaranteed to be found.
+        // TODO(https://fxbug.dev/377317738): When make-fuchsia-vol is guaranteed to create the
+        // required FAT EFI partition successfully in out-of-tree configurations, the following
+        // block can be removed.
+        if disk_image_format == DiskImageFormat::Gpt {
+            if let EnvironmentKind::InTree { .. } = env.context.env_kind() {
+                tracing::debug!("Test running in-tree, DiskImageFormat::Gpt is expected to work.");
+            } else {
+                tracing::debug!("Skipping test for DiskImageFormat::Gpt, mkfs-msdosfs is not guaranteed to be available");
+                return Ok(());
+            }
+        }
+
         assert!(updated.is_ok(), "expected OK got {:?}", updated.unwrap_err());
 
         let actual = updated.map_err(|e| bug!("cannot get updated guest config: {e}"))?;
-        let expected = GuestConfig {
-            kernel_image: Some(root.join(instance_name).join("kernel")),
-            zbi_image: Some(root.join(instance_name).join("zbi")),
-            disk_image: Some(
-                disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
-            ),
-            ..Default::default()
+        let expected = if disk_image_format == DiskImageFormat::Gpt {
+            GuestConfig {
+                disk_image: Some(
+                    disk_image_format.as_disk_image(root.join(instance_name).join("gpt_disk.img")),
+                ),
+                is_gpt: true,
+                ovmf_vars: root.join(instance_name).join("OVMF_VARS.fd"),
+                vbmeta_key_file: Some(tempdir.join("atx_psk.pem")),
+                vbmeta_key_metadata_file: Some(tempdir.join("avb_atx_metadata.bin")),
+                ..Default::default()
+            }
+        } else {
+            GuestConfig {
+                kernel_image: Some(root.join(instance_name).join("kernel")),
+                zbi_image: Some(root.join(instance_name).join("zbi")),
+                disk_image: Some(
+                    disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
+                ),
+                ovmf_vars: root.join("OVMF_VARS.fd"),
+                vbmeta_key_file: Some(tempdir.join("atx_psk.pem")),
+                vbmeta_key_metadata_file: Some(tempdir.join("avb_atx_metadata.bin")),
+                ..Default::default()
+            }
         };
         assert_eq!(actual, expected);
 
@@ -1139,45 +1298,64 @@ mod tests {
         assert!(updated.is_ok(), "expected OK got {:?}", updated.unwrap_err());
 
         let actual = updated.map_err(|e| bug!("cannot get updated guest config, reuse: {e}"))?;
-        let expected = GuestConfig {
-            kernel_image: Some(root.join(instance_name).join("kernel")),
-            zbi_image: Some(root.join(instance_name).join("zbi")),
-            disk_image: Some(
-                disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
-            ),
-            ..Default::default()
+        let expected = if disk_image_format == DiskImageFormat::Gpt {
+            GuestConfig {
+                disk_image: Some(
+                    disk_image_format.as_disk_image(root.join(instance_name).join("gpt_disk.img")),
+                ),
+                is_gpt: true,
+                ovmf_vars: root.join(instance_name).join("OVMF_VARS.fd"),
+                vbmeta_key_file: Some(tempdir.join("atx_psk.pem")),
+                vbmeta_key_metadata_file: Some(tempdir.join("avb_atx_metadata.bin")),
+                ..Default::default()
+            }
+        } else {
+            GuestConfig {
+                kernel_image: Some(root.join(instance_name).join("kernel")),
+                zbi_image: Some(root.join(instance_name).join("zbi")),
+                disk_image: Some(
+                    disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
+                ),
+                ovmf_vars: root.join("OVMF_VARS.fd"),
+                vbmeta_key_file: Some(tempdir.join("atx_psk.pem")),
+                vbmeta_key_metadata_file: Some(tempdir.join("avb_atx_metadata.bin")),
+                ..Default::default()
+            }
         };
         assert_eq!(actual, expected);
 
-        eprintln!(
-            "Reading contents from {}",
-            actual.kernel_image.clone().expect("kernel file path").display()
-        );
-        eprintln!("Reading contents from {}", actual.disk_image.as_ref().unwrap().display());
-        let mut kernel = File::open(&actual.kernel_image.clone().expect("kernel file path"))
-            .map_err(|e| bug!("cannot open overwritten kernel file for read: {e}"))?;
-        let mut disk_image = File::open(&*actual.disk_image.unwrap())
-            .map_err(|e| bug!("cannot open overwritten disk image file for read: {e}"))?;
+        // The following parts are not applicable for GPT images as those are constructed via
+        // make-fuchsia-vol and do not start the emulator with a kernel argument.
+        if disk_image_format != DiskImageFormat::Gpt {
+            eprintln!(
+                "Reading contents from {}",
+                actual.kernel_image.clone().expect("kernel file path").display()
+            );
+            eprintln!("Reading contents from {}", actual.disk_image.as_ref().unwrap().display());
+            let mut kernel = File::open(&actual.kernel_image.clone().expect("kernel file path"))
+                .map_err(|e| bug!("cannot open overwritten kernel file for read: {e}"))?;
+            let mut disk_image = File::open(&*actual.disk_image.unwrap())
+                .map_err(|e| bug!("cannot open overwritten disk image file for read: {e}"))?;
 
-        let mut kernel_contents = String::new();
-        let mut fvm_contents = String::new();
+            let mut kernel_contents = String::new();
+            let mut fvm_contents = String::new();
 
-        kernel
-            .read_to_string(&mut kernel_contents)
-            .map_err(|e| bug!("cannot read contents of reused kernel file: {e}"))?;
-        disk_image
-            .read_to_string(&mut fvm_contents)
-            .map_err(|e| bug!("cannot read contents of reused disk image file: {e}"))?;
+            kernel
+                .read_to_string(&mut kernel_contents)
+                .map_err(|e| bug!("cannot read contents of reused kernel file: {e}"))?;
+            disk_image
+                .read_to_string(&mut fvm_contents)
+                .map_err(|e| bug!("cannot read contents of reused disk image file: {e}"))?;
 
-        assert_eq!(kernel_contents, UPDATED);
+            assert_eq!(kernel_contents, UPDATED);
 
-        // Fxfs will have ORIGINAL padded with nulls for be 32 bytes.
-        //(set in emu_config at the top of this method).
-        match disk_image_format {
-            DiskImageFormat::Fvm => assert_eq!(fvm_contents, UPDATED),
-            DiskImageFormat::Fxfs => assert_eq!(fvm_contents, UPDATED_PADDED),
-        };
-
+            // Fxfs will have ORIGINAL padded with nulls for be 32 bytes.
+            //(set in emu_config at the top of this method).
+            match disk_image_format {
+                DiskImageFormat::Fvm | DiskImageFormat::Gpt => assert_eq!(fvm_contents, UPDATED),
+                DiskImageFormat::Fxfs => assert_eq!(fvm_contents, UPDATED_PADDED),
+            };
+        }
         Ok(())
     }
 
@@ -1191,6 +1369,11 @@ mod tests {
         test_staging_no_reuse_common(DiskImageFormat::Fxfs).await
     }
 
+    #[fuchsia::test]
+    async fn test_staging_no_reuse_gpt() -> Result<()> {
+        test_staging_no_reuse_common(DiskImageFormat::Gpt).await
+    }
+
     async fn test_staging_with_reuse_common(disk_image_format: DiskImageFormat) -> Result<()> {
         let env = ffx_config::test_init().await?;
         make_fake_sdk(&env).await;
@@ -1200,27 +1383,72 @@ mod tests {
         emu_config.device.storage = DataAmount { quantity: 32, units: DataUnits::Bytes };
 
         let root = setup(&env.context, &mut emu_config.guest, &temp, disk_image_format).await?;
+        fs::create_dir_all(&root.join(instance_name)).expect("create test-instance dir");
 
-        // This checks if --reuse is true, but the directory isn't there to reuse; should succeed.
+        let tempdir = temp.into_path();
+        emu_config.guest.vbmeta_key_file = Some(tempdir.join("atx_psk.pem"));
+        emu_config.guest.vbmeta_key_metadata_file = Some(tempdir.join("avb_atx_metadata.bin"));
+        fs::write(emu_config.guest.vbmeta_key_file.as_ref().unwrap(), VBMETA_TEST_KEY)
+            .map_err(|e| bug!("cannot write test key file: {e}"))?;
+        fs::write(
+            emu_config.guest.vbmeta_key_metadata_file.as_ref().unwrap(),
+            VBMETA_TEST_KEY_METADATA,
+        )
+        .map_err(|e| bug!("cannot write test key metadata file: {e}"))?;
+
         write_to(&emu_config.guest.kernel_image.clone().expect("kernel file path"), ORIGINAL)
             .expect("cannot write original value to kernel file");
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
             .expect("cannot write original value to disk image file");
+        // Need to place a fake zbi file in the `test-instance` because fake_zbi does not actually
+        // stage the file into this dir when it is called, but vbmeta signing requires the file
+        // to exist.
+        fs::write(&root.join(instance_name).join("zbi"), ORIGINAL)
+            .map_err(|e| bug!("cannot write fake zbi file: {e}"))?;
 
         let updated: Result<GuestConfig> =
             <TestEngine as QemuBasedEngine>::stage_image_files(instance_name, &emu_config, true)
                 .await;
 
+        // Staging of GPT images is only expected work when mkfs-msdosfs is guaranteed to be found.
+        // TODO(https://fxbug.dev/377317738): When make-fuchsia-vol is guaranteed to create the
+        // required FAT EFI partition successfully in out-of-tree configurations, the following
+        // block can be removed.
+        if disk_image_format == DiskImageFormat::Gpt {
+            if let EnvironmentKind::InTree { .. } = env.context.env_kind() {
+                tracing::debug!("Test running in-tree, DiskImageFormat::Gpt is expected to work.");
+            } else {
+                tracing::debug!("Skipping test for DiskImageFormat::Gpt, mkfs-msdosfs is not guaranteed to be available");
+                return Ok(());
+            }
+        }
+
         assert!(updated.is_ok(), "expected OK got {:?}", updated.unwrap_err());
 
         let actual = updated.expect("cannot get updated guest config");
-        let expected = GuestConfig {
-            kernel_image: Some(root.join(instance_name).join("kernel")),
-            zbi_image: Some(root.join(instance_name).join("zbi")),
-            disk_image: Some(
-                disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
-            ),
-            ..Default::default()
+        let expected = if disk_image_format == DiskImageFormat::Gpt {
+            GuestConfig {
+                disk_image: Some(
+                    disk_image_format.as_disk_image(root.join(instance_name).join("gpt_disk.img")),
+                ),
+                is_gpt: true,
+                ovmf_vars: root.join(instance_name).join("OVMF_VARS.fd"),
+                vbmeta_key_file: Some(tempdir.join("atx_psk.pem")),
+                vbmeta_key_metadata_file: Some(tempdir.join("avb_atx_metadata.bin")),
+                ..Default::default()
+            }
+        } else {
+            GuestConfig {
+                kernel_image: Some(root.join(instance_name).join("kernel")),
+                zbi_image: Some(root.join(instance_name).join("zbi")),
+                disk_image: Some(
+                    disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
+                ),
+                ovmf_vars: root.join("OVMF_VARS.fd"),
+                vbmeta_key_file: Some(tempdir.join("atx_psk.pem")),
+                vbmeta_key_metadata_file: Some(tempdir.join("avb_atx_metadata.bin")),
+                ..Default::default()
+            }
         };
         assert_eq!(actual, expected);
 
@@ -1238,41 +1466,61 @@ mod tests {
         assert!(updated.is_ok(), "expected OK got {:?}", updated.unwrap_err());
 
         let actual = updated.expect("cannot get updated guest config, reuse");
-        let expected = GuestConfig {
-            kernel_image: Some(root.join(instance_name).join("kernel")),
-            zbi_image: Some(root.join(instance_name).join("zbi")),
-            disk_image: Some(
-                disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
-            ),
-            ..Default::default()
+        let expected = if disk_image_format == DiskImageFormat::Gpt {
+            GuestConfig {
+                disk_image: Some(
+                    disk_image_format.as_disk_image(root.join(instance_name).join("gpt_disk.img")),
+                ),
+                is_gpt: true,
+                ovmf_vars: root.join(instance_name).join("OVMF_VARS.fd"),
+                vbmeta_key_file: Some(tempdir.join("atx_psk.pem")),
+                vbmeta_key_metadata_file: Some(tempdir.join("avb_atx_metadata.bin")),
+                ..Default::default()
+            }
+        } else {
+            GuestConfig {
+                kernel_image: Some(root.join(instance_name).join("kernel")),
+                zbi_image: Some(root.join(instance_name).join("zbi")),
+                disk_image: Some(
+                    disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
+                ),
+                ovmf_vars: root.join("OVMF_VARS.fd"),
+                vbmeta_key_file: Some(tempdir.join("atx_psk.pem")),
+                vbmeta_key_metadata_file: Some(tempdir.join("avb_atx_metadata.bin")),
+                ..Default::default()
+            }
         };
         assert_eq!(actual, expected);
 
-        eprintln!(
-            "Reading contents from {}",
-            actual.kernel_image.clone().expect("kernel file path").display()
-        );
-        let mut kernel = File::open(&actual.kernel_image.expect("kernel file path"))
-            .expect("cannot open reused kernel file for read");
-        let mut fvm =
-            File::open(&*actual.disk_image.unwrap()).expect("cannot open reused fvm file for read");
+        // The following parts are not applicable for GPT images as those are constructed via
+        // make-fuchsia-vol and do not start the emulator with a kernel argument.
+        if disk_image_format != DiskImageFormat::Gpt {
+            eprintln!(
+                "Reading contents from {}",
+                actual.kernel_image.clone().expect("kernel file path").display()
+            );
+            let mut kernel = File::open(&actual.kernel_image.expect("kernel file path"))
+                .expect("cannot open reused kernel file for read");
+            let mut fvm = File::open(&*actual.disk_image.unwrap())
+                .expect("cannot open reused fvm file for read");
 
-        let mut kernel_contents = String::new();
-        let mut fvm_contents = String::new();
+            let mut kernel_contents = String::new();
+            let mut fvm_contents = String::new();
 
-        kernel
-            .read_to_string(&mut kernel_contents)
-            .expect("cannot read contents of reused kernel file");
-        fvm.read_to_string(&mut fvm_contents).expect("cannot read contents of reused fvm file");
+            kernel
+                .read_to_string(&mut kernel_contents)
+                .expect("cannot read contents of reused kernel file");
+            fvm.read_to_string(&mut fvm_contents).expect("cannot read contents of reused fvm file");
 
-        assert_eq!(kernel_contents, ORIGINAL);
+            assert_eq!(kernel_contents, ORIGINAL);
 
-        // Fxfs will have ORIGINAL padded with nulls for be 32 bytes.
-        //(set in emu_config at the top of this method).
-        match disk_image_format {
-            DiskImageFormat::Fvm => assert_eq!(fvm_contents, ORIGINAL),
-            DiskImageFormat::Fxfs => assert_eq!(fvm_contents, ORIGINAL_PADDED),
-        };
+            // Fxfs will have ORIGINAL padded with nulls for be 32 bytes.
+            //(set in emu_config at the top of this method).
+            match disk_image_format {
+                DiskImageFormat::Fvm | DiskImageFormat::Gpt => assert_eq!(fvm_contents, ORIGINAL),
+                DiskImageFormat::Fxfs => assert_eq!(fvm_contents, ORIGINAL_PADDED),
+            };
+        }
 
         Ok(())
     }
@@ -1285,6 +1533,11 @@ mod tests {
     #[fuchsia::test]
     async fn test_staging_with_reuse_fxfs() -> Result<()> {
         test_staging_with_reuse_common(DiskImageFormat::Fxfs).await
+    }
+
+    #[fuchsia::test]
+    async fn test_staging_with_reuse_gpt() -> Result<()> {
+        test_staging_with_reuse_common(DiskImageFormat::Gpt).await
     }
 
     // There's no equivalent test for FVM for now -- extending FVM images is more complex and
@@ -1326,6 +1579,7 @@ mod tests {
             kernel_image: Some(root.join(instance_name).join("kernel")),
             zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(DiskImage::Fxfs(root.join(instance_name).join("disk"))),
+            ovmf_vars: root.join("OVMF_VARS.fd"),
             ..Default::default()
         };
         assert_eq!(config, expected);
@@ -1356,16 +1610,35 @@ mod tests {
         let src = emu_config.guest.zbi_image.expect("zbi image path");
         let dest = root.join("dest.zbi");
 
-        <TestEngine as QemuBasedEngine>::embed_boot_data(&src, &dest).await?;
+        <TestEngine as QemuBasedEngine>::embed_boot_data(&src, &dest, None).await?;
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_embed_boot_data_with_kernel_cmdline() -> Result<()> {
+        let env = ffx_config::test_init().await?;
+        make_fake_sdk(&env).await;
+        let temp = tempdir().expect("cannot get tempdir");
+        let mut emu_config = EmulatorConfiguration::default();
+
+        let root = setup(&env.context, &mut emu_config.guest, &temp, DiskImageFormat::Fvm).await?;
+
+        let src = emu_config.guest.zbi_image.expect("zbi image path");
+        let dest = root.join("dest.zbi");
+
+        <TestEngine as QemuBasedEngine>::embed_boot_data(
+            &src,
+            &dest,
+            Some("kernel.boot=yes".into()),
+        )
+        .await?;
 
         Ok(())
     }
 
     #[fuchsia::test]
     async fn test_generate_vbmeta() -> Result<()> {
-        let test_key = include_str!("../../test_data/testkey_atx_psk.pem");
-        let test_key_metadata = include_bytes!("../../test_data/atx_metadata.bin");
-
         let env = ffx_config::test_init().await?;
         make_fake_sdk(&env).await;
         let temp = tempdir().expect("cannot get tempdir");
@@ -1376,8 +1649,8 @@ mod tests {
         let tempdir = temp.into_path();
         let key_path = tempdir.join("atx_psk.pem");
         let metadata_path = tempdir.join("avb_atx_metadata.bin");
-        std::fs::write(&key_path, test_key).expect("write test key file");
-        std::fs::write(&metadata_path, test_key_metadata).expect("write test key metadata");
+        std::fs::write(&key_path, VBMETA_TEST_KEY).expect("write test key file");
+        std::fs::write(&metadata_path, VBMETA_TEST_KEY_METADATA).expect("write test key metadata");
 
         let zbi = emu_config.guest.zbi_image.expect("zbi image path");
         let dest = root.join("dest.zbi");

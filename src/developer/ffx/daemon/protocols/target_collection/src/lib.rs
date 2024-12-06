@@ -76,7 +76,7 @@ async fn target_is_fastboot_tcp(addr: SocketAddr) -> bool {
     let tclone = Target::new_with_fastboot_addrs(
         Option::<String>::None,
         Option::<String>::None,
-        vec![addr].iter().map(|x| From::from(*x)).collect(),
+        [addr].iter().map(|x| From::from(*x)).collect(),
         FastbootInterface::Tcp,
     );
 

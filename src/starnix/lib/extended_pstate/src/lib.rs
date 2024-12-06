@@ -11,11 +11,6 @@ pub use x86_64::XSAVE_AREA_SIZE as X64_XSAVE_AREA_SIZE;
 #[cfg(target_arch = "x86_64")]
 pub use x86_64::SUPPORTED_XSAVE_FEATURES as X64_SUPPORTED_XSAVE_FEATURES;
 
-#[cfg(not(target_arch = "x86_64"))]
-// Rustdoc struggles in our build with conditional dependencies. Allow this to be unconditionally
-// specified in BUILD.gn without triggering unused dep warnings on other architectures.
-use once_cell as _;
-
 #[cfg(target_arch = "aarch64")]
 mod aarch64;
 

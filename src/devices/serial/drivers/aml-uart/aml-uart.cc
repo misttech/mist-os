@@ -4,18 +4,11 @@
 
 #include "src/devices/serial/drivers/aml-uart/aml-uart.h"
 
-#ifdef DFV1
-#include <lib/ddk/debug.h>  // nogncheck
-#else
-#include <lib/driver/compat/cpp/logging.h>  // nogncheck
-#endif
-
+#include <lib/driver/compat/cpp/logging.h>
 #include <lib/zx/clock.h>
 #include <threads.h>
 #include <zircon/syscalls-next.h>
 #include <zircon/threads.h>
-
-#include <fbl/auto_lock.h>
 
 #include "src/devices/serial/drivers/aml-uart/registers.h"
 
@@ -51,26 +44,15 @@ fit::closure DriverTransportWriteOperation::MakeCallback(zx_status_t status) {
 
 AmlUart::AmlUart(fdf::PDev pdev,
                  const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
-                 fdf::MmioBuffer mmio, fdf::UnownedSynchronizedDispatcher irq_dispatcher,
-                 std::optional<fdf::UnownedSynchronizedDispatcher> timer_dispatcher,
-                 bool power_control_enabled,
-                 std::optional<fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>> sag)
+                 fdf::MmioBuffer mmio, bool power_control_enabled,
+                 fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag)
     : pdev_(std::move(pdev)),
       serial_port_info_(serial_port_info),
       mmio_(std::move(mmio)),
-      irq_dispatcher_(std::move(irq_dispatcher)),
       power_control_enabled_(power_control_enabled) {
-  if (timer_dispatcher != std::nullopt) {
-    timer_dispatcher_ = std::move(*timer_dispatcher);
-    // Use ZX_TIMER_SLACK_LATE so that the timer will never fire earlier than the deadline.
-    zx::timer::create(ZX_TIMER_SLACK_LATE, ZX_CLOCK_MONOTONIC, &lease_timer_);
-    timer_waiter_.set_object(lease_timer_.get());
-    timer_waiter_.set_trigger(ZX_TIMER_SIGNALED);
-  }
-
-  if (sag != std::nullopt) {
-    sag_.Bind(std::move(*sag));
-    this->sag_available_ = true;
+  if (sag.is_valid()) {
+    wake_lease_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(), "aml-uart-wake",
+                        std::move(sag));
   }
 }
 
@@ -159,8 +141,6 @@ zx_status_t AmlUart::Config(uint32_t baud_rate, uint32_t flags) {
                   .set_use_xtal_clk(1)
                   .set_use_new_baud_rate(1);
 
-  fbl::AutoLock al(&enable_lock_);
-
   if ((flags & fhsi::kSerialSetBaudRateOnly) == 0) {
     // Invert our RTS if we are we are not enabled and configured for flow control.
     if (!enabled_ && (ctrl.two_wire() == 0)) {
@@ -174,7 +154,7 @@ zx_status_t AmlUart::Config(uint32_t baud_rate, uint32_t flags) {
   return ZX_OK;
 }
 
-void AmlUart::EnableLocked(bool enable) {
+void AmlUart::EnableInner(bool enable) {
   auto ctrl = Control::Get().ReadFrom(&mmio_);
 
   if (enable) {
@@ -212,34 +192,20 @@ void AmlUart::EnableLocked(bool enable) {
 }
 
 void AmlUart::HandleTXRaceForTest() {
-  {
-    fbl::AutoLock al(&enable_lock_);
-    EnableLocked(true);
-  }
+  EnableInner(true);
   Writable();
   HandleTX();
   HandleTX();
 }
 
 void AmlUart::HandleRXRaceForTest() {
-  {
-    fbl::AutoLock al(&enable_lock_);
-    EnableLocked(true);
-  }
+  EnableInner(true);
   Readable();
   HandleRX();
   HandleRX();
 }
 
-void AmlUart::InjectTimerForTest(zx_handle_t handle) {
-  lease_timer_.reset(handle);
-  timer_waiter_.set_object(lease_timer_.get());
-  timer_waiter_.set_trigger(ZX_TIMER_SIGNALED);
-}
-
 zx_status_t AmlUart::Enable(bool enable) {
-  fbl::AutoLock al(&enable_lock_);
-
   if (enable && !enabled_) {
     if (power_control_enabled_) {
       zx::result irq = pdev_.GetInterrupt(0, ZX_INTERRUPT_WAKE_VECTOR);
@@ -257,13 +223,13 @@ zx_status_t AmlUart::Enable(bool enable) {
       irq_ = std::move(irq.value());
     }
 
-    EnableLocked(true);
+    EnableInner(true);
 
     irq_handler_.set_object(irq_.get());
-    irq_handler_.Begin(irq_dispatcher_->async_dispatcher());
+    irq_handler_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
   } else if (!enable && enabled_) {
     irq_handler_.Cancel();
-    EnableLocked(false);
+    EnableInner(false);
   }
 
   enabled_ = enable;
@@ -273,18 +239,14 @@ zx_status_t AmlUart::Enable(bool enable) {
 
 void AmlUart::CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) {
   {
-    fbl::AutoLock read_lock(&read_lock_);
     if (read_operation_) {
-      auto cb = MakeReadCallbackLocked(ZX_ERR_CANCELED, nullptr, 0);
-      read_lock.release();
+      auto cb = MakeReadCallback(ZX_ERR_CANCELED, nullptr, 0);
       cb();
     }
   }
   {
-    fbl::AutoLock write_lock(&write_lock_);
     if (write_operation_) {
-      auto cb = MakeWriteCallbackLocked(ZX_ERR_CANCELED);
-      write_lock.release();
+      auto cb = MakeWriteCallback(ZX_ERR_CANCELED);
       cb();
     }
   }
@@ -295,7 +257,6 @@ void AmlUart::CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) 
 // Handles receiviung data into the buffer and calling the read callback when complete.
 // Does nothing if read_pending_ is false.
 void AmlUart::HandleRX() {
-  fbl::AutoLock lock(&read_lock_);
   if (!read_operation_) {
     return;
   }
@@ -313,15 +274,13 @@ void AmlUart::HandleRX() {
     return;
   }
   // Some bytes were read.  The client must queue another read to get any data.
-  auto cb = MakeReadCallbackLocked(ZX_OK, buf, read);
-  lock.release();
+  auto cb = MakeReadCallback(ZX_OK, buf, read);
   cb();
 }
 
 // Handles transmitting the data in write_buffer_ until it is completely written.
 // Does nothing if write_pending_ is not true.
 void AmlUart::HandleTX() {
-  fbl::AutoLock lock(&write_lock_);
   if (!write_operation_) {
     return;
   }
@@ -337,30 +296,29 @@ void AmlUart::HandleTX() {
   write_buffer_ += written;
   if (!write_size_) {
     // The write has completed, notify the client.
-    auto cb = MakeWriteCallbackLocked(ZX_OK);
-    lock.release();
+    auto cb = MakeWriteCallback(ZX_OK);
     cb();
   }
 }
 
-fit::closure AmlUart::MakeReadCallbackLocked(zx_status_t status, void* buf, size_t len) {
+fit::closure AmlUart::MakeReadCallback(zx_status_t status, void* buf, size_t len) {
   if (read_operation_) {
     auto callback = read_operation_->MakeCallback(status, buf, len);
     read_operation_.reset();
     return callback;
   }
 
-  ZX_PANIC("AmlUart::MakeReadCallbackLocked invalid state. No active Read operation.");
+  ZX_PANIC("AmlUart::MakeReadCallback invalid state. No active Read operation.");
 }
 
-fit::closure AmlUart::MakeWriteCallbackLocked(zx_status_t status) {
+fit::closure AmlUart::MakeWriteCallback(zx_status_t status) {
   if (write_operation_) {
     auto callback = write_operation_->MakeCallback(status);
     write_operation_.reset();
     return callback;
   }
 
-  ZX_PANIC("AmlUart::MakeWriteCallbackLocked invalid state. No active Write operation.");
+  ZX_PANIC("AmlUart::MakeWriteCallback invalid state. No active Write operation.");
 }
 
 void AmlUart::Config(ConfigRequestView request, fdf::Arena& arena,
@@ -384,28 +342,22 @@ void AmlUart::Enable(EnableRequestView request, fdf::Arena& arena,
 }
 
 void AmlUart::Read(fdf::Arena& arena, ReadCompleter::Sync& completer) {
-  fbl::AutoLock lock(&read_lock_);
   if (read_operation_) {
-    lock.release();
     completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
   read_operation_.emplace(std::move(arena), completer.ToAsync());
-  lock.release();
   HandleRX();
 }
 
 void AmlUart::Write(WriteRequestView request, fdf::Arena& arena, WriteCompleter::Sync& completer) {
-  fbl::AutoLock lock(&write_lock_);
   if (write_operation_) {
-    lock.release();
     completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
   write_buffer_ = request->data.data();
   write_size_ = request->data.count();
   write_operation_.emplace(std::move(arena), completer.ToAsync());
-  lock.release();
   HandleTX();
 }
 
@@ -420,31 +372,9 @@ void AmlUart::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_
   if (status != ZX_OK) {
     return;
   }
-  // If sag is not available, it means that power management is not enabled for this driver,
-  // the driver will not take a wake lease and set timer in this case.
-  if (this->sag_available_) {
-    fbl::AutoLock lock(&timer_lock_);
-
-    if (sag_.is_valid() && !token_) {
-      // Take a wake lease.
-      fidl::Request<::fuchsia_power_system::ActivityGovernor::TakeWakeLease> request;
-      request.name("uart");
-      auto activity_governor_result = sag_->TakeWakeLease(request);
-      if (activity_governor_result.is_error()) {
-        zxlogf(ERROR, "Failed to take wake lease: %s",
-               activity_governor_result.error_value().FormatDescription().c_str());
-        return;
-      }
-      token_ = std::move(activity_governor_result.value().token());
-    }
-
-    timeout_ = zx::deadline_after(zx::msec(kPowerLeaseTimeoutMs));
-    // Must set the new timeout before the wait on dispatcher begins, otherwise if there was a
-    // previous timer that has been fired, the new wait on dispatcher will capture the asserted
-    // signal again. Also we don't need to worry about missing the timeout signal from the new timer
-    // set, because the timeout signal will persist after timer fires.
-    lease_timer_.set(timeout_, zx::duration());
-    timer_waiter_.Begin(timer_dispatcher_->async_dispatcher());
+  if (wake_lease_.has_value()) {
+    constexpr zx::duration kPowerLeaseTimeout = zx::msec(300);
+    wake_lease_->AcquireWakeLease(kPowerLeaseTimeout);
   }
 
   auto uart_status = Status::Get().ReadFrom(&mmio_);
@@ -456,31 +386,6 @@ void AmlUart::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_
   }
 
   irq_.ack();
-}
-
-void AmlUart::HandleLeaseTimer(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                               zx_status_t status, const zx_packet_signal_t* signal) {
-  fbl::AutoLock lock(&timer_lock_);
-  if (status == ZX_ERR_CANCELED) {
-    // Do nothing if the handler is triggered by the destroy of the dispatcher.
-    return;
-  }
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Timer fired with an error: %s", zx_status_get_string(status));
-    return;
-  }
-
-  if (zx::clock::get_monotonic() < timeout_) {
-    // If the current time is earlier than timeout, it means that this handler is triggered after
-    // |HandleIrq| holds the lock, and when this handler get the lock, the timer has been reset, so
-    // don't drop the lease in this case.
-    zxlogf(INFO,
-           "Timer has been reset by a new interrupt, this handler is out-of-date, so do nothing.");
-    return;
-  }
-
-  // Release the wake lease.
-  token_.reset();
 }
 
 }  // namespace serial

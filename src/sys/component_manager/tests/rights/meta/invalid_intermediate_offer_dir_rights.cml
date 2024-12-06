@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 // Intermediate offer that attempts to increase its permissions on the read only directory.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
             name: "use_dir_rights",
@@ -43,11 +46,6 @@
             from: "parent",
             to: "#use_dir_rights",
             rights: [ "r*" ],
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#use_dir_rights",
         },
     ],
     expose: [

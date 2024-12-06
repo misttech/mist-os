@@ -8,8 +8,8 @@ use crate::repo_client::RepoClient;
 use crate::repository::{Error as RepoError, RepoProvider};
 use anyhow::Result;
 use async_lock::RwLock as AsyncRwLock;
-use async_net::{TcpListener, TcpStream};
 use chrono::Utc;
+use derivative::Derivative;
 use fuchsia_async as fasync;
 use fuchsia_url::RepositoryUrl;
 use futures::future::Shared;
@@ -21,6 +21,7 @@ use hyper::body::Body;
 use hyper::header::RANGE;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
+use netext::{TcpListenerStream, TokioAsyncReadExt, TokioAsyncWrapper};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -30,6 +31,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex, RwLock as SyncRwLock, Weak};
 use std::task::{Context, Poll};
 use std::time::Duration;
+use tokio::net::{TcpListener, TcpStream};
 use tracing::{error, info, warn};
 
 // FIXME: This value was chosen basically at random.
@@ -239,7 +241,9 @@ async fn run_server(
 
     // Merge the listener connections with the tunnel connections.
     let mut incoming = futures::stream::select(
-        listener.incoming().map_ok(ConnectionStream::Tcp).map_err(Into::into),
+        TcpListenerStream(listener)
+            .map_ok(|value| ConnectionStream::Tcp(TcpStreamWithPeerAddr::from(value)))
+            .map_err(Into::into),
         tunnel_conns,
     )
     .fuse();
@@ -295,7 +299,7 @@ async fn handle_connection(
 ) {
     let service_server_stopped = server_stopped.clone();
     let peer_addr = if let ConnectionStream::Tcp(tcp_stream) = &conn {
-        if let Ok(addr) = tcp_stream.peer_addr() {
+        if let Ok(addr) = tcp_stream.peer_addr {
             addr.to_string()
         } else {
             String::from("unknown")
@@ -772,11 +776,24 @@ async fn read_timestamp_version(
 fn status_response(status_code: StatusCode) -> Response<Body> {
     Response::builder().status(status_code).body(Body::empty()).unwrap()
 }
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct TcpStreamWithPeerAddr {
+    #[derivative(Debug = "ignore")]
+    stream: TokioAsyncWrapper<TcpStream>,
+    peer_addr: std::io::Result<SocketAddr>,
+}
+
+impl From<TcpStream> for TcpStreamWithPeerAddr {
+    fn from(value: TcpStream) -> Self {
+        Self { peer_addr: value.peer_addr(), stream: value.into_futures_stream() }
+    }
+}
 
 /// Adapt [async_net::TcpStream] to work with hyper.
 #[derive(Debug)]
 pub enum ConnectionStream {
-    Tcp(TcpStream),
+    Tcp(TcpStreamWithPeerAddr),
     Socket(fasync::Socket, rcs::port_forward::SocketKeepAliveToken),
 }
 
@@ -787,7 +804,9 @@ impl tokio::io::AsyncRead for ConnectionStream {
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         match &mut *self {
-            ConnectionStream::Tcp(t) => Pin::new(t).poll_read(cx, buf.initialize_unfilled()),
+            ConnectionStream::Tcp(t) => {
+                Pin::new(&mut t.stream).poll_read(cx, buf.initialize_unfilled())
+            }
             ConnectionStream::Socket(t, _) => {
                 futures::AsyncRead::poll_read(Pin::new(t), cx, buf.initialize_unfilled())
             }
@@ -805,21 +824,21 @@ impl tokio::io::AsyncWrite for ConnectionStream {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         match &mut *self {
-            ConnectionStream::Tcp(t) => Pin::new(t).poll_write(cx, buf),
+            ConnectionStream::Tcp(t) => Pin::new(&mut t.stream).poll_write(cx, buf),
             ConnectionStream::Socket(t, _) => futures::AsyncWrite::poll_write(Pin::new(t), cx, buf),
         }
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut *self {
-            ConnectionStream::Tcp(t) => Pin::new(t).poll_flush(cx),
+            ConnectionStream::Tcp(t) => Pin::new(&mut t.stream).poll_flush(cx),
             ConnectionStream::Socket(t, _) => futures::AsyncWrite::poll_flush(Pin::new(t), cx),
         }
     }
 
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut *self {
-            ConnectionStream::Tcp(t) => Pin::new(t).poll_close(cx),
+            ConnectionStream::Tcp(t) => Pin::new(&mut t.stream).poll_close(cx),
             ConnectionStream::Socket(t, _) => Pin::new(t).poll_close(cx),
         }
     }

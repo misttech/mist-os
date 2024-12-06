@@ -81,6 +81,7 @@ impl UpdateDispatcherInner {
     }
 
     fn connect_or_create_new_controller(&mut self, id: fnet_filter_ext::ControllerId) {
+        #[allow(clippy::map_entry)]
         if !self.resources.contains_key(&id) {
             assert_matches!(self.resources.insert(id, Controller::default()), None);
         }

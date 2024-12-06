@@ -1,0 +1,31 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_assembly_developer_overrides.bzl",
+    "fuchsia_assembly_developer_overrides_list",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+# Toolchain type for the Fuchsia toolchain.
+toolchain_type(
+    name = "toolchain",
+)
+
+# Toolchain type for the Fuchsia devicetree toolchain.
+toolchain_type(
+    name = "devicetree_toolchain_type",
+)
+
+# Set --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=<label>
+# to point to a fuchsia_assembly_developer_overrides_list() target.
+label_flag(
+    name = "assembly_developer_overrides_list",
+    build_setting_default = ":empty_assembly_developer_overrides_list",
+)
+
+fuchsia_assembly_developer_overrides_list(
+    name = "empty_assembly_developer_overrides_list",
+)

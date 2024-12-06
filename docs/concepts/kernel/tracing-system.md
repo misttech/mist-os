@@ -112,9 +112,7 @@ The trace manager implements the following FIDL protocols:
 A first in, first out (FIFO) method notifies the trace manager of the start
 and shutdown of a trace provider. The FIFO handle is passed from the trace
 manager to each trace provider as part of the initial start tracing
-request. For more information on the FIFO packets that the Fuchsia
-tracing system uses, see
-[FIFO packets](/docs/reference/tracing/FIFO-packets.md).
+request.
 
 ## Cross-process communication {#cross-process-communication}
 

@@ -7,6 +7,8 @@
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/dma-buffer/buffer.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/sync/completion.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/device.h>
@@ -18,7 +20,6 @@
 #include <atomic>
 #include <memory>
 
-#include <ddktl/device.h>
 #include <virtio/block.h>
 
 #include "src/lib/listnode/listnode.h"
@@ -37,35 +38,34 @@ struct block_txn_t {
 };
 
 class Ring;
-class BlockDevice;
-using DeviceType = ddk::Device<BlockDevice, ddk::GetProtocolable, ddk::Unbindable>;
-class BlockDevice : public Device,
-                    // Mixins for protocol device:
-                    public DeviceType,
-                    // Mixin for Block banjo protocol:
-                    public ddk::BlockImplProtocol<BlockDevice, ddk::base_protocol> {
+class BlockDriver;
+class BlockDevice : public virtio::Device {
  public:
-  BlockDevice(zx_device_t* device, zx::bti bti, std::unique_ptr<Backend> backend);
+  BlockDevice(zx::bti bti, std::unique_ptr<Backend> backend, fdf::Logger& logger);
 
-  virtual zx_status_t Init() override;
+  // virtio::Device overrides
+  zx_status_t Init() override;
+  void Release() override;
 
-  // DDKTL device hooks:
-  void DdkRelease();
-  void DdkUnbind(ddk::UnbindTxn txn);
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
-
-  virtual void IrqRingUpdate() override;
-  virtual void IrqConfigChange() override;
+  void IrqRingUpdate() override;
+  void IrqConfigChange() override;
 
   uint32_t GetBlockSize() const { return config_.blk_size; }
   uint64_t GetBlockCount() const { return config_.capacity; }
   const char* tag() const override { return "virtio-blk"; }
 
-  // DDKTL Block protocol banjo functions:
-  void BlockImplQuery(block_info_t* bi, size_t* bopsz);
+  // ddk::BlockImplProtocol functions invoked by BlockDriver.
+  void BlockImplQuery(block_info_t* info, size_t* bopsz);
   void BlockImplQueue(block_op_t* bop, block_impl_queue_callback completion_cb, void* cookie);
 
  private:
+  static constexpr uint16_t kRingSize = 128;  // 128 matches legacy pci.
+
+  // A queue of block request/responses.
+  static constexpr size_t kBlkReqCount = 32;
+
+  static constexpr zx::duration kWatchdogInterval = zx::sec(10);
+
   void SignalWorker(block_txn_t* txn);
   void WorkerThread();
   void WatchdogThread();
@@ -77,6 +77,8 @@ class BlockDevice : public Device,
 
   void txn_complete(block_txn_t* txn, zx_status_t status);
 
+  fdf::Logger& logger() { return logger_; }
+
   // The main virtio ring.
   Ring vring_{this};
 
@@ -85,13 +87,8 @@ class BlockDevice : public Device,
   // it.
   std::mutex ring_lock_;
 
-  static const uint16_t ring_size = 128;  // 128 matches legacy pci.
-
   // Saved block device configuration out of the pci config BAR.
   virtio_blk_config_t config_ = {};
-
-  // A queue of block request/responses.
-  static const size_t blk_req_count = 32;
 
   std::unique_ptr<dma_buffer::ContiguousBuffer> blk_req_buf_;
   virtio_blk_req_t* blk_req_ = nullptr;
@@ -100,21 +97,21 @@ class BlockDevice : public Device,
   uint8_t* blk_res_ = nullptr;
 
   uint32_t blk_req_bitmap_ = 0;
-  static_assert(blk_req_count <= sizeof(blk_req_bitmap_) * CHAR_BIT, "");
+  static_assert(kBlkReqCount <= sizeof(blk_req_bitmap_) * CHAR_BIT, "");
 
   // When a transaction is enqueued, its start time (in the monotonic clock) is recorded, and the
   // timestamp is cleared when the transaction completes.  A watchdog task will fire after a
   // configured interval, and all timestamps will be checked against a deadline; if any exceed the
   // deadline an error is logged.
   std::mutex watchdog_lock_;
-  zx::time blk_req_start_timestamps_[blk_req_count] __TA_GUARDED(watchdog_lock_);
+  zx::time blk_req_start_timestamps_[kBlkReqCount] __TA_GUARDED(watchdog_lock_);
 
   size_t alloc_blk_req() {
     size_t i = 0;
     if (blk_req_bitmap_ != 0) {
       i = sizeof(blk_req_bitmap_) * CHAR_BIT - __builtin_clz(blk_req_bitmap_);
     }
-    if (i < blk_req_count) {
+    if (i < kBlkReqCount) {
       blk_req_bitmap_ |= (1 << i);
     }
     return i;
@@ -134,11 +131,41 @@ class BlockDevice : public Device,
   std::atomic_bool worker_shutdown_ = false;
 
   thrd_t watchdog_thread_;
-  static constexpr zx::duration kWatchdogInterval = zx::sec(10);
   sync_completion_t watchdog_signal_;
   std::atomic_bool watchdog_shutdown_ = false;
 
   bool supports_discard_ = false;
+
+  fdf::Logger& logger_;
+};
+
+class BlockDriver : public fdf::DriverBase, public ddk::BlockImplProtocol<BlockDriver> {
+ public:
+  static constexpr char kDriverName[] = "virtio-block";
+
+  BlockDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
+
+  zx::result<> Start() override;
+
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
+
+  // ddk::BlockImplProtocol functions passed through to BlockDevice.
+  void BlockImplQuery(block_info_t* info, size_t* bopsz);
+  void BlockImplQueue(block_op_t* bop, block_impl_queue_callback completion_cb, void* cookie);
+
+ protected:
+  // Override to inject dependency for unit testing.
+  virtual zx::result<std::unique_ptr<BlockDevice>> CreateBlockDevice();
+
+ private:
+  std::unique_ptr<BlockDevice> block_device_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
+
+  compat::BanjoServer block_impl_server_{ZX_PROTOCOL_BLOCK_IMPL, this, &block_impl_protocol_ops_};
+  compat::SyncInitializedDeviceServer compat_server_;
 };
 
 }  // namespace virtio

@@ -528,7 +528,7 @@ pub fn selector_to_string(
         .join("/");
 
     if let Some(target_property) = maybe_property_selector {
-        tree_selector_str.push_str(":");
+        tree_selector_str.push(':');
         tree_selector_str.push_str(&match target_property {
             StringSelector::StringPattern(p) => {
                 needs_to_be_quoted = true;
@@ -549,7 +549,7 @@ pub fn selector_to_string(
         Some(names) => match names {
             TreeNames::Some(names) => {
                 let list = names
-                    .into_iter()
+                    .iter()
                     .filter_map(|name| {
                         if name == DEFAULT_TREE_NAME {
                             return None;

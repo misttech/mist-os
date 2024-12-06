@@ -1025,10 +1025,10 @@ mod handle_mlme_request_tests {
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let driver_frame = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SaeFrameTx { frame })) => frame);
-        assert_eq!(driver_frame.peer_sta_address, [1u8; 6]);
-        assert_eq!(driver_frame.status_code, fidl_ieee80211::StatusCode::Success);
-        assert_eq!(driver_frame.seq_num, 2);
-        assert_eq!(driver_frame.sae_fields, vec![3u8; 4]);
+        assert_eq!(driver_frame.peer_sta_address.unwrap(), [1u8; 6]);
+        assert_eq!(driver_frame.status_code.unwrap(), fidl_ieee80211::StatusCode::Success);
+        assert_eq!(driver_frame.seq_num.unwrap(), 2);
+        assert_eq!(driver_frame.sae_fields.unwrap(), vec![3u8; 4]);
     }
 
     #[test]
@@ -1486,18 +1486,21 @@ mod handle_driver_event_tests {
         );
     }
 
-    #[test_case(fidl_fullmac::WlanStartResult::Success, true, fidl_mlme::StartResultCode::Success; "success start result")]
-    #[test_case(fidl_fullmac::WlanStartResult::BssAlreadyStartedOrJoined, false, fidl_mlme::StartResultCode::BssAlreadyStartedOrJoined; "other start result")]
+    #[test_case(fidl_fullmac::StartResult::Success, true, fidl_mlme::StartResultCode::Success; "success start result")]
+    #[test_case(fidl_fullmac::StartResult::BssAlreadyStartedOrJoined, false, fidl_mlme::StartResultCode::BssAlreadyStartedOrJoined; "other start result")]
     #[fuchsia::test(add_test_attr = false)]
     fn test_start_conf(
-        start_result: fidl_fullmac::WlanStartResult,
+        start_result: fidl_fullmac::StartResult,
         expected_link_state_changed: bool,
         expected_fidl_result_code: fidl_mlme::StartResultCode,
     ) {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let start_conf = fidl_fullmac::WlanFullmacStartConfirm { result_code: start_result };
+        let start_conf = fidl_fullmac::WlanFullmacImplIfcStartConfRequest {
+            result_code: Some(start_result),
+            ..Default::default()
+        };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.start_conf(&start_conf)),
             Poll::Ready(Ok(()))
@@ -1525,8 +1528,9 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let stop_conf = fidl_fullmac::WlanFullmacStopConfirm {
-            result_code: fidl_fullmac::WlanStopResult::Success,
+        let stop_conf = fidl_fullmac::WlanFullmacImplIfcStopConfRequest {
+            result_code: Some(fidl_fullmac::StopResult::Success),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.stop_conf(&stop_conf)),
@@ -1547,9 +1551,10 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let eapol_conf = fidl_fullmac::WlanFullmacEapolConfirm {
-            result_code: fidl_fullmac::WlanEapolResult::Success,
-            dst_addr: [1u8; 6],
+        let eapol_conf = fidl_fullmac::WlanFullmacImplIfcEapolConfRequest {
+            result_code: Some(fidl_fullmac::EapolTxResult::Success),
+            dst_addr: Some([1u8; 6]),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.eapol_conf(&eapol_conf)),
@@ -1780,10 +1785,11 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let eapol_ind = fidl_fullmac::WlanFullmacEapolIndication {
-            src_addr: [1u8; 6],
-            dst_addr: [2u8; 6],
-            data: vec![3u8; 4],
+        let eapol_ind = fidl_fullmac::WlanFullmacImplIfcEapolIndRequest {
+            src_addr: Some([1u8; 6]),
+            dst_addr: Some([2u8; 6]),
+            data: Some(vec![3u8; 4]),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.eapol_ind(&eapol_ind)),
@@ -1808,7 +1814,11 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let pmk_info = fidl_fullmac::WlanFullmacPmkInfo { pmk: vec![1u8; 2], pmkid: vec![3u8; 4] };
+        let pmk_info = fidl_fullmac::WlanFullmacImplIfcOnPmkAvailableRequest {
+            pmk: Some(vec![1u8; 2]),
+            pmkid: Some(vec![3u8; 4]),
+            ..Default::default()
+        };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.on_pmk_available(&pmk_info)),
             Poll::Ready(Ok(()))
@@ -1844,11 +1854,12 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let sae_frame = fidl_fullmac::WlanFullmacSaeFrame {
-            peer_sta_address: [1u8; 6],
-            status_code: fidl_ieee80211::StatusCode::Success,
-            seq_num: 2,
-            sae_fields: vec![3u8; 4],
+        let sae_frame = fidl_fullmac::SaeFrame {
+            peer_sta_address: Some([1u8; 6]),
+            status_code: Some(fidl_ieee80211::StatusCode::Success),
+            seq_num: Some(2),
+            sae_fields: Some(vec![3u8; 4]),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.sae_frame_rx(&sae_frame)),

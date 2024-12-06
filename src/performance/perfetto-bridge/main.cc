@@ -15,19 +15,13 @@
 #include <perfetto/ext/base/thread_task_runner.h>
 #include <perfetto/ext/tracing/ipc/service_ipc_host.h>
 #include <perfetto/tracing/platform.h>
-#include <src/lib/fxl/command_line.h>
-#include <src/lib/fxl/log_settings_command_line.h>
 
-#include "src/performance/perfetto-bridge/consumer_adapter.h"
-#include "src/performance/perfetto-bridge/producer_connector_impl.h"
+#include "consumer_adapter.h"
+#include "producer_connector_impl.h"
 
 int main(int argc, char** argv) {
   // Set up the FIDL task runner.
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  fxl::CommandLine cl = fxl::CommandLineFromArgcArgv(argc, argv);
-  if (!fxl::SetLogSettingsFromCommandLine(cl)) {
-    return EXIT_FAILURE;
-  }
   async_dispatcher_t* dispatcher = loop.dispatcher();
 
   // Set up the Perfetto environment and task runner.

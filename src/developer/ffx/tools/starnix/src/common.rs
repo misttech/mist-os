@@ -41,7 +41,7 @@ async fn find_session_container(rcs_proxy: &rc::RemoteControlProxy) -> Result<St
     if containers.len() > 1 {
         println!("Found multiple Starnix containers in the session:");
         for container in containers.iter() {
-            println!("  {}", container.moniker.to_string())
+            println!("  {}", container.moniker)
         }
         println!("Please specify a container with --moniker");
         bail!("too many containers")

@@ -1,0 +1,82 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+"""Definitions for a few targets required by @rules_fuchsia."""
+
+load("@rules_fuchsia//fuchsia/workspace:fuchsia_toolchain_info.bzl", "fuchsia_toolchain_info")
+
+filegroup(
+    name = "empty",
+    srcs = [],
+)
+
+filegroup(
+    name = "cmc_includes",
+    srcs = [],
+)
+
+fuchsia_toolchain_info(
+    name = "fuchsia_toolchain_info",
+    aemu_runfiles = ":empty",  # "//tools:aemu_internal_{{HOST_CPU}}",
+    bindc = ":empty",  # "//tools:{{HOST_CPU}}/bindc",
+    blobfs = ":empty",  # "//tools:{{HOST_CPU}}/blobfs_do_not_depend",
+    blobfs_manifest = ":empty",  # "//tools:{{HOST_CPU}}/blobfs_do_not_depend-meta.json",
+    bootserver = ":empty",  # "//tools:{{HOST_CPU}}/bootserver",
+    cmc = ":empty",  # "//tools:{{HOST_CPU}}/cmc",
+    cmc_includes = select({
+        "@platforms//os:fuchsia": "//:cmc_includes",
+        "//conditions:default": None,
+    }),
+    cmc_manifest = ":empty",  # "//tools:{{HOST_CPU}}/cmc-meta.json",
+    configc = ":empty",  # "//tools:{{HOST_CPU}}/configc",
+    default_target_api = "HEAD",  # str(DEFAULT_TARGET_API),
+    elf_test_runner_shard = "sys/testing/elf_test_runner.shard.cml",
+    exec_cpu = "x64",  # "{{HOST_CPU}}",
+    far = ":empty",  # "//tools:{{HOST_CPU}}/far",
+    ffx = ":empty",  # "//tools:{{HOST_CPU}}/ffx",
+    ffx_assembly = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-assembly",
+    ffx_assembly_fho_meta = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-assembly.json",
+    ffx_assembly_manifest = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-assembly-meta.json",
+    ffx_driver = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-driver",
+    ffx_driver_fho_meta = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-driver.json",
+    ffx_driver_manifest = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-driver-meta.json",
+    ffx_package = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-package",
+    ffx_package_fho_meta = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-package.json",
+    ffx_package_manifest = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-package-meta.json",
+    ffx_product = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-product",
+    ffx_product_fho_meta = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-product.json",
+    ffx_product_manifest = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-product-meta.json",
+    ffx_scrutiny = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-scrutiny",
+    ffx_scrutiny_fho_meta = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-scrutiny.json",
+    ffx_scrutiny_manifest = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-scrutiny-meta.json",
+    ffx_test = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-test",
+    ffx_test_fho_meta = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-test.json",
+    ffx_test_manifest = ":empty",  # "//tools:{{HOST_CPU}}/ffx_tools/ffx-test-meta.json",
+    fidl_format = ":empty",  # "//tools:{{HOST_CPU}}/fidl-format",
+    fidlc = ":empty",  # "//tools:{{HOST_CPU}}/fidlc",
+    fidlgen_cpp = ":empty",  # "//tools:{{HOST_CPU}}/fidlgen_cpp",
+    fidlgen_hlcpp = ":empty",  # "//tools:{{HOST_CPU}}/fidlgen_hlcpp",
+    fssh = ":empty",  # "//tools:{{HOST_CPU}}/fssh",
+    funnel = ":empty",  # "//tools:{{HOST_CPU}}/funnel",
+    fvm = ":empty",  # "//tools:{{HOST_CPU}}/fvm",
+    fvm_manifest = ":empty",  # "//tools:{{HOST_CPU}}/fvm-meta.json",
+    gen_android_starnix_container = ":empty",  # "//tools:{{HOST_CPU}}/gen-android-starnix-container",
+    gtest_runner_shard = "sys/testing/gtest_runner.shard.cml",
+    merkleroot = ":empty",  # "//tools:{{HOST_CPU}}/merkleroot",
+    minfs = ":empty",  # "//tools:{{HOST_CPU}}/minfs",
+    minfs_manifest = ":empty",  # "//tools:{{HOST_CPU}}/minfs-meta.json",
+    sdk_id = "{{SDK_ID}}",
+    sdk_manifest = ":empty",  # "//:meta/manifest.json",
+    symbol_index_config = ":empty",  # "//data/config/symbol_index",
+    symbolizer = ":empty",  # "//tools:{{HOST_CPU}}/symbolizer",
+    symbolizer_manifest = ":empty",  # "//tools:{{HOST_CPU}}/symbolizer-meta.json",
+    zbi = ":empty",  # "//tools:{{HOST_CPU}}/zbi",
+    zbi_manifest = ":empty",  # "//tools:{{HOST_CPU}}/zbi-meta.json",
+)
+
+toolchain(
+    name = "fuchsia_toolchain_sdk",
+    toolchain = ":fuchsia_toolchain_info",
+    toolchain_type = "@rules_fuchsia//fuchsia:toolchain",
+)

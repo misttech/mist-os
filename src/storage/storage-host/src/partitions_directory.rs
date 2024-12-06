@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, Weak};
 use vfs::directory::helper::DirectlyMutable as _;
 
-/// A directory of instances of the fuchsia.storagehost.PartitionService service.
+/// A directory of instances of the fuchsia.storage.partitions.PartitionService service.
 pub struct PartitionsDirectory {
     node: Arc<vfs::directory::immutable::Simple>,
     entries: Mutex<BTreeMap<String, PartitionsDirectoryEntry>>,
@@ -43,7 +43,7 @@ impl PartitionsDirectory {
     }
 }
 
-/// A node which hosts an instance of fuchsia.storagehost.PartitionService.
+/// A node which hosts an instance of fuchsia.storage.partitions.PartitionService.
 pub struct PartitionsDirectoryEntry {
     node: Arc<vfs::directory::immutable::Simple>,
 }

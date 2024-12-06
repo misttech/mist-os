@@ -52,6 +52,7 @@ struct TestEntry {
     log_settings: Option<LogSettings>,
     build_rule: Option<String>,
     has_generated_manifest: Option<bool>,
+    create_no_exception_channel: Option<bool>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -238,6 +239,7 @@ fn to_test_list_entry(test_entry: &TestEntry, realm: Option<String>) -> TestList
             max_severity_logs: test_entry.get_max_log_severity(),
             min_severity_logs: test_entry.get_min_log_severity(),
             realm: realm,
+            create_no_exception_channel: test_entry.create_no_exception_channel.unwrap_or(false),
         })),
         None => None,
     };
@@ -320,6 +322,7 @@ fn write_depfile(
     if inputs.len() == 0 {
         return Ok(());
     }
+    #[allow(clippy::format_collect, reason = "mass allow for https://fxbug.dev/381896734")]
     let contents =
         format!("{}: {}\n", output, &inputs.iter().map(|i| format!(" {}", i)).collect::<String>(),);
     if let Some(depfile_dir) = depfile.parent() {
@@ -736,7 +739,7 @@ mod tests {
 
     #[test]
     fn test_to_test_list_entry() {
-        let make_test_entry = |log_settings| TestEntry {
+        let make_test_entry = |log_settings, create_no_exception_channel| TestEntry {
             name: "test-name".to_string(),
             label: "test-label".to_string(),
             cpu: "x64".to_string(),
@@ -750,6 +753,7 @@ mod tests {
                     .to_string(),
             ]),
             log_settings,
+            create_no_exception_channel,
             ..TestEntry::default()
         };
 
@@ -764,49 +768,60 @@ mod tests {
             ..TestEntry::default()
         };
 
-        let make_expected_test_list_entry = |max_severity_logs, min_severity_logs| TestListEntry {
-            name: "test-name".to_string(),
-            labels: vec!["test-label".to_string()],
-            tags: vec![],
-            execution: Some(ExecutionEntry::FuchsiaComponent(FuchsiaComponentExecutionEntry {
-                component_url:
-                    "fuchsia-pkg://fuchsia.com/echo-integration-test#meta/echo-client-test.cm"
-                        .to_string(),
-                test_args: vec![],
-                timeout_seconds: None,
-                test_filters: None,
-                also_run_disabled_tests: false,
-                parallel: None,
-                max_severity_logs,
-                min_severity_logs,
-                realm: None,
-            })),
-        };
+        let make_expected_test_list_entry =
+            |max_severity_logs, min_severity_logs, create_no_exception_channel| TestListEntry {
+                name: "test-name".to_string(),
+                labels: vec!["test-label".to_string()],
+                tags: vec![],
+                execution: Some(ExecutionEntry::FuchsiaComponent(FuchsiaComponentExecutionEntry {
+                    component_url:
+                        "fuchsia-pkg://fuchsia.com/echo-integration-test#meta/echo-client-test.cm"
+                            .to_string(),
+                    test_args: vec![],
+                    timeout_seconds: None,
+                    test_filters: None,
+                    also_run_disabled_tests: false,
+                    parallel: None,
+                    max_severity_logs,
+                    min_severity_logs,
+                    realm: None,
+                    create_no_exception_channel,
+                })),
+            };
 
         // Default severity.
-        let test_list_entry = to_test_list_entry(&make_test_entry(None), None);
-        assert_eq!(test_list_entry, make_expected_test_list_entry(None, None),);
+        let test_list_entry = to_test_list_entry(&make_test_entry(None, None), None);
+        assert_eq!(test_list_entry, make_expected_test_list_entry(None, None, false),);
 
         // Inner default severity.
         let test_list_entry = to_test_list_entry(
-            &make_test_entry(Some(LogSettings { max_severity: None, min_severity: None })),
+            &make_test_entry(Some(LogSettings { max_severity: None, min_severity: None }), None),
             None,
         );
-        assert_eq!(test_list_entry, make_expected_test_list_entry(None, None),);
+        assert_eq!(test_list_entry, make_expected_test_list_entry(None, None, false),);
 
         // Explicit severity
         let test_list_entry = to_test_list_entry(
-            &make_test_entry(Some(LogSettings {
-                max_severity: Some(Severity::Error),
-                min_severity: None,
-            })),
+            &make_test_entry(
+                Some(LogSettings { max_severity: Some(Severity::Error), min_severity: None }),
+                None,
+            ),
             None,
         );
-        assert_eq!(test_list_entry, make_expected_test_list_entry(Some(Severity::Error), None));
+        assert_eq!(
+            test_list_entry,
+            make_expected_test_list_entry(Some(Severity::Error), None, false)
+        );
+
+        // Explicit create_no_exception_channel.
+        let test_list_entry = to_test_list_entry(&make_test_entry(None, Some(true)), None);
+        assert_eq!(test_list_entry, make_expected_test_list_entry(None, None, true),);
+        let test_list_entry = to_test_list_entry(&make_test_entry(None, Some(false)), None);
+        assert_eq!(test_list_entry, make_expected_test_list_entry(None, None, false),);
 
         // pass in realm
         let test_list_entry =
-            to_test_list_entry(&make_test_entry(None), Some("/some/moniker".into()));
+            to_test_list_entry(&make_test_entry(None, None), Some("/some/moniker".into()));
         let expected_list = TestListEntry {
             name: "test-name".to_string(),
             labels: vec!["test-label".to_string()],
@@ -823,6 +838,7 @@ mod tests {
                 max_severity_logs: None,
                 min_severity_logs: None,
                 realm: Some("/some/moniker".into()),
+                create_no_exception_channel: false,
             })),
         };
         assert_eq!(test_list_entry, expected_list);

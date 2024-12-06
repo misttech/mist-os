@@ -5,14 +5,15 @@
 """A cc_library backed by a FIDL library."""
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
-load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 _CodegenInfo = provider("Carries generated information across FIDL bindings code generation ", fields = ["files"])
 
 # ALL CODE BELOW IS DEPRECATED - TODO: REMOVE IT when soft transition is over
 def _codegen_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     fidlgen = sdk.fidlgen_cpp if ctx.attr.binding_level == "llcpp" else sdk.fidlgen_hlcpp
 
     ir = ctx.attr.library[FuchsiaFidlLibraryInfo].ir
@@ -97,7 +98,7 @@ def _impl_wrapper_impl(ctx):
 # the cc_library as two separate rules.
 _codegen = rule(
     implementation = _codegen_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     # Files must be generated in genfiles in order for the header to be included
     # anywhere.
     output_to_genfiles = True,

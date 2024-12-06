@@ -357,6 +357,7 @@ async fn test_params_from_args(
                 test_args,
                 tags: vec![],
                 break_on_failure: cmd.break_on_failure,
+                no_exception_channel: cmd.no_exception_channel,
             };
 
             let count = cmd.count.unwrap_or(1);
@@ -576,6 +577,7 @@ mod test {
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
                     break_on_failure: false,
+                    no_exception_channel: false,
                 },
                 vec![run_test_suite_lib::TestParams {
                     test_url: "my-test-url".to_string(),
@@ -589,6 +591,44 @@ mod test {
                     min_severity_logs: vec![],
                     tags: vec![],
                     break_on_failure: false,
+                    no_exception_channel: false,
+                }],
+            ),
+            (
+                RunCommand {
+                    timeout: None,
+                    test_args: vec!["my-test-url".to_string()],
+                    test_file: None,
+                    test_filter: vec![],
+                    realm: None,
+                    run_disabled: false,
+                    filter_ansi: false,
+                    parallel: None,
+                    count: None,
+                    min_severity_logs: vec![],
+                    show_full_moniker_in_logs: false,
+                    max_severity_logs: None,
+                    output_directory: None,
+                    disable_output_directory: false,
+                    continue_on_timeout: false,
+                    stop_after_failures: None,
+                    experimental_parallel_execution: None,
+                    break_on_failure: false,
+                    no_exception_channel: true,
+                },
+                vec![run_test_suite_lib::TestParams {
+                    test_url: "my-test-url".to_string(),
+                    realm: None.into(),
+                    timeout_seconds: None,
+                    test_filters: None,
+                    also_run_disabled_tests: false,
+                    parallel: None,
+                    test_args: vec![],
+                    max_severity_logs: None,
+                    min_severity_logs: vec![],
+                    tags: vec![],
+                    break_on_failure: false,
+                    no_exception_channel: true,
                 }],
             ),
             (
@@ -611,6 +651,7 @@ mod test {
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
                     break_on_failure: false,
+                    no_exception_channel: false,
                 },
                 vec![
                     run_test_suite_lib::TestParams {
@@ -625,6 +666,7 @@ mod test {
                         test_args: vec![],
                         tags: vec![],
                         break_on_failure: false,
+                        no_exception_channel: false,
                     };
                     10
                 ],
@@ -649,6 +691,7 @@ mod test {
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
                     break_on_failure: false,
+                    no_exception_channel: false,
                 },
                 vec![run_test_suite_lib::TestParams {
                     test_url: "my-test-url".to_string(),
@@ -662,6 +705,7 @@ mod test {
                     test_args: vec!["--".to_string(), "arg".to_string()],
                     tags: vec![],
                     break_on_failure: false,
+                    no_exception_channel: false,
                 }],
             ),
             (
@@ -686,6 +730,7 @@ mod test {
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
                     break_on_failure: false,
+                    no_exception_channel: false,
                 },
                 vec![
                     run_test_suite_lib::TestParams {
@@ -700,6 +745,7 @@ mod test {
                         test_args: vec![],
                         tags: vec![],
                         break_on_failure: false,
+                        no_exception_channel: false,
                     },
                     run_test_suite_lib::TestParams {
                         test_url: "file-test-url-2".to_string(),
@@ -713,6 +759,7 @@ mod test {
                         test_args: vec![],
                         tags: vec![],
                         break_on_failure: false,
+                        no_exception_channel: false,
                     },
                     run_test_suite_lib::TestParams {
                         test_url: "file-test-url-3".to_string(),
@@ -729,6 +776,7 @@ mod test {
                             value: "true".to_string(),
                         }],
                         break_on_failure: false,
+                        no_exception_channel: false,
                     },
                 ],
             ),
@@ -779,6 +827,7 @@ mod test {
                 stop_after_failures: None,
                 experimental_parallel_execution: None,
                 break_on_failure: false,
+                no_exception_channel: false,
             },
             true,
         )
@@ -816,6 +865,7 @@ mod test {
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
                     break_on_failure: false,
+                    no_exception_channel: false,
                 },
             ),
             (
@@ -841,6 +891,7 @@ mod test {
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
                     break_on_failure: false,
+                    no_exception_channel: false,
                 },
             ),
             (
@@ -866,6 +917,7 @@ mod test {
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
                     break_on_failure: false,
+                    no_exception_channel: false,
                 },
             ),
         ];

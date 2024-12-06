@@ -110,7 +110,6 @@ async fn listen_for_syslog_routed_stdio() {
         .connect_to_protocol::<ArchiveAccessorMarker>()
         .await
         .expect("ArchiveAccessor unavailable");
-    info!("Connected to Accessor");
 
     let mut reader = ArchiveReader::new();
     reader.with_archive(accessor);

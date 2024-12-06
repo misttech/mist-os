@@ -182,11 +182,7 @@ impl Directory for Incoming {
 
         for entry in &self.0 {
             if let Some(remain) = match_prefix(&path, &entry.path) {
-                return entry.directory.open(
-                    &format!("/{}", remain.to_string()),
-                    flags,
-                    server_end,
-                );
+                return entry.directory.open(&format!("/{}", remain), flags, server_end);
             }
         }
         Err(Status::NOT_FOUND)

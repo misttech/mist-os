@@ -62,8 +62,7 @@ impl ConfigDataBuilder {
             for (destination_path, source_file) in entries {
                 let config_data_package_path =
                     Utf8PathBuf::from("meta/data").join(&package_name).join(destination_path);
-                package_builder
-                    .add_file_to_far(config_data_package_path, source_file.to_string())?;
+                package_builder.add_file_to_far(config_data_package_path, &source_file)?;
             }
         }
 

@@ -14,7 +14,7 @@ rustc_test("mock-omaha-server_lib_test") {
   edition = "2021"
 
   source_root =
-      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/src/lib.rs"
+      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.3/src/lib.rs"
 
   deps = [
     "//src/lib/fuchsia-async",
@@ -35,7 +35,7 @@ rustc_test("mock-omaha-server_lib_test") {
   ]
   if (!is_fuchsia) {
     deps += [
-      "//third_party/rust_crates:async-net",
+      "//src/developer/ffx/lib/netext:lib",
       "//third_party/rust_crates:tokio",
     ]
   }
@@ -43,7 +43,7 @@ rustc_test("mock-omaha-server_lib_test") {
   inputs = [ "src/testing_keys/test_private_key.pem" ]
 
   sources =
-      [ "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/src/lib.rs" ]
+      [ "//third_party/rust_crates/vendor/mock-omaha-server-0.3.3/src/lib.rs" ]
 
   configs += [
     ":fasync",
@@ -79,7 +79,7 @@ if (is_host) {
     edition = "2021"
 
     source_root =
-        "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/src/main.rs"
+        "//third_party/rust_crates/vendor/mock-omaha-server-0.3.3/src/main.rs"
 
     deps = [
       "//src/lib/fuchsia-async",
@@ -93,7 +93,7 @@ if (is_host) {
     inputs = [ "src/testing_keys/test_private_key.pem" ]
 
     sources = [
-      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/src/main.rs",
+      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.3/src/main.rs",
     ]
 
     configs += [

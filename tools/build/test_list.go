@@ -38,13 +38,14 @@ type TestListEntry struct {
 }
 
 type ExecutionDef struct {
-	Type            string `json:"type"`
-	ComponentURL    string `json:"component_url"`
-	TimeoutSeconds  int    `json:"timeout_seconds,omitempty"`
-	Parallel        uint16 `json:"parallel,omitempty"`
-	MaxSeverityLogs string `json:"max_severity_logs,omitempty"`
-	MinSeverityLogs string `json:"min_severity_logs,omitempty"`
-	Realm           string `json:"realm,omitempty"`
+	Type                     string `json:"type"`
+	ComponentURL             string `json:"component_url"`
+	TimeoutSeconds           int    `json:"timeout_seconds,omitempty"`
+	Parallel                 uint16 `json:"parallel,omitempty"`
+	MaxSeverityLogs          string `json:"max_severity_logs,omitempty"`
+	MinSeverityLogs          string `json:"min_severity_logs,omitempty"`
+	Realm                    string `json:"realm,omitempty"`
+	CreateNoExceptionChannel bool   `json:"create_no_exception_channel,omitempty"`
 }
 
 // TestTag represents arbitrary test metadata.

@@ -6,6 +6,7 @@
 
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("@fuchsia_sdk//fuchsia/private:fuchsia_api_level.bzl", "FuchsiaAPILevelInfo", "fuchsia_api_level")
+load("//test_utils:api_levels.bzl", "some_valid_numerical_api_level_as_string")
 
 def _level_setting_test_impl(ctx):
     env = analysistest.begin(ctx)
@@ -32,20 +33,55 @@ def _make_test_fuchsia_api_level(name, level):
     fuchsia_api_level(
         name = name,
         build_setting_default = level,
-        # Use levels that we know will never be in the SDK
-        valid_api_levels_for_test = ["1", "2", "3"],
     )
 
 def _test_level_setting():
     _make_test_fuchsia_api_level(
-        name = "supported",
-        level = "2",
+        name = "supported_numerical_string",
+        level = some_valid_numerical_api_level_as_string(),
     )
 
     level_setting_test(
-        name = "test_setting_supported",
-        target_under_test = ":supported",
-        expected_level = "2",
+        name = "test_setting_supported_numerical_string",
+        target_under_test = ":supported_numerical_string",
+        expected_level = some_valid_numerical_api_level_as_string(),
+        tags = ["manual"],
+    )
+
+    _make_test_fuchsia_api_level(
+        name = "next",
+        level = "NEXT",
+    )
+
+    level_setting_test(
+        name = "test_setting_next",
+        target_under_test = ":next",
+        expected_level = "NEXT",
+        tags = ["manual"],
+    )
+
+    _make_test_fuchsia_api_level(
+        name = "head",
+        level = "HEAD",
+    )
+
+    level_setting_test(
+        name = "test_setting_head",
+        target_under_test = ":head",
+        expected_level = "HEAD",
+        tags = ["manual"],
+    )
+
+    # TODO(https://fxbug.dev/354047162): Move to failures when filtering supported levels.
+    _make_test_fuchsia_api_level(
+        name = "platform",
+        level = "PLATFORM",
+    )
+
+    level_setting_test(
+        name = "test_setting_platform",
+        target_under_test = ":platform",
+        expected_level = "PLATFORM",
         tags = ["manual"],
     )
 
@@ -77,26 +113,51 @@ level_setting_failure_test = analysistest.make(
 
 def _test_level_setting_failures():
     _make_test_fuchsia_api_level(
-        name = "head",
-        level = "HEAD",
+        name = "unknown_string",
+        level = "SOMETHING",
     )
 
     level_setting_failure_test(
-        name = "test_setting_head",
-        target_under_test = ":head",
-        expected_failure_message = "HEAD is not a valid API level",
+        name = "test_setting_unknown_string",
+        target_under_test = ":unknown_string",
+        expected_failure_message = '"SOMETHING" is not an API level supported by this SDK. API level should be one of ["',
         tags = ["manual"],
     )
 
     _make_test_fuchsia_api_level(
-        name = "unsupported_level",
-        level = "900",
+        name = "retired_level",
+        # TODO(https://fxbug.dev/354047162): Change to 21 when filtering supported levels.
+        level = "3",
     )
 
     level_setting_failure_test(
-        name = "test_unsupported",
-        target_under_test = ":unsupported_level",
-        expected_failure_message = "900 is not a valid API level",
+        name = "test_retired",
+        target_under_test = ":retired_level",
+        expected_failure_message = '"3" is not an API level supported by this SDK. API level should be one of ["',
+        tags = ["manual"],
+    )
+
+    _make_test_fuchsia_api_level(
+        name = "future_numerical_string",
+        level = "90000",
+    )
+
+    level_setting_failure_test(
+        name = "test_future_numerical_string",
+        target_under_test = ":future_numerical_string",
+        expected_failure_message = '"90000" is not an API level supported by this SDK. API level should be one of ["',
+        tags = ["manual"],
+    )
+
+    _make_test_fuchsia_api_level(
+        name = "next_lowercase",
+        level = "next",
+    )
+
+    level_setting_failure_test(
+        name = "test_setting_next_lowercase",
+        target_under_test = ":next_lowercase",
+        expected_failure_message = '"next" is not an API level supported by this SDK. API level should be one of ["',
         tags = ["manual"],
     )
 
@@ -108,12 +169,17 @@ def fuchsia_api_level_test_suite(name, **kwargs):
         name = name,
         tests = [
             # _test_level_setting tests
-            ":test_setting_supported",
+            ":test_setting_supported_numerical_string",
+            ":test_setting_next",
+            ":test_setting_head",
+            ":test_setting_platform",
             ":test_unset",
 
             # _test_level_setting_failures tests
-            ":test_setting_head",
-            ":test_unsupported",
+            ":test_setting_unknown_string",
+            ":test_retired",
+            ":test_future_numerical_string",
+            ":test_setting_next_lowercase",
         ],
         **kwargs
     )

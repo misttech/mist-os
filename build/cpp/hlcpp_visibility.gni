@@ -354,7 +354,6 @@ hlcpp_visibility = [
   "//third_party/mesa/src/util/tests/inflight_list:*",
   "//third_party/openweave-core/src/include:*",
   "//third_party/openweave-core/src/inet:*",
-  "//third_party/Vulkan-Tools/cube:*",
   "//tools/create/goldens/my-component-test-cpp:*",
   "//zircon/kernel/lib/devicetree/tests:*",
   "//zircon/system/ulib/ktrace/*",

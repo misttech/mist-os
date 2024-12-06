@@ -564,7 +564,7 @@ impl<'a, S> TracingEvent<'a, S> {
     }
 }
 
-impl<'a, S> RecordEvent for TracingEvent<'a, S>
+impl<S> RecordEvent for TracingEvent<'_, S>
 where
     for<'lookup> S: Subscriber + LookupSpan<'lookup>,
 {
@@ -911,7 +911,7 @@ impl MutableBuffer for Cursor<ResizableBuffer> {
     }
 }
 
-impl<'a, T: MutableBuffer + ?Sized> MutableBuffer for &'a mut T {
+impl<T: MutableBuffer + ?Sized> MutableBuffer for &mut T {
     fn has_remaining(&self, num_bytes: usize) -> bool {
         (**self).has_remaining(num_bytes)
     }

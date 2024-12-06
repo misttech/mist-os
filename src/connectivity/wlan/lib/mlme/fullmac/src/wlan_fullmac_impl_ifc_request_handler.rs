@@ -97,22 +97,22 @@ fn handle_one_request(
                 ind: fullmac_to_mlme::convert_disassociate_indication(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::StartConf { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::StartConf { payload, responder } => {
             responder.send().context("Failed to respond to StartConf")?;
             driver_event_sink.0.send(FullmacDriverEvent::StartConf {
-                resp: fullmac_to_mlme::convert_start_confirm(resp),
+                resp: fullmac_to_mlme::convert_start_confirm(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::StopConf { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::StopConf { payload, responder } => {
             responder.send().context("Failed to respond to StopConf")?;
             driver_event_sink.0.send(FullmacDriverEvent::StopConf {
-                resp: fullmac_to_mlme::convert_stop_confirm(resp),
+                resp: fullmac_to_mlme::convert_stop_confirm(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::EapolConf { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::EapolConf { payload, responder } => {
             responder.send().context("Failed to respond to EapolConf")?;
             driver_event_sink.0.send(FullmacDriverEvent::EapolConf {
-                resp: fullmac_to_mlme::convert_eapol_confirm(resp),
+                resp: fullmac_to_mlme::convert_eapol_confirm(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::OnChannelSwitch { ind, responder } => {
@@ -127,16 +127,16 @@ fn handle_one_request(
                 ind: fullmac_to_mlme::convert_signal_report_indication(ind),
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::EapolInd { ind, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::EapolInd { payload, responder } => {
             responder.send().context("Failed to respond to EapolInd")?;
             driver_event_sink.0.send(FullmacDriverEvent::EapolInd {
-                ind: fullmac_to_mlme::convert_eapol_indication(ind),
+                ind: fullmac_to_mlme::convert_eapol_indication(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::OnPmkAvailable { info, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::OnPmkAvailable { payload, responder } => {
             responder.send().context("Failed to respond to OnPmkAvailable")?;
             driver_event_sink.0.send(FullmacDriverEvent::OnPmkAvailable {
-                info: fullmac_to_mlme::convert_pmk_info(info),
+                info: fullmac_to_mlme::convert_pmk_info(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::SaeHandshakeInd { ind, responder } => {
@@ -148,7 +148,7 @@ fn handle_one_request(
         fidl_fullmac::WlanFullmacImplIfcRequest::SaeFrameRx { frame, responder } => {
             responder.send().context("Failed to respond to SaeFrameRx")?;
             driver_event_sink.0.send(FullmacDriverEvent::SaeFrameRx {
-                frame: fullmac_to_mlme::convert_sae_frame(frame),
+                frame: fullmac_to_mlme::convert_sae_frame(frame)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::OnWmmStatusResp {

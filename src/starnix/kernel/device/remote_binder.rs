@@ -1131,16 +1131,17 @@ mod tests {
     use crate::vfs::{FileSystemOptions, WhatToMount};
     use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
     use fidl::HandleBased;
-    use once_cell::sync::Lazy;
     use rand::distributions::{Alphanumeric, DistString};
+    use starnix_types::arch::ArchWidth;
     use starnix_uapi::file_mode::mode;
     use starnix_uapi::mount_flags::MountFlags;
     use std::collections::BTreeMap;
     use std::ffi::CString;
+    use std::sync::LazyLock;
 
-    static REMOTE_CONTROLLER_CLIENT: Lazy<
+    static REMOTE_CONTROLLER_CLIENT: LazyLock<
         Mutex<BTreeMap<String, ClientEnd<fbinder::RemoteControllerMarker>>>,
-    > = Lazy::new(|| {
+    > = LazyLock::new(|| {
         Mutex::<BTreeMap<String, ClientEnd<fbinder::RemoteControllerMarker>>>::default()
     });
 
@@ -1202,7 +1203,7 @@ mod tests {
                 )
                 .expect("Task")
                 .into();
-                task.mm().initialize_mmap_layout_for_test();
+                task.mm().initialize_mmap_layout_for_test(ArchWidth::Arch64);
 
                 let remote_binder_handle =
                     RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task);

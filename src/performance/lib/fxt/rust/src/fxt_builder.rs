@@ -13,8 +13,7 @@ impl<H: crate::header::TraceHeader> FxtBuilder<H> {
     /// the corresponding record except for its size in words which will be updated by the builder.
     pub fn new(mut header: H) -> Self {
         // Make space for our header word before anything gets added.
-        let mut buf = vec![];
-        buf.resize(8, 0);
+        let buf = vec![0; 8];
 
         // Set an initial size, we'll update as we go.
         header.set_size_words(1);

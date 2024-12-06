@@ -66,7 +66,7 @@ fn bench_json_packet_serializer(b: &mut criterion::Bencher, total_logs: u64) {
     let mut executor = fasync::LocalExecutor::new();
     b.iter(|| {
         let logs_for_fut = logs.clone();
-        criterion::black_box(executor.run_singlethreaded(async move {
+        executor.run_singlethreaded(async move {
             let mut stream = JsonPacketSerializer::new_without_stats(
                 FORMATTED_CONTENT_CHUNK_SIZE_TARGET,
                 stream::iter(logs_for_fut),
@@ -74,7 +74,7 @@ fn bench_json_packet_serializer(b: &mut criterion::Bencher, total_logs: u64) {
             while let Some(res) = stream.next().await {
                 let _ = criterion::black_box(res);
             }
-        }));
+        });
     });
 }
 

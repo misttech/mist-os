@@ -511,7 +511,7 @@ impl CurrentLevelHandler {
                         let mut broker = self.broker.borrow_mut();
                         fuchsia_trace::counter!(
                             c"power-broker", c"CurrentLevel.Update.Received", 0,
-                            &broker.lookup_name(&element_id).into_owned() => current_level as u32
+                            &broker.lookup_name(&element_id) => current_level as u32
                         );
 
                         let current_level =

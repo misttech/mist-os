@@ -191,7 +191,7 @@ impl FramedStreamReader {
             unreachable!();
         };
 
-        let mut payload = Vec::new();
+        let mut payload = vec![0; hdr.length];
         payload.resize(hdr.length, 0);
         if !read_exact(&self.reader, &mut payload).await? {
             return Err(format_err!("Unexpected end of stream"));

@@ -4,10 +4,10 @@
 
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 
+#include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <gtest/gtest.h>
-#include <mock-mmio-range/mock-mmio-range.h>
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 

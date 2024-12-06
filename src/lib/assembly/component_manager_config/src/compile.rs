@@ -15,6 +15,19 @@ use std::io::Write;
 use std::path::PathBuf;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal};
 
+trait Mergeable {
+    fn merge(self, another: Self) -> Result<Self, Error>
+    where
+        Self: Sized;
+}
+
+impl<T> Mergeable for Vec<T> {
+    fn merge(mut self, another: Self) -> Result<Self, Error> {
+        self.extend(another);
+        Ok(self)
+    }
+}
+
 fn remove_duplicates<T: Ord>(mut v: Vec<T>) -> Vec<T> {
     v.sort();
     v.dedup();
@@ -98,6 +111,7 @@ impl PlatformCapability {
 #[serde(deny_unknown_fields)]
 struct Config {
     debug: Option<bool>,
+    trace_provider: Option<TraceProvider>,
     list_children_batch_size: Option<u32>,
     security_policy: Option<SecurityPolicy>,
     namespace_capabilities: Option<Vec<cml::Capability>>,
@@ -188,6 +202,15 @@ pub enum VmexSource {
 
 symmetrical_enums!(VmexSource, component_internal::VmexSource, SystemResource, Namespace);
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum TraceProvider {
+    Namespace,
+    RootExposed,
+}
+
+symmetrical_enums!(TraceProvider, component_internal::TraceProvider, Namespace, RootExposed);
+
 #[derive(Deserialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct SecurityPolicy {
@@ -197,9 +220,9 @@ pub struct SecurityPolicy {
     child_policy: Option<ChildPolicyAllowlists>,
 }
 
-impl SecurityPolicy {
-    fn merge(self, another: SecurityPolicy) -> Result<Self, Error> {
-        return Ok(SecurityPolicy {
+impl Mergeable for SecurityPolicy {
+    fn merge(self, another: Self) -> Result<Self, Error> {
+        return Ok(Self {
             job_policy: deep_merge_field!(self, another, job_policy),
             capability_policy: merge_option(
                 self.capability_policy,
@@ -426,6 +449,7 @@ impl TryFrom<Config> for component_internal::Config {
 
         Ok(Self {
             debug: config.debug,
+            trace_provider: config.trace_provider.map(Into::into),
             enable_introspection: config.enable_introspection,
             use_builtin_process_launcher: config.use_builtin_process_launcher,
             maintain_utc_clock: config.maintain_utc_clock,
@@ -554,13 +578,14 @@ impl Config {
     fn merge(self, another: Config) -> Result<Self, Error> {
         Ok(Config {
             debug: merge_field!(self, another, debug),
+            trace_provider: merge_field!(self, another, trace_provider),
             enable_introspection: merge_field!(self, another, enable_introspection),
             use_builtin_process_launcher: merge_field!(self, another, use_builtin_process_launcher),
             maintain_utc_clock: merge_field!(self, another, maintain_utc_clock),
             list_children_batch_size: merge_field!(self, another, list_children_batch_size),
             security_policy: deep_merge_field!(self, another, security_policy),
-            namespace_capabilities: merge_field!(self, another, namespace_capabilities),
-            builtin_capabilities: merge_field!(self, another, builtin_capabilities),
+            namespace_capabilities: deep_merge_field!(self, another, namespace_capabilities),
+            builtin_capabilities: deep_merge_field!(self, another, builtin_capabilities),
             num_threads: merge_field!(self, another, num_threads),
             root_component_url: merge_field!(self, another, root_component_url),
             component_id_index_path: merge_field!(self, another, component_id_index_path),
@@ -814,6 +839,7 @@ mod tests {
     fn test_compile() {
         let input = r#"{
             debug: true,
+            trace_provider: "namespace",
             enable_introspection: true,
             list_children_batch_size: 123,
             maintain_utc_clock: false,
@@ -891,6 +917,7 @@ mod tests {
             config,
             component_internal::Config {
                 debug: Some(true),
+                trace_provider: Some(component_internal::TraceProvider::Namespace),
                 enable_introspection: Some(true),
                 maintain_utc_clock: Some(false),
                 use_builtin_process_launcher: Some(true),

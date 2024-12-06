@@ -38,7 +38,7 @@ use vfs::service;
 use zx::sys::{zx_handle_t, zx_status_t};
 use zx::{self as zx, AsHandleRef, MonotonicDuration};
 use {
-    fidl_fuchsia_fshost as fshost, fidl_fuchsia_storagehost as fstoragehost,
+    fidl_fuchsia_fshost as fshost, fidl_fuchsia_storage_partitions as fpartitions,
     fuchsia_async as fasync,
 };
 
@@ -595,7 +595,7 @@ async fn shred_data_volume(
 }
 
 async fn init_system_partition_table(
-    partitions: Vec<fstoragehost::PartitionInfo>,
+    partitions: Vec<fpartitions::PartitionInfo>,
     environment: &Arc<Mutex<dyn Environment>>,
     config: &fshost_config::Config,
 ) -> Result<(), zx::Status> {
@@ -635,7 +635,7 @@ async fn init_system_partition_table(
         Err(zx::Status::BAD_STATE)
     })?;
     let client =
-        connect_to_protocol_at_dir_root::<fstoragehost::PartitionsAdminMarker>(&exposed_dir)
+        connect_to_protocol_at_dir_root::<fpartitions::PartitionsAdminMarker>(&exposed_dir)
             .unwrap();
     client
         .reset_partition_table(&partitions[..])

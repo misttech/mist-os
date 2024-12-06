@@ -173,7 +173,7 @@ impl ToString for RemoteComponentStoragePath {
         format!(
             "{}{sep}/{}",
             self.instance_id,
-            self.relative_path.to_string_lossy().to_string(),
+            self.relative_path.to_string_lossy(),
             sep = REMOTE_PATH_SEPARATOR
         )
     }
@@ -185,7 +185,7 @@ impl ToString for RemoteDirectoryPath {
             "{}{sep}{}{sep}/{}",
             self.moniker,
             dir_type_to_str(&self.dir_type).unwrap(),
-            self.relative_path.to_string_lossy().to_string(),
+            self.relative_path.to_string_lossy(),
             sep = REMOTE_PATH_SEPARATOR
         )
     }
@@ -272,7 +272,7 @@ pub async fn add_source_filename_to_path_if_absent<D: Directory>(
     // If the destination is a directory, append `source_file_str`.
     if let Some(destination_file) = destination_path.file_name() {
         let parent_dir = open_parent_subdir_readable(destination_path, destination_dir)?;
-        match parent_dir.entry_type(&destination_file.to_string_lossy().to_string()).await? {
+        match parent_dir.entry_type(destination_file.to_string_lossy().as_ref()).await? {
             Some(DirentKind::File) | None => Ok(destination_path.clone()),
             Some(DirentKind::Directory) => Ok(destination_path.join(source_file_str)),
         }

@@ -64,7 +64,7 @@ impl EventSource {
                     // Subscribe to events in the registry, discarding prior events
                     // from before this subscribe call if this is the second
                     // time opening the event stream.
-                    if request.event_name.source_name.to_string() == "capability_requested" {
+                    if request.event_name.source_name == "capability_requested" {
                         // Don't support creating a new capability_requested stream.
                         return Err(ModelError::EventsError {
                             err: EventsError::CapabilityRequestedStreamTaken,

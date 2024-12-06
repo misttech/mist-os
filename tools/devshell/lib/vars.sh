@@ -87,58 +87,58 @@ fi
 # Use this to conditionally prefix a command with "${RBE_WRAPPER[@]}".
 # NOTE: this function depends on FUCHSIA_BUILD_DIR which is set only after
 # initialization.
-function fx-rbe-enabled {
+# The cached version of this function is 'fx-rbe-enabled', below.
+function recheck-fx-rbe-enabled {
   # This function is called during tests without a build directory.
   # Returns 1 to indicate that RBE is not enabled.
   fx-build-dir-if-present || return 1
 
   # This RBE settings file is created at GN gen time.
-  local rbe_settings_file="${FUCHSIA_BUILD_DIR}/rbe_settings.json"
+  local -r rbe_settings_file="${FUCHSIA_BUILD_DIR}/rbe_settings.json"
 
   # Check to see if the rbe settings indicate that the reproxy wrapper is
   # needed.
-  needs_reproxy=($("$jq" '-r' '.final.needs_reproxy' < "${rbe_settings_file}"))
+  local needs_reproxy=($("$jq" '-r' '.final.needs_reproxy' < "${rbe_settings_file}"))
   if [[ "$needs_reproxy" != "true" ]]; then
     return 1
   fi
 }
 
-# At the moment, direct use of RBE uses gcloud to authenticate.
-# TODO(https://fxbug.dev/42173157): simplify this process with an auth script
-#   without depending on a locally installed gcloud.
-function fx-check-rbe-setup {
-  if ! fx-rbe-enabled ; then return ; fi
-
-  # build/rbe/fuchsia-reproxy-wrap.sh now uses gcert to authenticate
-  # See go/rbe/dev/x/reclientoptions#autoauth
-  if which gcert > /dev/null ; then return ; fi
-
-  # gcloud is only needed as a backup authentication method
-  gcloud="$(which gcloud)" || {
-    cat <<EOF
-
-\`gcloud\` command not found (but is needed to authenticate).
-\`gcloud\` can be installed from the Cloud SDK:
-
-  http://go/cloud-sdk#installing-and-using-the-cloud-sdk
-
-EOF
-  return
-  }
-
-# Check authentication first.
-# Instruct user to authenticate if needed.
-  "$gcloud" auth list 2>&1 | grep -q "$USER@google.com" || {
-    cat <<EOF
-Did not find credentialed account (\`gcloud auth list\`): $USER@google.com.
-
-To authenticate, run:
-
-  gcloud auth login --update-adc --no-browser
-
-EOF
+_fx_rbe_enabled_cache_var=
+function fx-rbe-enabled {
+  if [[ -z "$_fx_rbe_enabled_cache_var" ]]; then
+     recheck-fx-rbe-enabled
+     # Cache the return status.
+     _fx_rbe_enabled_cache_var="$?"
+  fi
+  return "$_fx_rbe_enabled_cache_var"
 }
 
+# Returns 0 if the build is configured to use authenticated services.
+# The value of this function is cached by 'fx-build-needs-auth'.
+function recheck-fx-build-needs-auth() {
+  # For testing-only, return 1 to indicate that authentication is not needed.
+  fx-build-dir-if-present || return 1
+
+  # This RBE settings file is created at GN gen time.
+  local -r rbe_settings_file="${FUCHSIA_BUILD_DIR}/rbe_settings.json"
+
+  # Return 0 if authentication is needed for build remote services,
+  # otherwise return 1.
+  local needs_auth=($("$jq" '-r' '.final.needs_auth' < "${rbe_settings_file}"))
+  if [[ "$needs_auth" != "true" ]]; then
+    return 1
+  fi
+}
+
+_fx_build_needs_auth_cache_var=
+function fx-build-needs-auth {
+  if [[ -z "$_fx_build_needs_auth_cache_var" ]]; then
+     recheck-fx-build-needs-auth
+     # Cache the return status.
+     _fx_build_needs_auth_cache_var="$?"
+  fi
+  return "$_fx_build_needs_auth_cache_var"
 }
 
 # fx-is-stderr-tty exits with success if stderr is a tty.
@@ -194,6 +194,19 @@ function _symlink_relative {
   ln -sf "$source_rel" "$link"
 }
 
+function _directory_symlink_relative {
+  source="$1"
+  link="$2"
+  # Do _not_ support ln's behavior, remove any existing link if it exists.
+  # otherwise a new link will be created into the target directory instead.
+  if [ -e "$link" ]; then
+    rm "$link"
+  fi
+  link_dir="$(dirname "$link")"
+  source_rel="${source#"$link_dir/"}"
+  ln -sf "$source_rel" "$link"
+}
+
 function _link_gen_artifacts {
   # These artifacts need to be in the root directory.
   local -r linked_artifacts=("compile_commands.json" "rust-project.json")
@@ -202,6 +215,23 @@ function _link_gen_artifacts {
       _symlink_relative "${FUCHSIA_BUILD_DIR}/$artifact" "${FUCHSIA_DIR}/$artifact"
     fi
   done
+
+  # Create Bazel convenience symlinks. See //build/bazel/README.md
+  _directory_symlink_relative \
+      "${FUCHSIA_BUILD_DIR}/gen/build/bazel/workspace" \
+      "${FUCHSIA_DIR}/bazel-workspace"
+
+  _directory_symlink_relative \
+      "${FUCHSIA_BUILD_DIR}/gen/build/bazel/workspace/bazel-bin" \
+      "${FUCHSIA_DIR}/bazel-bin"
+
+  _directory_symlink_relative \
+      "${FUCHSIA_BUILD_DIR}/gen/build/bazel/workspace/bazel-out" \
+      "${FUCHSIA_DIR}/bazel-out"
+
+  _directory_symlink_relative \
+      "${FUCHSIA_BUILD_DIR}/gen/build/bazel/output_base/external" \
+      "${FUCHSIA_DIR}/bazel-repos"
 }
 
 function fx-gen-internal {
@@ -1003,8 +1033,38 @@ function fx-run-ninja {
   # through the proxy.
   #
   local -r build_uuid="$(fx-uuid)"
-  local rbe_wrapper=()
-  local user_rbe_env=()
+  local -a user_rbe_env=()
+
+  local -a rbe_wrapper_loas_args=()
+  if fx-build-needs-auth
+  then
+    local loas_type
+    # TODO(b/342026853): automatic use of gcert for authentication in bazel
+    # is still experimental, and is opt-in with FX_BUILD_AUTO_AUTH=1.
+    # gcert authentication for reclient already works.
+    local -r loas_type_detected="$(fx-command-run rbe _check_loas_type)"
+    local -r loas_type_for_reclient="$loas_type_detected"
+    local loas_type_for_bazel
+    if [[ "$FX_BUILD_AUTO_AUTH" == 1 ]]
+    then loas_type_for_bazel="$loas_type_detected"
+    else loas_type_for_bazel="restricted"
+    fi
+    rbe_wrapper_loas_args+=( --loas-type="$loas_type_for_reclient" )
+    user_rbe_env+=(
+      # Automatic auth with gcert (from re-client bootstrap) needs $USER.
+      "USER=${USER}"
+      "FX_BUILD_LOAS_TYPE=$loas_type_for_bazel"
+      # A few tools need credentials for authentication, like remotetool.
+      # Explicitly set this variable without forwarding $HOME.
+      # User-overridable.
+      "GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-$HOME/.config/gcloud/application_default_credentials.json}"
+      # For bazel subinvocations to be able to authenticate with gcert,
+      # need to forward the authentication socket (used by gnubby).
+      "SSH_AUTH_SOCK=${SSH_AUTH_SOCK}"
+    )
+  fi
+
+  local -a rbe_wrapper=()
   if fx-rbe-enabled
   then
     # Move the reproxy logs outside of $FUCHSIA_BUILD_DIR so they do not get cleaned,
@@ -1045,19 +1105,14 @@ function fx-run-ninja {
       --logdir "$reproxy_logdir"
       --tmpdir "$reproxy_tmpdir"
       "${proxy_cfg_args[@]}"
+      "${rbe_wrapper_loas_args[@]}"
       --
     )
     [[ "${USER-NOT_SET}" != "NOT_SET" ]] || {
       echo "Error: USER is not set"
       exit 1
     }
-    user_rbe_env=(
-      # Automatic auth with gcert (from re-client bootstrap) needs $USER.
-      "USER=${USER}"
-      # A few tools need credentials for authentication, like remotetool.
-      # Explicitly set this variable without forwarding $HOME.
-      # User-overridable.
-      "GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-$HOME/.config/gcloud/application_default_credentials.json}"
+    user_rbe_env+=(
       # Honor environment variable to disable RBE build metrics.
       "FX_REMOTE_BUILD_METRICS=${FX_REMOTE_BUILD_METRICS}"
     )
@@ -1083,6 +1138,7 @@ function fx-run-ninja {
     ${TMPDIR+"TMPDIR=$TMPDIR"}
     ${CLICOLOR_FORCE+"CLICOLOR_FORCE=$CLICOLOR_FORCE"}
     ${FX_BUILD_RBE_STATS+"FX_BUILD_RBE_STATS=$FX_BUILD_RBE_STATS"}
+    ${FX_BUILD_AUTO_AUTH+"FX_BUILD_AUTO_AUTH=$FX_BUILD_AUTO_AUTH"}
   )
 
   if [[ "${have_jobs}" ]]; then

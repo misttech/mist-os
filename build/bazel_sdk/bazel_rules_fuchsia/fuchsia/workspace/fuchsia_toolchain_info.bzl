@@ -57,7 +57,6 @@ def _fuchsia_toolchain_info_impl(ctx):
         symbol_index_config = ctx.runfiles(ctx.files.symbol_index_config),
         zbi = ctx.executable.zbi,
         zbi_manifest = ctx.file.zbi_manifest,
-        default_api_level = ctx.attr.default_target_api,
         exec_cpu = ctx.attr.exec_cpu,
         sdk_id = ctx.attr.sdk_id,
         sdk_manifest = ctx.file.sdk_manifest,
@@ -346,10 +345,6 @@ included in the Fuchsia IDK.
             mandatory = True,
             cfg = "exec",
             allow_single_file = True,
-        ),
-        "default_target_api": attr.string(
-            doc = "Default platform target api.",
-            mandatory = True,
         ),
         "exec_cpu": attr.string(
             doc = "The exec cpu configuration.",

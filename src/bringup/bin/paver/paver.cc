@@ -20,16 +20,16 @@
 #if defined(LEGACY_PAVER)
 #include "src/storage/lib/paver/android.h"
 #include "src/storage/lib/paver/astro.h"
-#include "src/storage/lib/paver/kola.h"
 #include "src/storage/lib/paver/luis.h"
+#include "src/storage/lib/paver/moonflower.h"
 #include "src/storage/lib/paver/nelson.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/vim3.h"
 #include "src/storage/lib/paver/x64.h"
 #elif defined(astro)
 #include "src/storage/lib/paver/astro.h"
-#elif defined(kola)
-#include "src/storage/lib/paver/kola.h"
+#elif defined(moonflower)
+#include "src/storage/lib/paver/moonflower.h"
 #elif defined(luis)
 #include "src/storage/lib/paver/luis.h"
 #elif defined(nelson)
@@ -89,7 +89,8 @@ int main(int argc, char** argv) {
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::KolaPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(
+      std::make_unique<paver::MoonflowerPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AndroidPartitionerFactory>());
@@ -101,8 +102,9 @@ int main(int argc, char** argv) {
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
 #elif defined(sherlock)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
-#elif defined(kola)
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::KolaPartitionerFactory>());
+#elif defined(moonflower)
+  paver::DevicePartitionerFactory::Register(
+      std::make_unique<paver::MoonflowerPartitionerFactory>());
 #elif defined(luis)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
 #elif defined(vim3)

@@ -20,9 +20,10 @@ use net_types::ip::{
 };
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
-    BroadcastIpExt, CoreTimerContext, ExistsError, Inspectable, InspectableValue, Inspector,
-    Instant, InstantBindingsTypes, NestedIntoCoreTimerCtx, NotFoundError, ReferenceNotifiers,
-    TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
+    AssignedAddrIpExt, BroadcastIpExt, CoreTimerContext, ExistsError, Inspectable,
+    InspectableValue, Inspector, Instant, InstantBindingsTypes, IpAddressId,
+    NestedIntoCoreTimerCtx, NotFoundError, ReferenceNotifiers, TimerBindingsTypes, TimerContext,
+    WeakDeviceIdentifier,
 };
 use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
@@ -32,12 +33,12 @@ use crate::internal::device::route_discovery::Ipv6RouteDiscoveryState;
 use crate::internal::device::router_solicitation::RsState;
 use crate::internal::device::slaac::{SlaacConfiguration, SlaacState};
 use crate::internal::device::{
-    IpAddressId, IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceAddr, Ipv4DeviceTimerId,
+    IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceAddr, Ipv4DeviceTimerId,
     Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
 };
 use crate::internal::gmp::igmp::{IgmpConfig, IgmpState, IgmpTimerId};
 use crate::internal::gmp::mld::{MldConfig, MldTimerId};
-use crate::internal::gmp::{GmpDelayedReportTimerId, GmpGroupState, GmpState, MulticastGroupSet};
+use crate::internal::gmp::{GmpGroupState, GmpState, GmpTimerId, MulticastGroupSet};
 use crate::internal::types::RawMetric;
 
 use super::dad::NonceCollection;
@@ -54,14 +55,15 @@ const DEFAULT_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
 
 /// An `Ip` extension trait adding IP device state properties.
 pub trait IpDeviceStateIpExt: BroadcastIpExt {
-    /// The information stored about an IP address assigned to an interface.
-    type AssignedAddress<BT: IpDeviceStateBindingsTypes>: AssignedAddress<Self::Addr> + Debug;
+    /// Information stored about an IP address assigned to an interface.
+    type AssignedAddressState<BT: IpDeviceStateBindingsTypes>: AssignedAddressState<Self::Addr>
+        + Debug;
     /// The GMP protocol-specific state.
     type GmpProtoState<BT: IpDeviceStateBindingsTypes>;
     /// The GMP protocol-specific configuration.
     type GmpProtoConfig: Default;
     /// The timer id for GMP timers.
-    type GmpTimerId<D: WeakDeviceIdentifier>: From<GmpDelayedReportTimerId<Self, D>>;
+    type GmpTimerId<D: WeakDeviceIdentifier>: From<GmpTimerId<Self, D>>;
 
     /// Creates a new [`Self::GmpProtoState`].
     fn new_gmp_state<
@@ -75,7 +77,7 @@ pub trait IpDeviceStateIpExt: BroadcastIpExt {
 }
 
 impl IpDeviceStateIpExt for Ipv4 {
-    type AssignedAddress<BT: IpDeviceStateBindingsTypes> = Ipv4AddressEntry<BT>;
+    type AssignedAddressState<BT: IpDeviceStateBindingsTypes> = Ipv4AddressEntry<BT>;
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = IgmpState<BT>;
     type GmpTimerId<D: WeakDeviceIdentifier> = IgmpTimerId<D>;
     type GmpProtoConfig = IgmpConfig;
@@ -92,54 +94,8 @@ impl IpDeviceStateIpExt for Ipv4 {
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> IpAddressId<Ipv4Addr> for StrongRc<Ipv4AddressEntry<BT>> {
-    type Weak = WeakRc<Ipv4AddressEntry<BT>>;
-
-    fn downgrade(&self) -> Self::Weak {
-        StrongRc::downgrade(self)
-    }
-
-    fn addr(&self) -> IpDeviceAddr<Ipv4Addr> {
-        IpDeviceAddr::new_from_witness(self.addr_sub.addr())
-    }
-
-    fn addr_sub(&self) -> AddrSubnet<Ipv4Addr, Ipv4DeviceAddr> {
-        self.addr_sub
-    }
-}
-
-impl<BT: IpDeviceStateBindingsTypes> WeakIpAddressId<Ipv4Addr> for WeakRc<Ipv4AddressEntry<BT>> {
-    type Strong = StrongRc<Ipv4AddressEntry<BT>>;
-    fn upgrade(&self) -> Option<Self::Strong> {
-        self.upgrade()
-    }
-}
-
-impl<BT: IpDeviceStateBindingsTypes> IpAddressId<Ipv6Addr> for StrongRc<Ipv6AddressEntry<BT>> {
-    type Weak = WeakRc<Ipv6AddressEntry<BT>>;
-
-    fn downgrade(&self) -> Self::Weak {
-        StrongRc::downgrade(self)
-    }
-
-    fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
-        IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub.addr())
-    }
-
-    fn addr_sub(&self) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
-        self.addr_sub
-    }
-}
-
-impl<BT: IpDeviceStateBindingsTypes> WeakIpAddressId<Ipv6Addr> for WeakRc<Ipv6AddressEntry<BT>> {
-    type Strong = StrongRc<Ipv6AddressEntry<BT>>;
-    fn upgrade(&self) -> Option<Self::Strong> {
-        self.upgrade()
-    }
-}
-
 impl IpDeviceStateIpExt for Ipv6 {
-    type AssignedAddress<BT: IpDeviceStateBindingsTypes> = Ipv6AddressEntry<BT>;
+    type AssignedAddressState<BT: IpDeviceStateBindingsTypes> = Ipv6AddressEntry<BT>;
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = ();
     type GmpTimerId<D: WeakDeviceIdentifier> = MldTimerId<D>;
     type GmpProtoConfig = MldConfig;
@@ -157,20 +113,164 @@ impl IpDeviceStateIpExt for Ipv6 {
 }
 
 /// The state associated with an IP address assigned to an IP device.
-pub trait AssignedAddress<A: IpAddress> {
+pub trait AssignedAddressState<A: IpAddress>: Debug + Send + Sync + 'static {
     /// Gets the address.
     fn addr(&self) -> IpDeviceAddr<A>;
+
+    /// Gets the address subnet this ID represents.
+    fn addr_sub(&self) -> AddrSubnet<A, <A::Version as AssignedAddrIpExt>::AssignedWitness>
+    where
+        A::Version: AssignedAddrIpExt;
 }
 
-impl<BT: IpDeviceStateBindingsTypes> AssignedAddress<Ipv4Addr> for Ipv4AddressEntry<BT> {
+impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState<Ipv4Addr> for Ipv4AddressEntry<BT> {
     fn addr(&self) -> IpDeviceAddr<Ipv4Addr> {
         IpDeviceAddr::new_from_witness(self.addr_sub().addr())
     }
+
+    fn addr_sub(&self) -> AddrSubnet<Ipv4Addr, Ipv4DeviceAddr> {
+        *self.addr_sub()
+    }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> AssignedAddress<Ipv6Addr> for Ipv6AddressEntry<BT> {
+impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState<Ipv6Addr> for Ipv6AddressEntry<BT> {
     fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
         IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub().addr())
+    }
+
+    fn addr_sub(&self) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
+        *self.addr_sub()
+    }
+}
+
+/// The primary reference to the state associated with an IP address assigned
+/// to an IP device.
+//
+// TODO(https://fxbug.dev/382093426): manually implement `Debug`.
+#[derive(Derivative)]
+#[derivative(Debug(bound = "S: Debug"))]
+pub struct PrimaryAddressId<S>(PrimaryRc<S>);
+
+impl<S> Deref for PrimaryAddressId<S> {
+    type Target = S;
+
+    fn deref(&self) -> &Self::Target {
+        let Self(inner) = self;
+        inner.deref()
+    }
+}
+
+impl<S> PrimaryAddressId<S> {
+    /// Creates a new primary reference to the provided state.
+    fn new_with_strong_clone(addr: S) -> (Self, AddressId<S>) {
+        let primary = PrimaryRc::new(addr);
+        let strong = PrimaryRc::clone_strong(&primary);
+        (Self(primary), AddressId(strong))
+    }
+
+    /// Clones a strongly-held reference.
+    pub fn clone_strong(&self) -> AddressId<S> {
+        let Self(inner) = self;
+        AddressId(PrimaryRc::clone_strong(inner))
+    }
+
+    /// Checks for equality with the provided strongly-held reference.
+    pub fn ptr_eq(&self, other: &AddressId<S>) -> bool {
+        let Self(inner) = self;
+        let AddressId(other) = other;
+        PrimaryRc::ptr_eq(inner, other)
+    }
+
+    /// Consumes `self` and returns the inner [`PrimaryRc`].
+    pub fn into_inner(self) -> PrimaryRc<S> {
+        self.0
+    }
+}
+
+impl<A, S> AssignedAddressState<A> for PrimaryAddressId<S>
+where
+    A: IpAddress<Version: AssignedAddrIpExt>,
+    S: AssignedAddressState<A>,
+{
+    fn addr(&self) -> IpDeviceAddr<A> {
+        let Self(inner) = self;
+        inner.addr()
+    }
+
+    fn addr_sub(&self) -> AddrSubnet<A, <A::Version as AssignedAddrIpExt>::AssignedWitness> {
+        let Self(inner) = self;
+        inner.addr_sub()
+    }
+}
+
+/// A strongly-held reference to an IP address assigned to a device.
+//
+// TODO(https://fxbug.dev/382093426): manually implement `Debug`.
+#[derive(Derivative)]
+#[derivative(
+    Debug(bound = "S: Debug"),
+    Clone(bound = ""),
+    Eq(bound = ""),
+    Hash(bound = ""),
+    PartialEq(bound = "")
+)]
+pub struct AddressId<S>(StrongRc<S>);
+
+impl<S> Deref for AddressId<S> {
+    type Target = S;
+
+    fn deref(&self) -> &Self::Target {
+        let Self(inner) = self;
+        inner.deref()
+    }
+}
+
+impl<A, S> IpAddressId<A> for AddressId<S>
+where
+    A: IpAddress<Version: AssignedAddrIpExt>,
+    S: AssignedAddressState<A>,
+{
+    type Weak = WeakAddressId<S>;
+
+    fn downgrade(&self) -> Self::Weak {
+        let Self(inner) = self;
+        WeakAddressId(StrongRc::downgrade(inner))
+    }
+
+    fn addr(&self) -> IpDeviceAddr<A> {
+        let Self(inner) = self;
+        inner.addr()
+    }
+
+    fn addr_sub(&self) -> AddrSubnet<A, <A::Version as AssignedAddrIpExt>::AssignedWitness> {
+        let Self(inner) = self;
+        inner.addr_sub()
+    }
+}
+
+/// A weakly-held reference to an IP address assigned to a device.
+//
+// TODO(https://fxbug.dev/382093426): manually implement `Debug`.
+#[derive(Derivative)]
+#[derivative(
+    Debug(bound = "S: Debug"),
+    Clone(bound = ""),
+    Eq(bound = ""),
+    Hash(bound = ""),
+    PartialEq(bound = "")
+)]
+pub struct WeakAddressId<S>(WeakRc<S>);
+
+impl<A, S> WeakIpAddressId<A> for WeakAddressId<S>
+where
+    A: IpAddress<Version: AssignedAddrIpExt>,
+    S: AssignedAddressState<A>,
+{
+    type Strong = AddressId<S>;
+
+    fn upgrade(&self) -> Option<Self::Strong> {
+        let Self(inner) = self;
+        inner.upgrade().map(AddressId)
     }
 }
 
@@ -321,7 +421,7 @@ impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext> IpDev
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug))]
 pub struct IpDeviceAddresses<I: Ip + IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> {
-    addrs: Vec<PrimaryRc<I::AssignedAddress<BT>>>,
+    addrs: Vec<PrimaryAddressId<I::AssignedAddressState<BT>>>,
 }
 
 // TODO(https://fxbug.dev/42165707): Once we figure out what invariants we want to
@@ -331,8 +431,9 @@ impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpDeviceAddresses<I,
     /// Iterates over the addresses assigned to this device.
     pub fn iter(
         &self,
-    ) -> impl ExactSizeIterator<Item = &PrimaryRc<I::AssignedAddress<BT>>> + ExactSizeIterator + Clone
-    {
+    ) -> impl ExactSizeIterator<Item = &PrimaryAddressId<I::AssignedAddressState<BT>>>
+           + ExactSizeIterator
+           + Clone {
         self.addrs.iter()
     }
 
@@ -344,13 +445,12 @@ impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpDeviceAddresses<I,
     /// Adds an IP address to this interface.
     pub fn add(
         &mut self,
-        addr: I::AssignedAddress<BT>,
-    ) -> Result<StrongRc<I::AssignedAddress<BT>>, ExistsError> {
+        addr: I::AssignedAddressState<BT>,
+    ) -> Result<AddressId<I::AssignedAddressState<BT>>, ExistsError> {
         if self.iter().any(|a| a.addr() == addr.addr()) {
             return Err(ExistsError);
         }
-        let primary = PrimaryRc::new(addr);
-        let strong = PrimaryRc::clone_strong(&primary);
+        let (primary, strong) = PrimaryAddressId::new_with_strong_clone(addr);
         self.addrs.push(primary);
         Ok(strong)
     }
@@ -359,8 +459,8 @@ impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpDeviceAddresses<I,
     pub fn remove(
         &mut self,
         addr: &I::Addr,
-    ) -> Result<PrimaryRc<I::AssignedAddress<BT>>, NotFoundError> {
-        let (index, _entry): (_, &PrimaryRc<I::AssignedAddress<BT>>) = self
+    ) -> Result<PrimaryAddressId<I::AssignedAddressState<BT>>, NotFoundError> {
+        let (index, _entry): (_, &PrimaryAddressId<I::AssignedAddressState<BT>>) = self
             .addrs
             .iter()
             .enumerate()
@@ -372,17 +472,17 @@ impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpDeviceAddresses<I,
 
 /// An iterator over address StrongIds. Created from `IpDeviceAddresses`.
 pub struct AddressIdIter<'a, I: Ip + IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>(
-    core::slice::Iter<'a, PrimaryRc<I::AssignedAddress<BT>>>,
+    core::slice::Iter<'a, PrimaryAddressId<I::AssignedAddressState<BT>>>,
 );
 
 impl<'a, I: Ip + IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Iterator
     for AddressIdIter<'a, I, BT>
 {
-    type Item = StrongRc<I::AssignedAddress<BT>>;
+    type Item = AddressId<I::AssignedAddressState<BT>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let Self(inner) = self;
-        inner.next().map(PrimaryRc::clone_strong)
+        inner.next().map(|addr| addr.clone_strong())
     }
 }
 
@@ -717,11 +817,11 @@ impl<BT: IpDeviceStateBindingsTypes> AsMut<IpDeviceState<Ipv6, BT>> for Ipv6Devi
 
 /// Bindings types required for IP device state.
 pub trait IpDeviceStateBindingsTypes:
-    InstantBindingsTypes + TimerBindingsTypes + ReferenceNotifiers
+    InstantBindingsTypes + TimerBindingsTypes + ReferenceNotifiers + 'static
 {
 }
 impl<BT> IpDeviceStateBindingsTypes for BT where
-    BT: InstantBindingsTypes + TimerBindingsTypes + ReferenceNotifiers
+    BT: InstantBindingsTypes + TimerBindingsTypes + ReferenceNotifiers + 'static
 {
 }
 
@@ -1292,7 +1392,7 @@ mod tests {
             common: CommonAddressProperties { valid_until, ..Default::default() },
         };
 
-        let _: StrongRc<_> = ipv4
+        let _: AddressId<_> = ipv4
             .add(Ipv4AddressEntry::new(AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(), config))
             .unwrap();
         // Adding the same address with different prefix should fail.
@@ -1317,7 +1417,7 @@ mod tests {
 
         let mut bindings_ctx = FakeBindingsCtxImpl::default();
 
-        let _: StrongRc<_> = ipv6
+        let _: AddressId<_> = ipv6
             .add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(),
                 Ipv6DadState::Tentative {

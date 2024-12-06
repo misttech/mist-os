@@ -24,8 +24,8 @@
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/lib/paver/abr-client.h"
 #include "src/storage/lib/paver/astro.h"
-#include "src/storage/lib/paver/kola.h"
 #include "src/storage/lib/paver/luis.h"
+#include "src/storage/lib/paver/moonflower.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/test/test-utils.h"
 #include "src/storage/lib/paver/x64.h"
@@ -34,7 +34,7 @@ namespace abr {
 
 using device_watcher::RecursiveWaitForFile;
 using driver_integration_test::IsolatedDevmgr;
-using paver::KolaGptEntryAttributes;
+using paver::MoonflowerGptEntryAttributes;
 
 TEST(AstroAbrTests, CreateFails) {
   IsolatedDevmgr devmgr;
@@ -70,7 +70,7 @@ TEST(SherlockAbrTests, CreateFails) {
   ASSERT_NOT_OK(partitioner);
 }
 
-TEST(KolaAbrTests, CreateFails) {
+TEST(MoonflowerAbrTests, CreateFails) {
   IsolatedDevmgr devmgr;
   IsolatedDevmgr::Args args;
   args.disable_block_watcher = false;
@@ -82,8 +82,8 @@ TEST(KolaAbrTests, CreateFails) {
   zx::result devices = paver::BlockDevices::CreateDevfs(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   std::shared_ptr<paver::Context> context;
-  zx::result partitioner = paver::KolaPartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
-                                                               paver::Arch::kArm64, context, {});
+  zx::result partitioner = paver::MoonflowerPartitionerFactory().New(
+      *devices, devmgr.RealmExposedDir(), paver::Arch::kArm64, context, {});
   ASSERT_NOT_OK(partitioner);
 }
 
@@ -149,7 +149,7 @@ class CurrentSlotUuidTest : public PaverTest {
 
   zx::result<paver::BlockDevices> CreateBlockDevices() {
     if (DevmgrArgs().enable_storage_host) {
-      return paver::BlockDevices::CreateStorageHost(devmgr_.RealmExposedDir().borrow());
+      return paver::BlockDevices::CreateFromPartitionService(devmgr_.RealmExposedDir().borrow());
     }
     return paver::BlockDevices::CreateDevfs(devmgr_.devfs_root().duplicate());
   }
@@ -277,7 +277,7 @@ class FakeBootArgs : public fidl::WireServer<fuchsia_boot::Arguments> {
   void Collect(CollectRequestView request, CollectCompleter::Sync& completer) override {}
 };
 
-class KolaAbrClientTest : public CurrentSlotUuidTest {
+class MoonflowerAbrClientTest : public CurrentSlotUuidTest {
  protected:
   static constexpr uint8_t kFvmType[GPT_GUID_LEN] = GPT_FVM_TYPE_GUID;
   static constexpr uint8_t kVbMetaType[GPT_GUID_LEN] = GPT_VBMETA_ABR_TYPE_GUID;
@@ -285,7 +285,7 @@ class KolaAbrClientTest : public CurrentSlotUuidTest {
 
   IsolatedDevmgr::Args DevmgrArgs() override {
     IsolatedDevmgr::Args args;
-    args.board_name = "kola";
+    args.board_name = "sorrel";
     args.fake_boot_args = std::make_unique<FakeBootArgs>();
     args.disable_block_watcher = false;
     return args;
@@ -305,7 +305,7 @@ class KolaAbrClientTest : public CurrentSlotUuidTest {
     zx::result devices = CreateBlockDevices();
     ASSERT_OK(devices);
     std::shared_ptr<paver::Context> context;
-    zx::result partitioner = paver::KolaPartitionerFactory().New(
+    zx::result partitioner = paver::MoonflowerPartitionerFactory().New(
         *devices, devmgr_.RealmExposedDir(), paver::Arch::kArm64, context, {});
     ASSERT_OK(partitioner);
     zx::result abr_client = partitioner->CreateAbrClient();
@@ -314,7 +314,6 @@ class KolaAbrClientTest : public CurrentSlotUuidTest {
     abr_client_ = std::move(*abr_client);
   }
 
-  // TODO(https://fxbug.dev/371060853): Remove this; use fshost APIs.
   zx::result<std::unique_ptr<gpt::GptDevice>> OpenGptDevice() {
     zx::result new_connection = GetNewConnections(disk_->block_controller_interface());
     if (new_connection.is_error()) {
@@ -332,142 +331,146 @@ class KolaAbrClientTest : public CurrentSlotUuidTest {
                                   /*blocks=*/disk_->block_count());
   }
 
-  zx::result<KolaGptEntryAttributes> CheckPartitionState(uint32_t index, std::string_view name,
-                                                         const uint8_t* type_guid) {
+  void CheckPartitionState(uint32_t index, std::string_view name, const uint8_t* type_guid,
+                           MoonflowerGptEntryAttributes* out) {
     zx::result gpt_result = OpenGptDevice();
-    if (gpt_result.is_error()) {
-      return gpt_result.take_error();
-    }
+    ASSERT_OK(gpt_result);
     std::unique_ptr<gpt::GptDevice> gpt = std::move(gpt_result.value());
-    auto gpt_entry = gpt->GetPartition(index);
-    if (gpt_entry.is_error()) {
-      return gpt_entry.take_error();
-    }
+    zx::result gpt_entry = gpt->GetPartition(index);
+    ASSERT_OK(gpt_entry);
 
     char cstring_name[GPT_NAME_LEN / 2 + 1] = {0};
     ::utf16_to_cstring(cstring_name, reinterpret_cast<const uint16_t*>(gpt_entry->name),
                        sizeof(cstring_name));
     const std::string_view partition_name = cstring_name;
-    EXPECT_EQ(partition_name, name);
+    ASSERT_EQ(partition_name, name);
 
-    EXPECT_EQ(memcmp(gpt_entry->type, type_guid, GPT_GUID_LEN), 0);
+    ASSERT_EQ(uuid::Uuid(gpt_entry->type), uuid::Uuid(type_guid));
 
-    return zx::ok(KolaGptEntryAttributes{gpt_entry->flags});
+    *out = MoonflowerGptEntryAttributes{gpt_entry->flags};
   }
 
   void AbrClientFlush() { ASSERT_OK(abr_client_->Flush()); }
+
+  void MoonflowerTest();
 
   std::unique_ptr<paver::DevicePartitioner> partitioner_;
   std::unique_ptr<abr::Client> abr_client_;
 };
 
-TEST_F(KolaAbrClientTest, KolaTest) {
+void MoonflowerAbrClientTest::MoonflowerTest() {
   // Initial active slot A.
   ASSERT_OK(abr_client_->MarkSlotActive(kAbrSlotIndexA));
   ASSERT_OK(abr_client_->MarkSlotSuccessful(kAbrSlotIndexA));
   AbrClientFlush();
 
-  zx::result<KolaGptEntryAttributes> attributes = CheckPartitionState(0, "boot_a", kZirconType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
-  EXPECT_EQ(attributes->active(), true);
-  EXPECT_EQ(attributes->retry_count(), 0);
-  EXPECT_EQ(attributes->boot_success(), true);
-  EXPECT_EQ(attributes->unbootable(), false);
-  attributes = CheckPartitionState(1, "boot_b", kBootloaderType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
-  EXPECT_EQ(attributes->active(), false);
-  EXPECT_EQ(attributes->retry_count(), 0);
-  EXPECT_EQ(attributes->boot_success(), false);
-  EXPECT_EQ(attributes->unbootable(), true);
-  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
-  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kVbMetaType));
-  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kBootloaderType));
+  MoonflowerGptEntryAttributes attributes{0};
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(0, "boot_a", kZirconType, &attributes));
+  EXPECT_EQ(attributes.priority(), MoonflowerGptEntryAttributes::kMoonflowerMaxPriority);
+  EXPECT_EQ(attributes.active(), true);
+  EXPECT_EQ(attributes.retry_count(), 0);
+  EXPECT_EQ(attributes.boot_success(), true);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(1, "boot_b", kBootloaderType, &attributes));
+  EXPECT_EQ(attributes.priority(), MoonflowerGptEntryAttributes::kMoonflowerMaxPriority - 1);
+  EXPECT_EQ(attributes.active(), false);
+  EXPECT_EQ(attributes.retry_count(), 0);
+  EXPECT_EQ(attributes.boot_success(), false);
+  EXPECT_EQ(attributes.unbootable(), true);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kVbMetaType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kBootloaderType, &attributes));
 
   ASSERT_OK(abr_client_->MarkSlotActive(kAbrSlotIndexB));
   AbrClientFlush();
 
-  attributes = CheckPartitionState(0, "boot_a", kBootloaderType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
-  EXPECT_EQ(attributes->active(), false);
-  EXPECT_EQ(attributes->retry_count(), 0);
-  EXPECT_EQ(attributes->boot_success(), true);
-  EXPECT_EQ(attributes->unbootable(), false);
-  attributes = CheckPartitionState(1, "boot_b", kZirconType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
-  EXPECT_EQ(attributes->active(), true);
-  EXPECT_EQ(attributes->retry_count(), kAbrMaxTriesRemaining);
-  EXPECT_EQ(attributes->boot_success(), false);
-  EXPECT_EQ(attributes->unbootable(), false);
-  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
-  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kBootloaderType));
-  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kVbMetaType));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(0, "boot_a", kBootloaderType, &attributes));
+  EXPECT_EQ(attributes.priority(), MoonflowerGptEntryAttributes::kMoonflowerMaxPriority - 1);
+  ASSERT_EQ(attributes.active(), false);
+  EXPECT_EQ(attributes.retry_count(), 0);
+  EXPECT_EQ(attributes.boot_success(), true);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(1, "boot_b", kZirconType, &attributes));
+  EXPECT_EQ(attributes.priority(), MoonflowerGptEntryAttributes::kMoonflowerMaxPriority);
+  EXPECT_EQ(attributes.active(), true);
+  EXPECT_EQ(attributes.retry_count(), kAbrMaxTriesRemaining);
+  EXPECT_EQ(attributes.boot_success(), false);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kBootloaderType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kVbMetaType, &attributes));
 
   ASSERT_OK(abr_client_->MarkSlotSuccessful(kAbrSlotIndexB));
   AbrClientFlush();
 
-  attributes = CheckPartitionState(0, "boot_a", kBootloaderType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
-  EXPECT_EQ(attributes->active(), false);
-  EXPECT_EQ(attributes->retry_count(), kAbrMaxTriesRemaining);
-  EXPECT_EQ(attributes->boot_success(), false);
-  EXPECT_EQ(attributes->unbootable(), false);
-  attributes = CheckPartitionState(1, "boot_b", kZirconType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
-  EXPECT_EQ(attributes->active(), true);
-  EXPECT_EQ(attributes->retry_count(), 0);
-  EXPECT_EQ(attributes->boot_success(), true);
-  EXPECT_EQ(attributes->unbootable(), false);
-  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
-  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kBootloaderType));
-  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kVbMetaType));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(0, "boot_a", kBootloaderType, &attributes));
+  EXPECT_EQ(attributes.priority(), MoonflowerGptEntryAttributes::kMoonflowerMaxPriority - 1);
+  EXPECT_EQ(attributes.active(), false);
+  EXPECT_EQ(attributes.retry_count(), kAbrMaxTriesRemaining);
+  EXPECT_EQ(attributes.boot_success(), false);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(1, "boot_b", kZirconType, &attributes));
+  EXPECT_EQ(attributes.priority(), MoonflowerGptEntryAttributes::kMoonflowerMaxPriority);
+  EXPECT_EQ(attributes.active(), true);
+  EXPECT_EQ(attributes.retry_count(), 0);
+  EXPECT_EQ(attributes.boot_success(), true);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kBootloaderType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kVbMetaType, &attributes));
 
   ASSERT_OK(abr_client_->MarkSlotActive(kAbrSlotIndexA));
   AbrClientFlush();
 
-  attributes = CheckPartitionState(0, "boot_a", kZirconType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
-  EXPECT_EQ(attributes->active(), true);
-  EXPECT_EQ(attributes->retry_count(), kAbrMaxTriesRemaining);
-  EXPECT_EQ(attributes->boot_success(), false);
-  EXPECT_EQ(attributes->unbootable(), false);
-  attributes = CheckPartitionState(1, "boot_b", kBootloaderType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
-  EXPECT_EQ(attributes->active(), false);
-  EXPECT_EQ(attributes->retry_count(), 0);
-  EXPECT_EQ(attributes->boot_success(), true);
-  EXPECT_EQ(attributes->unbootable(), false);
-  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
-  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kVbMetaType));
-  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kBootloaderType));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(0, "boot_a", kZirconType, &attributes));
+  EXPECT_EQ(attributes.priority(), MoonflowerGptEntryAttributes::kMoonflowerMaxPriority);
+  EXPECT_EQ(attributes.active(), true);
+  EXPECT_EQ(attributes.retry_count(), kAbrMaxTriesRemaining);
+  EXPECT_EQ(attributes.boot_success(), false);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(1, "boot_b", kBootloaderType, &attributes));
+  EXPECT_EQ(attributes.priority(), MoonflowerGptEntryAttributes::kMoonflowerMaxPriority - 1);
+  EXPECT_EQ(attributes.active(), false);
+  EXPECT_EQ(attributes.retry_count(), 0);
+  EXPECT_EQ(attributes.boot_success(), true);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kVbMetaType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kBootloaderType, &attributes));
 
   ASSERT_OK(abr_client_->MarkSlotSuccessful(kAbrSlotIndexA));
   AbrClientFlush();
 
-  attributes = CheckPartitionState(0, "boot_a", kZirconType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
-  EXPECT_EQ(attributes->active(), true);
-  EXPECT_EQ(attributes->retry_count(), 0);
-  EXPECT_EQ(attributes->boot_success(), true);
-  EXPECT_EQ(attributes->unbootable(), false);
-  attributes = CheckPartitionState(1, "boot_b", kBootloaderType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
-  EXPECT_EQ(attributes->active(), false);
-  EXPECT_EQ(attributes->retry_count(), kAbrMaxTriesRemaining);
-  EXPECT_EQ(attributes->boot_success(), false);
-  EXPECT_EQ(attributes->unbootable(), false);
-  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
-  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kVbMetaType));
-  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kBootloaderType));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(0, "boot_a", kZirconType, &attributes));
+  EXPECT_EQ(attributes.priority(), MoonflowerGptEntryAttributes::kMoonflowerMaxPriority);
+  EXPECT_EQ(attributes.active(), true);
+  EXPECT_EQ(attributes.retry_count(), 0);
+  EXPECT_EQ(attributes.boot_success(), true);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(1, "boot_b", kBootloaderType, &attributes));
+  EXPECT_EQ(attributes.priority(), MoonflowerGptEntryAttributes::kMoonflowerMaxPriority - 1);
+  EXPECT_EQ(attributes.active(), false);
+  EXPECT_EQ(attributes.retry_count(), kAbrMaxTriesRemaining);
+  EXPECT_EQ(attributes.boot_success(), false);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kVbMetaType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kBootloaderType, &attributes));
+}
+
+class MoonflowerAbrClientWithStorageHostTest : public MoonflowerAbrClientTest {
+ protected:
+  IsolatedDevmgr::Args DevmgrArgs() override {
+    IsolatedDevmgr::Args args = MoonflowerAbrClientTest::DevmgrArgs();
+    args.enable_storage_host = true;
+    return args;
+  }
+};
+
+TEST_F(MoonflowerAbrClientTest, MoonflowerTest) { ASSERT_NO_FATAL_FAILURE(MoonflowerTest()); }
+
+TEST_F(MoonflowerAbrClientWithStorageHostTest, MoonflowerTest) {
+  ASSERT_NO_FATAL_FAILURE(MoonflowerTest());
 }
 
 class FakePartitionClient final : public paver::PartitionClient {

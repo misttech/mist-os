@@ -24,6 +24,11 @@ FUCHSIA_PLATFORMS_MAP = {
     "riscv64": "fuchsia_riscv64",
 }
 
+# Build at HEAD to hopefully exercise as much code as possible.
+# The downside is that code removed at HEAD (or NEXT or a recent stable API
+# level) will not be built.
+_TARGET_API_LEVEL = "HEAD"
+
 def _cc_std_version_transition_impl(settings, attr):
     input_cpu = settings["//command_line_option:cpu"]
     output_cpu = NATIVE_CPU_ALIASES.get(input_cpu, None)
@@ -45,9 +50,11 @@ def _cc_std_version_transition_impl(settings, attr):
         "//command_line_option:cxxopt": cxxopts,
         "//command_line_option:copt": copts,
         "//command_line_option:platforms": fuchsia_platform,
-        "@fuchsia_sdk//fuchsia:fuchsia_api_level": "HEAD",
+        "@fuchsia_sdk//fuchsia:fuchsia_api_level": _TARGET_API_LEVEL,
     }
 
+# This transition replicates some of the functionality of `fuchsia_transition`,
+# including setting the API level label and adding it to the compiler args.
 cc_std_version_transition = transition(
     implementation = _cc_std_version_transition_impl,
     inputs = [
@@ -60,7 +67,7 @@ cc_std_version_transition = transition(
         "//command_line_option:cxxopt",
         "//command_line_option:platforms",
         "//command_line_option:copt",
-        "@fuchsia_sdk//fuchsia:fuchsia_api_level",
+        "@fuchsia_sdk//fuchsia:fuchsia_api_level",  # "@fuchsia_sdk%s" % FUCHSIA_API_LEVEL_TARGET_NAME,
     ],
 )
 
@@ -152,6 +159,7 @@ def _fuchsia_sdk_cc_source_library_test_impl(ctx):
 _fuchsia_sdk_cc_source_library_test = rule(
     test = True,
     implementation = _fuchsia_sdk_cc_source_library_test_impl,
+    # Use a custom transition to control the exact compiler options.
     cfg = cc_std_version_transition,
     attrs = {
         "driver_binary": attr.label(

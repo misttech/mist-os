@@ -217,9 +217,10 @@ impl FvmReader {
         let mut allocation_index = 0;
         for slice in allocations {
             if slice.is_allocated() {
-                if !partition_alloc_map.contains_key(&slice.vpartition()) {
-                    partition_alloc_map
-                        .insert(slice.vpartition(), vec![(slice.vslice(), allocation_index)]);
+                if let std::collections::hash_map::Entry::Vacant(e) =
+                    partition_alloc_map.entry(slice.vpartition())
+                {
+                    e.insert(vec![(slice.vslice(), allocation_index)]);
                 } else {
                     partition_alloc_map
                         .get_mut(&slice.vpartition())

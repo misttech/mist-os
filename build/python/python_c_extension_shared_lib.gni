@@ -40,10 +40,5 @@ template("python_c_extension_shared_lib") {
       # However, Python only expects C extensions to have a .so extension.
       output_extension = "so"
     }
-
-    # pie is not used when building on Linux. If this is enabled a warning is emitted.
-    if (host_os == "linux") {
-      configs -= [ "//build/config/linux:default-pie" ]
-    }
   }
 }

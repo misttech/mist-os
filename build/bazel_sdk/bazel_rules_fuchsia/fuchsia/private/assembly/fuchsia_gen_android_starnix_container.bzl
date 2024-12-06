@@ -2,12 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("//fuchsia/private:fuchsia_prebuilt_package.bzl", "fuchsia_prebuilt_package")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _gen_android_starnix_container_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
 
     _hal_files = []
     for hal in ctx.attr.hals:
@@ -40,7 +40,7 @@ def _gen_android_starnix_container_impl(ctx):
 
     _args = [
         "--name",
-        ctx.attr.package_name,
+        ctx.attr.package_name if ctx.attr.package_name else ctx.label.name,
         "--outdir",
         _container_manifest.dirname,
         "--base",
@@ -64,6 +64,11 @@ def _gen_android_starnix_container_impl(ctx):
             ctx.actions.declare_directory("vendor", sibling = _container_manifest),
         ]
 
+    if ctx.attr.skip_subpackages:
+        _args += [
+            "--skip_subpackages",
+        ]
+
     ctx.actions.run(
         executable = sdk.gen_android_starnix_container,
         arguments = _args,
@@ -82,10 +87,10 @@ def _gen_android_starnix_container_impl(ctx):
         ),
     ]
 
-_gen_android_starnix_container_internal = rule(
+fuchsia_gen_android_starnix_container = rule(
     doc = "Construct a starnix container that can include an Android system and HALs.",
     implementation = _gen_android_starnix_container_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "base": attr.label(
             doc = "Path to package containing base resources to include",
@@ -112,16 +117,8 @@ _gen_android_starnix_container_internal = rule(
             doc = "HALs to include in this container. List of fuchsia_prebuilt_package labels or far files",
             allow_files = True,
         ),
+        "skip_subpackages": attr.bool(
+            doc = "Skip including HALs as subpackages.",
+        ),
     },
 )
-
-def fuchsia_gen_android_starnix_container(name, base, system, base_files = [], package_name = None, hals = [], vendor = None):
-    _gen_android_starnix_container_internal(
-        name = name,
-        package_name = package_name if package_name else name,
-        base = base,
-        base_files = base_files,
-        hals = hals,
-        system = system,
-        vendor = vendor,
-    )

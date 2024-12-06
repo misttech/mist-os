@@ -9,7 +9,7 @@
 #include "src/ui/lib/escher/impl/frame_manager.h"
 #include "src/ui/lib/escher/vk/color_space.h"
 #if ESCHER_USE_RUNTIME_GLSL
-#include "third_party/shaderc/libshaderc/include/shaderc/shaderc.hpp"  // nogncheck
+#include <shaderc/shaderc.hpp>  // nogncheck
 #endif
 #include "src/ui/lib/escher/impl/image_cache.h"
 #include "src/ui/lib/escher/impl/mesh_manager.h"

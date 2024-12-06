@@ -17,7 +17,8 @@ import("//tools/cmc/build/expect_includes.gni")
 #     If not specified, the target name is used.
 #
 #   required_offers (optional)
-#     [list of strings] The set of protocols that should be offered to every child.
+#     {protocol:[string], dictionary:[string]} The set of protocols and dictionaries and that
+#     should be offered to every child.
 #
 #   required_uses (optional)
 #     [list of strings] The set of protocols that each child must use.
@@ -123,10 +124,29 @@ template("cm") {
     if (!defined(required_offers)) {
       # These offers are required in all CML that does not explicitly disable it.
       # This behavior will eventually be the default everywhere: https://fxbug.dev/42175121
-      required_offers = [ "fuchsia.logger.LogSink" ]
+      required_offers = {
+        protocol = [ "fuchsia.logger.LogSink" ]
+        dictionary = []
+      }
     }
 
-    foreach(offer, required_offers) {
+    # Add required offer lint flags
+    if (!defined(required_offers.dictionary)) {
+      required_offers.dictionary = []
+    }
+
+    if (!defined(required_offers.protocol)) {
+      required_offers.protocol = []
+    }
+
+    foreach(offer, required_offers.dictionary) {
+      args += [
+        "--must-offer-dictionary",
+        offer,
+      ]
+    }
+
+    foreach(offer, required_offers.protocol) {
       args += [
         "--must-offer-protocol",
         offer,

@@ -24,8 +24,8 @@
 
 #include <virtio/virtio.h>
 
-#include "src/graphics/display/drivers/virtio-gpu-display/display-controller-banjo.h"
-#include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-banjo.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-banjo-adapter.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
@@ -237,11 +237,10 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
     auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
     fidl::BindServer(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
 
-    device_ = std::make_unique<DisplayEngine>(&coordinator_events_, std::move(sysmem_client),
+    device_ = std::make_unique<DisplayEngine>(&engine_events_, std::move(sysmem_client),
                                               std::move(gpu_device));
 
-    banjo_controller_ =
-        std::make_unique<DisplayControllerBanjo>(device_.get(), &coordinator_events_);
+    banjo_controller_ = std::make_unique<DisplayEngineBanjoAdapter>(device_.get(), &engine_events_);
     ASSERT_OK(device_->Init());
 
     RunLoopUntilIdle();
@@ -269,9 +268,9 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   std::vector<uint8_t> virtio_cursor_queue_buffer_pool_;
   std::unique_ptr<MockAllocator> fake_sysmem_;
 
-  DisplayCoordinatorEventsBanjo coordinator_events_;
+  DisplayEngineEventsBanjo engine_events_;
   std::unique_ptr<DisplayEngine> device_;
-  std::unique_ptr<DisplayControllerBanjo> banjo_controller_;
+  std::unique_ptr<DisplayEngineBanjoAdapter> banjo_controller_;
 };
 
 TEST_F(VirtioGpuTest, ImportVmo) {

@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/async/cpp/irq.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/focaltech/focaltech.h>
@@ -97,6 +98,11 @@ class FtDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTR
   void GetInputReport(GetInputReportRequestView request,
                       GetInputReportCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_input_report::InputDevice> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    zxlogf(WARNING, "Unexpected fidl method invoked: %ld", metadata.method_ordinal);
   }
 
   // Visible for testing.

@@ -4,7 +4,6 @@
 
 use super::event::TraceEventQueue;
 use super::tracing_directory::TraceMarkerFile;
-use once_cell::sync::Lazy;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
     BytesFile, BytesFileOps, CacheMode, ConstFile, FileObject, FileOps, FileSystem,
@@ -21,7 +20,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::{errno, error, statfs, TRACEFS_MAGIC};
 use std::borrow::Cow;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 pub fn trace_fs(
     _locked: &mut Locked<'_, Unlocked>,
@@ -74,7 +73,7 @@ impl TraceFs {
         );
         dir.subdir(current_task, "per_cpu", 0o755, |dir| {
             /// A name for each cpu directory, cached to provide a 'static lifetime.
-            static CPU_DIR_NAMES: Lazy<Vec<String>> = Lazy::new(|| {
+            static CPU_DIR_NAMES: LazyLock<Vec<String>> = LazyLock::new(|| {
                 (0..zx::system_get_num_cpus()).map(|cpu| format!("cpu{}", cpu)).collect()
             });
             for dir_name in CPU_DIR_NAMES.iter().map(|s| s.as_str()) {

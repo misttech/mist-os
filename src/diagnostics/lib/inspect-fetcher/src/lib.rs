@@ -28,7 +28,6 @@ impl InspectFetcher {
     ///
     /// `service_path` should name a fuchsia.diagnostics.ArchiveAccessor service.
     /// `selectors` should be in Triage format, i.e. INSPECT:moniker:path:leaf.
-
     pub fn create(service_path: &str, selectors: Vec<String>) -> Result<InspectFetcher, Error> {
         if selectors.is_empty() {
             return Ok(InspectFetcher { reader: None });

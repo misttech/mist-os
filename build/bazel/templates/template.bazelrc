@@ -64,7 +64,13 @@ common:exec_log --experimental_enable_execution_graph_log
 common --experimental_downloader_config={config_file}
 
 # Pass local developer overrides for assembly to Bazel
+# For now, this needs to set the label_flag() in both @rules_fuchsia
+# and @fuchsia_sdk to ensure that all fuchsia_product() definitions
+# correctly support this feature. The @fuchsia_sdk one may be
+# removed when the fuchsia.git and vendor/*.git repositories no
+# longer include rules from @fuchsia_sdk.
 common --@fuchsia_sdk//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list
+common --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list
 
 # TODO(http://b/319377689#comment5): Remove this flag when the linked issue is
 # fixed upstream.
@@ -101,3 +107,13 @@ import third_party/pigweed/configuration.bazelrc
 # Profiling network usage can help find unexpected uploading/downloading by RBE, BES, etc.
 # As of Bazel 8, this will be enabled by default.
 build --experimental_collect_system_network_usage
+
+# Use --config=no_sdk to ensure that the @fuchsia_sdk and @fuchsia_clang
+# repositories will be empty. This prevents generating Fuchsia binaries
+# entirely but may be useful to run Bazel commands immediately in the build.
+common:no_sdk \
+  --override_repository=fuchsia_in_tree_idk=build/bazel/local_repositories/empty \
+  --override_repository=fuchsia_internal_idk=build/bazel/local_repositories/empty \
+  --override_repository=fuchsia_sdk=build/bazel/local_repositories/empty_fuchsia_sdk \
+  --override_repository=fuchsia_clang=build/bazel/local_repositories/empty_fuchsia_clang \
+  --platforms=//build/bazel/platforms:{host_platform}

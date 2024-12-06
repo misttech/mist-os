@@ -210,8 +210,11 @@ impl Unlocked {
     /// Entry point for locked access.
     ///
     /// `Unlocked` is the "root" lock level and can be acquired before any lock.
+    ///
+    /// # Safety
+    /// `Unlocked` should only be used before any lock in the program has been acquired.
     #[inline(always)]
-    pub fn new() -> Locked<'static, Unlocked> {
+    pub unsafe fn new() -> Locked<'static, Unlocked> {
         Locked::<'static, Unlocked>(Default::default())
     }
 }
@@ -404,8 +407,10 @@ mod test {
 
         impl LockFor<LockA> for HoldsLocks {
             type Data = u8;
-            type Guard<'l> = std::sync::MutexGuard<'l, u8>
-                where Self: 'l;
+            type Guard<'l>
+                = std::sync::MutexGuard<'l, u8>
+            where
+                Self: 'l;
             fn lock(&self) -> Self::Guard<'_> {
                 self.a.lock().unwrap()
             }
@@ -413,8 +418,10 @@ mod test {
 
         impl LockFor<LockB> for HoldsLocks {
             type Data = u32;
-            type Guard<'l> = std::sync::MutexGuard<'l, u32>
-                where Self: 'l;
+            type Guard<'l>
+                = std::sync::MutexGuard<'l, u32>
+            where
+                Self: 'l;
             fn lock(&self) -> Self::Guard<'_> {
                 self.b.lock().unwrap()
             }
@@ -424,7 +431,7 @@ mod test {
 
         let state = HoldsLocks::default();
         // Create a new lock session with the "root" lock level (empty tuple).
-        let mut locked = Unlocked::new();
+        let mut locked = unsafe { Unlocked::new() };
         // Access locked state.
         let (_a, mut locked_a) = locked.lock_and::<LockA, _>(&state);
         let _b = locked_a.lock::<LockB, _>(&state);
@@ -538,7 +545,7 @@ mod test {
     fn lock_a_then_c() {
         let data = Data::default();
 
-        let mut w = Unlocked::new();
+        let mut w = unsafe { Unlocked::new() };
         let (_a, mut wa) = w.lock_and::<A, _>(&data);
         let (_c, _wc) = wa.lock_and::<C, _>(&data);
         // This won't compile!
@@ -549,7 +556,7 @@ mod test {
     fn cast_a_then_c() {
         let data = Data::default();
 
-        let mut w = Unlocked::new();
+        let mut w = unsafe { Unlocked::new() };
         let mut wa = w.cast_locked::<A>();
         let (_c, _wc) = wa.lock_and::<C, _>(&data);
         // This should not compile:
@@ -560,7 +567,7 @@ mod test {
     fn unlocked_access_does_not_prevent_locking() {
         let data = Data { a: Mutex::new(15), u: 34, ..Data::default() };
 
-        let mut locked = Unlocked::new();
+        let mut locked = unsafe { Unlocked::new() };
         let u = &data.u;
 
         // Prove that `u` does not prevent locked state from being accessed.
@@ -574,7 +581,7 @@ mod test {
     fn nested_locks() {
         let data = Data { e: Mutex::new(Mutex::new(1)), ..Data::default() };
 
-        let mut locked = Unlocked::new();
+        let mut locked = unsafe { Unlocked::new() };
         let (e, mut next_locked) = locked.lock_and::<E, _>(&data);
         let v = next_locked.lock::<F, _>(&*e);
         assert_eq!(*v, 1);
@@ -584,7 +591,7 @@ mod test {
     fn rw_lock() {
         let data = Data { d: RwLock::new(1), ..Data::default() };
 
-        let mut locked = Unlocked::new();
+        let mut locked = unsafe { Unlocked::new() };
         {
             let mut d = locked.write_lock::<D, _>(&data);
             *d = 10;
@@ -597,7 +604,7 @@ mod test {
     fn collections() {
         let data = Data { g: Mutex::new(vec![Mutex::new(0), Mutex::new(1)]), ..Data::default() };
 
-        let mut locked = Unlocked::new();
+        let mut locked = unsafe { Unlocked::new() };
         let (g, mut next_locked) = locked.lock_and::<G, _>(&data);
         let v = next_locked.lock::<H, _>(&g[1]);
         assert_eq!(*v, 1);
@@ -607,7 +614,7 @@ mod test {
     fn lock_same_level() {
         let data1 = Data { a: Mutex::new(5), b: Mutex::new(15), ..Data::default() };
         let data2 = Data { a: Mutex::new(10), b: Mutex::new(20), ..Data::default() };
-        let mut locked = Unlocked::new();
+        let mut locked = unsafe { Unlocked::new() };
         {
             let (a1, a2, mut new_locked) = locked.lock_both_and::<A, _>(&data1, &data2);
             assert_eq!(*a1, 5);

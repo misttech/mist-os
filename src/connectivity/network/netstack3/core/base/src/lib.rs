@@ -8,7 +8,7 @@
 //! and is the base dependency for most of them.
 
 #![no_std]
-#![deny(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
+#![warn(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
 
 extern crate fakealloc as alloc;
 extern crate fakestd as std;
@@ -37,7 +37,10 @@ pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use data_structures::token_bucket::TokenBucket;
-pub use device::address::{IpDeviceAddr, Ipv4DeviceAddr, Ipv6DeviceAddr};
+pub use device::address::{
+    AssignedAddrIpExt, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr,
+    Ipv6DeviceAddr, WeakIpAddressId,
+};
 pub use device::link::{LinkAddress, LinkDevice, LinkUnicastAddress};
 pub use device::{
     AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, DeviceIdentifier, DeviceWithName,
@@ -137,6 +140,7 @@ pub mod testutil {
     mod misc;
     mod monotonic_id;
 
+    pub use crate::device::address::testutil::FakeWeakAddressId;
     pub use crate::device::link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId};
     pub use crate::device::testutil::{
         FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,

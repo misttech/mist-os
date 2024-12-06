@@ -145,7 +145,7 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
             (Err(e), Some(fuzzer)) => {
                 let result = self.report_error(e);
                 let url = fuzzer.url();
-                let _ = self.stop(&url.to_string()).await;
+                let _ = self.stop(url.as_ref()).await;
                 result
             }
         }

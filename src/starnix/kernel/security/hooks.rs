@@ -7,8 +7,8 @@ use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntryHandle, FileHandle, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode,
-    ValueOrSize, XattrOp,
+    DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
+    NamespaceNode, ValueOrSize, XattrOp,
 };
 use fuchsia_inspect_contrib::profile_duration;
 use selinux::{SecurityPermission, SecurityServer};
@@ -339,6 +339,15 @@ pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
     FileObjectState { state: selinux_hooks::file_alloc_security(current_task) }
 }
 
+/// Returns whether `current_task` can issue an ioctl to `file`.
+/// Corresponds to the `file_ioctl()` LSM hook.
+pub fn check_file_ioctl_access(current_task: &CurrentTask, file: &FileObject) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_file_ioctl_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_file_ioctl_access(security_server, current_task, file)
+    })
+}
+
 /// Return the default initial `TaskState` for kernel tasks.
 /// Corresponds to the `task_alloc()` LSM hook, in the special case when current_task is null.
 pub fn task_alloc_for_kernel() -> TaskState {
@@ -588,27 +597,34 @@ pub fn task_prlimit(
     })
 }
 
-/// Check permission before an object specified by `dev_name` is mounted on the mount point named by `path`.
-/// `type` contains the filesystem type. `flags` contains the mount flags. `data` contains the filesystem-specific data.
+/// Check permission before mounting to `path`. `flags` contains the mount flags that determine the
+/// kind of mount operation done, and therefore the permissions that the caller requires.
 /// Corresponds to the `sb_mount()` LSM hook.
 pub fn sb_mount(
     current_task: &CurrentTask,
-    dev_name: &bstr::BStr,
     path: &NamespaceNode,
-    fs_type: &bstr::BStr,
     flags: MountFlags,
-    data: &bstr::BStr,
 ) -> Result<(), Errno> {
     profile_duration!("security.hooks.sb_mount");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::superblock::sb_mount(
             &security_server.as_permission_check(),
             current_task,
-            dev_name,
             path,
-            fs_type,
             flags,
-            data,
+        )
+    })
+}
+
+/// Checks if `current_task` has the permission to get the filesystem statistics of `fs`.
+/// Corresponds to the `sb_statfs()` LSM hook.
+pub fn sb_statfs(current_task: &CurrentTask, fs: &FileSystem) -> Result<(), Errno> {
+    profile_duration!("security.hooks.sb_statfs");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::superblock::sb_statfs(
+            &security_server.as_permission_check(),
+            current_task,
+            fs,
         )
     })
 }
@@ -695,6 +711,17 @@ pub fn check_fs_node_removexattr_access(
             name,
         )
     })
+}
+
+/// If SELinux is enabled and `fs_node` is in a filesystem without xattr support, returns the xattr
+/// name for the security label associated with inode. Otherwise returns None.
+///
+/// This hook is called from the `listxattr` syscall.
+///
+/// Corresponds to the `inode_listsecurity()` LSM hook.
+pub fn fs_node_listsecurity(current_task: &CurrentTask, fs_node: &FsNode) -> Option<FsString> {
+    profile_duration!("security.hooks.fs_node_listsecurity");
+    if_selinux_else(current_task, |_| selinux_hooks::fs_node_listsecurity(fs_node), || None)
 }
 
 /// Returns the value of the specified "security.*" attribute for `fs_node`.

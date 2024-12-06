@@ -4,7 +4,7 @@
 
 pub mod table;
 
-mod misc;
+pub mod misc;
 pub mod time;
 
 #[cfg(feature = "syscall_stats")]
@@ -13,25 +13,25 @@ pub mod syscall_stats {
     use starnix_uapi;
 
     use fuchsia_inspect as inspect;
-    use once_cell::sync::Lazy;
     use paste::paste;
+    use std::sync::LazyLock;
 
     /// A macro for declaring a SyscallDecl stats property.
     macro_rules! syscall_stats_property {
         ($($name:ident,)*) => {
             paste!{
                 $(
-                    static [<SYSCALL_ $name:upper _STATS>]: Lazy<inspect::UintProperty> =
-                    Lazy::new(|| SYSCALL_STATS_NODE.create_uint(stringify!($name), 0));
+                    static [<SYSCALL_ $name:upper _STATS>]: LazyLock<inspect::UintProperty> =
+                    LazyLock::new(|| SYSCALL_STATS_NODE.create_uint(stringify!($name), 0));
                 )*
             }
         }
     }
 
-    static SYSCALL_STATS_NODE: Lazy<inspect::Node> =
-        Lazy::new(|| inspect::component::inspector().root().create_child("syscall_stats"));
-    static SYSCALL_UNKNOWN_STATS: Lazy<inspect::UintProperty> =
-        Lazy::new(|| SYSCALL_STATS_NODE.create_uint("<unknown>", 0));
+    static SYSCALL_STATS_NODE: LazyLock<inspect::Node> =
+        LazyLock::new(|| inspect::component::inspector().root().create_child("syscall_stats"));
+    static SYSCALL_UNKNOWN_STATS: LazyLock<inspect::UintProperty> =
+        LazyLock::new(|| SYSCALL_STATS_NODE.create_uint("<unknown>", 0));
 
     // Produce each syscall stats property.
     for_each_syscall! {syscall_stats_property}

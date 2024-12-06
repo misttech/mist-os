@@ -63,7 +63,7 @@ $ ktrace save /tmp/save.ktrace
 Then copy the file to the development host, and export it:
 
 ```
-host$ out/default/host-tools/netcp :/tmp/save.ktrace save.fxt
+host$ fx cp --to-host /tmp/save.ktrace save.fxt
 host$ fx trace2json < save.fxt > save.json
 ```
 

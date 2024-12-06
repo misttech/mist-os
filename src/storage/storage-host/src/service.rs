@@ -16,7 +16,7 @@ use vfs::path::Path;
 use {
     fidl_fuchsia_fs_startup as fstartup, fidl_fuchsia_hardware_block as fblock,
     fidl_fuchsia_io as fio, fidl_fuchsia_process_lifecycle as flifecycle,
-    fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync,
+    fidl_fuchsia_storage_partitions as fpartitions, fuchsia_async as fasync,
 };
 
 pub struct StorageHostService {
@@ -88,14 +88,14 @@ impl StorageHostService {
         )?;
         svc_dir
             .add_entry(
-                fstoragehost::PartitionServiceMarker::SERVICE_NAME,
+                fpartitions::PartitionServiceMarker::SERVICE_NAME,
                 self.partitions_dir.clone(),
             )
             .unwrap();
 
         svc_dir
             .add_entry(
-                fstoragehost::PartitionsAdminMarker::PROTOCOL_NAME,
+                fpartitions::PartitionsAdminMarker::PROTOCOL_NAME,
                 vfs::service::host(move |requests| {
                     let weak = weak2.clone();
                     async move {
@@ -109,7 +109,7 @@ impl StorageHostService {
 
         svc_dir
             .add_entry(
-                fstoragehost::PartitionsManagerMarker::PROTOCOL_NAME,
+                fpartitions::PartitionsManagerMarker::PROTOCOL_NAME,
                 vfs::service::host(move |requests| {
                     let weak = weak3.clone();
                     async move {
@@ -203,24 +203,24 @@ impl StorageHostService {
 
     async fn handle_partitions_manager_requests(
         self: Arc<Self>,
-        mut stream: fstoragehost::PartitionsManagerRequestStream,
+        mut stream: fpartitions::PartitionsManagerRequestStream,
     ) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await.context("Reading request")? {
             tracing::debug!(?request);
             match request {
-                fstoragehost::PartitionsManagerRequest::GetBlockInfo { responder } => {
+                fpartitions::PartitionsManagerRequest::GetBlockInfo { responder } => {
                     responder
                         .send(self.get_block_info().await.map_err(|status| status.into_raw()))
                         .unwrap_or_else(|e| {
                             tracing::error!(?e, "Failed to send GetBlockInfo response")
                         });
                 }
-                fstoragehost::PartitionsManagerRequest::CreateTransaction { responder } => {
+                fpartitions::PartitionsManagerRequest::CreateTransaction { responder } => {
                     responder
                         .send(self.create_transaction().await.map_err(|status| status.into_raw()))
                         .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Start response"));
                 }
-                fstoragehost::PartitionsManagerRequest::CommitTransaction {
+                fpartitions::PartitionsManagerRequest::CommitTransaction {
                     transaction,
                     responder,
                 } => {
@@ -268,12 +268,12 @@ impl StorageHostService {
 
     async fn handle_partitions_admin_requests(
         self: Arc<Self>,
-        mut stream: fstoragehost::PartitionsAdminRequestStream,
+        mut stream: fpartitions::PartitionsAdminRequestStream,
     ) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await.context("Reading request")? {
             tracing::debug!(?request);
             match request {
-                fstoragehost::PartitionsAdminRequest::ResetPartitionTable {
+                fpartitions::PartitionsAdminRequest::ResetPartitionTable {
                     partitions,
                     responder,
                 } => {
@@ -292,9 +292,9 @@ impl StorageHostService {
 
     async fn reset_partition_table(
         &self,
-        partitions: Vec<fstoragehost::PartitionInfo>,
+        partitions: Vec<fpartitions::PartitionInfo>,
     ) -> Result<(), zx::Status> {
-        fn convert_partition_info(info: fstoragehost::PartitionInfo) -> gpt::PartitionInfo {
+        fn convert_partition_info(info: fpartitions::PartitionInfo) -> gpt::PartitionInfo {
             gpt::PartitionInfo {
                 label: info.name,
                 type_guid: gpt::Guid::from_bytes(info.type_guid.value),
@@ -374,7 +374,7 @@ mod tests {
     use {
         fidl_fuchsia_fs_startup as fstartup, fidl_fuchsia_hardware_block as fblock,
         fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
-        fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync,
+        fidl_fuchsia_storage_partitions as fpartitions, fuchsia_async as fasync,
     };
 
     async fn setup_server(
@@ -506,7 +506,7 @@ mod tests {
                     .expect("Start failed");
 
                 let pm_client = connect_to_protocol_at_dir_svc::<
-                    fstoragehost::PartitionsManagerMarker,
+                    fpartitions::PartitionsManagerMarker,
                 >(&outgoing_dir)
                 .unwrap();
                 let transaction = pm_client

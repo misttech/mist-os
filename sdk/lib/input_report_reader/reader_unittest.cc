@@ -6,10 +6,9 @@
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/input_report_reader/reader.h>
+#include <zircon/time.h>
 
 #include <zxtest/zxtest.h>
-
-#include "zircon/system/public/zircon/time.h"
 
 struct MouseReport {
   int64_t movement_x;
@@ -51,6 +50,11 @@ class MouseDevice : public fidl::WireServer<fuchsia_input_report::InputDevice> {
                         SetFeatureReportCompleter::Sync& completer) override;
   void GetInputReport(GetInputReportRequestView request,
                       GetInputReportCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_input_report::InputDevice> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    fprintf(stderr, "Unexpected fidl method invoked: %ld", metadata.method_ordinal);
+  }
 
  private:
   sync_completion_t next_reader_wait_;

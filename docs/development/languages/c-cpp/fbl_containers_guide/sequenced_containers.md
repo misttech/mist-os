@@ -88,7 +88,7 @@ position either immediately before (`insert`) or immediately after
 (`insert_after`) the iterator. Either `begin()` or `end()` may be provided as
 the iterator for `insert`, which is functionally equivalent to saying simply
 `push_front` or `push_back`. It is an error to call `insert_after` with an
-iterator that does not reference an element, therefor `insert_after` will only
+iterator that does not reference an element, therefore `insert_after` will only
 accept a container's `begin()` when the container is non-empty, and will never
 accept `end()`. Continuing the previous example:
 

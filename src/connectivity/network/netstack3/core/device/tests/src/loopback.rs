@@ -10,6 +10,7 @@ use net_types::ethernet::Mac;
 use net_types::ip::{AddrSubnet, Ipv4, Ipv6, Mtu};
 use net_types::SpecifiedAddr;
 use netstack3_base::testutil::{TestAddrs, TestIpExt};
+use netstack3_base::IpAddressId as _;
 use netstack3_core::error::NotFoundError;
 use netstack3_core::testutil::{
     CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
@@ -17,7 +18,6 @@ use netstack3_core::testutil::{
 use netstack3_core::IpExt;
 use netstack3_device::loopback::{self, LoopbackCreationProperties, LoopbackDevice};
 use netstack3_device::queue::ReceiveQueueContext;
-use netstack3_ip::device::IpAddressId as _;
 use netstack3_ip::{self as ip, DeviceIpLayerMetadata};
 use packet::{Buf, ParseBuffer as _};
 use packet_formats::ethernet::{EthernetFrame, EthernetFrameLengthCheck};

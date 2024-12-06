@@ -55,7 +55,7 @@ impl FromStr for Version {
         if value.is_empty() {
             return Err(anyhow::anyhow!("Version string cannot be empty."));
         }
-        let placeholder_url = format!("http://some.domain/{}", value.to_string());
+        let placeholder_url = format!("http://some.domain/{}", value);
         if let Ok(val) = Url::parse(&placeholder_url) {
             // If the parsed URL has changed, then the string had to be escaped (it was not URL-safe).
             if val.to_string() == placeholder_url {

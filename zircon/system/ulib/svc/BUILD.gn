@@ -63,7 +63,6 @@ zx_library("svc") {
     "//src/graphics/drivers/misc/goldfish/*",
     "//src/graphics/drivers/misc/goldfish_address_space/*",
     "//src/graphics/drivers/misc/goldfish_sync/*",
-    "//src/media/audio/drivers/aml-dsp/*",
     "//src/storage/lib/paver/*",
     "//src/storage/lib/paver/test/*",
     "//src/sys/component_manager/tests/rights/*",

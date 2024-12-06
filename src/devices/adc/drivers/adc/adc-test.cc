@@ -66,10 +66,10 @@ class AdcTestEnvironment : fdf_testing::Environment {
       return result.take_error();
     }
 
-    zx_status_t status =
-        metadata_server_.Serve(to_driver_vfs, fdf::Dispatcher::GetCurrent()->async_dispatcher());
-    if (status != ZX_OK) {
-      return zx::error(status);
+    if (zx::result result = metadata_server_.Serve(
+            to_driver_vfs, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+        result.is_error()) {
+      return result.take_error();
     }
 
     return zx::ok();
@@ -84,7 +84,7 @@ class AdcTestEnvironment : fdf_testing::Environment {
         });
     fuchsia_hardware_adcimpl::Metadata metadata{{.channels = std::move(channels)}};
 
-    ASSERT_EQ(ZX_OK, metadata_server_.SetMetadata(metadata));
+    ASSERT_EQ(ZX_OK, metadata_server_.SetMetadata(metadata).status_value());
   }
 
   FakeAdcImplServer& fake_adc_impl_server() { return fake_adc_impl_server_; }

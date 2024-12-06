@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-
-use once_cell::sync::Lazy as LazySync;
+use std::sync::LazyLock;
 
 /// A [`PortEvent`] is interested only in events originating from within the
 /// process (see [`PortEvent.futex`] for more details), and the waiter is
@@ -53,7 +52,7 @@ pub struct PortEvent {
     ///
     /// Lazily allocated to optimize for the case where waiters are interested
     /// only in events triggered within a process.
-    port: LazySync<zx::Port>,
+    port: LazyLock<zx::Port>,
     /// Indicates whether a user packet is sitting in the `zx::Port` to wake up
     /// waiter after handling user events.
     has_pending_user_packet: AtomicBool,
@@ -87,7 +86,7 @@ impl PortEvent {
     pub fn new() -> Self {
         Self {
             futex: zx::Futex::new(FUTEX_WAITING),
-            port: LazySync::new(zx::Port::create),
+            port: LazyLock::new(zx::Port::create),
             has_pending_user_packet: Default::default(),
         }
     }

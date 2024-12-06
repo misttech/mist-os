@@ -15,6 +15,7 @@ struct Case {
 }
 
 impl Case {
+    #[allow(clippy::inherent_to_string, reason = "mass allow for https://fxbug.dev/381896734")]
     fn to_string(&self) -> String {
         format!("{}/{}", self.name, self.val.len())
     }
@@ -23,7 +24,7 @@ impl Case {
 fn make_repeated_cases(name: &'static str, base: &'static str, repeats: Vec<usize>) -> Vec<Case> {
     let mut ret = vec![];
     for r in repeats {
-        ret.push(Case { name: name, val: base.repeat(r) });
+        ret.push(Case { name, val: base.repeat(r) });
     }
     ret
 }
@@ -37,7 +38,7 @@ fn make_selector_cases(
     let mut ret = vec![];
     for r in repeats {
         let segment_count = if tree_name.is_some() { 3 } else { r };
-        let mut segment = vec![base]
+        let mut segment = [base]
             .iter()
             .cycle()
             .take(segment_count)
@@ -59,7 +60,7 @@ fn make_selector_cases(
             segment = format!(r#"[{name_set}, name="{n}"]{segment}"#);
         }
 
-        let val = vec![component_selector, segment, base.to_string()].join(":");
+        let val = [component_selector, segment, base.to_string()].join(":");
         ret.push(Case { name: case_name, val });
     }
     ret
@@ -75,9 +76,9 @@ fn bench_sanitize_string_for_selectors() -> criterion::Benchmark {
     // function is called frequently during selector parsing.
     let cases: Vec<Case> = vec![]
         .into_iter()
-        .chain(make_repeated_cases("no_replace", "abcd", vec![2, 64]).into_iter())
-        .chain(make_repeated_cases("replace_half", "a:b*", vec![2, 64]).into_iter())
-        .chain(make_repeated_cases("replace_all", ":*\\:", vec![2, 64]).into_iter())
+        .chain(make_repeated_cases("no_replace", "abcd", vec![2, 64]))
+        .chain(make_repeated_cases("replace_half", "a:b*", vec![2, 64]))
+        .chain(make_repeated_cases("replace_all", ":*\\:", vec![2, 64]))
         .collect();
 
     for case in cases.into_iter() {
@@ -95,19 +96,16 @@ fn bench_sanitize_string_for_selectors() -> criterion::Benchmark {
 fn bench_parse_selector() -> criterion::Benchmark {
     let cases: Vec<Case> = vec![]
         .into_iter()
-        .chain(make_selector_cases("no_wildcard", "abcd", None, vec![2, 64]).into_iter())
-        .chain(make_selector_cases("with_wildcard", "*ab*", None, vec![2, 64]).into_iter())
-        .chain(make_selector_cases("with_escaped", "ab\\:", None, vec![2, 64]).into_iter())
-        .chain(make_selector_cases("with_tree_name", "abcd", Some("foo"), vec![2, 64]).into_iter())
-        .chain(
-            make_selector_cases(
-                "with_tree_name_and_odd_chars",
-                "abcd",
-                Some(r#"foo:bar,baz\"qux\*_-"#),
-                vec![2, 64],
-            )
-            .into_iter(),
-        )
+        .chain(make_selector_cases("no_wildcard", "abcd", None, vec![2, 64]))
+        .chain(make_selector_cases("with_wildcard", "*ab*", None, vec![2, 64]))
+        .chain(make_selector_cases("with_escaped", "ab\\:", None, vec![2, 64]))
+        .chain(make_selector_cases("with_tree_name", "abcd", Some("foo"), vec![2, 64]))
+        .chain(make_selector_cases(
+            "with_tree_name_and_odd_chars",
+            "abcd",
+            Some(r#"foo:bar,baz\"qux\*_-"#),
+            vec![2, 64],
+        ))
         .collect();
 
     let mut bench = criterion::Benchmark::new("parse_selector/empty", move |b| {

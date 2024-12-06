@@ -11,7 +11,6 @@
 #include <lib/fit/result.h>
 
 #include <algorithm>
-#include <bit>
 #include <type_traits>
 #include <vector>
 
@@ -300,8 +299,8 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
            load_info_.CopyFrom(diag, this->decoded().load_info());
   }
 
-  template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, class Diagnostics,
-            class ModuleList, typename TlsDescResolver>
+  template <elfldltl::ElfMachine Machine, class Diagnostics, class ModuleList,
+            typename TlsDescResolver>
   bool Relocate(Diagnostics& diag, ModuleList& modules, const TlsDescResolver& tls_desc_resolver) {
     if (!PrepareLoadInfo(diag)) [[unlikely]] {
       return false;

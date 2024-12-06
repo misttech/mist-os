@@ -159,6 +159,10 @@ load(
     "//fuchsia/workspace:fuchsia_devicetree_toolchain_info.bzl",
     _fuchsia_devicetree_toolchain_info = "fuchsia_devicetree_toolchain_info",
 )
+load(
+    "//fuchsia/private:fuchsia_toolchains.bzl",
+    _register_fuchsia_sdk_toolchain = "register_fuchsia_sdk_toolchain",
+)
 
 # Workspace-dependent rules.
 load(
@@ -221,6 +225,7 @@ fuchsia_wrap_rust_binary = _fuchsia_wrap_rust_binary
 get_component_manifests = _get_component_manifests
 get_driver_component_manifests = _get_driver_component_manifests
 get_fuchsia_api_levels = _get_fuchsia_api_levels
+register_fuchsia_sdk_toolchain = _register_fuchsia_sdk_toolchain
 variant_select = _variant_select
 # keep-sorted end
 

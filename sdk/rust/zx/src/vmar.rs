@@ -9,6 +9,8 @@ use crate::{
     HandleRef, Koid, Name, ObjectQuery, Status, Topic, Vmo,
 };
 use bitflags::bitflags;
+use zerocopy::{FromBytes, Immutable};
+use zx_sys::PadByte;
 
 /// An object representing a Zircon
 /// [virtual memory address region](https://fuchsia.dev/fuchsia-src/concepts/objects/vm_address_region.md).
@@ -36,64 +38,87 @@ unsafe impl ObjectQuery for VmarInfo {
 struct VmarMapsInfo;
 unsafe impl ObjectQuery for VmarMapsInfo {
     const TOPIC: Topic = Topic::VMAR_MAPS;
-    type InfoTy = crate::sys::zx_info_maps_t;
+    type InfoTy = MapInfo;
 }
 
-/// Ergonomic wrapper around `zx_info_maps_t`.
-#[derive(Copy, Clone)]
-pub struct MapInfo {
-    pub name: Name,
-    pub base: usize,
-    pub size: usize,
-    pub depth: usize,
-    pub details: MapDetails,
-}
+static_assert_align!(
+    /// Ergonomic wrapper around `zx_info_maps_t`.
+    #[repr(C)]
+    #[derive(Copy, Clone, FromBytes, Immutable)]
+    <sys::zx_info_maps_t> pub struct MapInfo {
+        pub name <name>: Name,
+        pub base <base>: usize,
+        pub size <size>: usize,
+        pub depth <depth>: usize,
+        r#type <r#type>: sys::zx_info_maps_type_t,
+        u <u>: sys::InfoMapsTypeUnion,
+    }
+);
 
 impl MapInfo {
-    /// # Safety
-    ///
-    /// Must be passed a value written by the kernel.
-    pub(crate) unsafe fn from_raw(
-        sys::zx_info_maps_t { name, base, size, depth, r#type, u }: sys::zx_info_maps_t,
-    ) -> Result<Self, Status> {
-        let details = match r#type {
+    pub fn new(
+        name: Name,
+        base: usize,
+        size: usize,
+        depth: usize,
+        details: MapDetails<'_>,
+    ) -> Result<MapInfo, Status> {
+        let (map_type, map_details_union) = match details {
+            MapDetails::None => (
+                sys::ZX_INFO_MAPS_TYPE_NONE,
+                sys::InfoMapsTypeUnion { mapping: Default::default() },
+            ),
+            MapDetails::AddressSpace => (
+                sys::ZX_INFO_MAPS_TYPE_ASPACE,
+                sys::InfoMapsTypeUnion { mapping: Default::default() },
+            ),
+            MapDetails::Vmar => (
+                sys::ZX_INFO_MAPS_TYPE_VMAR,
+                sys::InfoMapsTypeUnion { mapping: Default::default() },
+            ),
+            MapDetails::Mapping(mapping_details) => (
+                sys::ZX_INFO_MAPS_TYPE_MAPPING,
+                sys::InfoMapsTypeUnion {
+                    mapping: {
+                        let mut mapping: sys::zx_info_maps_mapping_t = Default::default();
+                        mapping.mmu_flags = mapping_details.mmu_flags.bits();
+                        mapping.vmo_koid = mapping_details.vmo_koid.raw_koid();
+                        mapping.vmo_offset = mapping_details.vmo_offset;
+                        mapping.committed_bytes = mapping_details.committed_bytes;
+                        mapping.populated_bytes = mapping_details.populated_bytes;
+                        mapping.committed_private_bytes = mapping_details.committed_private_bytes;
+                        mapping.populated_private_bytes = mapping_details.populated_private_bytes;
+                        mapping.committed_scaled_bytes = mapping_details.committed_scaled_bytes;
+                        mapping.populated_scaled_bytes = mapping_details.populated_scaled_bytes;
+                        mapping.committed_fractional_scaled_bytes =
+                            mapping_details.committed_fractional_scaled_bytes;
+                        mapping.populated_fractional_scaled_bytes =
+                            mapping_details.populated_fractional_scaled_bytes;
+                        mapping
+                    },
+                },
+            ),
+            MapDetails::Unknown => {
+                return Err(Status::INVALID_ARGS);
+            }
+        };
+        Ok(MapInfo { name, base, size, depth, r#type: map_type, u: map_details_union })
+    }
+
+    pub fn details<'a>(&'a self) -> MapDetails<'a> {
+        match self.r#type {
             sys::ZX_INFO_MAPS_TYPE_NONE => MapDetails::None,
             sys::ZX_INFO_MAPS_TYPE_ASPACE => MapDetails::AddressSpace,
             sys::ZX_INFO_MAPS_TYPE_VMAR => MapDetails::Vmar,
             sys::ZX_INFO_MAPS_TYPE_MAPPING => {
-                // SAFETY: as long as this value was written by the kernel we can trust that the
-                // type corresponds to this layout.
-                let &sys::zx_info_maps_mapping_t {
-                    mmu_flags,
-                    vmo_koid,
-                    vmo_offset,
-                    committed_bytes,
-                    populated_bytes,
-                    committed_private_bytes,
-                    populated_private_bytes,
-                    committed_scaled_bytes,
-                    populated_scaled_bytes,
-                    committed_fractional_scaled_bytes,
-                    populated_fractional_scaled_bytes,
-                    ..
-                } = unsafe { &u.mapping };
-                MapDetails::Mapping(MappingDetails {
-                    mmu_flags: VmarFlagsExtended::from_bits_retain(mmu_flags),
-                    vmo_koid: Koid::from_raw(vmo_koid),
-                    vmo_offset,
-                    committed_bytes,
-                    populated_bytes,
-                    committed_private_bytes,
-                    populated_private_bytes,
-                    committed_scaled_bytes,
-                    populated_scaled_bytes,
-                    committed_fractional_scaled_bytes,
-                    populated_fractional_scaled_bytes,
-                })
+                // SAFETY: these values are produced by the kernel or `new()` which guarantees the
+                // discriminant matches the union contents.
+                let raw_mapping = unsafe { &self.u.mapping };
+                let mapping_details = zerocopy::transmute_ref!(raw_mapping);
+                MapDetails::Mapping(mapping_details)
             }
-            _ => return Err(Status::INTERNAL),
-        };
-        Ok(Self { name: Name::from_raw(name), base, size, depth, details })
+            _ => MapDetails::Unknown,
+        }
     }
 }
 
@@ -104,21 +129,24 @@ impl std::fmt::Debug for MapInfo {
             .field("base", &format_args!("{:#x}", self.base))
             .field("size", &self.size)
             .field("depth", &self.depth)
-            .field("details", &self.details)
+            .field("details", &self.details())
             .finish()
     }
 }
 
 #[derive(Copy, Clone, Debug)]
-pub enum MapDetails {
+pub enum MapDetails<'a> {
+    /// The underlying value returned by the kernel is unknown.
+    Unknown,
     None,
     AddressSpace,
     Vmar,
-    Mapping(MappingDetails),
+    // Mapping returns a reference to avoid copying data.
+    Mapping(&'a MappingDetails),
 }
 
-impl MapDetails {
-    pub fn as_mapping(&self) -> Option<MappingDetails> {
+impl<'a> MapDetails<'a> {
+    pub fn as_mapping(&'a self) -> Option<&'a MappingDetails> {
         match self {
             Self::Mapping(d) => Some(*d),
             _ => None,
@@ -126,19 +154,35 @@ impl MapDetails {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct MappingDetails {
-    pub mmu_flags: VmarFlagsExtended,
-    pub vmo_koid: Koid,
-    pub vmo_offset: u64,
-    pub committed_bytes: usize,
-    pub populated_bytes: usize,
-    pub committed_private_bytes: usize,
-    pub populated_private_bytes: usize,
-    pub committed_scaled_bytes: usize,
-    pub populated_scaled_bytes: usize,
-    pub committed_fractional_scaled_bytes: u64,
-    pub populated_fractional_scaled_bytes: u64,
+static_assert_align!(
+    #[repr(C)]
+    #[derive(Copy, Clone, Debug, FromBytes, Immutable)]
+    <sys::zx_info_maps_mapping_t> pub struct MappingDetails {
+        pub mmu_flags <mmu_flags>: VmarFlagsExtended,
+        padding1: [PadByte; 4],
+        pub vmo_koid <vmo_koid>: Koid,
+        pub vmo_offset <vmo_offset>: u64,
+        pub committed_bytes <committed_bytes>: usize,
+        pub populated_bytes <populated_bytes>: usize,
+        pub committed_private_bytes <committed_private_bytes>: usize,
+        pub populated_private_bytes <populated_private_bytes>: usize,
+        pub committed_scaled_bytes <committed_scaled_bytes>: usize,
+        pub populated_scaled_bytes <populated_scaled_bytes>: usize,
+        pub committed_fractional_scaled_bytes <committed_fractional_scaled_bytes>: u64,
+        pub populated_fractional_scaled_bytes <populated_fractional_scaled_bytes>: u64,
+    }
+);
+
+impl Default for MappingDetails {
+    fn default() -> MappingDetails {
+        Self::from(sys::zx_info_maps_mapping_t::default())
+    }
+}
+
+impl From<sys::zx_info_maps_mapping_t> for MappingDetails {
+    fn from(info: sys::zx_info_maps_mapping_t) -> MappingDetails {
+        zerocopy::transmute!(info)
+    }
 }
 
 impl Vmar {
@@ -267,14 +311,7 @@ impl Vmar {
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_VMAR_MAPS topic.
     pub fn info_maps_vec(&self) -> Result<Vec<MapInfo>, Status> {
-        object_get_info_vec::<VmarMapsInfo>(self.as_handle_ref())?
-            .into_iter()
-            .map(|i| {
-                // SAFETY: these values were written by the kernel which is the requirement for this
-                // function.
-                unsafe { MapInfo::from_raw(i) }
-            })
-            .collect::<Result<Vec<_>, _>>()
+        object_get_info_vec::<VmarMapsInfo>(self.as_handle_ref())
     }
 }
 
@@ -285,22 +322,26 @@ macro_rules! vmar_flags {
         safe: [$($safe_name:ident : $safe_sys_name:ident,)*],
         extended: [$($ex_name:ident : $ex_sys_name:ident,)*],
     ) => {
+        /// Flags to VMAR routines which are considered safe.
+        #[repr(transparent)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, Immutable)]
+        pub struct VmarFlags(sys::zx_vm_option_t);
+
         bitflags! {
-            /// Flags to VMAR routines which are considered safe.
-            #[repr(transparent)]
-            #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-            pub struct VmarFlags: sys::zx_vm_option_t {
+            impl VmarFlags: sys::zx_vm_option_t {
                 $(
                     const $safe_name = sys::$safe_sys_name;
                 )*
             }
         }
 
+        /// Flags to all VMAR routines.
+        #[repr(transparent)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, Immutable, Default)]
+        pub struct VmarFlagsExtended(sys::zx_vm_option_t);
+
         bitflags! {
-            /// Flags to all VMAR routines.
-            #[repr(transparent)]
-            #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-            pub struct VmarFlagsExtended: sys::zx_vm_option_t {
+            impl VmarFlagsExtended: sys::zx_vm_option_t {
                 $(
                     const $safe_name = sys::$safe_sys_name;
                 )*

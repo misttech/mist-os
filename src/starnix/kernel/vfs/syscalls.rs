@@ -37,7 +37,9 @@ use starnix_uapi::auth::{
     PTRACE_MODE_ATTACH_REALCREDS,
 };
 use starnix_uapi::device_type::DeviceType;
-use starnix_uapi::errors::{Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ETIMEDOUT};
+use starnix_uapi::errors::{
+    Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ENOTSUP, ETIMEDOUT,
+};
 use starnix_uapi::file_lease::FileLeaseType;
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::inotify_mask::InotifyMask;
@@ -445,7 +447,12 @@ fn do_writev(
     }
 
     let file = current_task.files.get(fd)?;
-    let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
+    // Try to minimize how far arch32 impacts the system
+    let iovec = if current_task.thread_state.arch_width.is_arch32() {
+        current_task.read_iovec32(iovec_addr, iovec_count)?
+    } else {
+        current_task.read_iovec(iovec_addr, iovec_count)?
+    };
     let mut data = UserBuffersInputBuffer::unified_new(current_task, iovec)?;
     let res = if let Some(offset) = offset {
         file.write_at(
@@ -646,7 +653,7 @@ impl From<StatxFlags> for LookupFlags {
     }
 }
 
-fn lookup_at<L>(
+pub fn lookup_at<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
@@ -1402,11 +1409,26 @@ fn do_listxattr(
     list_addr: UserAddress,
     size: usize,
 ) -> Result<usize, Errno> {
-    let mut list = vec![];
-    let xattrs = match node.entry.node.list_xattrs(locked, current_task, size)? {
-        ValueOrSize::Size(s) => return Ok(s),
-        ValueOrSize::Value(v) => v,
+    let security_xattr = security::fs_node_listsecurity(current_task, &node.entry.node);
+    let xattrs = match node.entry.node.list_xattrs(locked, current_task, size) {
+        Ok(ValueOrSize::Size(s)) => return Ok(s + security_xattr.map_or(0, |s| s.len() + 1)),
+        Ok(ValueOrSize::Value(mut v)) => {
+            if let Some(security_value) = security_xattr {
+                if !v.contains(&security_value) {
+                    v.push(security_value);
+                }
+            }
+            v
+        }
+        Err(e) => {
+            if e.code != ENOTSUP || security_xattr.is_none() {
+                return Err(e);
+            }
+            vec![security_xattr.unwrap()]
+        }
     };
+
+    let mut list = vec![];
     for name in xattrs.iter() {
         list.extend_from_slice(name);
         list.push(b'\0');
@@ -1497,7 +1519,7 @@ fn get_fd_flags(flags: u32) -> FdFlags {
 }
 
 pub fn sys_pipe2(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_pipe: UserRef<FdNumber>,
     flags: u32,
@@ -1506,7 +1528,7 @@ pub fn sys_pipe2(
     if flags & !(O_CLOEXEC | supported_file_flags.bits()) != 0 {
         return error!(EINVAL);
     }
-    let (read, write) = new_pipe(current_task)?;
+    let (read, write) = new_pipe(locked, current_task)?;
 
     let file_flags = OpenFlags::from_bits_truncate(flags & supported_file_flags.bits());
     read.update_file_flags(file_flags, supported_file_flags);
@@ -1531,6 +1553,9 @@ pub fn sys_ioctl(
     request: u32,
     arg: SyscallArg,
 ) -> Result<SyscallResult, Errno> {
+    // TODO: https://fxbug.dev/364569179 - Figure out what to do about the security
+    // check for FIONREAD, FIBMAP, FIGETBSZ, FIONBIO, and FIOASYNC. These ioctls check
+    // a different set of permissions than other arbitrary ioctls.
     match request {
         FIOCLEX => {
             current_task.files.set_fd_flags(fd, FdFlags::CLOEXEC)?;
@@ -1542,6 +1567,7 @@ pub fn sys_ioctl(
         }
         _ => {
             let file = current_task.files.get(fd)?;
+            security::check_file_ioctl_access(current_task, &file)?;
             file.ioctl(locked, current_task, request, arg)
         }
     }
@@ -1692,6 +1718,8 @@ pub fn sys_mount(
     let target =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, target_addr, LookupFlags::default())?;
 
+    security::sb_mount(current_task, &target, flags)?;
+
     if flags.contains(MountFlags::REMOUNT) {
         do_mount_remount(target, flags, data_addr)
     } else if flags.contains(MountFlags::BIND) {
@@ -1816,8 +1844,6 @@ fn do_mount_create(
         %data,
         "do_mount_create",
     );
-
-    security::sb_mount(current_task, source, &target, fs_type, flags, data)?;
 
     let options = FileSystemOptions {
         source: source.into(),

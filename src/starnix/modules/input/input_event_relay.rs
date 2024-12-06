@@ -4,7 +4,7 @@
 
 use crate::{
     parse_fidl_button_event, parse_fidl_keyboard_event_to_linux_input_event,
-    FuchsiaTouchEventToLinuxTouchEventConverter, InputFile,
+    FuchsiaTouchEventToLinuxTouchEventConverter, InputDeviceStatus, InputFile,
 };
 use fidl::endpoints::{ClientEnd, RequestStream};
 use fidl_fuchsia_ui_input3::{
@@ -57,6 +57,7 @@ impl std::fmt::Display for InputDeviceType {
 pub struct DeviceState {
     device_type: InputDeviceType,
     open_files: OpenedFiles,
+    inspect_status: Option<Arc<InputDeviceStatus>>,
 }
 
 pub type DeviceId = u32;
@@ -73,22 +74,33 @@ impl InputEventsRelay {
         Arc::new(Self { devices: Mutex::new(HashMap::new()) })
     }
 
-    pub fn add_touch_device(&self, device_id: DeviceId, open_files: OpenedFiles) {
+    pub fn add_touch_device(
+        &self,
+        device_id: DeviceId,
+        open_files: OpenedFiles,
+        inspect_status: Option<Arc<InputDeviceStatus>>,
+    ) {
         self.devices.lock().insert(
             device_id,
             DeviceState {
                 device_type: InputDeviceType::Touch(
                     FuchsiaTouchEventToLinuxTouchEventConverter::create(),
                 ),
-                open_files: open_files,
+                open_files,
+                inspect_status,
             },
         );
     }
 
-    pub fn add_keyboard_device(&self, device_id: DeviceId, open_files: OpenedFiles) {
+    pub fn add_keyboard_device(
+        &self,
+        device_id: DeviceId,
+        open_files: OpenedFiles,
+        inspect_status: Option<Arc<InputDeviceStatus>>,
+    ) {
         self.devices.lock().insert(
             device_id,
-            DeviceState { device_type: InputDeviceType::Keyboard, open_files: open_files },
+            DeviceState { device_type: InputDeviceType::Keyboard, open_files, inspect_status },
         );
     }
 
@@ -110,24 +122,29 @@ impl InputEventsRelay {
         registry_proxy: fuipolicy::DeviceListenerRegistrySynchronousProxy,
         default_touch_device_opened_files: OpenedFiles,
         default_keyboard_device_opened_files: OpenedFiles,
+        default_touch_device_inspect: Option<Arc<InputDeviceStatus>>,
+        default_keyboard_device_inspect: Option<Arc<InputDeviceStatus>>,
     ) {
         self.start_touch_relay(
             kernel,
             event_proxy_mode,
             touch_source_client_end,
             default_touch_device_opened_files,
+            default_touch_device_inspect,
         );
         self.start_keyboard_relay(
             kernel,
             keyboard,
             view_ref,
             default_keyboard_device_opened_files.clone(),
+            None,
         );
         self.start_button_relay(
             kernel,
             registry_proxy,
             event_proxy_mode,
             default_keyboard_device_opened_files,
+            default_keyboard_device_inspect,
         );
     }
 
@@ -137,6 +154,7 @@ impl InputEventsRelay {
         event_proxy_mode: EventProxyMode,
         touch_source_client_end: ClientEnd<fuipointer::TouchSourceMarker>,
         default_touch_device_opened_files: OpenedFiles,
+        device_inspect_status: Option<Arc<InputDeviceStatus>>,
     ) {
         let slf = self.clone();
         kernel.kthreads.spawn(move |_lock_context, _current_task| {
@@ -146,6 +164,7 @@ impl InputEventsRelay {
                     FuchsiaTouchEventToLinuxTouchEventConverter::create(),
                 ),
                 open_files: default_touch_device_opened_files,
+                inspect_status: device_inspect_status,
             };
             let (touch_source_proxy, resume_event) = match event_proxy_mode {
                 EventProxyMode::WakeContainer => {
@@ -213,36 +232,46 @@ impl InputEventsRelay {
                                 continue;
                             }
 
+                            if let Some(dev_inspect_status) = &dev.inspect_status {
+                                dev_inspect_status.count_total_received_events(num_received_events);
+                                dev_inspect_status.count_total_ignored_events(num_ignored_events);
+                                dev_inspect_status.count_total_unexpected_events(num_unexpected_events);
+                                dev_inspect_status.count_total_converted_events(num_converted_events);
+                                dev_inspect_status.count_total_generated_events(
+                                    new_events.len().try_into().unwrap(),
+                                    last_event_time_ns,
+                                );
+                            } else {
+                                log_warn!("unable to record inspect for device_id: {}, device_type: {}", device_id, dev.device_type);
+                            }
+
                             dev.open_files.lock().retain(|f| {
                                 let Some(file) = f.upgrade() else {
                                     log_warn!("Dropping input file for touch that failed to upgrade");
                                     return false;
                                 };
-                                let mut inner = file.inner.lock();
-                                match &inner.inspect_status {
-                                    Some(inspect_status) => {
-                                        inspect_status.count_received_events(num_received_events);
-                                        inspect_status.count_ignored_events(num_ignored_events);
-                                        inspect_status
-                                            .count_unexpected_events(num_unexpected_events);
-                                        inspect_status.count_converted_events(num_converted_events);
+                                match &file.inspect_status {
+                                    Some(file_inspect_status) => {
+                                        file_inspect_status.count_received_events(num_received_events);
+                                        file_inspect_status.count_ignored_events(num_ignored_events);
+                                        file_inspect_status.count_unexpected_events(num_unexpected_events);
+                                        file_inspect_status.count_converted_events(num_converted_events);
                                     }
                                     None => {
                                       log_warn!("unable to record inspect within the input file")
                                     }
                                 }
-
                                 if !new_events.is_empty() {
                                     // TODO(https://fxbug.dev/42075438): Reading from an `InputFile` should
                                     // not provide access to events that occurred before the file was
                                     // opened.
-                                    if let Some(inspect_status) = &inner.inspect_status {
-                                        inspect_status.count_generated_events(
+                                    if let Some(file_inspect_status) = &file.inspect_status {
+                                        file_inspect_status.count_generated_events(
                                             new_events.len().try_into().unwrap(),
                                             last_event_time_ns
                                         );
                                     }
-
+                                    let mut inner = file.inner.lock();
                                     inner.events.extend(new_events.clone());
                                     inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 }
@@ -266,6 +295,7 @@ impl InputEventsRelay {
         keyboard: KeyboardSynchronousProxy,
         view_ref: fuiviews::ViewRef,
         default_keyboard_device_opened_files: OpenedFiles,
+        device_inspect_status: Option<Arc<InputDeviceStatus>>,
     ) {
         let slf = self.clone();
         kernel.kthreads.spawn(move |_lock_context, _current_task| {
@@ -273,6 +303,7 @@ impl InputEventsRelay {
                 let mut default_keyboard_device = DeviceState {
                     device_type: InputDeviceType::Keyboard,
                     open_files: default_keyboard_device_opened_files,
+                    inspect_status: device_inspect_status,
                 };
                 let (keyboard_listener, mut event_stream) =
                     fidl::endpoints::create_request_stream::<KeyboardListenerMarker>();
@@ -327,6 +358,7 @@ impl InputEventsRelay {
         registry_proxy: fuipolicy::DeviceListenerRegistrySynchronousProxy,
         event_proxy_mode: EventProxyMode,
         default_keyboard_device_opened_files: OpenedFiles,
+        device_inspect_status: Option<Arc<InputDeviceStatus>>,
     ) {
         let slf: Arc<InputEventsRelay> = self.clone();
         kernel.kthreads.spawn(move |_lock_context, _current_task| {
@@ -357,6 +389,7 @@ impl InputEventsRelay {
                 slf.button_relay_loop(
                     local_listener_stream,
                     default_keyboard_device_opened_files,
+                    device_inspect_status,
                     local_resume_event,
                 )
                 .await;
@@ -368,6 +401,7 @@ impl InputEventsRelay {
         &self,
         mut local_listener_stream: fuipolicy::MediaButtonsListenerRequestStream,
         default_keyboard_device_opened_files: OpenedFiles,
+        device_inspect_status: Option<Arc<InputDeviceStatus>>,
         local_resume_event: Option<zx::EventPair>,
     ) {
         let mut power_was_pressed = false;
@@ -376,6 +410,7 @@ impl InputEventsRelay {
         let mut default_keyboard_device = DeviceState {
             device_type: InputDeviceType::Keyboard,
             open_files: default_keyboard_device_opened_files,
+            inspect_status: device_inspect_status,
         };
 
         loop {
@@ -413,31 +448,41 @@ impl InputEventsRelay {
                         None => &default_keyboard_device,
                     };
 
+                    if let Some(dev_inspect_status) = &dev.inspect_status {
+                        dev_inspect_status.count_total_received_events(1);
+                        dev_inspect_status.count_total_ignored_events(ignored_events);
+                        dev_inspect_status.count_total_converted_events(converted_events);
+                        dev_inspect_status.count_total_generated_events(
+                            generated_events,
+                            batch.event_time.into_nanos().try_into().unwrap(),
+                        );
+                    } else {
+                        log_warn!("unable to record inspect for button device");
+                    }
+
                     dev.open_files.lock().retain(|f| {
                         let Some(file) = f.upgrade() else {
                             log_warn!("Dropping input file for buttons that failed to upgrade");
                             return false;
                         };
-                        let mut inner = file.inner.lock();
-                        match &inner.inspect_status {
-                            Some(inspect_status) => {
-                                inspect_status.count_received_events(1);
-                                inspect_status.count_ignored_events(ignored_events);
-                                inspect_status.count_converted_events(converted_events);
+                        match &file.inspect_status {
+                            Some(file_inspect_status) => {
+                                file_inspect_status.count_received_events(1);
+                                file_inspect_status.count_ignored_events(ignored_events);
+                                file_inspect_status.count_converted_events(converted_events);
                             }
                             None => {
                                 log_warn!("unable to record inspect within the input file")
                             }
                         }
-
                         if !batch.events.is_empty() {
-                            if let Some(inspect_status) = &inner.inspect_status {
-                                inspect_status.count_generated_events(
+                            if let Some(file_inspect_status) = &file.inspect_status {
+                                file_inspect_status.count_generated_events(
                                     generated_events,
                                     batch.event_time.into_nanos().try_into().unwrap(),
                                 );
                             }
-
+                            let mut inner = file.inner.lock();
                             inner.events.extend(batch.events.clone());
                             inner.waiters.notify_fd_events(FdEvents::POLLIN);
                         }
@@ -563,6 +608,8 @@ mod test {
             device_registry_proxy,
             touch_device.open_files.clone(),
             keyboard_device.open_files.clone(),
+            Some(touch_device.inspect_status.clone()),
+            Some(keyboard_device.inspect_status.clone()),
         );
 
         (
@@ -671,7 +718,7 @@ mod test {
         device_id: u32,
     ) -> FileHandle {
         let open_files: OpenedFiles = Arc::new(Mutex::new(vec![]));
-        input_relay.add_touch_device(device_id, open_files.clone());
+        input_relay.add_touch_device(device_id, open_files.clone(), None);
         let device_file = Arc::new(InputFile::new_touch(
             input_id { bustype: 0, vendor: 0, product: 0, version: 0 },
             1000,
@@ -885,7 +932,7 @@ mod test {
 
         // add a device, mock uinput.
         let open_files: OpenedFiles = Arc::new(Mutex::new(vec![]));
-        input_relay.add_keyboard_device(DEVICE_ID, open_files.clone());
+        input_relay.add_keyboard_device(DEVICE_ID, open_files.clone(), None);
         let device_id_10_file = Arc::new(InputFile::new_keyboard(
             input_id { bustype: 0, vendor: 0, product: 0, version: 0 },
             None,
@@ -964,7 +1011,7 @@ mod test {
 
         // add a device, mock uinput.
         let open_files: OpenedFiles = Arc::new(Mutex::new(vec![]));
-        input_relay.add_keyboard_device(DEVICE_ID, open_files.clone());
+        input_relay.add_keyboard_device(DEVICE_ID, open_files.clone(), None);
         let device_id_10_file = Arc::new(InputFile::new_keyboard(
             input_id { bustype: 0, vendor: 0, product: 0, version: 0 },
             None,

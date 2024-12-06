@@ -1017,6 +1017,7 @@ impl<V> IaChecker for HashMap<v6::IAID, V> {
 // options and discarding the entire message configurable.
 // TODO(https://fxbug.dev/42055684): Move this function and associated types
 // into packet-formats-dhcp.
+#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 /// Process options.
 ///
 /// If any singleton options appears more than once, or there are multiple
@@ -2926,6 +2927,7 @@ pub struct IaUpdate<V> {
 // Processes a Reply to Solicit (with fast commit), Request, Renew, or Rebind.
 //
 // If an error is returned, the message should be ignored.
+#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 fn process_reply_with_leases<B: SplitByteSlice, I: Instant>(
     client_id: &[u8],
     server_id: &[u8],

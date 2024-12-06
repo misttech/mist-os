@@ -401,64 +401,69 @@ pub fn convert_disassociate_indication(
 }
 
 pub fn convert_start_confirm(
-    conf: fidl_fullmac::WlanFullmacStartConfirm,
-) -> fidl_mlme::StartConfirm {
-    use fidl_fullmac::WlanStartResult;
-    fidl_mlme::StartConfirm {
-        result_code: match conf.result_code {
-            WlanStartResult::Success => fidl_mlme::StartResultCode::Success,
-            WlanStartResult::BssAlreadyStartedOrJoined => {
+    conf: fidl_fullmac::WlanFullmacImplIfcStartConfRequest,
+) -> Result<fidl_mlme::StartConfirm> {
+    use fidl_fullmac::StartResult;
+    let result_code = conf.result_code.context("missing result_code")?;
+    Ok(fidl_mlme::StartConfirm {
+        result_code: match result_code {
+            StartResult::Success => fidl_mlme::StartResultCode::Success,
+            StartResult::BssAlreadyStartedOrJoined => {
                 fidl_mlme::StartResultCode::BssAlreadyStartedOrJoined
             }
-            WlanStartResult::ResetRequiredBeforeStart => {
+            StartResult::ResetRequiredBeforeStart => {
                 fidl_mlme::StartResultCode::ResetRequiredBeforeStart
             }
-            WlanStartResult::NotSupported => fidl_mlme::StartResultCode::NotSupported,
+            StartResult::NotSupported => fidl_mlme::StartResultCode::NotSupported,
             _ => {
                 warn!(
                     "Invalid start result {}, defaulting to StartResultCode::InternalError",
-                    conf.result_code.into_primitive()
+                    result_code.into_primitive()
                 );
                 fidl_mlme::StartResultCode::InternalError
             }
         },
-    }
+    })
 }
-pub fn convert_stop_confirm(conf: fidl_fullmac::WlanFullmacStopConfirm) -> fidl_mlme::StopConfirm {
-    use fidl_fullmac::WlanStopResult;
-    fidl_mlme::StopConfirm {
-        result_code: match conf.result_code {
-            WlanStopResult::Success => fidl_mlme::StopResultCode::Success,
-            WlanStopResult::BssAlreadyStopped => fidl_mlme::StopResultCode::BssAlreadyStopped,
-            WlanStopResult::InternalError => fidl_mlme::StopResultCode::InternalError,
+pub fn convert_stop_confirm(
+    conf: fidl_fullmac::WlanFullmacImplIfcStopConfRequest,
+) -> Result<fidl_mlme::StopConfirm> {
+    use fidl_fullmac::StopResult;
+    let result_code = conf.result_code.context("missing result_code")?;
+    Ok(fidl_mlme::StopConfirm {
+        result_code: match result_code {
+            StopResult::Success => fidl_mlme::StopResultCode::Success,
+            StopResult::BssAlreadyStopped => fidl_mlme::StopResultCode::BssAlreadyStopped,
+            StopResult::InternalError => fidl_mlme::StopResultCode::InternalError,
             _ => {
                 warn!(
                     "Invalid stop result {}, defaulting to StopResultCode::InternalError",
-                    conf.result_code.into_primitive()
+                    result_code.into_primitive()
                 );
                 fidl_mlme::StopResultCode::InternalError
             }
         },
-    }
+    })
 }
 pub fn convert_eapol_confirm(
-    conf: fidl_fullmac::WlanFullmacEapolConfirm,
-) -> fidl_mlme::EapolConfirm {
-    use fidl_fullmac::WlanEapolResult;
-    fidl_mlme::EapolConfirm {
-        result_code: match conf.result_code {
-            WlanEapolResult::Success => fidl_mlme::EapolResultCode::Success,
-            WlanEapolResult::TransmissionFailure => fidl_mlme::EapolResultCode::TransmissionFailure,
+    conf: fidl_fullmac::WlanFullmacImplIfcEapolConfRequest,
+) -> Result<fidl_mlme::EapolConfirm> {
+    use fidl_fullmac::EapolTxResult;
+    let result_code = conf.result_code.context("missing result_code")?;
+    Ok(fidl_mlme::EapolConfirm {
+        result_code: match result_code {
+            EapolTxResult::Success => fidl_mlme::EapolResultCode::Success,
+            EapolTxResult::TransmissionFailure => fidl_mlme::EapolResultCode::TransmissionFailure,
             _ => {
                 warn!(
                     "Invalid eapol result code {}, defaulting to EapolResultCode::TransmissionFailure",
-                    conf.result_code.into_primitive()
+                    result_code.into_primitive()
                 );
                 fidl_mlme::EapolResultCode::TransmissionFailure
             }
         },
-        dst_addr: conf.dst_addr,
-    }
+        dst_addr: conf.dst_addr.context("missing dst_addr")?,
+    })
 }
 pub fn convert_channel_switch_info(
     info: fidl_fullmac::WlanFullmacChannelSwitchInfo,
@@ -471,25 +476,34 @@ pub fn convert_signal_report_indication(
     fidl_internal::SignalReportIndication { rssi_dbm: ind.rssi_dbm, snr_db: ind.snr_db }
 }
 pub fn convert_eapol_indication(
-    ind: fidl_fullmac::WlanFullmacEapolIndication,
-) -> fidl_mlme::EapolIndication {
-    fidl_mlme::EapolIndication { src_addr: ind.src_addr, dst_addr: ind.dst_addr, data: ind.data }
+    ind: fidl_fullmac::WlanFullmacImplIfcEapolIndRequest,
+) -> Result<fidl_mlme::EapolIndication> {
+    Ok(fidl_mlme::EapolIndication {
+        src_addr: ind.src_addr.context("missing src_addr")?,
+        dst_addr: ind.dst_addr.context("missing dst_addr")?,
+        data: ind.data.context("missing data")?,
+    })
 }
-pub fn convert_pmk_info(info: fidl_fullmac::WlanFullmacPmkInfo) -> fidl_mlme::PmkInfo {
-    fidl_mlme::PmkInfo { pmk: info.pmk, pmkid: info.pmkid }
+pub fn convert_pmk_info(
+    info: fidl_fullmac::WlanFullmacImplIfcOnPmkAvailableRequest,
+) -> Result<fidl_mlme::PmkInfo> {
+    Ok(fidl_mlme::PmkInfo {
+        pmk: info.pmk.context("missing pmk")?,
+        pmkid: info.pmkid.context("missing pmkid")?,
+    })
 }
 pub fn convert_sae_handshake_indication(
     ind: fidl_fullmac::WlanFullmacSaeHandshakeInd,
 ) -> fidl_mlme::SaeHandshakeIndication {
     fidl_mlme::SaeHandshakeIndication { peer_sta_address: ind.peer_sta_address }
 }
-pub fn convert_sae_frame(frame: fidl_fullmac::WlanFullmacSaeFrame) -> fidl_mlme::SaeFrame {
-    fidl_mlme::SaeFrame {
-        peer_sta_address: frame.peer_sta_address,
-        status_code: frame.status_code,
-        seq_num: frame.seq_num,
-        sae_fields: frame.sae_fields,
-    }
+pub fn convert_sae_frame(frame: fidl_fullmac::SaeFrame) -> Result<fidl_mlme::SaeFrame> {
+    Ok(fidl_mlme::SaeFrame {
+        peer_sta_address: frame.peer_sta_address.context("missing peer_sta_address")?,
+        status_code: frame.status_code.context("missing status code")?,
+        seq_num: frame.seq_num.context("missing seq_num")?,
+        sae_fields: frame.sae_fields.context("missing sae_fields")?,
+    })
 }
 pub fn convert_wmm_params(
     wmm_params: fidl_common::WlanWmmParameters,
@@ -823,34 +837,37 @@ mod tests {
 
     #[test]
     fn test_convert_start_confirm_unknown_result_code_defaults_to_internal_error() {
-        let fullmac = fidl_fullmac::WlanFullmacStartConfirm {
-            result_code: fidl_fullmac::WlanStartResult::from_primitive_allow_unknown(123),
+        let fullmac = fidl_fullmac::WlanFullmacImplIfcStartConfRequest {
+            result_code: Some(fidl_fullmac::StartResult::from_primitive_allow_unknown(123)),
+            ..Default::default()
         };
         assert_eq!(
-            convert_start_confirm(fullmac),
+            convert_start_confirm(fullmac).unwrap(),
             fidl_mlme::StartConfirm { result_code: fidl_mlme::StartResultCode::InternalError }
         );
     }
 
     #[test]
     fn test_convert_stop_confirm_unknown_result_code_defaults_to_internal_error() {
-        let fullmac = fidl_fullmac::WlanFullmacStopConfirm {
-            result_code: fidl_fullmac::WlanStopResult::from_primitive_allow_unknown(123),
+        let fullmac = fidl_fullmac::WlanFullmacImplIfcStopConfRequest {
+            result_code: Some(fidl_fullmac::StopResult::from_primitive_allow_unknown(123)),
+            ..Default::default()
         };
         assert_eq!(
-            convert_stop_confirm(fullmac),
+            convert_stop_confirm(fullmac).unwrap(),
             fidl_mlme::StopConfirm { result_code: fidl_mlme::StopResultCode::InternalError }
         );
     }
 
     #[test]
     fn test_convert_eapol_confirm_unknown_result_code_defaults_to_transmission_failure() {
-        let fullmac = fidl_fullmac::WlanFullmacEapolConfirm {
-            dst_addr: [1; 6],
-            result_code: fidl_fullmac::WlanEapolResult::from_primitive_allow_unknown(123),
+        let fullmac = fidl_fullmac::WlanFullmacImplIfcEapolConfRequest {
+            dst_addr: Some([1; 6]),
+            result_code: Some(fidl_fullmac::EapolTxResult::from_primitive_allow_unknown(123)),
+            ..Default::default()
         };
         assert_eq!(
-            convert_eapol_confirm(fullmac),
+            convert_eapol_confirm(fullmac).unwrap(),
             fidl_mlme::EapolConfirm {
                 dst_addr: [1; 6],
                 result_code: fidl_mlme::EapolResultCode::TransmissionFailure,

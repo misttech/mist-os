@@ -60,6 +60,11 @@ struct Args {
     #[argh(option)]
     count: Option<u32>,
 
+    /// whether the test creates exception channels, which may conflict with any exception
+    /// channels created by test_manager.
+    #[argh(switch)]
+    no_exception_channel: bool,
+
     /// when set, only logs with a severity equal to the given one or higher will be printed for
     /// the associated component.
     ///
@@ -111,6 +116,7 @@ async fn main() {
         stop_after_failures,
         parallel,
         count,
+        no_exception_channel,
         min_severity_logs,
         max_severity_logs,
         deprecated_output_directory,
@@ -217,6 +223,7 @@ async fn main() {
                 min_severity_logs,
                 tags: vec![],
                 break_on_failure: false,
+                no_exception_channel,
             };
             count as usize
         ],

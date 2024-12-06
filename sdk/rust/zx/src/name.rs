@@ -88,12 +88,6 @@ impl Name {
         Self(inner)
     }
 
-    pub(crate) fn from_raw(mut inner: [u8; ZX_MAX_NAME_LEN]) -> Self {
-        // Set the last byte to null just in case this is being constructed from an invalid array.
-        inner[ZX_MAX_NAME_LEN - 1] = 0;
-        Self(inner)
-    }
-
     fn before_nulls(&self) -> &[u8] {
         self.0.splitn(ZX_MAX_NAME_LEN - 1, |b| *b == 0).next().unwrap_or(&[])
     }

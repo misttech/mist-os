@@ -9,6 +9,8 @@ import("//build/cpp/library_headers.gni")
 import("//build/zircon/zircon_cpu.gni")
 import("//zircon/system/ulib/hwreg/hwreg_asm_header.gni")
 
+supported_cpus = standard_fuchsia_cpus + [ "arm" ]
+
 group("headers") {
   # The per-CPU subdirectory is a separate library target but it shares (and
   # overrides) the <lib/arch/...> header name space and users of this library
@@ -17,8 +19,7 @@ group("headers") {
   # The "host" subdirectory is a stub stand-in for a per-CPU subdirectory that
   # provides no-op implementations of a few headers so they can be used
   # unconditionally in various places.
-  if (standard_fuchsia_cpus + [ current_cpu ] - [ current_cpu ] ==
-      standard_fuchsia_cpus) {
+  if (supported_cpus + [ current_cpu ] - [ current_cpu ] == supported_cpus) {
     assert(!is_fuchsia)
     public_deps = [ "host" ]
   } else {

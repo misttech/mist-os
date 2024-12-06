@@ -34,7 +34,7 @@ pub struct RepositoryBuilder<'a> {
     delivery_blob_type: DeliveryBlobType,
 }
 
-impl<'a> Default for RepositoryBuilder<'a> {
+impl Default for RepositoryBuilder<'_> {
     fn default() -> Self {
         Self { packages: vec![], repodir: None, delivery_blob_type: DeliveryBlobType::Type1 }
     }

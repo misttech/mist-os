@@ -284,7 +284,7 @@ fn load_pages(path: PathBuf) -> Result<Vec<Vec<(u16, u16, char)>>, Error> {
             for (column, c) in line.chars().enumerate() {
                 // 12 is form feed (a.k.a. page break).
                 if c == 12 as char {
-                    pages.push(cells.drain(..).collect());
+                    pages.push(std::mem::take(&mut cells));
                     row_start = row + 1;
                     break;
                 } else {

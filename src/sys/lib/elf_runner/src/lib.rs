@@ -275,6 +275,13 @@ impl ElfRunner {
     ) -> Result<ElfComponent, StartComponentError> {
         let resolved_url = &start_info.resolved_url;
 
+        // Fail early if there are clock issues.
+        let boot_clock = zx::Clock::<zx::MonotonicTimeline, zx::BootTimeline>::create(
+            zx::ClockOpts::CONTINUOUS,
+            /*backstop=*/ None,
+        )
+        .map_err(StartComponentError::BootClockCreateFailed)?;
+
         // Connect to `fuchsia.process.Launcher`.
         let launcher = self
             .launcher_connector
@@ -450,9 +457,9 @@ impl ElfRunner {
         );
 
         // Add process start time to the runtime dir.
-        let process_start_time =
+        let process_start_mono_ns =
             process.info().map_err(StartComponentError::ProcessInfoFailed)?.start_time;
-        runtime_dir.add_process_start_time(process_start_time);
+        runtime_dir.add_process_start_time(process_start_mono_ns);
 
         // Add UTC estimate of the process start time to the runtime dir.
         let utc_clock_started = fasync::OnSignals::new(&utc_clock_dup, zx::Signals::CLOCK_STARTED)
@@ -461,21 +468,44 @@ impl ElfRunner {
             })
             .await
             .is_ok();
-        let clock_transformation = utc_clock_started
+
+        // The clock transformations needed to map a timestamp on a monotonic timeline
+        // to a timestamp on the UTC timeline.
+        let mono_to_clock_transformation =
+            boot_clock.get_details().map(|details| details.reference_to_synthetic).ok();
+        let boot_to_utc_transformation = utc_clock_started
             .then(|| utc_clock_dup.get_details().map(|details| details.reference_to_synthetic).ok())
             .flatten();
-        if let Some(clock_transformation) = clock_transformation {
-            let utc_timestamp = clock_transformation
-                // TODO: b/377525445 - This will give wrong values once we introduce
-                // stoppable monotonic clock. We allow it temporarily since it
-                // will work until that happens.
-                .apply(zx::BootInstant::from_nanos(process_start_time))
-                .into_nanos();
-            let seconds = (utc_timestamp / 1_000_000_000) as i64;
-            let nanos = (utc_timestamp % 1_000_000_000) as u32;
-            let dt =
-                Utc.from_utc_datetime(&NaiveDateTime::from_timestamp_opt(seconds, nanos).unwrap());
-            runtime_dir.add_process_start_time_utc_estimate(dt.to_string())
+
+        if let Some(clock_transformation) = boot_to_utc_transformation {
+            // This composes two transformations, to get from a timestamp expressed in
+            // nanoseconds on the monotonic timeline, to our best estimate of the
+            // corresponding UTC date-time.
+            //
+            // The clock transformations are computed before they are applied. If
+            // a suspend intervenes exactly between the computation and application,
+            // the timelines will drift away during sleep, causing a wrong date-time
+            // to be exposed in `runtime_dir`.
+            //
+            // This should not be a huge issue in practice, as the chances of that
+            // happening are vanishingly small.
+            let process_start_instant_mono =
+                zx::MonotonicInstant::from_nanos(process_start_mono_ns);
+            let maybe_time_utc = mono_to_clock_transformation
+                .map(|t| t.apply(process_start_instant_mono))
+                .map(|time_boot| clock_transformation.apply(time_boot));
+
+            if let Some(utc_timestamp) = maybe_time_utc {
+                let utc_time_ns = utc_timestamp.into_nanos();
+                let seconds = (utc_time_ns / 1_000_000_000) as i64;
+                let nanos = (utc_time_ns % 1_000_000_000) as u32;
+                let dt = Utc
+                    .from_utc_datetime(&NaiveDateTime::from_timestamp_opt(seconds, nanos).unwrap());
+
+                // If any of the above values are unavailable (unlikely), then this
+                // does not happen.
+                runtime_dir.add_process_start_time_utc_estimate(dt.to_string())
+            }
         };
 
         Ok(ElfComponent::new(

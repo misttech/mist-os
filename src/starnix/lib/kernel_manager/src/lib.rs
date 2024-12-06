@@ -242,6 +242,10 @@ async fn suspend_container(
 > {
     fuchsia_trace::duration!(c"power", c"starnix-runner:suspending-container");
     let Some(container_job) = payload.container_job else {
+        warn!(
+            "error suspending container: could not find container job {:?}",
+            payload.container_job
+        );
         return Ok(Err(fstarnixrunner::SuspendError::SuspendFailure));
     };
 
@@ -267,6 +271,7 @@ async fn suspend_container(
             Ok(_) => {
                 // There were wake locks active after suspending all processes, resume
                 // and fail the suspend call.
+                warn!("error suspending container: Linux wake locks exist");
                 fuchsia_trace::instant!(
                     c"power",
                     c"starnix-runner:suspend-failed-with-wake-locks",

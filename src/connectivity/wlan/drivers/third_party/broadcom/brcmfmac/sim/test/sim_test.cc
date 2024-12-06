@@ -248,12 +248,12 @@ void SimInterface::DisassocInd(DisassocIndRequestView request,
 }
 
 void SimInterface::StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) {
-  stats_.start_confirmations.push_back(request->resp);
+  stats_.start_confirmations.push_back(fidl::ToNatural(*request));
   completer.Reply();
 }
 
 void SimInterface::StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) {
-  stats_.stop_confirmations.push_back(request->resp);
+  stats_.stop_confirmations.push_back(fidl::ToNatural(*request));
   completer.Reply();
 }
 

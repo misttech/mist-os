@@ -41,7 +41,7 @@ use error::Location;
 
 pub use crate::one_or_many::OneOrMany;
 pub use crate::translate::{compile, CompileOptions};
-pub use crate::validate::ProtocolRequirements;
+pub use crate::validate::{CapabilityRequirements, MustOfferRequirement, MustUseRequirement};
 
 lazy_static! {
     static ref DEFAULT_EVENT_STREAM_NAME: Name = "EventStream".parse().unwrap();
@@ -198,7 +198,7 @@ impl<'a> CapabilityId<'a> {
                 return Ok(vec![CapabilityId::UsedEventStream(path.clone())]);
             }
             return Ok(vec![CapabilityId::UsedEventStream(Path::new(
-                "/svc/fuchsia.component.EventStream".to_string(),
+                "/svc/fuchsia.component.EventStream",
             )?)]);
         } else if let Some(n) = use_.runner() {
             match n {
@@ -1170,12 +1170,6 @@ pub struct Document {
     /// [`capabilities`]: #capabilities
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include: Option<Vec<String>>,
-
-    /// The `disable` section disables certain features in a particular CML that are
-    /// otherwise enforced by cmc.
-    #[reference_doc(recurse)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub disable: Option<Disable>,
 
     /// Components that are executable include a `program` section. The `program`
     /// section must set the `runner` property to select a [runner][doc-runners] to run
@@ -3345,27 +3339,6 @@ pub struct Child {
     pub environment: Option<EnvironmentRef>,
 }
 
-/// Example:
-///
-/// ```json5
-/// disable: {
-///     must_offer_protocol: [ "fuchsia.logger.LogSink", "fuchsia.component.Binder" ],
-///     must_use_protocol: [ "fuchsia.logger.LogSink" ],
-/// }
-/// ```
-#[derive(Default, ReferenceDoc, Deserialize, Debug, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-#[reference_doc(fields_as = "list", top_level_doc_after_fields)]
-pub struct Disable {
-    /// Lists protocols for which the option "--must-offer-protocol" is disabled.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub must_offer_protocol: Option<Vec<String>>,
-
-    /// Lists protocols for which the option "--must-use-protocol" is disabled.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub must_use_protocol: Option<Vec<String>>,
-}
-
 #[derive(Deserialize, Debug, PartialEq, ReferenceDoc, Serialize)]
 #[serde(deny_unknown_fields)]
 #[reference_doc(fields_as = "list", top_level_doc_after_fields)]
@@ -4252,7 +4225,6 @@ pub fn format_cml(buffer: &str, file: Option<&std::path::Path>) -> Result<Vec<u8
             "/*" => hashset! {
                 PathOption::PropertyNameOrder(vec![
                     "include",
-                    "disable",
                     "program",
                     "children",
                     "collections",

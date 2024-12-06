@@ -153,7 +153,7 @@ capabilities.
 
 <!-- Source code and examples. Please link to https://cs.opensource.google -->
 [testgen]: https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/testgen/
-[RealmProxy]: https://cs.opensource.google/fuchsia/fuchisa/+/main:sdk/fidl/fuchsia.testing.harness/realm_proxy.fidl
+[RealmProxy]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.testing.harness/realm_proxy.fidl
 [Archivist test puppet]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/diagnostics/archivist/testing/puppet
 [Archivist test puppet fidl]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/diagnostics/archivist/testing/fidl/puppet.test.fidl
 [WLAN hw-sim tests]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/wlan/testing/hw-sim/test

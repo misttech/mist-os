@@ -14,13 +14,15 @@ use {
     fidl_fuchsia_recovery as frecovery,
 };
 
-use crate::arch::ARCH_NAME;
+use crate::arch::{ARCH_NAME, ARCH_NAME_COMPAT};
 #[cfg(not(feature = "starnix_lite"))]
 use crate::device::android::bootloader_message_store::BootloaderMessage;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{FdNumber, FsString};
 use starnix_logging::{log_error, log_info, log_warn, track_stub};
+#[cfg(feature = "arch32")]
+use starnix_syscalls::{for_each_arch32_syscall, syscall_arch32_number_to_name_literal_callback};
 use starnix_syscalls::{
     for_each_syscall, syscall_number_to_name_literal_callback, SyscallResult, SUCCESS,
 };
@@ -38,25 +40,16 @@ use starnix_uapi::{
     LINUX_REBOOT_MAGIC2, LINUX_REBOOT_MAGIC2A, LINUX_REBOOT_MAGIC2B, LINUX_REBOOT_MAGIC2C,
 };
 
-pub fn sys_uname(
+pub fn do_uname(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    name: UserRef<utsname>,
+    result: &mut utsname,
 ) -> Result<(), Errno> {
     fn init_array(fixed: &mut [c_char; 65], init: &[u8]) {
         let len = init.len();
         let as_c_char = unsafe { std::mem::transmute::<&[u8], &[c_char]>(init) };
         fixed[..len].copy_from_slice(as_c_char)
     }
-
-    let mut result = utsname {
-        sysname: [0; 65],
-        nodename: [0; 65],
-        release: [0; 65],
-        version: [0; 65],
-        machine: [0; 65],
-        domainname: [0; 65],
-    };
 
     init_array(&mut result.sysname, b"Linux");
     if current_task.thread_group.read().personality.contains(PersonalityFlags::UNAME26) {
@@ -76,7 +69,12 @@ pub fn sys_uname(
     })?;
 
     init_array(&mut result.version, version.as_bytes());
-    init_array(&mut result.machine, ARCH_NAME);
+    // TODO(https://fxbug.dev/380431743) rename property or use personality?
+    if cfg!(feature = "arch32") && current_task.thread_state.arch_width.is_arch32() {
+        init_array(&mut result.machine, ARCH_NAME_COMPAT);
+    } else {
+        init_array(&mut result.machine, ARCH_NAME);
+    }
 
     {
         // Get the UTS namespace from the perspective of this task.
@@ -85,7 +83,23 @@ pub fn sys_uname(
         init_array(&mut result.nodename, uts_ns.hostname.as_slice());
         init_array(&mut result.domainname, uts_ns.domainname.as_slice());
     }
+    Ok(())
+}
 
+pub fn sys_uname(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    name: UserRef<utsname>,
+) -> Result<(), Errno> {
+    let mut result = utsname {
+        sysname: [0; 65],
+        nodename: [0; 65],
+        release: [0; 65],
+        version: [0; 65],
+        machine: [0; 65],
+        domainname: [0; 65],
+    };
+    do_uname(locked, current_task, &mut result)?;
     current_task.write_object(name, &result)?;
     Ok(())
 }
@@ -390,14 +404,17 @@ pub fn sys_sched_yield(
 
 pub fn sys_unknown(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
+    #[allow(unused_variables)] current_task: &CurrentTask,
     syscall_number: u64,
 ) -> Result<SyscallResult, Errno> {
-    track_stub!(
-        TODO("https://fxbug.dev/322874143"),
-        for_each_syscall! { syscall_number_to_name_literal_callback, syscall_number },
-        syscall_number,
-    );
+    #[cfg(feature = "arch32")]
+    if current_task.thread_state.arch_width.is_arch32() {
+        let name = for_each_arch32_syscall! { syscall_arch32_number_to_name_literal_callback, syscall_number };
+        track_stub!(TODO("https://fxbug.dev/322874143"), name, syscall_number,);
+        return error!(ENOSYS);
+    }
+    let name = for_each_syscall! { syscall_number_to_name_literal_callback, syscall_number };
+    track_stub!(TODO("https://fxbug.dev/322874143"), name, syscall_number,);
     // TODO: We should send SIGSYS once we have signals.
     error!(ENOSYS)
 }

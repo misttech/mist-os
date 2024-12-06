@@ -4,10 +4,10 @@
 
 # AUTO-GENERATED - DO NOT EDIT!
 
-# Enable gcert authentication. This will use gcert credentials instead of application
-# default credentials.  Applicable to Google FTEs only, running inside a Corp
-# environment.
-build:gcertauth --experimental_credential_helper=/google/src/head/depot/google3/devtools/blaze/bazel/credhelper/credhelper
+# Enable gcert authentication, which will automatically refresh OAuth
+# tokens while gcert certificate (unrestricted) is still valid.
+# Use build/rbe/check_loas_restrictions.sh to determine certificate type.
+build:gcertauth --credential_helper=*.googleapis.com=/google/src/head/depot/google3/devtools/blaze/bazel/credhelper/credhelper
 
 # Setup remote build (RBE)
 build:_remote_common --remote_instance_name={remote_instance_name}

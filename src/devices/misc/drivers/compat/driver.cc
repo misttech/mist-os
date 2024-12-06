@@ -542,24 +542,16 @@ zx_status_t Driver::GetProperties(device_props_args_t* out_args,
     return out_value;
   };
 
-  auto props = node_properties(parent_node_name);
+  auto props = node_properties_2(parent_node_name);
   uint32_t str_prop_count = 0;
   for (auto& prop : props) {
-    switch (prop.key().Which()) {
-      case fuchsia_driver_framework::NodePropertyKey::Tag::kIntValue:
-        logger_->log(fdf::WARN, "Found key '%u'. Integer-based keys are no longer supported",
-                     prop.key().int_value().value());
-        break;
-      case fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue:
-        if (str_prop_count >= out_args->str_prop_count) {
-          out_args->actual_str_prop_count = str_prop_count;
-          return ZX_ERR_BUFFER_TOO_SMALL;
-        }
-        str_prop_count++;
-        out_args->str_props[str_prop_count - 1].key = prop.key().string_value()->data();
-        out_args->str_props[str_prop_count - 1].property_value = set_str_prop_value(prop.value());
-        break;
+    if (str_prop_count >= out_args->str_prop_count) {
+      out_args->actual_str_prop_count = str_prop_count;
+      return ZX_ERR_BUFFER_TOO_SMALL;
     }
+    str_prop_count++;
+    out_args->str_props[str_prop_count - 1].key = prop.key().c_str();
+    out_args->str_props[str_prop_count - 1].property_value = set_str_prop_value(prop.value());
   }
   out_args->actual_str_prop_count = str_prop_count;
   return ZX_OK;

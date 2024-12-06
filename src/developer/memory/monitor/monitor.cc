@@ -37,7 +37,6 @@
 #include "src/developer/memory/monitor/memory_metrics_registry.cb.h"
 #include "src/developer/memory/pressure_signaler/pressure_observer.h"
 #include "src/lib/files/file.h"
-#include "src/lib/fsl/socket/strings.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 
@@ -47,9 +46,10 @@ using memory::Capture;
 using memory::CaptureLevel;
 using memory::Digest;
 using memory::Digester;
-using memory::Printer;
+using memory::JsonPrinter;
 using memory::SORTED;
 using memory::Summary;
+using memory::TextPrinter;
 
 const char Monitor::kTraceName[] = "memory_monitor";
 
@@ -342,12 +342,8 @@ void Monitor::CollectJsonStatsWithOptions(zx::socket socket) {
   } else {
     FX_CHECK(files::ReadFileToString(kBucketConfigPath, &configuration_str));
   }
-  std::stringstream stream;
-  Printer printer(stream);
+  JsonPrinter printer(socket);
   printer.PrintCaptureAndBucketConfig(capture, configuration_str);
-  // TODO(b/229972119): avoid a copy by having the stream write directly to the socket.
-  // Send string through socket.
-  fsl::BlockingCopyFromString(stream.view(), socket);
 }
 
 void Monitor::PrintHelp() {
@@ -371,7 +367,7 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
 
   Summary summary(capture, Summary::kNameMatches);
   std::ostringstream summary_stream;
-  Printer summary_printer(summary_stream);
+  TextPrinter summary_printer(summary_stream);
   summary_printer.PrintSummary(summary, CaptureLevel::VMO, SORTED);
   auto current_string = summary_stream.str();
   auto high_water_string = high_water_->GetHighWater();
@@ -445,7 +441,7 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
   Digest digest;
   digester_->Digest(capture, &digest);
   std::ostringstream digest_stream;
-  Printer digest_printer(digest_stream);
+  TextPrinter digest_printer(digest_stream);
   digest_printer.PrintDigest(digest);
   auto current_digest_string = digest_stream.str();
   auto high_water_digest_string = high_water_->GetHighWaterDigest();

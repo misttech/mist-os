@@ -185,6 +185,9 @@ class IdlePowerThread final {
 
   Thread thread_;
   cpu_num_t this_cpu_{INVALID_CPU};
+
+  // Accumulates the time spent in a lower-power idle state since the last reschedule. This value is
+  // reset to zero on each reschedule and when a CPU goes offline.
   zx_duration_t processor_idle_time_ns_{0};
 
   DECLARE_SINGLETON_MUTEX(TransitionLock);

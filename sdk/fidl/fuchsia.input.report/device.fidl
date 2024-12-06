@@ -37,7 +37,7 @@ closed protocol InputReportsReader {
 /// once they are read by the client. If the FIFO is full, it will drop the
 /// oldest report to make room for an incoming report.
 @discoverable
-closed protocol InputDevice {
+open protocol InputDevice {
     /// Open a new InputReportsReader on this device. Each reader receives
     /// their own reports.
     strict GetInputReportsReader(resource struct {

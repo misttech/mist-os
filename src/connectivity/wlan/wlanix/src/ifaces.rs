@@ -118,20 +118,21 @@ impl IfaceManager for DeviceMonitorIfaceManager {
         let (iface_id, wlanix_provisioned) = match unmanaged_iface_id {
             Some(id) => (id, false),
             None => {
-                let (status, response) = self
+                let response = self
                     .monitor_svc
-                    .create_iface(&fidl_device_service::CreateIfaceRequest {
-                        phy_id,
-                        role: fidl_fuchsia_wlan_common::WlanMacRole::Client,
+                    .create_iface(&fidl_device_service::DeviceMonitorCreateIfaceRequest {
+                        phy_id: Some(phy_id),
+                        role: Some(fidl_fuchsia_wlan_common::WlanMacRole::Client),
                         // TODO(b/322060085): Determine if we need to populate this and how.
-                        sta_addr: [0u8; 6],
+                        sta_address: Some([0u8; 6]),
+                        ..Default::default()
                     })
-                    .await?;
-                zx::Status::ok(status)?;
+                    .await?
+                    .map_err(|e| format_err!("Failed to create iface: {:?}", e))?;
                 (
                     response
-                        .ok_or_else(|| format_err!("Did not receive a CreateIfaceResponse"))?
-                        .iface_id,
+                        .iface_id
+                        .ok_or_else(|| format_err!("Missing iface id in CreateIfaceResponse"))?,
                     true,
                 )
             }
@@ -982,12 +983,10 @@ mod tests {
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::CreateIface { responder, .. })) => responder);
         responder
-            .send(
-                0,
-                Some(&fidl_device_service::CreateIfaceResponse {
-                    iface_id: FAKE_IFACE_RESPONSE.id,
-                }),
-            )
+            .send(Ok(&fidl_device_service::DeviceMonitorCreateIfaceResponse {
+                iface_id: Some(FAKE_IFACE_RESPONSE.id),
+                ..Default::default()
+            }))
             .expect("Failed to send CreateIface response");
 
         // Establish a connection to the new iface.
@@ -1039,7 +1038,9 @@ mod tests {
         let responder = assert_variant!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::CreateIface { responder, .. })) => responder);
-        responder.send(1, None).expect("Failed to send CreateIface response");
+        responder
+            .send(Err(fidl_device_service::DeviceMonitorError::unknown()))
+            .expect("Failed to send CreateIface response");
 
         assert_variant!(
             exec.run_until_stalled(&mut manager.get_client_iface(FAKE_IFACE_RESPONSE.id)),

@@ -21,7 +21,7 @@ namespace paver {
 
 namespace {
 
-// Connects to the volume protocol in an instance of fuchsia.storagehost.PartitionService.
+// Connects to the volume protocol in an instance of fuchsia.storage.partitions.PartitionService.
 zx::result<std::unique_ptr<VolumeConnector>> CreateServiceBasedVolumeConnector(
     int dir_fd, const std::string& filename) {
   zx::channel partition_local, partition_remote;
@@ -76,7 +76,7 @@ zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>> DevfsVolumeCo
   return zx::ok(std::move(client));
 }
 
-zx::result<fidl::ClientEnd<fuchsia_storagehost::Partition>>
+zx::result<fidl::ClientEnd<fuchsia_storage_partitions::Partition>>
 DevfsVolumeConnector::PartitionManagement() const {
   ZX_ASSERT_MSG(false, "Called PartitionManagement on a DevfsVolumeConnector");
 }
@@ -109,10 +109,10 @@ ServiceBasedVolumeConnector::Connect() const {
   return zx::ok(std::move(client));
 }
 
-zx::result<fidl::ClientEnd<fuchsia_storagehost::Partition>>
+zx::result<fidl::ClientEnd<fuchsia_storage_partitions::Partition>>
 ServiceBasedVolumeConnector::PartitionManagement() const {
   fdio_cpp::UnownedFdioCaller caller(service_dir_);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_storagehost::Partition>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_storage_partitions::Partition>();
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }
@@ -149,7 +149,7 @@ zx::result<BlockDevices> BlockDevices::CreateDevfs(fbl::unique_fd devfs_root) {
   return zx::ok(BlockDevices(std::move(devfs_root), {}));
 }
 
-zx::result<BlockDevices> BlockDevices::CreateStorageHost(
+zx::result<BlockDevices> BlockDevices::CreateFromPartitionService(
     fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root) {
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
@@ -157,7 +157,7 @@ zx::result<BlockDevices> BlockDevices::CreateStorageHost(
   }
   auto [client, server] = std::move(*endpoints);
   if (zx_status_t status = fdio_open3_at(
-          svc_root.handle()->get(), "fuchsia.storagehost.PartitionService",
+          svc_root.handle()->get(), "fuchsia.storage.partitions.PartitionService",
           static_cast<uint64_t>(fuchsia_io::wire::kPermReadable), server.TakeChannel().release());
       status != ZX_OK) {
     ERROR("Failed to open partition service: %s\n", zx_status_get_string(status));

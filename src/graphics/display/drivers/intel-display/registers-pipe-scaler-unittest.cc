@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/registers-pipe-scaler.h"
 
+#include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <cmath>
@@ -11,7 +12,6 @@
 
 #include <gtest/gtest.h>
 #include <hwreg/bitfields.h>
-#include <mock-mmio-range/mock-mmio-range.h>
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 
@@ -491,7 +491,7 @@ TEST(PipeScalerCoefficients, Write) {
     coefficients[i].set_is_negative(0).set_mantissa(i).set_exponent(0);
   }
 
-  std::vector<ddk_mock::MockMmioRange::Access> expected_access_list = {
+  std::vector<mock_mmio::MockMmioRange::Access> expected_access_list = {
       {.address = 0x68198, .value = 0x00000400, .write = true},
   };
   for (size_t i = 0; i < kNumCoefficients; i += 2) {
@@ -504,7 +504,7 @@ TEST(PipeScalerCoefficients, Write) {
   }
 
   constexpr static int kMmioRangeSize = 0x140000;
-  ddk_mock::MockMmioRange mmio_range{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
+  mock_mmio::MockMmioRange mmio_range{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
   mmio_range.Expect(expected_access_list);
   fdf::MmioBuffer mmio_buffer(mmio_range.GetMmioBuffer());
 
@@ -521,7 +521,7 @@ TEST(PipeScalerCoefficients, Read) {
     expected_coefficients[i].set_is_negative(0).set_mantissa(i).set_exponent(0);
   }
 
-  std::vector<ddk_mock::MockMmioRange::Access> expected_access_list = {
+  std::vector<mock_mmio::MockMmioRange::Access> expected_access_list = {
       {.address = 0x68198, .value = 0x00000400, .write = true},
   };
   for (size_t i = 0; i < kNumCoefficients; i += 2) {
@@ -534,7 +534,7 @@ TEST(PipeScalerCoefficients, Read) {
   }
 
   constexpr static int kMmioRangeSize = 0x140000;
-  ddk_mock::MockMmioRange mmio_range{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
+  mock_mmio::MockMmioRange mmio_range{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
   mmio_range.Expect(expected_access_list);
   fdf::MmioBuffer mmio_buffer(mmio_range.GetMmioBuffer());
 

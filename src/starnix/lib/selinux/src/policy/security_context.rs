@@ -7,7 +7,9 @@ use crate::policy::{CategoryId, ParseStrategy, RoleId, SensitivityId, TypeId, Us
 
 use crate::NullessByteStr;
 use bstr::BString;
+use std::cell::RefCell;
 use std::cmp::Ordering;
+use std::slice::Iter;
 use thiserror::Error;
 
 /// The security context, a variable-length string associated with each SELinux object in the
@@ -203,7 +205,7 @@ impl SecurityContext {
                 user: user.name_bytes().into(),
             });
         }
-        if let Some(high_level) = &self.high_level {
+        if let Some(ref high_level) = self.high_level {
             // 2. Validate that the high sensitivity is within the permitted range.
             if high_level.sensitivity < valid_low.sensitivity()
                 || high_level.sensitivity > valid_high.sensitivity()
@@ -214,18 +216,14 @@ impl SecurityContext {
                 });
             }
 
-            // 3. Validate that the high level is not less-than the low level.
-            if *high_level < self.low_level {
+            // 3. Validate that the high level dominates the low level.
+            if !(high_level).dominates(&self.low_level) {
                 return Err(SecurityContextError::InvalidSecurityRange {
                     low: self.low_level.serialize(policy_index).into(),
                     high: high_level.serialize(policy_index).into(),
                 });
             }
         }
-
-        // TODO(b/319232900): Determine whether additional validations should be performed here, e.g:
-        // - That the categories are valid for the sensitivity levels.
-
         Ok(())
     }
 
@@ -348,12 +346,92 @@ impl SecurityLevel {
             .ok_or_else(|| SecurityContextError::UnknownCategory { name: name.into() })?
             .id())
     }
+
+    // Implements the "dominance" partial ordering of security levels.
+    fn compare(&self, other: &Self) -> Option<Ordering> {
+        let s_order = self.sensitivity.cmp(&other.sensitivity);
+        let c_order = CategoryIter::new(self.categories.iter())
+            .compare(&CategoryIter::new(other.categories.iter()))?;
+        if s_order == c_order {
+            return Some(s_order);
+        } else if c_order == Ordering::Equal {
+            return Some(s_order);
+        } else if s_order == Ordering::Equal {
+            return Some(c_order);
+        }
+        // In the remaining cases `s_order` and `c_order` are strictly opposed,
+        // so the security levels are not comparable.
+        None
+    }
+
+    fn dominates(&self, other: &Self) -> bool {
+        match self.compare(other) {
+            Some(Ordering::Equal) | Some(Ordering::Greater) => true,
+            _ => false,
+        }
+    }
 }
 
-impl PartialOrd for SecurityLevel {
-    fn partial_cmp(&self, other: &SecurityLevel) -> Option<Ordering> {
-        // TODO(b/319232900): Take category-set ordering into account!
-        self.sensitivity.partial_cmp(&other.sensitivity)
+// An immutable wrapper around an iterator over a list of category spans.
+pub(super) struct CategoryIter<'a>(RefCell<Iter<'a, CategorySpan>>);
+
+impl<'a> CategoryIter<'a> {
+    fn new(iter: Iter<'a, CategorySpan>) -> Self {
+        Self(RefCell::new(iter))
+    }
+
+    fn next(&self) -> Option<&CategorySpan> {
+        self.0.borrow_mut().next()
+    }
+
+    // Implements the set-containment partial ordering on lists of categories.
+    fn compare(&self, other: &CategoryIter<'a>) -> Option<Ordering> {
+        let mut self_contains_other = true;
+        let mut other_contains_self = true;
+
+        let mut self_now = self.next();
+        let mut other_now = other.next();
+
+        while let (Some(self_span), Some(other_span)) = (self_now, other_now) {
+            if self_span.high < other_span.low {
+                other_contains_self = false;
+            } else if other_span.high < self_span.low {
+                self_contains_other = false;
+            } else {
+                match self_span.compare(&other_span) {
+                    None => {
+                        return None;
+                    }
+                    Some(Ordering::Less) => {
+                        self_contains_other = false;
+                    }
+                    Some(Ordering::Greater) => {
+                        other_contains_self = false;
+                    }
+                    Some(Ordering::Equal) => {}
+                }
+                if !self_contains_other && !other_contains_self {
+                    return None;
+                }
+            }
+            if self_span.high <= other_span.high {
+                self_now = self.next();
+            }
+            if other_span.high <= self_span.high {
+                other_now = other.next();
+            }
+        }
+        if self_now.is_some() {
+            other_contains_self = false;
+        } else if other_now.is_some() {
+            self_contains_other = false;
+        }
+        match (self_contains_other, other_contains_self) {
+            (true, true) => Some(Ordering::Equal),
+            (true, false) => Some(Ordering::Greater),
+            (false, true) => Some(Ordering::Less),
+            (false, false) => None,
+        }
     }
 }
 
@@ -380,6 +458,20 @@ impl CategorySpan {
                 policy_index.parsed_policy().category(self.high).name_bytes(),
             ]
             .join(b".".as_ref()),
+        }
+    }
+
+    // Implements the set-containment partial ordering.
+    fn compare(&self, other: &Self) -> Option<Ordering> {
+        match (self.low.cmp(&other.low), self.high.cmp(&other.high)) {
+            (Ordering::Equal, Ordering::Equal) => Some(Ordering::Equal),
+            (Ordering::Equal, Ordering::Greater)
+            | (Ordering::Less, Ordering::Equal)
+            | (Ordering::Less, Ordering::Greater) => Some(Ordering::Greater),
+            (Ordering::Equal, Ordering::Less)
+            | (Ordering::Greater, Ordering::Equal)
+            | (Ordering::Greater, Ordering::Less) => Some(Ordering::Less),
+            _ => None,
         }
     }
 }
@@ -411,6 +503,8 @@ pub enum SecurityContextError {
 mod tests {
     use super::super::{parse_policy_by_reference, ByRef, Policy};
     use super::*;
+
+    use std::num::NonZeroU32;
 
     type TestPolicy = Policy<ByRef<&'static [u8]>>;
     fn test_policy() -> TestPolicy {
@@ -458,6 +552,116 @@ mod tests {
         categories: &Vec<CategorySpan>,
     ) -> Vec<CategoryItem<'a>> {
         categories.iter().map(|x| category_span(policy, x)).collect()
+    }
+
+    // A test helper that creates a category span from a pair of positive integers.
+    fn cat(low: u32, high: u32) -> CategorySpan {
+        CategorySpan {
+            low: CategoryId(NonZeroU32::new(low).expect("category ids are nonzero")),
+            high: CategoryId(NonZeroU32::new(high).expect("category ids are nonzero")),
+        }
+    }
+
+    // A test helper that compares two sets of catetories.
+    fn compare(lhs: &[CategorySpan], rhs: &[CategorySpan]) -> Option<Ordering> {
+        CategoryIter::new(lhs.iter()).compare(&CategoryIter::new(rhs.iter()))
+    }
+
+    #[test]
+    fn category_compare() {
+        let cat_1 = cat(1, 1);
+        let cat_2 = cat(1, 3);
+        let cat_3 = cat(2, 3);
+        assert_eq!(cat_1.compare(&cat_1), Some(Ordering::Equal));
+        assert_eq!(cat_1.compare(&cat_2), Some(Ordering::Less));
+        assert_eq!(cat_1.compare(&cat_3), None);
+        assert_eq!(cat_2.compare(&cat_1), Some(Ordering::Greater));
+        assert_eq!(cat_2.compare(&cat_3), Some(Ordering::Greater));
+    }
+
+    #[test]
+    fn categories_compare_empty_iter() {
+        let cats_0 = &[];
+        let cats_1 = &[cat(1, 1)];
+        assert_eq!(compare(cats_0, cats_0), Some(Ordering::Equal));
+        assert_eq!(compare(cats_0, cats_1), Some(Ordering::Less));
+        assert_eq!(compare(cats_1, cats_0), Some(Ordering::Greater));
+    }
+
+    #[test]
+    fn categories_compare_same_length() {
+        let cats_1 = &[cat(1, 1), cat(3, 3)];
+        let cats_2 = &[cat(1, 1), cat(4, 4)];
+        let cats_3 = &[cat(1, 2), cat(4, 4)];
+        let cats_4 = &[cat(1, 2), cat(4, 5)];
+
+        assert_eq!(compare(cats_1, cats_1), Some(Ordering::Equal));
+        assert_eq!(compare(cats_1, cats_2), None);
+        assert_eq!(compare(cats_1, cats_3), None);
+        assert_eq!(compare(cats_1, cats_4), None);
+
+        assert_eq!(compare(cats_2, cats_1), None);
+        assert_eq!(compare(cats_2, cats_2), Some(Ordering::Equal));
+        assert_eq!(compare(cats_2, cats_3), Some(Ordering::Less));
+        assert_eq!(compare(cats_2, cats_4), Some(Ordering::Less));
+
+        assert_eq!(compare(cats_3, cats_1), None);
+        assert_eq!(compare(cats_3, cats_2), Some(Ordering::Greater));
+        assert_eq!(compare(cats_3, cats_3), Some(Ordering::Equal));
+        assert_eq!(compare(cats_3, cats_4), Some(Ordering::Less));
+
+        assert_eq!(compare(cats_4, cats_1), None);
+        assert_eq!(compare(cats_4, cats_2), Some(Ordering::Greater));
+        assert_eq!(compare(cats_4, cats_3), Some(Ordering::Greater));
+        assert_eq!(compare(cats_4, cats_4), Some(Ordering::Equal));
+    }
+
+    #[test]
+    fn categories_compare_different_lengths() {
+        let cats_1 = &[cat(1, 1)];
+        let cats_2 = &[cat(1, 4)];
+        let cats_3 = &[cat(1, 1), cat(4, 4)];
+        let cats_4 = &[cat(1, 2), cat(4, 5), cat(7, 7)];
+
+        assert_eq!(compare(cats_1, cats_3), Some(Ordering::Less));
+        assert_eq!(compare(cats_1, cats_4), Some(Ordering::Less));
+
+        assert_eq!(compare(cats_2, cats_3), Some(Ordering::Greater));
+        assert_eq!(compare(cats_2, cats_4), None);
+
+        assert_eq!(compare(cats_3, cats_1), Some(Ordering::Greater));
+        assert_eq!(compare(cats_3, cats_2), Some(Ordering::Less));
+        assert_eq!(compare(cats_3, cats_4), Some(Ordering::Less));
+
+        assert_eq!(compare(cats_4, cats_1), Some(Ordering::Greater));
+        assert_eq!(compare(cats_4, cats_2), None);
+        assert_eq!(compare(cats_4, cats_3), Some(Ordering::Greater));
+    }
+
+    #[test]
+    // Test cases where one interval appears before or after all intervals of the
+    // other set, or in a gap between intervals of the other set.
+    fn categories_compare_with_gaps() {
+        let cats_1 = &[cat(1, 2), cat(4, 5)];
+        let cats_2 = &[cat(4, 5)];
+        let cats_3 = &[cat(2, 5), cat(10, 11)];
+        let cats_4 = &[cat(2, 5), cat(7, 8), cat(10, 11)];
+
+        assert_eq!(compare(cats_1, cats_2), Some(Ordering::Greater));
+        assert_eq!(compare(cats_1, cats_3), None);
+        assert_eq!(compare(cats_1, cats_4), None);
+
+        assert_eq!(compare(cats_2, cats_1), Some(Ordering::Less));
+        assert_eq!(compare(cats_2, cats_3), Some(Ordering::Less));
+        assert_eq!(compare(cats_2, cats_4), Some(Ordering::Less));
+
+        assert_eq!(compare(cats_3, cats_1), None);
+        assert_eq!(compare(cats_3, cats_2), Some(Ordering::Greater));
+        assert_eq!(compare(cats_3, cats_4), Some(Ordering::Less));
+
+        assert_eq!(compare(cats_4, cats_1), None);
+        assert_eq!(compare(cats_4, cats_2), Some(Ordering::Greater));
+        assert_eq!(compare(cats_4, cats_3), Some(Ordering::Greater));
     }
 
     #[test]
@@ -671,12 +875,44 @@ mod tests {
     fn invalid_security_context_fields() {
         let policy = test_policy();
 
-        // TODO(b/319232900): Should fail validation because the low security level has
-        // categories that the high level does not.
+        // Fails validation because the security context's high level does not dominate its
+        // low level: the low level has categories that the high level does not.
         let context = policy
             .parse_security_context(b"user0:object_r:type0:s1:c0,c3.c4-s1".into())
             .expect("successfully parsed");
-        assert!(policy.validate_security_context(&context).is_ok());
+        assert_eq!(
+            policy.validate_security_context(&context),
+            Err(SecurityContextError::InvalidSecurityRange {
+                low: "s1:c0,c3.c4".into(),
+                high: "s1".into()
+            })
+        );
+
+        // Fails validation because the security context's high level does not dominate its
+        // low level: the category sets of the high level and low level are not comparable.
+        let context = policy
+            .parse_security_context(b"user0:object_r:type0:s1:c0-s1:c1".into())
+            .expect("successfully parsed");
+        assert_eq!(
+            policy.validate_security_context(&context),
+            Err(SecurityContextError::InvalidSecurityRange {
+                low: "s1:c0".into(),
+                high: "s1:c1".into()
+            })
+        );
+
+        // Fails validation because the security context's high level does not dominate its
+        // low level: the sensitivity of the high level is lower than that of the low level.
+        let context = policy
+            .parse_security_context(b"user0:object_r:type0:s1:c0-s0:c0.c1".into())
+            .expect("successfully parsed");
+        assert_eq!(
+            policy.validate_security_context(&context),
+            Err(SecurityContextError::InvalidSecurityRange {
+                low: "s1:c0".into(),
+                high: "s0:c0.c1".into()
+            })
+        );
 
         // Fails validation because the sensitivity is not valid for the user.
         let context = policy

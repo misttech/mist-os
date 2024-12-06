@@ -87,7 +87,7 @@ impl Framebuffer {
             // Fill the buffer with black pixels as a placeholder, if visual debug is off.
             // Fill the buffer with purple, if visual debug is on.
             let background = if enable_visual_debugging {
-                vec![0xff, 0x00, 0xff, 0xff].repeat((memory_len / 4) as usize)
+                [0xff, 0x00, 0xff, 0xff].repeat((memory_len / 4) as usize)
             } else {
                 vec![0x00; memory_len as usize]
             };

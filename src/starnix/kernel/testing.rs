@@ -16,21 +16,20 @@ use crate::vfs::{
     FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
     FileSystemOptions, FsContext, FsNode, FsNodeOps, FsStr, Namespace,
 };
-
 use fidl_fuchsia_io as fio;
 use selinux::SecurityServer;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
-use std::ffi::CString;
-use std::mem::MaybeUninit;
-use std::sync::{mpsc, Arc};
-use zerocopy::{Immutable, IntoBytes};
-
 use starnix_syscalls::{SyscallArg, SyscallResult};
+use starnix_types::arch::ArchWidth;
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{statfs, MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE};
+use std::ffi::CString;
+use std::mem::MaybeUninit;
+use std::sync::{mpsc, Arc};
+use zerocopy::{Immutable, IntoBytes};
 
 /// Create a FileSystemHandle for use in testing.
 ///
@@ -119,7 +118,7 @@ fn spawn_kernel_and_run_internal<F>(callback: F, security_server: Option<Arc<Sec
 where
     F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) + Send + Sync + 'static,
 {
-    let mut locked = Unlocked::new();
+    let mut locked = unsafe { Unlocked::new() };
     let kernel = create_test_kernel(&mut locked, security_server);
     let fs = create_test_fs_context(&mut locked, &kernel, TmpFs::new_fs);
     let init_task = create_test_init_task(&mut locked, &kernel, fs);
@@ -197,7 +196,7 @@ fn create_test_init_task(
         &[],
     )
     .expect("failed to create first task");
-    init_task.mm().initialize_mmap_layout_for_test();
+    init_task.mm().initialize_mmap_layout_for_test(ArchWidth::Arch64);
 
     let system_task =
         CurrentTask::create_system_task(locked, kernel, fs).expect("create system task");
@@ -218,7 +217,7 @@ fn create_test_init_task(
 fn create_kernel_task_and_unlocked_with_fs<'l>(
     create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
-    let mut locked = Unlocked::new();
+    let mut locked = unsafe { Unlocked::new() };
     let kernel = create_test_kernel(&mut locked, None);
     let fs = create_fs(&kernel);
     let fs_context = create_test_fs_context(&mut locked, &kernel, |_| fs.clone());
@@ -247,7 +246,7 @@ pub fn create_task(
         None,
     )
     .expect("failed to create second task");
-    task.mm().initialize_mmap_layout_for_test();
+    task.mm().initialize_mmap_layout_for_test(ArchWidth::Arch64);
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.
@@ -547,7 +546,8 @@ impl From<TaskBuilder> for AutoReleasableTask {
 
 impl Drop for AutoReleasableTask {
     fn drop(&mut self) {
-        let mut locked = Unlocked::new(); // TODO(mariagl): Find a way to avoid creating a new locked context here.
+        // TODO(mariagl): Find a way to avoid creating a new locked context here.
+        let mut locked = unsafe { Unlocked::new() };
         self.0.take().unwrap().release(&mut locked);
     }
 }

@@ -390,7 +390,8 @@ impl ArchiveAccessorWriter for Peekable<BatchIteratorRequestStream> {
                 Some(Ok(BatchIteratorRequest::WaitForReady { responder })) => {
                     responder.send()?;
                 }
-                Some(Ok(BatchIteratorRequest::_UnknownMethod { .. })) => {
+                Some(Ok(BatchIteratorRequest::_UnknownMethod { method_type, ordinal, .. })) => {
+                    warn!(?method_type, ordinal, "Got unknown interaction on BatchIterator");
                     return Err(IteratorError::PeerClosed);
                 }
                 Some(Err(err)) => return Err(err.into()),

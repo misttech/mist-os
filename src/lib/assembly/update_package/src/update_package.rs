@@ -288,10 +288,10 @@ impl UpdatePackageBuilder {
             let (zbi, vbmeta) =
                 slot.zbi_and_vbmeta().ok_or_else(|| anyhow!("primary slot missing a zbi image"))?;
 
-            builder.package.add_file_as_blob(&zbi.destination, zbi.source.to_string())?;
+            builder.package.add_file_as_blob(&zbi.destination, &zbi.source)?;
 
             if let Some(vbmeta) = &vbmeta {
-                builder.package.add_file_as_blob(&vbmeta.destination, vbmeta.source.to_string())?;
+                builder.package.add_file_as_blob(&vbmeta.destination, &vbmeta.source)?;
             }
 
             let (url, manifest) = builder.build()?;
@@ -312,10 +312,10 @@ impl UpdatePackageBuilder {
                 .zbi_and_vbmeta()
                 .ok_or_else(|| anyhow!("recovery slot missing a zbi image"))?;
 
-            builder.package.add_file_as_blob(&zbi.destination, zbi.source.to_string())?;
+            builder.package.add_file_as_blob(&zbi.destination, &zbi.source)?;
 
             if let Some(vbmeta) = &vbmeta {
-                builder.package.add_file_as_blob(&vbmeta.destination, vbmeta.source.to_string())?;
+                builder.package.add_file_as_blob(&vbmeta.destination, &vbmeta.source)?;
             }
 
             let (url, manifest) = builder.build()?;
@@ -340,7 +340,7 @@ impl UpdatePackageBuilder {
                     "" => "firmware".to_string(),
                     t => format!("firmware_{}", t),
                 };
-                builder.package.add_file_as_blob(destination, bootloader.image.to_string())?;
+                builder.package.add_file_as_blob(destination, &bootloader.image)?;
             }
 
             let (url, manifest) = builder.build()?;

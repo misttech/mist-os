@@ -6,7 +6,7 @@
 //!
 //! This module provides Fuchsia bindings for the [`netstack3_core`] crate.
 
-#![deny(clippy::redundant_clone)]
+#![warn(clippy::redundant_clone)]
 
 #[cfg(test)]
 mod integration_tests;
@@ -1307,7 +1307,10 @@ impl NetstackSeed {
             info!("all interface watchers closed, interfaces worker shutdown is complete");
         });
 
-        let neighbor_worker_task = NamedTask::spawn("neighbor worker", neighbor_worker.run());
+        let neighbor_worker_task = NamedTask::spawn("neighbor worker", {
+            let ctx = netstack.ctx.clone();
+            neighbor_worker.run(ctx)
+        });
 
         let no_finish_tasks = loopback_tasks.into_iter().chain([
             interfaces_worker_task,

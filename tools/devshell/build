@@ -44,6 +44,9 @@
 ##   -j <count>               Specify an explicit max job count for both Ninja
 ##                            and Bazel.
 ##
+##   --skip-auth-check        Bypass pre-flight build service authentication
+##                            checks.
+##
 ##   --verbose                Print extra information, such as the list of
 ##                            Ninja targets corresponding to the input GN labels
 ##                            to build. This does *not* enable Ninja --verbose flag,
@@ -130,6 +133,7 @@ function main {
   local log_file is_logging fint_params_path
   local has_ninja_options no_checks
   local verbose
+  local skip_auth_check=0
 
   # When tracing, increase verbosity.
   if [[ -o xtrace ]]; then
@@ -176,6 +180,10 @@ function main {
 
       --no-checks)
         no_checks=true
+        ;;
+
+      --skip-auth-check)
+        skip_auth_check=1
         ;;
 
       --verbose)
@@ -492,6 +500,12 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
           echo "Ninja jobserver mode is enabled."
         fi
         ninja_switches+=(--jobserver)
+      fi
+
+      # When using any remote build services, do a quick authentication
+      # check before starting the build.
+      if [[ "$skip_auth_check" == 0 ]]; then
+        fx-command-run rbe preflight
       fi
     fi
 

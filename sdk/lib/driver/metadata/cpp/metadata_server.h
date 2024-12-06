@@ -86,7 +86,7 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
       : MetadataServer(ObjectDetails<FidlType>::Name, std::move(instance_name)) {}
 
   // Set the metadata to be served to |metadata|. |metadata| must be persistable.
-  zx_status_t SetMetadata(const FidlType& metadata) {
+  zx::result<> SetMetadata(const FidlType& metadata) {
     static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
     static_assert(!fidl::IsResource<FidlType>::value,
                   "|FidlType| cannot be a resource type. Resources cannot be persisted.");
@@ -95,27 +95,11 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
     if (data.is_error()) {
       FDF_SLOG(ERROR, "Failed to persist metadata.",
                KV("status", data.error_value().status_string()));
-      return data.error_value().status();
+      return zx::error(data.error_value().status());
     }
     encoded_metadata_.emplace(data.value());
 
-    return ZX_OK;
-  }
-
-  zx_status_t SetMetadataForSoftTransition(const FidlType& metadata) {
-    static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
-    static_assert(!fidl::IsResource<FidlType>::value,
-                  "|FidlType| cannot be a resource type. Resources cannot be persisted.");
-
-    fit::result data = fidl::Persist(metadata);
-    if (data.is_error()) {
-      FDF_SLOG(ERROR, "Failed to persist metadata.",
-               KV("status", data.error_value().status_string()));
-      return data.error_value().status();
-    }
-    encoded_metadata_.emplace(data.value());
-
-    return ZX_OK;
+    return zx::ok();
   }
 
   // Sets the metadata to be served to the metadata found in |incoming|.
@@ -125,7 +109,7 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
   //
   // Make sure that the component manifest specifies that is uses the
   // `fdf_metadata::ObjectDetails<|FidlType|>::Name` FIDL service
-  zx_status_t ForwardMetadata(
+  zx::result<> ForwardMetadata(
       const std::shared_ptr<fdf::Namespace>& incoming,
       std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
     fidl::WireSyncClient<fuchsia_driver_metadata::Metadata> client{};
@@ -134,7 +118,7 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
       if (result.is_error()) {
         FDF_SLOG(ERROR, "Failed to connect to metadata server.",
                  KV("status", result.status_string()));
-        return result.status_value();
+        return result.take_error();
       }
       client.Bind(std::move(result.value()));
     }
@@ -142,36 +126,36 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
     fidl::WireResult<fuchsia_driver_metadata::Metadata::GetMetadata> result = client->GetMetadata();
     if (!result.ok()) {
       FDF_SLOG(ERROR, "Failed to send GetMetadata request.", KV("status", result.status_string()));
-      return result.status();
+      return zx::error(result.status());
     }
     if (result->is_error()) {
       FDF_SLOG(ERROR, "Failed to get metadata.",
                KV("status", zx_status_get_string(result->error_value())));
-      return result->error_value();
+      return result->take_error();
     }
     cpp20::span<uint8_t> metadata = result.value()->metadata.get();
     std::vector<uint8_t> copy;
     copy.insert(copy.begin(), metadata.begin(), metadata.end());
     encoded_metadata_.emplace(std::move(copy));
 
-    return ZX_OK;
+    return zx::ok();
   }
 
-  zx_status_t Serve(fdf::OutgoingDirectory& outgoing, async_dispatcher_t* dispatcher) {
+  zx::result<> Serve(fdf::OutgoingDirectory& outgoing, async_dispatcher_t* dispatcher) {
     return Serve(outgoing.component(), dispatcher);
   }
 
   // Serves the fuchsia.driver.metadata/Service service to |outgoing| under the service name
   // `service_name_` and instance name `MetadataServer::instance_name_`.
-  zx_status_t Serve(component::OutgoingDirectory& outgoing, async_dispatcher_t* dispatcher) {
+  zx::result<> Serve(component::OutgoingDirectory& outgoing, async_dispatcher_t* dispatcher) {
     fuchsia_driver_metadata::Service::InstanceHandler handler{
         {.metadata = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure)}};
     zx::result result = outgoing.AddService(std::move(handler), service_name_, instance_name_);
     if (result.is_error()) {
       FDF_SLOG(ERROR, "Failed to add service.", KV("status", result.status_string()));
-      return result.status_value();
+      return result.take_error();
     }
-    return ZX_OK;
+    return zx::ok();
   }
 
   // Creates an offer for this `MetadataServer` instance's fuchsia.driver.metadata/Service

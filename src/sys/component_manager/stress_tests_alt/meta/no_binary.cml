@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     collections: [
         {
             name: "dynamic_children",
@@ -12,11 +15,6 @@
     offer: [
         {
             protocol: "fidl.examples.routing.echo.Echo",
-            from: "parent",
-            to: "#dynamic_children",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: "#dynamic_children",
         },

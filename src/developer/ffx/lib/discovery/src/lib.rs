@@ -324,7 +324,7 @@ impl Stream for TargetStream {
                     handle
                 );
                 // Schedule the future for this to be woken up again.
-                cx.waker().clone().wake();
+                cx.waker().wake_by_ref();
                 return Poll::Pending;
             }
         }
@@ -336,7 +336,7 @@ impl Stream for TargetStream {
         }
 
         // Schedule the future for this to be woken up again.
-        cx.waker().clone().wake();
+        cx.waker().wake_by_ref();
         return Poll::Pending;
     }
 }

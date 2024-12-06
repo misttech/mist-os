@@ -615,7 +615,7 @@ struct Attempt<'a> {
     concurrent_package_resolves: usize,
 }
 
-impl<'a> Attempt<'a> {
+impl Attempt<'_> {
     // Run the update attempt, if update is canceled, any await during this attempt could be an
     // early return point.
     async fn run(

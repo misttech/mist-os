@@ -130,7 +130,7 @@ where
     watcher: &'a mut W,
 }
 
-impl<'a, V, W> Deref for InspectableGuard<'a, V, W>
+impl<V, W> Deref for InspectableGuard<'_, V, W>
 where
     W: Watch<V>,
 {
@@ -141,7 +141,7 @@ where
     }
 }
 
-impl<'a, V, W> DerefMut for InspectableGuard<'a, V, W>
+impl<V, W> DerefMut for InspectableGuard<'_, V, W>
 where
     W: Watch<V>,
 {
@@ -150,7 +150,7 @@ where
     }
 }
 
-impl<'a, V, W> Drop for InspectableGuard<'a, V, W>
+impl<V, W> Drop for InspectableGuard<'_, V, W>
 where
     W: Watch<V>,
 {

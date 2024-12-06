@@ -93,7 +93,7 @@ impl From<HostInfo> for fsys::HostInfo {
 impl fmt::Display for HostInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(fmt, "HostInfo:")?;
-        writeln!(fmt, "\tidentifier:\t{}", self.id.to_string())?;
+        writeln!(fmt, "\tidentifier:\t{}", self.id)?;
         writeln!(fmt, "\taddresses:\t{}", addresses_to_custom_string(&self.addresses, "\n\t\t\t"))?;
         writeln!(fmt, "\tactive:\t{}", self.active)?;
         writeln!(fmt, "\ttechnology:\t{:?}", self.technology)?;

@@ -8,7 +8,10 @@ Before you begin, make sure you have completed the following tasks:
 
 * [Familiarize yourself with the Fuchsia tracing system][fuchsia-tracing-system].
 * [Register your component as a tracing provider][register-a-trace-provider].
-* [Include the `libtrace` library to capture trace data][libtrace-trace-event].
+
+Also, make sure to use the relevant library in your code:
+
+<<../_common/_tracing_headers.md>>
 
 ## Use tracing macros in your code {:#use-tracing-macros-in-your-code}
 
@@ -243,7 +246,6 @@ trace from the component. For more information, see the next
 
 [fuchsia-tracing-system]: /docs/concepts/kernel/tracing-system.md
 [register-a-trace-provider]: /docs/development/tracing/tutorial/register-a-trace-provider.md
-[libtrace-trace-event]: /docs/reference/tracing/libraries.md#libtrace-trace-event
 [c-cpp-macros]: /docs/reference/tracing/c_cpp_macros.md
 [rust-macros]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_trace/index.html
 [trace-instant]: /docs/reference/tracing/c_cpp_macros.md#TRACE_INSTANT

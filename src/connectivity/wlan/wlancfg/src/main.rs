@@ -421,8 +421,9 @@ async fn run_all_futures() -> Result<(), Error> {
     Ok(())
 }
 
-// The return value from main() gets swallowed, including if it returns a Result<Err>. Therefore,
-// use this simple wrapper to ensure that any errors from run_all_futures() are printed to the log.
+// The information in the Err(e) return value from main() gets swallowed. Therefore,
+// use this simple wrapper to ensure that any errors from run_all_futures() are printed to the log,
+// while still having the process exit with ExitCode::FAILURE.
 #[fasync::run_singlethreaded]
 async fn main() {
     let options =
@@ -433,7 +434,9 @@ async fn main() {
     wtrace::instant_wlancfg_start();
 
     #[allow(clippy::large_futures)]
-    if let Err(e) = run_all_futures().await {
-        error!("{:?}", e);
-    }
+    run_all_futures().await.unwrap_or_else(|e| {
+        error!("{e:?}");
+        // The wlancfg component is `on_terminate: "reboot"`, so this will reboot the device.
+        panic!("wlancfg unclean exit")
+    })
 }

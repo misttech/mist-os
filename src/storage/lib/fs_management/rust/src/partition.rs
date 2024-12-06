@@ -150,7 +150,7 @@ pub async fn partition_matches_with_proxy(
         }
         let mut matches_label = false;
         for label in matcher_labels {
-            if name == label.to_string() {
+            if name == *label {
                 matches_label = true;
                 break;
             }

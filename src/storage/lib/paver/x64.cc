@@ -151,15 +151,6 @@ zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::FindPartition
   }
 }
 
-zx::result<> EfiDevicePartitioner::FinalizePartition(const PartitionSpec& spec) const {
-  if (!SupportsPartition(spec)) {
-    ERROR("Unsupported partition %s\n", spec.ToString().c_str());
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  return zx::make_result(gpt_->GetGpt()->Sync());
-}
-
 zx::result<> EfiDevicePartitioner::WipeFvm() const { return gpt_->WipeFvm(); }
 
 zx::result<> EfiDevicePartitioner::ResetPartitionTables() const {

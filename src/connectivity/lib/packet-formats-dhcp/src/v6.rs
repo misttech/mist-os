@@ -833,9 +833,7 @@ pub fn duid_uuid() -> [u8; 18] {
     duid[1] = 4;
     let uuid = Uuid::new_v4();
     let uuid = uuid.as_bytes();
-    for i in 0..16 {
-        duid[2 + i] = uuid[i];
-    }
+    duid[2..].copy_from_slice(&uuid[..]);
     duid
 }
 

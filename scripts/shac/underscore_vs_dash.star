@@ -151,12 +151,18 @@ def underscore_vs_dash(ctx):
         # If the file is out of step with the scores, report a finding.
         prefix, underscore_score, dash_score = _compute_scores(indexed, path)
 
+        # Don't count the file itself.
         if category == "_":
             underscore_score -= 1
         else:
             dash_score -= 1
 
-        if (underscore_score < dash_score and category == "_") or (dash_score < underscore_score and category == "-"):
+        # We put our thumb on the scale here in favor of "_", as there's this
+        # doc, which says "_" is preferred:
+        # https://fuchsia.dev/fuchsia-src/development/source_code/layout#naming_conventions
+        #
+        # Thus, we only recommend "-" if it substantially outnumbers "_".
+        if (2 * underscore_score < dash_score and category == "_") or (dash_score < underscore_score and category == "-"):
             _emit_finding(ctx, path, category, prefix, underscore_score, dash_score)
 
 def register_underscore_vs_dash_checks():

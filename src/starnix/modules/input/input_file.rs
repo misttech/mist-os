@@ -21,15 +21,13 @@ use starnix_uapi::{
     MSC_CNT, REL_CNT, SW_CNT,
 };
 use std::collections::VecDeque;
+use std::sync::Arc;
 use zerocopy::IntoBytes as _; // for `as_bytes()`
 
 const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 
-pub struct InspectStatus {
-    /// A node that contains the state below.
-    _inspect_node: fuchsia_inspect::Node,
-
-    /// The number of FIDL events received from Fuchsia input system.
+pub struct InputFileStatus {
+    /// The number of FIDL events received by this file from Fuchsia input system.
     ///
     /// We expect:
     /// fidl_events_received_count = fidl_events_ignored_count +
@@ -64,8 +62,8 @@ pub struct InspectStatus {
     pub last_read_uapi_event_timestamp_ns: fuchsia_inspect::IntProperty,
 }
 
-impl InspectStatus {
-    fn new(node: fuchsia_inspect::Node) -> Self {
+impl InputFileStatus {
+    fn new(node: &fuchsia_inspect::Node) -> Self {
         let fidl_events_received_count = node.create_uint("fidl_events_received_count", 0);
         let fidl_events_ignored_count = node.create_uint("fidl_events_ignored_count", 0);
         let fidl_events_unexpected_count = node.create_uint("fidl_events_unexpected_count", 0);
@@ -77,7 +75,6 @@ impl InspectStatus {
         let last_read_uapi_event_timestamp_ns =
             node.create_int("last_read_uapi_event_timestamp_ns", 0);
         Self {
-            _inspect_node: node,
             fidl_events_received_count,
             fidl_events_ignored_count,
             fidl_events_unexpected_count,
@@ -132,6 +129,9 @@ pub struct InputFile {
     x_axis_info: uapi::input_absinfo,
     y_axis_info: uapi::input_absinfo,
     pub inner: Mutex<InputFileMutableState>,
+    // InputFile will be initialized with an InputFileStatus that holds Inspect data
+    // `None` for Uinput InputFiles
+    pub inspect_status: Option<Arc<InputFileStatus>>,
 
     // A descriptive device name. Should contain only alphanumerics and `_`.
     device_name: String,
@@ -141,10 +141,6 @@ pub struct InputFile {
 pub struct InputFileMutableState {
     pub events: VecDeque<uapi::input_event>,
     pub waiters: WaitQueue,
-    // TODO: https://fxbug.dev/42081918 - remove `Optional` when implementing Inspect for Keyboard InputFiles
-    // Touch InputFile will be initialized with a InspectStatus that holds Inspect data
-    // `None` for Keyboard InputFile
-    pub inspect_status: Option<InspectStatus>,
 }
 
 /// Returns the minimum number of bytes required to store `n_bits` bits.
@@ -217,12 +213,12 @@ impl InputFile {
     /// - `input_id`: device's bustype, vendor id, product id, and version.
     /// - `width`: width of screen.
     /// - `height`: height of screen.
-    /// - `inspect_node`: The root node for "touch_input_file" inspect tree.
+    /// - `inspect_status`: The inspect status for the parent device of "touch_input_file".
     pub fn new_touch(
         input_id: uapi::input_id,
         width: i32,
         height: i32,
-        inspect_node: Option<fuchsia_inspect::Node>,
+        node: Option<&fuchsia_inspect::Node>,
     ) -> Self {
         let device_name = get_device_name("starnix_touch", &input_id);
         // Fuchsia scales the position reported by the touch sensor to fit view coordinates.
@@ -266,8 +262,8 @@ impl InputFile {
             inner: Mutex::new(InputFileMutableState {
                 events: VecDeque::new(),
                 waiters: WaitQueue::default(),
-                inspect_status: inspect_node.map(|n| InspectStatus::new(n)),
             }),
+            inspect_status: node.map(|n| Arc::new(InputFileStatus::new(n))),
             device_name,
         }
     }
@@ -276,10 +272,8 @@ impl InputFile {
     ///
     /// # Parameters
     /// - `input_id`: device's bustype, vendor id, product id, and version.
-    pub fn new_keyboard(
-        input_id: uapi::input_id,
-        inspect_node: Option<fuchsia_inspect::Node>,
-    ) -> Self {
+    /// - `inspect_status`: The inspect status for the parent device of "touch_input_file".
+    pub fn new_keyboard(input_id: uapi::input_id, node: Option<&fuchsia_inspect::Node>) -> Self {
         let device_name = get_device_name("starnix_buttons", &input_id);
         Self {
             driver_version: Self::DRIVER_VERSION,
@@ -299,8 +293,8 @@ impl InputFile {
             inner: Mutex::new(InputFileMutableState {
                 events: VecDeque::new(),
                 waiters: WaitQueue::default(),
-                inspect_status: inspect_node.map(|n| InspectStatus::new(n)),
             }),
+            inspect_status: node.map(|n| Arc::new(InputFileStatus::new(n))),
             device_name,
         }
     }
@@ -483,9 +477,8 @@ impl FileOps for InputFile {
         let last_event_time_ns = duration_from_timeval::<zx::MonotonicTimeline>(last_event_timeval)
             .unwrap()
             .into_nanos();
-        inner
-            .inspect_status
-            .as_ref()
+        self.inspect_status
+            .clone()
             .map(|status| status.count_read_events(events.len() as u64, last_event_time_ns));
         data.write_all(events.as_bytes())
     }

@@ -30,11 +30,6 @@ http_archive(
 
 # Setup fuchsia rules
 local_repository(
-    name = "fuchsia_sdk_common",
-    path = "../../bazel/local_repositories/fuchsia_sdk_common",
-)
-
-local_repository(
     name = "rules_fuchsia",
     path = "../bazel_rules_fuchsia",
 )
@@ -51,12 +46,15 @@ fuchsia_sdk_repository(
     name = "fuchsia_sdk",
 )
 
-register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
+# Register the fuchsia_sdk toolchain
+load("@rules_fuchsia//fuchsia:defs.bzl", "register_fuchsia_sdk_toolchain")
+
+register_fuchsia_sdk_toolchain()
 
 register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
 
 # Create the @fuchsia_build_config information to get host_tag information.
-load("@fuchsia_sdk_common//common:fuchsia_platform_build.bzl", "fuchsia_build_config_repository")
+load("@rules_fuchsia//common:fuchsia_platform_build.bzl", "fuchsia_build_config_repository")
 
 fuchsia_build_config_repository(
     name = "fuchsia_build_config",
@@ -82,7 +80,7 @@ register_clang_toolchains()
 # python3 interpreter in the current PATH, and packages it in a way
 # that allows sandboxes and remote builders to access / use it.
 load(
-    "@fuchsia_sdk_common//common:toolchains/python/repository_rule.bzl",
+    "@rules_fuchsia//common:toolchains/python/repository_rule.bzl",
     "compact_python_runtime_repository",
 )
 
@@ -95,7 +93,7 @@ register_toolchains("@prebuilt_python//:py_toolchain")
 # Register an empty C++ host toolchain, because thiss test suite
 # needs to run on CI bots without GCC or Clang installed.
 load(
-    "@fuchsia_sdk_common//common:toolchains/clang/repository_utils.bzl",
+    "@rules_fuchsia//common:toolchains/clang/repository_utils.bzl",
     "empty_host_cpp_toolchain_repository",
 )
 

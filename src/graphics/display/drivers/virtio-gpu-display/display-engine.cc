@@ -98,7 +98,7 @@ void DisplayEngine::OnCoordinatorConnected() {
       .pixel_formats_count = kSupportedFormats.size(),
   };
 
-  coordinator_events_.OnDisplayAdded(banjo_display_info);
+  engine_events_.OnDisplayAdded(banjo_display_info);
 }
 
 zx::result<> DisplayEngine::ImportBufferCollection(
@@ -187,13 +187,13 @@ void DisplayEngine::ReleaseImage(display::DriverImageId image_id) {
 
 config_check_result_t DisplayEngine::CheckConfiguration(
     display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
-    cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
-    size_t* out_client_composition_opcodes_actual) {
+    cpp20::span<layer_composition_operations_t> out_layer_composition_operations,
+    size_t* out_layer_composition_operations_actual) {
   ZX_DEBUG_ASSERT(display_id == kDisplayId);
 
-  ZX_DEBUG_ASSERT(out_client_composition_opcodes.size() >= layers.size());
-  ZX_DEBUG_ASSERT(!out_client_composition_opcodes_actual ||
-                  *out_client_composition_opcodes_actual == layers.size());
+  ZX_DEBUG_ASSERT(out_layer_composition_operations.size() >= layers.size());
+  ZX_DEBUG_ASSERT(!out_layer_composition_operations_actual ||
+                  *out_layer_composition_operations_actual == layers.size());
 
   ZX_DEBUG_ASSERT(layers.size() == 1);
 
@@ -205,29 +205,30 @@ config_check_result_t DisplayEngine::CheckConfiguration(
       .height = static_cast<int32_t>(current_display_.scanout_info.geometry.height),
   });
 
+  config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
   if (layer.display_destination() != display_area) {
     // TODO(costan): Doesn't seem right?
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
-    return CONFIG_CHECK_RESULT_OK;
+    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
   if (layer.image_source() != layer.display_destination()) {
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
-    return CONFIG_CHECK_RESULT_OK;
+    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
   if (layer.image_metadata().dimensions() != layer.image_source().dimensions()) {
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_SRC_FRAME;
-    return CONFIG_CHECK_RESULT_OK;
+    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_SRC_FRAME;
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
   if (layer.alpha_mode() != display::AlphaMode::kDisable) {
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_TRANSFORM;
-    return CONFIG_CHECK_RESULT_OK;
+    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
   if (layer.image_source_transformation() != display::CoordinateTransformation::kIdentity) {
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_TRANSFORM;
-    return CONFIG_CHECK_RESULT_OK;
+    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
 
-  return CONFIG_CHECK_RESULT_OK;
+  return check_result;
 }
 
 void DisplayEngine::ApplyConfiguration(display::DisplayId display_id,
@@ -277,13 +278,11 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
           .cpu_domain_supported(true)
           .Build());
 
-  static constexpr fuchsia_images2::wire::ColorSpace kColorSpaces[] = {
-      fuchsia_images2::wire::ColorSpace::kSrgb};
   constraints.image_format_constraints(
       std::vector{fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
                       .pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)
                       .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
-                      .color_spaces(kColorSpaces)
+                      .color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kSrgb})
                       .bytes_per_row_divisor(4)
                       .Build()});
 
@@ -318,13 +317,13 @@ zx::result<> DisplayEngine::SetMinimumRgb(uint8_t minimum_rgb) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-DisplayEngine::DisplayEngine(DisplayCoordinatorEventsInterface* coordinator_events,
+DisplayEngine::DisplayEngine(DisplayEngineEventsInterface* engine_events,
                              fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client,
                              std::unique_ptr<VirtioGpuDevice> gpu_device)
     : imported_images_(std::move(sysmem_client)),
-      coordinator_events_(*coordinator_events),
+      engine_events_(*engine_events),
       gpu_device_(std::move(gpu_device)) {
-  ZX_DEBUG_ASSERT(coordinator_events != nullptr);
+  ZX_DEBUG_ASSERT(engine_events != nullptr);
   ZX_DEBUG_ASSERT(gpu_device_);
 }
 
@@ -333,8 +332,7 @@ DisplayEngine::~DisplayEngine() = default;
 // static
 zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
     fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client, zx::bti bti,
-    std::unique_ptr<virtio::Backend> backend,
-    DisplayCoordinatorEventsInterface* coordinator_events) {
+    std::unique_ptr<virtio::Backend> backend, DisplayEngineEventsInterface* engine_events) {
   zx::result<std::unique_ptr<VirtioPciDevice>> virtio_device_result =
       VirtioPciDevice::Create(std::move(bti), std::move(backend));
   if (!virtio_device_result.is_ok()) {
@@ -351,7 +349,7 @@ zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
   }
 
   auto display_engine = fbl::make_unique_checked<DisplayEngine>(
-      &alloc_checker, coordinator_events, std::move(sysmem_client), std::move(gpu_device));
+      &alloc_checker, engine_events, std::move(sysmem_client), std::move(gpu_device));
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -416,8 +414,7 @@ void DisplayEngine::virtio_gpu_flusher() {
 
     {
       fbl::AutoLock al(&flush_lock_);
-      coordinator_events_.OnDisplayVsync(kDisplayId, zx::time(next_deadline),
-                                         displayed_config_stamp_);
+      engine_events_.OnDisplayVsync(kDisplayId, zx::time(next_deadline), displayed_config_stamp_);
     }
     next_deadline = zx_time_add_duration(next_deadline, period);
   }

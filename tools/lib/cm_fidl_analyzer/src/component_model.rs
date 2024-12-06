@@ -132,6 +132,14 @@ impl BuildModelResult {
     }
 }
 
+#[derive(Default)]
+pub struct DynamicConfig {
+    pub components: HashMap<Moniker, (AbsoluteComponentUrl, Option<Name>)>,
+    pub dictionaries: DynamicDictionaryConfig,
+}
+
+pub type DynamicDictionaryConfig = HashMap<Moniker, HashMap<Name, Vec<(CapabilityTypeName, Name)>>>;
+
 impl ModelBuilderForAnalyzer {
     pub fn new(default_root_url: Url) -> Self {
         Self { default_root_url }
@@ -188,8 +196,8 @@ impl ModelBuilderForAnalyzer {
         component_id_index: Arc<component_id_index::Index>,
         runner_registry: RunnerRegistry,
     ) -> BuildModelResult {
-        self.build_with_dynamic_components(
-            HashMap::new(),
+        self.build_with_dynamic_config(
+            DynamicConfig::default(),
             decls_by_url,
             runtime_config,
             component_id_index,
@@ -197,9 +205,9 @@ impl ModelBuilderForAnalyzer {
         )
     }
 
-    pub fn build_with_dynamic_components(
+    pub fn build_with_dynamic_config(
         self,
-        dynamic_components: HashMap<Moniker, (AbsoluteComponentUrl, Option<Name>)>,
+        dynamic_config: DynamicConfig,
         decls_by_url: HashMap<Url, (ComponentDecl, Option<ConfigFields>)>,
         runtime_config: Arc<RuntimeConfig>,
         component_id_index: Arc<component_id_index::Index>,
@@ -208,8 +216,10 @@ impl ModelBuilderForAnalyzer {
         let mut result = BuildModelResult::new();
 
         let (dynamic_components, mut dynamic_component_errors) =
-            Self::load_dynamic_components(dynamic_components);
+            Self::load_dynamic_components(dynamic_config.components);
         result.errors.append(&mut dynamic_component_errors);
+
+        let dynamic_dictionaries = Arc::new(dynamic_config.dictionaries);
 
         // Initialize the model with an empty `instances` map.
         let mut model = ComponentModelForAnalyzer {
@@ -243,12 +253,14 @@ impl ModelBuilderForAnalyzer {
                     model.policy_checker.clone(),
                     Arc::clone(&model.component_id_index),
                     runner_registry,
+                    Arc::clone(&dynamic_dictionaries),
                 );
 
                 Self::add_descendants(
                     &root_instance,
                     &decls_by_url,
                     &dynamic_components,
+                    &dynamic_dictionaries,
                     &mut model,
                     &mut result,
                 );
@@ -269,6 +281,7 @@ impl ModelBuilderForAnalyzer {
         instance: &Arc<ComponentInstanceForAnalyzer>,
         decls_by_url: &HashMap<Url, (ComponentDecl, Option<ConfigFields>)>,
         dynamic_components: &HashMap<Moniker, Vec<Child>>,
+        dynamic_dictionaries: &Arc<DynamicDictionaryConfig>,
         model: &mut ComponentModelForAnalyzer,
         result: &mut BuildModelResult,
     ) {
@@ -320,12 +333,14 @@ impl ModelBuilderForAnalyzer {
                         Arc::clone(instance),
                         model.policy_checker.clone(),
                         Arc::clone(&model.component_id_index),
+                        Arc::clone(&dynamic_dictionaries),
                     ) {
                         Ok(child_instance) => {
                             Self::add_descendants(
                                 &child_instance,
                                 decls_by_url,
                                 dynamic_components,
+                                dynamic_dictionaries,
                                 model,
                                 result,
                             );

@@ -1,6 +1,7 @@
 ?aslr.entropy_bits=*
 ?console.shell=false
 ?kernel.arm64.debug.dap-rom-soc=*
+?kernel.arm64.event-stream.enable=false
 ?kernel.compression.at_memory_pressure=true
 ?kernel.compression.reclaim_anonymous=true
 ?kernel.compression.reclaim_zero_forks=true

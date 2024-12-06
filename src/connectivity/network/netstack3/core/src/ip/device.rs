@@ -16,10 +16,10 @@ use lock_order::relation::LockBefore;
 use log::debug;
 use net_types::ip::{AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
 use net_types::{LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
-use netstack3_base::sync::WeakRc;
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext, ExistsError,
-    IpDeviceAddr, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError, RemoveResourceResultWithContext,
+    IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError,
+    RemoveResourceResultWithContext,
 };
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_filter::FilterImpl;
@@ -28,20 +28,21 @@ use netstack3_ip::device::{
     is_ip_device_enabled, is_ip_multicast_forwarding_enabled, is_ip_unicast_forwarding_enabled,
     join_ip_multicast_with_config, leave_ip_multicast_with_config, AddressRemovedReason,
     DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadStateRef, DadTimerId,
-    DefaultHopLimit, DelIpAddr, DualStackIpDeviceState, IpAddressId, IpAddressIdSpec,
-    IpAddressIdSpecContext, IpAddressState, IpDeviceAddresses, IpDeviceConfiguration,
-    IpDeviceEvent, IpDeviceFlags, IpDeviceIpExt, IpDeviceMulticastGroups,
-    IpDeviceStateBindingsTypes, IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId,
-    Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig,
-    Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState,
-    Ipv6DeviceConfiguration, Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
-    Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext,
-    RsState, RsTimerId, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
-    SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
+    DefaultHopLimit, DelIpAddr, DualStackIpDeviceState, IpAddressIdSpec, IpAddressIdSpecContext,
+    IpAddressState, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceEvent, IpDeviceFlags,
+    IpDeviceIpExt, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateContext,
+    IpDeviceStateIpExt, IpDeviceTimerId, Ipv4AddressEntry, Ipv4AddressState,
+    Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddrSlaacConfig, Ipv6AddressEntry,
+    Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6DeviceTimerId,
+    Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters,
+    Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext, RsState, RsTimerId,
+    SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig, SlaacConfig,
+    SlaacContext, SlaacCounters, SlaacState, WeakAddressId,
 };
 use netstack3_ip::gmp::{
-    GmpGroupState, GmpStateRef, IgmpContext, IgmpSendContext, IgmpState, IgmpStateContext,
-    MldContext, MldSendContext, MldStateContext, MulticastGroupSet,
+    GmpGroupState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext, IgmpState,
+    IgmpStateContext, MldContext, MldContextMarker, MldSendContext, MldStateContext,
+    MulticastGroupSet,
 };
 use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
 use netstack3_ip::{
@@ -98,7 +99,7 @@ where
                     let addr_sub = addr_id.addr_sub();
                     match config {
                         Some(Ipv6AddrConfig::Slaac(config)) => {
-                            Some(SlaacAddressEntry { addr_sub, config: *config })
+                            Some(SlaacAddressEntry { addr_sub: *addr_sub, config: *config })
                         }
                         None | Some(Ipv6AddrConfig::Manual(_)) => None,
                     }
@@ -177,7 +178,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
                 config,
                 Some(Ipv6AddrConfig::Slaac(c)) => c
             );
-            and_then(SlaacAddressEntryMut { addr_sub, config }, bindings_ctx)
+            and_then(SlaacAddressEntryMut { addr_sub: *addr_sub, config }, bindings_ctx)
         })
     }
 
@@ -212,6 +213,8 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
     }
 }
 
+impl<BT: BindingsTypes, L> IgmpContextMarker for CoreCtx<'_, BT, L> {}
+
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     IgmpStateContext<BC> for CoreCtx<'_, BC, L>
 {
@@ -226,6 +229,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>
         cb(groups)
     }
 }
+
+impl<BT: BindingsTypes, L> MldContextMarker for CoreCtx<'_, BT, L> {}
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
     MldStateContext<BC> for CoreCtx<'_, BC, L>
@@ -1007,13 +1012,13 @@ impl<'a, Config, BC: BindingsContext> device::Ipv6DeviceContext<BC>
     }
 }
 
-impl<'a, Config, I: IpDeviceIpExt, L, BC: BindingsContext> device::IpDeviceAddressIdContext<I>
+impl<'a, Config, I: IpDeviceIpExt, L, BC: BindingsContext> IpDeviceAddressIdContext<I>
     for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 where
-    CoreCtx<'a, BC, L>: device::IpDeviceAddressIdContext<I>,
+    CoreCtx<'a, BC, L>: IpDeviceAddressIdContext<I>,
 {
-    type AddressId = <CoreCtx<'a, BC, L> as device::IpDeviceAddressIdContext<I>>::AddressId;
-    type WeakAddressId = <CoreCtx<'a, BC, L> as device::IpDeviceAddressIdContext<I>>::WeakAddressId;
+    type AddressId = <CoreCtx<'a, BC, L> as IpDeviceAddressIdContext<I>>::AddressId;
+    type WeakAddressId = <CoreCtx<'a, BC, L> as IpDeviceAddressIdContext<I>>::WeakAddressId;
 }
 
 impl<'a, Config, I: IpDeviceIpExt, BC: BindingsContext, L> device::IpDeviceAddressContext<I, BC>
@@ -1154,6 +1159,11 @@ where
     }
 }
 
+impl<BC: BindingsContext, Config, L> IgmpContextMarker
+    for CoreCtxWithIpDeviceConfiguration<'_, Config, L, BC>
+{
+}
+
 impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpContext<BC>
     for CoreCtxWithIpDeviceConfiguration<
         'a,
@@ -1212,6 +1222,11 @@ impl<'a, BC: BindingsContext> IgmpSendContext<BC>
     ) -> Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>> {
         ip::device::get_ipv4_addr_subnet(self, device)
     }
+}
+
+impl<BC: BindingsContext, Config, L> MldContextMarker
+    for CoreCtxWithIpDeviceConfiguration<'_, Config, L, BC>
+{
 }
 
 impl<
@@ -1422,8 +1437,8 @@ impl<BC: BindingsContext, I: Ip, L> CounterContext<NudCounters<I>> for CoreCtx<'
 pub struct IpAddrCtxSpec<BT>(Never, PhantomData<BT>);
 
 impl<BT: BindingsTypes> IpAddressIdSpec for IpAddrCtxSpec<BT> {
-    type WeakV4 = WeakRc<Ipv4AddressEntry<BT>>;
-    type WeakV6 = WeakRc<Ipv6AddressEntry<BT>>;
+    type WeakV4 = WeakAddressId<Ipv4AddressEntry<BT>>;
+    type WeakV6 = WeakAddressId<Ipv6AddressEntry<BT>>;
 }
 
 impl<BC: BindingsContext, L> IpAddressIdSpecContext for CoreCtx<'_, BC, L> {
@@ -1431,11 +1446,11 @@ impl<BC: BindingsContext, L> IpAddressIdSpecContext for CoreCtx<'_, BC, L> {
 }
 
 impl<L, BT: BindingsTypes>
-    CoreTimerContext<DadTimerId<WeakDeviceId<BT>, WeakRc<Ipv6AddressEntry<BT>>>, BT>
+    CoreTimerContext<DadTimerId<WeakDeviceId<BT>, WeakAddressId<Ipv6AddressEntry<BT>>>, BT>
     for CoreCtx<'_, BT, L>
 {
     fn convert_timer(
-        dispatch_id: DadTimerId<WeakDeviceId<BT>, WeakRc<Ipv6AddressEntry<BT>>>,
+        dispatch_id: DadTimerId<WeakDeviceId<BT>, WeakAddressId<Ipv6AddressEntry<BT>>>,
     ) -> BT::DispatchId {
         IpDeviceTimerId::<Ipv6, _, _>::from(Ipv6DeviceTimerId::from(dispatch_id)).into()
     }

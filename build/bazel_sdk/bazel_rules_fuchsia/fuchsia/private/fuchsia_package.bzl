@@ -36,6 +36,7 @@ load(
     "rule_variants",
     "stub_executable",
 )
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def get_driver_component_manifests(package):
     """Returns a list of the manifest paths for drivers in the package
@@ -296,7 +297,7 @@ def fuchsia_unittest_package(
     )
 
 def _build_fuchsia_package_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     archive_name = ctx.attr.archive_name or ctx.attr.package_name
 
     if not archive_name.endswith(".far"):
@@ -574,7 +575,7 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
     doc = "Builds a fuchsia package.",
     implementation = _build_fuchsia_package_impl,
     cfg = fuchsia_transition,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain", "@bazel_tools//tools/cpp:toolchain_type"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION + ["@bazel_tools//tools/cpp:toolchain_type"],
     attrs = {
         "package_name": attr.string(
             doc = "The name of the package",

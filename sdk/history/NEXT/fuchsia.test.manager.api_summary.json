@@ -843,6 +843,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.test.manager/RunOptions.no_exception_channel",
+        "ordinal": "9",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.test.manager/RunOptions.parallel",
         "ordinal": "2",
         "type": "uint16"
@@ -900,6 +906,12 @@
         "name": "fuchsia.test.manager/RunSuiteOptions.max_concurrent_test_case_runs",
         "ordinal": "3",
         "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.test.manager/RunSuiteOptions.no_exception_channel",
+        "ordinal": "10",
+        "type": "bool"
     },
     {
         "kind": "table/member",

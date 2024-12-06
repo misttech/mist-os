@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <optional>
 #include <ranges>
-#include <span>
 #include <type_traits>
 
 #include "abi.h"
@@ -144,17 +143,18 @@ namespace ld {
 // Various other methods are provided for interrogating the list of modules and
 // accessing the dynamic linker stub module and the ld::RemoteAbi object.
 
-template <class Elf = elfldltl::Elf<>, RemoteLoadZygote Zygote = RemoteLoadZygote::kNo>
+template <class Elf = elfldltl::Elf<>, RemoteLoadZygote Zygote = RemoteLoadZygote::kNo,
+          elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative>
 class RemoteDynamicLinker {
  public:
-  using AbiStubPtr = typename RemoteAbiStub<Elf>::Ptr;
+  using AbiStubPtr = typename RemoteAbiStub<Elf, Machine>::Ptr;
   using Module = RemoteLoadModule<Elf, Zygote>;
   using DecodedModule = typename Module::Decoded;
   using DecodedModulePtr = typename DecodedModule::Ptr;
   using Soname = typename Module::Soname;
   using List = typename Module::List;
   using size_type = typename Elf::size_type;
-  using TlsDescResolver = ld::StaticTlsDescResolver<Elf>;
+  using TlsDescResolver = ld::StaticTlsDescResolver<Elf, Machine>;
   using TlsdescRuntimeHooks = typename TlsDescResolver::RuntimeHooks;
 
   // The Init method takes an InitModuleList as an argument.  Each element
@@ -333,8 +333,8 @@ class RemoteDynamicLinker {
 
   // Other accessors should be used only after a successful Init call (below).
 
-  RemoteAbi<Module>& remote_abi() { return remote_abi_; }
-  const RemoteAbi<Module>& remote_abi() const { return remote_abi_; }
+  RemoteAbi<Module, Machine>& remote_abi() { return remote_abi_; }
+  const RemoteAbi<Module, Machine>& remote_abi() const { return remote_abi_; }
 
   List& modules() { return modules_; }
   const List& modules() const { return modules_; }
@@ -424,9 +424,9 @@ class RemoteDynamicLinker {
   // initial module's place in the load order.  The modules() list is complete,
   // remote_abi() has been initialized, and abi_stub_module() can be used.
   template <class Diagnostics, typename GetDep>
-  std::optional<InitResult> Init(
-      Diagnostics& diag, InitModuleList initial_modules, GetDep&& get_dep,
-      std::optional<elfldltl::ElfMachine> machine = elfldltl::ElfMachine::kNative) {
+  std::optional<InitResult> Init(Diagnostics& diag, InitModuleList initial_modules,
+                                 GetDep&& get_dep,
+                                 std::optional<elfldltl::ElfMachine> machine = Machine) {
     static_assert(std::is_invocable_r_v<GetDepResult, GetDep, Soname>);
 
     assert(abi_stub_);
@@ -645,10 +645,7 @@ class RemoteDynamicLinker {
   }
 
   // Shorthand for the two-argument Relocate method below.
-  template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, class Diagnostics>
-  bool Relocate(Diagnostics& diag) {
-    return Relocate<Machine>(diag, tls_desc_resolver());
-  }
+  bool Relocate(auto& diag) { return Relocate(diag, tls_desc_resolver()); }
 
   // Perform relocations on all modules.  The modules() list gives the set and
   // order of modules used for symbol resolution.
@@ -669,15 +666,13 @@ class RemoteDynamicLinker {
   // missing dependency modules is an obvious recipe for undefined symbol
   // errors that aren't going to be more enlightening to the user.  But this
   // class supports any policy.
-  template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, class Diagnostics,
-            typename TlsDescResolverType>
+  template <class Diagnostics, typename TlsDescResolverType>
   bool Relocate(Diagnostics& diag, TlsDescResolverType&& tls_desc_resolver) {
     // If any module wasn't decoded successfully, just skip it.
     auto valid_modules = ValidModules();
     auto relocate = [&](auto& module) -> bool {
-      return module.template Relocate<Machine>(
-          // Resolve against successfully decoded modules, ignoring the others.
-          diag, valid_modules, tls_desc_resolver);
+      // Resolve against successfully decoded modules, ignoring the others.
+      return module.template Relocate<Machine>(diag, valid_modules, tls_desc_resolver);
     };
 
     // After the segments are complete, make sure all the VMO handles are
@@ -832,7 +827,7 @@ class RemoteDynamicLinker {
   }
 
   AbiStubPtr abi_stub_;
-  RemoteAbi<Module> remote_abi_;
+  RemoteAbi<Module, Machine> remote_abi_;
   List modules_;
   size_type max_tls_modid_ = 0;
   uint32_t stub_modid_ = 0;

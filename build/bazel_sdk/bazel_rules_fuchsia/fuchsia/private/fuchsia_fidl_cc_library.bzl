@@ -7,6 +7,7 @@
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 _CodegenInfo = provider("Carries generated information across FIDL bindings code generation ", fields = ["files"])
 
@@ -86,7 +87,7 @@ def fuchsia_fidl_cc_library(name, library, binding_type = "cpp_wire", sdk_for_de
     )
 
 def _codegen_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
 
     ir = ctx.attr.library[FuchsiaFidlLibraryInfo].ir
     name = ctx.attr.library[FuchsiaFidlLibraryInfo].name
@@ -160,7 +161,7 @@ def _codegen_impl(ctx):
 # the cc_library as two separate rules.
 _codegen = rule(
     implementation = _codegen_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     # Files must be generated in genfiles in order for the header to be included
     # anywhere.
     output_to_genfiles = True,

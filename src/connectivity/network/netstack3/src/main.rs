@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 //! A networking stack.
-#![deny(clippy::unused_async)]
-#![deny(missing_docs, unreachable_patterns, unused)]
+#![warn(clippy::unused_async)]
+#![warn(missing_docs, unreachable_patterns, unused)]
 #![recursion_limit = "256"]
 
 mod bindings;

@@ -157,12 +157,25 @@ template("fidl_cpp_codegen") {
 template("_fidl_cpp_library_impl") {
   forward_variables_from(invoker,
                          [
+                           "bindings_flavor",
                            "fidl_target",
                            "fidl_gen_dir",
                          ])
-  generation_target_name = "${fidl_target}_${invoker.bindings_flavor}_generate"
+  assert(defined(bindings_flavor))
+  assert(defined(fidl_target))
+  assert(defined(fidl_gen_dir))
 
-  root = "$fidl_gen_dir/${invoker.bindings_flavor}"
+  # Instances, such as tests, that do not have their own `fidl_cpp_codegen()`
+  # target need to override the generation target base name to be match the
+  # codegen target being used. The name should correspond to `bindings_flavor`.
+  if (defined(invoker.codegen_target_base_name)) {
+    codegen_target_base_name = invoker.codegen_target_base_name
+  } else {
+    codegen_target_base_name = target_name
+  }
+  generation_target_name = "${codegen_target_base_name}_generate"
+
+  root = "$fidl_gen_dir/${bindings_flavor}"
   not_needed([ "root" ])
 
   if (defined(invoker.generated_headers)) {
@@ -215,8 +228,8 @@ template("_fidl_cpp_library_impl") {
     ]
 
     # Map FIDL library dependencies to generated library dependencies
-    # of the same type (identified by bindings_flavor or dep_suffix).
-    dep_suffix = "_${invoker.bindings_flavor}"
+    # of the same type (identified by `bindings_flavor` or `dep_suffix`).
+    dep_suffix = "_${bindings_flavor}"
     if (defined(invoker.dep_suffix)) {
       dep_suffix = invoker.dep_suffix
     }
@@ -381,6 +394,8 @@ template("fidl_cpp_family") {
     }
 
     _hlcpp_target = "${target_name}_hlcpp"
+
+    # Note that this is not the `_hlcpp_target` as the template adds a suffix.
     fidl_cpp_codegen(_hlcpp_target) {
       forward_variables_from(invoker,
                              [
@@ -393,7 +408,8 @@ template("fidl_cpp_family") {
       forward_variables_from(hlcpp_options, "*")
       fidlgen_tool = "//tools/fidl/fidlgen_hlcpp"
     }
-    fidl_cpp_library("${target_name}_hlcpp") {
+
+    fidl_cpp_library(_hlcpp_target) {
       forward_variables_from(invoker,
                              [
                                "applicable_licenses",
@@ -500,11 +516,11 @@ template("fidl_cpp_family") {
     }
 
     # Testing target
-    fidl_cpp_library("${target_name}_cpp_testing") {
+    fidl_cpp_library("${_cpp_target}_testing") {
+      testonly = true
       forward_variables_from(invoker,
                              [
                                "applicable_licenses",
-                               "testonly",
                                "visibility",
                                "public_configs",
                                "fidl_target",
@@ -512,12 +528,12 @@ template("fidl_cpp_family") {
                                "public_deps",
                              ])
       bindings_flavor = "cpp"
+      codegen_target_base_name = _cpp_target
       dep_suffix = "_cpp_testing"
       generated_headers = [
         "fidl/$library_name/cpp/test_base.h",
         "fidl/$library_name/cpp/wire_test_base.h",
       ]
-      testonly = true
       additional_public_deps = [ ":${_cpp_target}" ]
     }
 
@@ -526,7 +542,7 @@ template("fidl_cpp_family") {
       sdk_atom_alias("${_cpp_target}_sdk") {
         atom = ":$sdk_target_name($fidl_toolchain)"
       }
-      sdk_atom_alias("${target_name}_cpp_testing_sdk") {
+      sdk_atom_alias("${_cpp_target}_testing_sdk") {
         atom = ":$sdk_target_name($fidl_toolchain)"
       }
     }
@@ -545,6 +561,7 @@ template("fidl_cpp_family") {
                                "public_deps",
                              ])
       bindings_flavor = "cpp"
+      codegen_target_base_name = _cpp_target
       dep_suffix = "_cpp_hlcpp_conversion"
       generated_headers = [ "fidl/$library_name/cpp/hlcpp_conversion.h" ]
       additional_public_deps = [
@@ -555,7 +572,8 @@ template("fidl_cpp_family") {
     }
   }
 
-  fidl_cpp_codegen("${target_name}_cpp") {
+  # Note that this is not the `_cpp_target` as the template adds a suffix.
+  fidl_cpp_codegen(_cpp_target) {
     forward_variables_from(invoker,
                            [
                              "applicable_licenses",
@@ -606,10 +624,6 @@ template("fidl_cpp_family") {
   # Fuzzers (also dependent on HLCPP and LLCPP)
   #
   if (enable_hlcpp) {
-    libfuzzer_options = {
-      testonly = true
-      bindings_flavor = "libfuzzer"
-    }
     libfuzzer_headers = [
       "$library_name_slashes/cpp/libfuzzer.h",
       "$library_name_slashes/cpp/libfuzzer_decode_encode.h",
@@ -620,36 +634,40 @@ template("fidl_cpp_family") {
     ]
 
     # Define fuzzer targets.
-    fidl_cpp_codegen("${target_name}_libfuzzer") {
+
+    _libfuzzer_target = "${target_name}_libfuzzer"
+
+    # Note that this is not the `_libfuzzer_target` as the template adds a suffix.
+    fidl_cpp_codegen(_libfuzzer_target) {
+      testonly = true
       forward_variables_from(invoker,
                              [
                                "applicable_licenses",
-                               "testonly",
                                "fuzzers",
                                "golden_fuzzer",
                                "fidl_gen_dir",
                                "fidl_ir_json",
                                "fidl_ir_target",
                              ])
-      forward_variables_from(libfuzzer_options, "*")
+      bindings_flavor = "libfuzzer"
       generated_headers = libfuzzer_headers
       generated_sources = libfuzzer_sources
       fidlgen_tool = "//tools/fidl/fidlgen_libfuzzer"
     }
 
     # Define fuzzer header library.
-    fidl_cpp_library("${target_name}_libfuzzer") {
+    fidl_cpp_library(_libfuzzer_target) {
+      testonly = true
       forward_variables_from(invoker,
                              [
                                "applicable_licenses",
-                               "testonly",
                                "visibility",
                                "public_deps",
                                "fidl_target",
                                "fidl_gen_dir",
                              ])
-      forward_variables_from(libfuzzer_options, "*")
-      testonly = true
+      bindings_flavor = "libfuzzer"
+      codegen_target_base_name = _libfuzzer_target
       additional_public_deps = [
         "//sdk/lib/async-default",
         "//sdk/lib/async-loop:async-loop-cpp",
@@ -659,8 +677,8 @@ template("fidl_cpp_family") {
         # The generated headers `#include` the hlcpp and new C++ bindings headers
         # generated by the clauses above, so the generated target needs
         # that bindings library target in its public_deps.
-        ":${fidl_target}_cpp",
-        ":${fidl_target}_hlcpp",
+        ":${_cpp_target}",
+        ":${_hlcpp_target}",
       ]
 
       # Note: `.../libfuzzer.cc` is linked with different build-time parameters below in loop
@@ -698,19 +716,19 @@ template("fidl_cpp_family") {
       fuzzer_lib_name = "${target_name}_${bindings_flavor}${protocol_suffix}"
 
       fidl_cpp_library(fuzzer_lib_name) {
+        testonly = true
         forward_variables_from(invoker,
                                [
                                  "applicable_licenses",
-                                 "testonly",
                                  "visibility",
                                  "public_deps",
                                  "fidl_target",
                                  "fidl_gen_dir",
                                ])
-        forward_variables_from(libfuzzer_options, "*")
-        testonly = true
+        bindings_flavor = "libfuzzer"
+        codegen_target_base_name = _libfuzzer_target
         defines = library_defines
-        additional_public_deps = [ ":${fidl_target}_libfuzzer" ]
+        additional_public_deps = [ ":${_libfuzzer_target}" ]
         generated_sources = libfuzzer_sources
       }
     }
@@ -721,19 +739,19 @@ template("fidl_cpp_family") {
   if (defined(invoker.golden_fuzzer) && invoker.golden_fuzzer) {
     # Note: double underscore to prevent clashes with the fuzzer targets below.
     fidl_cpp_library("${target_name}_libfuzzer__golden") {
+      testonly = true
       forward_variables_from(invoker,
                              [
                                "applicable_licenses",
-                               "testonly",
                                "visibility",
                                "public_deps",
                                "fidl_target",
                                "fidl_gen_dir",
                              ])
-      forward_variables_from(libfuzzer_options, "*")
-      testonly = true
+      bindings_flavor = "libfuzzer"
+      codegen_target_base_name = _libfuzzer_target
       defines = [ "GOLDEN_FUZZER" ]
-      additional_public_deps = [ ":${fidl_target}_libfuzzer" ]
+      additional_public_deps = [ ":${_libfuzzer_target}" ]
       generated_sources = libfuzzer_sources
     }
   }

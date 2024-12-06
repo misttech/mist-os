@@ -4,10 +4,10 @@
 
 #include "src/graphics/display/drivers/intel-display/registers-typec.h"
 
+#include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
 #include <zircon/compiler.h>
 
 #include <gtest/gtest.h>
-#include <mock-mmio-range/mock-mmio-range.h>
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 
@@ -16,7 +16,7 @@ namespace intel_display {
 class RegisterTypeCTest : public ::testing::Test {
  protected:
   constexpr static int kMmioRangeSize = 0x100000;
-  ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
+  mock_mmio::MockMmioRange mmio_range_{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 };
 
@@ -28,7 +28,7 @@ TEST_F(DynamicFlexIoDisplayPortMainLinkLaneEnabledTest, Getter) {
   constexpr uint32_t kFiaOffsets[] = {0x1638C0, 0x16E8C0, 0x16F8C0};
 
   // Test `enabled_main_links_bits` getter.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kFiaOffsets[0], .value = 0x0000'003c, .write = false},
       {.address = kFiaOffsets[1], .value = 0x0000'00f3, .write = false},
       {.address = kFiaOffsets[2], .value = 0x0000'0031, .write = false},
@@ -65,7 +65,7 @@ TEST_F(DynamicFlexIoDisplayPortMainLinkLaneEnabledTest, Setter) {
   constexpr uint32_t kFiaOffsets[] = {0x1638C0, 0x16E8C0, 0x16F8C0};
 
   // Test `enabled_main_links_bits` getter.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kFiaOffsets[0], .value = 0x0000'003c, .write = false},
       {.address = kFiaOffsets[0], .value = 0x0000'003f, .write = true},
       {.address = kFiaOffsets[1], .value = 0x0000'00f3, .write = false},
@@ -173,7 +173,7 @@ TEST_F(DynamicFlexIoScratchPadTest, Getter) {
 
   // Test `display_port_tx_lane_assignment`, `type_c_live_state` getters
   // and helper method `display_port_assigned_tx_lane_count`.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kFiaOffsets[0], .value = 0b0000'0000'0010'1100, .write = false},
       {.address = kFiaOffsets[1], .value = 0b0100'0001'0000'1111, .write = false},
       {.address = kFiaOffsets[2], .value = 0b0000'0000'0010'1111, .write = false},
@@ -248,7 +248,7 @@ TEST_F(DynamicFlexIoPinAssignmentTest, Getter) {
   constexpr uint32_t kFiaOffsets[] = {0x163880, 0x16E880, 0x16F880};
 
   // Test `pin_assignment_for_ddi` getter.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kFiaOffsets[0], .value = 0b0000'0000'0000'0110, .write = false},
       {.address = kFiaOffsets[1], .value = 0b0000'0000'0001'0101, .write = false},
       {.address = kFiaOffsets[2], .value = 0b0000'0000'0000'0100, .write = false},
@@ -333,7 +333,7 @@ TEST_F(DynamicFlexIoDisplayPortControllerSafeStateSettingsTest, Getter) {
   constexpr uint32_t kFiaOffsets[] = {0x163894, 0x16E894, 0x16F894};
 
   // Test `set_disable_safe_mode_for_ddi` setter.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kFiaOffsets[0], .value = 0b0000'0000'0000'0000, .write = false},
       {.address = kFiaOffsets[0], .value = 0b0000'0000'0000'0001, .write = true},
       {.address = kFiaOffsets[1], .value = 0b0000'0000'0000'0010, .write = false},
@@ -401,7 +401,7 @@ TEST_F(DynamicFlexIoDisplayPortPhyModeStatusTest, Getter) {
   constexpr uint32_t kFiaOffsets[] = {0x163890, 0x16E890, 0x16F890};
 
   // Test `phy_is_ready_for_ddi` getter.
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
       {.address = kFiaOffsets[0], .value = 0b0000'0000'0000'0001, .write = false},
       {.address = kFiaOffsets[1], .value = 0b0000'0000'0000'0001, .write = false},
       {.address = kFiaOffsets[2], .value = 0b0000'0000'0000'0010, .write = false},
@@ -458,7 +458,7 @@ TEST_F(RegisterTypeCTest, ReadWriteDekelRegister) {
     constexpr uint32_t kBaseAddr = 0x168000;
     constexpr uint32_t kRegMmioAddr = kBaseAddr | (kPhysicalInternalAddress & 0xfff);
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kHipIndex0Addr, .value = 0x000cc000f, .write = false},
         {.address = kHipIndex0Addr, .value = 0x000cc0002, .write = true},
         {.address = kRegMmioAddr, .value = 0xfeedcafe, .write = false},
@@ -481,7 +481,7 @@ TEST_F(RegisterTypeCTest, ReadWriteDekelRegister) {
     constexpr uint32_t kBaseAddr = 0x16D000;
     constexpr uint32_t kRegMmioAddr = kBaseAddr | (kPhysicalInternalAddress & 0xfff);
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kHipIndex1Addr, .value = 0x00cc0f00, .write = false},
         {.address = kHipIndex1Addr, .value = 0x00cc0200, .write = true},
         {.address = kRegMmioAddr, .value = 0xfeedcafe, .write = false},
@@ -505,7 +505,7 @@ TEST_F(RegisterTypeCTest, DekelLaneRegister) {
     constexpr uint32_t kBaseAddr = 0x168000;
     constexpr uint32_t kRegMmioAddr = kBaseAddr | (kPhysicalInternalAddress & 0xfff);
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kHipIndex0Addr, .value = 0x00cc000f, .write = false},
         {.address = kHipIndex0Addr, .value = 0x00cc0000, .write = true},
         {.address = kRegMmioAddr, .value = 0x000000f0, .write = false},
@@ -521,7 +521,7 @@ TEST_F(RegisterTypeCTest, DekelLaneRegister) {
     constexpr uint32_t kBaseAddr = 0x168000;
     constexpr uint32_t kRegMmioAddr = kBaseAddr | (kPhysicalInternalAddress & 0xfff);
 
-    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
         {.address = kHipIndex0Addr, .value = 0x00cc000f, .write = false},
         {.address = kHipIndex0Addr, .value = 0x00cc0001, .write = true},
         {.address = kRegMmioAddr, .value = 0x000000f0, .write = false},

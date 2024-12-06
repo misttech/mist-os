@@ -202,6 +202,17 @@ class DriverBase {
   cpp20::span<const fuchsia_driver_framework::NodeProperty> node_properties(
       const std::string& parent_node_name = "default") const;
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  // Returns the node properties of the node the driver is bound to or its parents.
+  // Returns the node's own node properties if `parent_node_name` is "default" and the node is a
+  // non-composite.
+  // Returns the node's primary parent's node properties if `parent_node_name` is "default" and the
+  // node is a composite.
+  // Returns an empty vector if the parent does not exist.
+  cpp20::span<const fuchsia_driver_framework::NodeProperty2> node_properties_2(
+      const std::string& parent_node_name = "default") const;
+#endif
+
   // The symbols field in the start args.
   // These come from the driver that added |node|, and are filtered to the symbols requested in the
   // bind program.
@@ -282,6 +293,12 @@ class DriverBase {
   DriverStartArgs start_args_;
   std::unordered_map<std::string, cpp20::span<const fuchsia_driver_framework::NodeProperty>>
       node_properties_;
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  std::unordered_map<std::string, cpp20::span<const fuchsia_driver_framework::NodeProperty2>>
+      node_properties_2_;
+#endif
+
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
   async_dispatcher_t* dispatcher_;
   std::shared_ptr<Namespace> incoming_;

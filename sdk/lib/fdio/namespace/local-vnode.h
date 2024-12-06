@@ -18,7 +18,6 @@
 #include <utility>
 
 #include <fbl/intrusive_wavl_tree.h>
-#include <fbl/macros.h>
 #include <fbl/mutex.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
@@ -39,7 +38,10 @@ using EnumerateCallback = fit::function<zx_status_t(std::string_view path, zxio_
 // This class is thread-compatible.
 class LocalVnode : public fbl::RefCounted<LocalVnode> {
  public:
-  DISALLOW_COPY_ASSIGN_AND_MOVE(LocalVnode);
+  LocalVnode(const LocalVnode&) = delete;
+  LocalVnode(LocalVnode&&) = delete;
+  LocalVnode& operator=(const LocalVnode&) = delete;
+  LocalVnode& operator=(LocalVnode&&) = delete;
 
   // Detaches this vnode from its parent. The Vnode's own children are not unlinked.
   void UnlinkFromParent();
@@ -99,6 +101,12 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
 
   class Intermediate {
    public:
+    Intermediate(const Intermediate&) = delete;
+    Intermediate(Intermediate&&) = delete;
+    Intermediate& operator=(const Intermediate&) = delete;
+    Intermediate& operator=(Intermediate&&) = delete;
+
+    Intermediate() = default;
     ~Intermediate();
 
     size_t num_children() const;
@@ -131,6 +139,11 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
 
   class Local {
    public:
+    Local(const Local&) = delete;
+    Local(Local&&) = delete;
+    Local& operator=(const Local&) = delete;
+    Local& operator=(Local&&) = delete;
+
     Local(fdio_open_local_func_t on_open, void* context);
     zx::result<fdio_ptr> Open();
 
@@ -141,7 +154,14 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
 
   class Remote {
    public:
+    Remote(const Remote&) = delete;
+    Remote(Remote&&) = delete;
+    Remote& operator=(const Remote&) = delete;
+    Remote& operator=(Remote&&) = delete;
+
     explicit Remote(zxio_storage_t remote_storage) : remote_storage_(remote_storage) {}
+    ~Remote();
+
     zxio_t* Connection() const { return const_cast<zxio_t*>(&remote_storage_.io); }
 
    private:
@@ -162,7 +182,6 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
   LocalVnode(std::optional<ParentAndId> parent_and_id, std::in_place_type_t<T> in_place,
              Args&&... args)
       : node_type_(in_place, std::forward<Args>(args)...), parent_and_id_(parent_and_id) {}
-  ~LocalVnode();
 
   std::variant<Local, Intermediate, Remote> node_type_;
   std::optional<ParentAndId> parent_and_id_;

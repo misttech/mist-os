@@ -27,12 +27,6 @@ if (is_host) {
       "configuration:tests",
       "engines:tests",
     ]
-    deps = [
-      ":aemu_internal",
-      ":crosvm_internal",
-      ":qemu_internal",
-      ":uefi_internal",
-    ]
   }
 
   # AEMU is supported on mac and linux and both arm64 and x64

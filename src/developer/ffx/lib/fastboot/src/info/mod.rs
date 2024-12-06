@@ -5,13 +5,11 @@
 use anyhow::{anyhow, Result};
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, Variable};
 use futures::prelude::*;
-use futures::try_join;
 use std::io::Write;
-use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 /// Aggregates fastboot variables from a callback listener.
-async fn handle_variables_for_fastboot<W: Write>(
+pub async fn handle_variables_for_fastboot<W: Write>(
     writer: &mut W,
     mut var_server: Receiver<Variable>,
 ) -> Result<()> {
@@ -25,23 +23,12 @@ async fn handle_variables_for_fastboot<W: Write>(
     }
 }
 
-#[tracing::instrument(skip(writer))]
-pub async fn info<W: Write, F: FastbootInterface>(
-    writer: &mut W,
+#[tracing::instrument(skip(messenger))]
+pub async fn info<F: FastbootInterface>(
+    messenger: Sender<Variable>,
     fastboot_interface: &mut F,
 ) -> Result<()> {
-    let (var_client, var_server): (Sender<Variable>, Receiver<Variable>) = mpsc::channel(1);
-    let _ = try_join!(
-        fastboot_interface.get_all_vars(var_client).map_err(|e| {
-            tracing::error!("FIDL Communication error: {}", e);
-            anyhow!(
-                "There was an error communicating with the daemon. Try running\n\
-                `ffx doctor` for further diagnositcs."
-            )
-        }),
-        handle_variables_for_fastboot(writer, var_server),
-    )?;
-    Ok(())
+    fastboot_interface.get_all_vars(messenger).map_err(|e| anyhow!(e)).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -51,14 +38,15 @@ pub async fn info<W: Write, F: FastbootInterface>(
 mod test {
     use super::*;
     use crate::test::setup;
+    use tokio::sync::mpsc;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_showing_variables() -> Result<()> {
         let (_, mut proxy) = setup();
-        let mut writer = Vec::<u8>::new();
-        info(&mut writer, &mut proxy).await?;
-        let output = String::from_utf8(writer).expect("utf-8 string");
-        assert!(output.contains("test: test"));
+        let (client, mut server) = mpsc::channel(1);
+        info(client, &mut proxy).await?;
+        let e = server.recv().await.unwrap();
+        assert_eq!(e, Variable { name: "test".to_string(), value: "test".to_string() });
         Ok(())
     }
 }

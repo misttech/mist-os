@@ -190,21 +190,23 @@ pub enum SerialMode {
 }
 
 /// This struct defines supported kernel features.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(default, deny_unknown_fields)]
 pub struct BoardKernelConfig {
     /// Enable the use of 'contiguous physical pages'. This should be enabled
     /// when a significant contiguous memory size is required.
-    #[serde(default)]
     pub contiguous_physical_pages: bool,
 
     /// Where to print serial logs.
-    #[serde(default)]
     pub serial_mode: SerialMode,
 
     /// Disable printing to the console during early boot (ie, make it quiet)
-    #[serde(default)]
     pub quiet_early_boot: bool,
+
+    /// When enabled, each ARM cpu will enable an event stream generator, which
+    /// per-cpu sets the hidden event flag at a particular rate. This has the
+    /// effect of kicking cpus out of any WFE states they may be sitting in.
+    pub arm64_event_stream_enable: bool,
 
     /// This controls what serial port is used.  If provided, it overrides the
     /// serial port described by the system's bootdata.  The kernel debug serial
@@ -213,22 +215,33 @@ pub struct BoardKernelConfig {
     /// If set to "none", the kernel debug serial port will be disabled and will
     /// not be reserved, allowing the default serial port to be used outside the
     /// kernel.
-    #[serde(default)]
     pub serial: Option<String>,
 
     /// When searching for a CPU on which to place a task, prefer little cores
     /// over big cores. Enabling this option trades off improved performance in
     /// favor of reduced power consumption.
-    #[serde(default)]
     pub scheduler_prefer_little_cpus: bool,
 
     /// The system will halt on a kernel panic instead of rebooting.
-    #[serde(default)]
     pub halt_on_panic: bool,
 
     /// OOM related configurations.
-    #[serde(default)]
     pub oom: Option<OOM>,
+}
+
+impl Default for BoardKernelConfig {
+    fn default() -> Self {
+        Self {
+            contiguous_physical_pages: false,
+            serial_mode: SerialMode::default(),
+            quiet_early_boot: false,
+            arm64_event_stream_enable: true,
+            serial: None,
+            scheduler_prefer_little_cpus: false,
+            halt_on_panic: false,
+            oom: None,
+        }
+    }
 }
 
 /// This struct defines supported Out of memory features.
@@ -383,6 +396,7 @@ mod test {
             "kernel": {
                 "contiguous_physical_pages": true,
                 "scheduler_prefer_little_cpus": true,
+                "arm64_event_stream_enable": false,
             },
             "platform": {
                 "development_support": {
@@ -416,6 +430,7 @@ mod test {
                 scheduler_prefer_little_cpus: true,
                 halt_on_panic: false,
                 oom: None,
+                arm64_event_stream_enable: false,
             },
             platform: PlatformConfig {
                 connectivity: ConnectivityConfig::default(),

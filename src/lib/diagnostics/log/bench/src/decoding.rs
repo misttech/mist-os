@@ -110,13 +110,13 @@ fn main() {
         .sample_size(100);
 
     let mut bench = criterion::Benchmark::new("Decoder/Argument/Boolean", bench_argument(true))
-        .with_function("Decoder/Argument/Floating", bench_argument(1234.5678 as f64))
-        .with_function("Decoder/Argument/UnsignedInt", bench_argument(12345 as u64))
-        .with_function("Decoder/Argument/SignedInt", bench_argument(-12345 as i64));
+        .with_function("Decoder/Argument/Floating", bench_argument(1234.5678_f64))
+        .with_function("Decoder/Argument/UnsignedInt", bench_argument(12345_u64))
+        .with_function("Decoder/Argument/SignedInt", bench_argument(-12345_i64));
 
     for size in [16, 128, 256, 512, 1024, 32000] {
         bench = bench.with_function(
-            &format!("Decoder/Argument/Text/{}", size),
+            format!("Decoder/Argument/Text/{}", size),
             bench_argument((*common::PLACEHOLDER_TEXT).get(..size).unwrap()),
         )
     }

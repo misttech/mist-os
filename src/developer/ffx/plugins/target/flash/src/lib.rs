@@ -5,26 +5,33 @@
 use addr::TargetAddr;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use chrono::Duration;
+use chrono::{Duration, Utc};
 use errors::ffx_bail;
 use ffx_fastboot::common::cmd::OemFile;
 use ffx_fastboot::common::fastboot::{
     tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
 };
 use ffx_fastboot::common::from_manifest;
+use ffx_fastboot::util::{Event, UnlockEvent};
+use ffx_fastboot_interface::fastboot_interface::UploadProgress;
 use ffx_flash_args::FlashCommand;
 use ffx_ssh::SshKeyFiles;
-use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxContext, FfxMain, FfxTool, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::{
     FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
     TargetState,
 };
 use fuchsia_async::{MonotonicInstant, Timer};
+use futures::try_join;
+use schemars::JsonSchema;
+use serde::Serialize;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Once;
 use termion::{color, style};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::Receiver;
 
 const SSH_OEM_COMMAND: &str = "add-staged-bootloader-file ssh.authorized_keys";
 
@@ -41,15 +48,39 @@ pub struct FlashTool {
 
 fho::embedded_plugin!(FlashTool);
 
+#[derive(Debug, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum FlashMessage {
+    Progress(FlashProgress),
+    Finished { success: bool, error_message: String },
+}
+
+#[derive(Debug, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum FlashProgress {
+    FlashPartitionStarted { partition_name: String },
+    FlashPartitionFinished { partition_name: String },
+    Unlock,
+    RebootToBootloaderStarted,
+    RebootToBootloaderFinished,
+    GotVariable,
+    OemCommand { oem_command: String },
+    UploadStarted,
+    UploadFinished,
+    UploadError,
+}
+
 #[async_trait(?Send)]
 impl FfxMain for FlashTool {
-    type Writer = SimpleWriter;
+    // TODO(b/b/380444711): Add tests for schema
+    type Writer = VerifiedMachineWriter<FlashMessage>;
+
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         // Checks
         preflight_checks(&self.cmd, &mut writer)?;
 
         // Massage FlashCommand
-        let cmd = preprocess_flash_cmd(&mut writer, self.cmd).await?;
+        let cmd = preprocess_flash_cmd(self.cmd).await?;
 
         flash_plugin_impl(self.target_proxy.await?, cmd, &mut writer).await
     }
@@ -68,10 +99,7 @@ fn preflight_checks<W: Write>(cmd: &FlashCommand, mut writer: W) -> Result<()> {
     Ok(())
 }
 
-async fn preprocess_flash_cmd<W: Write>(
-    mut writer: W,
-    mut cmd: FlashCommand,
-) -> Result<FlashCommand> {
+async fn preprocess_flash_cmd(mut cmd: FlashCommand) -> Result<FlashCommand> {
     match cmd.authorized_keys.as_ref() {
         Some(ssh) => {
             let ssh_file = match std::fs::canonicalize(ssh) {
@@ -98,8 +126,6 @@ async fn preprocess_flash_cmd<W: Write>(
             if !cmd.oem_stage.iter().any(|f| f.command() == SSH_OEM_COMMAND) {
                 if cmd.skip_authorized_keys {
                     tracing::warn!("Skipping uploading authorized keys");
-                    writeln!(writer, "Skipping uploading authorized-keys")
-                        .user_message("Error writing user message")?;
                 } else {
                     let ssh_keys = SshKeyFiles::load(None)
                         .await
@@ -107,7 +133,7 @@ async fn preprocess_flash_cmd<W: Write>(
                     ssh_keys.create_keys_if_needed(false).context("creating ssh keys if needed")?;
                     if ssh_keys.authorized_keys.exists() {
                         let k = ssh_keys.authorized_keys.display().to_string();
-                        eprintln!("No `--authorized-keys` flag, using {}", k);
+                        tracing::debug!("No `--authorized-keys` flag, using {}", k);
                         cmd.oem_stage.push(OemFile::new(SSH_OEM_COMMAND.to_string(), k));
                     } else {
                         // Since the key will be initialized, this should never happen.
@@ -130,12 +156,10 @@ async fn preprocess_flash_cmd<W: Write>(
 
     if cmd.product_bundle.is_none() && cmd.manifest_path.is_none() && cmd.manifest.is_none() {
         let product_path: String = ffx_config::get("product.path")?;
-        writeln!(
-            writer,
+        tracing::debug!(
             "No product bundle or manifest passed. Inferring product bundle path from config: {}",
             product_path
-        )
-        .user_message("Error writing user message")?;
+        );
         cmd.product_bundle = Some(product_path);
     }
 
@@ -151,22 +175,20 @@ async fn preprocess_flash_cmd<W: Write>(
             .strip_suffix('"')
             .unwrap()
             .to_string();
-        writeln!(
-            writer,
+        tracing::debug!(
             "Passed product bundle was wrapped in quotes, trimming it to: {}",
             cleaned_product_bundle
-        )
-        .user_message("Error writing ser message")?;
+        );
         cmd.product_bundle = Some(cleaned_product_bundle);
     }
     Ok(cmd)
 }
 
 #[tracing::instrument(skip(target_proxy, writer))]
-async fn flash_plugin_impl<W: Write>(
+async fn flash_plugin_impl(
     target_proxy: TargetProxy,
     cmd: FlashCommand,
-    mut writer: W,
+    writer: &mut VerifiedMachineWriter<FlashMessage>,
 ) -> fho::Result<()> {
     let mut info = target_proxy.identity().await.user_message("Error getting Target's identity")?;
 
@@ -243,14 +265,19 @@ async fn flash_plugin_impl<W: Write>(
         }
     };
 
-    match info.fastboot_interface {
+    let start_time = Utc::now();
+
+    let res = match info.fastboot_interface {
         None => ffx_bail!("Could not connect to {}: Target not in fastboot", display_name(&info)),
         Some(FidlFastbootInterface::Usb) => {
             let serial_num = info.serial_number.ok_or_else(|| {
                 anyhow!("Target was detected in Fastboot USB but did not have a serial number")
             })?;
             let mut proxy = usb_proxy(serial_num).await?;
-            from_manifest(&mut writer, cmd, &mut proxy).await.map_err(fho::Error::from)
+            let (client, server) = mpsc::channel(1);
+            try_join!(from_manifest(client, cmd, &mut proxy), handle_event(writer, server))
+                .map_err(fho::Error::from)?;
+            Ok::<(), fho::Error>(())
         }
         Some(FidlFastbootInterface::Udp) => {
             // We take the first address as when a target is in Fastboot mode and over
@@ -269,7 +296,7 @@ Warning: the target does not have a node name and is in UDP fastboot mode.
 Rediscovering the target after bootloader reboot will be impossible.
 Please try --no-bootloader-reboot to avoid a reboot.
 Using address {} as node name",
-                        socket_addr.to_string()
+                        socket_addr
                     )
                     .user_message("Error writing user message")?;
                     socket_addr.to_string()
@@ -279,7 +306,10 @@ Using address {} as node name",
                     ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
                 let mut proxy =
                     udp_proxy(target_name, fastboot_device_file_path, &socket_addr, config).await?;
-                from_manifest(&mut writer, cmd, &mut proxy).await.map_err(fho::Error::from)
+                let (client, server) = mpsc::channel(1);
+                try_join!(from_manifest(client, cmd, &mut proxy), handle_event(writer, server))
+                    .map_err(fho::Error::from)?;
+                Ok(())
             } else {
                 ffx_bail!("Could not get a valid address for target");
             }
@@ -301,7 +331,7 @@ Warning: the target does not have a node name and is in TCP fastboot mode.
 Rediscovering the target after bootloader reboot will be impossible.
 Please try --no-bootloader-reboot to avoid a reboot.
 Using address {} as node name",
-                        socket_addr.to_string()
+                        socket_addr
                     )
                     .user_message("Error writing user message")?;
                     socket_addr.to_string()
@@ -311,10 +341,177 @@ Using address {} as node name",
                     ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
                 let mut proxy =
                     tcp_proxy(target_name, fastboot_device_file_path, &socket_addr, config).await?;
-                from_manifest(&mut writer, cmd, &mut proxy).await.map_err(fho::Error::from)
+                let (client, server) = mpsc::channel(1);
+                try_join!(from_manifest(client, cmd, &mut proxy), handle_event(writer, server))
+                    .map_err(fho::Error::from)?;
+                Ok(())
             } else {
                 ffx_bail!("Could not get a valid address for target");
             }
+        }
+    };
+
+    match res {
+        Ok(()) => {
+            let duration = Utc::now().signed_duration_since(start_time);
+            let finished_message = format!("Continuing to boot - this could take awhile\n{}Done{}. {}Total Time{} [{}{:.2}s{}]",
+                color::Fg(color::Green),
+                style::Reset,
+                color::Fg(color::Green),
+                style::Reset,
+                color::Fg(color::Blue),
+                (duration.num_milliseconds() as f32) / (1000 as f32),
+                style::Reset
+            );
+
+            writer.machine_or(
+                &FlashMessage::Finished { success: true, error_message: "".to_string() },
+                finished_message,
+            )?;
+        }
+        Err(e) => {
+            writer.machine_or(
+                &FlashMessage::Finished { success: false, error_message: format!("{}", e) },
+                format!("Error: {:?}", e),
+            )?;
+            return Err(e);
+        }
+    }
+    Ok(())
+}
+
+fn done_time(duration: Duration) -> String {
+    format!(
+        "{}Done{} [{}{:.2}s{}]",
+        color::Fg(color::Green),
+        style::Reset,
+        color::Fg(color::Blue),
+        (duration.num_milliseconds() as f32) / (1000 as f32),
+        style::Reset
+    )
+}
+
+async fn handle_event(
+    writer: &mut VerifiedMachineWriter<FlashMessage>,
+    mut rec: Receiver<Event>,
+) -> Result<()> {
+    loop {
+        match rec.recv().await {
+            Some(event) => match event {
+                Event::Upload(upload) => match upload {
+                    UploadProgress::OnStarted { size: _size } => {
+                        let (machine, message) = (
+                            FlashMessage::Progress(FlashProgress::UploadStarted),
+                            "Uploading... ".to_string(),
+                        );
+                        writer.machine_or_write(&machine, message)?;
+                    }
+                    UploadProgress::OnProgress { bytes_written } => {
+                        tracing::trace!("Made progres, wrote: {}", bytes_written);
+                    }
+                    UploadProgress::OnFinished => {
+                        let (machine, message) = (
+                            FlashMessage::Progress(FlashProgress::UploadFinished),
+                            format!("{}Done{}", color::Fg(color::Green), style::Reset),
+                        );
+                        writer.machine_or(&machine, message)?;
+                    }
+                    UploadProgress::OnError { error } => {
+                        let (machine, message) = (
+                            FlashMessage::Progress(FlashProgress::UploadError),
+                            format!("Error {}", error),
+                        );
+                        writer.machine_or(&machine, message)?;
+                    }
+                },
+                Event::FlashPartition { partition_name } => {
+                    let (machine, message) = (
+                        FlashMessage::Progress(FlashProgress::FlashPartitionStarted {
+                            partition_name: partition_name.clone(),
+                        }),
+                        format!("Beginning flash for partition {}... ", partition_name),
+                    );
+                    writer.machine_or_write(&machine, message)?;
+                }
+                Event::FlashPartitionFinished { partition_name, duration } => {
+                    let (machine, message) = (
+                        FlashMessage::Progress(FlashProgress::FlashPartitionFinished {
+                            partition_name: partition_name.clone(),
+                        }),
+                        done_time(duration),
+                    );
+                    writer.machine_or(&machine, message)?;
+                }
+                Event::Unlock(unlock_event) => {
+                    let (machine, message) = match unlock_event {
+                        UnlockEvent::SearchingForCredentials => (
+                            FlashMessage::Progress(FlashProgress::Unlock),
+                            "Looking for unlock credentials... ".to_string(),
+                        ),
+                        UnlockEvent::FoundCredentials(delta) => (
+                            FlashMessage::Progress(FlashProgress::Unlock),
+                            format!("{}\n", done_time(delta)),
+                        ),
+                        UnlockEvent::GeneratingToken => (
+                            FlashMessage::Progress(FlashProgress::Unlock),
+                            "Generating unlock token... ".to_string(),
+                        ),
+                        UnlockEvent::FinishedGeneratingToken(delta) => (
+                            FlashMessage::Progress(FlashProgress::Unlock),
+                            format!("{}\n", done_time(delta)),
+                        ),
+                        UnlockEvent::BeginningUploadOfToken => (
+                            FlashMessage::Progress(FlashProgress::Unlock),
+                            "Preparing to upload unlock token\n".to_string(),
+                        ),
+                        UnlockEvent::Done => {
+                            (FlashMessage::Progress(FlashProgress::Unlock), "Done\n".to_string())
+                        }
+                    };
+                    writer.machine_or_write(&machine, message)?;
+                }
+                Event::Oem { oem_command } => {
+                    let (machine, message) = (
+                        FlashMessage::Progress(FlashProgress::OemCommand {
+                            oem_command: oem_command.clone(),
+                        }),
+                        format!("Sendinge command: \"{}\"", oem_command),
+                    );
+                    writer.machine_or(&machine, message)?;
+                }
+                Event::RebootStarted => {
+                    let (machine, message) = (
+                        FlashMessage::Progress(FlashProgress::RebootToBootloaderStarted),
+                        "Rebooting to bootloader... ".to_string(),
+                    );
+                    writer.machine_or_write(&machine, message)?;
+                }
+                Event::Rebooted(delta) => {
+                    let (machine, message) = (
+                        FlashMessage::Progress(FlashProgress::RebootToBootloaderFinished),
+                        done_time(delta),
+                    );
+                    writer.machine_or(&machine, message)?;
+                }
+                Event::Variable(variable) => {
+                    tracing::trace!("got variable {:#?}", variable);
+                    let (machine, message) = (
+                        FlashMessage::Progress(FlashProgress::GotVariable),
+                        "variable".to_string(),
+                    );
+                    writer.machine_or(&machine, message)?;
+                }
+                Event::Locked => {
+                    let msg = format!("The flashing library should not Lock the device...");
+                    let (machine, message) = (
+                        FlashMessage::Finished { success: false, error_message: msg.clone() },
+                        msg.clone(),
+                    );
+                    writer.machine_or(&machine, message)?;
+                    return Err(anyhow!(msg));
+                }
+            },
+            None => return Ok(()),
         }
     }
 }
@@ -325,6 +522,7 @@ Using address {} as node name",
 #[cfg(test)]
 mod test {
     use super::*;
+    use fho::Format;
     use pretty_assertions::assert_eq;
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
@@ -338,23 +536,17 @@ mod test {
             .set("foo".into())
             .await
             .expect("creating temp product.path");
-        let writer = Vec::new();
-        let cmd =
-            preprocess_flash_cmd(writer, FlashCommand { ..Default::default() }).await.unwrap();
+        let cmd = preprocess_flash_cmd(FlashCommand { ..Default::default() }).await.unwrap();
         assert_eq!(cmd.product_bundle, Some("foo".to_string()));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_nonexistent_file_throws_err() {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
-        let writer = Vec::new();
-        assert!(preprocess_flash_cmd(
-            writer,
-            FlashCommand {
-                manifest_path: Some(PathBuf::from("ffx_test_does_not_exist")),
-                ..Default::default()
-            }
-        )
+        assert!(preprocess_flash_cmd(FlashCommand {
+            manifest_path: Some(PathBuf::from("ffx_test_does_not_exist")),
+            ..Default::default()
+        })
         .await
         .is_err())
     }
@@ -369,15 +561,11 @@ mod test {
         let ssh_tmp_file = NamedTempFile::new().expect("tmp access failed");
         let ssh_tmp_file_name = ssh_tmp_file.path().to_string_lossy().to_string();
 
-        let writer = Vec::new();
-        let cmd = preprocess_flash_cmd(
-            writer,
-            FlashCommand {
-                product_bundle: Some(wrapped_pb_tmp_file_name),
-                authorized_keys: Some(ssh_tmp_file_name),
-                ..Default::default()
-            },
-        )
+        let cmd = preprocess_flash_cmd(FlashCommand {
+            product_bundle: Some(wrapped_pb_tmp_file_name),
+            authorized_keys: Some(ssh_tmp_file_name),
+            ..Default::default()
+        })
         .await
         .unwrap();
         assert_eq!(Some(pb_tmp_file_name), cmd.product_bundle);
@@ -388,15 +576,11 @@ mod test {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
-        let writer = Vec::new();
-        assert!(preprocess_flash_cmd(
-            writer,
-            FlashCommand {
-                manifest_path: Some(PathBuf::from(tmp_file_name)),
-                authorized_keys: Some("ssh_does_not_exist".to_string()),
-                ..Default::default()
-            },
-        )
+        assert!(preprocess_flash_cmd(FlashCommand {
+            manifest_path: Some(PathBuf::from(tmp_file_name)),
+            authorized_keys: Some("ssh_does_not_exist".to_string()),
+            ..Default::default()
+        },)
         .await
         .is_err())
     }
@@ -406,23 +590,15 @@ mod test {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
-        let mut w = Vec::new();
+        let mut writer = VerifiedMachineWriter::<FlashMessage>::new(Some(Format::Json));
         assert!(preflight_checks(
             &FlashCommand {
                 manifest: Some(PathBuf::from(tmp_file_name.clone())),
                 manifest_path: Some(PathBuf::from(tmp_file_name)),
                 ..Default::default()
             },
-            &mut w
+            &mut writer
         )
         .is_err());
-        // Additionally, check that the warning was printed
-        assert_eq!(
-            std::str::from_utf8(&w).expect("UTF8 String"),
-            format!(
-                "{}WARNING:{} specifying the flash manifest via a positional argument is deprecated. Use the --manifest flag instead (https://fxbug.dev/42076631)\n",
-                color::Fg(color::Red),
-                style::Reset
-        ));
     }
 }

@@ -142,7 +142,6 @@ really well for doing remote work from your laptop.
         "*.cc.golden": "cpp",
         "*.h.golden": "cpp",
         "*.go.golden": "go",
-        "*.dart.golden": "dart",
   },
   ```
 
@@ -191,10 +190,8 @@ Read the [Fuchsia Getting Started][getting_started] guide first.
 If you are working on the FIDL toolchain, use:
 
 ```sh
-fx set core.x64 --with //bundles/fidl:tests --with-base //src/dart:dart_jit_runner
+fx set core.x64 --with-test //bundles/fidl:tests
 ```
-
-The `--with-base` flag is necessary to run Dart tests and benchmarks.
 
 If you are working on an LSC:
 
@@ -351,7 +348,7 @@ These "golden" files are examples of what kind of JSON IR `fidlc` produces and
 are used to track changes. It is required to regenerate the golden files each
 time the JSON IR is changed in any way, otherwise the `json_generator_tests` fails.
 
-### fidlgen (New C++, HLCPP, Rust, Go, Dart)
+### fidlgen (New C++, HLCPP, Rust, Go)
 
 Build:
 
@@ -362,7 +359,7 @@ fx build tools/fidl
 Run:
 
 ```sh
-$FUCHSIA_DIR/out/default/host_x64/fidlgen_{cpp,hlcpp,rust,go,dart}
+$FUCHSIA_DIR/out/default/host_x64/fidlgen_{cpp,hlcpp,rust,go}
 ```
 
 Some example tests you can run:
@@ -370,7 +367,6 @@ Some example tests you can run:
 ```sh
 fx test fidlgen_hlcpp_golden_tests
 fx test fidlgen_golang_lib_tests
-fx test dart-bindings-test
 fidldev test --no-regen fidlgen
 ```
 
@@ -418,7 +414,6 @@ fidldev test --no-regen llcpp
 fidldev test --no-regen c
 fidldev test --no-regen go
 fidldev test --no-regen rust
-fidldev test --no-regen dart
 ```
 
 Alternatively, run fidldev with no arguments to test files that have changed:
@@ -490,10 +485,6 @@ useful for debugging issues that prevent boot of the device.
 | New C++ tests            | `fx test //sdk/lib/fidl/cpp`        | //sdk/lib/fidl/cpp
 | go bindings tests        | `fx test go-fidl-tests`             | //third_party/go/syscall/zx/fidl //third_party/go/syscall/zx/fidl/fidl_test //src/tests/fidl/go_bindings_test |
 | rust bindings tests      | `fx test //src/lib/fidl/rust`           | //src/lib/fidl/rust |
-
-Note: `fx test dart-bindings-test` needs `--with-base //src/dart:dart_jit_runner` or it will fail.
-While `fx test dart-bindings-test` prints test names as they run, it does not show stack traces
-for test failures. To see those, look at the `fx qemu` or `ffx log` output.
 
 ##### Host
 
@@ -736,7 +727,6 @@ fidl fmt --library my_library.fidl -i
 [/src/lib/fidl/rust]: /src/lib/fidl/rust
 [/sdk/lib/fidl_base]: /sdk/lib/fidl_base
 [/third_party/go/src/syscall/zx/fidl]: /third_party/go/src/syscall/zx/fidl
-[/sdk/dart/fidl]: /sdk/dart/fidl
 [/src/lib/fidl/c]: /src/lib/fidl/c
 [/sdk/lib/fidl/cpp]: /sdk/lib/fidl/cpp
 [/src/lib/fidl/llcpp]: /src/lib/fidl/llcpp

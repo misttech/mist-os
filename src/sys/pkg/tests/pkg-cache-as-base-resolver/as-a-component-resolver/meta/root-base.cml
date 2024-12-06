@@ -86,6 +86,17 @@
             ],
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [
+                "#fake_dependencies",
+                "#integration_test",
+                "#pkg-cache",
+                "#pkg-cache-config",
+                "#subpackage_exposer",
+            ],
+        },
+        {
             resolver: "base_resolver",
             from: "#pkg-cache",
             to: "#integration_test",

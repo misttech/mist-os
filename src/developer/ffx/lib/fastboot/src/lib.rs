@@ -9,6 +9,7 @@ pub mod info;
 pub mod lock;
 pub mod manifest;
 pub mod unlock;
+pub mod util;
 
 ////////////////////////////////////////////////////////////////////////////////
 // tests
@@ -23,7 +24,6 @@ pub mod test {
     };
     use std::collections::HashMap;
     use std::default::Default;
-    use std::io::Write;
     use std::sync::{Arc, Mutex};
     use tokio::sync::mpsc::Sender;
 
@@ -72,7 +72,7 @@ pub mod test {
 
     #[async_trait(?Send)]
     impl FileResolver for TestResolver {
-        async fn get_file<W: Write>(&mut self, _writer: &mut W, file: &str) -> Result<String> {
+        async fn get_file(&mut self, file: &str) -> Result<String> {
             Ok(file.to_owned())
         }
     }

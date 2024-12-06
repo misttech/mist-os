@@ -455,7 +455,6 @@ async fn init_daemon_proxy(
         return Ok(proxy);
     }
 
-    eprintln!("Daemon is a different version, attempting to restart");
     tracing::info!("Daemon is a different version, attempting to restart");
 
     // Tell the daemon to quit, and wait for the link task to finish.

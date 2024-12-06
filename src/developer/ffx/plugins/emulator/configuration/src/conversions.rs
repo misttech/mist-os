@@ -21,6 +21,7 @@ use std::path::PathBuf;
 pub async fn convert_bundle_to_configs(
     product_bundle: &ProductBundle,
     device_name: Option<String>,
+    uefi: bool,
 ) -> Result<EmulatorConfiguration> {
     match &product_bundle {
         ProductBundle::V2(product_bundle) => {
@@ -58,7 +59,7 @@ pub async fn convert_bundle_to_configs(
                 &product_bundle,
                 &virtual_device
             );
-            convert_v2_bundle_to_configs(&product_bundle, &virtual_device)
+            convert_v2_bundle_to_configs(&product_bundle, &virtual_device, uefi)
         }
     }
 }
@@ -99,6 +100,7 @@ fn parse_device_name_as_path(path: &Option<String>) -> Option<VirtualDevice> {
 fn convert_v2_bundle_to_configs(
     product_bundle: &ProductBundleV2,
     virtual_device: &VirtualDeviceV1,
+    uefi: bool,
 ) -> Result<EmulatorConfiguration> {
     let mut emulator_configuration: EmulatorConfiguration = EmulatorConfiguration::default();
 
@@ -138,9 +140,10 @@ fn convert_v2_bundle_to_configs(
         _ => None,
     });
 
-    let mut disk_image: Option<DiskImage> = system.iter().find_map(|i| match i {
-        Image::FVM(path) => Some(DiskImage::Fvm(path.clone().into())),
-        Image::Fxfs { path, .. } => Some(DiskImage::Fxfs(path.clone().into())),
+    let mut disk_image: Option<DiskImage> = system.iter().find_map(|i| match (uefi, i) {
+        (false, Image::FVM(path)) => Some(DiskImage::Fvm(path.clone().into())),
+        (false, Image::Fxfs { path, .. }) => Some(DiskImage::Fxfs(path.clone().into())),
+        (true, Image::Fxfs { path, .. }) => Some(DiskImage::Gpt(path.clone().into())),
         _ => None,
     });
 
@@ -231,8 +234,8 @@ mod tests {
         };
 
         // Run the conversion, then assert everything in the config matches the manifest data.
-        let config =
-            convert_v2_bundle_to_configs(&pb, &device).expect("convert_v2_bundle_to_configs");
+        let config = convert_v2_bundle_to_configs(&pb, &device, false)
+            .expect("convert_v2_bundle_to_configs");
         assert_eq!(config.device.audio, device.hardware.audio);
         assert_eq!(config.device.cpu.architecture, device.hardware.cpu.arch);
         assert_eq!(config.device.memory, device.hardware.memory);
@@ -283,8 +286,8 @@ mod tests {
         ports.insert("debug".to_string(), 2345);
         device.ports = Some(ports);
 
-        let mut config =
-            convert_v2_bundle_to_configs(&pb, &device).expect("convert_bundle_v2_to_configs");
+        let mut config = convert_v2_bundle_to_configs(&pb, &device, false)
+            .expect("convert_bundle_v2_to_configs");
 
         // Verify that all of the new values are loaded and match the new manifest data.
         assert_eq!(config.device.audio, device.hardware.audio);
@@ -300,6 +303,94 @@ mod tests {
         assert_eq!(
             config.guest.disk_image.unwrap(),
             DiskImage::Fxfs(expected_disk_image_path.into())
+        );
+        assert_eq!(config.guest.kernel_image, Some(expected_kernel.into()));
+        assert_eq!(config.guest.zbi_image, Some(expected_zbi.into_std_path_buf()));
+
+        assert_eq!(config.host.port_map.len(), 2);
+        assert!(config.host.port_map.contains_key("ssh"));
+        assert_eq!(
+            config.host.port_map.remove("ssh").unwrap(),
+            PortMapping { host: None, guest: 22 }
+        );
+        assert!(config.host.port_map.contains_key("debug"));
+        assert_eq!(
+            config.host.port_map.remove("debug").unwrap(),
+            PortMapping { host: None, guest: 2345 }
+        );
+    }
+
+    #[test]
+    fn test_convert_v2_bundle_to_uefi_config() {
+        let temp_dir = tempfile::TempDir::new().expect("creating sdk_root temp dir");
+        let sdk_root = temp_dir.path();
+        let template_path = sdk_root.join("fake_template");
+        std::fs::write(&template_path, b"").expect("create fake template file");
+
+        let expected_kernel = Utf8PathBuf::from_path_buf(sdk_root.join("some/new_kernel"))
+            .expect("couldn't convert kernel to utf8");
+        let expected_disk_image_path = Utf8PathBuf::from_path_buf(sdk_root.join("fxfs"))
+            .expect("couldn't convert fxfs to utf8");
+        let expected_zbi = Utf8PathBuf::from_path_buf(sdk_root.join("path/to/new_zbi"))
+            .expect("couldn't convert zbi to utf8");
+
+        let pb = ProductBundleV2 {
+            product_name: String::default(),
+            product_version: String::default(),
+            partitions: PartitionsConfig::default(),
+            sdk_version: String::default(),
+            system_a: Some(vec![
+                Image::ZBI { path: expected_zbi.clone(), signed: false },
+                Image::QemuKernel(expected_kernel.clone()),
+                Image::Fxfs {
+                    path: expected_disk_image_path.clone(),
+                    contents: BlobfsContents::default(),
+                },
+            ]),
+            system_b: None,
+            system_r: None,
+            repositories: vec![],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        };
+        let mut device = VirtualDeviceV1 {
+            name: "FakeDevice".to_string(),
+            description: Some("A fake virtual device".to_string()),
+            kind: ElementType::VirtualDevice,
+            hardware: Hardware {
+                cpu: Cpu { arch: CpuArchitecture::X64, count: 4 },
+                audio: AudioDevice { model: AudioModel::Hda },
+                storage: DataAmount { quantity: 512, units: DataUnits::Megabytes },
+                inputs: InputDevice { pointing_device: PointingDevice::Mouse },
+                memory: DataAmount { quantity: 4, units: DataUnits::Gigabytes },
+                window_size: Screen { height: 480, width: 640, units: ScreenUnits::Pixels },
+                vsock: VsockDevice { enabled: false, cid: 3 },
+            },
+            ports: None,
+        };
+        let mut ports = HashMap::new();
+        ports.insert("ssh".to_string(), 22);
+        ports.insert("debug".to_string(), 2345);
+        device.ports = Some(ports);
+
+        let mut config =
+            convert_v2_bundle_to_configs(&pb, &device, true).expect("convert_bundle_v2_to_configs");
+
+        assert_eq!(config.device.audio, device.hardware.audio);
+        assert_eq!(config.device.cpu.architecture, device.hardware.cpu.arch);
+        assert_eq!(config.device.memory, device.hardware.memory);
+        assert_eq!(config.device.pointing_device, device.hardware.inputs.pointing_device);
+        assert_eq!(config.device.screen, device.hardware.window_size);
+        assert_eq!(config.device.storage, device.hardware.storage);
+        assert_eq!(config.device.vsock, Some(device.hardware.vsock));
+
+        assert!(config.guest.disk_image.is_some());
+
+        // After converting the v2 bundle to config, the resulting guest config should contain the
+        // newly assembled GPT full disk image, not the source Fxfs image.
+        assert_eq!(
+            config.guest.disk_image.unwrap(),
+            DiskImage::Gpt(expected_disk_image_path.into())
         );
         assert_eq!(config.guest.kernel_image, Some(expected_kernel.into()));
         assert_eq!(config.guest.zbi_image, Some(expected_zbi.into_std_path_buf()));
@@ -390,8 +481,8 @@ mod tests {
         };
 
         // Run the conversion, then assert everything in the config matches the manifest data.
-        let config =
-            convert_v2_bundle_to_configs(&pb, &device).expect("convert_v2_bundle_to_configs");
+        let config = convert_v2_bundle_to_configs(&pb, &device, false)
+            .expect("convert_v2_bundle_to_configs");
         assert_eq!(config.device.audio, device.hardware.audio);
         assert_eq!(config.device.cpu.architecture, device.hardware.cpu.arch);
         assert_eq!(config.device.memory, device.hardware.memory);
@@ -448,8 +539,8 @@ mod tests {
         };
 
         // Run the conversion, then assert everything in the config matches the manifest data.
-        let config =
-            convert_v2_bundle_to_configs(&pb, &device).expect("convert_v2_bundle_to_configs");
+        let config = convert_v2_bundle_to_configs(&pb, &device, false)
+            .expect("convert_v2_bundle_to_configs");
         assert_eq!(config.device.audio, device.hardware.audio);
         assert_eq!(config.device.cpu.architecture, device.hardware.cpu.arch);
         assert_eq!(config.device.memory, device.hardware.memory);

@@ -141,7 +141,11 @@ pub fn get_doc_comment(maybe_attrs: &Option<Vec<Attribute>>, tabs: usize) -> Str
                         if value.is_empty() {
                             "".to_string()
                         } else {
-                            let tabs: String = iter::repeat(' ').take(tabs * 4).collect();
+                            let tabs: String = " ".repeat(tabs * 4);
+                            #[allow(
+                                clippy::format_collect,
+                                reason = "mass allow for https://fxbug.dev/381896734"
+                            )]
                             value
                                 .trim_end()
                                 .split("\n")

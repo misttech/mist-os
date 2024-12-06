@@ -508,7 +508,7 @@ void WlanInterface::SaeHandshakeResp(SaeHandshakeRespRequestView request,
 
 void WlanInterface::SaeFrameTx(SaeFrameTxRequestView request,
                                SaeFrameTxCompleter::Sync& completer) {
-  const fuchsia_wlan_fullmac::wire::WlanFullmacSaeFrame frame = request->frame;
+  const fuchsia_wlan_fullmac::wire::SaeFrame frame = request->frame;
   brcmf_if_sae_frame_tx(wdev_->netdev, &frame);
   completer.Reply();
 }

@@ -6,9 +6,9 @@
 #[cfg(not(feature = "starnix_lite"))]
 use crate::vdso::vdso_loader::MemoryMappedVvar;
 use fuchsia_runtime::{zx_utc_reference_get, UtcTimeline};
-use once_cell::sync::Lazy;
 use starnix_logging::log_warn;
 use starnix_sync::Mutex;
+use std::sync::LazyLock;
 use zx::{self as zx, AsHandleRef, Unowned};
 
 // TODO(https://fxbug.dev/356911500): Use types below from fuchsia_runtime
@@ -117,7 +117,7 @@ impl UtcClock {
     }
 }
 
-static UTC_CLOCK: Lazy<Mutex<UtcClock>> = Lazy::new(|| {
+static UTC_CLOCK: LazyLock<Mutex<UtcClock>> = LazyLock::new(|| {
     Mutex::new(UtcClock::new(duplicate_utc_clock_handle(zx::Rights::SAME_RIGHTS).unwrap()))
 });
 

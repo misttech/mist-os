@@ -194,8 +194,8 @@ pub async fn preprocess_cmd<I: structured_ui::Interface>(
     )
     .await?
     .iter()
+    .filter(|&x| x.name == cmd.manifest_url)
     .cloned()
-    .filter(|x| x.name == cmd.manifest_url)
     .collect::<Vec<_>>();
 
     if products.len() != 1 {

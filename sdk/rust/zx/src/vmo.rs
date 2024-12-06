@@ -12,7 +12,8 @@ use crate::{
 use bitflags::bitflags;
 use std::mem::MaybeUninit;
 use std::ptr;
-use zerocopy::FromBytes;
+use zerocopy::{FromBytes, Immutable};
+use zx_sys::PadByte;
 
 /// An object representing a Zircon
 /// [virtual memory object](https://fuchsia.dev/fuchsia-src/concepts/objects/vm_object.md).
@@ -23,29 +24,39 @@ use zerocopy::FromBytes;
 pub struct Vmo(Handle);
 impl_handle_based!(Vmo);
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct VmoInfo {
-    pub koid: Koid,
-    pub name: Name,
-    pub size_bytes: u64,
-    pub parent_koid: Koid,
-    pub num_children: usize,
-    pub num_mappings: usize,
-    pub share_count: usize,
-    pub flags: VmoInfoFlags,
-    pub committed_bytes: u64,
-    pub handle_rights: Rights,
-    pub cache_policy: CachePolicy,
-    pub metadata_bytes: u64,
-    pub committed_change_events: u64,
-    pub populated_bytes: u64,
-    pub committed_private_bytes: u64,
-    pub populated_private_bytes: u64,
-    pub committed_scaled_bytes: u64,
-    pub populated_scaled_bytes: u64,
-    pub committed_fractional_scaled_bytes: u64,
-    pub populated_fractional_scaled_bytes: u64,
+static_assert_align!(
+    #[doc="Ergonomic equivalent of [sys::zx_info_vmo_t]. Must be ABI-compatible with it."]
+    #[repr(C)]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, FromBytes, Immutable)]
+    <sys::zx_info_vmo_t> pub struct VmoInfo {
+        pub koid <koid>: Koid,
+        pub name <name>: Name,
+        pub size_bytes <size_bytes>: u64,
+        pub parent_koid <parent_koid>: Koid,
+        pub num_children <num_children>: usize,
+        pub num_mappings <num_mappings>: usize,
+        pub share_count <share_count>: usize,
+        pub flags <flags>: VmoInfoFlags,
+        padding1: [PadByte; 4],
+        pub committed_bytes <committed_bytes>: u64,
+        pub handle_rights <handle_rights>: Rights,
+        cache_policy <cache_policy>: u32,
+        pub metadata_bytes <metadata_bytes>: u64,
+        pub committed_change_events <committed_change_events>: u64,
+        pub populated_bytes <populated_bytes>: u64,
+        pub committed_private_bytes <committed_private_bytes>: u64,
+        pub populated_private_bytes <populated_private_bytes>: u64,
+        pub committed_scaled_bytes <committed_scaled_bytes>: u64,
+        pub populated_scaled_bytes <populated_scaled_bytes>: u64,
+        pub committed_fractional_scaled_bytes <committed_fractional_scaled_bytes>: u64,
+        pub populated_fractional_scaled_bytes <populated_fractional_scaled_bytes>: u64,
+    }
+);
+
+impl VmoInfo {
+    pub fn cache_policy(&self) -> CachePolicy {
+        CachePolicy::from(self.cache_policy)
+    }
 }
 
 impl Default for VmoInfo {
@@ -56,28 +67,7 @@ impl Default for VmoInfo {
 
 impl From<sys::zx_info_vmo_t> for VmoInfo {
     fn from(info: sys::zx_info_vmo_t) -> VmoInfo {
-        VmoInfo {
-            koid: Koid::from_raw(info.koid),
-            name: Name::from_raw(info.name),
-            size_bytes: info.size_bytes,
-            parent_koid: Koid::from_raw(info.parent_koid),
-            num_children: info.num_children,
-            num_mappings: info.num_mappings,
-            share_count: info.share_count,
-            flags: VmoInfoFlags::from_bits_truncate(info.flags),
-            committed_bytes: info.committed_bytes,
-            handle_rights: Rights::from_bits_truncate(info.handle_rights),
-            cache_policy: CachePolicy::from(info.cache_policy),
-            metadata_bytes: info.metadata_bytes,
-            committed_change_events: info.committed_change_events,
-            populated_bytes: info.populated_bytes,
-            committed_private_bytes: info.committed_private_bytes,
-            populated_private_bytes: info.populated_private_bytes,
-            committed_scaled_bytes: info.committed_scaled_bytes,
-            populated_scaled_bytes: info.populated_scaled_bytes,
-            committed_fractional_scaled_bytes: info.committed_fractional_scaled_bytes,
-            populated_fractional_scaled_bytes: info.populated_fractional_scaled_bytes,
-        }
+        zerocopy::transmute!(info)
     }
 }
 
@@ -392,11 +382,14 @@ bitflags! {
     }
 }
 
+/// Flags that may be set when receiving info on a `Vmo`.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, Immutable)]
+pub struct VmoInfoFlags(u32);
+
 bitflags! {
-    /// Flags that may be set when receiving info on a `Vmo`.
-    #[repr(transparent)]
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    pub struct VmoInfoFlags: u32 {
+    impl VmoInfoFlags : u32 {
+        const PAGED = sys::ZX_INFO_VMO_TYPE_PAGED;
         const RESIZABLE = sys::ZX_INFO_VMO_RESIZABLE;
         const IS_COW_CLONE = sys::ZX_INFO_VMO_IS_COW_CLONE;
         const VIA_HANDLE = sys::ZX_INFO_VMO_VIA_HANDLE;
@@ -464,6 +457,18 @@ impl From<u32> for CachePolicy {
             sys::ZX_CACHE_POLICY_UNCACHED_DEVICE => CachePolicy::UnCachedDevice,
             sys::ZX_CACHE_POLICY_WRITE_COMBINING => CachePolicy::WriteCombining,
             _ => CachePolicy::Unknown,
+        }
+    }
+}
+
+impl Into<u32> for CachePolicy {
+    fn into(self) -> u32 {
+        match self {
+            CachePolicy::Cached => sys::ZX_CACHE_POLICY_CACHED,
+            CachePolicy::UnCached => sys::ZX_CACHE_POLICY_UNCACHED,
+            CachePolicy::UnCachedDevice => sys::ZX_CACHE_POLICY_UNCACHED_DEVICE,
+            CachePolicy::WriteCombining => sys::ZX_CACHE_POLICY_WRITE_COMBINING,
+            CachePolicy::Unknown => u32::MAX,
         }
     }
 }
@@ -554,6 +559,7 @@ mod tests {
         let vmo = Vmo::create(size).unwrap();
         let info = vmo.info().unwrap();
         assert!(!info.flags.contains(VmoInfoFlags::PAGER_BACKED));
+        assert!(info.flags.contains(VmoInfoFlags::PAGED));
     }
 
     #[test]

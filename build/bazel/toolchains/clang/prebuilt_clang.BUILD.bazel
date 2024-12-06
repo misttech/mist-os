@@ -10,11 +10,11 @@ load(
 )
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 load(
-    "@fuchsia_sdk_common//common:toolchains/clang/clang_utils_test.bzl",
+    "@rules_fuchsia//common:toolchains/clang/clang_utils_test.bzl",
     "include_clang_utils_test_suite",
 )
 load(
-    "@fuchsia_sdk_common//common:toolchains/clang/repository_utils.bzl",
+    "@rules_fuchsia//common:toolchains/clang/repository_utils.bzl",
     "setup_clang_repository",
 )
 load(":generated_constants.bzl", "constants")

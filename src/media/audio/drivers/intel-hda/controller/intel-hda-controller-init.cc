@@ -322,13 +322,13 @@ zx_status_t IntelHDAController::SetupStreamDescriptors() {
   bidir_stream_cnt = HDA_REG_GCAP_BSS(gcap);
   total_stream_cnt = input_stream_cnt + output_stream_cnt + bidir_stream_cnt;
 
-  using RegType = decltype(IntelHDAController::regs());
-  static_assert(MAX_STREAMS_PER_CONTROLLER == std::size(RegType()->stream_desc),
-                "Max stream count mismatch!");
+  using RegType = decltype(IntelHDAController::regs()->stream_desc);
+  constexpr size_t reg_type_stream_cnt = std::extent_v<RegType>;
+  static_assert(MAX_STREAMS_PER_CONTROLLER == reg_type_stream_cnt, "Max stream count mismatch!");
 
-  if (!total_stream_cnt || (total_stream_cnt > std::size(RegType()->stream_desc))) {
+  if (!total_stream_cnt || (total_stream_cnt > reg_type_stream_cnt)) {
     LOG(ERROR, "Invalid stream counts in GCAP register (In %u Out %u Bidir %u; Max %zu)",
-        input_stream_cnt, output_stream_cnt, bidir_stream_cnt, std::size(RegType()->stream_desc));
+        input_stream_cnt, output_stream_cnt, bidir_stream_cnt, reg_type_stream_cnt);
     return ZX_ERR_INTERNAL;
   }
 

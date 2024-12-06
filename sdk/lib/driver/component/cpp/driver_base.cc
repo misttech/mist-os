@@ -51,12 +51,25 @@ DriverBase::DriverBase(std::string_view name, DriverStartArgs start_args,
     }
   }
 #endif
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  const auto& node_properties_2 = start_args_.node_properties_2();
+  if (node_properties_2.has_value()) {
+    for (const auto& entry : node_properties_2.value()) {
+      node_properties_2_.emplace(std::string{entry.name()}, entry.properties());
+    }
+  }
+#endif
+
 #if FUCHSIA_API_LEVEL_AT_LEAST(25)
   zx::result val = fdf_internal::ProgramValue(program(), "service_connect_validation");
   if (val.is_ok() && val.value() == "true") {
     EnableServiceValidator();
   }
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(25)
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#endif
 }
 
 void DriverBase::InitializeAndServe(
@@ -128,6 +141,19 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> DriverBase
 }
 
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+
+cpp20::span<const fuchsia_driver_framework::NodeProperty2> DriverBase::node_properties_2(
+    const std::string& parent_node_name) const {
+  auto it = node_properties_2_.find(parent_node_name);
+  if (it == node_properties_2_.end()) {
+    return {};
+  }
+  return {it->second};
+}
+
+#endif
 
 DriverBase::~DriverBase() { Logger::SetGlobalInstance(nullptr); }
 

@@ -139,9 +139,7 @@ rustc_library("lib") {
   ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-
-  # TODO(https://fxbug.dev/356474618): re-enable and fix existing lints
-  # configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_binary("bin") {
@@ -174,6 +172,7 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component_manifest("wlancfg-manifest") {

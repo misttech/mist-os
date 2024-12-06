@@ -138,7 +138,7 @@ impl fmt::Display for Peer {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(fmt, "Peer:")?;
         writeln!(fmt, "\tId:\t\t{}", self.id)?;
-        writeln!(fmt, "\tAddress:\t{}", self.address.to_string())?;
+        writeln!(fmt, "\tAddress:\t{}", self.address)?;
         writeln!(fmt, "\tTechnology:\t{:?}", self.technology)?;
         if let Some(name) = &self.name {
             writeln!(fmt, "\tName:\t\t{}", name)?;

@@ -234,7 +234,7 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
                 flag_groups = [
                     flag_group(
                         flags = [
-                            "-Wl,-Map=%{output_execpath}.map" if (is_macos or is_fuchsia) else "-Wl,--Map=%{output_execpath}",
+                            "-Wl,-Map=%{output_execpath}.map" if is_macos else "-Wl,--Map=%{output_execpath}.map",
                         ],
                         expand_if_available = "output_execpath",
                     ),

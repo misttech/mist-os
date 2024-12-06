@@ -8,7 +8,9 @@
 #include <string>
 
 #include "src/lib/fxl/strings/string_printf.h"
-#include "src/media/audio/audio_core/shared/mixer/test/frequency_set.h"
+#include "src/media/audio/audio_core/shared/mixer/gain.h"
+#include "src/media/audio/audio_core/shared/mixer/mixer.h"
+#include "src/media/audio/audio_core/shared/mixer/output_producer.h"
 #include "src/media/audio/lib/analysis/generators.h"
 #include "src/media/audio/lib/format/audio_buffer.h"
 #include "src/media/audio/lib/format/traits.h"
@@ -27,17 +29,20 @@ float to_usecs(zx::duration duration) { return static_cast<float>(duration.to_ns
 std::string AsfToString(const ASF& sample_format, bool abbreviate) {
   if (sample_format == ASF::UNSIGNED_8) {
     return abbreviate ? "un8" : "Unsigned_8";
-  } else if (sample_format == ASF::SIGNED_16) {
-    return abbreviate ? "i16" : "Signed_16";
-  } else if (sample_format == ASF::SIGNED_24_IN_32) {
-    return abbreviate ? "i24" : "Signed_24_In_32";
-  } else if (sample_format == ASF::FLOAT) {
-    return abbreviate ? "f32" : "Float";
-  } else {
-    FX_LOGS(FATAL) << "Unknown sample format for creation profiling: "
-                   << static_cast<int64_t>(sample_format);
-    return "";
   }
+  if (sample_format == ASF::SIGNED_16) {
+    return abbreviate ? "i16" : "Signed_16";
+  }
+  if (sample_format == ASF::SIGNED_24_IN_32) {
+    return abbreviate ? "i24" : "Signed_24_In_32";
+  }
+  if (sample_format == ASF::FLOAT) {
+    return abbreviate ? "f32" : "Float";
+  }
+
+  FX_LOGS(FATAL) << "Unknown sample format for creation profiling: "
+                 << static_cast<int64_t>(sample_format);
+  return "";
 }
 
 const zx::duration kMixLength = zx::msec(10);
@@ -53,7 +58,7 @@ struct Stats {
   zx::duration total;
   perftest::TestCaseResults* perftest_result;
 
-  zx::duration mean() { return total / runs; }
+  zx::duration mean() const { return total / runs; }
 
   void Add(zx::duration elapsed) {
     if (perftest_result) {
@@ -72,7 +77,7 @@ struct Stats {
     runs++;
   }
 
-  std::string Summary() {
+  std::string Summary() const {
     return fxl::StringPrintf("%10.3lf\t%10.3lf\t%10.3lf\t%10.3lf\t%10ld", to_usecs(mean()),
                              to_usecs(first), to_usecs(best), to_usecs(worst), runs);
   }
@@ -153,7 +158,7 @@ std::string AudioPerformance::MixerConfig::ToStringForCreate() const {
                            num_output_chans, source_rate, dest_rate);
 }
 
-std::string AudioPerformance::MixerConfig::ToStringForMixer() const {
+std::string AudioPerformance::MixerConfig::ToStringForMixing() const {
   char gain_char;
   switch (gain_type) {
     case GainType::Mute:
@@ -174,7 +179,7 @@ std::string AudioPerformance::MixerConfig::ToStringForMixer() const {
                            (accumulate ? '+' : '-'));
 }
 
-std::string AudioPerformance::MixerConfig::ToPerftestFormatForCreate() const {
+std::string AudioPerformance::MixerConfig::ToPerftestFormat() const {
   std::string sampler;
   switch (sampler_type) {
     case Resampler::SampleAndHold:
@@ -195,7 +200,11 @@ std::string AudioPerformance::MixerConfig::ToPerftestFormatForCreate() const {
                            dest_rate);
 }
 
-std::string AudioPerformance::MixerConfig::ToPerftestFormatForMixer() const {
+std::string AudioPerformance::MixerConfig::ToPerftestFormatForCreation() const {
+  return fxl::StringPrintf("Creation/%s", ToPerftestFormat().c_str());
+}
+
+std::string AudioPerformance::MixerConfig::ToPerftestFormatForMixing() const {
   std::string gain;
   switch (gain_type) {
     case GainType::Mute:
@@ -212,7 +221,7 @@ std::string AudioPerformance::MixerConfig::ToPerftestFormatForMixer() const {
       break;
   }
 
-  return fxl::StringPrintf("%s/%s%c", ToPerftestFormatForCreate().c_str(), gain.c_str(),
+  return fxl::StringPrintf("Mixing/%s/%s%c", ToPerftestFormat().c_str(), gain.c_str(),
                            (accumulate ? '+' : '-'));
 }
 
@@ -260,7 +269,7 @@ std::string AudioPerformance::OutputProducerConfig::ToPerftestFormat() const {
       break;
   }
 
-  return fxl::StringPrintf("%s/%s/Channels_%u", format.c_str(), range.c_str(), num_chans);
+  return fxl::StringPrintf("Output/%s/%s/Channels_%u", format.c_str(), range.c_str(), num_chans);
 }
 
 void AudioPerformance::DisplayMixerCreationLegend() {
@@ -299,10 +308,10 @@ void AudioPerformance::ProfileMixerCreation(const std::vector<MixerConfig>& conf
 
 void AudioPerformance::ProfileMixerCreation(const MixerConfig& cfg, const Limits& limits,
                                             perftest::ResultsSet* results) {
-  auto* result = results
-                     ? results->AddTestCase("fuchsia.audio.mixer_creation",
-                                            cfg.ToPerftestFormatForCreate().c_str(), "nanoseconds")
-                     : nullptr;
+  auto* result =
+      results ? results->AddTestCase("fuchsia.audio.mixer",
+                                     cfg.ToPerftestFormatForCreation().c_str(), "nanoseconds")
+              : nullptr;
   Stats cold_cache(result);
   Stats warm_cache(result);
 
@@ -336,7 +345,7 @@ void AudioPerformance::ProfileMixerCreation(const MixerConfig& cfg, const Limits
          to_usecs(warm_cache.mean()));
 }
 
-void AudioPerformance::DisplayMixerLegend() {
+void AudioPerformance::DisplayMixingLegend() {
   printf("\n    Elapsed time in microseconds for Mix() to produce %ld ms of frames\n",
          kMixLength.to_msecs());
   printf(
@@ -351,42 +360,42 @@ void AudioPerformance::DisplayMixerLegend() {
       "\t      A: Accumulate - [-] no or [+] yes\n\n");
 }
 
-void AudioPerformance::DisplayMixerColumnHeader() {
+void AudioPerformance::DisplayMixingColumnHeader() {
   printf("Configuration             \t     Mean\t    First\t     Best\t    Worst\t  Iterations\n");
 }
 
-void AudioPerformance::ProfileMixer(const std::vector<MixerConfig>& configs, const Limits& limits,
-                                    perftest::ResultsSet* results) {
+void AudioPerformance::ProfileMixing(const std::vector<MixerConfig>& configs, const Limits& limits,
+                                     perftest::ResultsSet* results) {
   auto start_time = zx::clock::get_monotonic();
 
-  DisplayMixerLegend();
-  DisplayMixerColumnHeader();
+  DisplayMixingLegend();
+  DisplayMixingColumnHeader();
 
   for (auto& cfg : configs) {
     switch (cfg.sample_format) {
       case ASF::UNSIGNED_8:
-        ProfileMixer<ASF::UNSIGNED_8>(cfg, limits, results);
+        ProfileMixing<ASF::UNSIGNED_8>(cfg, limits, results);
         break;
       case ASF::SIGNED_16:
-        ProfileMixer<ASF::SIGNED_16>(cfg, limits, results);
+        ProfileMixing<ASF::SIGNED_16>(cfg, limits, results);
         break;
       case ASF::SIGNED_24_IN_32:
-        ProfileMixer<ASF::SIGNED_24_IN_32>(cfg, limits, results);
+        ProfileMixing<ASF::SIGNED_24_IN_32>(cfg, limits, results);
         break;
       case ASF::FLOAT:
-        ProfileMixer<ASF::FLOAT>(cfg, limits, results);
+        ProfileMixing<ASF::FLOAT>(cfg, limits, results);
         break;
     }
   }
 
-  DisplayMixerColumnHeader();
+  DisplayMixingColumnHeader();
   printf("   Total time to profile %zu Mixer configs: %lu ms\n   --------\n\n", configs.size(),
          (zx::clock::get_monotonic() - start_time).get() / ZX_MSEC(1));
 }
 
 template <ASF SampleFormat>
-void AudioPerformance::ProfileMixer(const MixerConfig& cfg, const Limits& limits,
-                                    perftest::ResultsSet* results) {
+void AudioPerformance::ProfileMixing(const MixerConfig& cfg, const Limits& limits,
+                                     perftest::ResultsSet* results) {
   FX_CHECK(SampleFormat == cfg.sample_format);
 
   double amplitude;
@@ -415,9 +424,9 @@ void AudioPerformance::ProfileMixer(const MixerConfig& cfg, const Limits& limits
 
   // Allocate enough source and destination frames for kMixLength.
   // When allocating source frames, we round up to ensure we have enough source frames.
-  const int32_t dest_frame_count =
-      static_cast<int32_t>(TimelineRate(cfg.dest_rate, 1'000'000'000)
-                               .Scale(kMixLength.to_nsecs(), TimelineRate::RoundingMode::Floor));
+  const int64_t dest_frame_count =
+      TimelineRate(cfg.dest_rate, 1'000'000'000)
+          .Scale(kMixLength.to_nsecs(), TimelineRate::RoundingMode::Floor);
   const int64_t source_frames =
       TimelineRate(cfg.source_rate, 1'000'000'000)
           .Scale(kMixLength.to_nsecs(), TimelineRate::RoundingMode::Ceiling);
@@ -461,8 +470,8 @@ void AudioPerformance::ProfileMixer(const MixerConfig& cfg, const Limits& limits
   mixer->gain.SetDestGain(media_audio::kUnityGainDb);
   auto source_frames_fixed = Fixed(source_frames);
 
-  Stats stats(results ? results->AddTestCase("fuchsia.audio.mixing",
-                                             cfg.ToPerftestFormatForMixer().c_str(), "nanoseconds")
+  Stats stats(results ? results->AddTestCase("fuchsia.audio.mixer",
+                                             cfg.ToPerftestFormatForMixing().c_str(), "nanoseconds")
                       : nullptr);
 
   // Limit to |duration_per_config| or between 5 and |runs_per_config| iterations, whichever
@@ -506,10 +515,10 @@ void AudioPerformance::ProfileMixer(const MixerConfig& cfg, const Limits& limits
     }
   }
 
-  printf("%s:\t%s\n", cfg.ToStringForMixer().c_str(), stats.Summary().c_str());
+  printf("%s:\t%s\n", cfg.ToStringForMixing().c_str(), stats.Summary().c_str());
 }
 
-void AudioPerformance::DisplayOutputConfigLegend() {
+void AudioPerformance::DisplayMixOutputConfigLegend() {
   printf("\n   Elapsed time in microseconds to ProduceOutput() %ld ms of frames\n",
          kMixLength.to_msecs());
   printf(
@@ -519,42 +528,42 @@ void AudioPerformance::DisplayOutputConfigLegend() {
       "\t     n: Number of output channels (one-digit number)\n\n");
 }
 
-void AudioPerformance::DisplayOutputColumnHeader() {
+void AudioPerformance::DisplayMixOutputColumnHeader() {
   printf("Config\t     Mean\t    First\t     Best\t    Worst\t  Iterations\n");
 }
 
-void AudioPerformance::ProfileOutputProducer(const std::vector<OutputProducerConfig>& configs,
-                                             const Limits& limits, perftest::ResultsSet* results) {
+void AudioPerformance::ProfileMixOutput(const std::vector<OutputProducerConfig>& configs,
+                                        const Limits& limits, perftest::ResultsSet* results) {
   auto start_time = zx::clock::get_monotonic();
 
-  DisplayOutputConfigLegend();
-  DisplayOutputColumnHeader();
+  DisplayMixOutputConfigLegend();
+  DisplayMixOutputColumnHeader();
 
   for (auto& cfg : configs) {
     switch (cfg.sample_format) {
       case ASF::UNSIGNED_8:
-        ProfileOutputProducer<ASF::UNSIGNED_8>(cfg, limits, results);
+        ProfileMixOutput<ASF::UNSIGNED_8>(cfg, limits, results);
         break;
       case ASF::SIGNED_16:
-        ProfileOutputProducer<ASF::SIGNED_16>(cfg, limits, results);
+        ProfileMixOutput<ASF::SIGNED_16>(cfg, limits, results);
         break;
       case ASF::SIGNED_24_IN_32:
-        ProfileOutputProducer<ASF::SIGNED_24_IN_32>(cfg, limits, results);
+        ProfileMixOutput<ASF::SIGNED_24_IN_32>(cfg, limits, results);
         break;
       case ASF::FLOAT:
-        ProfileOutputProducer<ASF::FLOAT>(cfg, limits, results);
+        ProfileMixOutput<ASF::FLOAT>(cfg, limits, results);
         break;
     }
   }
 
-  DisplayOutputColumnHeader();
+  DisplayMixOutputColumnHeader();
   printf("   Total time to profile %zu OutputProducer configs: %lu ms\n   --------\n\n",
          configs.size(), (zx::clock::get_monotonic() - start_time).get() / ZX_MSEC(1));
 }
 
 template <ASF SampleFormat>
-void AudioPerformance::ProfileOutputProducer(const OutputProducerConfig& cfg, const Limits& limits,
-                                             perftest::ResultsSet* results) {
+void AudioPerformance::ProfileMixOutput(const OutputProducerConfig& cfg, const Limits& limits,
+                                        perftest::ResultsSet* results) {
   FX_CHECK(SampleFormat == cfg.sample_format);
 
   auto output_producer = SelectOutputProducer(SampleFormat, cfg.num_chans);
@@ -569,8 +578,8 @@ void AudioPerformance::ProfileOutputProducer(const OutputProducerConfig& cfg, co
   int32_t num_samples = frame_count * cfg.num_chans;
   auto dest = std::make_unique<SampleT[]>(num_samples);
 
-  Stats stats(results ? results->AddTestCase("fuchsia.audio.mixer_output",
-                                             cfg.ToPerftestFormat().c_str(), "nanoseconds")
+  Stats stats(results ? results->AddTestCase("fuchsia.audio.mixer", cfg.ToPerftestFormat().c_str(),
+                                             "nanoseconds")
                       : nullptr);
 
   if (cfg.output_range == OutputSourceRange::Silence) {
@@ -617,7 +626,7 @@ void AudioPerformance::ProfileOutputProducer(const OutputProducerConfig& cfg, co
     while (iterations <= limits.min_runs_per_config ||
            (stats.total < limits.duration_per_config && iterations <= limits.runs_per_config)) {
       auto t0 = zx::clock::get_monotonic();
-      output_producer->ProduceOutput(&accum.samples()[0], dest.get(), frame_count);
+      output_producer->ProduceOutput(accum.samples().data(), dest.get(), frame_count);
 
       // Do *not* include the first run to avoid artificially slow initial cases.
       [[maybe_unused]] auto t1 = zx::clock::get_monotonic();

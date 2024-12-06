@@ -632,9 +632,9 @@ Symbols:
   - { Name: iconv, Type: Func }
   - { Name: iconv_close, Type: Func }
   - { Name: iconv_open, Type: Func }
-  - { Name: if_freenameindex, Type: Func }
+  - { Name: if_freenameindex, Type: Func, Weak: true }
   - { Name: if_indextoname, Type: Func }
-  - { Name: if_nameindex, Type: Func }
+  - { Name: if_nameindex, Type: Func, Weak: true }
   - { Name: if_nametoindex, Type: Func }
   - { Name: ilogb, Type: Func }
   - { Name: ilogbf, Type: Func }

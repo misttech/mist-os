@@ -59,7 +59,7 @@
             to: "#paver",
         },
         {
-            service: [ "fuchsia.storagehost.PartitionService" ],
+            service: [ "fuchsia.storage.partitions.PartitionService" ],
             from: "#fshost",
             to: "#paver",
         },

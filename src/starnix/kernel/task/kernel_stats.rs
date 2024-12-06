@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use fuchsia_component::client::connect_to_protocol_sync;
-use once_cell::sync::OnceCell;
+use std::sync::OnceLock;
 
 #[derive(Default)]
-pub struct KernelStats(OnceCell<fidl_fuchsia_kernel::StatsSynchronousProxy>);
+pub struct KernelStats(OnceLock<fidl_fuchsia_kernel::StatsSynchronousProxy>);
 
 impl KernelStats {
     pub fn get(&self) -> &fidl_fuchsia_kernel::StatsSynchronousProxy {

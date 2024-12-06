@@ -12,7 +12,7 @@
         },
     ],
     offer: [
-        // Needed by come tests or test runners
+        // Needed by some tests or test runners
         {
             directory: "dev-builtin",
             from: "parent",
@@ -506,6 +506,12 @@
             ],
             from: "#tzdata-provider",
             to: "#testing",
+        },
+        {
+            protocol: [ "fuchsia.feedback.CrashReporter" ],
+            from: "#feedback",
+            to: "#testing",
+            source_availability: "unknown",
         },
     ],
 }

@@ -58,6 +58,10 @@ struct Command {
     /// path to extra init scripts, will go in /odm/etc/init. Can be passed more than once.
     #[argh(option)]
     init: Vec<Utf8PathBuf>,
+
+    /// whether to skip including HALs as subpackages.
+    #[argh(switch)]
+    skip_subpackages: bool,
 }
 
 fn main() -> Result<()> {
@@ -168,10 +172,13 @@ fn generate(cmd: Command) -> Result<()> {
     for hal in &cmd.hal {
         let manifest = PackageManifest::try_load_from(&hal)
             .with_context(|| format!("Reading hal package manifest: {}", hal))?;
-        let name: RelativePackageUrl = manifest.name().to_owned().into();
-        builder
-            .add_subpackage(&name, manifest.hash(), hal.into())
-            .with_context(|| format!("Adding subpackage from manifest: {}", &hal))?;
+
+        if !cmd.skip_subpackages {
+            let name: RelativePackageUrl = manifest.name().to_owned().into();
+            builder
+                .add_subpackage(&name, manifest.hash(), hal.into())
+                .with_context(|| format!("Adding subpackage from manifest: {}", &hal))?;
+        }
 
         let hal_package_name = manifest.name().to_string();
         let (hal_manifest, hal_manifest_source_path) =
@@ -242,7 +249,7 @@ fn generate(cmd: Command) -> Result<()> {
     builder.manifest_path(manifest_path);
     builder.build(&cmd.outdir, &metafar_path).context("Building starnix container")?;
     deps.track_outputs(
-        vec![
+        [
             cmd.outdir.join("meta.far"),
             cmd.outdir.join("meta/fuchsia.abi/abi-revision"),
             cmd.outdir.join("meta/fuchsia.pkg/subpackages"),
@@ -313,6 +320,7 @@ mod tests {
             depfile: None,
             fstab: None,
             init: vec![],
+            skip_subpackages: false,
         };
         generate(cmd).unwrap();
 
@@ -371,6 +379,46 @@ mod tests {
     }
 
     #[test]
+    fn test_skip_subpackages() -> Result<()> {
+        let tmp = TempDir::new().unwrap();
+        let outdir = Utf8Path::from_path(tmp.path()).unwrap();
+        let base_manifest_path = fake_base(outdir);
+
+        // Build a fake HAL.
+        let hal_manifest_path = outdir.join("hal_package_manifest.json");
+        let mut builder = PackageBuilder::new_platform_internal_package("test-hal");
+        builder.add_contents_as_blob("data/hal", "test-hal-blob", &outdir).unwrap();
+        builder.manifest_path(&hal_manifest_path);
+        let _ = builder.build(&outdir, outdir.join("hal-meta.far")).unwrap();
+
+        // Run the generator.
+        let cmd = Command {
+            name: "test-name".into(),
+            outdir: outdir.to_owned(),
+            base: base_manifest_path,
+            system: Utf8PathBuf::from_str(EXT4_IMAGE_PATH).unwrap(),
+            vendor: Some(Utf8PathBuf::from_str(EXT4_IMAGE_PATH).unwrap()),
+            hal: vec![hal_manifest_path],
+            depfile: None,
+            fstab: None,
+            init: vec![],
+            skip_subpackages: true,
+        };
+        generate(cmd).unwrap();
+
+        // Read the package manifest, and ensure the correct files are present as blobs, and the
+        // HALs are not listed as subpackages.
+        let manifest_path = outdir.join("package_manifest.json");
+        let manifest = PackageManifest::try_load_from(&manifest_path).unwrap();
+        assert_eq!(manifest.name().as_ref(), "test-name");
+        let (blobs, subpackages) = manifest.into_blobs_and_subpackages();
+        assert_eq!(blobs.len(), 7);
+        assert_eq!(subpackages.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_hal_init_rc() {
         let tmp = TempDir::new().unwrap();
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
@@ -402,6 +450,7 @@ mod tests {
             vendor: None,
             fstab: None,
             init: vec![],
+            skip_subpackages: false,
         };
         generate(cmd).unwrap();
 
@@ -476,6 +525,7 @@ mod tests {
             vendor: None,
             fstab: None,
             init: vec![],
+            skip_subpackages: false,
         };
         generate(cmd).unwrap();
 
@@ -543,6 +593,7 @@ tmpfs   /data       tmpfs   defaults            wait
             vendor: None,
             fstab: Some(fstab_path),
             init: vec![],
+            skip_subpackages: false,
         };
         generate(cmd).unwrap();
 
@@ -599,6 +650,7 @@ tmpfs   /data       tmpfs   defaults            wait
             vendor: None,
             fstab: None,
             init: vec![init_path],
+            skip_subpackages: false,
         };
         generate(cmd).unwrap();
 

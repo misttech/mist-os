@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 
+#include <cstdint>
 #include <initializer_list>
 
 #include <gmock/gmock.h>

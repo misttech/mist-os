@@ -14,7 +14,7 @@ pub struct Nat64AddressMappingIterator<'a, T: ?Sized> {
     pub ot_instance: &'a T,
 }
 
-impl<'a, T: ?Sized + Nat64> Iterator for Nat64AddressMappingIterator<'a, T> {
+impl<T: ?Sized + Nat64> Iterator for Nat64AddressMappingIterator<'_, T> {
     type Item = Nat64AddressMapping;
     fn next(&mut self) -> Option<Self::Item> {
         let mut mapping = Nat64AddressMapping::default();

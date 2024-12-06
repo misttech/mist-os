@@ -238,11 +238,11 @@ template("ld_abi_user") {
 # in which it could be in the same variant as its users.
 loadable_module("ld-stub") {
   visibility = [ "./*" ]
-  configs += [
-    "//build/config/mistos:no_cpp_standard_library",
-    "//build/config/zircon:nolibc",
-    ":abi-soname",
-  ]
+  configs += [ ":abi-soname" ]
+
+  if (is_linux) {
+    configs -= [ "//build/config/linux:implicit-host-libs" ]
+  }
 
   # This should in fact have no dependencies of any kind, since it contains
   # only data and leaf assembly code.  Make sure no implicit ones sneak in.

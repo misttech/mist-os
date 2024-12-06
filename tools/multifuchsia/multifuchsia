@@ -286,6 +286,13 @@ function cmd_rebase() {
   echo "updating remotes/origin/main"
   git -C "$checkout.new" fetch --force "$WORKDIR/snapshots/update.success" "remotes/origin/main:remotes/origin/main"
 
+  # Copy environment profile files over if they exist
+  for i in .env .envrc; do
+    if [ -f "$checkout/$i" ]; then
+      cp -p "$checkout/$i" "$checkout.new/$i"
+    fi
+  done
+
   swap "$checkout" "$checkout.new"
   btrfs subvolume delete -c "$checkout.new"
 

@@ -59,8 +59,8 @@
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/lib/paver/android.h"
-#include "src/storage/lib/paver/kola.h"
 #include "src/storage/lib/paver/luis.h"
+#include "src/storage/lib/paver/moonflower.h"
 #include "src/storage/lib/paver/nelson.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/system_shutdown_state.h"
@@ -372,10 +372,11 @@ class GptDevicePartitionerTests : public PaverTest {
     fbl::unique_fd fd;
     ASSERT_OK(fdio_fd_create(svc_root.TakeHandle().release(), fd.reset_and_get_address()));
     std::vector<std::string> entries;
-    ASSERT_TRUE(
-        files::ReadDirContentsAt(fd.get(), "fuchsia.storagehost.PartitionService", &entries));
+    ASSERT_TRUE(files::ReadDirContentsAt(fd.get(), "fuchsia.storage.partitions.PartitionService",
+                                         &entries));
     for (const auto& entry : entries) {
-      std::string path = std::format("fuchsia.storagehost.PartitionService/{}/volume", entry);
+      std::string path =
+          std::format("fuchsia.storage.partitions.PartitionService/{}/volume", entry);
       fdio_cpp::UnownedFdioCaller caller(fd.get());
       zx::result partition = component::ConnectAt<fuchsia_hardware_block_partition::Partition>(
           caller.directory(), path);
@@ -661,7 +662,7 @@ class EfiDevicePartitionerWithStorageHostTests : public EfiDevicePartitionerTest
       return controller.take_error();
     }
 
-    zx::result devices = paver::BlockDevices::CreateStorageHost(devmgr_.RealmExposedDir());
+    zx::result devices = paver::BlockDevices::CreateFromPartitionService(devmgr_.RealmExposedDir());
     if (devices.is_error()) {
       return devices.take_error();
     }
@@ -813,23 +814,6 @@ TEST_F(FixedDevicePartitionerTests, WipeFvmTest) {
   auto status = paver::FixedDevicePartitioner::Initialize(*devices, {});
   ASSERT_OK(status);
   ASSERT_OK(status->WipeFvm());
-}
-
-TEST_F(FixedDevicePartitionerTests, FinalizePartitionTest) {
-  zx::result devices = paver::BlockDevices::CreateDevfs(devmgr_.devfs_root().duplicate());
-  ASSERT_OK(devices);
-  auto status = paver::FixedDevicePartitioner::Initialize(*devices, {});
-  ASSERT_OK(status);
-  auto& partitioner = status.value();
-
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kBootloaderA)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kZirconA)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kZirconB)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kZirconR)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kVbMetaA)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kVbMetaB)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kVbMetaR)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kFuchsiaVolumeManager)));
 }
 
 TEST_F(FixedDevicePartitionerTests, FindPartitionTest) {
@@ -1078,9 +1062,9 @@ TEST_F(SherlockPartitionerTests, SupportsPartition) {
       partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconA, "foo_type")));
 }
 
-class KolaPartitionerTests : public GptDevicePartitionerTests {
+class MoonflowerPartitionerTests : public GptDevicePartitionerTests {
  protected:
-  KolaPartitionerTests() : GptDevicePartitionerTests("kola") {}
+  MoonflowerPartitionerTests() : GptDevicePartitionerTests("sorrel") {}
 
   // Create a DevicePartition for a device.
   zx::result<std::unique_ptr<paver::DevicePartitioner>> CreatePartitioner(BlockDevice* gpt) {
@@ -1093,25 +1077,26 @@ class KolaPartitionerTests : public GptDevicePartitionerTests {
     if (devices.is_error()) {
       return devices.take_error();
     }
-    return paver::KolaPartitioner::Initialize(*devices, svc_root, std::move(controller.value()));
+    return paver::MoonflowerPartitioner::Initialize(*devices, svc_root,
+                                                    std::move(controller.value()));
   }
 };
 
-TEST_F(KolaPartitionerTests, InitializeWithoutGptFails) {
+TEST_F(MoonflowerPartitionerTests, InitializeWithoutGptFails) {
   std::unique_ptr<BlockDevice> gpt_dev;
   ASSERT_NO_FATAL_FAILURE(CreateDisk(&gpt_dev));
 
   ASSERT_NOT_OK(CreatePartitioner({}));
 }
 
-TEST_F(KolaPartitionerTests, InitializeWithoutFvmFails) {
+TEST_F(MoonflowerPartitionerTests, InitializeWithoutFvmFails) {
   std::unique_ptr<BlockDevice> gpt_dev;
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithGpt(&gpt_dev, 32 * kGibibyte));
 
   ASSERT_NOT_OK(CreatePartitioner({}));
 }
 
-TEST_F(KolaPartitionerTests, FindPartition) {
+TEST_F(MoonflowerPartitionerTests, FindPartition) {
   constexpr uint64_t kBlockCount = 0x748034;
   std::unique_ptr<BlockDevice> gpt_dev;
   ASSERT_NO_FATAL_FAILURE(
@@ -1142,7 +1127,7 @@ TEST_F(KolaPartitionerTests, FindPartition) {
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kFuchsiaVolumeManager)));
 }
 
-TEST_F(KolaPartitionerTests, SupportsPartition) {
+TEST_F(MoonflowerPartitionerTests, SupportsPartition) {
   std::unique_ptr<BlockDevice> gpt_dev;
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithGpt(&gpt_dev, 64 * kMebibyte));
 

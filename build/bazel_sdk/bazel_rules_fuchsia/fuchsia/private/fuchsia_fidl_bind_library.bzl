@@ -8,9 +8,10 @@ load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_bind_library.bzl", "fuchsia_bind_library")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _bindlibgen_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     bindc = sdk.bindc
 
     ir = ctx.attr.library[FuchsiaFidlLibraryInfo].ir
@@ -41,7 +42,7 @@ def _bindlibgen_impl(ctx):
 # Runs bindc to produce the bind library file.
 _bindlibgen = rule(
     implementation = _bindlibgen_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "library": attr.label(
             doc = "The FIDL library to generate bind library for",

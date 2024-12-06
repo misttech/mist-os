@@ -373,11 +373,6 @@ zx::result<> PartitionPave(const DevicePartitioner& partitioner, zx::vmo payload
     return status.take_error();
   }
 
-  if (auto status = partitioner.FinalizePartition(spec); status.is_error()) {
-    ERROR("Failed to finalize partition \"%s\"\n", spec.ToString().c_str());
-    return status.take_error();
-  }
-
   LOG("Completed paving partition \"%s\" successfully\n", spec.ToString().c_str());
   return zx::ok();
 }

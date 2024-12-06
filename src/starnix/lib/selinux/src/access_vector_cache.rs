@@ -4,8 +4,7 @@
 
 use crate::policy::AccessDecision;
 use crate::sync::Mutex;
-use crate::{AbstractObjectClass, SecurityId};
-
+use crate::{AbstractObjectClass, FileClass, ObjectClass, SecurityId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -20,6 +19,15 @@ pub trait Query {
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessDecision;
+
+    /// Computes the appropriate security identifier (SID) for the security context of a file-like
+    /// object of class `file_class` created by `source_sid` targeting `target_sid`.
+    fn compute_new_file_sid(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error>;
 }
 
 /// An interface through which statistics may be obtained from each cache.
@@ -39,6 +47,15 @@ pub trait QueryMut {
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessDecision;
+
+    /// Computes the appropriate security identifier (SID) for the security context of a file-like
+    /// object of class `file_class` created by `source_sid` targeting `target_sid`.
+    fn compute_new_file_sid(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error>;
 }
 
 impl<Q: Query> QueryMut for Q {
@@ -49,6 +66,15 @@ impl<Q: Query> QueryMut for Q {
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
         (self as &dyn Query).query(source_sid, target_sid, target_class)
+    }
+
+    fn compute_new_file_sid(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        (self as &dyn Query).compute_new_file_sid(source_sid, target_sid, file_class)
     }
 }
 
@@ -90,6 +116,15 @@ impl Query for DenyAll {
     ) -> AccessDecision {
         AccessDecision::default()
     }
+
+    fn compute_new_file_sid(
+        &self,
+        _source_sid: SecurityId,
+        _target_sid: SecurityId,
+        _file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        unreachable!()
+    }
 }
 
 impl Reset for DenyAll {
@@ -106,6 +141,7 @@ struct QueryAndResult {
     target_sid: SecurityId,
     target_class: AbstractObjectClass,
     access_decision: AccessDecision,
+    new_file_sid: Option<SecurityId>,
 }
 
 /// An empty access vector cache that delegates to an [`AccessQueryable`].
@@ -132,6 +168,15 @@ impl<D: QueryMut> QueryMut for Empty<D> {
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
         self.delegate.query(source_sid, target_sid, target_class)
+    }
+
+    fn compute_new_file_sid(
+        &mut self,
+        _source_sid: SecurityId,
+        _target_sid: SecurityId,
+        _file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        unreachable!()
     }
 }
 
@@ -182,31 +227,14 @@ impl<D, const SIZE: usize> Fixed<D, SIZE> {
         self.next_index == 0 && !self.is_full
     }
 
-    /// Inserts `query_and_result` into the cache.
-    #[inline]
-    fn insert(&mut self, query_and_result: QueryAndResult) {
-        let entry = &mut self.cache[self.next_index];
-
-        self.stats.allocs += 1;
-        if entry.is_some() {
-            self.stats.reclaims += 1;
-        }
-
-        *entry = Some(query_and_result);
-        self.next_index = (self.next_index + 1) % SIZE;
-        if self.next_index == 0 {
-            self.is_full = true;
-        }
-    }
-}
-
-impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
-    fn query(
+    /// Searches the cache and returns the index of a [`QueryAndResult`] matching
+    /// the given `source_sid`, `target_sid`, and `target_class` (or returns `None`).
+    fn search(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessDecision {
+    ) -> Option<usize> {
         self.stats.lookups += 1;
 
         if !self.is_empty() {
@@ -221,7 +249,7 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
                     && &target_class == &query_and_result.target_class
                 {
                     self.stats.hits += 1;
-                    return query_and_result.access_decision.clone();
+                    return Some(index);
                 }
 
                 if index == self.next_index || (index == 0 && !self.is_full) {
@@ -234,6 +262,42 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
 
         self.stats.misses += 1;
 
+        None
+    }
+
+    /// Inserts `query_and_result` into the cache and returns the
+    /// index at which it was inserted.
+    #[inline]
+    fn insert(&mut self, query_and_result: QueryAndResult) -> usize {
+        let index = self.next_index;
+        let entry = &mut self.cache[index];
+
+        self.stats.allocs += 1;
+        if entry.is_some() {
+            self.stats.reclaims += 1;
+        }
+
+        *entry = Some(query_and_result);
+        self.next_index = (self.next_index + 1) % SIZE;
+        if self.next_index == 0 {
+            self.is_full = true;
+        }
+
+        index
+    }
+}
+
+impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
+    fn query(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: AbstractObjectClass,
+    ) -> AccessDecision {
+        if let Some(hit_index) = self.search(source_sid, target_sid, target_class.clone()) {
+            return self.cache[hit_index].as_ref().unwrap().access_decision.clone();
+        }
+
         let access_decision = self.delegate.query(source_sid, target_sid, target_class.clone());
 
         self.insert(QueryAndResult {
@@ -241,9 +305,44 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
             target_sid,
             target_class,
             access_decision: access_decision.clone(),
+            new_file_sid: None,
         });
 
         access_decision
+    }
+
+    fn compute_new_file_sid(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        let target_class = AbstractObjectClass::System(ObjectClass::from(file_class));
+
+        let index = if let Some(index) = self.search(source_sid, target_sid, target_class.clone()) {
+            index
+        } else {
+            let access_decision = self.delegate.query(source_sid, target_sid, target_class.clone());
+            self.insert(QueryAndResult {
+                source_sid,
+                target_sid,
+                target_class,
+                access_decision,
+                new_file_sid: None,
+            })
+        };
+
+        let query_and_result = &mut self.cache[index].as_mut().unwrap();
+        if let Some(new_file_sid) = query_and_result.new_file_sid {
+            Ok(new_file_sid)
+        } else {
+            let new_file_sid =
+                self.delegate.compute_new_file_sid(source_sid, target_sid, file_class);
+            if let Ok(new_file_sid) = new_file_sid {
+                query_and_result.new_file_sid = Some(new_file_sid);
+            }
+            new_file_sid
+        }
     }
 }
 
@@ -295,6 +394,15 @@ impl<D: QueryMut> Query for Locked<D> {
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
         self.delegate.lock().query(source_sid, target_sid, target_class)
+    }
+
+    fn compute_new_file_sid(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        self.delegate.lock().compute_new_file_sid(source_sid, target_sid, file_class)
     }
 }
 
@@ -352,6 +460,15 @@ impl<Q: Query> Query for Arc<Q> {
     ) -> AccessDecision {
         self.as_ref().query(source_sid, target_sid, target_class)
     }
+
+    fn compute_new_file_sid(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        self.as_ref().compute_new_file_sid(source_sid, target_sid, file_class)
+    }
 }
 
 impl<R: Reset> Reset for Arc<R> {
@@ -368,6 +485,17 @@ impl<Q: Query> Query for Weak<Q> {
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
         self.upgrade().map(|q| q.query(source_sid, target_sid, target_class)).unwrap_or_default()
+    }
+
+    fn compute_new_file_sid(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        self.upgrade()
+            .map(|q| q.compute_new_file_sid(source_sid, target_sid, file_class))
+            .unwrap_or(Err(anyhow::anyhow!("weak reference failed to resolve")))
     }
 }
 
@@ -413,6 +541,22 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
 
         // Allow `self.delegate` to implement caching strategy and prepare response.
         self.delegate.query(source_sid, target_sid, target_class)
+    }
+
+    fn compute_new_file_sid(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        let version = self.active_version.as_ref().version();
+        if self.current_version != version {
+            self.current_version = version;
+            self.delegate.reset();
+        }
+
+        // Allow `self.delegate` to implement caching strategy and prepare response.
+        self.delegate.compute_new_file_sid(source_sid, target_sid, file_class)
     }
 }
 
@@ -566,6 +710,15 @@ mod tests {
         ) -> AccessDecision {
             self.query_count.fetch_add(1, Ordering::Relaxed);
             self.delegate.query(source_sid, target_sid, target_class)
+        }
+
+        fn compute_new_file_sid(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+        ) -> Result<SecurityId, anyhow::Error> {
+            unreachable!()
         }
     }
 
@@ -752,6 +905,15 @@ mod starnix_tests {
             } else {
                 panic!("query found invalid policy: {}", policy);
             }
+        }
+
+        fn compute_new_file_sid(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+        ) -> Result<SecurityId, anyhow::Error> {
+            unreachable!()
         }
     }
 
@@ -1060,6 +1222,15 @@ mod starnix_tests {
             } else {
                 panic!("query found invalid policy: {}", policy);
             }
+        }
+
+        fn compute_new_file_sid(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _file_class: FileClass,
+        ) -> Result<SecurityId, anyhow::Error> {
+            unreachable!()
         }
     }
 

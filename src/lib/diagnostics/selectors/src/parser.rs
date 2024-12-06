@@ -69,7 +69,7 @@ fn parse_quote_sensitive_separator(input: &str, sep: char) -> Vec<&str> {
     let mut result = vec![];
 
     let mut push_substr = |curr_index| {
-        result.push((&input[last_split_index..curr_index]).trim_start());
+        result.push(input[last_split_index..curr_index].trim_start());
         last_split_index = curr_index + 1;
     };
 
@@ -94,7 +94,7 @@ fn parse_quote_sensitive_separator(input: &str, sep: char) -> Vec<&str> {
 
     // if a split is produced by a trailing comma then last_split_index is input.len() + 1
     if last_split_index < input.len() {
-        let maybe_last_segment = (&input[last_split_index..]).trim_start();
+        let maybe_last_segment = input[last_split_index..].trim_start();
         if !maybe_last_segment.is_empty() {
             result.push(maybe_last_segment);
         }

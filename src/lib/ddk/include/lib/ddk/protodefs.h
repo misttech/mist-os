@@ -177,7 +177,7 @@ DDK_PROTOCOL_DEF(TPM,                     160, "tpm", 0)
 DDK_PROTOCOL_DEF(CHROMEOS_ACPI,           161, "chromeos-acpi", 0)
 DDK_PROTOCOL_DEF(CTAP,                    162, "ctap", 0)
 DDK_PROTOCOL_DEF(AML_MAILBOX,             163, "aml-mailbox", 0)
-DDK_PROTOCOL_DEF(AML_DSP,                 164, "aml-dsp", 0)
+// 164 was aml-dsp
 DDK_PROTOCOL_DEF(ADB,                     165, "adb", 0)
 // Out-of-order (or added later).
 DDK_PROTOCOL_DEF(USB_INTERFACE_ASSOCIATION, 166, "usb-interface-association", PF_NOPUB)

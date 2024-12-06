@@ -16,6 +16,7 @@
             protocol: [
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.BootControl",
                 "fuchsia.power.system.CpuElementManager",
             ],
         },
@@ -62,6 +63,7 @@
             protocol: [
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.BootControl",
                 "fuchsia.power.system.CpuElementManager",
             ],
             from: "self",

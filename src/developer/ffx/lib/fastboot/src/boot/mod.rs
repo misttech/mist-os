@@ -6,11 +6,12 @@ use crate::common::stage_file;
 use crate::file_resolver::FileResolver;
 use anyhow::{anyhow, Result};
 use byteorder::{ByteOrder, LittleEndian};
-use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
+use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, UploadProgress};
 use std::fs::{metadata, File};
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
+use tokio::sync::mpsc::Sender;
 
 const PAGE_SIZE: u32 = 4096;
 const BOOT_MAGIC: &str = "ANDROID!";
@@ -29,8 +30,7 @@ fn copy<R: Read, W: Write>(mut reader: BufReader<R>, writer: &mut BufWriter<W>) 
     }
 }
 
-async fn get_boot_image<W: Write, F: FileResolver + Sync>(
-    writer: &mut W,
+async fn get_boot_image<F: FileResolver + Sync>(
     file_resolver: &mut F,
     zbi: &String,
     vbmeta: &Option<String>,
@@ -39,13 +39,13 @@ async fn get_boot_image<W: Write, F: FileResolver + Sync>(
     match vbmeta {
         None => {
             let mut path = PathBuf::new();
-            path.push(file_resolver.get_file(writer, &zbi).await?);
+            path.push(file_resolver.get_file(&zbi).await?);
             Ok(path)
         }
         Some(v) => {
             // if vbmeta exists, concat the two into a single boot image file
-            let zbi_path = file_resolver.get_file(writer, &zbi).await?;
-            let v_path = file_resolver.get_file(writer, &v).await?;
+            let zbi_path = file_resolver.get_file(&zbi).await?;
+            let v_path = file_resolver.get_file(&v).await?;
             let mut path = PathBuf::new();
             path.push(temp_dir.path());
             path.push("boot_image.bin");
@@ -61,16 +61,15 @@ async fn get_boot_image<W: Write, F: FileResolver + Sync>(
     }
 }
 
-pub async fn boot<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
-    writer: &mut W,
+pub async fn boot<F: FileResolver + Sync, T: FastbootInterface>(
+    messenger: Sender<UploadProgress>,
     file_resolver: &mut F,
     zbi: String,
     vbmeta: Option<String>,
     fastboot_interface: &mut T,
 ) -> Result<()> {
-    writeln!(writer, "Creating boot image...")?;
     let temp_dir = tempdir()?;
-    let boot_image = get_boot_image(writer, file_resolver, &zbi, &vbmeta, &temp_dir).await?;
+    let boot_image = get_boot_image(file_resolver, &zbi, &vbmeta, &temp_dir).await?;
 
     let page_mask: u32 = PAGE_SIZE - 1;
     let kernal_size: u32 = metadata(&boot_image)?.len().try_into()?;
@@ -102,7 +101,7 @@ pub async fn boot<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
     outfile.flush()?;
 
     stage_file(
-        writer,
+        messenger,
         file_resolver,
         false, /* resolve */
         path.to_str().ok_or_else(|| anyhow!("Could not get temp boot image path"))?,

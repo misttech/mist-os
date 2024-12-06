@@ -163,6 +163,22 @@ type DisplayConfig = struct {
     layer vector<Layer>:MAX;
 };
 
+/// Subset of compositing operations on a layer.
+///
+/// The set of all compositing operations is the members of the FIDL enum
+/// [`fuchsia.hardware.display.types/ClientCompositionOpcode`]. See the
+/// documentation there for the semantics of each operation.
+type LayerCompositionOperations = strict bits : uint32 {
+    USE_IMAGE = 0x1;
+    MERGE_BASE = 0x2;
+    MERGE_SRC = 0x4;
+    FRAME_SCALE = 0x8;
+    SRC_FRAME = 0x10;
+    TRANSFORM = 0x20;
+    COLOR_CONVERSION = 0x40;
+    ALPHA = 0x80;
+};
+
 // An E-EDID can contain up to 256 data blocks, each of which contains 128
 // bytes. So it can contain up to 256 * 128 = 32768 bytes of data.
 const MAX_COUNT_EDID_BYTES uint32 = 32768;
@@ -307,34 +323,30 @@ open protocol Engine {
     /// Whether or not the driver can accept the configuration cannot depend on
     /// the particular image handles, as it must always be possible to present
     /// a new image in place of another image with a matching configuration.
-    ///
-    /// `config_check_result` should be set to a CONFIG_DISPLAY_* error if the
-    /// combination of display modes is not supported.
-    ///
-    /// `client_composition_opcodes` are per-layer client operations
-    /// to make the layer configuration supported by the display hardware. If
-    /// the `config_check_result` is not `CONFIG_CHECK_RESULT_OK`, the values of
-    /// `client_composition_opcodes` are undefined and should be ignored by the
-    /// client.
-    ///
-    /// `client_composition_opcodes` is an array with one element for each
-    /// layer in
-    /// each display_config element. The elements map to layers following a
-    /// DFS traversal of a tree where the first-level children are the
-    /// `display_config` elements, and the second-level children are each
-    /// `DisplayConfig`'s layers.
-    ///
-    /// The element ordering matches flattening the array obtained by mapping
-    /// each display_config element to its `DisplayConfig.layers` value:
-    ///   [ display 0 layer 0, display 0 layer 1, ...,
-    ///     display 1 layer 0, display 1 layer 1, ...,
-    ///     display (N-1) layer 0, ..., display (N-1) layer (M-1) ].
     flexible CheckConfiguration(struct {
         display_config vector<DisplayConfig>:MAX;
     }) -> (struct {
+        /// Indicates if the combination of display modes is supported.
         config_check_result fuchsia.hardware.display.types.ConfigResult;
-        client_composition_opcodes
-                vector<fuchsia.hardware.display.types.ClientCompositionOpcode>:MAX;
+
+        /// Compositing operations that yield a supported configuration.
+        ///
+        /// This member is only meaningful if `config_check_result` is
+        /// [fuchsia.hardware.display.types/ConfigResult.UNSUPPORTED_CONFIG`].
+        /// Otherwise, the value is undefined and should be ignored.
+        ///
+        /// The compositing operations are specified as an array with one
+        /// element for each layer in each `display_config` element. The
+        /// elements map to layers following a DFS traversal of a tree where the
+        /// first-level children are the `display_config` elements, and the
+        /// second-level children are each `DisplayConfig`'s layers.
+        ///
+        /// The element ordering matches flattening the array obtained by mapping
+        /// each `display_config` element to its `DisplayConfig.layers` value:
+        ///   [ display 0 layer 0, display 0 layer 1, ...,
+        ///     display 1 layer 0, display 1 layer 1, ...,
+        ///     display (N-1) layer 0, ..., display (N-1) layer (M-1) ].
+        layer_composition_operations vector<LayerCompositionOperations>:MAX;
     });
 
     /// Applies the configuration.

@@ -74,8 +74,8 @@ impl RoamManager {
         ap_state: types::ApState,
         network_identifier: types::NetworkIdentifier,
         credential: Credential,
-    ) -> (roam_monitor::RoamDataSender, mpsc::Receiver<types::ScannedCandidate>) {
-        let (roam_sender, roam_receiver) = mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
+        roam_sender: mpsc::Sender<types::ScannedCandidate>,
+    ) -> roam_monitor::RoamDataSender {
         let (roam_trigger_data_sender, roam_trigger_data_receiver) =
             mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
         let _ = self
@@ -90,7 +90,7 @@ impl RoamManager {
             .inspect_err(|e| {
                 error!("Failed to request roam monitoring: {}. Proceeding without roaming.", e)
             });
-        (roam_monitor::RoamDataSender::new(roam_trigger_data_sender), roam_receiver)
+        roam_monitor::RoamDataSender::new(roam_trigger_data_sender)
     }
 }
 
@@ -226,10 +226,12 @@ mod tests {
 
         // Send a request to initialize a roam monitor
         let connection_data = generate_random_roaming_connection_data();
-        let (mut roam_monitor_sender, _) = test_values.roam_manager.initialize_roam_monitor(
+        let (sender, _) = mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
+        let mut roam_monitor_sender = test_values.roam_manager.initialize_roam_monitor(
             connection_data.ap_state.clone(),
             generate_random_network_identifier(),
             generate_random_password(),
+            sender,
         );
 
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -258,10 +260,12 @@ mod tests {
 
         // Send a request to initialize a roam monitor
         let connection_data = generate_random_roaming_connection_data();
-        let (mut roam_monitor_sender, _) = test_values.roam_manager.initialize_roam_monitor(
+        let (sender, _) = mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
+        let mut roam_monitor_sender = test_values.roam_manager.initialize_roam_monitor(
             connection_data.ap_state.clone(),
             generate_random_network_identifier(),
             generate_random_password(),
+            sender,
         );
 
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);

@@ -202,9 +202,9 @@ pub enum VisualDebuggingLevel {
     InfoPlatform,
 }
 
-impl std::convert::Into<u8> for VisualDebuggingLevel {
-    fn into(self) -> u8 {
-        match self {
+impl std::convert::From<VisualDebuggingLevel> for u8 {
+    fn from(val: VisualDebuggingLevel) -> Self {
+        match val {
             VisualDebuggingLevel::None => 0,
             VisualDebuggingLevel::InfoProduct => 1,
             VisualDebuggingLevel::InfoPlatform => 2,

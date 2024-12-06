@@ -4,10 +4,9 @@
 # found in the LICENSE file.
 
 #### CATEGORY=Device management
-### flash and, optionally, pave a connected device
-## usage: fx flash [-s <serial>] [--build|--no-build] [--pave]
+### flash a connected device
+## usage: fx flash [-s <serial>] [--build|--no-build]
 ##   --build | --no-build    Build (or not) the required dependencies
-##   --pave                  Pave device after flashing (recommended)
 ##   -s                      Serial of device you wish to flash to (only necessary
 ##                           if multiple devices in fastboot mode)
 ##  --skip-verify            Skip hardware verification. This is dangerous, please be
@@ -39,7 +38,6 @@ if is_feature_enabled "incremental"; then
   # Keep old behavior if incremental is not enabled.
   build=true
 fi
-pave=false
 serial=
 device=$(get-device-name)
 skip_verify=false
@@ -54,12 +52,6 @@ while [[ $# -ge 1 ]]; do
     ;;
   --build)
     build=true
-    ;;
-  --pave)
-    pave=true
-    ;;
-  --nopave|--no-pave)
-    pave=false
     ;;
   -s)
     shift
@@ -94,9 +86,6 @@ case "${flash_source}" in
       flash_manifest="${FUCHSIA_BUILD_DIR}"/"${flash_source#flash-manifest:}"
       product_bundle=
       artifacts=($(fx-command-run list-build-artifacts flash)) || exit $?
-      if $pave; then
-        artifacts+=($(fx-command-run list-build-artifacts pave)) || exit $?
-      fi
       ;;
   product-bundle:*)
       flash_manifest=
@@ -124,8 +113,3 @@ fi
 
 cd "${FUCHSIA_BUILD_DIR}"
 fx-flash "${serial}" "${device}" "${flash_manifest}" "${product_bundle}" "${skip_verify}" "${no_bootloader_reboot}"
-
-if $pave; then
-  # no need to build, since all dependencies were already built above.
-  fx-command-exec pave -1 --no-build
-fi

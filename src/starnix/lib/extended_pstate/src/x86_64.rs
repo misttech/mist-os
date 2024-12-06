@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use once_cell::sync::Lazy;
 use static_assertions::const_assert_eq;
+use std::sync::LazyLock;
 
 #[derive(Clone, Copy)]
 pub(crate) struct State {
@@ -126,7 +126,7 @@ pub enum Strategy {
     FXSave,
 }
 
-pub static PREFERRED_STRATEGY: Lazy<Strategy> = Lazy::new(|| {
+pub static PREFERRED_STRATEGY: LazyLock<Strategy> = LazyLock::new(|| {
     if is_x86_feature_detected!("xsaveopt") {
         Strategy::XSaveOpt
     } else if is_x86_feature_detected!("xsave") {

@@ -10,6 +10,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/irq.h>
+#include <lib/ddk/debug.h>
 #include <lib/hid/boot.h>
 #include <lib/input_report_reader/reader.h>
 #include <lib/zx/interrupt.h>
@@ -119,6 +120,11 @@ class I8042Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INP
   void GetInputReport(GetInputReportRequestView request,
                       GetInputReportCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_input_report::InputDevice> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    zxlogf(WARNING, "Unexpected fidl method invoked: %ld", metadata.method_ordinal);
   }
 
 #ifdef PS2_TEST

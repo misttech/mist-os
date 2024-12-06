@@ -4,23 +4,24 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <inttypes.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/heap.h>
 #include <lib/kconcurrent/chainlock_transaction.h>
+#include <lib/power-management/energy-model.h>
+#include <lib/power-management/kernel-registry.h>
 #include <lib/syscalls/forward.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
 #include <trace.h>
 #include <zircon/errors.h>
-#if __mist_os__
-#include <zircon/mistos/syscalls/object.h>
-#endif
+#include <zircon/syscalls-next.h>
 #include <zircon/syscalls/iob.h>
 #include <zircon/syscalls/object.h>
+#include <zircon/syscalls/resource.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/mp.h>
 #include <kernel/scheduler.h>
@@ -1246,6 +1247,67 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       return ZX_OK;
     }
 
+    case ZX_INFO_POWER_DOMAINS: {
+      if (zx_status_t res =
+              validate_ranged_resource(handle, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_INFO_BASE, 1);
+          res != ZX_OK) {
+        return res;
+      }
+      size_t max_copy = buffer_size / sizeof(zx_power_domain_info_t);
+      if (max_copy == 0 && max_copy != buffer_size) {
+        return ZX_ERR_BUFFER_TOO_SMALL;
+      }
+
+      // Alternatively clamp `max_copy` to `arch_max_num_cpus()`.
+      size_t power_domain_count = 0;
+      power_management::KernelPowerDomainRegistry::Visit(
+          [&power_domain_count](const auto& power_domain) { ++power_domain_count; });
+
+      // Avoid arbitrary large buffers.
+      max_copy = ktl::min(power_domain_count, max_copy);
+
+      ktl::unique_ptr<zx_power_domain_info_t[]> entries = nullptr;
+      if (max_copy > 0) {
+        fbl::AllocChecker ac;
+        entries = ktl::make_unique<zx_power_domain_info_t[]>(&ac, max_copy);
+        if (!ac.check()) {
+          return ZX_ERR_NO_MEMORY;
+        }
+      }
+
+      // Reset the count, in case we are racing against an update, so we can return somewhat
+      // consistent `avail`.
+      power_domain_count = 0;
+      power_management::KernelPowerDomainRegistry::Visit(
+          [&power_domain_count, &entries, max_copy](const power_management::PowerDomain& domain) {
+            if (power_domain_count < max_copy) {
+              zx_power_domain_info_t& entry = entries[power_domain_count];
+              entry = {
+                  .cpus = domain.cpus(),
+                  .domain_id = domain.id(),
+                  .idle_power_levels = static_cast<uint8_t>(domain.model().idle_levels().size()),
+                  .active_power_levels =
+                      static_cast<uint8_t>(domain.model().active_levels().size()),
+              };
+            }
+            power_domain_count++;
+          });
+      size_t actual = ktl::min(max_copy, power_domain_count);
+      if (zx_status_t res = _actual.copy_to_user(actual); res != ZX_OK) {
+        return res;
+      }
+
+      if (zx_status_t res = _avail.copy_to_user(power_domain_count); res != ZX_OK) {
+        return res;
+      }
+
+      if (max_copy == 0) {
+        return ZX_OK;
+      }
+      return _buffer.reinterpret<zx_power_domain_info_t>().copy_array_to_user(entries.get(),
+                                                                              actual);
+    }
+
     default:
       return ZX_ERR_NOT_SUPPORTED;
   }
@@ -1626,14 +1688,6 @@ zx_status_t sys_object_set_property(zx_handle_t handle_value, uint32_t property,
       }
       return stream->SetAppendMode(value);
     }
-#if __mist_os__
-    case ZX_PROP_MISTOS_PROCESS_STACK: {
-      if (size < sizeof(zx_mistos_process_stack_t)) {
-        return ZX_ERR_BUFFER_TOO_SMALL;
-      }
-      return ZX_OK;
-    }
-#endif
     default:
       return ZX_ERR_NOT_SUPPORTED;
   }

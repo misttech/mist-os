@@ -24,6 +24,9 @@ use tracing::{error, info};
 use zx::JobCriticalOptions;
 use {fidl_fuchsia_component_internal as finternal, fuchsia_async as fasync};
 
+#[cfg(feature = "tracing")]
+use cm_config::TraceProvider;
+
 mod bedrock;
 mod bootfs;
 mod builtin;
@@ -77,10 +80,9 @@ fn main() {
         info!("Component manager was started with boot defaults");
     }
 
-    #[cfg(eng)]
-    {
+    #[cfg(feature = "tracing")]
+    if runtime_config.trace_provider == TraceProvider::Namespace {
         fuchsia_trace_provider::trace_provider_create_with_fdio();
-        info!("Component manager tracing is on");
     }
 
     let run_root_fut = async move {
@@ -117,10 +119,8 @@ fn build_runtime_config(args: &startup::Arguments) -> (RuntimeConfig, Option<Boo
             panic!("Failed to read config from uninitialized vfs with error {}.", err)
         })
     } else {
-        // This is the legacy path where bootsvc is hosting a C++ bootfs VFS,
-        // and component manager can read its config using standard filesystem APIs.
         let path = PathBuf::from(&args.config);
-        std::fs::read(path).expect("failed to read config file")
+        std::fs::read(&path).unwrap_or_else(|e| panic!("failed to read config file {path:?}: {e}"))
     };
 
     let mut config = RuntimeConfig::new_from_bytes(&config_bytes)

@@ -29,6 +29,11 @@ pub struct ListSubCommand {
     /// list packages from this repository.
     pub repository: Option<String>,
 
+    #[argh(option, short = 'p')]
+    /// repository server port number.
+    /// Required needed to disambiguate multiple repositories with the same name.
+    pub port: Option<u16>,
+
     /// if true, package hashes will be displayed in full (i.e. not truncated).
     #[argh(switch)]
     pub full_hash: bool,
@@ -44,6 +49,11 @@ pub struct ShowSubCommand {
     #[argh(option, short = 'r')]
     /// list package contents from this repository.
     pub repository: Option<String>,
+
+    #[argh(option, short = 'p')]
+    /// repository server port number.
+    /// Required to disambiguate multiple repositories with the same name.
+    pub port: Option<u16>,
 
     /// if true, package hashes will be displayed in full (i.e. not truncated).
     #[argh(switch)]
@@ -72,6 +82,11 @@ pub struct ExtractArchiveSubCommand {
     #[argh(option, short = 'r')]
     /// extract package from this repository.
     pub repository: Option<String>,
+
+    #[argh(option, short = 'p')]
+    /// repository server port number.
+    /// Required disambiguate multiple repositories with the same name.
+    pub port: Option<u16>,
 
     #[argh(positional)]
     /// extract this package.

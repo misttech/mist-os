@@ -6,9 +6,10 @@ use crate::common::cmd::{ManifestParams, OemFile};
 use crate::common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR};
 use crate::file_resolver::FileResolver;
 use crate::manifest::{from_in_tree, from_local_product_bundle, from_path, from_sdk};
+use crate::util::Event;
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, RebootEvent, UploadProgress};
 use futures::prelude::*;
@@ -16,9 +17,7 @@ use futures::try_join;
 use pbms::is_local_product_bundle;
 use sdk::SdkVersion;
 use sparse::build_sparse_files;
-use std::io::Write;
 use std::path::PathBuf;
-use termion::{color, style};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -46,29 +45,27 @@ pub trait Product<P> {
 
 #[async_trait(?Send)]
 pub trait Flash {
-    async fn flash<W, F, T>(
+    async fn flash<F, T>(
         &self,
-        writer: &mut W,
+        messenger: &Sender<Event>,
         file_resolver: &mut F,
         fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface;
 }
 
 #[async_trait(?Send)]
 pub trait Unlock {
-    async fn unlock<W, F, T>(
+    async fn unlock<F, T>(
         &self,
-        _writer: &mut W,
+        _messenger: &Sender<Event>,
         _file_resolver: &mut F,
         _fastboot_interface: &mut T,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
@@ -81,151 +78,56 @@ pub trait Unlock {
 
 #[async_trait(?Send)]
 pub trait Boot {
-    async fn boot<W, F, T>(
+    async fn boot<F, T>(
         &self,
-        writer: &mut W,
+        messenger: Sender<Event>,
         file_resolver: &mut F,
         slot: String,
         fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface;
 }
 
 pub const MISSING_PRODUCT: &str = "Manifest does not contain product";
 
-const LARGE_FILE: &str = "large file, please wait... ";
 const LOCK_COMMAND: &str = "vx-lock";
 
 pub const UNLOCK_ERR: &str = "The product requires the target to be unlocked. \
                                      Please unlock target and try again.";
 
-pub fn done_time<W: Write>(writer: &mut W, duration: Duration) -> std::io::Result<()> {
-    writeln!(
-        writer,
-        "{}Done{} [{}{:.2}s{}]",
-        color::Fg(color::Green),
-        style::Reset,
-        color::Fg(color::Blue),
-        (duration.num_milliseconds() as f32) / (1000 as f32),
-        style::Reset
-    )?;
-    writer.flush()
-}
-
-async fn handle_upload_progress_for_upload<W: Write>(
-    writer: &mut W,
-    mut prog_server: Receiver<UploadProgress>,
-    mut on_large: impl FnMut() -> (),
-    mut on_finished: impl FnMut(&mut W) -> Result<()>,
-) -> Result<Option<DateTime<Utc>>> {
-    let mut start_time: Option<DateTime<Utc>> = None;
-    let mut finish_time: Option<DateTime<Utc>> = None;
-    loop {
-        match prog_server.recv().await {
-            Some(UploadProgress::OnStarted { size, .. }) => {
-                start_time.replace(Utc::now());
-                tracing::debug!("Upload started: {}", size);
-                write!(writer, "Uploading... ")?;
-                if size > (1 << 24) {
-                    on_large();
-                    write!(writer, "{}", LARGE_FILE)?;
-                }
-                writer.flush()?;
-            }
-            Some(UploadProgress::OnFinished { .. }) => {
-                if let Some(st) = start_time {
-                    let d = Utc::now().signed_duration_since(st);
-                    tracing::debug!("Upload duration: {:.2}s", (d.num_milliseconds() / 1000));
-                    done_time(writer, d)?;
-                } else {
-                    // Write done without the time .
-                    writeln!(writer, "{}Done{}", color::Fg(color::Green), style::Reset)?;
-                    writer.flush()?;
-                }
-                on_finished(writer)?;
-                finish_time.replace(Utc::now());
-                tracing::debug!("Upload finished");
-            }
-            Some(UploadProgress::OnError { error, .. }) => {
-                tracing::error!("{}", error);
-                ffx_bail!("{}", error)
-            }
-            Some(UploadProgress::OnProgress { bytes_written, .. }) => {
-                tracing::trace!("Upload progress: {}", bytes_written);
-            }
-            None => return Ok(finish_time),
-        }
-    }
-}
-
-async fn handle_upload_progress_for_staging<W: Write>(
-    writer: &mut W,
-    prog_server: Receiver<UploadProgress>,
-) -> Result<Option<DateTime<Utc>>> {
-    handle_upload_progress_for_upload(writer, prog_server, move || {}, move |_writer| Ok(())).await
-}
-
-async fn handle_upload_progress_for_flashing<W: Write>(
-    name: &str,
-    writer: &mut W,
-    prog_server: Receiver<UploadProgress>,
-) -> Result<Option<DateTime<Utc>>> {
-    // Using a boolean results in a warning that the variable is never read.
-    let mut is_large: Option<()> = None;
-    handle_upload_progress_for_upload(
-        writer,
-        prog_server,
-        move || {
-            is_large.replace(());
-        },
-        move |writer| {
-            write!(writer, "Partitioning {}... ", name)?;
-            if is_large.is_some() {
-                write!(writer, "{}", LARGE_FILE)?;
-            }
-            writer.flush()?;
-            Ok(())
-        },
-    )
-    .await
-}
-
-pub async fn stage_file<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
-    writer: &mut W,
+pub async fn stage_file<F: FileResolver + Sync, T: FastbootInterface>(
+    prog_client: Sender<UploadProgress>,
     file_resolver: &mut F,
     resolve: bool,
     file: &str,
     fastboot_interface: &mut T,
 ) -> Result<()> {
-    let (prog_client, prog_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
-        mpsc::channel(1);
     let file_to_upload = if resolve {
-        file_resolver.get_file(writer, file).await.context("reconciling file for upload")?
+        file_resolver.get_file(file).await.context("reconciling file for upload")?
     } else {
         file.to_string()
     };
     tracing::debug!("Preparing to stage {}", file_to_upload);
-    try_join!(
-        fastboot_interface.stage(&file_to_upload, prog_client).map_err(|e| anyhow!(e)),
-        handle_upload_progress_for_staging(writer, prog_server),
-    )
-    .map_err(|e| anyhow!("There was an error staging {}: {:?}", file_to_upload, e))?;
+    fastboot_interface
+        .stage(&file_to_upload, prog_client)
+        .await
+        .map_err(|e| anyhow!(e))
+        .map_err(|e| anyhow!("There was an error staging {}: {:?}", file_to_upload, e))?;
     Ok(())
 }
 
-#[tracing::instrument(skip(writer))]
-async fn do_flash<W: Write, F: FastbootInterface>(
-    writer: &mut W,
+#[tracing::instrument()]
+async fn do_flash<F: FastbootInterface>(
     name: &str,
+    messenger: &Sender<Event>,
     fastboot_interface: &mut F,
     file_to_upload: &str,
     timeout: Duration,
 ) -> Result<()> {
-    let (prog_client, prog_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
+    let (prog_client, mut prog_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
         mpsc::channel(1);
     try_join!(
         fastboot_interface.flash(name, file_to_upload, prog_client, timeout).map_err(|e| anyhow!(
@@ -234,26 +136,29 @@ async fn do_flash<W: Write, F: FastbootInterface>(
             file_to_upload,
             e
         )),
-        handle_upload_progress_for_flashing(name, writer, prog_server),
-    )
-    .and_then(|(_, prog)| {
-        if let Some(p) = prog {
-            let d = Utc::now().signed_duration_since(p);
-            tracing::debug!("Partition duration: {:.2}s", (d.num_milliseconds() / 1000));
-            done_time(writer, d)?;
-        } else {
-            // Write a line break otherwise
-            writeln!(writer, "{}Done{}", color::Fg(color::Green), style::Reset)?;
-            writer.flush()?;
+        async {
+            loop {
+                match prog_server.recv().await {
+                    Some(upload) => {
+                        messenger.send(Event::Upload(upload)).await?;
+                    }
+                    None => {
+                        messenger
+                            .send(Event::FlashPartition { partition_name: name.to_string() })
+                            .await?;
+                        return Ok(());
+                    }
+                }
+            }
         }
-        Ok(())
-    })
+    )?;
+    Ok(())
 }
 
-#[tracing::instrument(skip(writer))]
-async fn flash_partition_sparse<W: Write, F: FastbootInterface>(
-    writer: &mut W,
+#[tracing::instrument()]
+async fn flash_partition_sparse<F: FastbootInterface>(
     name: &str,
+    messenger: &Sender<Event>,
     file_to_upload: &str,
     fastboot_interface: &mut F,
     max_download_size: u64,
@@ -269,17 +174,15 @@ async fn flash_partition_sparse<W: Write, F: FastbootInterface>(
     )?;
     for tmp_file_path in sparse_files {
         let tmp_file_name = tmp_file_path.to_str().unwrap();
-        writeln!(writer, "For partition: {}, flashing sparse image file {}", name, tmp_file_name)?;
-
-        do_flash(writer, name, fastboot_interface, tmp_file_name, timeout).await?;
+        do_flash(name, messenger, fastboot_interface, tmp_file_name, timeout).await?;
     }
 
     Ok(())
 }
 
-#[tracing::instrument(skip(writer, file_resolver))]
-pub async fn flash_partition<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
-    writer: &mut W,
+#[tracing::instrument(skip(file_resolver))]
+pub async fn flash_partition<F: FileResolver + Sync, T: FastbootInterface>(
+    messenger: &Sender<Event>,
     file_resolver: &mut F,
     name: &str,
     file: &str,
@@ -288,7 +191,7 @@ pub async fn flash_partition<W: Write, F: FileResolver + Sync, T: FastbootInterf
     flash_timeout_rate_mb_per_second: u64,
 ) -> Result<()> {
     let file_to_upload =
-        file_resolver.get_file(writer, file).await.context("reconciling file for upload")?;
+        file_resolver.get_file(file).await.context("reconciling file for upload")?;
     tracing::debug!("Preparing to upload {}", file_to_upload);
 
     // If the given file to flash is bigger than what the device can download
@@ -327,24 +230,28 @@ pub async fn flash_partition<W: Write, F: FileResolver + Sync, T: FastbootInterf
     tracing::trace!("Device Max Download Size: {}", max_download_size);
     tracing::trace!("File size: {}", file_size);
 
+    let start_time = Utc::now();
+
     if u64::from(max_download_size) < file_size {
-        writeln!(
-            writer,
-            "File size ({}) is bigger than device Max Download Size ({})... \
-            Flashing image in Sparse mode",
-            file_size, max_download_size
-        )?;
-        return flash_partition_sparse(
-            writer,
+        flash_partition_sparse(
             name,
+            messenger,
             &file_to_upload,
             fastboot_interface,
             max_download_size,
             timeout,
         )
-        .await;
+        .await?;
+    } else {
+        do_flash(name, messenger, fastboot_interface, &file_to_upload, timeout).await?;
     }
-    do_flash(writer, name, fastboot_interface, &file_to_upload, timeout).await
+    messenger
+        .send(Event::FlashPartitionFinished {
+            partition_name: name.to_string(),
+            duration: Utc::now().signed_duration_since(start_time),
+        })
+        .await?;
+    Ok(())
 }
 
 pub async fn verify_hardware(
@@ -382,13 +289,12 @@ pub async fn verify_variable_value(
         .map(|res| res == value)
 }
 
-#[tracing::instrument(skip(writer))]
-pub async fn reboot_bootloader<W: Write, F: FastbootInterface>(
-    writer: &mut W,
+#[tracing::instrument(skip(messenger))]
+pub async fn reboot_bootloader<F: FastbootInterface>(
+    messenger: &Sender<Event>,
     fastboot_interface: &mut F,
 ) -> Result<()> {
-    write!(writer, "Rebooting to bootloader... ")?;
-    writer.flush()?;
+    messenger.send(Event::RebootStarted).await?;
     let (reboot_client, mut reboot_server): (Sender<RebootEvent>, Receiver<RebootEvent>) =
         mpsc::channel(1);
     let start_time = Utc::now();
@@ -408,20 +314,36 @@ pub async fn reboot_bootloader<W: Write, F: FastbootInterface>(
 
     let d = Utc::now().signed_duration_since(start_time);
     tracing::debug!("Reboot duration: {:.2}s", (d.num_milliseconds() / 1000));
-    done_time(writer, d)?;
+    messenger.send(Event::Rebooted(d)).await?;
     Ok(())
 }
 
-pub async fn stage_oem_files<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
-    writer: &mut W,
+pub async fn stage_oem_files<F: FileResolver + Sync, T: FastbootInterface>(
+    messenger: &Sender<Event>,
     file_resolver: &mut F,
     resolve: bool,
     oem_files: &Vec<OemFile>,
     fastboot_interface: &mut T,
 ) -> Result<()> {
     for oem_file in oem_files {
-        stage_file(writer, file_resolver, resolve, oem_file.file(), fastboot_interface).await?;
-        writeln!(writer, "Sending command \"{}\"", oem_file.command())?;
+        let (prog_client, mut prog_server) = mpsc::channel(1);
+        try_join!(
+            stage_file(prog_client, file_resolver, resolve, oem_file.file(), fastboot_interface),
+            async {
+                loop {
+                    match prog_server.recv().await {
+                        Some(e) => {
+                            messenger.send(Event::Upload(e)).await?;
+                        }
+                        None => {
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        )?;
+
+        messenger.send(Event::Oem { oem_command: oem_file.command().to_string() }).await?;
         fastboot_interface.oem(oem_file.command()).await.map_err(|_| {
             anyhow!("There was an error sending oem command \"{}\"", oem_file.command())
         })?;
@@ -436,14 +358,9 @@ pub async fn set_slot_a_active(fastboot_interface: &mut impl FastbootInterface) 
     fastboot_interface.set_active("a").await.map_err(|_| anyhow!("Could not set active slot"))
 }
 
-#[tracing::instrument(skip(writer, file_resolver, partitions))]
-pub async fn flash_partitions<
-    W: Write,
-    F: FileResolver + Sync,
-    P: Partition,
-    T: FastbootInterface,
->(
-    writer: &mut W,
+#[tracing::instrument(skip(file_resolver, partitions))]
+pub async fn flash_partitions<F: FileResolver + Sync, P: Partition, T: FastbootInterface>(
+    messenger: &Sender<Event>,
     file_resolver: &mut F,
     partitions: &Vec<P>,
     fastboot_interface: &mut T,
@@ -455,7 +372,7 @@ pub async fn flash_partitions<
             (Some(var), Some(value)) => {
                 if verify_variable_value(var, value, fastboot_interface).await? {
                     flash_partition(
-                        writer,
+                        messenger,
                         file_resolver,
                         partition.name(),
                         partition.file(),
@@ -468,7 +385,7 @@ pub async fn flash_partitions<
             }
             _ => {
                 flash_partition(
-                    writer,
+                    messenger,
                     file_resolver,
                     partition.name(),
                     partition.file(),
@@ -483,23 +400,22 @@ pub async fn flash_partitions<
     Ok(())
 }
 
-#[tracing::instrument(skip(writer, file_resolver, product, cmd))]
-pub async fn flash<W, F, Part, P, T>(
-    writer: &mut W,
+#[tracing::instrument(skip(file_resolver, product, cmd))]
+pub async fn flash<F, Part, P, T>(
+    messenger: &Sender<Event>,
     file_resolver: &mut F,
     product: &P,
     fastboot_interface: &mut T,
     cmd: ManifestParams,
 ) -> Result<()>
 where
-    W: Write,
     F: FileResolver + Sync,
     Part: Partition,
     P: Product<Part>,
     T: FastbootInterface,
 {
-    flash_bootloader(writer, file_resolver, product, fastboot_interface, &cmd).await?;
-    flash_product(writer, file_resolver, product, fastboot_interface, &cmd).await
+    flash_bootloader(messenger, file_resolver, product, fastboot_interface, &cmd).await?;
+    flash_product(messenger, file_resolver, product, fastboot_interface, &cmd).await
 }
 
 pub async fn is_userspace_fastboot(
@@ -511,23 +427,22 @@ pub async fn is_userspace_fastboot(
     }
 }
 
-#[tracing::instrument(skip(file_resolver, writer, cmd, product))]
-pub async fn flash_bootloader<W, F, Part, P, T>(
-    writer: &mut W,
+#[tracing::instrument(skip(file_resolver, cmd, product))]
+pub async fn flash_bootloader<F, Part, P, T>(
+    messenger: &Sender<Event>,
     file_resolver: &mut F,
     product: &P,
     fastboot_interface: &mut T,
     cmd: &ManifestParams,
 ) -> Result<()>
 where
-    W: Write,
     F: FileResolver + Sync,
     Part: Partition,
     P: Product<Part>,
     T: FastbootInterface,
 {
     flash_partitions(
-        writer,
+        messenger,
         file_resolver,
         product.bootloader_partitions(),
         fastboot_interface,
@@ -540,28 +455,27 @@ where
         && !is_userspace_fastboot(fastboot_interface).await?
     {
         set_slot_a_active(fastboot_interface).await?;
-        reboot_bootloader(writer, fastboot_interface).await?;
+        reboot_bootloader(messenger, fastboot_interface).await?;
     }
     Ok(())
 }
 
-#[tracing::instrument(skip(writer, file_resolver, cmd, product))]
-pub async fn flash_product<W, F, Part, P, T>(
-    writer: &mut W,
+#[tracing::instrument(skip(file_resolver, cmd, product))]
+pub async fn flash_product<F, Part, P, T>(
+    messenger: &Sender<Event>,
     file_resolver: &mut F,
     product: &P,
     fastboot_interface: &mut T,
     cmd: &ManifestParams,
 ) -> Result<()>
 where
-    W: Write,
     F: FileResolver + Sync,
     Part: Partition,
     P: Product<Part>,
     T: FastbootInterface,
 {
     flash_partitions(
-        writer,
+        &messenger,
         file_resolver,
         product.partitions(),
         fastboot_interface,
@@ -570,39 +484,33 @@ where
     )
     .await?;
     if !cmd.no_bootloader_reboot && is_userspace_fastboot(fastboot_interface).await? {
-        write!(writer, "Rebooting into updated userspace fastboot...\n")?;
-        reboot_bootloader(writer, fastboot_interface).await?;
+        reboot_bootloader(messenger, fastboot_interface).await?;
     }
-    stage_oem_files(writer, file_resolver, false, &cmd.oem_stage, fastboot_interface).await?;
-    stage_oem_files(writer, file_resolver, true, product.oem_files(), fastboot_interface).await
+    stage_oem_files(messenger, file_resolver, false, &cmd.oem_stage, fastboot_interface).await?;
+    stage_oem_files(messenger, file_resolver, true, product.oem_files(), fastboot_interface).await
 }
 
-#[tracing::instrument(skip(writer, file_resolver, cmd, product))]
-pub async fn flash_and_reboot<W, F, Part, P, T>(
-    writer: &mut W,
+#[tracing::instrument(skip(file_resolver, cmd, product))]
+pub async fn flash_and_reboot<F, Part, P, T>(
+    messenger: &Sender<Event>,
     file_resolver: &mut F,
     product: &P,
     fastboot_interface: &mut T,
     cmd: ManifestParams,
 ) -> Result<()>
 where
-    W: Write,
     F: FileResolver + Sync,
     Part: Partition,
     P: Product<Part>,
     T: FastbootInterface,
 {
-    flash(writer, file_resolver, product, fastboot_interface, cmd).await?;
-    finish(writer, fastboot_interface).await
+    flash(messenger, file_resolver, product, fastboot_interface, cmd).await?;
+    finish(fastboot_interface).await
 }
 
-pub async fn finish<W: Write, F: FastbootInterface>(
-    writer: &mut W,
-    fastboot_interface: &mut F,
-) -> Result<()> {
+pub async fn finish<F: FastbootInterface>(fastboot_interface: &mut F) -> Result<()> {
     set_slot_a_active(fastboot_interface).await?;
     fastboot_interface.continue_boot().await.map_err(|_| anyhow!("Could not reboot device"))?;
-    writeln!(writer, "Continuing to boot - this could take awhile")?;
     Ok(())
 }
 
@@ -614,13 +522,12 @@ pub async fn lock_device(fastboot_interface: &mut impl FastbootInterface) -> Res
     fastboot_interface.oem(LOCK_COMMAND).await.map_err(|_| anyhow!("Could not lock device"))
 }
 
-pub async fn from_manifest<W, C, F>(
-    writer: &mut W,
+pub async fn from_manifest<C, F>(
+    messenger: Sender<Event>,
     input: C,
     fastboot_interface: &mut F,
 ) -> Result<()>
 where
-    W: Write,
     C: Into<ManifestParams>,
     F: FastbootInterface,
 {
@@ -630,23 +537,27 @@ where
             if !manifest.is_file() {
                 ffx_bail!("Manifest \"{}\" is not a file.", manifest.display());
             }
-            from_path(writer, manifest.to_path_buf(), fastboot_interface, cmd).await
+            from_path(&messenger, manifest.to_path_buf(), fastboot_interface, cmd).await
         }
         None => {
             if let Some(path) = cmd.product_bundle.as_ref().filter(|s| is_local_product_bundle(s)) {
-                from_local_product_bundle(writer, PathBuf::from(&*path), fastboot_interface, cmd)
-                    .await
+                from_local_product_bundle(
+                    &messenger,
+                    PathBuf::from(&*path),
+                    fastboot_interface,
+                    cmd,
+                )
+                .await
             } else {
                 let sdk = ffx_config::global_env_context()
                     .context("loading global environment context")?
                     .get_sdk()
                     .await?;
                 let mut path = sdk.get_path_prefix().to_path_buf();
-                writeln!(writer, "No manifest path was given, using SDK from {}.", path.display())?;
                 path.push("flash.json"); // Not actually used, placeholder value needed.
                 match sdk.get_version() {
-                    SdkVersion::InTree => from_in_tree(writer, fastboot_interface, cmd).await,
-                    SdkVersion::Version(_) => from_sdk(writer, fastboot_interface, cmd).await,
+                    SdkVersion::InTree => from_in_tree(&messenger, fastboot_interface, cmd).await,
+                    SdkVersion::Version(_) => from_sdk(&messenger, fastboot_interface, cmd).await,
                     _ => ffx_bail!("Unknown SDK type"),
                 }
             }

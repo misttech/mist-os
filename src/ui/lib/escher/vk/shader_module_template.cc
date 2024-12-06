@@ -9,7 +9,7 @@
 #include "src/ui/lib/escher/util/trace_macros.h"
 
 #if ESCHER_USE_RUNTIME_GLSL
-#include "third_party/shaderc/libshaderc/include/shaderc/shaderc.hpp"  // nogncheck
+#include <shaderc/shaderc.hpp>  // nogncheck
 #endif
 
 namespace escher {

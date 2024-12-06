@@ -5,7 +5,7 @@
 // TODO(286435361): This file should be generated.
 {
     include: [
-        "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
+        "//sdk/lib/driver_test_realm/meta/client.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],

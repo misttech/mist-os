@@ -67,7 +67,7 @@ class GoldfishDisplayEngineTest : public testing::Test {
 
   std::array<display_config_t, kDisplayCount> configs_ = {};
 
-  std::array<client_composition_opcode_t, kMaxLayerCount * kDisplayCount> results_ = {};
+  std::array<layer_composition_operations_t, kMaxLayerCount * kDisplayCount> results_ = {};
 
   std::unique_ptr<DisplayEngine> display_engine_;
 
@@ -107,10 +107,10 @@ void GoldfishDisplayEngineTest::TearDown() { allocator_binding_->Unbind(); }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigNoDisplay) {
   // Test No display
-  size_t client_composition_opcodes_actual = 0;
+  size_t layer_composition_operations_actual = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      configs_.data(), 0, results_.data(), results_.size(), &client_composition_opcodes_actual);
-  EXPECT_OK(res);
+      configs_.data(), 0, results_.data(), results_.size(), &layer_composition_operations_actual);
+  EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigMultiLayer) {
@@ -122,14 +122,14 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigMultiLayer) {
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
-  EXPECT_OK(res);
+  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kMaxLayerCount);
   int result_cfg_offset = 0;
   for (size_t j = 0; j < kDisplayCount; j++) {
-    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_MERGE_BASE,
-              results_[result_cfg_offset] & CLIENT_COMPOSITION_OPCODE_MERGE_BASE);
+    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_MERGE_BASE,
+              results_[result_cfg_offset] & LAYER_COMPOSITION_OPERATIONS_MERGE_BASE);
     for (unsigned i = 1; i < kMaxLayerCount; i++) {
-      EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_MERGE_SRC, results_[result_cfg_offset + i]);
+      EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_MERGE_SRC, results_[result_cfg_offset + i]);
     }
     result_cfg_offset += kMaxLayerCount;
   }
@@ -157,11 +157,11 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColor) {
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
-  EXPECT_OK(res);
+  EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
-    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_USE_IMAGE,
-              results_[i] & CLIENT_COMPOSITION_OPCODE_USE_IMAGE);
+    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_USE_IMAGE,
+              results_[i] & LAYER_COMPOSITION_OPERATIONS_USE_IMAGE);
   }
 }
 
@@ -186,7 +186,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerPrimary) {
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
-  EXPECT_OK(res);
+  EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
     EXPECT_EQ(0u, results_[i]);
@@ -218,10 +218,10 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerDestFrame) {
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
-  EXPECT_OK(res);
+  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
-    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_FRAME_SCALE, results_[i]);
+    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE, results_[i]);
   }
 }
 
@@ -250,10 +250,10 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerSrcFrame) {
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
-  EXPECT_OK(res);
+  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
-    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_SRC_FRAME, results_[i]);
+    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_SRC_FRAME, results_[i]);
   }
 }
 
@@ -277,10 +277,10 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerAlpha) {
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
-  EXPECT_OK(res);
+  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
-    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_ALPHA, results_[i]);
+    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_ALPHA, results_[i]);
   }
 }
 
@@ -304,10 +304,10 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerTransform) {
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
-  EXPECT_OK(res);
+  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
-    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_TRANSFORM, results_[i]);
+    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_TRANSFORM, results_[i]);
   }
 }
 
@@ -331,11 +331,11 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColorCoversion) {
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
-  EXPECT_OK(res);
+  EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
     // TODO(payamm): For now, driver will pretend it supports color conversion.
-    // It should return CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION instead.
+    // It should return LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION instead.
     EXPECT_EQ(0u, results_[i]);
   }
 }
@@ -368,14 +368,14 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
-  EXPECT_OK(res);
+  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
   for (size_t i = 0; i < kDisplayCount; i++) {
     // TODO(https://fxbug.dev/42080897): Driver will pretend it supports color conversion
     // for now. Instead this should contain
-    // CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION bit.
-    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_FRAME_SCALE | CLIENT_COMPOSITION_OPCODE_SRC_FRAME |
-                  CLIENT_COMPOSITION_OPCODE_ALPHA | CLIENT_COMPOSITION_OPCODE_TRANSFORM,
+    // LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION bit.
+    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE | LAYER_COMPOSITION_OPERATIONS_SRC_FRAME |
+                  LAYER_COMPOSITION_OPERATIONS_ALPHA | LAYER_COMPOSITION_OPERATIONS_TRANSFORM,
               results_[i]);
   }
 }

@@ -8,6 +8,7 @@ load("@bazel_skylib//rules:select_file.bzl", "select_file")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
 load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaDebugSymbolInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _relative_file_name(ctx, filename):
     return ctx.label.name + "_expanded/" + filename
@@ -52,7 +53,7 @@ def _make_component_info(ctx):
     ]
 
 def _unpack_prebuilt_package_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     far_archive = ctx.files.archive[0]
     output_files = [far_archive]
 
@@ -169,7 +170,7 @@ def _unpack_prebuilt_package_impl(ctx):
 _unpack_prebuilt_package = rule(
     doc = """Provides access to a fuchsia package from a prebuilt package archive (.far).""",
     implementation = _unpack_prebuilt_package_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "archive": attr.label(
             doc = "The fuchsia archive (typically a .far file).",
@@ -197,7 +198,7 @@ _unpack_prebuilt_package = rule(
 )
 
 def _pack_prebuilt_package_impl(ctx):
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
 
     # Inputs
     manifest = ctx.files.manifest[0]
@@ -245,7 +246,7 @@ def _pack_prebuilt_package_impl(ctx):
 _pack_prebuilt_package = rule(
     doc = """Provides access to a fuchsia package from a package manifest.""",
     implementation = _pack_prebuilt_package_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "manifest": attr.label(
             doc = "The package's manifest file",

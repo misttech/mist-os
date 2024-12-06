@@ -72,7 +72,7 @@ impl TemplateVars {
         cpp_namespace: String,
         fidl_library_name: String,
     ) -> Self {
-        let cpp_namespace = cpp_namespace.replace('.', "_").replace('-', "_").to_ascii_lowercase();
+        let cpp_namespace = cpp_namespace.replace(['.', '-'], "_").to_ascii_lowercase();
         let header_guard = fidl_library_name.replace('.', "_").to_ascii_uppercase();
         let (fidl_cpp_namespace, fidl_cpp_header_prefix) = {
             let ns = fidl_library_name.replace('.', "_").to_ascii_lowercase();

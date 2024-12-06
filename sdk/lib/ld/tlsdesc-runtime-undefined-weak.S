@@ -55,8 +55,6 @@
 
 #elif defined(__arm__)
 
-.thumb
-
 // Read $tp into \reg (as __builtin_thread_pointer() does).
 .macro read_tp reg
   mrc p15, #0, \reg, c13, c0, #3
@@ -64,7 +62,6 @@
 
 // Return -$tp so that adding $tp yields zero, i.e. nullptr.
 .function _ld_tlsdesc_runtime_undefined_weak, global, retain=TLSDESC_RETAIN
-  .fnstart
   .tlsdesc.cfi
   .tlsdesc.lsda kUndefinedWeak
 
@@ -73,12 +70,10 @@
 
   bx lr
 
-  .fnend
 .end_function
 
 // Return addend-$tp so that adding $tp looks like nullptr+addend.
 .function _ld_tlsdesc_runtime_undefined_weak_addend, global, retain=TLSDESC_RETAIN
-  .fnstart
   .tlsdesc.cfi
   .tlsdesc.lsda kUndefinedWeakAddend
 
@@ -108,7 +103,6 @@
   .cfi_adjust_cfa_offset -8
   bx lr
 
-  .fnend
 .end_function
 
 #elif defined(__riscv)

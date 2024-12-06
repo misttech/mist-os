@@ -12,51 +12,66 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use crate::experimental::clock::{Timed, Timestamp};
-use crate::experimental::series::{FoldError, Interpolator, MatrixSampler};
+use crate::experimental::series::buffer::BufferStrategy;
+use crate::experimental::series::interpolation::Interpolation;
+use crate::experimental::series::statistic::{Metadata, Statistic};
+use crate::experimental::series::{FoldError, Interpolator, MatrixSampler, TimeMatrix};
 
-/// Capacity of "first come, first serve" slots available to clients of
-/// the mpsc::Sender<TelemetryEvent>.
-const TIME_MATRIX_SENDER_BUFFER_SIZE: usize = 10;
-
-/// How often to interpolate time series stats.
-const INTERPOLATE_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(5);
-
-/// Create a `TimeMatrixClient` and a `Future` server for routine management tasks of time
-/// matrices.
-/// The caller of this function is responsible for running the server.
+// TODO(https://fxbug.dev/375489301): It is not possible to inject a mock time matrix into this
+//                                    function. Refactor the function so that a unit test can
+//                                    assert that interpolation occurs after an interval of time.
+/// Creates a client and server for interpolating and recording time matrices to the given [Inspect
+/// node][`Node`].
+///
+/// The client end can be used to instrument and send a [`TimeMatrix`] to the server. The server
+/// end must be polled to incorporate and interpolate time matrices.
+///
+/// [`Node`]: fuchsia_inspect::Node
+/// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
 pub fn serve_time_matrix_inspection(
     node: InspectNode,
 ) -> (TimeMatrixClient, impl Future<Output = Result<(), anyhow::Error>>) {
+    /// The buffer capacity of the MPSC channel through which time matrices are sent from clients
+    /// to the server future.
+    const TIME_MATRIX_SENDER_BUFFER_SIZE: usize = 10;
+
+    /// The duration between interpolating data in inspected time matrices.
+    const INTERPOLATION_PERIOD: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(5);
+
     let (sender, mut receiver) = mpsc::channel::<Arc<Mutex<dyn Interpolator<Error = FoldError>>>>(
         TIME_MATRIX_SENDER_BUFFER_SIZE,
     );
-    let manager = TimeMatrixClient::new(sender, node.clone_weak());
 
-    let fut = async move {
+    let client = TimeMatrixClient::new(sender, node.clone_weak());
+    let server = async move {
         let _node = node;
-        let mut time_matrices = vec![];
+        let mut matrices = vec![];
 
-        let mut interpolate_interval = fasync::Interval::new(INTERPOLATE_INTERVAL);
+        let mut interpolation = fasync::Interval::new(INTERPOLATION_PERIOD);
         loop {
             select! {
-                time_matrix = receiver.next() => {
-                    match time_matrix {
-                        Some(time_matrix) => time_matrices.push(time_matrix),
-                        None => info!("TimeMatrix stream terminated."),
+                // Incorporate any matrices received from the client.
+                matrix = receiver.next() => {
+                    match matrix {
+                        Some(matrix) => matrices.push(matrix),
+                        None => info!("time matrix inspection terminated."),
                     }
                 }
-                _ = interpolate_interval.next() => {
+                // Periodically interpolate data in each matrix.
+                _ = interpolation.next() => {
                     let now = Timestamp::now();
-                    for time_matrix in &time_matrices {
-                        if let Err(e) = time_matrix.lock().interpolate(now) {
-                            warn!("Failed to interpolate {}: {:?}", "TODO: add name", e);
+                    for matrix in matrices.iter() {
+                        if let Err(error) = matrix.lock().interpolate(now) {
+                            // TODO(https://fxbug.dev/375255877): Log more information, such as the
+                            //                                    name associated with the matrix.
+                            warn!("failed to interpolate time matrix: {:?}", error);
                         }
                     }
                 }
             }
         }
     };
-    (manager, fut)
+    (client, server)
 }
 
 type SharedTimeMatrix = Arc<Mutex<dyn Interpolator<Error = FoldError>>>;
@@ -74,39 +89,79 @@ impl Clone for TimeMatrixClient {
 
 impl TimeMatrixClient {
     fn new(sender: mpsc::Sender<SharedTimeMatrix>, node: InspectNode) -> Self {
-        Self { sender: Arc::new(Mutex::new(sender)), node: node }
+        Self { sender: Arc::new(Mutex::new(sender)), node }
     }
 
-    /// Record TimeMatrix lazily into Inspect.
-    /// Also send TimeMatrix to the server future for management.
-    pub fn inspect_time_matrix<T>(
+    /// Sends a [`TimeMatrix`] to the client's inspection server.
+    ///
+    /// See [`inspect_time_matrix_with_metadata`].
+    ///
+    /// [`inspect_time_matrix_with_metadata`]: crate::experimental::serve::TimeMatrixClient::inspect_time_matrix_with_metadata
+    /// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
+    pub fn inspect_time_matrix<F, P>(
         &self,
         name: impl Into<String>,
-        time_matrix: impl MatrixSampler<T> + Send + 'static,
-    ) -> InspectedTimeMatrix<T> {
-        self.inspect_time_matrix_with_metadata(
-            name,
-            time_matrix,
-            InspectedTimeMatrixMetadata::default(),
-        )
+        matrix: TimeMatrix<F, P>,
+    ) -> InspectedTimeMatrix<F::Sample>
+    where
+        TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
+        Metadata<F>: 'static + Send + Sync,
+        F: BufferStrategy<F::Aggregation, P> + Statistic,
+        P: Interpolation<FillSample<F> = F::Sample>,
+    {
+        self.inspect_and_record_with(name, matrix, |_node| {})
     }
 
-    /// Record TimeMatrix lazily with the provided `(key, value)` pairs from |args| into Inspect.
-    /// Also send TimeMatrix to the server future for management.
-    // TODO(https://fxbug.dev/365177159): Flesh out API for setting metadata
-    pub fn inspect_time_matrix_with_metadata<T>(
+    /// Sends a [`TimeMatrix`] to the client's inspection server.
+    ///
+    /// This function lazily records the given [`TimeMatrix`] to Inspect. The server end
+    /// periodically interpolates the matrix and records data as needed. The returned
+    /// [handle][`InspectedTimeMatrix`] can be used to fold samples into the matrix.
+    ///
+    /// [`InspectedTimeMatrix`]: crate::experimental::serve::InspectedTimeMatrix
+    /// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
+    pub fn inspect_time_matrix_with_metadata<F, P>(
         &self,
         name: impl Into<String>,
-        time_matrix: impl MatrixSampler<T> + Send + 'static,
-        metadata: InspectedTimeMatrixMetadata,
-    ) -> InspectedTimeMatrix<T> {
+        matrix: TimeMatrix<F, P>,
+        metadata: impl Into<Metadata<F>>,
+    ) -> InspectedTimeMatrix<F::Sample>
+    where
+        TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
+        Metadata<F>: 'static + Send + Sync,
+        F: BufferStrategy<F::Aggregation, P> + Statistic,
+        P: Interpolation<FillSample<F> = F::Sample>,
+    {
+        let metadata = Arc::new(metadata.into());
+        self.inspect_and_record_with(name, matrix, move |node| {
+            use crate::experimental::series::metadata::Metadata;
+
+            node.record_child("metadata", |node| {
+                metadata.record(node);
+            })
+        })
+    }
+
+    fn inspect_and_record_with<F, P, R>(
+        &self,
+        name: impl Into<String>,
+        matrix: TimeMatrix<F, P>,
+        record: R,
+    ) -> InspectedTimeMatrix<F::Sample>
+    where
+        TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
+        Metadata<F>: 'static + Send + Sync,
+        F: BufferStrategy<F::Aggregation, P> + Statistic,
+        P: Interpolation<FillSample<F> = F::Sample>,
+        R: 'static + Clone + Fn(&InspectNode) + Send + Sync,
+    {
         let name = name.into();
-        let time_matrix = Arc::new(Mutex::new(time_matrix));
-        record_lazy_time_matrix(&self.node, &name, time_matrix.clone(), metadata);
-        if let Err(e) = self.sender.lock().try_send(time_matrix.clone()) {
-            error!("Failed to process TimeMatrix {}: {:?}", name, e);
+        let matrix = Arc::new(Mutex::new(matrix));
+        self::record_lazy_time_matrix_with(&self.node, &name, matrix.clone(), record);
+        if let Err(error) = self.sender.lock().try_send(matrix.clone()) {
+            error!("failed to send time matrix \"{}\" to inspection server: {:?}", name, error);
         }
-        InspectedTimeMatrix::new(name, time_matrix)
+        InspectedTimeMatrix::new(name, matrix)
     }
 }
 
@@ -115,71 +170,59 @@ impl TimeMatrixClient {
 pub struct InspectedTimeMatrix<T> {
     name: String,
     #[derivative(Debug = "ignore")]
-    time_matrix: Arc<Mutex<dyn MatrixSampler<T> + Send>>,
+    matrix: Arc<Mutex<dyn MatrixSampler<T> + Send>>,
 }
 
 impl<T> InspectedTimeMatrix<T> {
     pub(crate) fn new(
         name: impl Into<String>,
-        time_matrix: Arc<Mutex<dyn MatrixSampler<T> + Send>>,
+        matrix: Arc<Mutex<dyn MatrixSampler<T> + Send>>,
     ) -> Self {
-        Self { name: name.into(), time_matrix }
+        Self { name: name.into(), matrix }
     }
 
     pub fn fold(&self, sample: Timed<T>) -> Result<(), FoldError> {
-        self.time_matrix.lock().fold(sample)
+        self.matrix.lock().fold(sample)
     }
 
     pub fn fold_or_log_error(&self, sample: Timed<T>) {
-        if let Err(e) = self.time_matrix.lock().fold(sample) {
-            warn!("Failed logging {} sample: {:?}", self.name, e);
+        if let Err(error) = self.matrix.lock().fold(sample) {
+            warn!("failed to fold sample into time matrix \"{}\": {:?}", self.name, error);
         }
     }
 }
 
-/// A superset of metadata that might be attached to a TimeMatrix's Inspect node
-#[derive(Debug, Default)]
-pub struct InspectedTimeMatrixMetadata {
-    bit_mapping: Option<String>,
-}
-
-impl InspectedTimeMatrixMetadata {
-    pub fn with_bit_mapping(self, bit_mapping: String) -> Self {
-        Self { bit_mapping: Some(bit_mapping), ..self }
-    }
-
-    fn record_inspect(&self, node: &InspectNode) {
-        if let Some(bit_mapping) = &self.bit_mapping {
-            node.record_string("bit_mapping", bit_mapping);
-        }
-    }
-}
-
-fn record_lazy_time_matrix(
-    inspect_node: &InspectNode,
+/// Records a lazy child node in the given node that records buffers and metadata for the given
+/// time matrix.
+///
+/// The function `f` is passed a node to record arbitrary data after the data semantic and buffers
+/// of the time matrix have been recorded using that same node.
+fn record_lazy_time_matrix_with<F>(
+    node: &InspectNode,
     name: impl Into<String>,
-    time_matrix: Arc<Mutex<dyn Interpolator<Error = FoldError> + Send>>,
-    metadata: InspectedTimeMatrixMetadata,
-) {
+    matrix: Arc<Mutex<dyn Interpolator<Error = FoldError> + Send>>,
+    f: F,
+) where
+    F: 'static + Clone + Fn(&InspectNode) + Send + Sync,
+{
     let name = name.into();
-    let metadata = Arc::new(metadata);
-    inspect_node.record_lazy_child(name, move || {
-        let time_matrix = time_matrix.clone();
-        let metadata = metadata.clone();
+    node.record_lazy_child(name, move || {
+        let matrix = matrix.clone();
+        let f = f.clone();
         async move {
             let inspector = Inspector::default();
             {
                 let now = Timestamp::now();
-                match time_matrix.lock().interpolate_and_get_buffers(now) {
+                match matrix.lock().interpolate_and_get_buffers(now) {
                     Ok(buffer) => {
                         inspector.root().atomic_update(|node| {
                             node.record_string("type", buffer.data_semantic);
                             node.record_bytes("data", buffer.data);
-                            metadata.record_inspect(&node);
+                            f(node);
                         });
                     }
-                    Err(e) => {
-                        inspector.root().record_string("type", format!("error: {:?}", e));
+                    Err(error) => {
+                        inspector.root().record_string("type", format!("error: {:?}", error));
                     }
                 }
             }
@@ -195,89 +238,78 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, AnyBytesProperty};
     use fuchsia_async as fasync;
     use futures::task::Poll;
+    use std::mem;
     use std::pin::pin;
 
-    use crate::experimental::testing::{MockTimeMatrix, TimeMatrixCall};
+    use crate::experimental::series::interpolation::LastSample;
+    use crate::experimental::series::metadata::BitSetMap;
+    use crate::experimental::series::statistic::Union;
 
     #[test]
-    fn test_serve_time_matrix_inspection_interpolate_data_periodically() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+    fn serve_time_matrix_inspection_then_inspect_data_tree_contains_buffers() {
+        let _executor = fasync::TestExecutor::new_with_fake_time();
 
         let inspector = Inspector::default();
-        let (client, test_fut) =
-            serve_time_matrix_inspection(inspector.root().create_child("time_series"));
-        let mut test_fut = pin!(test_fut);
+        let (client, _server) =
+            serve_time_matrix_inspection(inspector.root().create_child("serve_test_node"));
+        let _matrix = client
+            .inspect_time_matrix("connectivity", TimeMatrix::<Union<u64>, LastSample>::default());
 
-        let time_matrix = MockTimeMatrix::<u64>::default();
-        let _inspected_time_matrix = client.inspect_time_matrix("blah_blah", time_matrix.clone());
-
-        let Poll::Pending = exec.run_until_stalled(&mut test_fut) else {
-            panic!("test_fut has terminated");
-        };
-        assert_eq!(&time_matrix.drain_calls()[..], &[]);
-
-        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(300_000_000_000));
-        let Poll::Pending = exec.run_until_stalled(&mut test_fut) else {
-            panic!("test_fut has terminated");
-        };
-        assert_eq!(
-            &time_matrix.drain_calls()[..],
-            &[TimeMatrixCall::Interpolate(Timestamp::from_nanos(300_000_000_000))]
-        );
-    }
-
-    #[test]
-    fn test_serve_time_matrix_inspection_outputs_data_in_inspect() {
-        let _exec = fasync::TestExecutor::new_with_fake_time();
-
-        let inspector = Inspector::default();
-        let (client, _test_fut) =
-            serve_time_matrix_inspection(inspector.root().create_child("time_series"));
-        let time_matrix = MockTimeMatrix::<u64>::default();
-        let metadata =
-            InspectedTimeMatrixMetadata::default().with_bit_mapping("some_bit_mapping".to_string());
-        let _inspected_time_matrix =
-            client.inspect_time_matrix_with_metadata("blah_blah", time_matrix.clone(), metadata);
-
-        assert_data_tree!(inspector, root: {
-            time_series: {
-                blah_blah: {
-                    "type": "mock",
+        assert_data_tree!(inspector, root: contains {
+            serve_test_node: {
+                connectivity: {
+                    "type": "bitset",
                     "data": AnyBytesProperty,
-                    "bit_mapping": "some_bit_mapping",
                 }
             }
         });
     }
 
     #[test]
-    fn test_inspected_time_matrix_fold() {
-        let _exec = fasync::TestExecutor::new_with_fake_time();
+    fn serve_time_matrix_inspection_with_metadata_then_inspect_data_tree_contains_metadata() {
+        let _executor = fasync::TestExecutor::new_with_fake_time();
 
         let inspector = Inspector::default();
-        let (client, _test_fut) =
-            serve_time_matrix_inspection(inspector.root().create_child("time_series"));
-        let time_matrix = MockTimeMatrix::<u64>::default();
-        let inspected_time_matrix = client.inspect_time_matrix("blah_blah", time_matrix.clone());
-        assert!(inspected_time_matrix.fold(Timed::now(1)).is_ok());
-        assert_eq!(&time_matrix.drain_calls()[..], &[TimeMatrixCall::Fold(Timed::now(1))]);
+        let (client, _server) =
+            self::serve_time_matrix_inspection(inspector.root().create_child("serve_test_node"));
+        let _matrix = client.inspect_time_matrix_with_metadata(
+            "engine",
+            TimeMatrix::<Union<u64>, LastSample>::default(),
+            BitSetMap::from_ordered(["check", "oil", "battery", "coolant"]),
+        );
+
+        assert_data_tree!(inspector, root: contains {
+            serve_test_node: {
+                engine: {
+                    "type": "bitset",
+                    "data": AnyBytesProperty,
+                    metadata: {
+                        index: {
+                            "0": "check",
+                            "1": "oil",
+                            "2": "battery",
+                            "3": "coolant",
+                        }
+                    }
+                }
+            }
+        });
     }
 
     #[test]
-    fn test_dropping_time_matrix_client() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time();
+    fn drop_time_matrix_client_then_server_continues_execution() {
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         let inspector = Inspector::default();
-        let (client, test_fut) =
-            serve_time_matrix_inspection(inspector.root().create_child("time_series"));
-        let mut test_fut = pin!(test_fut);
+        let (client, server) =
+            serve_time_matrix_inspection(inspector.root().create_child("serve_test_node"));
+        let mut server = pin!(server);
 
-        std::mem::drop(client);
+        mem::drop(client);
 
-        // The server fut should continue running even if TimeMatrixClient is dropped
-        let Poll::Pending = exec.run_until_stalled(&mut test_fut) else {
-            panic!("test_fut has terminated");
+        // The server future should continue execution even if its associated client is dropped.
+        let Poll::Pending = executor.run_until_stalled(&mut server) else {
+            panic!("time matrix inspection server terminated unexpectedly");
         };
     }
 }

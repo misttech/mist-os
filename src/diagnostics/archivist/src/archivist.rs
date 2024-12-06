@@ -16,20 +16,19 @@ use crate::logs::debuglog::KernelDebugLog;
 use crate::logs::repository::{ComponentInitialInterest, LogsRepository};
 use crate::logs::serial::{SerialConfig, SerialSink};
 use crate::logs::servers::*;
-use crate::pipeline::Pipeline;
+use crate::pipeline::PipelineManager;
 use archivist_config::Config;
-use fidl_fuchsia_diagnostics::ArchiveAccessorRequestStream;
 use fidl_fuchsia_process_lifecycle::LifecycleRequestStream;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
 use futures::prelude::*;
 use moniker::ExtendedMoniker;
-use std::path::Path;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
-use {fidl_fuchsia_diagnostics_host as fhost, fidl_fuchsia_io as fio, fuchsia_async as fasync};
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Responsible for initializing an `Archivist` instance. Supports multiple configurations by
 /// either calling or not calling methods on the builder like `serve_test_controller_protocol`.
@@ -38,7 +37,7 @@ pub struct Archivist {
     event_router: EventRouter,
 
     /// The diagnostics pipelines that have been installed.
-    pipelines: Vec<Arc<Pipeline>>,
+    pipeline_manager: PipelineManager,
 
     /// The repository holding Inspect data.
     _inspect_repository: Arc<InspectRepository>,
@@ -77,7 +76,13 @@ impl Archivist {
         let servers_scope = fasync::Scope::new();
 
         // Initialize the pipelines that the archivist will expose.
-        let pipelines = Self::init_pipelines(&config);
+        let pipeline_manager = PipelineManager::new(
+            PathBuf::from(&config.pipelines_path),
+            component::inspector().root().create_child("pipelines"),
+            component::inspector().root().create_child("archive_accessor_stats"),
+            general_scope.new_child(),
+        )
+        .await;
 
         // Initialize the core event router
         let mut event_router =
@@ -106,7 +111,7 @@ impl Archivist {
             general_scope.spawn(write_logs_to_serial);
         }
         let inspect_repo = Arc::new(InspectRepository::new(
-            pipelines.iter().map(Arc::downgrade).collect(),
+            pipeline_manager.weak_pipelines(),
             general_scope.new_child(),
         ));
 
@@ -177,38 +182,13 @@ impl Archivist {
             log_stream_server,
             event_router,
             _inspect_sink_server: inspect_sink_server,
-            pipelines,
+            pipeline_manager,
             _inspect_repository: inspect_repo,
             logs_repository: logs_repo,
             general_scope,
             servers_scope,
             incoming_events_scope,
         }
-    }
-
-    fn init_pipelines(config: &Config) -> Vec<Arc<Pipeline>> {
-        let pipelines_node = component::inspector().root().create_child("pipelines");
-        let accessor_stats_node =
-            component::inspector().root().create_child("archive_accessor_stats");
-        let pipelines_path = Path::new(&config.pipelines_path);
-        let pipelines = [
-            Pipeline::feedback(pipelines_path, &pipelines_node, &accessor_stats_node),
-            Pipeline::legacy_metrics(pipelines_path, &pipelines_node, &accessor_stats_node),
-            Pipeline::lowpan(pipelines_path, &pipelines_node, &accessor_stats_node),
-            Pipeline::all_access(pipelines_path, &pipelines_node, &accessor_stats_node),
-        ];
-
-        if pipelines.iter().any(|p| p.config_has_error()) {
-            component::health().set_unhealthy("Pipeline config has an error");
-        } else {
-            component::health().set_ok();
-        }
-        let pipelines = pipelines.into_iter().map(Arc::new).collect::<Vec<_>>();
-
-        component::inspector().root().record(pipelines_node);
-        component::inspector().root().record(accessor_stats_node);
-
-        pipelines
     }
 
     pub async fn initialize_external_event_sources(
@@ -246,11 +226,6 @@ impl Archivist {
         }
     }
 
-    fn add_host_before_last_dot(input: &str) -> String {
-        let (rest, last) = input.rsplit_once('.').unwrap();
-        format!("{}.host.{}", rest, last)
-    }
-
     /// Run archivist to completion.
     /// # Arguments:
     /// * `outgoing_channel`- channel to serve outgoing directory on.
@@ -258,12 +233,13 @@ impl Archivist {
         mut self,
         mut fs: ServiceFs<ServiceObj<'static, ()>>,
         is_embedded: bool,
+        store: fsandbox::CapabilityStoreProxy,
         request_stream: LifecycleRequestStream,
     ) -> Result<(), Error> {
         debug!("Running Archivist.");
 
         // Start servicing all outgoing services.
-        self.serve_protocols(&mut fs);
+        self.serve_protocols(&mut fs, store).await;
         let svc_task = self.general_scope.spawn(fs.collect::<()>());
 
         let _inspect_server_task = inspect_runtime::publish(
@@ -272,8 +248,8 @@ impl Archivist {
         );
 
         let Self {
-            pipelines: _pipelines,
             _inspect_repository,
+            mut pipeline_manager,
             logs_repository,
             accessor_server: _accessor_server,
             log_server: _log_server,
@@ -302,52 +278,42 @@ impl Archivist {
             logs_repository.stop_accepting_new_log_sinks();
             debug!("Close any new connections to FIDL servers");
             svc_task.cancel().await;
+            pipeline_manager.cancel().await;
             debug!("Stop allowing new connections through the incoming namespace.");
             logs_repository.wait_for_termination().await;
             debug!("All LogSink connections have finished");
             servers_scope.join().await;
             debug!("All servers stopped.");
         }));
-
         if is_embedded {
             debug!("Entering core loop.");
         } else {
             info!("archivist: Entering core loop.");
         }
 
+        component::health().set_ok();
         general_scope.await;
 
         Ok(())
     }
 
-    fn serve_protocols(&mut self, fs: &mut ServiceFs<ServiceObj<'static, ()>>) {
+    async fn serve_protocols(
+        &mut self,
+        fs: &mut ServiceFs<ServiceObj<'static, ()>>,
+        mut store: fsandbox::CapabilityStoreProxy,
+    ) {
         component::serve_inspect_stats();
-
         let mut svc_dir = fs.dir("svc");
 
-        // Serve fuchsia.diagnostics.ArchiveAccessors backed by a pipeline.
-        for pipeline in &self.pipelines {
-            let host_accessor_server = Arc::clone(&self.accessor_server);
-            let accessor_server = Arc::clone(&self.accessor_server);
-            let accessor_pipeline = Arc::clone(pipeline);
-            svc_dir.add_fidl_service_at(
-                pipeline.protocol_name(),
-                move |stream: ArchiveAccessorRequestStream| {
-                    accessor_server.spawn_server(Arc::clone(&accessor_pipeline), stream);
-                },
-            );
-            let accessor_pipeline = Arc::clone(pipeline);
-            // TODO(https://fxbug.dev/42077091): Add Inspect support
-            let accessor = Self::add_host_before_last_dot(accessor_pipeline.protocol_name());
-            svc_dir.add_fidl_service_at(
-                accessor,
-                move |stream: fhost::ArchiveAccessorRequestStream| {
-                    host_accessor_server.spawn_server(Arc::clone(&accessor_pipeline), stream);
-                },
-            );
-        }
+        let id_gen = sandbox::CapabilityIdGenerator::new();
 
-        // Server fuchsia.logger.Log
+        // Serve fuchsia.diagnostics.ArchiveAccessors backed by a pipeline.
+        let accessors_dict_id = self
+            .pipeline_manager
+            .serve_pipelines(Arc::clone(&self.accessor_server), &id_gen, &mut store)
+            .await;
+
+        // Serve fuchsia.logger.Log
         let log_server = Arc::clone(&self.log_server);
         svc_dir.add_fidl_service(move |stream| {
             debug!("fuchsia.logger.Log connection");
@@ -372,6 +338,43 @@ impl Archivist {
             debug!("fuchsia.diagnostics.LogSettings connection");
             log_settings_server.spawn(stream);
         });
+
+        // Serve fuchsia.component.sandbox.Router
+        let router_scope = self.servers_scope.new_child();
+        svc_dir.add_fidl_service(move |mut stream: fsandbox::DictionaryRouterRequestStream| {
+            let id_gen = Clone::clone(&id_gen);
+            let store = Clone::clone(&store);
+            router_scope.spawn(async move {
+                while let Ok(Some(request)) = stream.try_next().await {
+                    match request {
+                        fsandbox::DictionaryRouterRequest::Route { payload: _, responder } => {
+                            debug!("Got route request for the dynamic accessors dictionary");
+                            let dup_dict_id = id_gen.next();
+                            store
+                                .duplicate(*accessors_dict_id, dup_dict_id)
+                                .await
+                                .unwrap()
+                                .unwrap();
+                            let capability = store.export(dup_dict_id).await.unwrap().unwrap();
+                            let fsandbox::Capability::Dictionary(dict) = capability else {
+                                let _ = responder.send(Err(fsandbox::RouterError::Internal));
+                                continue;
+                            };
+                            let _ = responder.send(Ok(
+                                fsandbox::DictionaryRouterRouteResponse::Dictionary(dict),
+                            ));
+                        }
+                        fsandbox::DictionaryRouterRequest::_UnknownMethod {
+                            method_type,
+                            ordinal,
+                            ..
+                        } => {
+                            warn!(?method_type, ordinal, "Got unknown interaction on Router")
+                        }
+                    }
+                }
+            });
+        });
     }
 }
 
@@ -386,6 +389,7 @@ mod tests {
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy};
     use futures::channel::oneshot;
+    use std::collections::HashSet;
     use std::marker::PhantomData;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -473,6 +477,44 @@ mod tests {
         }
     }
 
+    fn spawn_fake_store_server() -> (fsandbox::CapabilityStoreProxy, fasync::Task<()>) {
+        let (store, mut request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
+        let task = fasync::Task::spawn(async move {
+            let mut dict_ids = HashSet::new();
+            let mut connector_ids = HashSet::new();
+            while let Some(Ok(request)) = request_stream.next().await {
+                match request {
+                    fsandbox::CapabilityStoreRequest::DictionaryInsert {
+                        id, responder, ..
+                    } => {
+                        assert!(dict_ids.contains(&id));
+                        assert!(!connector_ids.contains(&id));
+                        responder.send(Ok(())).unwrap();
+                    }
+                    fsandbox::CapabilityStoreRequest::ConnectorCreate { id, responder, .. } => {
+                        assert!(!connector_ids.contains(&id));
+                        assert!(!dict_ids.contains(&id));
+                        connector_ids.insert(id);
+                        responder.send(Ok(())).unwrap();
+                    }
+                    fsandbox::CapabilityStoreRequest::DictionaryCreate {
+                        id, responder, ..
+                    } => {
+                        assert!(!connector_ids.contains(&id));
+                        assert!(!dict_ids.contains(&id));
+                        dict_ids.insert(id);
+                        responder.send(Ok(())).unwrap();
+                    }
+                    _ => {
+                        unreachable!("tests don't call into this");
+                    }
+                }
+            }
+        });
+        (store, task)
+    }
+
     // run archivist and send signal when it dies.
     async fn run_archivist_and_signal_on_exit(
     ) -> (fio::DirectoryProxy, LifecycleProxy, oneshot::Receiver<()>) {
@@ -484,7 +526,8 @@ mod tests {
         let (lifecycle_proxy, request_stream) =
             fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>();
         fasync::Task::spawn(async move {
-            archivist.run(fs, false, request_stream).await.expect("Cannot run archivist");
+            let (store, _task) = spawn_fake_store_server();
+            archivist.run(fs, false, store, request_stream).await.expect("Cannot run archivist");
             signal_send.send(()).unwrap();
         })
         .detach();
@@ -500,7 +543,8 @@ mod tests {
         let (lifecycle_proxy, request_stream) =
             fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>();
         fasync::Task::spawn(async move {
-            archivist.run(fs, false, request_stream).await.expect("Cannot run archivist");
+            let (store, _task) = spawn_fake_store_server();
+            archivist.run(fs, false, store, request_stream).await.expect("Cannot run archivist");
         })
         .detach();
         (directory, lifecycle_proxy)

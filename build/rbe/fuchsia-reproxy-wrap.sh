@@ -32,9 +32,11 @@ project_root_rel="$(relpath . "$project_root")"
 
 # defaults
 readonly default_config="$script_dir"/fuchsia-reproxy.cfg
+readonly gcertauth_config="$script_dir"/fuchsia-reproxy-gcertauth.cfg
 
 readonly PREBUILT_SUBDIR="$PREBUILT_OS"-"$PREBUILT_ARCH"
 
+readonly check_loas_script="$script_dir"/check_loas_restrictions.sh
 readonly build_summary_script="$script_dir"/build_summary.py
 
 # location of reclient binaries relative to output directory where build is run
@@ -44,6 +46,8 @@ reclient_bindir="$project_root_rel"/prebuilt/proprietary/third_party/reclient/"$
 readonly fx_build_metrics_config="$project_root_rel"/.fx-build-metrics-config
 
 readonly jq="$project_root/prebuilt/third_party/jq/"$PREBUILT_SUBDIR"/bin/jq"
+
+loas_type=auto
 
 usage() {
   cat <<EOF
@@ -63,6 +67,9 @@ options:
   --bindir DIR: location of reproxy tools
   --logdir DIR: unique reproxy log dir
   --tmpdir DIR: reproxy temp dir
+  --loas-type TYPE: {skip,auto,restricted,unrestricted}, default [$loas_type]
+    'skip' will bypass any preflight authentication checks
+    'auto' will attempt to detect as restricted or unrestricted.
   -t: print additional timestamps for measuring overhead.
   -v | --verbose: print events verbosely
   All other flags before -- are forwarded to the reproxy bootstrap.
@@ -120,6 +127,8 @@ do
     --logdir) prev_opt=reproxy_logdir ;;
     --tmpdir=*) reproxy_tmpdir="$optarg" ;;
     --tmpdir) prev_opt=reproxy_tmpdir ;;
+    --loas-type=*) loas_type="$optarg" ;;
+    --loas-type) prev_opt=loas_type ;;
     -t) print_times=1 ;;
     -v | --verbose) verbose=1 ;;
     # stop option processing
@@ -227,23 +236,42 @@ rewrapper_env=(
 )
 
 # Check authentication.
-auth_option=()
-if [[ -n "${USER+x}" ]]
-then
-  gcert_status=0
-  gcert="$(which gcert)" || gcert_status="$?"
-  if [[ "$gcert_status" == 0 ]]
-  then
-    # In a Corp environment.
-    # Use the credentials helper named in the cfg.
-    :
-  else
-    # Everyone else uses gcloud authentication.
+# Same as 'fx rbe preflight', but re-implemented here to be standalone.
+[[ "$loas_type" != "auto" ]] || {
+  # Detect "restricted" or "unrestricted"
+  loas_type="$("$check_loas_script" | tail -n 1)" || {
+    echo "Error detecting LOAS certificate type"
+    exit 1
+  }
+}
+
+case "$loas_type" in
+  skip) ;;
+  unrestricted)
+    # Eligible to use credential helper to refresh OAuth from LOAS.
+    gcertstatus --check_remaining=2h > /dev/null || gcert || {
+      echo "Please run gcert to get a valid LOAS certificate."
+      exit 1
+    }
+    # There may be an reclient bootstrap bug where passing
+    # reproxy config options does not get forwarded properly,
+    # but concatenating configs together works.
+    configs+=( "$gcertauth_config" )
+    ;;
+  *)  # including 'restricted'
+    [[ "$loas_type" == restricted ]] || {
+      cat <<EOF
+Warning: Unexpected loas_type: '$loas_type'
+Proceeding as if type is "restricted".
+File a go/fuchsia-build-bug, including a go/paste link of: sh -x $check_loas_script
+EOF
+    }
+    # Can only use OAuth tokens directly, using gcloud authentication.
     gcloud="$(which gcloud)" || {
       cat <<EOF
 \`gcloud\` command not found (but is needed to authenticate).
-\`gcloud\` can be installed from the Cloud SDK:
 
+Run 'fx rbe auth' for a first-time setup or follow steps at:
   http://go/cloud-sdk#installing-and-using-the-cloud-sdk
 
 EOF
@@ -251,20 +279,18 @@ EOF
     }
 
     # Instruct user to authenticate if needed.
-    "$gcloud" auth list 2>&1 | grep -q "$USER@google.com" || {
+    "$gcloud" auth list 2>&1 | grep -q -w "$USER@google.com" || {
       cat <<EOF
 Did not find credentialed account (\`gcloud auth list\`): $USER@google.com.
-You may need to re-authenticate every 20 hours.
 
-To authenticate, run:
-
+To authenticate, run 'fx rbe auth' or
   gcloud auth login --update-adc
 
 EOF
       exit 1
     }
-  fi
-fi
+    ;;
+esac
 
 # If configured, collect reproxy logs.
 BUILD_METRICS_ENABLED=0

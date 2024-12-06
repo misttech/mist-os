@@ -11,15 +11,6 @@
 .ccls-cache
 .envrc
 .flutter_tool_state
-.fx
-.fx-build-dir
-.fx-build-profile-config
-.fx-build-metrics-config
-.fx-metrics-config
-.fx-multi-list
-.fx-remote-config
-.fx-ssh-path
-.fx-sync-from-stem.cache
 .cproject
 .DS_Store
 .gdb_history
@@ -67,6 +58,20 @@ tmp/
 !/third_party/rust_crates/vendor/**/tmp/
 json_generator_tests_*.txt
 tables_generator_tests_*.txt
+
+### fx configuration and cache files.
+# NOTE: For any new files, please write files under the top-level .fx/ directory
+# instead of adding new top-level files, to avoid cluttering this .gitignore
+# file and the top level of local checkouts.
+/.fx/
+.fx-build-dir
+.fx-build-profile-config
+.fx-build-metrics-config
+.fx-metrics-config
+.fx-multi-list
+.fx-remote-config
+.fx-ssh-path
+.fx-sync-from-stem.cache
 
 ### Checkout generated files
 /build/checkout.gni
@@ -171,6 +176,8 @@ tables_generator_tests_*.txt
 /third_party/pypng/src
 !/third_party/fuchsia-infra-bazel-rules
 /third_party/fuchsia-infra-bazel-rules/src
+!/third_party/volk
+/third_party/volk/src
 
 /tmp/
 /vendor/
@@ -179,6 +186,12 @@ tables_generator_tests_*.txt
 
 # rust-analyzer
 /rust-project.json
+
+# Symlinks related to the Bazel workspace
+/bazel-bin
+/bazel-out
+/bazel-repos
+/bazel-workspace
 
 # Symlinks created by `fx setup-go`.
 /go.mod

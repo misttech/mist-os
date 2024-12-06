@@ -26,7 +26,7 @@ pub enum ReadVersionError {
 
 struct SystemVersionVisitor;
 
-impl<'de> Visitor<'de> for SystemVersionVisitor {
+impl Visitor<'_> for SystemVersionVisitor {
     type Value = SystemVersion;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

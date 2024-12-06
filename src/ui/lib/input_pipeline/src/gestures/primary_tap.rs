@@ -25,6 +25,7 @@ pub(super) struct InitialContender {
 }
 
 impl InitialContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_finger_contact_contender(
         self: Box<Self>,
         finger_down_event: TouchpadEvent,
@@ -82,6 +83,7 @@ struct FingerContactContender {
 }
 
 impl FingerContactContender {
+    #[allow(clippy::boxed_local, reason = "mass allow for https://fxbug.dev/381896734")]
     fn into_matched_contender(
         self: Box<Self>,
         finger_up_event: TouchpadEvent,

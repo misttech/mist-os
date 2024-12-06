@@ -172,10 +172,6 @@ class BazelRepositoryAttr(object):
     def name(self) -> str:
         return self._name
 
-    @property
-    def fuchsia_api_level_override(self) -> str:
-        return ""
-
 
 class BazelRepositoryContext(object):
     """A Python object that mimics a Starlark repository_ctx at runtime."""

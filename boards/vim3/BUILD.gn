@@ -125,25 +125,11 @@ board_configuration("vim3") {
 board_configuration("reduced_perf_variation") {
   forward_variables_from(common_board_configuration, "*")
 
-  input_bundles += [ ":reduced_perf_variation_args" ]
-
   # Disable serial console printing during early boot, a phase during which
   # UART communication is single-threaded and synchronous. In production,
   # the serial console will be disabled, and so early boot benchmarks that
   # include this work is sensibly avoided.
   kernel.quiet_early_boot = true
-}
-
-board_input_bundle("reduced_perf_variation_args") {
-  kernel_cmdline = [
-    # Disable page scanning in all its forms. Page scanning is intended to
-    # provide a memory benefit to final systems, but the operation of the
-    # scanner and its unpredictable de-duplication or eviction of memory in use
-    # by benchmarks could cause noticeable variation.
-    "kernel.page-scanner.start-at-boot=false",
-    "kernel.page-scanner.zero-page-scans-per-second=0",
-    "kernel.page-scanner.enable-eviction=false",
-  ]
 }
 
 board_input_bundle("main_bundle") {
@@ -221,9 +207,9 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-pwm-init.cm" ]
     },
     {
-      package_target = "//src/devices/serial/drivers/aml-uart:package-dfv2"
+      package_target = "//src/devices/serial/drivers/aml-uart:package"
       package_set = "bootfs"
-      driver_components = [ "meta/aml-uart-dfv2.cm" ]
+      driver_components = [ "meta/aml-uart.cm" ]
     },
     {
       package_target = "//src/devices/thermal/drivers/aml-thermal:package"
@@ -353,7 +339,7 @@ group("vim3-release") {
     "//src/devices/power/drivers/fusb302:package-archive",
     "//src/devices/pwm/drivers/aml-pwm:package-archive",
     "//src/devices/pwm/drivers/aml-pwm-init:package-archive",
-    "//src/devices/serial/drivers/aml-uart:package-dfv2-archive",
+    "//src/devices/serial/drivers/aml-uart:package-archive",
     "//src/devices/suspend/drivers/aml-suspend:package-archive",
     "//src/devices/temperature/drivers/aml-trip:package-archive",
     "//src/devices/thermal/drivers/aml-thermal:package-archive",

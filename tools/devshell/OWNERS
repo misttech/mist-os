@@ -8,7 +8,6 @@ per-file             tests/subcommands/fx_remote_test = file: /src/sys/pkg/OWNER
 per-file             tests/subcommands/fx_serve_update_test = file: /src/sys/pkg/OWNERS
 
 per-file             flash,flash-migration,flash-remote                = file: /src/firmware/OWNERS
-per-file             pave,pave-remote,pave-zedboot,pave-zedboot-remote = joshuaseaton@google.com,surajmalhotra@google.com
 
 per-file             args,build,clean,clean-build,gen,get-build-artifacts   = file: /build/OWNERS
 per-file             get-build-dir,get-flash-source,get-src-dir,list-boards = file: /build/OWNERS

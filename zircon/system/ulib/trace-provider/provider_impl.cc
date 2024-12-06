@@ -62,7 +62,7 @@ namespace internal {
 
 TraceProviderImpl::TraceProviderImpl(std::string name, async_dispatcher_t* dispatcher,
                                      fidl::ServerEnd<fuchsia_tracing_provider::Provider> server_end)
-    : name_(std::move(name)), dispatcher_(dispatcher), executor_(dispatcher) {
+    : name_(std::move(name)), dispatcher_(dispatcher) {
   fidl::BindServer(
       dispatcher_, std::move(server_end), this,
       [](TraceProviderImpl* impl, fidl::UnbindInfo info,
@@ -94,33 +94,23 @@ void TraceProviderImpl::Stop(StopCompleter::Sync& completer) { Session::StopEngi
 void TraceProviderImpl::Terminate(TerminateCompleter::Sync& completer) { OnClose(); }
 
 void TraceProviderImpl::GetKnownCategories(GetKnownCategoriesCompleter::Sync& completer) {
-  if (get_known_categories_callback_ != nullptr) {
-    auto promise = get_known_categories_callback_().then(
-        [completer = completer.ToAsync(),
-         name = name_](fpromise::result<std::vector<trace::KnownCategory>>& result) mutable {
-          if (result.is_error()) {
-            fprintf(stderr, "TraceProvider: error getting known categories for %s\n", name.c_str());
-            completer.Reply({});
-            return;
-          }
-          auto known_categories = result.take_value();
-          std::vector<fuchsia_tracing::wire::KnownCategory> known_categories_fidl;
-          known_categories_fidl.reserve(known_categories.size());
-          for (const auto& known_category : known_categories) {
-            known_categories_fidl.push_back(fuchsia_tracing::wire::KnownCategory{
-                fidl::StringView::FromExternal(known_category.name),
-                fidl::StringView::FromExternal(known_category.description)});
-          }
-          completer.Reply(fidl::VectorView<fuchsia_tracing::wire::KnownCategory>::FromExternal(
-              known_categories_fidl));
-        });
-    executor_.schedule_task(std::move(promise));
+  // TODO(https://fxbug.dev/42068744): Return the trace categories that were registered with the
+  // category string literal.
+  if (get_known_categories_callback_ == nullptr) {
+    completer.Reply({});
     return;
   }
 
-  // TODO(https://fxbug.dev/42068744): Return the trace categories that were registered with the
-  // category string literal.
-  completer.Reply({});
+  std::vector<trace::KnownCategory> known_categories = get_known_categories_callback_();
+  std::vector<fuchsia_tracing::wire::KnownCategory> known_categories_fidl;
+  known_categories_fidl.reserve(known_categories.size());
+
+  for (const auto& known_category : known_categories) {
+    known_categories_fidl.emplace_back(fidl::StringView::FromExternal(known_category.name),
+                                       fidl::StringView::FromExternal(known_category.description));
+  }
+  completer.Reply(
+      fidl::VectorView<fuchsia_tracing::wire::KnownCategory>::FromExternal(known_categories_fidl));
 }
 
 void TraceProviderImpl::SetGetKnownCategoriesCallback(GetKnownCategoriesCallback callback) {

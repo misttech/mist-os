@@ -199,9 +199,6 @@ Loads a particular version of the Fuchsia IDK.
             doc = "An optional file used to mark the version of the SDK pointed to by local_paths.",
             allow_single_file = True,
         ),
-        "fuchsia_api_level_override": attr.string(
-            doc = "API level override to use when building Fuchsia.",
-        ),
         "buildifier": attr.label(
             doc = "An optional label to the buildifier tool, used to reformat all generated Bazel files.",
             allow_single_file = True,

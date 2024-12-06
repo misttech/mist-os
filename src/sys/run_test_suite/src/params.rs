@@ -43,6 +43,10 @@ pub struct TestParams {
 
     /// Stop the test suite on the first test failure so a debugger can attach.
     pub break_on_failure: bool,
+
+    /// Don't create exception channels, which may conflict with the exception channels created
+    /// by the test.
+    pub no_exception_channel: bool,
 }
 
 /// Parameters that specify how the overall test run should be executed.

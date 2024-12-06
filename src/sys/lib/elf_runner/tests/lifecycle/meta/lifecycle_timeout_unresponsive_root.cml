@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
             name: "custom-timeout-child",
@@ -19,16 +22,6 @@
     use: [
         {
             protocol: [ "fuchsia.process.Launcher" ],
-        },
-    ],
-    offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#custom-timeout-child",
-                "#inherited-timeout-child",
-            ],
         },
     ],
     expose: [

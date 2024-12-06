@@ -31,19 +31,20 @@ To run the audio_mixer_profiler locally using perfcompare, refer to
 
 ### Perfcompare
 
-Perfcompare results are exported in a format that outlines each test case configuration.
+Perfcompare results are exported in a format that outlines each test case configuration --
+beginning with `fuchsia.audio.mixer` to indicate that this test suite targets the audio mixer.
 
 For example:
 
-`fuchsia.audio.mixer_creation: WindowedSinc/Float/Channels_1:1/FrameRates_008000:192000`
-- `fuchsia.audio.mixer_creation` - suite to test mixer creation
+`fuchsia.audio.mixer: Creation/WindowedSinc/Float/Channels_1:1/FrameRates_008000:192000`
+- `Creation` - testing the creation of a mixer
 - `WindowedSinc` - resampler type
 - `Float` - sample format
 - `Channels_1:1` - input channels : output channels
 - `FrameRates_008000:192000` - source sample rate (Hz) : dest sample rate (Hz)
 
-`fuchsia.audio.mixing: Point/Float/Channels_1:1/FrameRates_048000:048000/Mute-`
-- `fuchsia.audio.mixing` - suite to test audio mixing
+`fuchsia.audio.mixer: Mixing/Point/Float/Channels_1:1/FrameRates_048000:048000/Mute-`
+- `Mixing` - testing a combination of audio mixing operations
 - `Point` - resampler type
 - `Float` - sample format
 - `Channels_1:1` - input channels : output channels
@@ -51,8 +52,8 @@ For example:
 - `Mute` - gain factor
 - `-` - accumulate yes (+) or no (-)
 
-`fuchsia.audio.mixer_output: Float/Silence/Channels_1`
-- `fuchsia.audio.mixer_output` - suite to test output production
+`fuchsia.audio.mixer: Output/Float/Silence/Channels_1`
+- `Output` - testing the emitting of final mix output
 - `Float` - sample format
 - `Silence` - range of source data
 - `Channels_1` - number of ouput channels

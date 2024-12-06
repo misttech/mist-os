@@ -6,6 +6,7 @@
 #define SRC_UI_INPUT_DRIVERS_GOLDFISH_SENSOR_INPUT_DEVICE_H_
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/async/dispatcher.h>
+#include <lib/ddk/debug.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fpromise/result.h>
 #include <lib/input_report_reader/reader.h>
@@ -77,6 +78,12 @@ class InputDevice : public InputDeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
   void GetInputReport(GetInputReportRequestView request,
                       GetInputReportCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_input_report::InputDevice> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    zxlogf(WARNING, "Unexpected fidl method invoked: %ld", metadata.method_ordinal);
   }
 
   async_dispatcher_t* dispatcher() const { return dispatcher_; }

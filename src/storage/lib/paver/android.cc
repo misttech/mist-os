@@ -132,15 +132,6 @@ zx::result<std::unique_ptr<PartitionClient>> AndroidDevicePartitioner::FindParti
   return zx::ok(std::move(*status));
 }
 
-zx::result<> AndroidDevicePartitioner::FinalizePartition(const PartitionSpec& spec) const {
-  if (!SupportsPartition(spec)) {
-    ERROR("Unsupported partition %s\n", spec.ToString().c_str());
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  return zx::make_result(gpt_->GetGpt()->Sync());
-}
-
 zx::result<> AndroidDevicePartitioner::WipeFvm() const { return gpt_->WipeFvm(); }
 
 zx::result<> AndroidDevicePartitioner::ResetPartitionTables() const {

@@ -62,6 +62,32 @@
             },
             {
                 "notes": [
+                    "Temporarily skip to allow volk to land.",
+                    "See b/382158082 for more info."
+                ],
+                "paths": [
+                    "third_party/volk"
+                ]
+            },
+            {
+                "notes": [
+                    "Temporarily disabled to allow for repository moves.",
+                    "See b/382185999 for more info."
+                ],
+                "paths": [
+                    "third_party/glslang",
+                    "third_party/shaderc",
+                    "third_party/spirv-cross",
+                    "third_party/spirv-headers",
+                    "third_party/spirv-tools",
+                    "third_party/Vulkan-Headers",
+                    "third_party/Vulkan-Loader",
+                    "third_party/Vulkan-Tools",
+                    "third_party/Vulkan-ValidationLayers"
+                ]
+            },
+            {
+                "notes": [
                     "Exempt the SDK workflow validation test workspace directory"
                 ],
                 "paths": [

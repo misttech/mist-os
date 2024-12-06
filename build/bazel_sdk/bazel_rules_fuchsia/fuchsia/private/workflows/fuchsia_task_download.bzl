@@ -7,6 +7,7 @@
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_shell_task.bzl", "shell_task_rule")
 load(":providers.bzl", "FuchsiaProductBundleInfo")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def get_product_bundle_dir(ctx):
     pb = ctx.attr.product_bundle[FuchsiaProductBundleInfo]
@@ -21,7 +22,7 @@ def _fuchsia_task_download_impl(ctx, make_shell_task):
         fail("fuchsia_task_download can only be used for remote product bundles.")
 
     output_dir = get_product_bundle_dir(ctx)
-    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     return make_shell_task(
         command = [
             "echo",
@@ -42,7 +43,7 @@ def _fuchsia_task_download_impl(ctx, make_shell_task):
 _fuchsia_task_download, _fuchsia_task_download_for_test, fuchsia_task_download = shell_task_rule(
     doc = """Downloads a product bundle.""",
     implementation = _fuchsia_task_download_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "product_bundle": attr.label(
             doc = "The product bundle to download",

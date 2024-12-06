@@ -5,7 +5,7 @@
 """Public definitions for Fuchsia clang workspace rules"""
 
 load(
-    "@fuchsia_sdk//fuchsia/workspace:fuchsia_clang_repository.bzl",
+    "//fuchsia/workspace:fuchsia_clang_repository.bzl",
     _fuchsia_clang_ext = "fuchsia_clang_ext",
     _fuchsia_clang_repository = "fuchsia_clang_repository",
 )

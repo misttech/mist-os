@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <fidl/fuchsia.power.system/cpp/wire.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/power/cpp/wake-lease.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/input_report_reader/reader.h>
@@ -66,6 +67,11 @@ class ButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevice>
   }
   void GetInputReport(GetInputReportRequestView request,
                       GetInputReportCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_input_report::InputDevice> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    fdf::warn("Unexpected fidl method invoked: {}", metadata.method_ordinal);
+  }
 
  private:
   zx::port port_;

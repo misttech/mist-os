@@ -31,7 +31,11 @@ pub use riscv64::*;
 
 // Bring in arm under 'arch32' for aarch64.
 #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
-pub mod arm;
+mod arm;
+#[cfg(all(target_arch = "aarch64", feature = "arch32"))]
+mod arm_manual;
 
 #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
-pub use arm as arch32;
+pub mod arch32 {
+    pub use crate::arm::*;
+}

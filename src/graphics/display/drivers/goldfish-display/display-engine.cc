@@ -360,10 +360,10 @@ void DisplayEngine::DisplayEngineReleaseImage(uint64_t image_handle) {
 
 config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     const display_config_t* display_configs, size_t display_count,
-    client_composition_opcode_t* out_client_composition_opcodes_list,
-    size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
-  if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = 0;
+    layer_composition_operations_t* out_layer_composition_operations_list,
+    size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = 0;
   }
 
   if (display_count == 0) {
@@ -373,19 +373,20 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   int total_layer_count = std::accumulate(
       display_configs, display_configs + display_count, 0,
       [](int total, const display_config_t& config) { return total += config.layer_count; });
-  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= static_cast<size_t>(total_layer_count));
-  if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = total_layer_count;
+  ZX_DEBUG_ASSERT(layer_composition_operations_count >= static_cast<size_t>(total_layer_count));
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = total_layer_count;
   }
-  cpp20::span<client_composition_opcode_t> client_composition_opcodes(
-      out_client_composition_opcodes_list, total_layer_count);
+  cpp20::span<layer_composition_operations_t> layer_composition_operations(
+      out_layer_composition_operations_list, total_layer_count);
 
-  int client_composition_opcodes_offset = 0;
+  config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
+  int layer_composition_operations_offset = 0;
   for (unsigned i = 0; i < display_count; i++) {
     const size_t layer_count = display_configs[i].layer_count;
-    cpp20::span<client_composition_opcode_t> current_display_client_composition_opcodes =
-        client_composition_opcodes.subspan(client_composition_opcodes_offset, layer_count);
-    client_composition_opcodes_offset += layer_count;
+    cpp20::span<layer_composition_operations_t> current_display_layer_composition_operations =
+        layer_composition_operations.subspan(layer_composition_operations_offset, layer_count);
+    layer_composition_operations_offset += layer_count;
 
     const display::DisplayId display_id = display::ToDisplayId(display_configs[i].display_id);
     if (layer_count > 0) {
@@ -402,7 +403,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
       const layer_t& layer0 = display_configs[i].layer_list[0];
       if (layer0.image_source.width == 0 || layer0.image_source.height == 0) {
         // Solid color fill layers are not yet supported.
-        current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_USE_IMAGE;
+        current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
       } else {
         // Scaling is allowed if destination frame match display and
         // source frame match image.
@@ -421,33 +422,39 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
         if (memcmp(&layer0.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
           // TODO(https://fxbug.dev/42111727): Need to provide proper flag to indicate driver only
           // accepts full screen dest frame.
-          current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
+          current_display_layer_composition_operations[0] |=
+              LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
+          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         }
         if (memcmp(&layer0.image_source, &image_area, sizeof(rect_u_t)) != 0) {
-          current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_SRC_FRAME;
+          current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_SRC_FRAME;
+          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         }
 
         if (layer0.alpha_mode != ALPHA_DISABLE) {
           // Alpha is not supported.
-          current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
+          current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_ALPHA;
+          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         }
 
         if (layer0.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
           // Transformation is not supported.
-          current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
+          current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
+          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
         }
       }
       // If there is more than one layer, the rest need to be merged into the base layer.
       if (layer_count > 1) {
-        current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+        current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
         for (unsigned j = 1; j < layer_count; j++) {
-          current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+          current_display_layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
         }
+        check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
       }
     }
   }
 
-  return CONFIG_CHECK_RESULT_OK;
+  return check_result;
 }
 
 zx_status_t DisplayEngine::PresentPrimaryDisplayConfig(const DisplayConfig& display_config) {

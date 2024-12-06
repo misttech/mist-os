@@ -9,11 +9,12 @@ use crate::manifest::v1::{
 };
 use crate::manifest::v2::FlashManifest as FlashManifestV2;
 use crate::manifest::{Boot, Flash, Unlock};
+use crate::util::Event;
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use serde::{Deserialize, Serialize};
-use std::io::Write;
+use tokio::sync::mpsc::Sender;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FlashManifest {
@@ -98,59 +99,56 @@ impl From<&FlashManifest> for FlashManifestV2 {
 
 #[async_trait(?Send)]
 impl Flash for FlashManifest {
-    #[tracing::instrument(skip(writer, file_resolver, cmd))]
-    async fn flash<W, F, T>(
+    #[tracing::instrument(skip(file_resolver, cmd))]
+    async fn flash<F, T>(
         &self,
-        writer: &mut W,
+        messenger: &Sender<Event>,
         file_resolver: &mut F,
         fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
         let v2: FlashManifestV2 = self.into();
-        v2.flash(writer, file_resolver, fastboot_interface, cmd).await
+        v2.flash(messenger, file_resolver, fastboot_interface, cmd).await
     }
 }
 
 #[async_trait(?Send)]
 impl Unlock for FlashManifest {
-    async fn unlock<W, F, T>(
+    async fn unlock<F, T>(
         &self,
-        writer: &mut W,
+        messenger: &Sender<Event>,
         file_resolver: &mut F,
         fastboot_interface: &mut T,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
         let v2: FlashManifestV2 = self.into();
-        v2.unlock(writer, file_resolver, fastboot_interface).await
+        v2.unlock(messenger, file_resolver, fastboot_interface).await
     }
 }
 
 #[async_trait(?Send)]
 impl Boot for FlashManifest {
-    async fn boot<W, F, T>(
+    async fn boot<F, T>(
         &self,
-        writer: &mut W,
+        messenger: Sender<Event>,
         file_resolver: &mut F,
         slot: String,
         fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
-        W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
         let v2: FlashManifestV2 = self.into();
-        v2.boot(writer, file_resolver, slot, fastboot_interface, cmd).await
+        v2.boot(messenger, file_resolver, slot, fastboot_interface, cmd).await
     }
 }
 
@@ -164,6 +162,7 @@ mod test {
     use serde_json::{from_str, json};
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
+    use tokio::sync::mpsc;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_minimal_manifest_succeeds() -> Result<()> {
@@ -208,9 +207,9 @@ mod test {
             state.set_var("var".to_string(), "val".to_string());
             state.set_var(MAX_DOWNLOAD_SIZE_VAR.to_string(), "8192".to_string());
         }
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(100);
         v.flash(
-            &mut writer,
+            &client,
             &mut TestResolver::new(),
             &mut proxy,
             ManifestParams {
@@ -277,9 +276,9 @@ mod test {
             state.set_var(REVISION_VAR.to_string(), "rev_test-b4".to_string());
             state.set_var(MAX_DOWNLOAD_SIZE_VAR.to_string(), "8192".to_string());
         }
-        let mut writer = Vec::<u8>::new();
+        let (client, _server) = mpsc::channel(100);
         v.flash(
-            &mut writer,
+            &client,
             &mut TestResolver::new(),
             &mut proxy,
             ManifestParams {

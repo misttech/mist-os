@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <zircon/assert.h>
 
+#include <cstdio>
 #include <mutex>
 
 void CodecAdmissionControl::TryAddCodec(bool multi_instance,

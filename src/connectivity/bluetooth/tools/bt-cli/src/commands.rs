@@ -29,9 +29,7 @@ macro_rules! gen_commands {
         impl $name {
             /// Returns a list of the string representations of all variants
             pub fn variants() -> Vec<String> {
-                let mut variants = Vec::new();
-                $(variants.push($val.to_string());)*
-                variants
+                vec![$($val.to_string(),)*]
             }
 
             pub fn arguments(&self) -> &'static str {
@@ -176,9 +174,7 @@ impl Hinter for CmdHelper {
         let needs_space = !line.ends_with(" ");
         line.trim()
             .parse::<Cmd>()
-            .map(|cmd| {
-                format!("{}{}", if needs_space { " " } else { "" }, cmd.arguments().to_string(),)
-            })
+            .map(|cmd| format!("{}{}", if needs_space { " " } else { "" }, cmd.arguments()))
             .ok()
     }
 }

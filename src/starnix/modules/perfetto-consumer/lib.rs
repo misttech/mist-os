@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use once_cell::sync::OnceCell;
 use perfetto_consumer_proto::perfetto::protos::trace_config::buffer_config::FillPolicy;
 use perfetto_consumer_proto::perfetto::protos::trace_config::{BufferConfig, DataSource};
 use perfetto_consumer_proto::perfetto::protos::{
@@ -25,12 +24,12 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
 use std::collections::VecDeque;
 use std::sync::mpsc::{channel, Sender};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use fuchsia_trace::{category_enabled, trace_state, ProlongedContext, TraceState};
 
 /// Sender for the trace state, which sends a message each time trace state is updated.
-static TRACE_STATE_SENDER: OnceCell<Sender<TraceState>> = OnceCell::new();
+static TRACE_STATE_SENDER: OnceLock<Sender<TraceState>> = OnceLock::new();
 
 const PERFETTO_BUFFER_SIZE_KB: u32 = 63488;
 

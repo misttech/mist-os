@@ -20,7 +20,7 @@ pub(crate) fn compile(
     config_package_path: Option<&str>,
     features: &FeatureSet,
     experimental_force_runner: &Option<String>,
-    required_protocols: cml::ProtocolRequirements<'_>,
+    required_capabilities: cml::CapabilityRequirements<'_>,
 ) -> Result<(), Error> {
     match file.extension().and_then(|e| e.to_str()) {
         Some("cml") => Ok(()),
@@ -62,7 +62,7 @@ pub(crate) fn compile(
     let options = cml::CompileOptions::new()
         .file(&file)
         .features(features)
-        .protocol_requirements(required_protocols);
+        .protocol_requirements(required_capabilities);
     let options =
         if let Some(s) = config_package_path { options.config_package_path(s) } else { options };
     let out_data = cml::compile(&document, options)?;
@@ -85,6 +85,7 @@ mod tests {
     use super::*;
     use crate::features::Feature;
     use assert_matches::assert_matches;
+    use cml::MustOfferRequirement;
     use difference::Changeset;
     use fidl::unpersist;
     use serde_json::json;
@@ -129,8 +130,9 @@ mod tests {
         expected_output: fdecl::Component,
         features: &FeatureSet,
         experimental_force_runner: &Option<String>,
-        must_offer: &[String],
-        must_use: &[String],
+        must_offer_protocol: &[String],
+        must_use_protocol: &[String],
+        must_offer_dictionary: &[String],
     ) -> Result<(), Error> {
         File::create(&in_path).unwrap().write_all(format!("{}", input).as_bytes()).unwrap();
         let includepath = includepath.unwrap_or(PathBuf::new());
@@ -144,7 +146,21 @@ mod tests {
             Some("test.cvf"),
             features,
             experimental_force_runner,
-            cml::ProtocolRequirements { must_offer, must_use },
+            cml::CapabilityRequirements {
+                must_offer: &must_offer_protocol
+                    .iter()
+                    .map(|value| cml::MustOfferRequirement::Protocol(value))
+                    .chain(
+                        must_offer_dictionary
+                            .iter()
+                            .map(|value| MustOfferRequirement::Dictionary(value)),
+                    )
+                    .collect::<Vec<_>>(),
+                must_use: &must_use_protocol
+                    .iter()
+                    .map(|value| cml::MustUseRequirement::Protocol(value))
+                    .collect::<Vec<_>>(),
+            },
         )?;
         let mut buffer = Vec::new();
         File::open(&out_path).unwrap().read_to_end(&mut buffer).unwrap();
@@ -179,6 +195,7 @@ mod tests {
             experimental_force_runner,
             &[],
             &[],
+            &[],
         )
     }
 
@@ -203,6 +220,7 @@ mod tests {
             &None,
             must_offer,
             must_use,
+            &[],
         )
     }
 
@@ -1094,7 +1112,7 @@ mod tests {
                 None,
                 &FeatureSet::empty(),
                 &None,
-                cml::ProtocolRequirements { must_offer: &[], must_use: &[] },
+                cml::CapabilityRequirements { must_offer: &[], must_use: &[] },
             );
             assert_matches!(
                 result,

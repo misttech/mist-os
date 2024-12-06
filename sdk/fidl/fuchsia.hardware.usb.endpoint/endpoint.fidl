@@ -65,6 +65,8 @@ type Completion = resource table {
     2: status zx.Status;
     /// Bytes successfully transferred.
     3: transfer_size uint64;
+    /// Wake lease if this completion took the system out of suspend.
+    4: wake_lease zx.Handle:EVENTPAIR;
 };
 
 /// Endpoint Interface.

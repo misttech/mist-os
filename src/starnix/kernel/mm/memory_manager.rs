@@ -17,8 +17,8 @@ use crate::vfs::{
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
+use starnix_types::arch::ArchWidth;
 
-use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 use range_map::RangeMap;
 use smallvec::SmallVec;
@@ -29,7 +29,7 @@ use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock};
 use starnix_types::futex_address::FutexAddress;
 use starnix_types::math::round_up_to_system_page_size;
 use starnix_types::ownership::WeakRef;
-use starnix_types::user_buffer::{UserBuffer, UserBuffers};
+use starnix_types::user_buffer::{UserBuffer, UserBuffers, UserBuffers32};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::Access;
 use starnix_uapi::range_ext::RangeExt;
@@ -51,7 +51,7 @@ use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut, Range};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
@@ -86,12 +86,15 @@ const ASLR_RANDOM_BITS: usize = 28;
 #[cfg(target_arch = "riscv64")]
 const ASLR_RANDOM_BITS: usize = 18;
 
+/// Number of bits of entropy for processes running in 32 bits mode.
+const ASLR_32_RANDOM_BITS: usize = 8;
+
 // The biggest we expect stack to be; increase as needed
 // TODO(https://fxbug.dev/322874791): Once setting RLIMIT_STACK is implemented, we should use it.
 const MAX_STACK_SIZE: usize = 512 * 1024 * 1024;
 
 fn usercopy() -> Option<&'static usercopy::Usercopy> {
-    static USERCOPY: Lazy<Option<usercopy::Usercopy>> = Lazy::new(|| {
+    static USERCOPY: LazyLock<Option<usercopy::Usercopy>> = LazyLock::new(|| {
         // We do not create shared processes in unit tests.
         if UNIFIED_ASPACES_ENABLED {
             // ASUMPTION: All Starnix managed Linux processes have the same
@@ -102,7 +105,7 @@ fn usercopy() -> Option<&'static usercopy::Usercopy> {
         }
     });
 
-    Lazy::force(&USERCOPY).as_ref()
+    LazyLock::force(&USERCOPY).as_ref()
 }
 
 /// Provides an implementation for zxio's `zxio_maybe_faultable_copy` that supports
@@ -131,7 +134,7 @@ pub unsafe fn zxio_maybe_faultable_copy_impl(
     }
 }
 
-pub static PAGE_SIZE: Lazy<u64> = Lazy::new(|| zx::system_get_page_size() as u64);
+pub static PAGE_SIZE: LazyLock<u64> = LazyLock::new(|| zx::system_get_page_size() as u64);
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -610,6 +613,7 @@ pub struct MemoryManagerState {
     ///
     /// We map userspace memory in this child VMAR so that we can destroy the
     /// entire VMAR during exec.
+    /// For 32-bit tasks, we limit the user_vmar to correspond to the available memory.
     user_vmar: zx::Vmar,
 
     /// Cached VmarInfo for user_vmar.
@@ -626,6 +630,9 @@ pub struct MemoryManagerState {
 
     forkable_state: MemoryManagerForkableState,
 }
+
+// 64k under the 4GB
+const LOWER_4GB_LIMIT: UserAddress = UserAddress::const_from(0xffff_0000);
 
 #[cfg(feature = "alternate_anon_allocs")]
 struct PrivateAnonymousMemoryManager {
@@ -2727,6 +2734,24 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         self.read_objects_to_smallvec(iovec_addr.into(), iovec_count)
     }
 
+    /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`.
+    ///
+    /// Fails if `iovec_count` is greater than `UIO_MAXIOV`.
+    // TODO(https://fxbug.dev/380427162) Should this be rolled into the
+    // above call with just a 32bit flag?
+    fn read_iovec32(
+        &self,
+        iovec_addr: UserAddress,
+        iovec_count: UserValue<i32>,
+    ) -> Result<UserBuffers, Errno> {
+        let iovec_count: usize = iovec_count.try_into().map_err(|_| errno!(EINVAL))?;
+        if iovec_count > UIO_MAXIOV as usize {
+            return error!(EINVAL);
+        }
+        let ub32s: UserBuffers32 = self.read_objects_to_smallvec(iovec_addr.into(), iovec_count)?;
+        Ok(ub32s.iter().map(|&ub32| ub32.into()).collect())
+    }
+
     /// Read up to `max_size` bytes from `string`, stopping at the first discovered null byte and
     /// returning the results as a Vec.
     fn read_c_string_to_vec(
@@ -3458,14 +3483,19 @@ impl MemoryManager {
         Ok(())
     }
 
-    pub fn exec(&self, exe_node: NamespaceNode) -> Result<(), zx::Status> {
+    pub fn exec(&self, exe_node: NamespaceNode, arch_width: ArchWidth) -> Result<(), zx::Status> {
         // The previous mapping should be dropped only after the lock to state is released to
         // prevent lock order inversion.
         let _old_mappings = {
             let mut state = self.state.write();
-            let info = self.root_vmar.info()?;
+            let mut info = self.root_vmar.info()?;
             // SAFETY: This operation is safe because the VMAR is for another process.
             unsafe { state.user_vmar.destroy()? }
+            if arch_width.is_arch32() {
+                info.len = (LOWER_4GB_LIMIT.ptr() - info.base) as usize;
+            } else {
+                info.len = RESTRICTED_ASPACE_HIGHEST_ADDRESS - info.base;
+            }
             state.user_vmar = create_user_vmar(&self.root_vmar, &info)?;
             state.user_vmar_info = state.user_vmar.info()?;
             state.brk = None;
@@ -3473,16 +3503,18 @@ impl MemoryManager {
 
             std::mem::replace(&mut state.mappings, RangeMap::new())
         };
-        self.initialize_mmap_layout()?;
+        self.initialize_mmap_layout(arch_width)?;
         Ok(())
     }
 
-    pub fn initialize_mmap_layout(&self) -> Result<(), Errno> {
+    pub fn initialize_mmap_layout(&self, arch_width: ArchWidth) -> Result<(), Errno> {
         let mut state = self.state.write();
 
         // Place the stack at the end of the address space, subject to ASLR adjustment.
         state.stack_origin = UserAddress::from_ptr(
-            RESTRICTED_ASPACE_HIGHEST_ADDRESS - MAX_STACK_SIZE - generate_random_offset_for_aslr(),
+            state.user_vmar_info.base + state.user_vmar_info.len
+                - MAX_STACK_SIZE
+                - generate_random_offset_for_aslr(arch_width),
         )
         .round_up(*PAGE_SIZE)?;
 
@@ -3490,43 +3522,47 @@ impl MemoryManager {
         // specific address, subject to ASLR adjustment.
         state.mmap_top = state
             .stack_origin
-            .checked_sub(generate_random_offset_for_aslr())
+            .checked_sub(generate_random_offset_for_aslr(arch_width))
             .ok_or_else(|| errno!(EINVAL))?;
         Ok(())
     }
 
     // Test tasks are not initialized by exec; simulate its behavior by initializing memory layout
     // as if a zero-size executable was loaded.
-    pub fn initialize_mmap_layout_for_test(self: &Arc<Self>) {
-        self.initialize_mmap_layout().unwrap();
-        let fake_executable_addr = self.get_random_base_for_executable(0).unwrap();
-        self.initialize_brk_origin(fake_executable_addr).unwrap();
+    pub fn initialize_mmap_layout_for_test(self: &Arc<Self>, arch_width: ArchWidth) {
+        self.initialize_mmap_layout(arch_width).unwrap();
+        let fake_executable_addr = self.get_random_base_for_executable(arch_width, 0).unwrap();
+        self.initialize_brk_origin(arch_width, fake_executable_addr).unwrap();
     }
 
     pub fn initialize_brk_origin(
         self: &Arc<Self>,
+        arch_width: ArchWidth,
         executable_end: UserAddress,
     ) -> Result<(), Errno> {
         self.state.write().brk_origin = executable_end
-            .checked_add(generate_random_offset_for_aslr())
+            .checked_add(generate_random_offset_for_aslr(arch_width))
             .ok_or_else(|| errno!(EINVAL))?;
         Ok(())
     }
 
     // Get a randomised address for loading a position-independent executable.
-    pub fn get_random_base_for_executable(&self, length: usize) -> Result<UserAddress, Errno> {
+    pub fn get_random_base_for_executable(
+        &self,
+        arch_width: ArchWidth,
+        length: usize,
+    ) -> Result<UserAddress, Errno> {
         let state = self.state.read();
 
         // Place it at approx. 2/3 of the available mmap space, subject to ASLR adjustment.
         let base = round_up_to_system_page_size(2 * state.mmap_top.ptr() / 3).unwrap()
-            + generate_random_offset_for_aslr();
+            + generate_random_offset_for_aslr(arch_width);
         if base.checked_add(length).ok_or_else(|| errno!(EINVAL))? <= state.mmap_top.ptr() {
             Ok(UserAddress::from_ptr(base))
         } else {
             Err(errno!(EINVAL))
         }
     }
-
     pub fn executable_node(&self) -> Option<NamespaceNode> {
         self.state.read().executable_node.clone()
     }
@@ -4379,13 +4415,15 @@ pub fn create_anonymous_mapping_memory(size: u64) -> Result<Arc<MemoryObject>, E
     Ok(Arc::new(memory))
 }
 
-fn generate_random_offset_for_aslr() -> usize {
+fn generate_random_offset_for_aslr(arch_width: ArchWidth) -> usize {
     // Generate a number with ASLR_RANDOM_BITS.
     let randomness = {
-        const MASK: usize = (1 << ASLR_RANDOM_BITS) - 1;
+        let random_bits =
+            if arch_width.is_arch32() { ASLR_32_RANDOM_BITS } else { ASLR_RANDOM_BITS };
+        let mask = (1 << random_bits) - 1;
         let mut bytes = [0; std::mem::size_of::<usize>()];
         zx::cprng_draw(&mut bytes);
-        usize::from_le_bytes(bytes) & MASK
+        usize::from_le_bytes(bytes) & mask
     };
 
     // Transform it into a page-aligned offset.
@@ -4511,7 +4549,7 @@ mod tests {
         assert!(has(&mapped_addr));
 
         let node = current_task.lookup_path_from_root(&mut locked, "/".into()).unwrap();
-        mm.exec(node).expect("failed to exec memory manager");
+        mm.exec(node, ArchWidth::Arch64).expect("failed to exec memory manager");
 
         assert!(!has(&brk_addr));
         assert!(!has(&mapped_addr));

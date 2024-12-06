@@ -68,13 +68,13 @@ source_set("paver-core") {
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp",
     "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
+    "//sdk/fidl/fuchsia.storage.partitions:fuchsia.storage.partitions_cpp",
     "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_cpp",
     "//sdk/lib/zbi-format",
     "//src/firmware/lib/abr",
     "//src/lib/uuid",
     "//src/storage/fvm",
     "//src/storage/lib/block_client/cpp",
-    "//src/storage/storage-host/fidl/fuchsia.storagehost:fuchsia.storagehost_cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
@@ -143,8 +143,8 @@ source_set("nelson") {
   ]
 }
 
-source_set("kola") {
-  sources = [ "kola.cc" ]
+source_set("moonflower") {
+  sources = [ "moonflower.cc" ]
   public_deps = [
     ":gpt",
     ":paver-core",
@@ -204,8 +204,8 @@ source_set("paver") {
   public_deps = [
     ":android",
     ":astro",
-    ":kola",
     ":luis",
+    ":moonflower",
     ":nelson",
     ":paver-core",
     ":sherlock",

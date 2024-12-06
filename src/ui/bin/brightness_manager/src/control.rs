@@ -84,18 +84,20 @@ impl From<fidl_fuchsia_ui_brightness::BrightnessTable> for BrightnessTable {
 //This will be replaced once SetBrightnessTable is called.
 lazy_static! {
     static ref BRIGHTNESS_TABLE: Arc<Mutex<BrightnessTable>> = {
-        let mut lux_to_nits = Vec::new();
-        lux_to_nits.push(BrightnessPoint { ambient_lux: 0., display_nits: 0. });
-        lux_to_nits.push(BrightnessPoint { ambient_lux: 10., display_nits: 3.33 });
-        lux_to_nits.push(BrightnessPoint { ambient_lux: 30., display_nits: 8.7 });
-        lux_to_nits.push(BrightnessPoint { ambient_lux: 60., display_nits: 18.27 });
-        lux_to_nits.push(BrightnessPoint { ambient_lux: 100., display_nits: 32.785 });
-        lux_to_nits.push(BrightnessPoint { ambient_lux: 150., display_nits: 36.82 });
-        lux_to_nits.push(BrightnessPoint { ambient_lux: 210., display_nits: 75.0 });
-        lux_to_nits.push(BrightnessPoint { ambient_lux: 250., display_nits: 124.16 });
-        lux_to_nits.push(BrightnessPoint { ambient_lux: 300., display_nits: 162.96 });
-        lux_to_nits.push(BrightnessPoint { ambient_lux: 340., display_nits: 300. });
-        Arc::new(Mutex::new(BrightnessTable { points: lux_to_nits }))
+        Arc::new(Mutex::new(BrightnessTable {
+            points: vec![
+                BrightnessPoint { ambient_lux: 0., display_nits: 0. },
+                BrightnessPoint { ambient_lux: 10., display_nits: 3.33 },
+                BrightnessPoint { ambient_lux: 30., display_nits: 8.7 },
+                BrightnessPoint { ambient_lux: 60., display_nits: 18.27 },
+                BrightnessPoint { ambient_lux: 100., display_nits: 32.785 },
+                BrightnessPoint { ambient_lux: 150., display_nits: 36.82 },
+                BrightnessPoint { ambient_lux: 210., display_nits: 75.0 },
+                BrightnessPoint { ambient_lux: 250., display_nits: 124.16 },
+                BrightnessPoint { ambient_lux: 300., display_nits: 162.96 },
+                BrightnessPoint { ambient_lux: 340., display_nits: 300. },
+            ],
+        }))
     };
 }
 

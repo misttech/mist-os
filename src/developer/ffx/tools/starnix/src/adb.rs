@@ -5,7 +5,6 @@
 use addr::TargetAddr;
 use anyhow::Context;
 use argh::{ArgsInfo, FromArgs};
-use async_net::{Ipv4Addr, TcpListener, TcpStream};
 use emulator_instance::EMU_INSTANCE_ROOT_DIR;
 use ffx_config::EnvironmentContext;
 use ffx_emulator_config::ShowDetail;
@@ -15,14 +14,16 @@ use fidl_fuchsia_developer_ffx::TargetInfo;
 use futures::io::AsyncReadExt;
 use futures::stream::StreamExt;
 use futures::FutureExt;
+use netext::{MultithreadedTokioAsyncWrapper, TcpListenerStream, TokioAsyncReadExt};
 use signal_hook::consts::signal::SIGINT;
 use signal_hook::iterator::Signals;
 use std::io::ErrorKind;
-use std::net::{SocketAddr, SocketAddrV4, TcpListener as SyncTcpListener};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener as SyncTcpListener};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tokio::net::{TcpListener, TcpStream};
 use tracing::info;
 use {
     fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_starnix_container as fstarcontainer,
@@ -153,7 +154,7 @@ async fn get_emu_host_adb_port(context: &EnvironmentContext, name: &str) -> Resu
 }
 
 async fn serve_adb_connection(
-    mut stream: TcpStream,
+    mut stream: MultithreadedTokioAsyncWrapper<TcpStream>,
     bridge_socket: fidl::Socket,
 ) -> anyhow::Result<()> {
     let mut bridge = fidl::AsyncSocket::from_socket(bridge_socket);
@@ -264,8 +265,8 @@ impl AdbProxyArgs {
         } else {
             println!("ADB bridge started. To connect: adb connect {listen_address}");
         }
-
-        while let Some(stream) = listener.incoming().next().await {
+        let mut listener = TcpListenerStream(listener);
+        while let Some(stream) = listener.next().await {
             if controller_proxy.1.load(Ordering::SeqCst) {
                 controller_proxy = reconnect().await?;
             }
@@ -284,7 +285,7 @@ impl AdbProxyArgs {
 
             let reconnect_flag = Arc::clone(&controller_proxy.1);
             fasync::Task::spawn(async move {
-                serve_adb_connection(stream, cbridge)
+                serve_adb_connection(stream.into_multithreaded_futures_stream(), cbridge)
                     .await
                     .unwrap_or_else(|e| println!("serve_adb_connection returned with {:?}", e));
                 reconnect_flag.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -302,11 +303,14 @@ impl AdbProxyArgs {
 mod test {
     use super::*;
     use futures::AsyncWriteExt;
+    use netext::{TcpListenerStream, TokioAsyncReadExt};
+    use tokio::net::{TcpListener, TcpStream};
 
     async fn run_connection(listener: TcpListener, socket: fidl::Socket) {
-        if let Some(stream) = listener.incoming().next().await {
+        let mut listener = TcpListenerStream(listener);
+        if let Some(stream) = listener.next().await {
             let stream = stream.unwrap();
-            serve_adb_connection(stream, socket).await.unwrap();
+            serve_adb_connection(stream.into_multithreaded_futures_stream(), socket).await.unwrap();
         } else {
             panic!("did not get a connection");
         }
@@ -328,7 +332,7 @@ mod test {
         .detach();
 
         let connect_address = format!("127.0.0.1:{}", port);
-        let mut stream = TcpStream::connect(connect_address).await.unwrap();
+        let mut stream = TcpStream::connect(connect_address).await.unwrap().into_futures_stream();
 
         let test_data_1: Vec<u8> = vec![1, 2, 3, 4, 5];
         stream.write_all(&test_data_1).await.unwrap();

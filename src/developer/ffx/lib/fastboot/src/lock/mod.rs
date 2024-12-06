@@ -6,18 +6,13 @@ use crate::common::{is_locked, lock_device, verify_variable_value};
 use anyhow::Result;
 use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
-use std::io::Write;
 
 const LOCKABLE_VAR: &str = "vx-unlockable";
 const EPHEMERAL: &str = "ephemeral";
 const EPHEMERAL_ERR: &str = "Cannot lock ephemeral devices. Reboot the device to unlock.";
 const LOCKED_ERR: &str = "Target is already locked.";
-const LOCKED: &str = "Target is now locked.";
 
-pub async fn lock<W: Write, F: FastbootInterface>(
-    writer: &mut W,
-    fastboot_interface: &mut F,
-) -> Result<()> {
+pub async fn lock<F: FastbootInterface>(fastboot_interface: &mut F) -> Result<()> {
     if is_locked(fastboot_interface).await? {
         ffx_bail!("{}", LOCKED_ERR);
     }
@@ -25,7 +20,6 @@ pub async fn lock<W: Write, F: FastbootInterface>(
         ffx_bail!("{}", EPHEMERAL_ERR);
     }
     lock_device(fastboot_interface).await?;
-    writeln!(writer, "{}", LOCKED)?;
     Ok(())
 }
 
@@ -46,8 +40,7 @@ mod test {
             // is_locked
             state.set_var(LOCKED_VAR.to_string(), "yes".to_string());
         }
-        let mut writer = Vec::<u8>::new();
-        let result = lock(&mut writer, &mut proxy).await;
+        let result = lock(&mut proxy).await;
         assert!(result.is_err());
         Ok(())
     }
@@ -61,8 +54,7 @@ mod test {
             // is_locked
             state.set_var(LOCKED_VAR.to_string(), "no".to_string());
         }
-        let mut writer = Vec::<u8>::new();
-        let result = lock(&mut writer, &mut proxy).await;
+        let result = lock(&mut proxy).await;
         assert!(result.is_err());
         Ok(())
     }
@@ -77,8 +69,7 @@ mod test {
             // is_locked
             state.set_var(LOCKED_VAR.to_string(), "no".to_string());
         }
-        let mut writer = Vec::<u8>::new();
-        lock(&mut writer, &mut proxy).await?;
+        lock(&mut proxy).await?;
         let state = state.lock().unwrap();
         assert_eq!(1, state.oem_commands.len());
         assert_eq!("vx-lock", state.oem_commands[0]);

@@ -72,7 +72,7 @@ impl Facade for BluetoothSysFacade {
             "BluetoothAcceptPairing" => {
                 let input = parse_arg!(args, as_str, "input")?;
                 let output = parse_arg!(args, as_str, "output")?;
-                let result = self.accept_pairing(&input.to_string(), &output.to_string()).await?;
+                let result = self.accept_pairing(input, output).await?;
                 Ok(to_value(result)?)
             }
             "BluetoothInitSys" => {
@@ -341,7 +341,7 @@ impl Facade for ProfileServerFacade {
                 let id = parse_identifier(args.clone())?;
                 let psm = parse_psm(args.clone())?;
                 let mode = parse_arg!(args, as_str, "mode")?;
-                let result = self.connect(id, psm as u16, &mode.to_string()).await?;
+                let result = self.connect(id, psm as u16, mode).await?;
                 Ok(to_value(result)?)
             }
             "ProfileServerRemoveService" => {

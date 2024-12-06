@@ -3,6 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::Config;
+
 #[cfg(not(feature = "starnix_lite"))]
 use anyhow::{anyhow, Context, Error};
 #[cfg(feature = "starnix_lite")]
@@ -105,15 +107,98 @@ pub struct Features {
     pub nanohub: bool,
 }
 
+impl Features {
+    pub fn record_inspect(&self, parent_node: &fuchsia_inspect::Node) {
+        parent_node.record_child("features", |inspect_node| match self {
+            Features {
+                kernel:
+                    KernelFeatures {
+                        bpf_v2,
+                        enable_suid,
+                        io_uring,
+                        error_on_failed_reboot,
+                        enable_visual_debugging,
+                        default_uid,
+                        default_seclabel,
+                        default_fsseclabel,
+                    },
+                selinux,
+                ashmem,
+                framebuffer,
+                gralloc,
+                magma,
+                gfxstream,
+                container,
+                test_data,
+                custom_artifacts,
+                android_serialno,
+                self_profile,
+                aspect_ratio,
+                perfetto,
+                android_fdr,
+                rootfs_rw,
+                network_manager,
+                nanohub,
+            } => {
+                inspect_node.record_bool("selinux", *selinux);
+                inspect_node.record_bool("ashmem", *ashmem);
+                inspect_node.record_bool("framebuffer", *framebuffer);
+                inspect_node.record_bool("gralloc", *gralloc);
+                inspect_node.record_bool("magma", *magma);
+                inspect_node.record_bool("gfxstream", *gfxstream);
+                inspect_node.record_bool("container", *container);
+                inspect_node.record_bool("test_data", *test_data);
+                inspect_node.record_bool("custom_artifacts", *custom_artifacts);
+                inspect_node.record_bool("android_serialno", *android_serialno);
+                inspect_node.record_bool("self_profile", *self_profile);
+                inspect_node.record_string(
+                    "aspect_ratio",
+                    aspect_ratio
+                        .as_ref()
+                        .map(|aspect_ratio| {
+                            format!("width: {} height: {}", aspect_ratio.width, aspect_ratio.height)
+                        })
+                        .unwrap_or_default(),
+                );
+                inspect_node.record_string(
+                    "perfetto",
+                    perfetto.as_ref().map(|p| p.to_string()).unwrap_or_default(),
+                );
+                inspect_node.record_bool("android_fdr", *android_fdr);
+                inspect_node.record_bool("rootfs_rw", *rootfs_rw);
+                inspect_node.record_bool("network_manager", *network_manager);
+                inspect_node.record_bool("nanohub", *nanohub);
+
+                inspect_node.record_child("kernel", |kernel_node| {
+                    kernel_node.record_bool("bpf_v2", *bpf_v2);
+                    kernel_node.record_bool("enable_suid", *enable_suid);
+                    kernel_node.record_bool("io_uring", *io_uring);
+                    kernel_node.record_bool("error_on_failed_reboot", *error_on_failed_reboot);
+                    kernel_node.record_bool("enable_visual_debugging", *enable_visual_debugging);
+                    kernel_node.record_int("default_uid", (*default_uid).into());
+                    kernel_node.record_string(
+                        "default_seclabel",
+                        default_seclabel.as_deref().unwrap_or_default(),
+                    );
+                    kernel_node.record_string(
+                        "default_fsseclabel",
+                        default_fsseclabel.as_ref().map_or("", |s| s),
+                    );
+                });
+            }
+        });
+    }
+}
+
 /// Parses all the featurse in `entries`.
 ///
 /// Returns an error if parsing fails, or if an unsupported feature is present in `features`.
 pub fn parse_features(
-    entries: &Vec<String>,
+    config: &Config,
     structured_config: &starnix_kernel_structured_config::Config,
 ) -> Result<Features, Error> {
     let mut features = Features::default();
-    for entry in entries {
+    for entry in &config.features {
         let (raw_flag, raw_args) =
             entry.split_once(':').map(|(f, a)| (f, Some(a.to_string()))).unwrap_or((entry, None));
         match (raw_flag, raw_args) {
@@ -179,6 +264,9 @@ pub fn parse_features(
     if structured_config.ui_visual_debugging_level > 0 {
         features.kernel.enable_visual_debugging = true;
     }
+
+    features.kernel.default_uid = config.default_uid;
+    features.kernel.default_seclabel = config.default_seclabel.clone();
 
     Ok(features)
 }
@@ -257,6 +345,8 @@ pub fn run_container_features(
             registry_proxy,
             touch_device.open_files.clone(),
             keyboard_device.open_files.clone(),
+            Some(touch_device.inspect_status.clone()),
+            Some(keyboard_device.inspect_status.clone()),
         );
 
         register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay);

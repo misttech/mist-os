@@ -6,6 +6,7 @@ use std::collections::{HashMap, VecDeque};
 
 use fidl::endpoints::{ControlHandle as _, RequestStream as _, Responder as _};
 use fidl_fuchsia_net_ext::IntoExt;
+use fidl_fuchsia_net_multicast_ext::FidlMulticastAdminIpExt;
 use fidl_fuchsia_net_neighbor::{
     self as fnet_neighbor, ControllerRequest, ControllerRequestStream, ViewRequest,
     ViewRequestStream,
@@ -18,7 +19,7 @@ use futures::task::Poll;
 use futures::{Future, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use log::{error, info, warn};
 use net_types::ethernet::Mac;
-use net_types::ip::{IpAddr, IpAddress, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpAddr, IpAddress, Ipv4, Ipv6};
 use net_types::{SpecifiedAddr, Witness as _};
 
 use crate::bindings::devices::{BindingId, DeviceIdAndName};
@@ -26,10 +27,11 @@ use crate::bindings::time::StackTime;
 use crate::bindings::util::IntoFidl;
 use crate::bindings::{BindingsCtx, Ctx};
 use netstack3_core::device::{
-    DeviceId, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
+    DeviceId, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId, WeakDeviceId,
 };
 use netstack3_core::error::NotFoundError;
 use netstack3_core::neighbor::{NeighborRemovalError, StaticNeighborInsertionError};
+use netstack3_core::routes::Entry;
 use netstack3_core::{neighbor, IpExt};
 
 #[derive(Debug)]
@@ -40,11 +42,114 @@ pub(crate) struct Event {
     pub(crate) at: StackTime,
 }
 
-impl std::fmt::Display for Event {
+struct EventLogger<'a> {
+    event: &'a Event,
+    ctx: &'a Ctx,
+}
+
+// NB: By burying this logic in a Display impl, we ensure it only gets
+// evaluated if the stack's log level is sufficient to actually log the message.
+impl std::fmt::Display for EventLogger<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self { id, addr, kind, at } = self;
-        write!(f, "neighbor event {:?} {} {:?} at {}", id.bindings_id(), addr, kind, at)
+        let Self { event: Event { id, addr, kind, at }, ctx } = self;
+        let dev = WeakDeviceId::Ethernet(id.clone());
+        // NB: We need a mutable reference to ctx, but the `Display` trait
+        // only gives us a shared reference. Clone the Ctx to work around this.
+        // Fortunately Ctx clones are cheap because it's an `Arc`.
+        let mut ctx = (*ctx).clone();
+        let neighbor_type = match (*addr).into() {
+            IpAddr::V4(addr) => get_neighbor_type::<Ipv4>(&addr, &dev, &mut ctx),
+            IpAddr::V6(addr) => get_neighbor_type::<Ipv6>(&addr, &dev, &mut ctx),
+        };
+        let bindings_id = id.bindings_id();
+        write!(f, "neighbor event {bindings_id:?} {addr} ({neighbor_type}) {kind:?} at {at}")
     }
+}
+
+// Additional debug info from the routing table about a particular neighbor.
+//
+// Note the order of the variants below is important: each later variant is
+// considered an upgrade of an earlier variant.
+#[derive(Debug, PartialEq, PartialOrd)]
+enum NeighborType {
+    // No additional information is known about this neighbor.
+    Unknown,
+    // The neighbor is directly connected (e.g. it's reachable via an onlink
+    // route).
+    Onlink,
+    // The neighbor is a gateway (e.g. it's listed as the gateway on a route).
+    Gateway,
+    // The neighbor is a gateway for the Internet (e.g. it's listed as a gateway
+    // on a default route).
+    InternetGateway,
+}
+
+impl std::fmt::Display for NeighborType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unknown => write!(f, "Unknown"),
+            Self::Onlink => write!(f, "Onlink"),
+            Self::Gateway => write!(f, "Gateway"),
+            Self::InternetGateway => write!(f, "Internet Gateway"),
+        }
+    }
+}
+
+impl NeighborType {
+    fn maybe_upgrade(&mut self, new: NeighborType) {
+        if &new > self {
+            *self = new
+        }
+    }
+
+    // Considers the given route, and modifies our current understanding
+    // of this `NeighborType`.
+    fn maybe_upgrade_with_route<I: Ip, D1, D2: PartialEq<D1>>(
+        &mut self,
+        addr: &SpecifiedAddr<I::Addr>,
+        dev: &D1,
+        route: &Entry<I::Addr, D2>,
+    ) {
+        let Entry { device, subnet, gateway, metric: _ } = route;
+        // NB: Ignore routes on different devices.
+        if device != dev {
+            return;
+        }
+        match gateway {
+            None => {
+                if subnet.contains(&addr.get()) {
+                    self.maybe_upgrade(NeighborType::Onlink)
+                }
+            }
+            Some(gateway) => {
+                if gateway == addr {
+                    // Is this a default route?
+                    if subnet.prefix() == 0 {
+                        self.maybe_upgrade(NeighborType::InternetGateway)
+                    } else {
+                        self.maybe_upgrade(NeighborType::Gateway)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Identify the `NeighborType` by consulting the routing table.
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn get_neighbor_type<I: IpExt + FidlMulticastAdminIpExt>(
+    addr: &SpecifiedAddr<I::Addr>,
+    dev: &WeakDeviceId<BindingsCtx>,
+    ctx: &mut Ctx,
+) -> NeighborType {
+    let neighbor_type = ctx.api().routes::<I>().fold_routes(
+        NeighborType::Unknown,
+        |mut neighbor_type, _table_id, route| {
+            neighbor_type.maybe_upgrade_with_route::<I, _, _>(addr, dev, route);
+            neighbor_type
+        },
+    );
+    neighbor_type
 }
 
 fn new_fidl_entry(
@@ -140,7 +245,7 @@ fn handle_new_watcher(
 }
 
 impl Worker {
-    pub(crate) async fn run(self) {
+    pub(crate) async fn run(self, ctx: Ctx) {
         let Self { event_receiver: event_stream, watcher_receiver: new_watchers } = self;
         let mut watchers = futures::stream::FuturesUnordered::<Watcher>::new();
         let mut neighbor_state: HashMap<
@@ -187,9 +292,7 @@ impl Worker {
                 Item::SinkItem(Some(SinkItem::Event(
                     ref event @ Event { ref id, kind, addr, at },
                 ))) => {
-                    // TODO(https://fxbug.dev/42086008): Add flags to the log indicating if
-                    // the neighbor is a default gateway and if it is on-link.
-                    info!("{event}");
+                    info!("{}", EventLogger { event, ctx: &ctx });
 
                     let DeviceIdAndName { id: binding_id, name: _ } = *id.bindings_id();
                     let entry = neighbor_state
@@ -501,4 +604,73 @@ pub(super) async fn serve_controller(
             }
         })
         .await
+}
+
+#[cfg(test)]
+mod tests {
+    use net_declare::{net_ip_v4, net_subnet_v4};
+    use net_types::ip::{Ipv4Addr, Subnet};
+    use net_types::SpecifiedAddr;
+    use netstack3_core::routes::{Metric, RawMetric};
+    use test_case::test_case;
+
+    use super::*;
+
+    const RIGHT_ADDR_RAW: Ipv4Addr = net_ip_v4!("192.168.0.1");
+    const RIGHT_ADDR: SpecifiedAddr<Ipv4Addr> =
+        unsafe { SpecifiedAddr::new_unchecked(RIGHT_ADDR_RAW) };
+    const WRONG_ADDR: SpecifiedAddr<Ipv4Addr> =
+        unsafe { SpecifiedAddr::new_unchecked(net_ip_v4!("192.168.0.2")) };
+
+    const RIGHT_DEV: u8 = 1;
+    const WRONG_DEV: u8 = 2;
+
+    const ONLINK_ENTRY: Entry<Ipv4Addr, u8> = Entry {
+        subnet: unsafe { Subnet::new_unchecked(RIGHT_ADDR_RAW, 32) },
+        device: RIGHT_DEV,
+        gateway: None,
+        metric: Metric::ExplicitMetric(RawMetric(0)),
+    };
+    const GATEWAY_ENTRY: Entry<Ipv4Addr, u8> = Entry {
+        subnet: net_subnet_v4!("192.168.0.0/16"),
+        device: RIGHT_DEV,
+        gateway: Some(RIGHT_ADDR),
+        metric: Metric::ExplicitMetric(RawMetric(0)),
+    };
+    const INTERNET_GATEWAY_ENTRY: Entry<Ipv4Addr, u8> = Entry {
+        subnet: net_subnet_v4!("0.0.0.0/0"),
+        device: RIGHT_DEV,
+        gateway: Some(RIGHT_ADDR),
+        metric: Metric::ExplicitMetric(RawMetric(0)),
+    };
+
+    #[test_case(RIGHT_ADDR, WRONG_DEV, ONLINK_ENTRY, NeighborType::Unknown
+        => NeighborType::Unknown; "wrong_dev")]
+    #[test_case(WRONG_ADDR, RIGHT_DEV, ONLINK_ENTRY, NeighborType::Unknown
+        => NeighborType::Unknown; "wrong_addr")]
+    #[test_case(RIGHT_ADDR, RIGHT_DEV, ONLINK_ENTRY, NeighborType::Unknown
+        => NeighborType::Onlink; "unknown_to_onlink")]
+    #[test_case(RIGHT_ADDR, RIGHT_DEV, GATEWAY_ENTRY, NeighborType::Unknown
+        => NeighborType::Gateway; "unknown_to_gateway")]
+    #[test_case(RIGHT_ADDR, RIGHT_DEV, GATEWAY_ENTRY, NeighborType::Onlink
+        => NeighborType::Gateway; "onlink_to_gateway")]
+    #[test_case(RIGHT_ADDR, RIGHT_DEV, ONLINK_ENTRY, NeighborType::Gateway
+        => NeighborType::Gateway; "gateway_downgrade_forbidden")]
+    #[test_case(RIGHT_ADDR, RIGHT_DEV, INTERNET_GATEWAY_ENTRY, NeighborType::Unknown
+        => NeighborType::InternetGateway; "unknown_to_internet_gateway")]
+    #[test_case(RIGHT_ADDR, RIGHT_DEV, INTERNET_GATEWAY_ENTRY, NeighborType::Onlink
+        => NeighborType::InternetGateway; "onlink_to_internet_gateway")]
+    #[test_case(RIGHT_ADDR, RIGHT_DEV, INTERNET_GATEWAY_ENTRY, NeighborType::Gateway
+        => NeighborType::InternetGateway; "gateway_to_internet_gateway")]
+    #[test_case(RIGHT_ADDR, RIGHT_DEV, GATEWAY_ENTRY, NeighborType::InternetGateway
+        => NeighborType::InternetGateway; "internet_gateway_downgrade_forbidden")]
+    fn upgrade_neighbor_type(
+        addr: SpecifiedAddr<Ipv4Addr>,
+        dev: u8,
+        entry: Entry<Ipv4Addr, u8>,
+        mut initial: NeighborType,
+    ) -> NeighborType {
+        initial.maybe_upgrade_with_route::<Ipv4, u8, u8>(&addr, &dev, &entry);
+        initial
+    }
 }

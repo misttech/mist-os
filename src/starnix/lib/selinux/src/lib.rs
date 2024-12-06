@@ -328,8 +328,12 @@ common_permission_enum! {
         Create("create"),
         /// Permission to query attributes, including uid, gid and extended attributes.
         GetAttr("getattr"),
+        /// Permission to execute ioctls on the file.
+        Ioctl("ioctl"),
         /// Permissions to create hard link.
         Link("link"),
+        /// Permission to use as mount point; only useful for directories and files.
+        MountOn("mounton"),
         /// Permission to open a file.
         Open("open"),
         /// Permission to read file contents. Note this applies to reading more than regular file's
@@ -447,6 +451,12 @@ class_permission_enum! {
         // keep-sorted start
         /// Permission to associate a file to the filesystem.
         Associate("associate"),
+        /// Permission to get filesystem attributes.
+        GetAttr("getattr"),
+        /// Permission to remount a filesystem with different flags.
+        Remount("remount"),
+        /// Permission to unmount a filesystem.
+        Unmount("unmount"),
         // keep-sorted end
     }
 }

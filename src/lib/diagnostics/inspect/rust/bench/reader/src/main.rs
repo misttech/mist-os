@@ -32,21 +32,18 @@ fn start_inspector_update_thread(inspector: Inspector, changes_per_second: usize
         let sleep_time =
             std::time::Duration::from_nanos(1_000_000_000u64 / changes_per_second as u64);
         std::thread::sleep(sleep_time);
-        match *state.lock().unwrap() {
-            InspectorState::Done => {
-                break;
-            }
-            _ => {}
+        if let InspectorState::Done = *state.lock().unwrap() {
+            break;
         }
         val.add(1);
     });
 
-    return move || {
+    move || {
         {
             *ret_state.lock().unwrap() = InspectorState::Done;
         }
         thread.join().expect("join thread");
-    };
+    }
 }
 
 /// Adds the given number of nodes as lazy nodes to the tree. Each lazy node will contain only one

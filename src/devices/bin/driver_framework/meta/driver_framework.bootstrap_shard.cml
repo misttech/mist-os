@@ -122,21 +122,6 @@
             ],
         },
         {
-            protocol: "fuchsia.component.resolution.Resolver",
-            from: "#pkg-cache",
-            as: "fuchsia.component.resolution.Resolver-base",
-            to: [
-                "#driver_index",
-                "#driver_manager",
-            ],
-
-            // pkg-cache depends on fshost for blobfs and fshost depends transitively on
-            // driver_index and driver_manager, but driver_index and driver_manager don't need base
-            // packages to provide fshost's (transitive) dependencies.
-            dependency: "weak",
-            source_availability: "unknown",
-        },
-        {
             // This is only used when the #driver_index |enable_ephemeral_drivers| config
             // is set, which enables loading drivers ephemerally. This is intended for
             // eng builds only and is set through product assembly.

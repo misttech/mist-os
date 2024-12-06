@@ -41,7 +41,7 @@ using Ehdr = Elf::Ehdr;
 using Phdr = Elf::Phdr;
 using Sym = Elf::Sym;
 using Dyn = Elf::Dyn;
-using TlsDescGot = Elf::TlsDescGot;
+using TlsDescGot = Elf::TlsDescGot<>;
 
 // StartupLoadModule::Load returns this.
 struct StartupLoadResult {

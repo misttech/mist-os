@@ -42,6 +42,8 @@
 #include <cstring>
 #include <memory>
 #include <optional>
+#include <ranges>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -944,9 +946,9 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
 
   // TODO(https://fxbug.dev/42080896): Do not use VLA. We should introduce a limit on
   // totally supported layers instead.
-  client_composition_opcode_t client_composition_opcodes[layers_size];
-  memset(client_composition_opcodes, 0, layers_size * sizeof(client_composition_opcode_t));
-  int client_composition_opcodes_count = 0;
+  layer_composition_operations_t layer_composition_operations[layers_size];
+  memset(layer_composition_operations, 0, layers_size * sizeof(layer_composition_operations_t));
+  int layer_composition_operations_count = 0;
 
   bool config_fail = false;
   size_t config_idx = 0;
@@ -981,7 +983,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
       ++layer_idx;
 
       banjo_layer = source_layer_node.layer->pending_layer_;
-      ++client_composition_opcodes_count;
+      ++layer_composition_operations_count;
 
       bool invalid = false;
       if (banjo_layer.image_source.width != 0 && banjo_layer.image_source.height != 0) {
@@ -1022,81 +1024,97 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
     return false;
   }
 
-  size_t client_composition_opcodes_count_actual;
-  uint32_t display_cfg_result = controller_->engine_driver_client()->CheckConfiguration(
-      configs, config_idx, client_composition_opcodes, client_composition_opcodes_count,
-      &client_composition_opcodes_count_actual);
+  size_t layer_composition_operations_count_actual;
+  config_check_result_t display_cfg_result =
+      controller_->engine_driver_client()->CheckConfiguration(
+          configs, config_idx, layer_composition_operations, layer_composition_operations_count,
+          &layer_composition_operations_count_actual);
 
-  if (display_cfg_result != CONFIG_CHECK_RESULT_OK) {
-    if (res) {
-      *res = display_cfg_result == CONFIG_CHECK_RESULT_TOO_MANY
-                 ? fhdt::wire::ConfigResult::kTooManyDisplays
-                 : fhdt::wire::ConfigResult::kUnsupportedDisplayModes;
-    }
-    return false;
-  }
-
-  bool layer_fail = false;
-  for (size_t i = 0; i < client_composition_opcodes_count_actual; i++) {
-    if (client_composition_opcodes[i]) {
-      layer_fail = true;
+  switch (display_cfg_result) {
+    case CONFIG_CHECK_RESULT_OK:
+      if (res) {
+        *res = fhdt::wire::ConfigResult::kOk;
+      }
+      return true;
+    case CONFIG_CHECK_RESULT_INVALID_CONFIG:
+      if (res) {
+        *res = fhdt::wire::ConfigResult::kInvalidConfig;
+      }
+      return false;
+    case CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG:
+      if (res) {
+        *res = fhdt::wire::ConfigResult::kUnsupportedConfig;
+      }
+      // Handle `ops` in the following steps.
       break;
-    }
+    case CONFIG_CHECK_RESULT_TOO_MANY:
+      if (res) {
+        *res = fhdt::wire::ConfigResult::kTooManyDisplays;
+      }
+      return false;
+    case CONFIG_CHECK_RESULT_UNSUPPORTED_MODES:
+      if (res) {
+        *res = fhdt::wire::ConfigResult::kUnsupportedDisplayModes;
+      }
+      return false;
   }
 
-  // Return unless we need to finish constructing the response
-  if (!layer_fail) {
-    return true;
-  }
-  if (!(res && ops)) {
-    return false;
-  }
-  *res = fhdt::wire::ConfigResult::kUnsupportedConfig;
+  ZX_DEBUG_ASSERT(display_cfg_result == CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG);
 
-  // TODO(b/249297195): Once Gerrit IFTTT supports multiple paths, add IFTTT
-  // comments to make sure that any change of type Client in
-  // //sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
-  // will cause the definition of `kAllErrors` to change as well.
-  constexpr uint32_t kAllErrors =
-      CLIENT_COMPOSITION_OPCODE_USE_IMAGE | CLIENT_COMPOSITION_OPCODE_MERGE_BASE |
-      CLIENT_COMPOSITION_OPCODE_MERGE_SRC | CLIENT_COMPOSITION_OPCODE_FRAME_SCALE |
-      CLIENT_COMPOSITION_OPCODE_SRC_FRAME | CLIENT_COMPOSITION_OPCODE_TRANSFORM |
-      CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION | CLIENT_COMPOSITION_OPCODE_ALPHA;
+  std::span<const layer_composition_operations_t> layer_composition_operations_actual(
+      layer_composition_operations, layer_composition_operations_count_actual);
+  const bool layer_fail =
+      std::ranges::any_of(layer_composition_operations_actual,
+                          [](layer_composition_operations_t ops) { return ops != 0; });
+  ZX_DEBUG_ASSERT_MSG(layer_fail,
+                      "At least one layer must have non-empty LayerCompositionOperations");
 
-  layer_idx = 0;
-  for (auto& display_config : configs_) {
-    if (display_config.pending_layers_.is_empty()) {
-      continue;
-    }
+  if (ops) {
+    // TODO(b/249297195): Once Gerrit IFTTT supports multiple paths, add IFTTT
+    // comments to make sure that any change of type Client in
+    // //sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
+    // will cause the definition of `kAllErrors` to change as well.
+    static constexpr layer_composition_operations_t kAllOperations =
+        LAYER_COMPOSITION_OPERATIONS_USE_IMAGE | LAYER_COMPOSITION_OPERATIONS_MERGE_BASE |
+        LAYER_COMPOSITION_OPERATIONS_MERGE_SRC | LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE |
+        LAYER_COMPOSITION_OPERATIONS_SRC_FRAME | LAYER_COMPOSITION_OPERATIONS_TRANSFORM |
+        LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION | LAYER_COMPOSITION_OPERATIONS_ALPHA;
 
-    bool seen_base = false;
-    for (auto& layer_node : display_config.pending_layers_) {
-      uint32_t err = kAllErrors & client_composition_opcodes[layer_idx];
-      // Fixup the error flags if the driver impl incorrectly set multiple MERGE_BASEs
-      if (err & CLIENT_COMPOSITION_OPCODE_MERGE_BASE) {
-        if (seen_base) {
-          err &= ~CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
-          err |= CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
-        } else {
-          seen_base = true;
-          err &= ~CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
-        }
+    layer_idx = 0;
+    for (auto& display_config : configs_) {
+      if (display_config.pending_layers_.is_empty()) {
+        continue;
       }
 
-      // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
-      // the client-side ID will have to be looked up in a map.
-      const display::LayerId layer_id(layer_node.layer->id.value());
-
-      for (uint8_t i = 0; i < 32; i++) {
-        if (err & (1 << i)) {
-          ops->emplace_back(fhd::wire::ClientCompositionOp{
-              .display_id = ToFidlDisplayId(display_config.id),
-              .layer_id = ToFidlLayerId(layer_id),
-              .opcode = static_cast<fhdt::wire::ClientCompositionOpcode>(i),
-          });
+      bool seen_base = false;
+      for (auto& layer_node : display_config.pending_layers_) {
+        uint32_t composition_operations = kAllOperations & layer_composition_operations[layer_idx];
+        // Fixup the error flags if the driver impl incorrectly set multiple MERGE_BASEs
+        if (composition_operations & LAYER_COMPOSITION_OPERATIONS_MERGE_BASE) {
+          if (seen_base) {
+            composition_operations &= ~LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
+            composition_operations |= LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+          } else {
+            seen_base = true;
+            composition_operations &= ~LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+          }
         }
+
+        // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
+        // the client-side ID will have to be looked up in a map.
+        const display::LayerId layer_id(layer_node.layer->id.value());
+
+        for (uint8_t i = 0; i < 32; i++) {
+          if (composition_operations & (1 << i)) {
+            ops->emplace_back(fhd::wire::ClientCompositionOp{
+                .display_id = ToFidlDisplayId(display_config.id),
+                .layer_id = ToFidlLayerId(layer_id),
+                .opcode = static_cast<fhdt::wire::ClientCompositionOpcode>(i),
+            });
+          }
+        }
+        layer_idx++;
       }
-      layer_idx++;
     }
   }
   return false;
@@ -1905,29 +1923,29 @@ ClientProxy::~ClientProxy() {}
 namespace {
 
 static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientUseImage)) ==
-                  CLIENT_COMPOSITION_OPCODE_USE_IMAGE,
+                  LAYER_COMPOSITION_OPERATIONS_USE_IMAGE,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientMergeBase)) ==
-                  CLIENT_COMPOSITION_OPCODE_MERGE_BASE,
+                  LAYER_COMPOSITION_OPERATIONS_MERGE_BASE,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientMergeSrc)) ==
-                  CLIENT_COMPOSITION_OPCODE_MERGE_SRC,
+                  LAYER_COMPOSITION_OPERATIONS_MERGE_SRC,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientFrameScale)) ==
-                  CLIENT_COMPOSITION_OPCODE_FRAME_SCALE,
+                  LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientSrcFrame)) ==
-                  CLIENT_COMPOSITION_OPCODE_SRC_FRAME,
+                  LAYER_COMPOSITION_OPERATIONS_SRC_FRAME,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientTransform)) ==
-                  CLIENT_COMPOSITION_OPCODE_TRANSFORM,
+                  LAYER_COMPOSITION_OPERATIONS_TRANSFORM,
               "Const mismatch");
 static_assert(
     (1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientColorConversion)) ==
-        CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION,
+        LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION,
     "Const mismatch");
 static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientAlpha)) ==
-                  CLIENT_COMPOSITION_OPCODE_ALPHA,
+                  LAYER_COMPOSITION_OPERATIONS_ALPHA,
               "Const mismatch");
 
 }  // namespace

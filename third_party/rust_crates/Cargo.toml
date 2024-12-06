@@ -145,7 +145,7 @@ md-5 = "0.10.5"
 memchr = "2.7.1"
 memoffset = "0.7.1"
 miniz_oxide = "0.3.6"
-mock-omaha-server = { version = "0.3.1", default-features = false }
+mock-omaha-server = { version = "0.3.3", default-features = false }
 mockall = "0.9"
 munge = "0.4.1"
 nix = "0.26.2"
@@ -362,7 +362,7 @@ output_vt100 = { path = "empty/output_vt100" }
 pkg-config = { path = "empty/pkg-config" }
 redox_syscall = { path = "empty/redox_syscall" }
 rustversion = { path = "empty/rustversion" }
-wasi-0_11_0_preview1 = { path = "empty/wasi-0.11.0+wasi-snapshot-preview1", package = "wasi" }
+wasi-0_11_0_preview1 = { path = "empty/wasi-0.11.0-wasi-snapshot-preview1", package = "wasi" }
 wasm-bindgen = { path = "empty/wasm-bindgen" }
 web-sys = { path = "empty/web-sys" }
 wepoll-ffi = { path = "empty/wepoll-ffi" }
@@ -639,7 +639,7 @@ rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cf
 [gn.package.mime_guess."2.0.5"]
 env_vars = ["MIME_TYPES_GENERATED_PATH=../../../compat/mime_guess/mime_types_generated.rs"]
 
-[gn.package.mock-omaha-server."0.3.1"]
+[gn.package.mock-omaha-server."0.3.3"]
 rustflags = ["--cfg=fasync"]
 deps = [
   "//src/lib/fuchsia-async",
@@ -648,7 +648,7 @@ deps = [
   "//third_party/rust_crates:argh"
 ]
 
-[gn.package.mock-omaha-server."0.3.1".platform."cfg(not(target_os = \"fuchsia\"))"]
+[gn.package.mock-omaha-server."0.3.3".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
   "//third_party/rust_crates:async-net",
   "//third_party/rust_crates:tokio",
@@ -984,6 +984,7 @@ rustflags = [
   "--cfg=feature=\\\"process\\\"",
   "--cfg=feature=\\\"rt-multi-thread\\\"",
   "--cfg=feature=\\\"rt\\\"",
+  "--cfg=feature=\\\"signal\\\"",
   "--cfg=feature=\\\"signal-hook-registry\\\"",
   "--cfg=feature=\\\"socket2\\\"",
   "--cfg=feature=\\\"sync\\\"",

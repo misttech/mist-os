@@ -271,8 +271,11 @@ impl UinputDeviceFile {
                             Ok(resp) => match resp.device_id {
                                 Some(device_id) => {
                                     inner.device_id = Some(device_id);
-                                    self.input_event_relay
-                                        .add_keyboard_device(device_id, open_files.clone());
+                                    self.input_event_relay.add_keyboard_device(
+                                        device_id,
+                                        open_files.clone(),
+                                        None,
+                                    );
                                     device_id
                                 }
                                 None => {
@@ -310,8 +313,11 @@ impl UinputDeviceFile {
                             Ok(resp) => match resp.device_id {
                                 Some(device_id) => {
                                     inner.device_id = Some(device_id);
-                                    self.input_event_relay
-                                        .add_touch_device(device_id, open_files.clone());
+                                    self.input_event_relay.add_touch_device(
+                                        device_id,
+                                        open_files.clone(),
+                                        None,
+                                    );
                                     device_id
                                 }
                                 None => {

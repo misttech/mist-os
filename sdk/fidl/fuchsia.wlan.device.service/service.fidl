@@ -6,7 +6,6 @@ library fuchsia.wlan.device.service;
 
 using fuchsia.wlan.common;
 using fuchsia.wlan.ieee80211 as ieee80211;
-using fuchsia.wlan.mlme;
 using fuchsia.wlan.sme;
 using fuchsia.wlan.stats;
 using zx;
@@ -22,16 +21,6 @@ type QueryIfaceResponse = struct {
     phy_assigned_id uint16;
     /// The iface's MAC.
     sta_addr ieee80211.MacAddr;
-};
-
-type CreateIfaceRequest = struct {
-    phy_id uint16;
-    role fuchsia.wlan.common.WlanMacRole;
-    sta_addr ieee80211.MacAddr;
-};
-
-type CreateIfaceResponse = struct {
-    iface_id uint16;
 };
 
 type DestroyIfaceRequest = struct {
@@ -63,17 +52,6 @@ type GetPowerSaveModeResponse = struct {
     ps_mode fuchsia.wlan.common.PowerSaveType;
 };
 
-type AddIfaceRequest = resource struct {
-    phy_id uint16;
-    assigned_iface_id uint16;
-    iface client_end:fuchsia.wlan.mlme.MLME;
-    generic_sme server_end:fuchsia.wlan.sme.GenericSme;
-};
-
-type AddIfaceResponse = struct {
-    iface_id uint16;
-};
-
 // TODO(https://fxbug.dev/42164319): Move this to wlan_internal.fidl after https://fxbug.dev/42166364 is fixed
 type GetIfaceCounterStatsResponse = strict union {
     1: stats fuchsia.wlan.stats.IfaceCounterStats;
@@ -101,16 +79,7 @@ closed protocol DeviceWatcher {
     });
 };
 
-@discoverable
-closed protocol DeviceService {
-    // Iface methods
-    strict AddIface(resource struct {
-        req AddIfaceRequest;
-    }) -> (struct {
-        status int32;
-        iface_id box<AddIfaceResponse>;
-    });
-};
+type DeviceMonitorError = flexible enum {};
 
 @discoverable
 closed protocol DeviceMonitor {
@@ -162,12 +131,13 @@ closed protocol DeviceMonitor {
     }) error int32;
 
     // Iface methods
-    strict CreateIface(struct {
-        req CreateIfaceRequest;
-    }) -> (struct {
-        status int32;
-        resp box<CreateIfaceResponse>;
-    });
+    strict CreateIface(table {
+        1: phy_id uint16;
+        2: role fuchsia.wlan.common.WlanMacRole;
+        3: sta_address ieee80211.MacAddr;
+    }) -> (table {
+        1: iface_id uint16;
+    }) error DeviceMonitorError;
     strict QueryIface(struct {
         iface_id uint16;
     }) -> (struct {

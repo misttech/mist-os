@@ -1790,7 +1790,7 @@ assembly_input_bundle("factory_reset_trigger") {
 # move them to other AIBs that are included by all other products.
 #
 assembly_input_bundle("common_standard") {
-  memory_buckets = [ "//src/developer/memory/buckets/buckets.json" ]
+  memory_buckets = [ "//src/developer/memory/buckets/buckets.json5" ]
 
   bootfs_files_labels = [ "//src/sys/core:bootfs" ]
 
@@ -2636,6 +2636,7 @@ assembly_input_bundle("camera") {
       ]
     },
   ]
+  memory_buckets = [ "//src/developer/memory/buckets/camera_buckets.json5" ]
 }
 
 assembly_input_bundle("factory_data") {
@@ -2850,6 +2851,7 @@ assembly_input_bundle("fshost_fxfs") {
       ]
     },
   ]
+  memory_buckets = [ "//src/developer/memory/buckets/fxfs_buckets.json5" ]
   bootfs_packages = [
     "//src/storage/fxfs:package",
     "//src/storage/fxfs-crypt:package",
@@ -2904,6 +2906,10 @@ assembly_input_bundle("fshost_storage_host_fvm_minfs") {
       ]
     },
   ]
+  memory_buckets = [
+    "//src/developer/memory/buckets/blobfs_buckets.json5",
+    "//src/developer/memory/buckets/minfs_buckets.json5",
+  ]
   bootfs_packages = [
     "//src/storage/storage-host:package",
     "//src/storage/blobfs/bin:package",
@@ -2934,6 +2940,7 @@ assembly_input_bundle("fshost_fvm") {
       ]
     },
   ]
+  memory_buckets = [ "//src/developer/memory/buckets/blobfs_buckets.json5" ]
   bootfs_packages = [ "//src/storage/blobfs/bin:package" ]
 }
 
@@ -2959,6 +2966,7 @@ assembly_input_bundle("fshost_fvm_fxfs") {
       ]
     },
   ]
+  memory_buckets = [ "//src/developer/memory/buckets/fxfs_buckets.json5" ]
   bootfs_packages = [
     "//src/storage/fxfs:package",
     "//src/storage/fxfs-crypt:package",
@@ -2988,6 +2996,7 @@ assembly_input_bundle("fshost_fvm_minfs") {
       ]
     },
   ]
+  memory_buckets = [ "//src/developer/memory/buckets/minfs_buckets.json5" ]
   bootfs_packages = [ "//src/storage/minfs/bin:package" ]
 }
 
@@ -3017,6 +3026,10 @@ assembly_input_bundle("fshost_fvm_minfs_migration") {
         },
       ]
     },
+  ]
+  memory_buckets = [
+    "//src/developer/memory/buckets/fxfs_buckets.json5",
+    "//src/developer/memory/buckets/minfs_buckets.json5",
   ]
   bootfs_packages = [
     "//src/storage/fxfs:package",
@@ -3479,6 +3492,8 @@ assembly_input_bundle("thread_lowpan") {
       ]
     },
   ]
+  memory_buckets =
+      [ "//src/developer/memory/buckets/thread_lowpan_buckets.json5" ]
 }
 
 # WLAN policy component
@@ -4417,6 +4432,7 @@ icu_assembly_input_bundle("setui") {
       ]
     },
   ]
+  memory_buckets = [ "//src/developer/memory/buckets/setui_buckets.json5" ]
 }
 
 icu_assembly_input_bundle("setui_with_camera") {
@@ -4433,6 +4449,7 @@ icu_assembly_input_bundle("setui_with_camera") {
       ]
     },
   ]
+  memory_buckets = [ "//src/developer/memory/buckets/setui_buckets.json5" ]
 }
 
 # Legacy fonts setup: fonts sourced from config-data.
@@ -4653,6 +4670,10 @@ assembly_input_bundle("kernel_page_scanner_aging_fast") {
 
 assembly_input_bundle("kernel_logs_in_reboot_info") {
   kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
+}
+
+assembly_input_bundle("kernel_arm64_event_stream_disable") {
+  kernel_cmdline = [ "kernel.arm64.event-stream.enable=false" ]
 }
 
 assembly_input_bundle("kernel_page_table_eviction_never") {

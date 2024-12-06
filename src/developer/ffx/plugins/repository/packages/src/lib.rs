@@ -85,7 +85,7 @@ async fn show_impl(
     context: EnvironmentContext,
     writer: &mut PackagesWriter,
 ) -> Result<()> {
-    let repo = connect_to_repo(cmd.repository.clone(), context).await?;
+    let repo = connect_to_repo(cmd.repository.clone(), cmd.port, context).await?;
 
     let Some(mut blobs) = repo
         .show_package(&cmd.package, cmd.include_subpackages)
@@ -162,7 +162,7 @@ async fn list_impl(
     context: EnvironmentContext,
     writer: &mut PackagesWriter,
 ) -> Result<()> {
-    let repo = connect_to_repo(cmd.repository.clone(), context).await?;
+    let repo = connect_to_repo(cmd.repository.clone(), cmd.port, context).await?;
 
     let mut packages = vec![];
     for package in repo.list_packages().await? {
@@ -267,6 +267,7 @@ fn to_rfc2822(time: SystemTime) -> String {
 
 async fn connect_to_repo(
     repo_name: Option<String>,
+    repo_port: Option<u16>,
     context: EnvironmentContext,
 ) -> Result<RepoClient<Box<dyn RepoProvider>>> {
     // If we specified a repository on the CLI, try to look up its repository spec.
@@ -276,7 +277,7 @@ async fn connect_to_repo(
             .get("repository.process_dir")
             .map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
         let mgr = PkgServerInstances::new(instance_root);
-        if let Some(info) = mgr.get_instance(repo_name.clone())? {
+        if let Some(info) = mgr.get_instance(repo_name.clone(), repo_port)? {
             Some(info.repo_spec())
         } else if let Some(repo_spec) = pkg::config::get_repository(&repo_name)
             .await
@@ -327,7 +328,7 @@ async fn extract_archive_impl(
     cmd: ExtractArchiveSubCommand,
     context: EnvironmentContext,
 ) -> Result<()> {
-    let repo = connect_to_repo(cmd.repository.clone(), context).await?;
+    let repo = connect_to_repo(cmd.repository.clone(), cmd.port, context).await?;
 
     let Some(entries) = repo
         .show_package(&cmd.package, true)
@@ -448,12 +449,21 @@ mod test {
         let tmp = tempfile::tempdir().unwrap();
         let env = setup_repo(tmp.path()).await;
 
+        // This test is only testing with daemon based repo.
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
+            .await
+            .unwrap();
+
         let test_buffers = TestBuffers::default();
         let mut writer = PackagesWriter::new_test(None, &test_buffers);
 
         run_impl(
             ListSubCommand {
                 repository: Some("devhost".to_string()),
+                port: None,
                 full_hash: false,
                 include_components: false,
             },
@@ -491,12 +501,21 @@ package2/0 24.03 KB {pkg2_hash} {pkg2_modified} \n",
         let tmp = tempfile::tempdir().unwrap();
         let env = setup_repo(tmp.path()).await;
 
+        // This test is only testing with daemon based repo.
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
+            .await
+            .unwrap();
+
         let test_buffers = TestBuffers::default();
         let mut writer = PackagesWriter::new_test(None, &test_buffers);
 
         run_impl(
             ListSubCommand {
                 repository: Some("devhost".to_string()),
+                port: None,
                 full_hash: true,
                 include_components: false,
             },
@@ -534,12 +553,21 @@ package2/0 24.03 KB {pkg2_hash} {pkg2_modified} \n",
         let tmp = tempfile::tempdir().unwrap();
         let env = setup_repo(tmp.path()).await;
 
+        // This test is only testing with daemon based repo.
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
+            .await
+            .unwrap();
+
         let test_buffers = TestBuffers::default();
         let mut writer = PackagesWriter::new_test(None, &test_buffers);
 
         run_impl(
             ListSubCommand {
                 repository: Some("devhost".to_string()),
+                port: None,
                 full_hash: false,
                 include_components: true,
             },
@@ -579,12 +607,21 @@ package2/0 24.03 KB {pkg2_hash} {pkg2_modified} meta/package2.cm \n",
         let tmp = tempfile::tempdir().unwrap();
         let env = setup_repo(tmp.path()).await;
 
+        // This test is only testing with daemon based repo.
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
+            .await
+            .unwrap();
+
         let test_buffers = TestBuffers::default();
         let mut writer = PackagesWriter::new_test(None, &test_buffers);
 
         run_impl_for_show_command(
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
+                port: None,
                 full_hash: false,
                 include_subpackages: false,
                 package: "package1/0".to_string(),
@@ -635,12 +672,21 @@ meta/package1.cmx             12 B  <unknown>   {pkg1_modified} \n"
         let tmp = tempfile::tempdir().unwrap();
         let env = setup_repo(tmp.path()).await;
 
+        // This test is only testing with daemon based repo.
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
+            .await
+            .unwrap();
+
         let test_buffers = TestBuffers::default();
         let mut writer = PackagesWriter::new_test(None, &test_buffers);
 
         run_impl_for_show_command(
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
+                port: None,
                 full_hash: true,
                 include_subpackages: false,
                 package: "package1/0".to_string(),
@@ -689,12 +735,21 @@ meta/package1.cmx             12 B  <unknown>                                   
         let tmp = tempfile::tempdir().unwrap();
         let env = setup_repo(tmp.path()).await;
 
+        // This test is only testing with daemon based repo.
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
+            .await
+            .unwrap();
+
         let test_buffers = TestBuffers::default();
         let mut writer = PackagesWriter::new_test(None, &test_buffers);
 
         run_impl_for_show_command(
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
+                port: None,
                 full_hash: false,
                 include_subpackages: true,
                 package: "package1/0".to_string(),
@@ -745,11 +800,20 @@ meta/package1.cmx             <root>     12 B  <unknown>   {pkg1_modified} \n"
         let tmp = tempfile::tempdir().unwrap();
         let env = setup_repo(&tmp.path().join("repo")).await;
 
+        // This test is only testing with daemon based repo.
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
+            .await
+            .unwrap();
+
         let archive_path = tmp.path().join("archive.far");
         extract_archive_impl(
             ExtractArchiveSubCommand {
                 out: archive_path.clone(),
                 repository: Some("devhost".to_string()),
+                port: None,
                 package: "package1/0".to_string(),
             },
             env.context.clone(),

@@ -12,13 +12,13 @@
 namespace fdf_metadata::test {
 
 zx::result<> MetadataForwarderTestDriver::Start() {
-  zx_status_t status = metadata_server_.Serve(*outgoing(), dispatcher());
-  if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", zx_status_get_string(status)));
-    return zx::error(status);
+  zx::result result = metadata_server_.Serve(*outgoing(), dispatcher());
+  if (result.is_error()) {
+    FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", result.status_string()));
+    return result.take_error();
   }
 
-  status = InitMetadataRetrieverNode();
+  zx_status_t status = InitMetadataRetrieverNode();
   if (status != ZX_OK) {
     FDF_SLOG(ERROR, "Failed to initialize metadata retriever node.",
              KV("status", zx_status_get_string(status)));
@@ -93,10 +93,10 @@ void MetadataForwarderTestDriver::Serve(
 
 void MetadataForwarderTestDriver::ForwardMetadata(ForwardMetadataCompleter::Sync& completer) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  zx_status_t status = metadata_server_.ForwardMetadata(incoming());
-  if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Failed to forward metadata.", KV("status", zx_status_get_string(status)));
-    completer.Reply(fit::error(status));
+  zx::result result = metadata_server_.ForwardMetadata(incoming());
+  if (result.is_error()) {
+    FDF_SLOG(ERROR, "Failed to forward metadata.", KV("status", result.status_string()));
+    completer.Reply(fit::error(result.error_value()));
     return;
   }
 

@@ -4,7 +4,9 @@
 
 """ Defines utilities for working with fuchsia api levels. """
 
-load("//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
+# NOTE: INTERNAL_ONLY_VALID_TARGET_APIS is part of the generated content of @fuchsia_sdk
+# and does not exist in @rules_fuchsia.
+load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
 
 # We define the provider in this file because it is a private implementation
 # detail in this file. It is only made public so that it can be used in tests.
@@ -57,25 +59,25 @@ def get_fuchsia_api_level(ctx):
     return ctx.attr._fuchsia_api_level[FuchsiaAPILevelInfo].level
 
 def fail_missing_api_level(name):
-    fail("'{}' does not have a valid API level set. Valid API levels are {}".format(name, [lvl.api_level for lvl in get_fuchsia_api_levels()]))
+    fail("'{}' does not have a valid API level set. Valid API levels are {}".format(name, _valid_api_level_names()))
 
-def _valid_api_levels(ctx):
-    if getattr(ctx.attr, "valid_api_levels_for_test", None):
-        levels = ctx.attr.valid_api_levels_for_test
-    else:
-        levels = [entry.api_level for entry in get_fuchsia_api_levels()]
+def _valid_api_level_names():
+    """ Returns a list of strings containing the names of the API levels supported by the SDK.
+    """
 
-    # The unset level is still valid since it can indicate that the user did
-    # not set the value. If we don't do this then we have no way of knowing if the
-    # user passed the flag along or not.
-    return levels + [""]
+    # The returned list is sorted alphabetically, which is not reader-friendly.
+    return [entry.api_level for entry in get_fuchsia_api_levels()]
 
 def _fuchsia_api_level_impl(ctx):
     raw_level = ctx.build_setting_value
-    if raw_level not in _valid_api_levels(ctx):
-        fail("ERROR: {} is not a valid API level. API level should be one of {}".format(
+
+    # Allow the empty string here even though it is not a supported level.
+    # TODO(https://fxbug.dev/354047162): Clarify the purpose of allowing the
+    # empty string, which was first added in https://fxrev.dev/926337.
+    if raw_level != "" and raw_level not in _valid_api_level_names():
+        fail('ERROR: "{}" is not an API level supported by this SDK. API level should be one of {}'.format(
             raw_level,
-            _valid_api_levels(ctx),
+            _valid_api_level_names(),
         ))
 
     return FuchsiaAPILevelInfo(
@@ -91,14 +93,6 @@ fuchsia_api_level = rule(
     """,
     implementation = _fuchsia_api_level_impl,
     build_setting = config.string(flag = True),
-    attrs = {
-        "valid_api_levels_for_test": attr.string_list(
-            doc = """A set of levels to use for testing.
-
-            This attr should not be used outside of a testing environment.""",
-            default = [],
-        ),
-    },
 )
 
 def _verify_cc_head_api_level_impl(ctx):
@@ -107,7 +101,7 @@ def _verify_cc_head_api_level_impl(ctx):
 
     if get_fuchsia_api_level(ctx) != "HEAD":
         fail("You are trying to use an unstable API in a stable package.\n" +
-             "You must target HEAD in order to use this library: " + ctx.attr.library_name)
+             "You must target \"HEAD\" in order to use this library: " + ctx.attr.library_name)
 
     return DefaultInfo(
         files = depset([f]),
@@ -120,7 +114,7 @@ verify_cc_head_api_level = rule(
     This rule should only be used by the generated cc_library rules for sdk
     elements. It will create an empty c++ file which can be added to the srcs
     of the cc_library. The check will look at the Fuchsia API level and fail if
-    it is not head.
+    it is not "HEAD".
     """,
     attrs = {
         "library_name": attr.string(mandatory = True),

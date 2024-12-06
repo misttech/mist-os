@@ -16,4 +16,9 @@ pub struct DeregisterCommand {
     #[argh(option, short = 'r')]
     /// remove the repository named `name` from the target, rather than the default.
     pub repository: Option<String>,
+
+    #[argh(option, short = 'p')]
+    /// repository server port number.
+    /// Required to disambiguate multiple repositories with the same name.
+    pub port: Option<u16>,
 }

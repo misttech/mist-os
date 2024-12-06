@@ -142,9 +142,9 @@ board_input_bundle("drivers") {
       driver_components = [ "meta/aml-pwm-init.cm" ]
     },
     {
-      package_target = "//src/devices/serial/drivers/aml-uart:package-dfv2"
+      package_target = "//src/devices/serial/drivers/aml-uart:package"
       package_set = "bootfs"
-      driver_components = [ "meta/aml-uart-dfv2.cm" ]
+      driver_components = [ "meta/aml-uart.cm" ]
     },
     {
       package_target = "//src/devices/thermal/drivers/aml-thermal:package"

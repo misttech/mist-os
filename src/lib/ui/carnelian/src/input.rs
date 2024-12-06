@@ -457,7 +457,7 @@ pub(crate) async fn listen_for_user_input(internal_sender: InternalSender) -> Re
         let entry = entry?;
         match listen_to_path(&entry.path(), &internal_sender).await {
             Err(err) => {
-                eprintln!("Error: {}: {}", entry.file_name().to_string_lossy().to_string(), err)
+                eprintln!("Error: {}: {}", entry.file_name().to_string_lossy(), err)
             }
             _ => (),
         }

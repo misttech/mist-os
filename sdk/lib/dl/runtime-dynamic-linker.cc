@@ -86,7 +86,7 @@ std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi
 
   // Arm the caller's AllocChecker with the return value of this function.
   auto result = [&ac](std::unique_ptr<RuntimeDynamicLinker> v) {
-    ac.arm(sizeof(RuntimeDynamicLinker), static_cast<bool>(v));
+    ac.arm(sizeof(RuntimeDynamicLinker), v);
     return v;
   };
 
@@ -98,6 +98,7 @@ std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi
     if (!populate_ac.check()) [[unlikely]] {
       return result(nullptr);
     }
+    dynamic_linker->max_static_tls_modid_ = abi.static_tls_modules.size();
   }
 
   return result(std::move(dynamic_linker));

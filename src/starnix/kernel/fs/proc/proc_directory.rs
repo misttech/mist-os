@@ -22,7 +22,6 @@ use crate::vfs::{
 use fuchsia_component::client::connect_to_protocol_sync;
 
 use maplit::btreemap;
-use once_cell::sync::Lazy;
 use starnix_logging::{bug_ref, log_error, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::time::duration_to_scheduler_clock;
@@ -36,7 +35,7 @@ use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error, off_t, pid_t};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 use std::time::SystemTime;
 
 /// `ProcDirectory` represents the top-level directory in `procfs`.
@@ -649,7 +648,7 @@ impl SysInfo {
     }
 }
 
-const SYSINFO: Lazy<SysInfo> = Lazy::new(|| {
+const SYSINFO: LazyLock<SysInfo> = LazyLock::new(|| {
     SysInfo::fetch().unwrap_or_else(|e| {
         log_error!("Failed to fetch sysinfo: {e}");
         SysInfo { board_name: "Unknown".to_string() }

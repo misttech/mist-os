@@ -18,6 +18,7 @@ pub struct Setup {
 }
 
 fn str_to_interfaces(src: &str) -> Result<ConfigurationInterfaces, String> {
+    #[allow(clippy::manual_try_fold, reason = "mass allow for https://fxbug.dev/381896734")]
     src.to_lowercase().split(",").fold(Ok(ConfigurationInterfaces::empty()), |acc, flag| {
         acc.and_then(|acc| {
             Ok(match flag {

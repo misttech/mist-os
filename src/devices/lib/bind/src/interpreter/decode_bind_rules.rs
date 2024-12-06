@@ -295,9 +295,7 @@ fn get_u32_bytes(bytecode: &Vec<u8>, idx: usize) -> Result<[u8; 4], BytecodeErro
     }
 
     let mut bytes: [u8; 4] = [0; 4];
-    for i in 0..4 {
-        bytes[i] = bytecode[idx + i];
-    }
+    bytes.copy_from_slice(&bytecode[idx..(4 + idx)]);
     Ok(bytes)
 }
 

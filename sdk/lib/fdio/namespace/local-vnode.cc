@@ -60,18 +60,11 @@ fbl::RefPtr<LocalVnode> LocalVnode::Intermediate::Lookup(const fbl::String& name
   return nullptr;
 }
 
-LocalVnode::~LocalVnode() {
-  std::visit(fdio_internal::overloaded{
-                 [](LocalVnode::Local& c) {},
-                 [](LocalVnode::Intermediate& c) {},
-                 [](LocalVnode::Remote& s) {
-                   // Close the channel underlying the remote connection without making a Close
-                   // call to preserve previous behavior.
-                   zx::channel remote_channel;
-                   zxio_release(s.Connection(), remote_channel.reset_and_get_address());
-                 },
-             },
-             node_type_);
+LocalVnode::Remote::~Remote() {
+  // Close the channel underlying the remote connection without making a Close
+  // call to preserve previous behavior.
+  zx::channel remote_channel;
+  zxio_release(Connection(), remote_channel.reset_and_get_address());
 }
 
 LocalVnode::Intermediate::~Intermediate() {

@@ -309,6 +309,7 @@ mod test {
     use crate::SampleConfig;
     use anyhow::format_err;
     use assert_matches::assert_matches;
+    use fuchsia_runtime::{UtcDuration, UtcInstant};
     use futures::channel::mpsc::channel;
     use futures::future::ready;
     use futures::stream::StreamExt;
@@ -329,17 +330,17 @@ mod test {
 
     lazy_static! {
         static ref TEST_SAMPLE_1: HttpsSample = HttpsSample {
-            utc: zx::BootInstant::from_nanos(111_222_333_444_555),
+            utc: UtcInstant::from_nanos(111_222_333_444_555),
             reference: zx::BootInstant::from_nanos(666_777_888_999_000),
-            standard_deviation: zx::BootDuration::from_millis(101),
-            final_bound_size: zx::BootDuration::from_millis(20),
+            standard_deviation: UtcDuration::from_millis(101),
+            final_bound_size: UtcDuration::from_millis(20),
             polls: vec![],
         };
         static ref TEST_SAMPLE_2: HttpsSample = HttpsSample {
-            utc: zx::BootInstant::from_nanos(999_999_999_999_999),
+            utc: UtcInstant::from_nanos(999_999_999_999_999),
             reference: zx::BootInstant::from_nanos(777_777_777_777_777),
-            standard_deviation: zx::BootDuration::from_millis(102),
-            final_bound_size: zx::BootDuration::from_millis(30),
+            standard_deviation: UtcDuration::from_millis(102),
+            final_bound_size: UtcDuration::from_millis(30),
             polls: vec![Poll { round_trip_time: zx::BootDuration::from_millis(23) }],
         };
     }

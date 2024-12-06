@@ -370,7 +370,6 @@
                 "/bootstrap/fshost",
                 "/bootstrap/pkg-cache",
                 "/bootstrap/sysmem",
-                "/core",
                 "/core/audio_core",
                 "/core/network/netstack",
                 "/core/setui_service",

@@ -327,7 +327,7 @@ ffx config remove repository.server.enabled && ffx doctor --restart-daemon
             // if we're starting using a product bundle, the name will be different so compare the repo_path
             // which is the path to the product bundle
             if let Some(pb_path) = &cmd.product_bundle {
-                if pb_path.to_string() != duplicate.repo_path_display() {
+                if *pb_path != duplicate.repo_path_display() {
                     return_user_error!("Repository address conflict. \
                 Cannot start a server named {repo_name} serving {repo_path:?}. \
                 Repository server  \"{}\" is already running on {addr} serving a different path: {}\n\

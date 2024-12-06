@@ -253,7 +253,7 @@ impl<'a> TreeSelector for ir::TreeSelector<'a> {
     }
 }
 
-impl<'a> StringSelector for ir::Segment<'a> {
+impl StringSelector for ir::Segment<'_> {
     fn exact_match(&self) -> Option<&str> {
         match self {
             Self::ExactMatch(s) => Some(s),

@@ -128,9 +128,9 @@ TEST_F(ScanAndApStartTest, ScanApStartInterference) {
   EXPECT_EQ(*result, wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware);
 
   // Make sure the AP iface started successfully.
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            wlan_fullmac_wire::WlanStartResult::kSuccess);
+  ASSERT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
+  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code(),
+            wlan_fullmac_wire::StartResult::kSuccess);
 }
 
 TEST_F(ScanAndApStartTest, ScanAbortFailure) {
@@ -157,9 +157,9 @@ TEST_F(ScanAndApStartTest, ScanAbortFailure) {
   EXPECT_EQ(*first_result, wlan_fullmac_wire::WlanScanResult::kSuccess);
 
   // Make sure the AP iface started successfully.
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            wlan_fullmac_wire::WlanStartResult::kSuccess);
+  ASSERT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
+  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code(),
+            wlan_fullmac_wire::StartResult::kSuccess);
 
   env_->ScheduleNotification(std::bind(&SimInterface::StartScan, &client_ifc_, kSecondScanId, false,
                                        std::optional<const std::vector<uint8_t>>{}),
@@ -203,9 +203,9 @@ TEST_F(ScanAndApStartTest, ScanWhileApStart) {
   EXPECT_EQ(*first_result, wlan_fullmac_wire::WlanScanResult::kShouldWait);
 
   // The result of AP iface start should be NOT_SUPPORT when timeout happened.
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            wlan_fullmac_wire::WlanStartResult::kNotSupported);
+  ASSERT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
+  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code(),
+            wlan_fullmac_wire::StartResult::kNotSupported);
 }
 
 }  // namespace wlan::brcmfmac

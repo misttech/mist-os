@@ -13,7 +13,16 @@
         colocate: "false",
         compat: "driver/pci-sdhci.so",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.sdhci.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.pci.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.sdhci.Service",
+            from: "self",
+        },
     ],
 }

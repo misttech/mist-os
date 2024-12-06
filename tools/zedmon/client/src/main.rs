@@ -213,7 +213,7 @@ fn main() -> Result<(), Error> {
 fn run_describe(arg_matches: &ArgMatches<'_>) -> Result<(), Error> {
     let zedmon = zedmon::zedmon(arg_matches.value_of("serial"))?;
     match arg_matches.value_of("name") {
-        Some(name) => println!("{}", zedmon.describe(name).unwrap().to_string()),
+        Some(name) => println!("{}", zedmon.describe(name).unwrap()),
         None => {
             let params = zedmon::DESCRIBABLE_PROPERTIES
                 .iter()

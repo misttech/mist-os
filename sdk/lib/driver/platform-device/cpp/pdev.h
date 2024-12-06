@@ -65,6 +65,7 @@ class PDev {
   zx::result<MmioInfo> GetMmio(uint32_t index) const;
 
   zx::result<zx::interrupt> GetInterrupt(uint32_t index, uint32_t flags = 0) const;
+  zx::result<zx::interrupt> GetInterrupt(cpp17::string_view name, uint32_t flags = 0) const;
   zx::result<zx::bti> GetBti(uint32_t index) const;
   zx::result<zx::resource> GetSmc(uint32_t index) const;
 

@@ -184,6 +184,7 @@ fuchsia_component("child_realm_with_realmbuilder") {
 fuchsia_test_package("fuchsia-component-test-tests") {
   deps = [
     ":child_realm_with_realmbuilder",
+    ":component_manager_expose_dir_rights",
     ":echo_client_empty_component",
     ":echo_client_with_elf_runner",
     ":echo_realm_component",
@@ -194,8 +195,6 @@ fuchsia_test_package("fuchsia-component-test-tests") {
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
     "//src/sys/component_manager/testing/echo_client",
     "//src/sys/component_manager/testing/echo_server",
-    "//src/sys/component_manager/tests/rights:component_manager_debug_config",
-    "//src/sys/component_manager/tests/rights:component_manager_for_rights_test",
     "//src/sys/component_manager/tests/rights:elf_runner_and_environment",
     "//src/sys/component_manager/tests/rights:expose_dir_rights",
   ]
@@ -203,6 +202,12 @@ fuchsia_test_package("fuchsia-component-test-tests") {
     ":fuchsia_component_test_tests_component",
     ":arbitrary_realm_test_component",
   ]
+}
+
+fuchsia_component("component_manager_expose_dir_rights") {
+  testonly = true
+  deps = [ "//src/sys/component_manager:bin_with_tracing" ]
+  manifest = "meta/component_manager_expose_dir_rights.cml"
 }
 
 fuchsia_test_package("scoped-instance-tests") {

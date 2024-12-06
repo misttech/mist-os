@@ -79,8 +79,8 @@ class ArpTest : public SimTest {
   void CleanupApInterface();
 
   void OnAssocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcAssocIndRequest* ind);
-  void OnStartConf(const wlan_fullmac_wire::WlanFullmacStartConfirm* resp);
-  void OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp);
+  void OnStartConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcStartConfRequest* resp);
+  void OnStopConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcStopConfRequest* resp);
 
   // Send a frame directly into the environment
   void Tx(const std::vector<uint8_t>& ethFrame);
@@ -110,12 +110,14 @@ void GenericIfc::AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& 
 }
 
 void GenericIfc::StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) {
-  test_->OnStartConf(&request->resp);
+  auto start_conf = fidl::ToNatural(*request);
+  test_->OnStartConf(&start_conf);
   completer.Reply();
 }
 
 void GenericIfc::StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) {
-  test_->OnStopConf(&request->resp);
+  auto stop_conf = fidl::ToNatural(*request);
+  test_->OnStopConf(&stop_conf);
   completer.Reply();
 }
 
@@ -124,12 +126,12 @@ void ArpTest::OnAssocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcAssocIndR
   assoc_ind_recv_ = true;
 }
 
-void ArpTest::OnStartConf(const wlan_fullmac_wire::WlanFullmacStartConfirm* resp) {
-  ASSERT_EQ(resp->result_code, wlan_fullmac_wire::WlanStartResult::kSuccess);
+void ArpTest::OnStartConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcStartConfRequest* resp) {
+  ASSERT_EQ(resp->result_code().value(), wlan_fullmac_wire::StartResult::kSuccess);
 }
 
-void ArpTest::OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp) {
-  ASSERT_EQ(resp->result_code, wlan_fullmac_wire::WlanStopResult::kSuccess);
+void ArpTest::OnStopConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcStopConfRequest* resp) {
+  ASSERT_EQ(resp->result_code().value(), wlan_fullmac_wire::StopResult::kSuccess);
 }
 
 void ArpTest::Init() {

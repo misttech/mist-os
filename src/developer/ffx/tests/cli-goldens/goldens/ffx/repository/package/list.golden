@@ -24,6 +24,18 @@
       "hidden": false
     },
     {
+      "kind": {
+        "Option": {
+          "arg_name": "port"
+        }
+      },
+      "optionality": "optional",
+      "long": "--port",
+      "short": "p",
+      "description": "repository server port number. Required needed to disambiguate multiple repositories with the same name.",
+      "hidden": false
+    },
+    {
       "kind": "Switch",
       "optionality": "optional",
       "long": "--full-hash",

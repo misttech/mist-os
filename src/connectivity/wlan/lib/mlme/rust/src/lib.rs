@@ -189,7 +189,7 @@ impl DriverEventSink {
         &self,
         driver_event: DriverEvent,
         responder: R,
-        response: R::Response,
+        response: R::Response<'_>,
     ) -> Result<R, anyhow::Error>
     where
         R: ResponderExt,
@@ -590,19 +590,19 @@ mod tests {
     }
 
     impl ResponderExt for RequestAxResponder {
-        type Response = ();
+        type Response<'a> = ();
         const REQUEST_NAME: &'static str = stringify!(RequestAx);
 
-        fn send(self, _: Self::Response) -> Result<(), fidl::Error> {
+        fn send(self, _: Self::Response<'_>) -> Result<(), fidl::Error> {
             Self::send(self)
         }
     }
 
     impl ResponderExt for RequestCxResponder {
-        type Response = Result<u64, u64>;
+        type Response<'a> = Result<u64, u64>;
         const REQUEST_NAME: &'static str = stringify!(RequestCx);
 
-        fn send(self, response: Self::Response) -> Result<(), fidl::Error> {
+        fn send(self, response: Self::Response<'_>) -> Result<(), fidl::Error> {
             Self::send(self, response)
         }
     }

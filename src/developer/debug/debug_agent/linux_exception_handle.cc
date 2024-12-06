@@ -73,4 +73,12 @@ debug_ipc::ExceptionRecord LinuxExceptionHandle::GetRecord() const {
   return debug_ipc::ExceptionRecord();
 }
 
+uint64_t LinuxExceptionHandle::GetPid() const {
+  // Processes and threads are difficult to distinguish on Linux, since exceptions happen on threads
+  // we don't return any information here since the LinuxTask we have should be corresponding to the
+  // thread the exception occurred on.
+  return 0;
+}
+
+uint64_t LinuxExceptionHandle::GetTid() const { return task_->pid(); }
 }  // namespace debug_agent

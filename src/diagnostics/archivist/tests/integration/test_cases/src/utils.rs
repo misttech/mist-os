@@ -19,10 +19,12 @@ pub(crate) async fn snapshot_and_stream_logs(
         .await
         .expect("connect to archive accessor");
 
-    ArchiveReader::new()
+    let subscription = ArchiveReader::new()
         .with_archive(accessor)
         .snapshot_then_subscribe::<Logs>()
-        .expect("subscribe to logs")
+        .expect("subscribe to logs");
+    subscription.wait_for_ready().await;
+    subscription
 }
 
 /// Extension methods on LogSettingsProxy.

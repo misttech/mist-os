@@ -130,9 +130,8 @@ tlsdesc.value_offset = 4
 .macro .tlsdesc.cfi
   // Almost all registers are preserved from the caller.  The integer set does
   // not include LR or SP, which .cfi_startproc covered.
-  // TODO(mcgrathr): add .cfi.all_* for aarch32 in lib/arch
-//.cfi.all_integer .cfi_same_value
-//.cfi.all_vectorfp .cfi_same_value
+  .cfi.all_integer .cfi_same_value
+  .cfi.all_vectorfp .cfi_same_value
 .endm
 
 #elif defined(__riscv)
@@ -217,14 +216,14 @@ extern "C" {
 // The implementation returns the addend minus the thread pointer, such that
 // adding the thread pointer back to this offset produces zero with a zero
 // addend, and thus nullptr.
-ptrdiff_t _ld_tlsdesc_runtime_undefined_weak(const elfldltl::Elf<>::TlsDescGot& got);
-ptrdiff_t _ld_tlsdesc_runtime_undefined_weak_addend(const elfldltl::Elf<>::TlsDescGot& got);
+ptrdiff_t _ld_tlsdesc_runtime_undefined_weak(const elfldltl::Elf<>::TlsDescGot<>& got);
+ptrdiff_t _ld_tlsdesc_runtime_undefined_weak_addend(const elfldltl::Elf<>::TlsDescGot<>& got);
 
 // In this minimal implementation used for PT_TLS segments in the static TLS
 // set, desc.valueu is always simply a fixed offset from the thread pointer.
 // Note this offset might be negative, but it's always handled as uintptr_t to
 // ensure well-defined overflow arithmetic.
-ptrdiff_t _ld_tlsdesc_runtime_static(const elfldltl::Elf<>::TlsDescGot& got);
+ptrdiff_t _ld_tlsdesc_runtime_static(const elfldltl::Elf<>::TlsDescGot<>& got);
 
 }  // extern "C"
 
@@ -269,13 +268,13 @@ constexpr std::optional<TlsdescRuntime> TlsdescRuntimeFromMagic(uintptr_t magic)
 // enum values (as from ld::RemoteAbiStub), and a load bias applied to those
 // addresses.  Individual hooks can be replaced later with SetHook.
 //
-template <class Elf>
+template <class Elf, elfldltl::ElfMachine Machine>
 class StaticTlsDescResolver {
  public:
-  using size_type = typename Elf::size_type;
-  using Addr = typename Elf::Addr;
-  using Addend = typename Elf::Addend;
-  using TlsDescGot = typename Elf::TlsDescGot;
+  using size_type = Elf::size_type;
+  using Addr = Elf::Addr;
+  using Addend = Elf::Addend;
+  using TlsDescGot = Elf::template TlsDescGot<Machine>;
   using RuntimeHooks = std::array<Addr, kTlsdescRuntimeCount>;
 
   explicit constexpr StaticTlsDescResolver(const RuntimeHooks& hooks, size_type bias = 0) {
@@ -347,7 +346,7 @@ class LocalRuntimeTlsDescResolver {
   using size_type = elfldltl::Elf<>::size_type;
   using Addr = elfldltl::Elf<>::Addr;
   using Addend = elfldltl::Elf<>::Addend;
-  using TlsDescGot = elfldltl::Elf<>::TlsDescGot;
+  using TlsDescGot = elfldltl::Elf<>::TlsDescGot<>;
 
   // Handle an undefined weak TLSDESC reference.  There are special runtime
   // resolvers for this case: one for zero addend, and one for nonzero addend.

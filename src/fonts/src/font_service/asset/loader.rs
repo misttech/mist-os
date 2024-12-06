@@ -24,6 +24,7 @@ pub trait AssetLoader {
     ) -> Result<io::DirectoryProxy, AssetCollectionError>;
 
     /// Gets a `VMO` handle to the [`Asset`] at a local `path`.
+    #[allow(clippy::result_large_err)]
     fn load_vmo_from_path(&self, path: &Path) -> Result<mem::Buffer, AssetCollectionError>;
 
     /// Gets a VMO handle to the file with the given `file_name` within the given directory.

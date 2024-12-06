@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
+        "//sdk/lib/sys/component/realm_builder.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
         "//src/sys/test_runners/tmp_storage.shard.cml",
         "syslog/use.shard.cml",
@@ -10,87 +11,12 @@
     program: {
         binary: "bin/iquery_test",
     },
-    children: [
-        {
-            name: "archivist",
-            url: "#meta/archivist-for-embedding.cm",
-            startup: "eager",
-        },
-        {
-            name: "realm_builder_server",
-            url: "#meta/realm_builder_server.cm",
-        },
-    ],
-    collections: [
-        {
-            name: "realm_builder",
-            environment: "#realm_builder_env",
-            durability: "transient",
-        },
-    ],
-    use: [
-        {
-            protocol: "fuchsia.component.Realm",
-            from: "framework",
-        },
-        {
-            protocol: "fuchsia.sys2.RealmExplorer",
-            from: "framework",
-            path: '/svc/fuchsia.sys2.RealmExplorer.root',
-        },
-        {
-            protocol: "fuchsia.sys2.RealmQuery",
-            from: "framework",
-            path: '/svc/fuchsia.sys2.RealmQuery.root',
-        },
-        {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor",
-            from: "#archivist",
-        },
-    ],
     offer: [
         {
-            event_stream: [
-                "capability_requested",
-                "stopped",
-            ],
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
-            to: "#archivist",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#archivist",
-        },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: [
-                "#realm_builder",
-                "#realm_builder_server",
-            ],
-        },
-    ],
-    environments: [
-        {
-            name: "realm_builder_env",
-            extends: "realm",
-            runners: [
-                {
-                    runner: "realm_builder",
-                    from: "#realm_builder_server",
-                },
-            ],
-            resolvers: [
-                {
-                    resolver: "realm_builder_resolver",
-                    from: "#realm_builder_server",
-                    scheme: "realm-builder",
-                },
-            ],
+            to: "#realm_builder",
+            availability: "optional",
         },
     ],
 }

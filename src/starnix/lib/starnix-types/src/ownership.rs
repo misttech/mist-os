@@ -607,7 +607,7 @@ impl Drop for DropGuard {
 thread_local! {
     /// Number of `TempRef` in the current thread. This is used to ensure there is no `TempRef`
     /// while doing a blocking operation.
-    static TEMP_REF_LOCAL_COUNT: std::cell::RefCell<usize> = std::cell::RefCell::new(0);
+    static TEMP_REF_LOCAL_COUNT: std::cell::RefCell<usize> = const { std::cell::RefCell::new(0) };
 }
 
 /// Assert that no temp ref exist on the current thread. This is used before executing a blocking

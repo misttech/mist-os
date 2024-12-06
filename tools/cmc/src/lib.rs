@@ -5,7 +5,7 @@
 //! `cmc` is the Component Manifest Compiler.
 
 use anyhow::{ensure, Error};
-use cml::{error, features, Document};
+use cml::{error, features, Document, MustOfferRequirement};
 use reference_doc::MarkdownReferenceDocGenerator;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
@@ -32,9 +32,15 @@ pub fn run_cmc(opt: opts::Opt) -> Result<(), Error> {
                 cml::compile(
                     &util::read_cml(file)?,
                     cml::CompileOptions::new().file(&file).protocol_requirements(
-                        cml::ProtocolRequirements {
-                            must_offer: &must_offer_protocol,
-                            must_use: &must_use_protocol,
+                        cml::CapabilityRequirements {
+                            must_offer: &must_offer_protocol
+                                .iter()
+                                .map(|value| cml::MustOfferRequirement::Protocol(value))
+                                .collect::<Vec<_>>(),
+                            must_use: &must_use_protocol
+                                .iter()
+                                .map(|value| cml::MustUseRequirement::Protocol(value))
+                                .collect::<Vec<_>>(),
                         },
                     ),
                 )?;
@@ -116,6 +122,7 @@ pub fn run_cmc(opt: opts::Opt) -> Result<(), Error> {
             experimental_force_runner,
             must_offer_protocol,
             must_use_protocol,
+            must_offer_dictionary,
         } => {
             path_exists(&file)?;
             compile::compile(
@@ -127,9 +134,20 @@ pub fn run_cmc(opt: opts::Opt) -> Result<(), Error> {
                 config_package_path.as_ref().map(String::as_str),
                 &features.into(),
                 &experimental_force_runner,
-                cml::ProtocolRequirements {
-                    must_offer: &must_offer_protocol,
-                    must_use: &must_use_protocol,
+                cml::CapabilityRequirements {
+                    must_offer: &must_offer_protocol
+                        .iter()
+                        .map(|value| cml::MustOfferRequirement::Protocol(value))
+                        .chain(
+                            must_offer_dictionary
+                                .iter()
+                                .map(|value| MustOfferRequirement::Dictionary(value)),
+                        )
+                        .collect::<Vec<_>>(),
+                    must_use: &must_use_protocol
+                        .iter()
+                        .map(|value| cml::MustUseRequirement::Protocol(value))
+                        .collect::<Vec<_>>(),
                 },
             )?
         }

@@ -5,6 +5,7 @@
     include: [
         "//src/connectivity/network/testing/netemul/runner/default.shard.cml",
         "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
     ],
     program: {
         networks: [
@@ -77,17 +78,6 @@
         },
     ],
     offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#client",
-                "#client-netstack",
-                "#server",
-                "#server-netstack",
-                "#sync-manager",
-            ],
-        },
         {
             protocol: "fuchsia.netemul.sync.SyncManager",
             from: "#sync-manager",

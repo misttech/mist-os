@@ -29,6 +29,7 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/emulator_instance:lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/plugins/emulator/configuration:ffx_emulator_config",
     "//src/developer/ffx/plugins/emulator/engines:ffx_emulator_engines",
@@ -37,12 +38,12 @@ rustc_library("lib") {
     "//src/sys/lib/component_debug",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
-    "//third_party/rust_crates:async-net",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:signal-hook",
+    "//third_party/rust_crates:tokio",
     "//third_party/rust_crates:tracing",
   ]
 

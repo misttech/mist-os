@@ -123,11 +123,9 @@ const char* ThreadRecord::StateToString(ThreadRecord::State state) {
     case ThreadRecord::State::kCoreDump:
       return "Core Dump";
     case ThreadRecord::State::kLast:
-      break;
+    default:
+      return "Unknown";
   }
-
-  FX_NOTREACHED();
-  return "";
 }
 
 const char* ThreadRecord::BlockedReasonToString(BlockedReason reason) {

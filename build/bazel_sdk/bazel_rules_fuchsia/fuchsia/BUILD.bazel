@@ -77,7 +77,7 @@ fuchsia_api_level(
     build_setting_default = "",
 )
 
-# Set --@fuchsia_sdk//fuchsia:assembly_developer_overrides_list=<label>
+# Set --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=<label>
 # to point to a fuchsia_assembly_developer_overrides_list() target.
 label_flag(
     name = "assembly_developer_overrides_list",

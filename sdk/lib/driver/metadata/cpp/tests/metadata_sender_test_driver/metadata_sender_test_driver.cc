@@ -29,10 +29,10 @@ void MetadataSenderTestDriver::Serve(
 
 void MetadataSenderTestDriver::ServeMetadata(ServeMetadataCompleter::Sync& completer) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  zx_status_t status = metadata_server_.Serve(*outgoing(), dispatcher());
-  if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", zx_status_get_string(status)));
-    completer.Reply(fit::error(status));
+  zx::result result = metadata_server_.Serve(*outgoing(), dispatcher());
+  if (result.is_error()) {
+    FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", result.status_string()));
+    completer.Reply(fit::error(result.error_value()));
     return;
   }
   offer_metadata_to_child_nodes_ = true;
@@ -46,10 +46,10 @@ void MetadataSenderTestDriver::ServeMetadata(ServeMetadataCompleter::Sync& compl
 void MetadataSenderTestDriver::SetMetadata(SetMetadataRequest& request,
                                            SetMetadataCompleter::Sync& completer) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  zx_status_t status = metadata_server_.SetMetadata(request.metadata());
-  if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", zx_status_get_string(status)));
-    completer.Reply(fit::error(status));
+  zx::result result = metadata_server_.SetMetadata(request.metadata());
+  if (result.is_error()) {
+    FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", result.status_string()));
+    completer.Reply(fit::error(result.error_value()));
   }
   completer.Reply(fit::ok());
 #else

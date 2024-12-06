@@ -35,8 +35,7 @@ async fn run_test(url: &str, expected_result: &str) {
         .await
         .unwrap();
 
-    let (cm_builder, _task) =
-        builder.with_nested_component_manager(COMPONENT_MANAGER_URL).await.unwrap();
+    let cm_builder = builder.with_nested_component_manager(COMPONENT_MANAGER_URL).await.unwrap();
 
     cm_builder
         .add_route(
@@ -206,8 +205,7 @@ async fn route_directories_from_component_manager_namespace() {
         .await
         .unwrap();
 
-    let (cm_builder, _task) =
-        builder.with_nested_component_manager(COMPONENT_MANAGER_URL).await.unwrap();
+    let cm_builder = builder.with_nested_component_manager(COMPONENT_MANAGER_URL).await.unwrap();
 
     let instance = cm_builder.build().await.unwrap();
 

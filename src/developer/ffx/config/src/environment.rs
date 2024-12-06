@@ -329,6 +329,10 @@ impl Environment {
                         Some(build_dirs) => build_dirs,
                         None => self.files.build.get_or_insert_with(Default::default),
                     };
+                    #[allow(
+                        clippy::map_entry,
+                        reason = "mass allow for https://fxbug.dev/381896734"
+                    )]
                     if !build_dirs.contains_key(&b_dir) {
                         tracing::debug!("Getting build dir config path");
                         let config = self.context.get_default_build_dir_config_path(&b_dir)?;

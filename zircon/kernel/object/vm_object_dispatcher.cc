@@ -555,6 +555,7 @@ zx::result<fbl::RefPtr<ContentSizeManager>> VmObjectDispatcher::content_size_man
       return result.take_error();
     }
     content_size_mgr_ = ktl::move(*result);
+    vmo_->SetUserContentSize(content_size_mgr_);
   }
   return zx::ok(content_size_mgr_);
 }

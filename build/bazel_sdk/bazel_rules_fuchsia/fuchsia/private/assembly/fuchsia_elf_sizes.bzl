@@ -7,10 +7,11 @@
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":providers.bzl", "FuchsiaProductImageInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_elf_sizes_impl(ctx):
     images_out = ctx.attr.product[FuchsiaProductImageInfo].images_out
-    zbi = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"].zbi
+    zbi = get_fuchsia_sdk_toolchain(ctx).zbi
 
     extracted_zbi_bootfs_dir = ctx.actions.declare_directory(ctx.label.name + "_extracted_zbi_bootfs")
     extracted_zbi_json = ctx.actions.declare_file(ctx.label.name + "_extracted_zbi_bootfs.json")
@@ -66,7 +67,7 @@ def _fuchsia_elf_sizes_impl(ctx):
 fuchsia_elf_sizes = rule(
     doc = """Create a ELF sizes summary file for a Fuchsia product.""",
     implementation = _fuchsia_elf_sizes_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     attrs = {
         "product": attr.label(
             doc = "The fuchsia product to check the size of.",

@@ -111,6 +111,7 @@ pub struct UpdateIssue {
     pub owner: Option<String>,
     pub cc_users: Option<Vec<String>>,
     pub component: Option<ComponentId>,
+    pub comment: Option<String>,
 }
 
 impl UpdateIssue {
@@ -118,6 +119,10 @@ impl UpdateIssue {
         use core::fmt::Write;
 
         let mut result = String::new();
+
+        if let Some(comment) = &self.comment {
+            writeln!(&mut result, "{}\n", comment).unwrap();
+        }
 
         if let Some(status) = &self.status {
             writeln!(&mut result, "STATUS={}", status).unwrap();

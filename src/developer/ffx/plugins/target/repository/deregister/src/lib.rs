@@ -58,8 +58,9 @@ impl FfxMain for DeregisterTool {
             configured using 'ffx repository default set'"
             )
         })?;
+        let repo_port = self.cmd.port;
 
-        let pkg_server_info = mgr.get_instance(repo_name.clone())?;
+        let pkg_server_info = mgr.get_instance(repo_name.clone(), repo_port)?;
 
         let target_spec = ffx_target::get_target_specifier(&self.context)
             .await
@@ -431,7 +432,7 @@ mod test {
             .expect("creating test server");
 
         let tool = DeregisterTool {
-            cmd: DeregisterCommand { repository: None },
+            cmd: DeregisterCommand { repository: None, port: None },
             repos,
             context: env.context.clone(),
             repo_proxy: repo_mgr,
@@ -465,7 +466,7 @@ mod test {
             .expect("creating test server");
 
         let tool = DeregisterTool {
-            cmd: DeregisterCommand { repository: None },
+            cmd: DeregisterCommand { repository: None, port: None },
             repos,
             context: env.context.clone(),
             repo_proxy: repo_mgr,
@@ -534,7 +535,7 @@ mod test {
             .expect("creating test server");
 
         let tool = DeregisterTool {
-            cmd: DeregisterCommand { repository: None },
+            cmd: DeregisterCommand { repository: None, port: None },
             repos,
             context: env.context.clone(),
             repo_proxy: repo_mgr,

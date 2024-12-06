@@ -24,17 +24,17 @@
 #include <bind/fuchsia/display/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/graphics/display/drivers/virtio-gpu-display/display-controller-banjo.h"
-#include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-banjo.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-banjo-adapter.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine.h"
 
 namespace virtio_display {
 
 zx::result<> GpuDeviceDriver::InitResources() {
   fbl::AllocChecker alloc_checker;
-  coordinator_events_ = fbl::make_unique_checked<DisplayCoordinatorEventsBanjo>(&alloc_checker);
+  engine_events_ = fbl::make_unique_checked<DisplayEngineEventsBanjo>(&alloc_checker);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for DisplayCoordinatorEventsBanjo");
+    FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngineEventsBanjo");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -62,17 +62,17 @@ zx::result<> GpuDeviceDriver::InitResources() {
   auto [bti, backend] = std::move(bti_and_backend_result).value();
 
   zx::result<std::unique_ptr<DisplayEngine>> display_engine_result = DisplayEngine::Create(
-      std::move(sysmem_client), std::move(bti), std::move(backend), coordinator_events_.get());
+      std::move(sysmem_client), std::move(bti), std::move(backend), engine_events_.get());
   if (display_engine_result.is_error()) {
     // DisplayEngine::Create() logs on error.
     return display_engine_result.take_error();
   }
   display_engine_ = std::move(display_engine_result).value();
 
-  display_controller_banjo_ = fbl::make_unique_checked<DisplayControllerBanjo>(
-      &alloc_checker, display_engine_.get(), coordinator_events_.get());
+  engine_banjo_adapter_ = fbl::make_unique_checked<DisplayEngineBanjoAdapter>(
+      &alloc_checker, display_engine_.get(), engine_events_.get());
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for DisplayControllerBanjo");
+    FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngineBanjoAdapter");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -93,7 +93,7 @@ zx::result<> GpuDeviceDriver::InitDisplayNode() {
   zx::result<> compat_server_init_result =
       display_compat_server_.Initialize(incoming(), outgoing(), node_name(), kDisplayChildNodeName,
                                         /*forward_metadata=*/compat::ForwardMetadata::None(),
-                                        display_controller_banjo_->CreateBanjoConfig());
+                                        engine_banjo_adapter_->CreateBanjoConfig());
   if (compat_server_init_result.is_error()) {
     FDF_LOG(ERROR, "Failed to initialize the compatibility server: %s",
             compat_server_init_result.status_string());

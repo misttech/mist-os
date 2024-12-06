@@ -1281,7 +1281,7 @@ impl Target {
                     ))
                     .await?;
                 // Dont care what the result is, just need to get it
-                let _result = fastboot_interface.get_var(&"version".to_string()).await?;
+                let _result = fastboot_interface.get_var("version").await?;
                 Ok(true)
             }
         }

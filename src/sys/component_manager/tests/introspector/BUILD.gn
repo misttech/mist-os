@@ -44,14 +44,20 @@ rustc_binary("proxy_outgoing_to_incoming") {
   ]
 }
 
-component_config("mock_runner_cm_config") {
-  sources = [ "mock_runner_cm_config.json5" ]
+component_config("component_manager_config") {
+  sources = [
+    "//src/sys/component_manager/configs/test_config.base.json5",
+    "mock_runner_cm_config.json5",
+  ]
 }
 
 fuchsia_component("component_manager_debug_with_mock_runner") {
   testonly = true
-  deps = [ "//src/sys/component_manager:bin_eng" ]
-  manifest = "meta/component_manager_debug_with_mock_runner.cml"
+  deps = [
+    ":component_manager_config",
+    "//src/sys/component_manager:bin_with_tracing",
+  ]
+  manifest = "//src/sys/component_manager/meta/component_manager.cml"
 }
 
 fuchsia_component("test_root") {
@@ -87,7 +93,6 @@ fuchsia_unittest_package("introspector-integration-test") {
     ":introspector_integration_test_bin",
     ":main_realm",
     ":main_realm_child",
-    ":mock_runner_cm_config",
     ":proxy_outgoing_to_incoming",
     ":test_root",
     ":unrelated_realm",

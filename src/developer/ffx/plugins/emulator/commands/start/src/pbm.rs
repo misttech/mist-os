@@ -48,7 +48,7 @@ pub(crate) async fn make_configs(
     } else {
         let pb = product_bundle.ok_or_else(|| user_error!("Product bundle required for configuring the emulator instance."))?;
         // Apply the values from the manifest to an emulation configuration.
-        let mut emu_config = convert_bundle_to_configs(&pb, cmd.device()?)
+        let mut emu_config = convert_bundle_to_configs(&pb, cmd.device()?, cmd.uefi)
             .await.context("problem with convert_bundle_to_configs")?;
         // Set OVMF references for non riscv guests (at this time we have no efi support for riscv).
         if emu_config.device.cpu.architecture != CpuArchitecture::Riscv64 {
@@ -78,9 +78,26 @@ pub(crate) async fn make_configs(
                 tracing::warn!("cannot find OVMF vars at {vars:?}");
             }
             emu_config.guest.ovmf_vars = vars;
+
+            // If provided, pass the vbmeta signing key and metadata to the emulator config
+            if let Some(p) = &cmd.vbmeta_key {
+                let p = PathBuf::from(p);
+                if p.exists() {
+                    emu_config.guest.vbmeta_key_file = Some(p);
+                } else {
+                    tracing::warn!("cannot find PEM file at {p:?}");
+                }
+            }
+            if let Some(p) = &cmd.vbmeta_key_metadata {
+                let p = PathBuf::from(p);
+                if p.exists() {
+                    emu_config.guest.vbmeta_key_metadata_file = Some(p);
+                } else {
+                    tracing::warn!("cannot find key metadata file at {p:?}");
+                }
+            }
         }
         emu_config
-
     };
 
     // HostConfig values that come from the OS environment.

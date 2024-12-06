@@ -257,6 +257,7 @@ impl ProcedureMarker {
         IProcedure::new(procedure)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Matches the HF `command` to the SLC Initialization procedure. Before initialization is
     /// complete, all commands should be routed to the initialization procedure.
     pub fn match_init_command(command: &at::Command) -> Result<Self, ProcedureError> {
@@ -276,6 +277,7 @@ impl ProcedureMarker {
         }
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Matches the AT `command` to a procedure. `initialized` represents the initialization state
     /// of the Service Level Connection.
     ///

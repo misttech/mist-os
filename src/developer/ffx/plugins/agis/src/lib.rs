@@ -31,7 +31,7 @@ impl std::fmt::Display for AgisResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.json {
             Some(json) => {
-                write!(f, "{}", json.to_string())
+                write!(f, "{}", json)
             }
             None => {
                 write!(f, "{{}}")

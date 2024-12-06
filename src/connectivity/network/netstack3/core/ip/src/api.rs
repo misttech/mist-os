@@ -17,8 +17,8 @@ use netstack3_base::{
 };
 
 use crate::internal::base::{
-    self, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, IpRouteTablesContext,
-    IpStateContext as _, ResolveRouteError, RoutingTableId,
+    self, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, IpRouteTableContext,
+    IpRouteTablesContext, IpStateContext as _, ResolveRouteError, RoutingTableId,
 };
 use crate::internal::device::{
     IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
@@ -116,6 +116,26 @@ where
     ) {
         self.core_ctx().with_main_ip_routing_table(|_core_ctx, table| {
             target.extend(table.iter_table().cloned().map(Into::into))
+        })
+    }
+
+    /// Like the Iterator fold accumulator.
+    ///
+    /// Applies the given `cb` to each route across all routing tables.
+    pub fn fold_routes<B, F>(&mut self, init: B, mut cb: F) -> B
+    where
+        F: FnMut(
+            B,
+            &RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+            &Entry<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        ) -> B,
+    {
+        self.core_ctx().with_ip_routing_tables(|ctx, tables| {
+            tables.keys().fold(init, |state, table_id| {
+                ctx.with_ip_routing_table(table_id, |_ctx, table| {
+                    table.iter_table().fold(state, |state, entry| cb(state, table_id, entry))
+                })
+            })
         })
     }
 
@@ -229,7 +249,7 @@ where
     pub fn list_table_ids(
         &mut self,
     ) -> Vec<RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>> {
-        self.core_ctx().with_ip_routing_tables_mut(|tables| tables.keys().cloned().collect())
+        self.core_ctx().with_ip_routing_tables(|_ctx, tables| tables.keys().cloned().collect())
     }
 }
 

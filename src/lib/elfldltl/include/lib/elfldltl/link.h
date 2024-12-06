@@ -125,17 +125,17 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
                                 typename RelocInfo::size_type bias, Resolve&& resolve) {
   using namespace std::literals;
 
-  using Elf = typename RelocInfo::Elf;
-  using Addr = typename Elf::Addr;
-  using Addend = typename Elf::Addend;
-  using size_type = typename Elf::size_type;
-  using Rel = typename Elf::Rel;
-  using Rela = typename Elf::Rela;
-  using TlsDescGot = typename Elf::TlsDescGot;
+  using Elf = RelocInfo::Elf;
+  using Addr = Elf::Addr;
+  using Addend = Elf::Addend;
+  using size_type = Elf::size_type;
+  using Rel = Elf::Rel;
+  using Rela = Elf::Rela;
+  using TlsDescGot = Elf::template TlsDescGot<Machine>;
 
   static_assert(std::is_same_v<typename SymbolInfo::Addr, Addr>,
                 "incompatible RelocInfo and SymbolInfo types passed to elfldltl::RelocateSymbolic");
-  using Sym = typename SymbolInfo::Sym;
+  using Sym = SymbolInfo::Sym;
 
   static_assert(std::is_invocable_v<Resolve, const Sym&, RelocateTls>,
                 "elfldltl::RelocateSymbolic requires resolve(const Sym&, RelocateTls) callback");

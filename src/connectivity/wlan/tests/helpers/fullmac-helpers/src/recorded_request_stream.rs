@@ -24,7 +24,7 @@ pub enum FullmacRequest {
     GetIfaceCounterStats,
     GetIfaceHistogramStats,
     SaeHandshakeResp(fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest),
-    SaeFrameTx(fidl_fullmac::WlanFullmacSaeFrame),
+    SaeFrameTx(fidl_fullmac::SaeFrame),
     WmmStatusReq,
     OnLinkStateChanged(fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest),
 

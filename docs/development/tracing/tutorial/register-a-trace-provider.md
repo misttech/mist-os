@@ -15,8 +15,7 @@ To register a trace provider, the steps are:
 ## Register a component with the trace manager {:#register-a-component--with-the-trace-manager .numbered}
 
 To register a component as a trace provider, you can use the `libtrace-provider`
-library to provide an asynchronous loop in your component's code. (For more
-information on tracing libraries, see [Tracing libraries][tracing-libraries].)
+library to provide an asynchronous loop in your component's code.
 
 See the examples below:
 
@@ -122,7 +121,6 @@ tracing in your code. For more information, see the next
 <!-- Reference links -->
 
 [fuchsia-tracing-system]: /docs/concepts/kernel/tracing-system.md
-[tracing-libraries]: /docs/reference/tracing/libraries.md
 [fdio]: /docs/concepts/filesystems/life_of_an_open.md#fdio
 [fuchsia-web-protocol]: https://fuchsia.dev/reference/fidl/fuchsia.web#CreateContextParams.service_directory
 [add-tracing-in-your-code]: /docs/development/tracing/tutorial/add-tracing-in-code.md

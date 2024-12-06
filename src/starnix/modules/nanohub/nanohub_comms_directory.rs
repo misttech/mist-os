@@ -29,7 +29,37 @@ impl NanohubCommsDirectory {
         let mut entries = DeviceDirectory::create_file_ops_entries();
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
+            name: b"display_select".into(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
+            name: b"display_state".into(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
+            name: b"download_firmware".into(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
             name: b"firmware_name".into(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
+            name: b"firmware_version".into(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
+            name: b"wakeup_event_msec".into(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
+            name: b"wake_lock".into(),
             inode: None,
         });
         entries
@@ -57,10 +87,52 @@ impl FsNodeOps for NanohubCommsDirectory {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
+            b"display_select" => Ok(node.fs().create_node(
+                current_task,
+                SocketTunnelFile::new(
+                    b"/sys/devices/virtual/nanohub/nanohub_comms/display_select".into(),
+                ),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o660), FsCred::root()),
+            )),
+            b"display_state" => Ok(node.fs().create_node(
+                current_task,
+                SocketTunnelFile::new(
+                    b"/sys/devices/virtual/nanohub/nanohub_comms/display_state".into(),
+                ),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+            )),
+            b"download_firmware" => Ok(node.fs().create_node(
+                current_task,
+                SocketTunnelFile::new(
+                    b"/sys/devices/virtual/nanohub/nanohub_comms/download_firmware".into(),
+                ),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o220), FsCred::root()),
+            )),
             b"firmware_name" => Ok(node.fs().create_node(
                 current_task,
                 SocketTunnelFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/firmware_name".into(),
+                ),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+            )),
+            b"firmware_version" => Ok(node.fs().create_node(
+                current_task,
+                SocketTunnelFile::new(
+                    b"/sys/devices/virtual/nanohub/nanohub_comms/firmware_version".into(),
+                ),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+            )),
+            b"wakeup_event_msec" => Ok(node.fs().create_node(
+                current_task,
+                SocketTunnelFile::new(
+                    b"/sys/devices/virtual/nanohub/nanohub_comms/wakeup_event_msec".into(),
+                ),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o660), FsCred::root()),
+            )),
+            b"wake_lock" => Ok(node.fs().create_node(
+                current_task,
+                SocketTunnelFile::new(
+                    b"/sys/devices/virtual/nanohub/nanohub_comms/wake_lock".into(),
                 ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
             )),

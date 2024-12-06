@@ -590,7 +590,7 @@ fn do_filter_print_namespace<W: std::io::Write>(
                     egress,
                     uninstalled: _,
                 } = ip_routines;
-                for (label, routines) in vec![
+                for (label, routines) in [
                     ("INGRESS", ingress),
                     ("LOCAL INGRESS", local_ingress),
                     ("FORWARDING", forwarding),
@@ -620,7 +620,7 @@ fn do_filter_print_namespace<W: std::io::Write>(
             let NatRoutines { ingress, local_ingress, local_egress, egress, uninstalled: _ } =
                 nat_routines;
             writeln_scoped(out, padding, "installed NAT routines", |out, padding| {
-                for (label, routines) in vec![
+                for (label, routines) in [
                     ("INGRESS", ingress),
                     ("LOCAL INGRESS", local_ingress),
                     ("LOCAL EGRESS", local_egress),

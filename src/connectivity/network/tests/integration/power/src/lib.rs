@@ -13,7 +13,8 @@ use cm_rust::NativeIntoFidl as _;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, ServiceMarker as _};
 use fidl::AsHandleRef;
 use fuchsia_async::TimeoutExt as _;
-use futures::StreamExt as _;
+use futures::stream::FusedStream;
+use futures::{Stream, StreamExt as _};
 use net_declare::{fidl_subnet, std_socket_addr_v6};
 use netstack_testing_common::realms::{KnownServiceProvider, NetstackVersion};
 use netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT;
@@ -163,12 +164,29 @@ async fn create_power_realm<'a>(
         ..Default::default()
     };
 
-    sandbox
+    let realm = sandbox
         .create_realm(
             name,
             [netstack_def, sag_def, suspender_def, pb_def, sag_config_suspender_def],
         )
-        .expect("failed to create realm")
+        .expect("failed to create realm");
+
+    // Start SAG and put it in a good state for all tests before we go starting
+    // netstack.
+    let sagctl =
+        realm.connect_to_protocol::<fsagcontrol::StateMarker>().expect("connect to SAG ctl");
+    let mut sag_state = pin!(execution_state_level_stream(&sagctl));
+    sagctl
+        .set(&fsagcontrol::SystemActivityGovernorState {
+            application_activity_level: Some(fpower_system::ApplicationActivityLevel::Active),
+            ..Default::default()
+        })
+        .await
+        .expect("SAG set")
+        .expect("SAG set");
+    assert_eq!(sag_state.next().await, Some(fpower_system::ExecutionStateLevel::Active));
+
+    realm
 }
 
 fn extract_udp_frame_in_ipv6_packet(ipv6_frame: &[u8]) -> Option<&[u8]> {
@@ -180,6 +198,25 @@ fn extract_udp_frame_in_ipv6_packet(ipv6_frame: &[u8]) -> Option<&[u8]> {
     let udp = UdpPacket::parse(&mut buffer, UdpParseArgs::new(ipv6.src_ip(), ipv6.dst_ip()))
         .expect("failed to parse UDP");
     Some(udp.into_body())
+}
+
+fn execution_state_level_stream(
+    sagctl: &fsagcontrol::StateProxy,
+) -> impl Stream<Item = fpower_system::ExecutionStateLevel> + FusedStream + '_ {
+    futures::stream::unfold(None, move |prev| async move {
+        loop {
+            let execution_level = sagctl
+                .watch()
+                .await
+                .expect("sagctl watch")
+                .execution_state_level
+                .expect("missing execution state level");
+            if prev.as_ref().map(|l| l != &execution_level).unwrap_or(true) {
+                break Some((execution_level, Some(execution_level)));
+            }
+        }
+    })
+    .fuse()
 }
 
 #[netstack_test]
@@ -196,32 +233,7 @@ async fn tx_suspension(name: &str, netstack_suspend_enabled: bool) {
 
     let sagctl =
         realm.connect_to_protocol::<fsagcontrol::StateMarker>().expect("connect to SAG ctl");
-    let sagctl = &sagctl;
-    let mut sag_state = pin!(futures::stream::unfold(None, |prev| async move {
-        loop {
-            let execution_level = sagctl
-                .watch()
-                .await
-                .expect("sagctl watch")
-                .execution_state_level
-                .expect("missing execution state level");
-            if prev.as_ref().map(|l| l != &execution_level).unwrap_or(true) {
-                break Some((execution_level, Some(execution_level)));
-            }
-        }
-    })
-    .fuse());
-
-    // Kick SAG out of boot mode.
-    sagctl
-        .set(&fsagcontrol::SystemActivityGovernorState {
-            application_activity_level: Some(fpower_system::ApplicationActivityLevel::Active),
-            ..Default::default()
-        })
-        .await
-        .expect("SAG set")
-        .expect("SAG set");
-
+    let mut sag_state = pin!(execution_state_level_stream(&sagctl));
     assert_eq!(sag_state.next().await, Some(fpower_system::ExecutionStateLevel::Active));
 
     let (tun_device, device) =

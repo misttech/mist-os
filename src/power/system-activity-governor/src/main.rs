@@ -68,6 +68,7 @@ async fn connect_to_suspender() -> Result<fhsuspend::SuspenderProxy> {
 
 enum IncomingService {
     ActivityGovernor(fsystem::ActivityGovernorRequestStream),
+    BootControl(fsystem::BootControlRequestStream),
     CpuElementManager(fsystem::CpuElementManagerRequestStream),
     Stats(fsuspend::StatsRequestStream),
     ElementInfoProviderService(fbroker::ElementInfoProviderServiceRequest),
@@ -82,6 +83,7 @@ where
     service_fs
         .dir("svc")
         .add_fidl_service(IncomingService::ActivityGovernor)
+        .add_fidl_service(IncomingService::BootControl)
         .add_fidl_service(IncomingService::Stats)
         .add_fidl_service(IncomingService::CpuElementManager)
         .add_fidl_service_instance(
@@ -103,6 +105,9 @@ where
                 match request {
                     IncomingService::ActivityGovernor(stream) => {
                         cpu_service.sag().await.handle_activity_governor_stream(stream).await
+                    }
+                    IncomingService::BootControl(stream) => {
+                        cpu_service.sag().await.handle_boot_control_stream(stream).await
                     }
                     IncomingService::CpuElementManager(stream) => {
                         cpu_service.handle_cpu_element_manager_stream(stream).await

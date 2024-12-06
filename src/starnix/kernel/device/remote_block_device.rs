@@ -12,7 +12,6 @@ use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{default_ioctl, default_seek, FileObject, FileOps, FsNode, FsString, SeekTarget};
 use anyhow::Error;
 
-use once_cell::sync::OnceCell;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::{DeviceType, REMOTE_BLOCK_MAJOR};
@@ -22,7 +21,7 @@ use starnix_uapi::user_address::UserRef;
 use starnix_uapi::{errno, from_status_like_fdio, off_t, BLKGETSIZE, BLKGETSIZE64};
 use std::collections::btree_map::BTreeMap;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 /// A block device which is backed by a VMO.  Notably, the contents of the device are not persistent
 /// across reboots.
@@ -238,7 +237,7 @@ pub fn remote_block_device_init(_locked: &mut Locked<'_, Unlocked>, current_task
 pub struct RemoteBlockDeviceRegistry {
     devices: Mutex<BTreeMap<u32, Arc<RemoteBlockDevice>>>,
     next_minor: AtomicU32,
-    device_added_fn: OnceCell<RemoteBlockDeviceAddedFn>,
+    device_added_fn: OnceLock<RemoteBlockDeviceAddedFn>,
 }
 
 /// Arguments are (name, minor, device).

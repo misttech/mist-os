@@ -20,6 +20,7 @@ fn ext4_to_pkg(
     let manifest = ext4_extract(path, out_dir)?;
 
     // Write a fini manifest
+    #[allow(clippy::format_collect, reason = "mass allow for https://fxbug.dev/381896734")]
     std::fs::write(
         format!("{out_dir}/manifest.fini"),
         manifest
@@ -29,6 +30,7 @@ fn ext4_to_pkg(
     )?;
 
     if let Some(dep_file) = dep_file {
+        #[allow(clippy::format_collect, reason = "mass allow for https://fxbug.dev/381896734")]
         let mut deps: String = manifest.iter().map(|(_, path)| format!("{path} ")).collect();
         deps += &format!(": {path}");
         std::fs::write(dep_file, &deps)?;

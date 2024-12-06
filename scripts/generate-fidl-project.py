@@ -4,12 +4,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """
-generate fidl_project.json file declaring FIDL libraries
-
-The first command line argument is the root $FUCHSIA_DIR.
-The second command line argument is the path to generated_sources.json.
-The third command line argument is the path to which the script will write
-fidl_project.json.
+Generate fidl_project.json file declaring FIDL libraries.
 
 This script reads the generated_sources.json file which contains the paths to
 fidlc-generated JSON IR, and generates a fidl_project.json file which declares
@@ -18,10 +13,10 @@ artifacts (JSON IR and bindings). This is for use in the FIDL Language Server,
 which uses fidl_project to do dependency resolution.
 """
 
+import argparse
 import json
 import os
 import re
-import sys
 from pathlib import Path
 
 # fidl_project.json schema: list of Library
@@ -58,13 +53,15 @@ library_pattern = (
 )
 
 
-def find_files(library_name, library_json, fuchsia_dir=""):
+def find_files(
+    library_name: str, library_json: str, *, fuchsia_dir: Path
+) -> list[str]:
     pattern = r"^fidling\/gen\/([\w\.\/-]+)\/[\w\-. ]+\.fidl\.json$"
     result = re.search(pattern, library_json)
     if not result or not result.group(1):
         return []
 
-    fidl_dir = Path(f"{fuchsia_dir}/{result.group(1)}")
+    fidl_dir = fuchsia_dir / result.group(1)
     globs = [
         fidl_dir.glob("*.fidl"),
         fidl_dir.parent.glob("*.fidl"),
@@ -86,8 +83,8 @@ def find_files(library_name, library_json, fuchsia_dir=""):
     return files
 
 
-def find_deps(library_json, fuchsia_dir=""):
-    library_json_path = Path(f"{fuchsia_dir}/out/default/{library_json}")
+def find_deps(library_json: str, *, root_build_dir: Path) -> list[str] | None:
+    library_json_path = root_build_dir / library_json
 
     if not os.path.isfile(library_json_path):
         return None
@@ -100,8 +97,12 @@ def find_deps(library_json, fuchsia_dir=""):
 
 
 def gen_fidl_project(
-    fuchsia_dir="", generated_sources_path="", fidl_project_path=""
-):
+    *,
+    root_build_dir: Path,
+    fuchsia_dir: Path,
+    generated_sources_path: Path,
+    fidl_project_path: Path,
+) -> None:
     result = []
     with open(generated_sources_path, "r") as f:
         artifacts = json.load(f)
@@ -114,7 +115,7 @@ def gen_fidl_project(
         if not artifact.endswith(".fidl.json"):
             continue
 
-        deps = find_deps(artifact, fuchsia_dir=fuchsia_dir)
+        deps = find_deps(artifact, root_build_dir=root_build_dir)
         if deps is None:
             continue
 
@@ -127,7 +128,8 @@ def gen_fidl_project(
         result.append(
             {
                 "name": library_name,
-                "json": f"{fuchsia_dir}/out/default/{artifact}",
+                # Path is not JSON serializable.
+                "json": str(root_build_dir / artifact),
                 "files": find_files(
                     library_name, artifact, fuchsia_dir=fuchsia_dir
                 ),
@@ -141,15 +143,18 @@ def gen_fidl_project(
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("Please run this script as:")
-        print(
-            "  fx exec scripts/generate-fidl-project.py <root/build/dir> <generated_sources.json> <fidl_project.json>"
-        )
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Generate fidl_project.json file declaring FIDL libraries."
+    )
+    parser.add_argument("root_build_dir", type=Path)
+    parser.add_argument("fuchsia_dir", type=Path)
+    parser.add_argument("generated_sources_path", type=Path)
+    parser.add_argument("fidl_project_path", type=Path)
+    args = parser.parse_args()
 
     gen_fidl_project(
-        fuchsia_dir=sys.argv[1],
-        generated_sources_path=sys.argv[2],
-        fidl_project_path=sys.argv[3],
+        root_build_dir=args.root_build_dir,
+        fuchsia_dir=args.fuchsia_dir,
+        generated_sources_path=args.generated_sources_path,
+        fidl_project_path=args.fidl_project_path,
     )

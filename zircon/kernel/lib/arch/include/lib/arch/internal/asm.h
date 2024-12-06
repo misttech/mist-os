@@ -152,15 +152,27 @@
 
 .macro _.function.start.abi
   .cfi_startproc
+#ifdef __arm__
+  .fnstart
+#endif
 .endm
 .macro _.function.end.abi
+#ifdef __arm__
+  .fnend
+#endif
   .cfi_endproc
 .endm
 
 .macro _.function.start.custom
   .cfi_startproc simple
+#ifdef __arm__
+  .fnstart
+#endif
 .endm
 .macro _.function.end.custom
+#ifdef __arm__
+  .fnend
+#endif
   .cfi_endproc
 .endm
 

@@ -1,30 +1,30 @@
 {
     "temperature_drivers": [
         {
-            "name": "soc_pll",
-            "topo_path_suffix": "/aml_thermal_pll/thermal"
+            "alias": "soc_pll",
+            "sensor_name": "CPU thermal"
         },
         {
-            "name": "therm_thread",
-            "topo_path_suffix": "/thermistor-device/therm-thread"
+            "alias": "therm_thread",
+            "sensor_name": "therm-thread"
         },
         {
-            "name": "therm_audio",
-            "topo_path_suffix": "/thermistor-device/therm-audio"
+            "alias": "therm_audio",
+            "sensor_name": "therm-audio"
         },
         {
-            "name": "top_board",
-            "topo_path_suffix": "/aml-i2c/i2c/i2c-0-112/shtv3"
+            "alias": "top_board",
+            "sensor_name": "temperature"
         }
     ],
     "power_drivers": [
         {
-            "name": "power_speakers",
-            "topo_path_suffix": "/i2c-2-64/ti_ina231_speakers/ti-ina231"
+            "alias": "power_speakers",
+            "sensor_name": "audio_power"
         },
         {
-            "name": "power_mlb",
-            "topo_path_suffix": "/i2c-2-73/ti_ina231_mlb/ti-ina231"
+            "alias": "power_mlb",
+            "sensor_name": "mlb_power"
         }
     ]
 }

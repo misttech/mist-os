@@ -142,6 +142,7 @@ mod tests {
     use super::*;
     use cm_rust::ConfigChecksum;
     use fidl_fuchsia_component_config_ext::config_decl;
+    use pretty_assertions::assert_eq;
     use quote::quote;
 
     fn test_checksum() -> ConfigChecksum {
@@ -219,9 +220,7 @@ type Config = struct {
                     let config_size = config_vmo.get_content_size().expect("must be able to read config vmo content size");
                     assert_ne!(config_size, 0, "config vmo must be non-empty");
 
-                    let mut config_bytes = Vec::new();
-                    config_bytes.resize(config_size as usize, 0);
-                    config_vmo.read(&mut config_bytes, 0).expect("must be able to read config vmo");
+                    let config_bytes = config_vmo.read_to_vec(0, config_size).expect("must be able to read config vmo");
 
                     let checksum_length = u16::from_le_bytes([config_bytes[0], config_bytes[1]]) as usize;
                     let fidl_start = 2 + checksum_length;

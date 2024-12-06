@@ -8,12 +8,15 @@
 #include <lib/async/default.h>
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace-engine/context.h>
+#include <lib/trace-engine/instrumentation.h>
+#include <lib/trace-provider/provider.h>
 #include <lib/trace/event.h>
 #include <unistd.h>
 #include <zircon/status.h>
 
-#include <algorithm>
 #include <functional>
+#include <latch>
 #include <unordered_set>
 #include <vector>
 
@@ -22,12 +25,6 @@
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
-
-#include "lib/fpromise/bridge.h"
-#include "lib/trace-engine/context.h"
-#include "lib/trace-engine/instrumentation.h"
-#include "lib/trace-provider/provider.h"
-#include "src/lib/fxl/strings/string_printf.h"
 
 #include <protos/perfetto/common/track_event_descriptor.gen.h>
 #include <protos/perfetto/config/track_event/track_event_config.gen.h>
@@ -68,18 +65,24 @@ class EmptyConsumer : public perfetto::Consumer {
 
 void LogTraceStats(const perfetto::TraceStats& stats) {
   const auto& buffer_stats = stats.buffer_stats().front();
-  FX_LOGS(INFO) << fxl::StringPrintf(
-      "Trace stats: "
-      "producers_connected: %u , "
-      "data_sources_registered: %u , "
-      "tracing_sessions: %u",
-      stats.producers_connected(), stats.data_sources_registered(), stats.tracing_sessions());
-  FX_LOGS(INFO) << fxl::StringPrintf(
-      "Consumer buffer stats :"
-      "consumer bytes_written: %lu, "
-      "consumer bytes_read: %lu, "
-      "consumer bytes_overwritten (lost): %lu, ",
-      buffer_stats.bytes_written(), buffer_stats.bytes_read(), buffer_stats.bytes_overwritten());
+  FX_LOGS(INFO) << "Trace stats: "
+                   "producers_connected: "
+                << stats.producers_connected()
+                << " , "
+                   "data_sources_registered: "
+                << stats.data_sources_registered()
+                << " , "
+                   "tracing_sessions: "
+                << stats.tracing_sessions();
+  FX_LOGS(INFO) << "Consumer buffer stats :"
+                   "consumer bytes_written: "
+                << buffer_stats.bytes_written()
+                << ", "
+                   "consumer bytes_read: "
+                << buffer_stats.bytes_read()
+                << ", "
+                   "consumer bytes_overwritten (lost): "
+                << buffer_stats.bytes_overwritten();
   if (buffer_stats.bytes_overwritten() > 0) {
     // If too much data was lost, then the consumer buffer should be enlarged
     // and/or the drain interval shortened.
@@ -87,7 +90,8 @@ void LogTraceStats(const perfetto::TraceStats& stats) {
   }
 }
 
-// TODO(https://fxbug.dev/42066806): Remove this once the migration to track_event_config is complete.
+// TODO(https://fxbug.dev/42066806): Remove this once the migration to track_event_config is
+// complete.
 std::string GetChromeTraceConfigString(
     const perfetto::protos::gen::TrackEventConfig& track_event_config) {
   rapidjson::Document chrome_trace_config(rapidjson::kObjectType);
@@ -134,7 +138,8 @@ perfetto::protos::gen::TraceConfig_DataSource* AddDataSource(
   const auto track_event_config = GetTrackEventConfig(enabled_categories);
   data_source_config->set_track_event_config_raw(track_event_config.SerializeAsString());
 
-  // TODO(https://fxbug.dev/42066806): Remove this once the migration to track_event_config is complete.
+  // TODO(https://fxbug.dev/42066806): Remove this once the migration to track_event_config is
+  // complete.
   if (data_source_name == kChromiumTraceEvent) {
     data_source_config->mutable_chrome_config()->set_trace_config(
         GetChromeTraceConfigString(track_event_config));
@@ -259,7 +264,7 @@ ConsumerAdapter::ConsumerAdapter(ConnectConsumerCallback connect_callback,
   FX_DCHECK(fuchsia_tracing_);
   FX_DCHECK(perfetto_task_runner_);
 
-  fuchsia_tracing_->SetGetKnownCategoriesCallback([this] { return GetKnownCategories(); });
+  fuchsia_tracing_->SetGetKnownCategoriesCallback([this]() { return GetKnownCategories(); });
   fuchsia_tracing_->StartObserving(fit::bind_member(this, &ConsumerAdapter::OnTraceStateUpdate));
 }
 
@@ -463,16 +468,17 @@ void ConsumerAdapter::CallPerfettoGetTraceStats(bool on_shutdown) {
   consumer_endpoint_->GetTraceStats();
 }
 
-fpromise::promise<std::vector<trace::KnownCategory>> ConsumerAdapter::GetKnownCategories() {
-  fpromise::bridge<std::vector<trace::KnownCategory>> bridge;
-  auto completer = std::make_shared<fpromise::completer<std::vector<trace::KnownCategory>>>(
-      std::move(bridge.completer));
+std::vector<trace::KnownCategory> ConsumerAdapter::GetKnownCategories() {
   auto empty_consumer = std::make_shared<EmptyConsumer>();
   const auto consumer_endpoint = connect_callback_(empty_consumer.get());
-  auto on_service_state = [completer, empty_consumer](
-                              bool success, const perfetto::TracingServiceState& service_state) {
+  std::vector<trace::KnownCategory> known_categories;
+  std::latch latch{1};
+  std::function on_service_state = [known_categories, &latch](
+                                       bool success,
+                                       const perfetto::TracingServiceState& service_state) mutable {
     if (!success) {
-      completer->complete_error();
+      latch.count_down();
+      return;
     }
     std::unordered_set<trace::KnownCategory, trace::KnownCategoryHash> categories;
     for (const auto& data_source : service_state.data_sources()) {
@@ -483,15 +489,15 @@ fpromise::promise<std::vector<trace::KnownCategory>> ConsumerAdapter::GetKnownCa
       perfetto::protos::gen::TrackEventDescriptor track_event_descriptor;
       track_event_descriptor.ParseFromArray(raw_descriptor.data(), raw_descriptor.size());
       for (const auto& available_category : track_event_descriptor.available_categories()) {
-        categories.insert(
-            {.name = available_category.name(), .description = available_category.description()});
+        known_categories.emplace_back(available_category.name(), available_category.description());
       }
     }
-    completer->complete_ok(std::vector<trace::KnownCategory>{categories.begin(), categories.end()});
+    latch.count_down();
   };
   consumer_endpoint->QueryServiceState(std::move(on_service_state));
-
-  return bridge.consumer.promise();
+  // Querying the service state triggers an ipc, the categories may not actually be filled in yet.
+  latch.wait();
+  return known_categories;
 }
 
 void ConsumerAdapter::OnTracingDisabled(const std::string& error) {

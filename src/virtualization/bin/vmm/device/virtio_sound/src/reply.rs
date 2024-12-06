@@ -126,7 +126,7 @@ pub mod reply_rxq {
     ) -> Result<(), Error> {
         // Write zeroes to fill out the buffer before writing the status.
         let size = buffer_size(&chain)?;
-        let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
+        let mut vec: std::vec::Vec<u8> = vec![0; size];
         vec.resize(size, 0u8);
         chain.write_all(&vec)?;
         reply_with_code(chain, status, latency_bytes)

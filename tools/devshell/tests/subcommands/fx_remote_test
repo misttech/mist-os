@@ -18,7 +18,6 @@ BT_FILE_DEPS=(
   "prebuilt/third_party/jq/$(read_host_platform)/bin/jq"
   "tools/devshell/flash-remote"
   "tools/devshell/serve-remote"
-  "tools/devshell/pave-remote"
   "tools/devshell/lib/fvm.sh"
   "tools/devshell/lib/fx-cmd-locator.sh"
   "tools/devshell/lib/fx-flash.sh"
@@ -140,56 +139,6 @@ TEST_fx-remote-args-given() {
 readonly _ERROR_NO_KEY=112
 readonly _ERROR_MISMATCHED_KEYS=113
 # // keep in sync with //tools/ssh-keys/gen-ssh-keys.sh
-
-# test pave-remote if the given host is used even when there's a cache file,
-# and that the cache file is updated with the given host
-TEST_fx-pave-remote-args-given() {
-  local testhost=myhostname.my.server.com
-  local testdir=~/myfuchsia/directory
-  local anotherhost=myhostname.my.server.com
-  local out="${BT_TEMP_DIR}/output.log"
-
-  {
-    echo "function fetch_remote_flash_source { echo flash-manifest:flash.json; }"
-    echo "function fetch_remote_build_artifacts { :; }"
-    echo "function fetch_or_build_tool { :; }"
-  } >> "${BT_TEMP_DIR}/tools/devshell/lib/fx-remote.sh"
-
-  echo "${testhost}:${testdir}" > "${BT_TEMP_DIR}/.fx-remote-config"
-
-  # mock ffx serving on port 12345
-  BT_ASSERT _create_mock_ffx 12345
-
-  BT_EXPECT ${fx} pave-remote --no-pave "$anotherhost" "${testdir}" >>${out} 2>&1
-  BT_EXPECT_FILE_CONTAINS "${BT_TEMP_DIR}/.fx-remote-config" "${anotherhost}:${testdir}:"
-  btf::does-mock-args-contain "${ssh_mock}.mock_state.1" "$anotherhost"
-  btf::does-mock-args-contain "${ssh_mock}.mock_state.2" "$anotherhost"
-}
-
-# test pave-remote if the build uses a bazel product bundle, and given host
-# is used even when there's a cache file, and that the cache file is updated
-# with the given host
-TEST_fx-pave-remote-args-given-with-product-bundle() {
-  local testhost=myhostname.my.server.com
-  local testdir=~/myfuchsia/directory
-  local anotherhost=myhostname.my.server.com
-  local out="${BT_TEMP_DIR}/output.log"
-
-  {
-    echo "function fetch_remote_flash_source { echo product-bundle:acme/product_bundle; }"
-    echo "function fetch_remote_artifacts { :; }"
-  } >> "${BT_TEMP_DIR}/tools/devshell/lib/fx-remote.sh"
-
-  echo "${testhost}:${testdir}" > "${BT_TEMP_DIR}/.fx-remote-config"
-
-  # mock ffx serving on port 12345
-  BT_ASSERT _create_mock_ffx 12345
-
-  BT_EXPECT ${fx} pave-remote --no-pave "$anotherhost" "${testdir}" >>${out} 2>&1
-  BT_EXPECT_FILE_CONTAINS "${BT_TEMP_DIR}/.fx-remote-config" "${anotherhost}:${testdir}:"
-  btf::does-mock-args-contain "${ssh_mock}.mock_state.1" "$anotherhost"
-  btf::does-mock-args-contain "${ssh_mock}.mock_state.2" "$anotherhost"
-}
 
 # test flash-remote if the fetched manifest from fx-remote is properly
 # forwarded to the fx-flash layer

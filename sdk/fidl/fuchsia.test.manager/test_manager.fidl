@@ -157,6 +157,12 @@ type RunSuiteOptions = resource table {
     /// This option is used when many tests are run in a batch, and delivering the accumulated
     /// data is more performant than delivering the debug data one test at a time.
     9: accumulate_debug_data bool;
+
+    /// If true, indicates the test creates an exception channel. In this case, the test manager
+    /// will refrain from creating its own exception channels to avoid conflicts. Default value
+    /// is false.
+    @available(added=NEXT)
+    10: no_exception_channel bool;
 };
 
 /// Options specifying the realm in which a test suite should be run. These options are
@@ -685,6 +691,12 @@ type RunOptions = table {
     /// support stopping running test suites.
     @available(added=20)
     8: break_on_failure bool;
+
+    /// If true, indicates the test creates an exception channel. In this case, the test manager
+    /// will refrain from creating its own exception channels to avoid conflicts. Default value
+    /// is false.
+    @available(added=NEXT)
+    9: no_exception_channel bool;
 };
 
 /// Optional instructions for how to execute and schedule suites in the test run.

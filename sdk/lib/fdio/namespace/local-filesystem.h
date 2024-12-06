@@ -10,7 +10,6 @@
 #include <lib/zx/channel.h>
 #include <lib/zxio/zxio.h>
 
-#include <fbl/macros.h>
 #include <fbl/mutex.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
@@ -32,7 +31,10 @@ struct fdio_namespace : public fbl::RefCounted<fdio_namespace> {
   using LocalVnode = fdio_internal::LocalVnode;
   using DirentIteratorState = fdio_internal::DirentIteratorState;
 
-  DISALLOW_COPY_ASSIGN_AND_MOVE(fdio_namespace);
+  fdio_namespace(const fdio_namespace&) = delete;
+  fdio_namespace(fdio_namespace&&) = delete;
+  fdio_namespace& operator=(const fdio_namespace&) = delete;
+  fdio_namespace& operator=(fdio_namespace&&) = delete;
 
   // Create a new object referring to the root of this namespace.
   //

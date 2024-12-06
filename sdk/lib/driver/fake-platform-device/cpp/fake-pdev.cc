@@ -36,30 +36,47 @@ void FakePDev::GetMmioByName(GetMmioByNameRequestView request,
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-void FakePDev::GetInterruptById(GetInterruptByIdRequestView request,
-                                GetInterruptByIdCompleter::Sync& completer) {
-  auto itr = config_.irqs.find(request->index);
+zx::result<zx::interrupt> FakePDev::GetInterruptById(uint32_t index) {
+  auto itr = config_.irqs.find(index);
   if (itr == config_.irqs.end()) {
     if (!config_.use_fake_irq) {
-      completer.ReplyError(ZX_ERR_NOT_FOUND);
-      return;
+      return zx::error(ZX_ERR_NOT_FOUND);
     }
     zx::interrupt irq;
     if (zx_status_t status = zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq);
         status != ZX_OK) {
-      completer.ReplyError(status);
-      return;
+      return zx::error(status);
     }
-    return completer.ReplySuccess(std::move(irq));
+    return zx::ok(std::move(irq));
   }
   zx::interrupt irq;
   itr->second.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq);
-  completer.ReplySuccess(std::move(irq));
+  return zx::ok(std::move(irq));
+}
+
+void FakePDev::GetInterruptById(GetInterruptByIdRequestView request,
+                                GetInterruptByIdCompleter::Sync& completer) {
+  zx::result irq = GetInterruptById(request->index);
+  if (irq.is_error()) {
+    completer.ReplyError(irq.status_value());
+    return;
+  }
+  completer.ReplySuccess(std::move(irq.value()));
 }
 
 void FakePDev::GetInterruptByName(GetInterruptByNameRequestView request,
                                   GetInterruptByNameCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  auto index = config_.irq_names.find(request->name.get());
+  if (index == config_.irq_names.end()) {
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+    return;
+  }
+  zx::result irq = GetInterruptById(index->second);
+  if (irq.is_error()) {
+    completer.ReplyError(irq.status_value());
+    return;
+  }
+  completer.ReplySuccess(std::move(irq.value()));
 }
 
 void FakePDev::GetBtiById(GetBtiByIdRequestView request, GetBtiByIdCompleter::Sync& completer) {

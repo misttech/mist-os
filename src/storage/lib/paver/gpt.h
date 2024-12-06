@@ -4,7 +4,7 @@
 #ifndef SRC_STORAGE_LIB_PAVER_GPT_H_
 #define SRC_STORAGE_LIB_PAVER_GPT_H_
 
-#include <fidl/fuchsia.storagehost/cpp/wire.h>
+#include <fidl/fuchsia.storage.partitions/cpp/wire.h>
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
@@ -57,7 +57,7 @@ class GptDevicePartitioner {
       const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       fidl::ClientEnd<fuchsia_device::Controller> block_controller);
 
-  GptDevice* GetGpt() const { return gpt_.get(); }
+  zx::result<std::unique_ptr<GptDevice>> ConnectToGpt() const;
 
   // Returns a connection to the first matching partition.
   zx::result<std::unique_ptr<BlockPartitionClient>> FindPartition(FilterCallback filter) const;
@@ -68,11 +68,12 @@ class GptDevicePartitioner {
 
   struct FindPartitionDetailsResult {
     std::unique_ptr<BlockPartitionClient> partition;
-    gpt_partition_t* gpt_partition;
+    // TODO(https://fxbug.dev/339491886): Remove this once Moonflower products are migrated to
+    // storage-host.
+    uint32_t index = UINT32_MAX;
   };
 
-  // Returns a connection to the first matching partition, as well as its GPT metadata.
-  // TODO(https://fxbug.dev/339491886): Remove once all products use storage-host.
+  // Returns a connection to the first matching partition.
   zx::result<FindPartitionDetailsResult> FindPartitionDetails(FilterCallback filter) const;
 
   // Wipes a specified partition from the GPT, and overwrites first 8KiB with
@@ -100,7 +101,7 @@ class GptDevicePartitioner {
   };
 
   // Wipes the partition table and resets it to `partitions`.
-  // See fuchsia.storagehost.PartitionsManager/ResetPartitionTables.
+  // See fuchsia.storage.partitions.PartitionsManager/ResetPartitionTables.
   zx::result<> ResetPartitionTables(std::vector<PartitionInitSpec> partitions) const;
 
   const paver::BlockDevices& devices() { return devices_; }
@@ -115,14 +116,16 @@ class GptDevicePartitioner {
       fidl::UnownedClientEnd<fuchsia_device::Controller> gpt_device);
 
   GptDevicePartitioner(BlockDevices devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-                       uint64_t block_count, uint32_t block_size, std::unique_ptr<GptDevice> gpt)
+                       uint64_t block_count, uint32_t block_size, std::unique_ptr<GptDevice> gpt,
+                       fidl::ClientEnd<fuchsia_device::Controller> gpt_controller)
       : devices_(std::move(devices)),
         block_count_(block_count),
         block_size_(block_size),
         svc_root_(component::MaybeClone(svc_root)),
-        gpt_(std::move(gpt)) {
-    // gpt_ is only set for the legacy Devfs configuration.
-    ZX_DEBUG_ASSERT(devices_.IsStorageHost() ^ gpt_ != nullptr);
+        gpt_(std::move(gpt)),
+        gpt_controller_(std::move(gpt_controller)) {
+    // gpt_ and gpt_controller_ are only set for the legacy Devfs configuration.
+    ZX_DEBUG_ASSERT(devices_.IsStorageHost() ^ (gpt_ != nullptr && gpt_controller_.is_valid()));
   }
 
   // FIDL clients for a block device that could contain a GPT.
@@ -156,6 +159,7 @@ class GptDevicePartitioner {
   // When storage-host is disabled, this can be used to read from the GPT device.
   // TODO(https://fxbug.dev/339491886): Remove once products are using storage-host.
   mutable std::unique_ptr<GptDevice> gpt_;
+  fidl::ClientEnd<fuchsia_device::Controller> gpt_controller_;
 };
 
 // TODO(69527): Remove this and migrate usages to |utf16_to_utf8|

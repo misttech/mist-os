@@ -59,11 +59,17 @@ async fn main() -> Result<(), Error> {
     let kernel_stats = connect_to_protocol::<fkernel::StatsMarker>()
         .context("Failed to connect to the kernel stats provider")?;
 
+    // Serves Fuchsia performance trace system.
+    // https://fuchsia.dev/fuchsia-src/concepts/kernel/tracing-system
     // Watch trace category and trace kernel memory stats, until this variable goes out of scope.
     let _kernel_trace_service = fuchsia_async::Task::spawn(traces::kernel::serve_forever(
         traces::watcher::subscribe(),
         kernel_stats.clone(),
     ));
+
+    // Serves Fuchsia component inspection protocol
+    // https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect
+    let _inspect_nodes_service = inspect_nodes::start_service(kernel_stats.clone())?;
 
     service_fs
         .for_each_concurrent(None, |stream| async {

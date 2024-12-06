@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod audit;
 pub(super) mod superblock;
 pub(super) mod task;
 pub(super) mod testing;
@@ -10,24 +11,25 @@ use super::FsNodeSecurityXattr;
 use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntry, DirEntryHandle, FileHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
-    PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
+    DirEntry, DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr,
+    FsString, PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
 };
+use audit::{audit_log, AuditContext};
 use bstr::BStr;
 use linux_uapi::XATTR_NAME_SELINUX;
-use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
+use selinux::permission_check::PermissionCheck;
 use selinux::policy::FsUseType;
 use selinux::{
-    ClassPermission, CommonFilePermission, DirPermission, FileClass, FileSystemLabel,
+    ClassPermission, CommonFilePermission, DirPermission, FdPermission, FileClass, FileSystemLabel,
     FileSystemLabelingScheme, FileSystemMountOptions, FileSystemPermission, InitialSid,
     ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
 };
-use starnix_logging::{log_debug, log_warn, track_stub};
+use starnix_logging::{log_debug, log_warn, track_stub, BugRef, __track_stub_inner};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::device_type::DeviceType;
-use starnix_uapi::errors::Errno;
+use starnix_uapi::errors::{Errno, ENODATA};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::{errno, error};
 use std::collections::HashSet;
@@ -98,6 +100,7 @@ where
         // fs_use_xattr-labelling defers to the security attribute on the file node, with fall-back
         // behaviours for missing and invalid labels.
         FileSystemLabelingScheme::FsUse { fs_use_type, def_sid, root_sid, .. } => {
+            let is_root_node = dir_entry.parent().is_none();
             let maybe_sid = match fs_use_type {
                 FsUseType::Xattr => {
                     // Determine the SID from the "security.selinux" attribute.
@@ -114,21 +117,43 @@ where
                                 .security_context_to_sid((&security_context).into())
                                 .unwrap_or_else(|_| SecurityId::initial(InitialSid::Unlabeled)),
                         ),
-                        _ => {
-                            // TODO: https://fxbug.dev/334094811 - Determine how to handle errors besides
-                            // `ENODATA` (no such xattr).
-                            None
+                        Ok(ValueOrSize::Size(_)) => None,
+                        Err(err) => {
+                            if err.code == ENODATA && is_root_node {
+                                // The root node of xattr-labeled filesystems should be labeled at
+                                // creation in principle. Distinguishing creation of the root of the
+                                // filesystem from re-instantiation of the `FsNode` representing an
+                                // existing root is tricky, so we work-around the issue by writing
+                                // the `root_sid` label here.
+                                let root_context =
+                                    security_server.sid_to_security_context(root_sid).unwrap();
+                                fs_node.ops().set_xattr(
+                                    &mut locked.cast_locked::<FileOpsCore>(),
+                                    fs_node,
+                                    current_task,
+                                    XATTR_NAME_SELINUX.to_bytes().into(),
+                                    root_context.as_slice().into(),
+                                    XattrOp::Create,
+                                )?;
+                                Some(root_sid)
+                            } else {
+                                // TODO: https://fxbug.dev/334094811 - Determine how to handle errors besides
+                                // `ENODATA` (no such xattr).
+                                None
+                            }
                         }
                     }
                 }
-                _ => None,
+                _ => {
+                    if is_root_node {
+                        Some(root_sid)
+                    } else {
+                        None
+                    }
+                }
             };
             maybe_sid.unwrap_or_else(|| {
-                // The node does not have a label, so apply the filesystem's default or root SID,
-                // depending on whether this is the root node.
-                if dir_entry.parent().is_none() {
-                    root_sid
-                } else {
+                // The node does not have a label, so apply the filesystem's default SID.
                     if fs.name() == "remotefs" {
                         track_stub!(TODO("https://fxbug.dev/378688761"), "RemoteFS node missing security label. Perhaps your device needs re-flashing?");
                     } else {
@@ -139,7 +164,6 @@ where
                         );
                     }
                     def_sid
-                }
             })
         }
         FileSystemLabelingScheme::GenFsCon => {
@@ -204,21 +228,53 @@ fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
 #[macro_export]
 macro_rules! todo_check_permission {
     (TODO($bug_url:literal, $todo_message:literal), $permission_check:expr, $source_sid:expr, $target_sid:expr, $permission:expr $(,)?) => {{
-        use crate::security::selinux_hooks::check_permission_internal;
-        if check_permission_internal(
+        use crate::security::selinux_hooks::__todo_check_permission_inner;
+        use starnix_logging::bug_ref;
+        __todo_check_permission_inner(
+            bug_ref!($bug_url),
+            $todo_message,
+            std::panic::Location::caller(),
             $permission_check,
             $source_sid,
             $target_sid,
-            $permission,
-            "todo_deny",
-        )
-        .is_err()
-        {
-            use starnix_logging::track_stub;
-            track_stub!(TODO($bug_url), $todo_message);
-        }
+            $permission.into(),
+        );
         Ok(())
     }};
+}
+
+#[doc(hidden)]
+#[inline]
+pub(super) fn __todo_check_permission_inner(
+    bug_ref: BugRef,
+    message: &'static str,
+    location: &'static std::panic::Location<'static>,
+    permission_check: &PermissionCheck<'_>,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
+    permission: Permission,
+) {
+    let _ = check_permission_internal(
+        permission_check,
+        source_sid,
+        target_sid,
+        permission,
+        |mut context| {
+            if !context.result.permit {
+                // Audit-log the first few denials, but skip further denials to avoid logspamming.
+                const MAX_TODO_AUDIT_DENIALS: u64 = 5;
+
+                // Re-using the `track_stub!()` internals to track the denial, and determine whether
+                // too many denial audit logs have already been emit for this case.
+                if __track_stub_inner(bug_ref, message, None, location) > MAX_TODO_AUDIT_DENIALS {
+                    return;
+                }
+                context.set_decision("todo_deny");
+            }
+
+            audit_log(context);
+        },
+    );
 }
 
 /// Returns the SID with which an `FsNode` of `new_node_class` would be labeled, if created by
@@ -262,6 +318,7 @@ fn compute_new_fs_node_sid(
             } else {
                 let parent_sid = fs_node_effective_sid(parent);
                 let sid = security_server
+                    .as_permission_check()
                     .compute_new_file_sid(current_task_sid, parent_sid, new_node_class)
                     // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
                     // for compute_new_file_sid to have failed?
@@ -677,6 +734,44 @@ pub(super) fn check_fs_node_removexattr_access(
     )
 }
 
+/// Returns whether `current_task` can issue an ioctl to `file`.
+pub(super) fn check_file_ioctl_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    file: &FileObject,
+) -> Result<(), Errno> {
+    let permission_check = security_server.as_permission_check();
+    let current_sid = current_task.security_state.lock().current_sid;
+    let file_sid = fs_node_effective_sid(file.node());
+    let mode = file.node().info().mode;
+    let file_class = file_class_from_file_mode(mode)?;
+    todo_check_permission!(
+        TODO("https://fxbug.dev/364569179", "ioctl fd use check"),
+        &permission_check,
+        current_sid,
+        file_sid,
+        FdPermission::Use
+    )?;
+
+    todo_check_permission!(
+        TODO("https://fxbug.dev/364569179", "ioctl"),
+        &permission_check,
+        current_sid,
+        file_sid,
+        CommonFilePermission::Ioctl.for_class(file_class),
+    )
+}
+
+/// If `fs_node` is in a filesystem without xattr support, returns the xattr name for the security
+/// label (i.e. "security.selinux"). Otherwise returns None.
+pub(super) fn fs_node_listsecurity(fs_node: &FsNode) -> Option<FsString> {
+    if fs_node.fs().security_state.state.supports_xattr() {
+        None
+    } else {
+        Some(XATTR_NAME_SELINUX.to_bytes().into())
+    }
+}
+
 /// Returns the Security Context corresponding to the SID with which `FsNode`
 /// is labelled, otherwise delegates to the node's [`crate::vfs::FsNodeOps`].
 pub(super) fn fs_node_getsecurity<L>(
@@ -860,7 +955,7 @@ fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     target_sid: SecurityId,
     permission: P,
 ) -> Result<(), Errno> {
-    check_permission_internal(permission_check, source_sid, target_sid, permission, "denied")
+    check_permission_internal(permission_check, source_sid, target_sid, permission, audit_log)
 }
 
 /// Checks that `subject_sid` has the specified process `permission` on `self`.
@@ -877,34 +972,22 @@ fn check_permission_internal<P: ClassPermission + Into<Permission> + Clone + 'st
     source_sid: SecurityId,
     target_sid: SecurityId,
     permission: P,
-    deny_result: &str,
+    audit_hook: impl FnOnce(AuditContext<'_>),
 ) -> Result<(), Errno> {
-    let PermissionCheckResult { permit, audit } =
-        permission_check.has_permission(source_sid, target_sid, permission.clone());
+    let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
 
-    if audit {
-        use bstr::BStr;
-
-        // TODO: https://fxbug.dev/362707360 - Add details to audit logging.
-        let result = if permit { "allowed" } else { deny_result };
-        let tclass = permission.class().name();
-        let permission_name = permission.into().name();
-        let security_server = permission_check.security_server();
-        let scontext = security_server
-            .sid_to_security_context(source_sid)
-            .unwrap_or_else(|| b"<invalid>".to_vec());
-        let scontext = BStr::new(&scontext);
-        let tcontext = security_server
-            .sid_to_security_context(target_sid)
-            .unwrap_or_else(|| b"<invalid>".to_vec());
-        let tcontext = BStr::new(&tcontext);
-
-        // See the SELinux Project's "AVC Audit Events" description (at
-        // https://selinuxproject.org/page/NB_AL) for details of the format and fields.
-        log_warn!("avc: {result} {{ {permission_name} }} scontext={scontext} tcontext={tcontext} tclass={tclass}");
+    if result.audit {
+        let context = AuditContext::new(
+            permission_check,
+            result.clone(),
+            source_sid,
+            target_sid,
+            permission.into(),
+        );
+        audit_hook(context);
     }
 
-    if permit {
+    if result.permit {
         Ok(())
     } else {
         error!(EACCES)
@@ -1147,6 +1230,17 @@ impl FileSystemState {
             mount_options,
             pending_entries: HashSet::new(),
         }))
+    }
+
+    /// Returns true if this `FileSystemState` is labeled with `fs_use_xattr` and thus supports
+    /// xattr.
+    fn supports_xattr(&self) -> bool {
+        if let FileSystemLabelState::Labeled { label } = &mut *self.0.lock() {
+            if let FileSystemLabelingScheme::FsUse { fs_use_type, .. } = label.scheme {
+                return fs_use_type == FsUseType::Xattr;
+            }
+        }
+        return false;
     }
 }
 

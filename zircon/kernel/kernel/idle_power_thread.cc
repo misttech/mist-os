@@ -101,6 +101,12 @@ void IdlePowerThread::FlushAndHalt() {
 int IdlePowerThread::Run(void* arg) {
   const cpu_num_t cpu_num = arch_curr_cpu_num();
   IdlePowerThread& this_idle_power_thread = percpu::GetCurrent().idle_power_thread;
+
+  // The accumulated idle time should always be reset to zero when a CPU comes online. Make sure
+  // that CPU hotplug does not leave this member in an inconsistent state with respect to the
+  // scheduler bookkeeping when this thread is revived after going offline.
+  DEBUG_ASSERT(this_idle_power_thread.processor_idle_time_ns_ == 0);
+
   for (;;) {
     // Disable preemption and interrupts to avoid races between idle power thread requests, handling
     // interrupts, and entering the processor idle state. All pending preemtions are handled at the
@@ -121,6 +127,10 @@ int IdlePowerThread::Run(void* arg) {
         case State::Offline: {
           // Emit the complete event early, since mp_unplug_current_cpu() will not return.
           trace.End();
+
+          // Clear any accumulated idle time to ensure consistency with runtime vs. idle time
+          // asserts in the scheduler when the CPU goes back online.
+          this_idle_power_thread.processor_idle_time_ns_ = 0;
 
           // Updating the state and signaling the complete event is handled by
           // mp_unplug_current_cpu() when it calls FlushAndHalt().

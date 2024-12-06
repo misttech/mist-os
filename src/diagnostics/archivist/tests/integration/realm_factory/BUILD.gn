@@ -48,6 +48,7 @@ fuchsia_component_manifest("archivist_manifest") {
   testonly = true
   component_name = "archivist"
   manifest = "meta/archivist.cml"
+  restricted_features = [ "dynamic_dictionaries" ]
 }
 
 fuchsia_component("archivist_component") {
@@ -70,6 +71,7 @@ fuchsia_package("pkg") {
     ":archivist_component",
     ":archivist_config",
     ":archivist_realm_factory_component",
+    ":default_pipelines",
     ":do_not_filter_feedback",
     ":filter_feedback",
     ":filter_lowpan",
@@ -83,6 +85,11 @@ fuchsia_package("pkg") {
     "puppet",
     "stop_watcher",
   ]
+}
+
+resource("default_pipelines") {
+  sources = [ "configs/pipelines/noop" ]
+  outputs = [ "data/config/pipelines/default/feedback/noop" ]
 }
 
 resource("filter_feedback") {

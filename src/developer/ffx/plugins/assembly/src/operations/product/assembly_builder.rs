@@ -777,7 +777,7 @@ impl ImageAssemblyConfigBuilder {
         let memory_buckets_path = outdir.join("memory_buckets.json");
         self.memory_buckets.write(&memory_buckets_path)?;
         self.add_config_data_entry(
-            "memory_monitor".to_string(),
+            "memory_monitor",
             FileEntry { source: memory_buckets_path, destination: "buckets.json".into() },
         )?;
 

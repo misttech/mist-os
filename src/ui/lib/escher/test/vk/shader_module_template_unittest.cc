@@ -9,7 +9,7 @@
 #include "src/ui/lib/escher/vk/shader_variant_args.h"
 
 #if ESCHER_USE_RUNTIME_GLSL
-#include "third_party/shaderc/libshaderc/include/shaderc/shaderc.hpp"
+#include <shaderc/shaderc.hpp>  // nogncheck
 #endif
 
 namespace {

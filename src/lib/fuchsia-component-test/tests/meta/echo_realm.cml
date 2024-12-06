@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
             name: "echo_server",
@@ -18,14 +21,6 @@
             protocol: "fidl.examples.routing.echo.Echo",
             from: "#echo_server",
             to: "#echo_client",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#echo_client",
-                "#echo_server",
-            ],
         },
     ],
 }

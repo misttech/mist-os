@@ -306,6 +306,7 @@
                 "fuchsia.session.window.Collection",
                 "fuchsia.session.window.InitialElementUrl",
                 "fuchsia.session.window.InitialViewIdAnnotation",
+                "fuchsia.ui.VisualDebuggingLevel",
             ],
             from: "parent",
             to: "#session-manager",

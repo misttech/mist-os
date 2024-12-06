@@ -47,13 +47,18 @@ void Device::IrqWorker() {
   while (backend_->InterruptValid() == ZX_OK) {
     auto result = backend_->WaitForInterrupt();
     if (!result.is_ok()) {
-      // Timeouts are fine, but need to continue because there's nothing to ack.
-      if (result.status_value() == ZX_ERR_TIMED_OUT) {
-        continue;
+      if (result.status_value() != ZX_ERR_TIMED_OUT) {
+        zxlogf(DEBUG, "error while waiting for interrupt: %s", result.status_string());
+        break;
       }
 
-      zxlogf(DEBUG, "error while waiting for interrupt: %s", result.status_string());
-      break;
+      if (irq_thread_should_exit_.load(std::memory_order_relaxed)) {
+        zxlogf(DEBUG, "terminating irq thread");
+        break;
+      }
+
+      // Timeouts are fine, but need to continue because there's nothing to ack.
+      continue;
     }
 
     // Ack the interrupt we saw based on the key returned from the port. For legacy interrupts
@@ -89,10 +94,6 @@ void Device::IrqWorker() {
           IrqRingUpdate();
           break;
       }
-    }
-
-    if (irq_thread_should_exit_.load(std::memory_order_relaxed)) {
-      break;
     }
   }
 }

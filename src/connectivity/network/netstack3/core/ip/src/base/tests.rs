@@ -216,10 +216,28 @@ impl<I: IpLayerIpExt> IpStateContext<I> for FakeCoreCtx<I> {
 }
 
 impl<I: IpLayerIpExt> IpRouteTablesContext<I> for FakeCoreCtx<I> {
-    type IpDeviceIdCtx<'a> = Self;
+    type Ctx<'a> = Self;
 
     fn main_table_id(&self) -> RoutingTableId<I, Self::DeviceId> {
         self.state.main_table_id.clone()
+    }
+
+    fn with_ip_routing_tables<
+        O,
+        F: FnOnce(
+            &mut Self::Ctx<'_>,
+            &HashMap<
+                RoutingTableId<I, Self::DeviceId>,
+                PrimaryRc<RwLock<RoutingTable<I, Self::DeviceId>>>,
+            >,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let route_tables = self.state.routing_tables.clone();
+        let route_tables = route_tables.borrow();
+        cb(self, &route_tables)
     }
 
     fn with_ip_routing_tables_mut<
@@ -238,6 +256,10 @@ impl<I: IpLayerIpExt> IpRouteTablesContext<I> for FakeCoreCtx<I> {
         let mut route_tables = route_tables.borrow_mut();
         cb(&mut route_tables)
     }
+}
+
+impl<I: IpLayerIpExt> IpRouteTableContext<I> for FakeCoreCtx<I> {
+    type IpDeviceIdCtx<'a> = Self;
 
     fn with_ip_routing_table<
         O,

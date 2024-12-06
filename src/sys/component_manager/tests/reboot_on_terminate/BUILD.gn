@@ -87,18 +87,20 @@ fuchsia_component("reboot_on_terminate_policy") {
   deps = [ ":reboot_on_terminate_policy_bin" ]
 }
 
-component_config("config") {
+component_config("component_manager_config") {
   testonly = true
-  sources = [ "config.json5" ]
-  dest = "data/component_manager_config"
+  sources = [
+    "//src/sys/component_manager/configs/test_config.base.json5",
+    "config.json5",
+  ]
 }
 
 fuchsia_component("component_manager") {
   testonly = true
   manifest = "meta/component_manager.cml"
   deps = [
-    ":config",
-    "//src/sys/component_manager:bin_eng",
+    ":component_manager_config",
+    "//src/sys/component_manager:bin_with_tracing",
   ]
 }
 

@@ -875,7 +875,7 @@ impl<
             tracing::debug!("repository server not enabled.");
         }
 
-        load_repositories_from_config(&self.inner, false).await;
+        load_repositories_from_config(&self.inner, true).await;
 
         self.event_handler_provider
             .setup_event_handlers(cx.clone(), Arc::clone(&self.inner), Arc::clone(&self.registrar))

@@ -81,7 +81,7 @@ pub struct StrictGetVarFastbootUsbLiveTester {
 
 impl FastbootUsbLiveTester for StrictGetVarFastbootUsbLiveTester {
     async fn is_fastboot_usb_live(&mut self, serial: &str) -> bool {
-        serial.to_string() == self.serial && open_interface_with_serial(serial).await.is_ok()
+        *serial == self.serial && open_interface_with_serial(serial).await.is_ok()
     }
 }
 

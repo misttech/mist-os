@@ -24,6 +24,11 @@
             to: "#wisdom_client",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "all",
+        },
+        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",

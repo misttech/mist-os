@@ -432,7 +432,7 @@ struct IndexBlobRecorder<'a> {
     gc_protection: fpkg::GcProtection,
 }
 
-impl<'a> missing_blobs::BlobRecorder for IndexBlobRecorder<'a> {
+impl missing_blobs::BlobRecorder for IndexBlobRecorder<'_> {
     fn record(
         &self,
         blobs: HashSet<Hash>,

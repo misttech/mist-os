@@ -11,10 +11,10 @@ _print_warnings = current_toolchain == ""
 
 declare_args() {
   # The overall compilation mode to use.  The valid values are:
-  #  * `dbg`: for debug-enabled builds.
-  #  * `fastbuild`: some optimizations, but prioritizing compilation speed over
+  #  * `debug`: for debug-enabled builds.
+  #  * `balanced`: some optimizations, but prioritizing compilation speed over
   #                 runtime performance.
-  #  * `opt`: all the optimizations, used for product releases.
+  #  * `release`: all the optimizations, used for product releases.
   compilation_mode = ""
 
   # Overridden settings for the compilation mode.  This is a set of override
@@ -36,15 +36,15 @@ declare_args() {
 }
 
 _default_compilation_settings = {
-  dbg = {
+  debug = {
     optimize = "none"
   }
 
-  fastbuild = {
-    optimize = "minimal"
+  balanced = {
+    optimize = "size_lto"
   }
 
-  opt = {
+  release = {
     optimize = "size_lto"
   }
 }
@@ -61,14 +61,14 @@ declare_args() {
 #
 if (compilation_mode == "" && is_debug == "") {
   # Neither is specified, use the "debug" compilation mode as the default
-  compilation_mode = "dbg"
+  compilation_mode = "debug"
   is_debug = true
 } else if (compilation_mode != "") {
   # capture the value as specified as a GN argument
   _is_debug_gn_arg = is_debug
 
   # Compilation mode has been set by the developer, set is_debug to match
-  is_debug = compilation_mode == "dbg"
+  is_debug = compilation_mode == "debug"
 
   # Print warnings about use of the old GN argument when 'compilation_mode'
   if (_is_debug_gn_arg != "" && _print_warnings) {
@@ -86,9 +86,9 @@ if (compilation_mode == "" && is_debug == "") {
   # Compilation mode has not been set, but is_debug has, so set compilation_mode
   # to match
   if (is_debug) {
-    compilation_mode = "dbg"
+    compilation_mode = "debug"
   } else {
-    compilation_mode = "opt"
+    compilation_mode = "release"
   }
 }
 
@@ -99,7 +99,7 @@ assert(compilation_mode != "",
 # Validate that the chosen compilation mode is one of the valid modes
 assert(
     defined(_default_compilation_settings[compilation_mode]),
-    "The specified compilation mode (${compilation_mode}) is not a valid option. They are: 'dbg', 'fastbuild', and 'opt'")
+    "The specified compilation mode (${compilation_mode}) is not a valid option. They are: 'debug', 'balanced', and 'release'")
 
 compilation_settings = {
   # Set the compilation settings to use based on the chosen compilation mode

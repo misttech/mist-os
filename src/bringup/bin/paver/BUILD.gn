@@ -6,7 +6,7 @@ import("//build/components.gni")
 
 _boards = [
   "astro",
-  "kola",
+  "moonflower",
   "luis",
   "nelson",
   "sherlock",

@@ -366,7 +366,11 @@ pub fn run(mut args: TopLevel) -> Result<(), Error> {
         String::new()
     };
 
-    let mut command = Command::new("mkfs-msdosfs");
+    let mut command = if let Some(p) = &args.mkfs_msdosfs {
+        Command::new(p)
+    } else {
+        Command::new("mkfs-msdosfs")
+    };
 
     // If a seed is provided, use a fixed timestamp.
     if args.seed.is_some() {

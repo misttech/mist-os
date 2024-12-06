@@ -362,8 +362,7 @@ impl Finish for Transformer {
         let mut func_attrs = Vec::new();
 
         let should_panic = attrs.iter().any(|attr| {
-            attr.path().segments.len() == 1
-                && attr.path().segments[0].ident.to_string() == "should_panic"
+            attr.path().segments.len() == 1 && attr.path().segments[0].ident == "should_panic"
         });
         let maybe_disable_lsan = if should_panic {
             quote! { ::fuchsia::disable_lsan_for_should_panic(); }

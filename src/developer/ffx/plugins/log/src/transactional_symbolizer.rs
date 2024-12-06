@@ -336,7 +336,6 @@ where
             "TXN:{id}:\n{}\nTXN-COMMIT:{id}:COMMIT\n",
             UnescapedMessage::from(Cow::from(target_log.msg().unwrap_or("").to_string()))
                 .sanitize()
-                .to_string()
         ));
 
         // If an existing task was waiting for input, wake it.

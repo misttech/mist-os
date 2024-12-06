@@ -34,6 +34,18 @@
       "short": "r",
       "description": "extract package from this repository.",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "port"
+        }
+      },
+      "optionality": "optional",
+      "long": "--port",
+      "short": "p",
+      "description": "repository server port number. Required disambiguate multiple repositories with the same name.",
+      "hidden": false
     }
   ],
   "notes": [],

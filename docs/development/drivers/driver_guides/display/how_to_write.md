@@ -186,8 +186,9 @@ class Device : public DeviceType {
 
   config_check_result_t DisplayEngineCheckConfiguration(
       const display_config_t** display_configs, size_t display_count,
-      client_composition_opcode_t* out_client_composition_opcodes_list, size_t client_composition_opcodes_count,
-      size_t* out_client_composition_opcodes_actual);
+      layer_composition_operations_t* out_layer_composition_operations_list,
+      size_t layer_composition_operations_count,
+      size_t* out_layer_composition_operations_actual);
 
   void DisplayEngineApplyConfiguration(
       const display_config_t** display_config, size_t display_count) {}

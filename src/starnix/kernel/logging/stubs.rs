@@ -4,13 +4,13 @@
 
 use fuchsia_inspect::Inspector;
 use futures::future::BoxFuture;
-use once_cell::sync::Lazy;
 use starnix_sync::Mutex;
 use std::collections::HashMap;
 use std::panic::Location;
+use std::sync::LazyLock;
 
-static STUB_COUNTS: Lazy<Mutex<HashMap<Invocation, Counts>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static STUB_COUNTS: LazyLock<Mutex<HashMap<Invocation, Counts>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[macro_export]
 macro_rules! track_stub {
@@ -51,7 +51,7 @@ pub fn __track_stub_inner(
     message: &'static str,
     flags: Option<u64>,
     location: &'static Location<'static>,
-) {
+) -> u64 {
     let mut counts = STUB_COUNTS.lock();
     let message_counts = counts.entry(Invocation { location, message, bug }).or_default();
     let context_count = message_counts.by_flags.entry(flags).or_default();
@@ -69,6 +69,7 @@ pub fn __track_stub_inner(
     }
 
     *context_count += 1;
+    *context_count
 }
 
 pub fn track_stub_lazy_node_callback() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> {

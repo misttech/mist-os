@@ -172,7 +172,7 @@ pub async fn get_driver_by_device(
             for item in fuzzy_device_list {
                 let device: Device = item.into();
                 // We don't appear to have a string builder crate in-tree.
-                builder = format!("{}{}\n", builder, device.get_full_name()?.to_string());
+                builder = format!("{}{}\n", builder, device.get_full_name()?);
             }
             return Err(anyhow!(builder));
         }

@@ -38,8 +38,8 @@ impl Scope {
         }
     }
 
-    /// Creates a [`ScopeRef`] to this scope.
-    pub fn make_ref(&self) -> ScopeHandle {
+    /// Creates a [`ScopeHandle`] to this scope.
+    pub fn to_handle(&self) -> ScopeHandle {
         self.inner.clone()
     }
 }

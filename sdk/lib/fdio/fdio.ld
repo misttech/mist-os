@@ -105,6 +105,8 @@
 		getpeername;
 		getsockname;
 		getsockopt;
+		if_nameindex;
+		if_freenameindex;
 		ioctl;
 		isatty;
 		lchown;

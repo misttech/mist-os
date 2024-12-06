@@ -4,6 +4,8 @@
 
 #ifndef SRC_GRAPHICS_EXAMPLES_VKPROTO_COMMON_DEVICE_H_
 #define SRC_GRAPHICS_EXAMPLES_VKPROTO_COMMON_DEVICE_H_
+
+#include <memory>
 #include <vector>
 
 #include "src/graphics/examples/vkproto/common/utils.h"

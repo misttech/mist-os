@@ -5,7 +5,10 @@
 // which is a test which connects to this injected server, tests it and
 // passes back result using `fuchsia.test.Suite`
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
 
     // Two children: a server and client. "echo_test_client" has "eager" startup so it
     // will be started along with the realm.
@@ -24,14 +27,6 @@
             protocol: "fidl.examples.routing.echo.Echo",
             from: "#echo_server",
             to: "#echo_test_client",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#echo_server",
-                "#echo_test_client",
-            ],
         },
     ],
     expose: [

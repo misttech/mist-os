@@ -481,7 +481,6 @@ if (zircon_toolchain == false) {
   if (is_linux) {
     default_common_binary_configs += [
       "//build/config/linux:compiler",
-      "//build/config/linux:default-pie",
       "//build/config/linux:implicit-host-libs",
     ]
   }
@@ -501,6 +500,10 @@ if (zircon_toolchain == false) {
                                  "//build/config:default_libs",
                                ]
   default_executable_deps = []
+
+  if (is_linux) {
+    default_executable_configs += [ "//build/config/linux:default-pie" ]
+  }
 
   # These configs are added here so that they can later be removed from default
   # configs for targets which do not need them. This cannot be done when the

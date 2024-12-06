@@ -15,7 +15,7 @@ use net_types::{LinkLocalAddr, SpecifiedAddr, UnicastAddr, Witness};
 use test_case::test_case;
 
 use netstack3_base::testutil::{assert_empty, FakeInstant, TestIpExt};
-use netstack3_base::InstantContext as _;
+use netstack3_base::{InstantContext as _, IpAddressId as _};
 use netstack3_core::device::{
     DeviceId, EthernetCreationProperties, EthernetLinkDevice, LoopbackCreationProperties,
     LoopbackDevice, MaxEthernetFrameSize,
@@ -27,8 +27,8 @@ use netstack3_core::{IpExt, StackStateBuilder, TimerId};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::{
     AddIpAddrSubnetError, AddressRemovedReason, CommonAddressProperties, DadTimerId,
-    IpAddressId as _, IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate,
-    IpDeviceEvent, IpDeviceFlags, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
+    IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
+    IpDeviceFlags, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
     Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId, Lifetime,
     PreferredLifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
     TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,

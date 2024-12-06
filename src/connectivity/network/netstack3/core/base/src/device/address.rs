@@ -4,12 +4,80 @@
 
 //! Address definitions for devices.
 
-use core::fmt::Display;
+use core::fmt::{Debug, Display};
+use core::hash::Hash;
 
-use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4Addr, Ipv6Addr, Ipv6SourceAddr};
-use net_types::{NonMappedAddr, NonMulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
+use net_types::ip::{
+    AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
+};
+use net_types::{NonMappedAddr, NonMulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
 
+use crate::device::{AnyDevice, DeviceIdContext};
 use crate::socket::SocketIpAddr;
+
+/// An extension trait adding an associated type for an IP address assigned to a
+/// device.
+pub trait AssignedAddrIpExt: Ip {
+    /// The witness type for assigned addresses.
+    type AssignedWitness: Witness<Self::Addr>
+        + Copy
+        + Eq
+        + PartialEq
+        + Debug
+        + Display
+        + Hash
+        + Send
+        + Sync
+        + Into<SpecifiedAddr<Self::Addr>>;
+}
+
+impl AssignedAddrIpExt for Ipv4 {
+    type AssignedWitness = Ipv4DeviceAddr;
+}
+
+impl AssignedAddrIpExt for Ipv6 {
+    type AssignedWitness = Ipv6DeviceAddr;
+}
+
+/// A weak IP address ID.
+pub trait WeakIpAddressId<A: IpAddress>: Clone + Eq + Debug + Hash + Send + Sync + 'static {
+    /// The strong version of this ID.
+    type Strong: IpAddressId<A>;
+
+    /// Attempts to upgrade this ID to the strong version.
+    ///
+    /// Upgrading fails if this is no longer a valid assigned IP address.
+    fn upgrade(&self) -> Option<Self::Strong>;
+}
+
+/// An IP address ID.
+pub trait IpAddressId<A: IpAddress>: Clone + Eq + Debug + Hash {
+    /// The weak version of this ID.
+    type Weak: WeakIpAddressId<A>;
+
+    /// Downgrades this ID to a weak reference.
+    fn downgrade(&self) -> Self::Weak;
+
+    /// Returns the address this ID represents.
+    //
+    // TODO(https://fxbug.dev/382104850): align this method with `addr_sub` by
+    // returning `A::Version::AssignedWitness` directly, and add an
+    // `Into: IpDeviceAddr<A>` bound on that associated type.
+    fn addr(&self) -> IpDeviceAddr<A>;
+
+    /// Returns the address subnet this ID represents.
+    fn addr_sub(&self) -> AddrSubnet<A, <A::Version as AssignedAddrIpExt>::AssignedWitness>
+    where
+        A::Version: AssignedAddrIpExt;
+}
+
+/// Provides the execution context related to address IDs.
+pub trait IpDeviceAddressIdContext<I: Ip>: DeviceIdContext<AnyDevice> {
+    /// The strong address identifier.
+    type AddressId: IpAddressId<I::Addr, Weak = Self::WeakAddressId>;
+    /// The weak address identifier.
+    type WeakAddressId: WeakIpAddressId<I::Addr, Strong = Self::AddressId>;
+}
 
 /// An IP address that witnesses properties needed to be assigned to a device.
 #[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
@@ -121,3 +189,61 @@ pub type Ipv4DeviceAddr = NonMulticastAddr<NonMappedAddr<SpecifiedAddr<Ipv4Addr>
 /// Like [`IpDeviceAddr`] but with stricter witnesses that are permitted for
 /// IPv6 addresses.
 pub type Ipv6DeviceAddr = NonMappedAddr<UnicastAddr<Ipv6Addr>>;
+
+#[cfg(any(test, feature = "testutils"))]
+pub mod testutil {
+    use net_types::ip::GenericOverIp;
+
+    use super::*;
+    use crate::testutil::FakeCoreCtx;
+    use crate::StrongDeviceIdentifier;
+
+    /// A fake weak address ID.
+    #[derive(Clone, Debug, Hash, Eq, PartialEq)]
+    pub struct FakeWeakAddressId<T>(pub T);
+
+    impl<A: IpAddress, T: IpAddressId<A> + Send + Sync + 'static> WeakIpAddressId<A>
+        for FakeWeakAddressId<T>
+    {
+        type Strong = T;
+
+        fn upgrade(&self) -> Option<Self::Strong> {
+            let Self(inner) = self;
+            Some(inner.clone())
+        }
+    }
+
+    impl<A: IpAddress> IpAddressId<A>
+        for AddrSubnet<A, <A::Version as AssignedAddrIpExt>::AssignedWitness>
+    where
+        A::Version: AssignedAddrIpExt,
+    {
+        type Weak = FakeWeakAddressId<Self>;
+
+        fn downgrade(&self) -> Self::Weak {
+            FakeWeakAddressId(self.clone())
+        }
+
+        fn addr(&self) -> IpDeviceAddr<A> {
+            #[derive(GenericOverIp)]
+            #[generic_over_ip(I, Ip)]
+            struct WrapIn<I: AssignedAddrIpExt>(I::AssignedWitness);
+            A::Version::map_ip(
+                WrapIn(self.addr()),
+                |WrapIn(v4_addr)| IpDeviceAddr::new_from_witness(v4_addr),
+                |WrapIn(v6_addr)| IpDeviceAddr::new_from_ipv6_device_addr(v6_addr),
+            )
+        }
+
+        fn addr_sub(&self) -> AddrSubnet<A, <A::Version as AssignedAddrIpExt>::AssignedWitness> {
+            self.clone()
+        }
+    }
+
+    impl<I: AssignedAddrIpExt, S, Meta, DeviceId: StrongDeviceIdentifier>
+        IpDeviceAddressIdContext<I> for FakeCoreCtx<S, Meta, DeviceId>
+    {
+        type AddressId = AddrSubnet<I::Addr, I::AssignedWitness>;
+        type WeakAddressId = FakeWeakAddressId<Self::AddressId>;
+    }
+}

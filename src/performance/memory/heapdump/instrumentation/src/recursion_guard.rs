@@ -21,7 +21,7 @@ pub fn with_recursion_guard<T>(f: impl FnOnce() -> T) -> T {
 
 thread_local! {
     /// Whether the current thread is currently in a `with_recursion_guard_impl` call or not.
-    static RECURSION_GUARD: Cell<bool> = Cell::new(false);
+    static RECURSION_GUARD: Cell<bool> = const { Cell::new(false) };
 }
 
 #[derive(Debug)]

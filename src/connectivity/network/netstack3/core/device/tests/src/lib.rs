@@ -6,7 +6,7 @@
 
 #![cfg(test)]
 #![no_std]
-#![deny(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
+#![warn(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
 // TODO(https://fxbug.dev/339502691): Return to the default limit once lock
 // ordering no longer causes overflows.
 #![recursion_limit = "256"]

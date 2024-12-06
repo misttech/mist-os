@@ -81,6 +81,14 @@ impl PkgServerInfo {
         return false;
     }
 
+    pub fn port(&self) -> u16 {
+        self.address.port()
+    }
+
+    pub(crate) fn filename(&self) -> String {
+        format!("{}@{}.json", self.name, self.port())
+    }
+
     /// Terminate the running process if the server type is no Daemon.
     /// Termination is done by sending the SIGTERM signal and then waiting
     /// the specified timeout, and if the process is still running, SIGKILL is
@@ -169,11 +177,23 @@ pub trait PkgServerInstanceInfo {
     /// Returns the information for the package server with the
     /// provided name, or None if there is no running server with that
     /// name.
-    fn get_instance(&self, name: String) -> Result<Option<PkgServerInfo>>;
+    /// Implementations must also handle the situation where there is multiple servers with the
+    /// same name. This happens when the "repo_name" that is used as part of the package URL must
+    /// meet some constraint. In these cases we need to support multiple repository servers, running
+    /// different ports, and most likely serving different repository paths.
+    /// For those, the port that the server is listening on can be used to disambiguate.
+    /// An error is returned if the name is non-unique.
+    fn get_instance(&self, name: String, port: Option<u16>) -> Result<Option<PkgServerInfo>>;
 
     ///  Removes the instance information for the server with the given name.
     /// If the name does not exist, it is ignored.
-    fn remove_instance(&self, name: String) -> Result<()>;
+    /// Implementations must also handle the situation where there is multiple servers with the
+    /// same name. This happens when the "repo_name" that is used as part of the package URL must
+    /// meet some constraint. In these cases we need to support multiple repository servers, running
+    /// different ports, and most likely serving different repository paths.
+    /// For those, the port that the server is listening on can be used to disambiguate.
+    /// An error is returned if the name is non-unique.
+    fn remove_instance(&self, name: String, port: Option<u16>) -> Result<()>;
 
     /// Writes the instance information provided.
     fn write_instance(&self, instance: &PkgServerInfo) -> Result<()>;
@@ -233,36 +253,41 @@ impl PkgServerInstanceInfo for PkgServerInstances {
         Ok(instances)
     }
 
-    fn get_instance(&self, name: String) -> Result<Option<PkgServerInfo>> {
-        let mut instance_file = self.instance_root.join(name);
-        instance_file.set_extension("json");
-        if !instance_file.exists() {
-            return Ok(None);
-        }
-        let data = fs::read(&instance_file)?;
-
-        match serde_json::from_slice::<PkgServerInfo>(&data) {
-            Ok(info) => {
-                if info.is_running() {
-                    Ok(Some(info))
-                } else {
-                    fs::remove_file(&instance_file)?;
-                    Ok(None)
-                }
-            }
-            Err(e) => {
-                tracing::warn!("Error deserializing {:?} into PkgServerInfo: {e}", instance_file);
-                fs::remove_file(instance_file)?;
-                Ok(None)
-            }
+    fn get_instance(&self, name: String, port: Option<u16>) -> Result<Option<PkgServerInfo>> {
+        let instances: Vec<PkgServerInfo> = self
+            .list_instances()?
+            .iter()
+            .filter(|r| r.name == name)
+            .filter(|r| r.is_running())
+            .filter(|r| port.is_none() || r.port() == port.unwrap())
+            .map(|r| r.clone())
+            .collect();
+        if instances.len() <= 1 {
+            return Ok(instances.first().cloned());
+        } else {
+            bail!(
+                "Multiple instances match repo-name: {name}. Disambiguate with one of {}",
+                instances
+                    .iter()
+                    .map(|r| format!("{} port: {}", r.name, r.port()))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            )
         }
     }
 
-    fn remove_instance(&self, name: String) -> Result<()> {
-        let mut instance_file = self.instance_root.join(name);
-        instance_file.set_extension("json");
-        if instance_file.exists() {
-            fs::remove_file(instance_file).map_err(Into::into)
+    fn remove_instance(&self, name: String, port: Option<u16>) -> Result<()> {
+        if let Some(instance) = self.get_instance(name, port)? {
+            let filename = instance.filename();
+            let instance_file = self.instance_root.join(filename);
+
+            let fullpath = self.instance_root.join(instance_file);
+
+            if fullpath.exists() {
+                fs::remove_file(fullpath).map_err(Into::into)
+            } else {
+                Ok(())
+            }
         } else {
             Ok(())
         }
@@ -272,8 +297,12 @@ impl PkgServerInstanceInfo for PkgServerInstances {
         if !self.instance_root.exists() {
             fs::create_dir_all(&self.instance_root)?;
         }
-        let mut instance_file = self.instance_root.join(&instance.name);
-        instance_file.set_extension("json");
+        // There can be multiple repository servers that are serving the same instance name
+        // This is common where the repository name is constrained, such as preconfigured on the
+        // device.
+        // To accommodate this, the port is added to the instance name, which should make it unique.
+        let filename = instance.filename();
+        let instance_file = self.instance_root.join(filename);
         let contents = serde_json::to_string_pretty(&instance)?;
         fs::write(instance_file, &contents).map_err(Into::into)
     }
@@ -306,7 +335,7 @@ pub async fn write_instance_info(
         pid: process::id(),
         repo_config,
     };
-    if let Some(existing) = mgr.get_instance(name.into())? {
+    if let Some(existing) = mgr.get_instance(name.into(), Some(info.port()))? {
         if existing.pid != info.pid {
             bail!("Cannot overrite running server with same name and a different pid: {name} existing pid: {} new pid: {}", existing.pid, info.pid);
         }
@@ -463,7 +492,7 @@ mod tests {
         };
 
         mgr.write_instance(&info).expect("written OK");
-        mgr.get_instance(instance_name.into()).expect("get instance");
+        mgr.get_instance(instance_name.into(), None).expect("get instance");
     }
 
     #[test]
@@ -491,20 +520,73 @@ mod tests {
 
         mgr.write_instance(&info).expect("written OK");
 
-        let got = mgr.get_instance(instance_name.into()).expect("get instance").unwrap();
+        let got = mgr.get_instance(instance_name.into(), None).expect("get instance").unwrap();
         assert_eq!(got.repo_path(), Some(Utf8PathBuf::from("path1")));
 
         info.repo_spec =
             RepositorySpec::Pm { path: Utf8PathBuf::from("path2"), aliases: BTreeSet::new() };
         mgr.write_instance(&info).expect("written OK");
 
-        let mut got = mgr.get_instance(instance_name.into()).expect("get instance").unwrap();
+        let mut got = mgr.get_instance(instance_name.into(), None).expect("get instance").unwrap();
         assert_eq!(got.repo_path(), Some(Utf8PathBuf::from("path2")));
 
         let mut instances = mgr.list_instances().expect("list instances");
         assert_eq!(instances.len(), 1);
         got = instances.pop().unwrap();
         assert_eq!(got.name, instance_name);
+    }
+
+    #[test]
+    fn test_write_same_name() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
+        let instance_name = "some-instance";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
+        let info_1 = PkgServerInfo {
+            name: instance_name.into(),
+            address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
+            repo_spec: RepositorySpec::Pm {
+                path: Utf8PathBuf::from("path1"),
+                aliases: BTreeSet::new(),
+            },
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+            server_mode: ServerMode::Foreground,
+            pid: process::id(),
+            registration_storage_type: RepositoryStorageType::Ephemeral,
+            repo_config,
+        };
+
+        let mut info_2 = info_1.clone();
+        info_2.address = (Ipv6Addr::UNSPECIFIED, 8002).into();
+        info_2.repo_spec =
+            RepositorySpec::Pm { path: Utf8PathBuf::from("path2"), aliases: BTreeSet::new() };
+
+        mgr.write_instance(&info_1).expect("written OK");
+        mgr.write_instance(&info_2).expect("written OK");
+
+        let got =
+            mgr.get_instance(instance_name.into(), Some(8000)).expect("get instance").unwrap();
+        assert_eq!(got.repo_path(), Some(Utf8PathBuf::from("path1")));
+
+        let got =
+            mgr.get_instance(instance_name.into(), Some(8002)).expect("get instance").unwrap();
+        assert_eq!(got.repo_path(), Some(Utf8PathBuf::from("path2")));
+
+        let res = mgr.get_instance(instance_name.into(), None);
+        if let Err(e) = res {
+            assert!(
+                e.to_string().contains("Multiple instance"),
+                "Expected multiple instance error, got {e}"
+            )
+        } else {
+            assert!(res.is_err(), "Expected error, got {res:?}")
+        }
+
+        let instances = mgr.list_instances().expect("list instances");
+        assert_eq!(instances.len(), 2);
     }
 
     #[test]
@@ -635,7 +717,7 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
 
-        let got = mgr.get_instance("some-instance".into()).expect("get_instance");
+        let got = mgr.get_instance("some-instance".into(), None).expect("get_instance");
         assert!(got.is_none());
     }
 
@@ -644,7 +726,7 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().into());
 
-        let got = mgr.get_instance("some-instance".into()).expect("get_instance");
+        let got = mgr.get_instance("some-instance".into(), None).expect("get_instance");
         assert!(got.is_none());
     }
 
@@ -669,7 +751,7 @@ mod tests {
         };
 
         mgr.write_instance(&info).expect("written OK");
-        let got = mgr.get_instance(instance_name.into()).expect("get instance");
+        let got = mgr.get_instance(instance_name.into(), None).expect("get instance");
         assert!(got.is_none());
     }
 
@@ -679,7 +761,7 @@ mod tests {
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
         let instance_name = "some-instance";
 
-        mgr.remove_instance(instance_name.into()).expect("remove OK");
+        mgr.remove_instance(instance_name.into(), None).expect("remove OK");
     }
 
     #[test]
@@ -706,9 +788,10 @@ mod tests {
 
         mgr.write_instance(&info).expect("written OK");
 
-        mgr.remove_instance(instance_name.into()).expect("remove OK");
+        mgr.remove_instance(instance_name.into(), None).expect("remove OK");
 
-        assert!(mgr.get_instance(instance_name.into()).expect("get instance").is_none());
+        let no_instance = mgr.get_instance(instance_name.into(), None).expect("get instance");
+        assert!(no_instance.is_none(), "expected empty, got {no_instance:?}");
     }
 
     #[test]
@@ -732,9 +815,9 @@ mod tests {
 
         mgr.write_instance(&info).expect("written OK");
 
-        mgr.remove_instance(instance_name.into()).expect("remove OK");
+        mgr.remove_instance(instance_name.into(), None).expect("remove OK");
 
-        assert!(mgr.get_instance(instance_name.into()).expect("get instance").is_none());
+        assert!(mgr.get_instance(instance_name.into(), None).expect("get instance").is_none());
     }
 
     #[test]
@@ -759,10 +842,13 @@ mod tests {
 
         mgr.write_instance(&info).expect("written OK");
 
-        mgr.remove_instance(another_instance_name.into()).expect("remove OK");
+        mgr.remove_instance(another_instance_name.into(), None).expect("remove OK");
 
-        assert!(mgr.get_instance(instance_name.into()).expect("get instance").is_some());
-        assert!(mgr.get_instance(another_instance_name.into()).expect("get instance").is_none());
+        assert!(mgr.get_instance(instance_name.into(), None).expect("get instance").is_some());
+        assert!(mgr
+            .get_instance(another_instance_name.into(), None)
+            .expect("get instance")
+            .is_none());
     }
     #[fuchsia::test]
     async fn test_terminate() {

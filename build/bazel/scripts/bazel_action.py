@@ -51,6 +51,8 @@ _BAZEL_BUILTIN_REPOSITORIES = (
     # The two repositories below were added by Bazel 7.2.
     "host_platform",
     "internal_platforms_do_not_use",
+    # Created and used internally by @rules_python
+    "rules_python_internal",
 )
 
 # A list of file extensions for files that should be ignored from depfiles.

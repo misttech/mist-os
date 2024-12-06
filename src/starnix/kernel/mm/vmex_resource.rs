@@ -4,9 +4,9 @@
 
 use fidl_fuchsia_kernel as fkernel;
 use fuchsia_component::client::connect_to_protocol_sync;
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
-pub static VMEX_RESOURCE: Lazy<zx::Resource> = Lazy::new(|| {
+pub static VMEX_RESOURCE: LazyLock<zx::Resource> = LazyLock::new(|| {
     connect_to_protocol_sync::<fkernel::VmexResourceMarker>()
         .expect("couldn't connect to fuchsia.kernel.VmexResource")
         .get(zx::MonotonicInstant::INFINITE)

@@ -12,7 +12,7 @@
 //! [rust-patterns]: https://fuchsia.dev/fuchsia-src/contribute/contributing-to-netstack/rust-patterns
 
 #![no_std]
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 
 use core::convert::Infallible as Never;
 use core::task::Poll;

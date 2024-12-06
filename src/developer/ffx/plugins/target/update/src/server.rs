@@ -19,6 +19,7 @@ use fidl_fuchsia_pkg_rewrite::EngineProxy;
 use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
 use fidl_fuchsia_sys2::OpenDirType;
 use fuchsia_async::{Task, Timer};
+use std::io::{Error, ErrorKind};
 use std::net::Ipv6Addr;
 use std::path::PathBuf;
 use std::process;
@@ -27,6 +28,32 @@ use timeout::timeout;
 use zx_status::Status;
 
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
+
+struct LogWriter {
+    prefix: String,
+}
+
+impl LogWriter {
+    pub fn new(prefix: &str) -> Self {
+        Self { prefix: prefix.to_string() }
+    }
+}
+
+impl std::io::Write for LogWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let strings = std::str::from_utf8(buf).map_err(|e| {
+            Error::new(ErrorKind::InvalidData, format!("Could not convert to UTF8: {e}"))
+        })?;
+        for s in strings.lines() {
+            tracing::info!("{}{}", self.prefix, s);
+        }
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
 
 pub(crate) struct PackageServerTask {
     pub(crate) repo_name: String,
@@ -100,7 +127,10 @@ pub(crate) async fn package_server_task(
             rcs_proxy_connector: connector.clone(),
         };
 
-        let server_writer = VerifiedMachineWriter::new(None);
+        let stdout = LogWriter::new("repo_server stdout");
+        let stderr = LogWriter::new("repo_server stderr");
+
+        let server_writer = VerifiedMachineWriter::new_buffers(None, stdout, stderr);
 
         let server_result = tool.main(server_writer).await;
         tracing::info!("product bundle server exited: {server_result:?}");

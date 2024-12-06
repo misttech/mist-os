@@ -69,7 +69,7 @@ async fn forward_console(console_in: fidl::Socket, console_out: fidl::Socket) ->
 
 fn get_environ() -> Vec<String> {
     let mut result = vec![];
-    for key in vec!["TERM"] {
+    for key in ["TERM"] {
         if let Ok(value) = std::env::var(key) {
             result.push(format!("{key}={value}").to_string());
         }

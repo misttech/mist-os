@@ -36,13 +36,19 @@ type DeleteKeyDescriptor = table {
     3: address ieee80211.MacAddr;
 };
 
-/// This struct is sent in both directions, containing the information of SAE authentication
-/// frames, sae_fields maps to challenge text, see IEEE Std 802.11-2016, 9.3.3.12.
-type WlanFullmacSaeFrame = struct {
-    peer_sta_address ieee80211.MacAddr;
-    status_code ieee80211.StatusCode;
-    seq_num uint16;
-    sae_fields vector<uint8>:MAX;
+/// Contains the information of SAE authentication frames. Shared between transmit and receive
+/// directions, see WlanFullmacImplIfc::SaeFrameRx and WlanFullmacImpl::SaeFrameTx.
+type SaeFrame = table {
+    /// The peer's MAC address. Required.
+    1: peer_sta_address ieee80211.MacAddr;
+    /// The status code for this SAE frame. Required.
+    2: status_code ieee80211.StatusCode;
+    /// The sequence number. Required.
+    3: seq_num uint16;
+    /// Contains fields in the frame body relevant to SAE.
+    /// See IEEE Std 802.11-2016 table 9-35 and table 9-36 for more details.
+    /// Required.
+    4: sae_fields vector<uint8>:MAX;
 };
 
 type WlanScanResult = flexible enum : uint8 {
@@ -76,49 +82,27 @@ type WlanAssocResult = flexible enum : uint8 {
 };
 
 
-type WlanStartResult = flexible enum : uint8 {
+type StartResult = flexible enum : uint8 {
     SUCCESS = 0;
     BSS_ALREADY_STARTED_OR_JOINED = 1;
     RESET_REQUIRED_BEFORE_START = 2;
     NOT_SUPPORTED = 3;
 };
 
-type WlanFullmacStartConfirm = struct {
-    result_code WlanStartResult;
-};
-
-type WlanStopResult = flexible enum : uint8 {
+type StopResult = flexible enum : uint8 {
     SUCCESS = 0;
     BSS_ALREADY_STOPPED = 1;
     INTERNAL_ERROR = 2;
 };
 
-type WlanFullmacStopConfirm = struct {
-    result_code WlanStopResult;
-};
-
-type WlanEapolResult = flexible enum : uint8 {
+type EapolTxResult = flexible enum : uint8 {
     SUCCESS = 0;
     TRANSMISSION_FAILURE = 1;
-};
-
-type WlanFullmacEapolConfirm = struct {
-    result_code WlanEapolResult;
-    /// This value corresponds to the dst_addr in the EapolTxRequest we're confirming.
-    /// IEEE 802.11-2016 does not include this field, but we need it to disambiguate
-    /// if multiple EAPoL handshakes are ongoing.
-    dst_addr ieee80211.MacAddr;
 };
 
 type WlanFullmacSignalReportIndication = struct {
     rssi_dbm int8;
     snr_db int8;
-};
-
-type WlanFullmacEapolIndication = struct {
-    src_addr ieee80211.MacAddr;
-    dst_addr ieee80211.MacAddr;
-    data vector<uint8>:MAX;
 };
 
 type WlanFullmacSaeHandshakeInd = struct {
@@ -327,11 +311,6 @@ type WlanFullmacChannelSwitchInfo = struct {
     new_channel uint8;
 };
 
-type WlanFullmacPmkInfo = struct {
-    pmk vector<uint8>:MAX;
-    pmkid vector<uint8>:MAX;
-};
-
 /// Protocol definition for communication from the fullmac vendor driver to the platform.
 @discoverable
 closed protocol WlanFullmacImplIfc {
@@ -463,14 +442,26 @@ closed protocol WlanFullmacImplIfc {
         /// externally (e.g. due to receipt of a disassociate frame from an AP).
         3: locally_initiated bool;
     }) -> ();
-    strict StartConf(struct {
-        resp WlanFullmacStartConfirm;
+    /// Report the result of a WlanFullmacImpl::StartBss request.
+    strict StartConf(table {
+        /// The result of the StartBss request. Required.
+        1: result_code StartResult;
     }) -> ();
-    strict StopConf(struct {
-        resp WlanFullmacStopConfirm;
+    /// Report the result of a WlanFullmacImpl::StopBss request.
+    strict StopConf(table {
+        /// The result of the StopBss request. Required.
+        1: result_code StopResult;
     }) -> ();
-    strict EapolConf(struct {
-        resp WlanFullmacEapolConfirm;
+    /// Report the result of a EAPoL frame transmission (IEEE 802.11-2020 6.3.22.2).
+    /// EAPoL frames are transmitted by the platform via WlanFullmacImpl::EapolTx.
+    strict EapolConf(table {
+        /// The result of the transmission. Required.
+        1: result_code EapolTxResult;
+        /// This value corresponds to the dst_addr in the EapolTxRequest we're confirming.
+        /// IEEE 802.11-2020 does not include this field, but we need it to disambiguate
+        /// if multiple EAPoL handshakes are ongoing.
+        /// Required.
+        2: dst_addr ieee80211.MacAddr;
     }) -> ();
     strict OnChannelSwitch(struct {
         ind WlanFullmacChannelSwitchInfo;
@@ -480,17 +471,28 @@ closed protocol WlanFullmacImplIfc {
     strict SignalReport(struct {
         ind WlanFullmacSignalReportIndication;
     }) -> ();
-    strict EapolInd(struct {
-        ind WlanFullmacEapolIndication;
+    /// Report that an EAPoL frame was received.
+    strict EapolInd(table {
+        /// The address of the sender. Required.
+        1: src_addr ieee80211.MacAddr;
+        /// The address of the intended destination. Required.
+        2: dst_addr ieee80211.MacAddr;
+        /// The bytes of the EAPoL frame data. Required.
+        3: data vector<uint8>:MAX;
     }) -> ();
-    strict OnPmkAvailable(struct {
-        info WlanFullmacPmkInfo;
+    /// Inform the platform that the PMK is available after a driver-handled SAE handshake.
+    strict OnPmkAvailable(table {
+        /// The pairwise master key bytes. Required.
+        1: pmk vector<uint8>:MAX;
+        /// The PMK IDs. Required.
+        2: pmkid vector<uint8>:MAX;
     }) -> ();
     strict SaeHandshakeInd(struct {
         ind WlanFullmacSaeHandshakeInd;
     }) -> ();
+    /// Receive an SAE authentication frame.
     strict SaeFrameRx(struct {
-        frame WlanFullmacSaeFrame;
+        frame SaeFrame;
     }) -> ();
     strict OnWmmStatusResp(struct {
         status zx.Status;
@@ -674,8 +676,9 @@ closed protocol WlanFullmacImpl {
         /// The status of the SAE handshake. Required.
         2: status_code ieee80211.StatusCode;
     }) -> ();
+    /// Transmit an SAE authentication frame.
     strict SaeFrameTx(struct {
-        frame WlanFullmacSaeFrame;
+        frame SaeFrame;
     }) -> ();
     strict WmmStatusReq() -> ();
 

@@ -611,7 +611,6 @@ def _generate_api_version_rules(
         parent_sdk_contents):
     ctx = runtime.ctx
     versions = []
-    max_api = -1
     for api_level, value in meta["data"]["api_levels"].items():
         versions.append(
             runtime.make_struct(
@@ -621,7 +620,6 @@ def _generate_api_version_rules(
                 status = value["status"],
             ),
         )
-        max_api = max(max_api, int(api_level))
 
     for api_level, value in meta["data"]["special_api_levels"].items():
         versions.append(
@@ -643,7 +641,6 @@ def _generate_api_version_rules(
         bzl_file,
         _sdk_template_path(runtime, "api_version"),
         {
-            "{{default_target_api}}": str(max_api),
             "{{valid_target_apis}}": _get_starlark_list(runtime, versions),
         },
     )

@@ -22,6 +22,18 @@
       "short": "r",
       "description": "remove the repository named `name` from the target, rather than the default.",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "port"
+        }
+      },
+      "optionality": "optional",
+      "long": "--port",
+      "short": "p",
+      "description": "repository server port number. Required to disambiguate multiple repositories with the same name.",
+      "hidden": false
     }
   ],
   "notes": [],

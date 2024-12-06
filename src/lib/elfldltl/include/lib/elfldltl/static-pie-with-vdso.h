@@ -49,9 +49,10 @@ inline SymbolInfo<typename Self::Elf> LinkStaticPieWithVdso(
     const Self& self, DiagnosticsType& diagnostics,
     const SymbolInfo<typename Self::Elf>& vdso_symbols, typename Self::Elf::size_type vdso_bias) {
   using namespace std::literals;
-  using Elf = typename Self::Elf;
+  using Elf = Self::Elf;
   using size_type = typename Elf::size_type;
-  using Sym = typename Elf::Sym;
+  using Sym = Elf::Sym;
+  using TlsDescGot = Elf::template TlsDescGot<>;
 
   auto memory = Self::Memory();
   auto bias = static_cast<size_type>(Self::LoadBias());
@@ -81,11 +82,10 @@ inline SymbolInfo<typename Self::Elf> LinkStaticPieWithVdso(
     // These will never actually be called.
     constexpr size_type tls_module_id() const { return 0; }
     constexpr size_type static_tls_bias() const { return 0; }
-    constexpr fit::result<bool, typename Elf::TlsDescGot> tls_desc(
-        DiagnosticsType& diagnostics) const {
+    constexpr fit::result<bool, TlsDescGot> tls_desc(DiagnosticsType& diagnostics) const {
       return fit::error{false};
     }
-    constexpr typename Elf::TlsDescGot tls_desc_undefined_weak() const { return {}; }
+    constexpr TlsDescGot tls_desc_undefined_weak() const { return {}; }
 
     const Sym& symbol_;
     size_type bias_;

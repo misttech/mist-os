@@ -166,16 +166,16 @@ zx::result<> EngineDriverClient::ReleaseCapture(
 
 config_check_result_t EngineDriverClient::CheckConfiguration(
     const display_config_t* display_config_list, size_t display_config_count,
-    client_composition_opcode_t* out_client_composition_opcodes_list,
-    size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
+    layer_composition_operations_t* out_layer_composition_operations_list,
+    size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
   if (use_engine_) {
     return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
   return banjo_engine_.CheckConfiguration(
-      display_config_list, display_config_count, out_client_composition_opcodes_list,
-      client_composition_opcodes_count, out_client_composition_opcodes_actual);
+      display_config_list, display_config_count, out_layer_composition_operations_list,
+      layer_composition_operations_count, out_layer_composition_operations_actual);
 }
 
 void EngineDriverClient::ApplyConfiguration(const display_config_t* display_config_list,

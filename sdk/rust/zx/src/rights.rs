@@ -9,14 +9,17 @@
 
 use crate::sys;
 use bitflags::bitflags;
+use zerocopy::{FromBytes, Immutable};
+
+/// Rights associated with a handle.
+///
+/// See [rights](https://fuchsia.dev/fuchsia-src/concepts/kernel/rights) for more information.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, Immutable)]
+pub struct Rights(sys::zx_rights_t);
 
 bitflags! {
-    /// Rights associated with a handle.
-    ///
-    /// See [rights](https://fuchsia.dev/fuchsia-src/concepts/kernel/rights) for more information.
-    #[repr(transparent)]
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    pub struct Rights: sys::zx_rights_t {
+    impl Rights: sys::zx_rights_t {
         const NONE            = sys::ZX_RIGHT_NONE;
         const DUPLICATE       = sys::ZX_RIGHT_DUPLICATE;
         const TRANSFER        = sys::ZX_RIGHT_TRANSFER;

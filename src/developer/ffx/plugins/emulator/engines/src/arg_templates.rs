@@ -213,13 +213,12 @@ pub fn process_flag_template(emu_config: &EmulatorConfiguration) -> Result<FlagD
             &emu_config.runtime.template
         ))?
     } else {
-        if emu_config.guest.is_efi() {
+        if emu_config.guest.is_efi() || emu_config.guest.is_gpt() {
             EFI_FLAGS_TEMPLATE_STR.to_string()
         } else {
             DEFAULT_FLAGS_TEMPLATE_STR.to_string()
         }
     };
-
     let flag_data = process_flag_template_inner(&template_text, emu_config)?;
     dedupe_kernel_args(flag_data, &emu_config.runtime.addl_kernel_args)
 }
@@ -852,7 +851,7 @@ mod tests {
             "unix:/monitor,server,nowait",
             "-serial",
             "unix:/serial,server,nowait,logfile=.serial",
-            "--machine",
+            "-machine",
             "q35",
             "-fw_cfg",
             "name=etc/sercon-port,string=0",
@@ -918,8 +917,76 @@ mod tests {
             "unix:/monitor,server,nowait",
             "-serial",
             "unix:/serial,server,nowait,logfile=.serial",
-            "--machine",
+            "-machine",
             "q35",
+            "-fw_cfg",
+            "name=etc/sercon-port,string=0",
+            "-accel",
+            "tcg,thread=single",
+            "-cpu",
+            "Haswell,+smap,-check,-fsgsbase",
+            "-no-audio",
+            "-nic",
+            "none",
+            "-nodefaults",
+            "-parallel",
+            "none",
+            "-vga",
+            "none",
+            "-device",
+            "virtio-keyboard-pci",
+        ]
+        .iter()
+        .map(|a| a.to_string())
+        .collect();
+
+        assert_eq!(actual.args, expected_args)
+    }
+
+    #[fuchsia::test]
+    fn test_efi_template_gpt_full_disk() {
+        let config = EmulatorConfiguration {
+            guest: GuestConfig {
+                disk_image: Some(DiskImage::Gpt("/path/to/some.img".into())),
+                is_gpt: true,
+                ovmf_code: "/some/ovmf_code.fd".into(),
+                ovmf_vars: "/some/ovmf_vars.fd".into(),
+                ..Default::default()
+            },
+            host: HostConfig { networking: NetworkingMode::None, ..Default::default() },
+            device: DeviceConfig {
+                cpu: VirtualCpu { architecture: sdk_metadata::CpuArchitecture::X64, count: 2 },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let actual = process_flag_template(&config).expect("ok processing");
+        let expected_args: Vec<String> = [
+            "-drive",
+            "if=pflash,format=raw,readonly=on,file=/some/ovmf_code.fd",
+            "-drive",
+            "if=pflash,format=raw,snapshot=on,file=/some/ovmf_vars.fd",
+            "-drive",
+            "if=none,format=raw,file=/path/to/some.img,id=uefi",
+            "-object",
+            "iothread,id=iothread0",
+            "-device",
+            "virtio-blk-pci,drive=uefi,iothread=iothread0",
+            "-m",
+            "0",
+            "-smp",
+            "2,threads=2",
+            "-qmp-pretty",
+            "unix:/qmp,server,nowait",
+            "-monitor",
+            "unix:/monitor,server,nowait",
+            "-serial",
+            "unix:/serial,server,nowait,logfile=.serial",
+            "-machine",
+            "q35",
+            "-device",
+            "isa-debug-exit,iobase=0xf4,iosize=0x04",
             "-fw_cfg",
             "name=etc/sercon-port,string=0",
             "-accel",

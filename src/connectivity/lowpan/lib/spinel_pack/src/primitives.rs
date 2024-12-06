@@ -223,7 +223,7 @@ impl TryPack for String {
 
 impl TryPackAs<str> for str {
     fn pack_as_len(&self) -> io::Result<usize> {
-        Ok(self.as_bytes().len() + 1)
+        Ok(self.len() + 1)
     }
 
     fn try_pack_as<T: std::io::Write + ?Sized>(&self, buffer: &mut T) -> io::Result<usize> {

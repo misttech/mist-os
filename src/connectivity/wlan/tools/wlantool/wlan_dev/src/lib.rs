@@ -253,10 +253,11 @@ async fn do_iface(cmd: opts::IfaceCmd, monitor_proxy: DeviceMonitor) -> Result<(
                 None => NULL_ADDR,
             };
 
-            let req = wlan_service::CreateIfaceRequest {
-                phy_id,
-                role: role.into(),
-                sta_addr: sta_addr.to_array(),
+            let req = wlan_service::DeviceMonitorCreateIfaceRequest {
+                phy_id: Some(phy_id),
+                role: Some(role.into()),
+                sta_address: Some(sta_addr.to_array()),
+                ..Default::default()
             };
 
             let response =
