@@ -142,6 +142,7 @@ if (toolchain_environment == "kernel") {
           "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-uapi:tests",
         ]
         deps += [ "//vendor/misttech/zircon/kernel/lib/mistos/util/tests" ]
+        deps += [ "//vendor/misttech/zircon/kernel/lib/mistos/zx/tests" ]
       }
     }
     public_deps = [ "//zircon/system/ulib/zx:headers" ]

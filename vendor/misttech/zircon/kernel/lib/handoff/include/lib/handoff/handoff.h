@@ -5,9 +5,8 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_HANDOFF_INCLUDE_LIB_HANDOFF_HANDOFF_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_HANDOFF_INCLUDE_LIB_HANDOFF_HANDOFF_H_
 
-#include <fbl/ref_ptr.h>
-#include <object/vm_object_dispatcher.h>
+#include <lib/mistos/zx/vmo.h>
 
-fbl::RefPtr<VmObjectDispatcher> GetZbi();
+zx::unowned_vmo GetZbi();
 
 #endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_HANDOFF_INCLUDE_LIB_HANDOFF_HANDOFF_H_

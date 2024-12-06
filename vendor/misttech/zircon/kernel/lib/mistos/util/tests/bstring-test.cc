@@ -8,8 +8,9 @@
 #include <lib/unittest/unittest.h>
 
 namespace unit_testing {
-
 namespace {
+
+using mtl::BString;
 
 bool empty() {
   BEGIN_TEST;
@@ -51,7 +52,7 @@ bool empty() {
   }
 
   {
-    BString empty("abcde", size_t(0u));
+    BString empty("abcde", static_cast<size_t>(0u));
 
     EXPECT_STREQ("", empty.data());
     EXPECT_STREQ("", empty.c_str());
@@ -231,6 +232,84 @@ bool to_string() {
   END_TEST;
 }
 
+bool format() {
+  BEGIN_TEST;
+
+  {
+    // Basic formatting
+    BString str = mtl::format("Hello %s", "world");
+    EXPECT_STREQ("Hello world", str.data());
+    EXPECT_EQ(11u, str.length());
+  }
+
+  {
+    // Multiple arguments
+    BString str = mtl::format("%d %s %d", 42, "test", 123);
+    EXPECT_STREQ("42 test 123", str.data());
+    EXPECT_EQ(11u, str.length());
+  }
+
+  {
+    // Empty format string
+    BString str = mtl::format("");
+    EXPECT_STREQ("", str.data());
+    EXPECT_EQ(0u, str.length());
+  }
+
+  {
+    // Format error case - buffer overflow
+    char long_str[1024];
+    memset(long_str, 'a', sizeof(long_str) - 1);
+    long_str[sizeof(long_str) - 1] = '\0';
+    BString str = mtl::format("%s", long_str);
+    EXPECT_STREQ("format error", str.data());
+  }
+
+  END_TEST;
+}
+
+bool vector_to_string() {
+  BEGIN_TEST;
+
+  {
+    // Empty vector
+    fbl::Vector<BString> vec;
+    BString str = mtl::to_string(vec);
+    EXPECT_STREQ("[]", str.data());
+    EXPECT_EQ(2u, str.length());
+  }
+
+  {
+    // Single element vector
+    fbl::Vector<BString> vec;
+    fbl::AllocChecker ac;
+    vec.push_back(BString("test"), &ac);
+    ASSERT_TRUE(ac.check());
+
+    BString str = mtl::to_string(vec);
+    EXPECT_STREQ("[test]", str.data());
+    EXPECT_EQ(6u, str.length());
+  }
+
+  {
+    // Multiple element vector
+    fbl::Vector<BString> vec;
+    fbl::AllocChecker ac;
+    vec.push_back(BString("abc"), &ac);
+    ASSERT_TRUE(ac.check());
+    vec.push_back(BString("123"), &ac);
+    ASSERT_TRUE(ac.check());
+    vec.push_back(BString("xyz"), &ac);
+    ASSERT_TRUE(ac.check());
+
+    BString str = mtl::to_string(vec);
+    EXPECT_STREQ("[abc, 123, xyz]", str.data());
+    EXPECT_EQ(15u, str.length());
+  }
+
+  END_TEST;
+}
+
 }  // namespace
 }  // namespace unit_testing
 
@@ -239,4 +318,6 @@ UNITTEST("test empty", unit_testing::empty)
 UNITTEST("test non empty", unit_testing::non_empty)
 UNITTEST("test copy move and assignment", unit_testing::copy_move_and_assignment)
 UNITTEST("test to string", unit_testing::to_string)
+UNITTEST("format", unit_testing::format)
+UNITTEST("vector to string", unit_testing::vector_to_string)
 UNITTEST_END_TESTCASE(mistos_util_bstring, "mistos_util_bstring", "Tests BString")

@@ -31,7 +31,7 @@ const UserAddress TEST_STACK_ADDR = UserAddress::const_from(0x30000000);
 
 class StackVmo : public starnix::MemoryAccessor {
  public:
-  StackVmo(starnix::Vmo vmo) : vmo_(ktl::move(vmo)) {}
+  StackVmo(zx::vmo vmo) : vmo_(ktl::move(vmo)) {}
 
   // impl StackVmo
   uint64_t address_to_offset(UserAddress addr) const {
@@ -56,8 +56,7 @@ class StackVmo : public starnix::MemoryAccessor {
 
   fit::result<Errno, size_t> write_memory(UserAddress addr,
                                           const ktl::span<const uint8_t>& bytes) const final {
-    auto status =
-        vmo_.dispatcher()->vmo()->Write(bytes.data(), address_to_offset(addr), bytes.size());
+    auto status = vmo_.write(bytes.data(), address_to_offset(addr), bytes.size());
     if (status != ZX_OK) {
       return fit::error(errno(EFAULT));
     }
@@ -74,19 +73,17 @@ class StackVmo : public starnix::MemoryAccessor {
   }
 
  private:
-  Vmo vmo_;
+  zx::vmo vmo_;
 };
 
 bool test_trivial_initial_stack() {
   BEGIN_TEST;
 
-  auto memory = create_vmo(0x4000, 0);
-  ASSERT_TRUE(memory.is_ok(), "Memory creation should succeed.");
+  zx::vmo vmo;
+  auto s = zx::vmo::create(0x4000, 0, &vmo);
+  ASSERT_OK(s, "VMO creation should succeed.");
 
-  auto vmo = memory->into_vmo();
-  ASSERT_TRUE(vmo.has_value(), "VMO creation should succeed.");
-
-  StackVmo stack_vmo(ktl::move(vmo.value()));
+  StackVmo stack_vmo(ktl::move(vmo));
   auto original_stack_start_addr = TEST_STACK_ADDR + 0x1000ul;
 
   ktl::string_view path("");
@@ -123,10 +120,8 @@ fit::result<Errno> exec_hello_starnix(starnix::CurrentTask& current_task) {
   argv.push_back("bin/hello_starnix", &ac);
   ZX_ASSERT(ac.check());
 
-  auto executable = current_task.open_file(argv[0], OpenFlags(OpenFlagsEnum::RDONLY));
-  if (executable.is_error()) {
-    return executable.take_error();
-  }
+  auto executable =
+      current_task.open_file(argv[0], OpenFlags(OpenFlagsEnum::RDONLY)) _EP(executable);
   return current_task.exec(executable.value(), argv[0], argv, fbl::Vector<BString>());
 }
 

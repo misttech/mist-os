@@ -28,6 +28,7 @@ namespace starnix {
 
 using starnix_sync::InterruptibleEvent;
 using starnix_sync::PortEvent;
+using starnix_uapi::Errno;
 using starnix_uapi::FdEvents;
 
 class ReadyItemKey {

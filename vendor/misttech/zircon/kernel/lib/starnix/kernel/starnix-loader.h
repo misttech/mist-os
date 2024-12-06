@@ -6,19 +6,11 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_STARNIX_LOADER_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_STARNIX_LOADER_H_
 
-#include <lib/elfldltl/diagnostics.h>
-#include <lib/elfldltl/memory.h>
-#include <lib/elfldltl/zircon.h>
-#include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
-#include <lib/mistos/util/system.h>
+#include <lib/mistos/zx/vmar.h>
+#include <lib/mistos/zx/vmo.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
-#include <zircon/errors.h>
-#include <zircon/rights.h>
-
-#include <type_traits>
-#include <utility>
 
 #include <fbl/ref_ptr.h>
 #include <ktl/algorithm.h>
@@ -27,6 +19,9 @@
 #include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>
+
+#include "lib/elfldltl/diagnostics.h"
+#include "lib/elfldltl/zircon.h"
 
 namespace starnix {
 
@@ -47,11 +42,11 @@ class StarnixLoader {
     SegmentVmo() = delete;
 
     template <class Segment>
-    SegmentVmo(const Segment& segment, fbl::RefPtr<MemoryObject> memory)
-        : memory_(ktl::move(memory)), offset_{segment.offset()} {}
+    SegmentVmo(const Segment& segment, zx::unowned_vmo vmo)
+        : vmo_{vmo->borrow()}, offset_{segment.offset()} {}
 
     // This is the VMO to map the segment's contents from.
-    fbl::RefPtr<MemoryObject> vmo() const { return memory_; }
+    zx::unowned_vmo vmo() const { return vmo_->borrow(); }
 
     // If true and the segment is writable, make a copy-on-write child VMO.
     // This is the usual behavior when using the original file VMO directly.
@@ -63,7 +58,7 @@ class StarnixLoader {
     uint64_t offset() const { return offset_; }
 
    private:
-    fbl::RefPtr<MemoryObject> memory_;
+    zx::unowned_vmo vmo_;
     uint64_t offset_;
   };
 
@@ -106,20 +101,20 @@ class StarnixLoader {
   // or not. Any mappings made are cleared out by destruction of the VmarLoader
   // object unless Commit() is called, see below.
   template <PartialPagePolicy PartialPage, class Diagnostics, class LoadInfo>
-  [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info,
-                          fbl::RefPtr<MemoryObject> memory, size_t mapper_base, size_t vaddr_bias) {
-    VmoName base_name_storage = GetVmoName(memory);
-    ktl::string_view base_name = ktl::string_view(base_name_storage.data());
+  [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info, zx::unowned_vmo vmo,
+                          size_t mapper_base, size_t vaddr_bias) {
+    VmoName base_name_storage = StarnixLoader::GetVmoName(vmo->borrow());
+    std::string_view base_name = std::string_view(base_name_storage.data());
 
-    auto mapper = [this, mapper_relative_bias = vaddr_bias - mapper_base, memory, &diag, base_name,
+    auto mapper = [this, mapper_relative_bias = vaddr_bias - mapper_base, vmo, &diag, base_name,
                    num_data_segments = size_t{0},
                    num_zero_segments = size_t{0}](const auto& segment) mutable {
       // Where in the VMAR the segment begins, accounting for load bias.
       const uintptr_t vmar_offset = segment.vaddr() + mapper_relative_bias;
 
       // Let the Segment type choose a different VMO and offset if it wants to.
-      SegmentVmo<LoadInfo> segment_vmo{segment, memory};
-      fbl::RefPtr<MemoryObject> map_vmo = segment_vmo.vmo();
+      SegmentVmo<LoadInfo> segment_vmo{segment, vmo->borrow()};
+      zx::unowned_vmo map_vmo = segment_vmo.vmo();
       const auto map_cow = segment_vmo.copy_on_write();
       const uint64_t map_offset = segment_vmo.offset();
 
@@ -134,7 +129,8 @@ class StarnixLoader {
         zx_vm_option_t options = kVmCommon |  //
                                  (segment.readable() ? ZX_VM_PERM_READ : 0) |
                                  (segment.executable() ? kVmExecutable : 0);
-        zx_status_t status = Map(vmar_offset, options, map_vmo, map_offset, segment.filesz());
+        zx_status_t status =
+            Map(vmar_offset, options, map_vmo->borrow(), map_offset, segment.filesz());
         if (status != ZX_OK) [[unlikely]] {
           diag.SystemError("cannot map read-only segment", elfldltl::FileAddress{segment.vaddr()},
                            " from ", elfldltl::FileOffset{segment.offset()}, ": ",
@@ -212,8 +208,8 @@ class StarnixLoader {
       if (map_size > 0) {
         zx_status_t status =
             MapWritable < PartialPage ==
-            PartialPagePolicy::kZeroInVmo >
-                (vmar_offset, map_vmo, map_cow, base_name, map_offset, map_size, num_data_segments);
+            PartialPagePolicy::kZeroInVmo > (vmar_offset, map_vmo->borrow(), map_cow, base_name,
+                                             map_offset, map_size, num_data_segments);
         if (status != ZX_OK) [[unlikely]] {
           diag.SystemError("cannot map writable segment", elfldltl::FileAddress{segment.vaddr()},
                            " from file", elfldltl::FileOffset{map_offset}, ": ",
@@ -271,15 +267,15 @@ class StarnixLoader {
  public:
   template <class Diagnostics, class LoadInfo>
   [[nodiscard]] bool map_elf_segments(Diagnostics& diag, const LoadInfo& load_info,
-                                      fbl::RefPtr<MemoryObject> memory, size_t mapper_base,
-                                      size_t vaddr_bias) {
-    return Load<PartialPagePolicy::kZeroInVmo>(diag, load_info, memory, mapper_base, vaddr_bias);
+                                      zx::unowned_vmo vmo, size_t mapper_base, size_t vaddr_bias) {
+    return Load<PartialPagePolicy::kZeroInVmo>(diag, load_info, vmo->borrow(), mapper_base,
+                                               vaddr_bias);
   }
 
  private:
   using VmoName = ktl::array<char, ZX_MAX_NAME_LEN>;
 
-  static VmoName GetVmoName(fbl::RefPtr<MemoryObject> memory);
+  static VmoName GetVmoName(zx::unowned_vmo vmo);
 
   // Permissions on Fuchsia are trickier than Linux, so read these comments
   // carefully if you are encountering permission issues!
@@ -311,15 +307,15 @@ class StarnixLoader {
   // zx_status_t AllocateVmar(size_t vaddr_size, size_t vaddr_start,
   //                         ktl::optional<size_t> vmar_offset);
 
-  zx_status_t Map(uintptr_t vmar_offset, zx_vm_option_t options, fbl::RefPtr<MemoryObject> memory,
+  zx_status_t Map(uintptr_t vmar_offset, zx_vm_option_t options, zx::unowned_vmo vmo,
                   uint64_t vmo_offset, size_t size) {
-    auto status = memory->duplicate_handle(ZX_RIGHT_SAME_RIGHTS);
-    if (status.is_error()) {
-      return status.error_value();
+    zx::vmo dup;
+    auto status = vmo->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
+    if (status != ZX_OK) {
+      return status;
     }
-    fbl::RefPtr<MemoryObject> map_vmo = status.value();
 
-    auto addr = mm_->base_addr.checked_add(vmar_offset);
+    auto addr = mm_->base_addr_.checked_add(vmar_offset);
     if (!addr.has_value()) {
       /*diag.SystemError("in elf load, addition overflow attempting to map at",
                        elfldltl::FileAddress{}, " + ", elfldltl::FileOffset{vmar_offset}, ": ",
@@ -327,10 +323,10 @@ class StarnixLoader {
       return ZX_ERR_INVALID_ARGS;
     }
 
-    auto result = mm_->map_memory({.type = DesiredAddressType::Fixed, .address = *addr}, map_vmo,
-                                  vmo_offset, size, ProtectionFlagsImpl::from_vmar_flags(options),
-                                  MappingOptionsFlags(MappingOptions::ELF_BINARY),
-                                  {.type = MappingNameType::File});
+    auto result = mm_->map_memory(
+        {.type = DesiredAddressType::Fixed, .address = *addr}, MemoryObject::From(ktl::move(dup)),
+        vmo_offset, size, ProtectionFlagsImpl::from_vmar_flags(options),
+        MappingOptionsFlags(MappingOptions::ELF_BINARY), {.type = MappingNameType::File});
     if (result.is_error()) {
       return ZX_ERR_INVALID_ARGS;
     }
@@ -339,25 +335,24 @@ class StarnixLoader {
   }
 
   template <bool ZeroPartialPage>
-  zx_status_t MapWritable(uintptr_t vmar_offset, fbl::RefPtr<MemoryObject> vmo, bool copy_vmo,
+  zx_status_t MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo,
                           ktl::string_view base_name, uint64_t vmo_offset, size_t size,
                           size_t& num_data_segments);
 
   zx_status_t MapZeroFill(uintptr_t vmar_offset, ktl::string_view base_name, size_t size,
                           size_t& num_zero_segments);
 
-  // This is the root VMAR that the mapping is placed into.
   fbl::RefPtr<MemoryManager> mm_;
 };
 
 // Both possible MapWritable instantiations are defined in vmar-loader.cc.
 
 extern template zx_status_t StarnixLoader::MapWritable<false>(  //
-    uintptr_t vmar_offset, fbl::RefPtr<MemoryObject> vmo, bool copy_vmo, ktl::string_view base_name,
+    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, std::string_view base_name,
     uint64_t vmo_offset, size_t size, size_t& num_data_segments);
 
 extern template zx_status_t StarnixLoader::MapWritable<true>(  //
-    uintptr_t vmar_offset, fbl::RefPtr<MemoryObject> vmo, bool copy_vmo, ktl::string_view base_name,
+    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, std::string_view base_name,
     uint64_t vmo_offset, size_t size, size_t& num_data_segments);
 
 }  // namespace starnix

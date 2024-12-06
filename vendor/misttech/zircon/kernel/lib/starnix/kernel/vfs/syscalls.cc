@@ -197,7 +197,8 @@ fit::result<Errno, size_t> sys_read(const CurrentTask& current_task, FdNumber fd
   auto file = current_task->files_.get(fd) _EP(file);
   auto buffer =
       UserBuffersOutputBuffer<TaskMemoryAccessor>::unified_new_at(current_task, address, length);
-  return map_eintr(file->read(current_task, &*buffer), errno(ERESTARTSYS));
+  return map_eintr(file->read(current_task, &*buffer),
+                   starnix_uapi::Errno::New(starnix_uapi::ERESTARTSYS));
 }
 
 fit::result<Errno, size_t> sys_write(const CurrentTask& current_task, FdNumber fd,
@@ -205,7 +206,8 @@ fit::result<Errno, size_t> sys_write(const CurrentTask& current_task, FdNumber f
   auto file = current_task->files_.get(fd) _EP(file);
   auto buffer = UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new_at(current_task, address,
                                                                            length) _EP(buffer);
-  return map_eintr(file->write(current_task, &*buffer), errno(ERESTARTSYS));
+  return map_eintr(file->write(current_task, &*buffer),
+                   starnix_uapi::Errno::New(starnix_uapi::ERESTARTSYS));
 }
 
 fit::result<Errno> sys_close(const CurrentTask& current_task, FdNumber fd) {

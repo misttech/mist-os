@@ -7,12 +7,12 @@
 #include <lib/mistos/util/strings/split_string.h>
 #include <lib/unittest/unittest.h>
 
-#include <string_view>
-
-#include "fbl/alloc_checker.h"
+#include <fbl/alloc_checker.h>
 
 namespace unit_testing {
 namespace {
+
+using mtl::BString;
 
 bool splitstring() {
   BEGIN_TEST;

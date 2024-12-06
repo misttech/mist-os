@@ -3,7 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/mistos/starnix/kernel/fs/mistos/tree_builder.h"
+#include "tree_builder.h"
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>

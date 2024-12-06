@@ -20,6 +20,14 @@
 
 namespace starnix {
 
+using starnix_uapi::Access;
+using starnix_uapi::DeviceType;
+using starnix_uapi::Errno;
+using starnix_uapi::FileMode;
+using starnix_uapi::FsCred;
+using starnix_uapi::OpenFlags;
+using starnix_uapi::UnmountFlags;
+
 class CurrentTask;
 class DirEntry;
 class FileObject;
@@ -28,16 +36,11 @@ class Task;
 class FsNode;
 class LookupContext;
 class SymlinkTarget;
+class WhatToMount;
 
-using starnix_uapi::DeviceType;
 using DirEntryHandle = fbl::RefPtr<DirEntry>;
 using FileHandle = fbl::RefPtr<FileObject>;
-using starnix_uapi::FileMode;
-using starnix_uapi::FsCred;
 using FsNodeHandle = fbl::RefPtr<FsNode>;
-using starnix_uapi::Access;
-using starnix_uapi::OpenFlags;
-using starnix_uapi::UnmountFlags;
 
 /// The path is reachable from the given root.
 struct Reachable {
@@ -130,7 +133,7 @@ class NamespaceNode {
   /// Will return an existing node unless `flags` contains `OpenFlags::EXCL`.
   fit::result<Errno, NamespaceNode> open_create_node(const CurrentTask& current_task,
                                                      const FsStr& name, FileMode mode,
-                                                     DeviceType dev, OpenFlags flags);
+                                                     DeviceType dev, OpenFlags flags) const;
 
   /// Create a node in the file system.
   ///
@@ -138,7 +141,7 @@ class NamespaceNode {
   ///
   /// Does not return an existing node.
   fit::result<Errno, NamespaceNode> create_node(const CurrentTask& current_task, const FsStr& name,
-                                                FileMode mode, DeviceType dev);
+                                                FileMode mode, DeviceType dev) const;
 
   /// Creates an anonymous file.
   ///
@@ -196,10 +199,10 @@ class NamespaceNode {
   /// A task may have a custom root set by `chroot`.
   PathWithReachability path_from_root(ktl::optional<NamespaceNode>) const;
 
-  // fit::result<Errno> mount(WhatToMount what, MountFlags flags);
+  fit::result<Errno> mount(WhatToMount what, MountFlags flags) const;
 
   /// If this is the root of a filesystem, unmount. Otherwise return EINVAL.
-  fit::result<Errno> unmount(UnmountFlags flags);
+  fit::result<Errno> unmount(UnmountFlags flags) const;
 
   NamespaceNode with_new_entry(DirEntryHandle entry) const;
 
@@ -211,6 +214,9 @@ class NamespaceNode {
   fit::result<Errno> check_access(const CurrentTask& current_task, Access access) const;
 
   fit::result<Errno> truncate(const CurrentTask& current_task, uint64_t length) const;
+
+  // impl fmt::Debug for NamespaceNode
+  mtl::BString debug() const;
 
   // C++
   // NamespaceNode(const NamespaceNode& other);

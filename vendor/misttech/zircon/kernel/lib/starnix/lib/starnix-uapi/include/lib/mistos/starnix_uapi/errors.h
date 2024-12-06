@@ -3,57 +3,92 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_ERRORS_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_ERRORS_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_ERRORS_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_ERRORS_H_
 
 #include <lib/fit/result.h>
+#include <lib/mistos/util/error.h>
+#include <lib/zircon-internal/macros.h>
 #include <zircon/types.h>
+
+#include <source_location>
+#include <utility>
+
+#include <ktl/optional.h>
+#include <ktl/string_view.h>
 
 #include <linux/errno.h>
 
+namespace starnix_uapi {
+
+using mtl::BString;
+
 class ErrnoCode {
  public:
-  explicit ErrnoCode(uint32_t code) : code_(code) {}
-
+  // impl ErrnoCode
   static ErrnoCode from_return_value(uint64_t retval) {
     int64_t rv = static_cast<int64_t>(retval);
     if (rv >= 0) {
+      // Collapse all success codes to 0. This is the only value in the u32 range which
+      // is guaranteed to not be an error code.
       return ErrnoCode(0);
     }
     return ErrnoCode(static_cast<uint32_t>(-rv));
   }
 
   static ErrnoCode from_error_code(int16_t code) { return ErrnoCode(static_cast<uint32_t>(code)); }
+
   uint64_t return_value() const { return -(static_cast<int64_t>(code_)); }
+
   uint32_t error_code() const { return code_; }
 
-  bool operator==(ErrnoCode other) const { return code_ == other.code_; }
+  BString to_string() const;
+
+  // C++
+  explicit ErrnoCode(uint32_t code, const char* name = "") : code_(code), name_(name) {}
+
+  bool operator==(const ErrnoCode& other) const { return code_ == other.code_; }
+  bool operator==(uint32_t other) const { return code_ == other; }
 
  private:
   uint32_t code_;
+  const char* name_ = nullptr;
 };
 
-class Errno {
+class Errno : public mtl::StdError {
  public:
-  static Errno New(const ErrnoCode& code) { return Errno(code); }
-  // static Errno Fail(const ErrnoCode& code) { return Errno(code); }
+  ErrnoCode code_{0};
+
+ private:
+  std::source_location location_;
+  ktl::optional<BString> context_;
+
+ public:
+  // impl Errno
+  static Errno New(const ErrnoCode& code,
+                   std::source_location location = std::source_location::current()) {
+    return Errno(code, location, ktl::nullopt);
+  }
+
+  static Errno with_context(const ErrnoCode& code, std::source_location location,
+                            ktl::string_view context) {
+    return Errno(code, location, context);
+  }
+
   uint64_t return_value() const { return code_.return_value(); }
+
+  BString to_string() const override;
+
+  // C++
   uint32_t error_code() const { return code_.error_code(); }
 
   bool operator==(const Errno& other) const { return code_ == other.code_; }
+  bool operator==(const ErrnoCode& other) const { return code_ == other; }
 
  private:
-  friend zx_status_t From(const Errno& code);
-
-  explicit Errno(const ErrnoCode& code) : code_(code) {}
-  ErrnoCode code_{0};
+  Errno(const ErrnoCode& code, std::source_location location, ktl::optional<BString> context)
+      : code_(code), location_(location), context_(std::move(context)) {}
 };
-
-zx_status_t From(const Errno& code);
-uint32_t from_status_like_fdio(zx_status_t);
-
-// Define macro errno!
-#define errno(err) Errno::New(ErrnoCode(err))
 
 // Special errors indicating a blocking syscall was interrupted, but it can be restarted.
 //
@@ -69,22 +104,22 @@ uint32_t from_status_like_fdio(zx_status_t);
 
 /// Convert to EINTR if interrupted by a signal handler without SA_RESTART enabled, otherwise
 /// restart.
-const ErrnoCode ERESTARTSYS(512);
+const ErrnoCode ERESTARTSYS(512, "ERESTARTSYS");
 
 /// Always restart, regardless of the signal handler.
-const ErrnoCode ERESTARTNOINTR(513);
+const ErrnoCode ERESTARTNOINTR(513, "ERESTARTNOINTR");
 
 /// Convert to EINTR if interrupted by a signal handler. SA_RESTART is ignored. Otherwise restart.
-const ErrnoCode ERESTARTNOHAND(514);
+const ErrnoCode ERESTARTNOHAND(514, "ERESTARTNOHAND");
 
 /// Like `ERESTARTNOHAND`, but restart by invoking a closure instead of calling the syscall
 /// implementation again.
-const ErrnoCode ERESTART_RESTARTBLOCK(516);
+const ErrnoCode ERESTART_RESTARTBLOCK(516, "ERESTART_RESTARTBLOCK");
 
-fit::result<Errno> map_eintr(fit::result<Errno> result, Errno err);
+fit::result<Errno> map_eintr(fit::result<Errno> result, const Errno& err);
 
 template <typename T>
-fit::result<Errno, T> map_eintr(fit::result<Errno, T> result, Errno err) {
+fit::result<Errno, T> map_eintr(fit::result<Errno, T> result, const Errno& err) {
   if (result.is_error()) {
     if (result.error_value().error_code() == EINTR) {
       return fit::error(err);
@@ -94,4 +129,73 @@ fit::result<Errno, T> map_eintr(fit::result<Errno, T> result, Errno err) {
   return result.take_value();
 }
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_ERRORS_H_
+// There isn't really a mapping from zx_status::Status to Errno. The correct mapping is
+// context-specific but this converter is a reasonable first-approximation. The translation matches
+// fdio_status_to_errno. See https://fxbug.dev/42105838 for more context.
+// TODO: Replace clients with more context-specific mappings.
+uint32_t from_status_like_fdio(zx_status_t);
+
+BString to_string(const std::source_location& location);
+
+template <typename E, typename... T>
+class SourceContext : public mtl::Context<E, T...> {
+ public:
+  // using Base = mtl::Context<E, T...>;
+  // using Base::Base;  // Inherit constructors
+
+  explicit SourceContext(fit::result<E, T...> result) : mtl::Context<E, T...>(std::move(result)) {}
+
+  template <typename ContextFn>
+  mtl::result<T...> with_source_context(
+      ContextFn&& context_fn, std::source_location caller = std::source_location::current()) {
+    return this->template with_context<BString>([&caller, &context_fn]() {
+      const BString context = context_fn();
+      auto caller_str = to_string(caller);
+      return mtl::format("%.*s, %.*s", static_cast<int>(context.size()), context.data(),
+                         static_cast<int>(caller_str.size()), caller_str.data());
+    });
+  }
+
+  template <typename Context>
+  mtl::result<T...> source_context(Context&& context,
+                                   std::source_location caller = std::source_location::current()) {
+    ktl::string_view context_sv = context;
+    auto caller_str = to_string(caller);
+    return this->context(mtl::format("%.*s, %.*s", static_cast<int>(context_sv.size()),
+                                     context_sv.data(), static_cast<int>(caller_str.size()),
+                                     caller_str.data()));
+  }
+};
+
+// Helper function to create SourceContext wrapper
+template <typename E, typename... T>
+SourceContext<E, T...> make_source_context(fit::result<E, T...> result) {
+  return SourceContext<E, T...>(std::move(result));
+}
+
+}  // namespace starnix_uapi
+
+#ifdef ENOTSUP
+#undef ENOTSUP
+#endif
+
+// ENOTSUP is a different error in posix, but has the same value as EOPNOTSUPP in linux.
+#define ENOTSUP EOPNOTSUPP
+
+/// `errno` returns an `Errno` struct tagged with the current file name and line number.
+///
+/// Use `error!` instead if you want the `Errno` to be wrapped in an `Err`.
+
+#define ERRNO_GET_MACRO(_1, _2, NAME, ...) NAME
+
+#define ERRNO_1(err, name) \
+  starnix_uapi::Errno::New(starnix_uapi::ErrnoCode(err, name), std::source_location::current())
+
+#define ERRNO_2(err, name, ctx)                                         \
+  starnix_uapi::Errno::with_context(starnix_uapi::ErrnoCode(err, name), \
+                                    std::source_location::current(), ctx)
+
+#define errno(err, ...) \
+  ERRNO_GET_MACRO(err, ##__VA_ARGS__, ERRNO_2, ERRNO_1)(err, #err, ##__VA_ARGS__)
+
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_ERRORS_H_

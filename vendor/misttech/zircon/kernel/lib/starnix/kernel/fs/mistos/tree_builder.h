@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_FS_MISTOS_TREE_BUILDER_H_
-#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_FS_MISTOS_TREE_BUILDER_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_FS_MISTOS_TREE_BUILDER_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_FS_MISTOS_TREE_BUILDER_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
@@ -12,7 +12,6 @@
 #include <lib/mistos/starnix/kernel/vfs/file_system.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
-#include <lib/mistos/starnix/kernel/vfs/simple_directory.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/util/allocator.h>
@@ -20,25 +19,21 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <map>
-
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/unique_ptr.h>
 #include <ktl/variant.h>
 
+#include "simple_directory.h"
+
 namespace starnix {
 
-using FileMode = starnix_uapi::FileMode;
-using FsCred = starnix_uapi::FsCred;
+using starnix_uapi::FileMode;
+using starnix_uapi::FsCred;
 
 class TreeBuilder;
 class SimpleDirectory;
-
-/*using HashMap = std::unordered_map<ktl::string_view, TreeBuilder, std::hash<ktl::string_view>,
-                                   std::equal_to<ktl::string_view>,
-                                   Allocator<ktl::pair<const ktl::string_view, TreeBuilder>>>;*/
 
 using HashMap =
     std::map<FsStr, TreeBuilder, std::less<>, util::Allocator<ktl::pair<const FsStr, TreeBuilder>>>;
@@ -195,4 +190,4 @@ class TreeBuilder {
 
 }  // namespace starnix
 
-#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_FS_MISTOS_TREE_BUILDER_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_FS_MISTOS_TREE_BUILDER_H_

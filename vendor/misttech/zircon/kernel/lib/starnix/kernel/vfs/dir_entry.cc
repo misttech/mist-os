@@ -61,9 +61,11 @@ DirEntryHandle DirEntry::New(FsNodeHandle node, ktl::optional<DirEntryHandle> pa
   fbl::AllocChecker ac;
   auto ops = ktl::make_unique<DefaultDirEntryOps>(&ac);
   ZX_ASSERT(ac.check());
-  auto result = fbl::AdoptRef(new (&ac) DirEntry(
-      ktl::move(node), ktl::move(ops),
-      {.parent = ktl::move(parent), .local_name = local_name, .is_dead = false, .mount_count = 0}));
+  auto result = fbl::AdoptRef(new (&ac) DirEntry(ktl::move(node), ktl::move(ops),
+                                                 {.parent = ktl::move(parent),
+                                                  .local_name = local_name,
+                                                  .is_dead = false,
+                                                  .has_mounts = false}));
   ZX_ASSERT(ac.check());
 
   // #[cfg(any(test, debug_assertions))]
@@ -83,6 +85,8 @@ DirEntry::DirEntryLockedChildren DirEntry::lock_children() {
 
 FsString DirEntry::local_name() const { return state_.Read()->local_name; }
 
+ktl::optional<DirEntryHandle> DirEntry::parent() const { return state_.Read()->parent; }
+
 DirEntryHandle DirEntry::parent_or_self() {
   auto parent = state_.Read()->parent;
   return parent ? parent.value() : fbl::RefPtr<DirEntry>(this);
@@ -99,9 +103,8 @@ fit::result<Errno, DirEntryHandle> DirEntry::component_lookup(const CurrentTask&
     return d->lookup(current_task, mount, name);
   };
 
-  auto get_or_create_child_result =
-      get_or_create_child(current_task, mount, name, create_fn) _EP(get_or_create_child_result);
-  auto [node, _] = get_or_create_child_result.value();
+  auto result = get_or_create_child(current_task, mount, name, create_fn) _EP(result);
+  auto [node, _] = result.value();
   return fit::ok(node);
 }
 
@@ -126,6 +129,41 @@ fit::result<Errno, DirEntryHandle> DirEntry::create_dir_for_testing(const Curren
                         return dir->mknod(current_task, mount, name, FILE_MODE(IFDIR, 0777),
                                           DeviceType::NONE, FsCred::root());
                       });
+}
+
+void DirEntry::destroy(const Mounts& mounts) && {
+  /*bool unmount = [this]() {
+    auto state = state_.Write();
+    if (state->is_dead) {
+      return false;
+    }
+    state->is_dead = true;
+    return ktl::exchange(state->has_mounts, false);
+  }();
+
+  node_->fs()->will_destroy_dir_entry(this);
+  if (unmount) {
+    mounts.unmount(this);
+  }
+  //notify_deletion();
+  */
+}
+
+bool DirEntry::is_descendant_of(const DirEntryHandle& other) const {
+  auto current = fbl::RefPtr<const DirEntry>(this);
+  while (true) {
+    if (current.get() == other.get()) {
+      // We found |other|.
+      return true;
+    }
+    auto next = current->parent();
+    if (next.has_value()) {
+      current = next.value();
+    } else {
+      // We reached the root of the file system.
+      return false;
+    }
+  }
 }
 
 fbl::Vector<FsString> DirEntry::copy_child_names() {
@@ -159,6 +197,42 @@ void DirEntry::internal_remove_child(DirEntry* child) {
       children->erase(local_name);
     }
   }
+}
+
+bool DirEntry::has_mounts() const { return state_.Read()->has_mounts; }
+
+/// Records whether or not the entry has mounts.
+void DirEntry::set_has_mounts(bool v) { state_.Write()->has_mounts = v; }
+
+/// Verifies this directory has nothing mounted on it.
+fit::result<Errno> DirEntry::require_no_mounts(const MountInfo& parent_mount) {
+  if (state_.Read()->has_mounts) {
+    ktl::optional<MountHandle> mount_handle = *parent_mount;
+    if (mount_handle.has_value()) {
+      if ((*mount_handle)->has_submount(fbl::RefPtr<DirEntry>(this))) {
+        return fit::error(errno(EBUSY));
+      }
+    }
+  }
+  return fit::ok();
+}
+
+BString DirEntry::debug() const {
+  fbl::Vector<BString> parents;
+  auto maybe_parent = state_.Read()->parent;
+  while (maybe_parent) {
+    fbl::AllocChecker ac;
+    parents.push_back(maybe_parent.value()->local_name(), &ac);
+    ZX_ASSERT(ac.check());
+    maybe_parent = maybe_parent.value()->parent();
+  }
+
+  auto name = local_name();
+  auto vec_fmt = mtl::to_string(parents);
+
+  return mtl::format("DirEntry {id=%p, local_name=%.*s, parent=%.*s}", this,
+                     static_cast<int>(name.size()), name.data(), static_cast<int>(vec_fmt.size()),
+                     vec_fmt.data());
 }
 
 }  // namespace starnix

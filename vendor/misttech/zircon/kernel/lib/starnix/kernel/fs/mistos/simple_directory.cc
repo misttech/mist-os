@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/mistos/starnix/kernel/vfs/simple_directory.h"
+#include "simple_directory.h"
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
@@ -13,14 +13,9 @@
 
 #include <fbl/alloc_checker.h>
 
-#include "../kernel_priv.h"
-
-#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
-
 namespace starnix {
 
 fit::result<Errno> SimpleDirectory::add_entry(FsStr name, FsNodeHandle entry, bool overwrite) {
-  LTRACEF("this(%p) name=[%.*s]\n", this, static_cast<int>(name.length()), name.data());
   if (!overwrite && entries_.contains(name)) {
     return fit::error(errno(EROFS));
   }
@@ -39,12 +34,31 @@ fit::result<Errno, ktl::unique_ptr<FileOps>> SimpleDirectory::create_file_ops(
 fit::result<Errno, FsNodeHandle> SimpleDirectory::lookup(const FsNode& node,
                                                          const CurrentTask& current_task,
                                                          const FsStr& name) const {
-  LTRACEF("this(%p) name=[%.*s]\n", this, static_cast<int>(name.length()), name.data());
   auto it = entries_.find(name);
   if (it != entries_.end()) {
     return fit::ok(it->second);
   }
-  return fit::error(errno(ENOENT));
+
+  auto keys_str = [this]() {
+    BString entries_str = "[";
+    bool first = true;
+    for (const auto& entry : entries_) {
+      if (!first) {
+        entries_str =
+            mtl::format("%.*s, ", static_cast<int>(entries_str.size()), entries_str.data());
+      }
+
+      entries_str =
+          mtl::format("%.*s%.*s", static_cast<int>(entries_str.size()), entries_str.data(),
+                      static_cast<int>(entry.first.size()), entry.first.data());
+      first = false;
+    }
+    return mtl::format("%.*s]", static_cast<int>(entries_str.length()), entries_str.data());
+  }();
+
+  return fit::error(errno(
+      ENOENT, mtl::format("looking for %.*s in %.*s", static_cast<int>(name.length()), name.data(),
+                          static_cast<int>(keys_str.length()), keys_str.data())));
 }
 
 }  // namespace starnix

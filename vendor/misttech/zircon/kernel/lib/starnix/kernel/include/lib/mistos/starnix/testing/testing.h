@@ -153,18 +153,6 @@ create_kernel_task_and_unlocked_with_bootfs_current_zbi();
 /// the test on the spawned task.
 ktl::pair<fbl::RefPtr<starnix::Kernel>, AutoReleasableTask> create_kernel_and_task();
 
-/// An old way of creating a task for testing
-///
-/// This way of creating a task has problems because the test isn't actually run with that task
-/// being current, which means that functions that expect a CurrentTask to actually be mapped into
-/// memory can operate incorrectly.
-///
-/// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
-/// for this use case, please consider adding one that follows the new pattern of actually running
-/// the test on the spawned task.
-ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
-    create_kernel_and_task_with_selinux(/*security_server: Arc<SecurityServer>*/);
-
 /// Create a Kernel object and run the given callback in the init process for that kernel.
 ///
 /// This function is useful if you want to test code that requires a CurrentTask because
@@ -181,20 +169,6 @@ ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
 ktl::pair<fbl::RefPtr<starnix::Kernel>, AutoReleasableTask> create_kernel_task_and_unlocked();
-
-/// An old way of creating a task for testing
-///
-/// This way of creating a task has problems because the test isn't actually run with that task
-/// being current, which means that functions that expect a CurrentTask to actually be mapped into
-/// memory can operate incorrectly.
-///
-/// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
-/// for this use case, please consider adding one that follows the new pattern of actually running
-/// the test on the spawned task.
-ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
-    create_kernel_task_and_unlocked_with_selinux(/*security_server: Arc<SecurityServer>*/);
-
-fbl::RefPtr<Kernel> create_test_kernel(/*security_server: Arc<SecurityServer>*/);
 
 /// An old way of creating a task for testing
 ///

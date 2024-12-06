@@ -615,7 +615,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
     void set_task(mtl::WeakPtr<Task> task) {
       ASSERT(task_ == nullptr);
-      task_ = task;
+      task_ = ktl::move(task);
     }
 
    private:

@@ -6,10 +6,10 @@
 #include "lib/mistos/starnix/kernel/runner/container.h"
 
 #include <lib/fit/result.h>
-#include <lib/handoff/handoff.h>
 #include <lib/mistos/starnix/kernel/execution/executor.h>
 #include <lib/mistos/starnix/kernel/fs/mistos/bootfs.h>
 #include <lib/mistos/starnix/kernel/fs/mistos/syslog.h>
+#include <lib/mistos/starnix/kernel/runner/mounts.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
@@ -17,7 +17,6 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/mount_info.h>
-#include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/error_propagation.h>
@@ -31,56 +30,98 @@
 #include <object/process_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
 
-#include "../kernel_priv.h"
+#include "private.h"
 
 #include <ktl/enforce.h>
 
-#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
+#define LOCAL_TRACE STARNIX_KERNEL_RUNNER_GLOBAL_TRACE(0)
 
-namespace starnix {
+namespace starnix_kernel_runner {
+
+using mtl::Error;
+
+using starnix::CurrentTask;
+using starnix::FdNumber;
+using starnix::FsContext;
+using starnix::Kernel;
+using starnix::Namespace;
+using starnix::SyslogFile;
+using starnix::WhatToMount;
 
 Container::~Container() { LTRACE_ENTRY_OBJ; }
 
-fit::result<Errno, Container> create_container(const Config& config) {
+namespace {
+
+fit::result<Error> mount_filesystems(const CurrentTask& system_task, const Config& config) {
+  // Skip the first mount, that was used to create the root filesystem
+  auto mounts_iter = config.mounts.begin();
+  if (mounts_iter != config.mounts.end()) {
+    ++mounts_iter;
+  }
+
+  for (; mounts_iter != config.mounts.end(); ++mounts_iter) {
+    const auto& mount_spec = *mounts_iter;
+
+    auto action_result =
+        starnix_uapi::make_source_context(MountAction::from_spec(system_task, mount_spec))
+            .with_source_context([&mount_spec]() {
+              return mtl::format("creating filesystem from spec: %.*s",
+                                 static_cast<int>(mount_spec.size()), mount_spec.data());
+            }) _EP(action_result);
+    auto action = action_result.value();
+
+    auto mount_point_result =
+        starnix_uapi::make_source_context(system_task.lookup_path_from_root(action.path_))
+            .with_source_context([&action]() {
+              return mtl::format("lookup path from root: %.*s",
+                                 static_cast<int>(action.path_.size()), action.path_.data());
+            }) _EP(mount_point_result);
+    auto mount_point = mount_point_result.value();
+
+    _EP(mount_point.mount(WhatToMount::Fs(action.fs_), action.flags_));
+  }
+
+  return fit::ok();
+}
+
+}  // namespace
+
+fit::result<Error, Container> create_container(const Config& config) {
   const ktl::string_view DEFAULT_INIT("/container/init");
 
-  fbl::RefPtr<Kernel> kernel = Kernel::New(config.kernel_cmdline).value_or(fbl::RefPtr<Kernel>());
-  ASSERT_MSG(kernel, "creating Kernel: %.*s\n", static_cast<int>(config.name.size()),
-             config.name.data());
+  auto kernel = starnix_uapi::make_source_context(Kernel::New(config.kernel_cmdline))
+                    .with_source_context([&config]() {
+                      return mtl::format("creating Kernel: %.*s",
+                                         static_cast<int>(config.name.size()), config.name.data());
+                    }) _EP(kernel);
 
-  fbl::RefPtr<FsContext> fs_context;
-  auto result = create_fs_context(kernel, config);
-  if (result.is_error()) {
-    LTRACEF("creating FsContext: %d\n", result.error_value());
-    return fit::error(errno(from_status_like_fdio(result.error_value())));
-  }
-  fs_context = result.value();
+  auto fs_context = starnix_uapi::make_source_context(create_fs_context(kernel.value(), config))
+                        .source_context("creating FsContext") _EP(fs_context);
 
   auto init_pid = kernel->pids_.Write()->allocate_pid();
   // Lots of software assumes that the pid for the init process is 1.
   DEBUG_ASSERT(init_pid == 1);
 
   {
-    auto system_task = CurrentTask::create_system_task(
-                           /*kernel.kthreads.unlocked_for_async().deref_mut(),*/ kernel, fs_context)
-                           .value();
+    auto system_task = starnix_uapi::make_source_context(
+                           CurrentTask::create_system_task(kernel.value(), fs_context.value()))
+                           .source_context("create system task") _EP(system_task);
     // The system task gives pid 2. This value is less critical than giving
     // pid 1 to init, but this value matches what is supposed to happen.
     DEBUG_ASSERT(system_task->id_ == 2);
 
-    _EP(kernel->kthreads_.Init(ktl::move(system_task)));
+    _EP(starnix_uapi::make_source_context(kernel->kthreads_.Init(ktl::move(system_task.value())))
+            .source_context("initializing kthreads"));
   }
 
   auto& system_task = kernel->kthreads_.system_task();
 
   // Register common devices and add them in sysfs and devtmpfs.
   starnix_modules::init_common_devices(system_task);
-  starnix_modules::register_common_file_systems(kernel);
+  starnix_modules::register_common_file_systems(kernel.value());
 
-  /*
-  mount_filesystems(locked, &system_task, config, &pkg_dir_proxy)
-        .source_context("mounting filesystems")?;
-  */
+  _EP(starnix_uapi::make_source_context(mount_filesystems(system_task, config))
+          .source_context("mounting filesystems"));
 
   // If there is an init binary path, run it, optionally waiting for the
   // startup_file_path to be created. The task struct is still used
@@ -108,16 +149,14 @@ fit::result<Errno, Container> create_container(const Config& config) {
 
   // let rlimits = parse_rlimits(&config.rlimits)?;
   fbl::Array<ktl::pair<starnix_uapi::Resource, uint64_t>> rlimits;
-  auto init_task = CurrentTask::create_init_process(kernel, init_pid, initial_name, fs_context,
-                                                    ktl::move(rlimits)) _EP(init_task);
-
-  if (LOCAL_TRACE) {
-    TRACEF("creating init task: ");
-    for (auto arg : config.init) {
-      TRACEF("%.*s ", static_cast<int>(arg.size()), arg.data());
-    }
-    TRACEF("\n");
-  }
+  auto init_task = starnix_uapi::make_source_context(
+                       CurrentTask::create_init_process(kernel.value(), init_pid, initial_name,
+                                                        fs_context.value(), ktl::move(rlimits)))
+                       .with_source_context([&config]() {
+                         auto vec_to_str = mtl::to_string(config.init);
+                         return mtl::format("creating init task: %.*s",
+                                            static_cast<int>(vec_to_str.size()), vec_to_str.data());
+                       }) _EP(init_task);
 
   auto pre_run = [&](CurrentTask& init_task) -> fit::result<Errno> {
     auto stdio = SyslogFile::new_file(init_task);
@@ -149,13 +188,28 @@ fit::result<Errno, Container> create_container(const Config& config) {
 
   execute_task_with_prerun_result(ktl::move(init_task.value()), pre_run, task_complete);
 
-  return fit::ok(Container{kernel});
+  return fit::ok(Container{kernel.value()});
 }
 
-fit::result<zx_status_t, fbl::RefPtr<FsContext>> create_fs_context(
-    const fbl::RefPtr<Kernel>& kernel, const Config& config) {
-  auto rootfs = BootFs::new_fs(kernel, GetZbi());
-  return fit::ok(ktl::move(FsContext::New(Namespace::new_with_flags(rootfs, MountFlags::empty()))));
+fit::result<Error, fbl::RefPtr<FsContext>> create_fs_context(const fbl::RefPtr<Kernel>& kernel,
+                                                             const Config& config) {
+  // The mounts are applied in the order listed. Mounting will fail if the designated mount
+  // point doesn't exist in a previous mount. The root must be first so other mounts can be
+  // applied on top of it.
+  auto mounts_iter = config.mounts.begin();
+  if (mounts_iter == config.mounts.end()) {
+    return fit::error(anyhow("Mounts list is empty"));
+  }
+
+  auto root_result = MountAction::new_for_root(kernel, *mounts_iter) _EP(root_result);
+  auto root = root_result.value();
+
+  if (root.path_ != "/") {
+    ZX_PANIC("First mount in mounts list is not the root");
+  }
+
+  return fit::ok(
+      ktl::move(FsContext::New(Namespace::new_with_flags(root.fs_, MountFlags::empty()))));
 }
 
-}  // namespace starnix
+}  // namespace starnix_kernel_runner

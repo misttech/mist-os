@@ -12,6 +12,7 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/testing/testing.h>
+#include <lib/mistos/util/testing/unittest.h>
 #include <lib/unittest/unittest.h>
 
 #include <fbl/ref_ptr.h>
@@ -42,7 +43,7 @@ bool test_chdir() {
   BEGIN_TEST;
   auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked_with_bootfs();
 
-  ASSERT_TRUE("/" == (*current_task)->fs()->cwd().path_escaping_chroot());
+  ASSERT_STREQ("/", (*current_task)->fs()->cwd().path_escaping_chroot());
   END_TEST;
 }
 

@@ -8,11 +8,13 @@
 
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
+#include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <zircon/types.h>
 
 namespace starnix {
 
+using starnix_uapi::Errno;
 using starnix_uapi::FileMode;
 
 class DirectoryEntryType {

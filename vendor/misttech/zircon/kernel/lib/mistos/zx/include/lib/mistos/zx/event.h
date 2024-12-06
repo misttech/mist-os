@@ -20,7 +20,7 @@ class event final : public object<event> {
 
   constexpr event() = default;
 
-  explicit event(zx_handle_t value) : object(value) {}
+  explicit event(fbl::RefPtr<Value> value) : object(value) {}
 
   explicit event(handle&& h) : object(h.release()) {}
 
@@ -31,7 +31,7 @@ class event final : public object<event> {
     return *this;
   }
 
-  static zx_status_t create(uint32_t options, event* result);
+  static zx_status_t create(uint32_t options, event* out);
 };
 
 using unowned_event = unowned<event>;

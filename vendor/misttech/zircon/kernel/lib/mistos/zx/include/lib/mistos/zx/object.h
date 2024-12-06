@@ -3,32 +3,79 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_OBJECT_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_OBJECT_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_OBJECT_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_OBJECT_H_
 
 #include <lib/mistos/zx/object_traits.h>
 #include <lib/mistos/zx/time.h>
-#include <stdio.h>
 #include <zircon/errors.h>
-#include <zircon/syscalls.h>
 #include <zircon/types.h>
+
+#include <utility>
+
+#include <object/handle.h>
 
 namespace zx {
 
-// class port;
-// class profile;
+class port;
+class profile;
+
+class Value : public fbl::RefCounted<Value> {
+ public:
+  Value() : value_(nullptr), handle_(nullptr) {}
+
+  explicit Value(HandleOwner handle) : value_(handle.get()), handle_(ktl::move(handle)) {}
+
+  explicit Value(Handle* handle) : value_(handle) {}
+
+  Value(Value&& other) : value_(other.value_), handle_(ktl::move(other.handle_)) {
+    other.value_ = nullptr;
+  }
+
+  Value& operator=(Value&& other) {
+    if (this != &other) {
+      value_ = other.value_;
+      handle_ = ktl::move(other.handle_);
+      other.value_ = nullptr;
+    }
+    return *this;
+  }
+
+  bool is_valid() const { return value_ != nullptr; }
+
+  Handle* get() const { return value_; }
+
+  void close() {
+    if (value_ != nullptr) {
+      if (handle_.get() != nullptr) {
+        ZX_ASSERT(value_ == handle_.get());
+        handle_.reset();
+      }
+      value_ = nullptr;
+    }
+  }
+
+  ~Value() { close(); }
+
+  const Handle& operator*() const { return *value_; }
+  const Handle* operator->() const { return value_; }
+
+ private:
+  Handle* value_;
+  HandleOwner handle_;
+};
 
 class object_base {
  public:
-  void reset(zx_handle_t value = ZX_HANDLE_INVALID) {
+  void reset(fbl::RefPtr<Value> value = nullptr) {
     close();
     value_ = value;
   }
 
-  bool is_valid() const { return value_ != ZX_HANDLE_INVALID; }
+  bool is_valid() const { return value_ && value_->is_valid(); }
   explicit operator bool() const { return is_valid(); }
 
-  zx_handle_t get() const { return value_; }
+  fbl::RefPtr<Value> get() const { return value_; }
 
   // Reset the underlying handle, and then get the address of the
   // underlying internal handle storage.
@@ -36,34 +83,26 @@ class object_base {
   // Note: The intended purpose is to facilitate interactions with C
   // APIs which expect to be provided a pointer to a handle used as
   // an out parameter.
-  zx_handle_t* reset_and_get_address() {
+  fbl::RefPtr<Value>* reset_and_get_address() {
     reset();
     return &value_;
   }
 
-  __attribute__((warn_unused_result)) zx_handle_t release() {
-    zx_handle_t result = value_;
-    value_ = ZX_HANDLE_INVALID;
+  __attribute__((warn_unused_result)) fbl::RefPtr<Value> release() {
+    fbl::RefPtr<Value> result = value_;
+    value_ = nullptr;
     return result;
   }
 
   zx_status_t get_info(uint32_t topic, void* buffer, size_t buffer_size, size_t* actual_count,
-                       size_t* avail_count) const {
-    return zx_object_get_info(get(), topic, buffer, buffer_size, actual_count, avail_count);
-  }
-
-  zx_status_t get_property(uint32_t property, void* value, size_t size) const {
-    return zx_object_get_property(get(), property, value, size);
-  }
-
-  zx_status_t set_property(uint32_t property, const void* value, size_t size) const {
-    return zx_object_set_property(get(), property, value, size);
-  }
+                       size_t* avail_count) const;
+  zx_status_t get_property(uint32_t property, void* _value, size_t size) const;
+  zx_status_t set_property(uint32_t property, const void* _value, size_t size) const;
 
  protected:
-  constexpr object_base() : value_(ZX_HANDLE_INVALID) {}
+  constexpr object_base() : value_(nullptr) {}
 
-  explicit object_base(zx_handle_t value) : value_(value) {}
+  explicit object_base(fbl::RefPtr<Value> value) : value_(std::move(value)) {}
 
   ~object_base() { close(); }
 
@@ -72,13 +111,13 @@ class object_base {
   void operator=(const object_base&) = delete;
 
   void close() {
-    if (value_ != ZX_HANDLE_INVALID) {
-      zx_handle_close(value_);
-      value_ = ZX_HANDLE_INVALID;
+    if (value_ != nullptr) {
+      value_->close();
+      value_ = nullptr;
     }
   }
 
-  zx_handle_t value_ = ZX_HANDLE_INVALID;
+  fbl::RefPtr<Value> value_;
 };
 
 // Forward declaration for borrow method.
@@ -93,7 +132,7 @@ class object : public object_base {
 
   constexpr object() = default;
 
-  explicit object(zx_handle_t value) : object_base(value) {}
+  explicit object(fbl::RefPtr<Value> value) : object_base(value) {}
 
   template <typename U>
   object(object<U>&& other) : object_base(other.release()) {
@@ -107,43 +146,85 @@ class object : public object_base {
     return *this;
   }
 
-  void swap(object<T>& other) {
-    zx_handle_t tmp = value_;
-    value_ = other.value_;
-    other.value_ = tmp;
-  }
+  void swap(object<T>& other) { value_.swap(other.value_); }
 
   zx_status_t duplicate(zx_rights_t rights, object<T>* result) const {
     static_assert(object_traits<T>::supports_duplication, "Object must support duplication.");
-    zx_handle_t h = ZX_HANDLE_INVALID;
-    zx_status_t status = zx_handle_duplicate(value_, rights, &h);
-    result->reset(h);
-    return status;
+    if (!value_)
+      return ZX_ERR_BAD_HANDLE;
+
+    auto current_handle = value_->get();
+    if (!current_handle)
+      return ZX_ERR_BAD_HANDLE;
+
+    if (!current_handle->HasRights(ZX_RIGHT_DUPLICATE))
+      return ZX_ERR_ACCESS_DENIED;
+    if (rights == ZX_RIGHT_SAME_RIGHTS) {
+      rights = current_handle->rights();
+    } else if ((current_handle->rights() & rights) != rights) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    HandleOwner h = Handle::Dup(current_handle, rights);
+    if (!h) {
+      return ZX_ERR_NO_MEMORY;
+    }
+    fbl::AllocChecker ac;
+    auto value = fbl::MakeRefCountedChecked<zx::Value>(&ac, ktl::move(h));
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
+
+    result->reset(value);
+    return ZX_OK;
   }
 
   zx_status_t replace(zx_rights_t rights, object<T>* result) {
-    zx_handle_t h = ZX_HANDLE_INVALID;
-    zx_status_t status = zx_handle_replace(value_, rights, &h);
-    // We store ZX_HANDLE_INVALID to value_ before calling reset on result
-    // in case result == this.
-    value_ = ZX_HANDLE_INVALID;
-    result->reset(h);
-    return status;
+    if (!value_)
+      return ZX_ERR_BAD_HANDLE;
+
+    auto current_handle = value_->get();
+    if (!current_handle)
+      return ZX_ERR_BAD_HANDLE;
+
+    if (rights == ZX_RIGHT_SAME_RIGHTS) {
+      rights = current_handle->rights();
+    } else if ((current_handle->rights() & rights) != rights) {
+      // handle_owner_.reset();
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    HandleOwner h = Handle::Dup(current_handle, rights);
+    if (!h) {
+      return ZX_ERR_NO_MEMORY;
+    }
+
+    fbl::AllocChecker ac;
+    auto value = fbl::MakeRefCountedChecked<zx::Value>(&ac, ktl::move(h));
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
+
+    value_ = nullptr;
+    result->reset(value);
+    return ZX_OK;
   }
 
   zx_status_t wait_one(zx_signals_t signals, zx::time deadline, zx_signals_t* pending) const {
     static_assert(object_traits<T>::supports_wait, "Object is not waitable.");
-    return zx_object_wait_one(value_, signals, deadline.get(), pending);
+    // return zx_object_wait_one(value_, signals, deadline.get(), pending);
+    return ZX_ERR_UNAVAILABLE;
   }
 
   zx_status_t get_child(uint64_t koid, zx_rights_t rights, object<void>* result) const {
     static_assert(object_traits<T>::supports_get_child, "Object must support getting children.");
     // Allow for |result| and |this| being the same container, though that
     // can only happen for |T=void|, due to strict aliasing.
-    object<void> h;
-    zx_status_t status = zx_object_get_child(value_, koid, rights, h.reset_and_get_address());
-    result->reset(h.release());
-    return status;
+    // object<void> h;
+    // zx_status_t status = zx_object_get_child(value_, koid, rights, h.reset_and_get_address());
+    // result->reset(h.release());
+    // return status;
+    return ZX_ERR_UNAVAILABLE;
   }
 
   // Returns a type-safe wrapper of the underlying handle that does not claim ownership.
@@ -192,62 +273,62 @@ bool operator>=(const object<T>& a, const object<T>& b) {
 }
 
 template <typename T>
-bool operator==(zx_handle_t a, const object<T>& b) {
+bool operator==(const fbl::RefPtr<Value>& a, const object<T>& b) {
   return a == b.get();
 }
 
 template <typename T>
-bool operator!=(zx_handle_t a, const object<T>& b) {
+bool operator!=(const fbl::RefPtr<Value>& a, const object<T>& b) {
   return !(a == b);
 }
 
 template <typename T>
-bool operator<(zx_handle_t a, const object<T>& b) {
+bool operator<(const fbl::RefPtr<Value>& a, const object<T>& b) {
   return a < b.get();
 }
 
 template <typename T>
-bool operator>(zx_handle_t a, const object<T>& b) {
+bool operator>(const fbl::RefPtr<Value>& a, const object<T>& b) {
   return a > b.get();
 }
 
 template <typename T>
-bool operator<=(zx_handle_t a, const object<T>& b) {
+bool operator<=(const fbl::RefPtr<Value>& a, const object<T>& b) {
   return !(a > b.get());
 }
 
 template <typename T>
-bool operator>=(zx_handle_t a, const object<T>& b) {
+bool operator>=(const fbl::RefPtr<Value>& a, const object<T>& b) {
   return !(a < b.get());
 }
 
 template <typename T>
-bool operator==(const object<T>& a, zx_handle_t b) {
+bool operator==(const object<T>& a, const fbl::RefPtr<Value>& b) {
   return a.get() == b;
 }
 
 template <typename T>
-bool operator!=(const object<T>& a, zx_handle_t b) {
+bool operator!=(const object<T>& a, const fbl::RefPtr<Value>& b) {
   return !(a == b);
 }
 
 template <typename T>
-bool operator<(const object<T>& a, zx_handle_t b) {
+bool operator<(const object<T>& a, const fbl::RefPtr<Value>& b) {
   return a.get() < b;
 }
 
 template <typename T>
-bool operator>(const object<T>& a, zx_handle_t b) {
+bool operator>(const object<T>& a, const fbl::RefPtr<Value>& b) {
   return a.get() > b;
 }
 
 template <typename T>
-bool operator<=(const object<T>& a, zx_handle_t b) {
+bool operator<=(const object<T>& a, const fbl::RefPtr<Value>& b) {
   return !(a.get() > b);
 }
 
 template <typename T>
-bool operator>=(const object<T>& a, zx_handle_t b) {
+bool operator>=(const object<T>& a, const fbl::RefPtr<Value>& b) {
   return !(a.get() < b);
 }
 
@@ -270,7 +351,7 @@ bool operator>=(const object<T>& a, zx_handle_t b) {
 template <typename T>
 class unowned final {
  public:
-  explicit unowned(zx_handle_t h) : value_(h) {}
+  explicit unowned(fbl::RefPtr<Value> h) : value_(h) { ZX_ASSERT(h); }
   explicit unowned(const T& owner) : unowned(owner.get()) {}
   explicit unowned(const unowned& other) : unowned(*other) {}
   constexpr unowned() = default;
@@ -297,7 +378,7 @@ class unowned final {
 
  private:
   void release_value() {
-    zx_handle_t h = value_.release();
+    fbl::RefPtr<Value> h = value_.release();
     static_cast<void>(h);
   }
 
@@ -335,65 +416,67 @@ bool operator>=(const unowned<T>& a, const unowned<T>& b) {
 }
 
 template <typename T>
-bool operator==(zx_handle_t a, const unowned<T>& b) {
+bool operator==(const fbl::RefPtr<Value>& a, const unowned<T>& b) {
   return a == b->get();
 }
 
 template <typename T>
-bool operator!=(zx_handle_t a, const unowned<T>& b) {
+bool operator!=(const fbl::RefPtr<Value>& a, const unowned<T>& b) {
   return !(a == b);
 }
 
 template <typename T>
-bool operator<(zx_handle_t a, const unowned<T>& b) {
+bool operator<(const fbl::RefPtr<Value>& a, const unowned<T>& b) {
   return a < b->get();
 }
 
 template <typename T>
-bool operator>(zx_handle_t a, const unowned<T>& b) {
+bool operator>(const fbl::RefPtr<Value>& a, const unowned<T>& b) {
   return a > b->get();
 }
 
 template <typename T>
-bool operator<=(zx_handle_t a, const unowned<T>& b) {
+bool operator<=(const fbl::RefPtr<Value>& a, const unowned<T>& b) {
   return !(a > b);
 }
 
 template <typename T>
-bool operator>=(zx_handle_t a, const unowned<T>& b) {
+bool operator>=(const fbl::RefPtr<Value>& a, const unowned<T>& b) {
   return !(a < b);
 }
 
 template <typename T>
-bool operator==(const unowned<T>& a, zx_handle_t b) {
+bool operator==(const unowned<T>& a, const fbl::RefPtr<Value>& b) {
   return a->get() == b;
 }
 
 template <typename T>
-bool operator!=(const unowned<T>& a, zx_handle_t b) {
+bool operator!=(const unowned<T>& a, const fbl::RefPtr<Value>& b) {
   return !(a == b);
 }
 
 template <typename T>
-bool operator<(const unowned<T>& a, zx_handle_t b) {
+bool operator<(const unowned<T>& a, const fbl::RefPtr<Value>& b) {
   return a->get() < b;
 }
 
 template <typename T>
-bool operator>(const unowned<T>& a, zx_handle_t b) {
+bool operator>(const unowned<T>& a, const fbl::RefPtr<Value>& b) {
   return a->get() > b;
 }
 
 template <typename T>
-bool operator<=(const unowned<T>& a, zx_handle_t b) {
+bool operator<=(const unowned<T>& a, const fbl::RefPtr<Value>& b) {
   return !(a > b);
 }
 
 template <typename T>
-bool operator>=(const unowned<T>& a, zx_handle_t b) {
+bool operator>=(const unowned<T>& a, const fbl::RefPtr<Value>& b) {
   return !(a < b);
 }
 
+bool operator<(const fbl::RefPtr<Value>& a, const fbl::RefPtr<Value>& b);
+
 }  // namespace zx
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_OBJECT_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_MISTOS_ZX_INCLUDE_LIB_MISTOS_ZX_OBJECT_H_

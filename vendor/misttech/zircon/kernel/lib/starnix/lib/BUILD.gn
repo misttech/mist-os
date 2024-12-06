@@ -6,13 +6,17 @@ group("lib") {
   deps = [
     "bootfs",
     "elfldltl",
+    "expando",
     "starnix-sync",
     "starnix-uapi",
   ]
 }
 
 group("tests") {
-  deps = [ "starnix-sync:tests" ]
+  deps = [
+    "expando:tests",
+    "starnix-sync:tests",
+  ]
 }
 
 group("benchmarks") {

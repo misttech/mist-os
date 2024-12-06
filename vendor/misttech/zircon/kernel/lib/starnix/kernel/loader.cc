@@ -152,7 +152,7 @@ fit::result<Errno, StackResult> populate_initial_stack(
   // argv
   constexpr fbl::static_vector<uint8_t, 8> kZero(8, 0u);
   auto next_arg_addr = argv_start;
-  for (auto arg : argv) {
+  for (const auto& arg : argv) {
     ktl::span<uint8_t> ptr(reinterpret_cast<uint8_t*>(&next_arg_addr), sizeof(next_arg_addr));
     ktl::copy_n(ptr.data(), ptr.size(), util::back_inserter(main_data));
     next_arg_addr += arg.length() + 1;
@@ -160,7 +160,7 @@ fit::result<Errno, StackResult> populate_initial_stack(
   ktl::copy(kZero.begin(), kZero.end(), util::back_inserter(main_data));
   // environ
   auto next_env_addr = environ_start;
-  for (auto env : envp) {
+  for (const auto& env : envp) {
     ktl::span<uint8_t> ptr(reinterpret_cast<uint8_t*>(&next_env_addr), sizeof(next_env_addr));
     ktl::copy_n(ptr.data(), ptr.size(), util::back_inserter(main_data));
     next_env_addr += env.length() + 1;
@@ -221,10 +221,10 @@ enum LoadElfUsage : uint8_t {
   Interpreter,
 };
 
-fit::result<Errno, LoadedElf> load_elf(
-    const FileHandle& file, const fbl::RefPtr<MemoryObject>& elf_memory,
-    const fbl::RefPtr<starnix::MemoryManager>& mm,
-    LoadElfUsage usage /*file_write_guard: FileWriteGuardRef,*/) {
+fit::result<Errno, LoadedElf> load_elf(const FileHandle& file,
+                                       const fbl::RefPtr<MemoryObject>& elf_memory,
+                                       const fbl::RefPtr<starnix::MemoryManager>& mm,
+                                       LoadElfUsage usage) {
   LTRACEF("[%s]\n", usage == LoadElfUsage::MainElf ? "MainElf" : "Interpreter");
   auto vmo = elf_memory->as_vmo();
   if (!vmo) {
@@ -232,7 +232,7 @@ fit::result<Errno, LoadedElf> load_elf(
   }
 
   auto diag = GetDiagnostics();
-  elfldltl::VmoFile vmo_file(vmo.value().get().dispatcher()->vmo(), diag);
+  elfldltl::UnownedVmoFile vmo_file(vmo.value().get().borrow(), diag);
   auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
       diag, vmo_file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
   ZX_ASSERT(headers);
@@ -253,7 +253,7 @@ fit::result<Errno, LoadedElf> load_elf(
         break;
       }
       case Interpreter: {
-        auto next_unused = mm->state.Read()->find_next_unused_range(length);
+        auto next_unused = mm->state_.Read()->find_next_unused_range(length);
         if (!next_unused.has_value()) {
           return fit::error(errno(EINVAL));
         }
@@ -268,7 +268,8 @@ fit::result<Errno, LoadedElf> load_elf(
   size_t vaddr_bias = file_base - load_info.vaddr_start();
 
   StarnixLoader mapper(mm);
-  ZX_ASSERT(mapper.map_elf_segments(diag, load_info, elf_memory, mm->base_addr.ptr(), vaddr_bias));
+  ZX_ASSERT(mapper.map_elf_segments(diag, load_info, vmo.value().get().borrow(),
+                                    mm->base_addr_.ptr(), vaddr_bias));
 
   LTRACEF("[%s] loaded at %lx, entry point %lx\n",
           usage == LoadElfUsage::MainElf ? "MainElf" : "Interpreter", file_base,
@@ -292,15 +293,16 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
     const fbl::RefPtr<MemoryObject>& memory, const fbl::Vector<BString>& argv,
     const fbl::Vector<BString>& environ
     /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
-  auto vmo = memory->as_vmo();
-  if (!vmo) {
+  auto vmo_ref = memory->as_vmo();
+  if (!vmo_ref.has_value()) {
     return fit::error(errno(EINVAL));
   }
+  auto& vmo = vmo_ref->get();
 
   ktl::optional<starnix::ResolvedInterpElf> resolved_interp;
 
   auto diag = GetDiagnostics();
-  elfldltl::VmoFile vmo_file(vmo.value().get().dispatcher()->vmo(), diag);
+  elfldltl::UnownedVmoFile vmo_file(vmo.borrow(), diag);
   auto elf_headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
       diag, vmo_file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
   ZX_ASSERT(elf_headers);
@@ -379,18 +381,14 @@ fit::result<Errno, starnix::ResolvedElf> resolve_script(
 fit::result<Errno, starnix::ResolvedElf> resolve_executable_impl(
     const starnix::CurrentTask& current_task, const starnix::FileHandle& file,
     ktl::string_view path, const fbl::Vector<BString>& argv, const fbl::Vector<BString>& environ,
-    size_t recursion_depth
-    /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
+    size_t recursion_depth) {
   if (recursion_depth > MAX_RECURSION_DEPTH) {
     return fit::error(errno(ELOOP));
   }
 
-  auto memory = file->get_memory(
-      current_task, {},
-      ProtectionFlags(ProtectionFlagsEnum::READ) | ProtectionFlags(ProtectionFlagsEnum::EXEC));
-  if (memory.is_error()) {
-    return memory.take_error();
-  }
+  auto memory = file->get_memory(current_task, {},
+                                 ProtectionFlags(ProtectionFlagsEnum::READ) |
+                                     ProtectionFlags(ProtectionFlagsEnum::EXEC)) _EP(memory);
 
   auto header = memory->read_to_array<char, HASH_BANG_SIZE>(0);
   if (header.is_error()) {
@@ -403,20 +401,20 @@ fit::result<Errno, starnix::ResolvedElf> resolve_executable_impl(
   }
 
   if (*header == HASH_BANG) {
-    return resolve_script(current_task, *memory, path, argv, environ, recursion_depth
-                          /*, selinux_state*/);
+    return resolve_script(current_task, memory.value(), path, argv, environ, recursion_depth);
   }
-  return resolve_elf(current_task, file, *memory, argv, environ /*, selinux_state*/);
+  return resolve_elf(current_task, file, memory.value(), argv, environ);
 }
 
 }  // namespace
 
 namespace starnix {
 
-fit::result<Errno, ResolvedElf> resolve_executable(
-    const CurrentTask& current_task, const FileHandle& file, const ktl::string_view& path,
-    const fbl::Vector<BString>& argv,
-    const fbl::Vector<BString>& environ /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
+fit::result<Errno, ResolvedElf> resolve_executable(const CurrentTask& current_task,
+                                                   const FileHandle& file,
+                                                   const ktl::string_view& path,
+                                                   const fbl::Vector<BString>& argv,
+                                                   const fbl::Vector<BString>& environ) {
   return resolve_executable_impl(current_task, file, path, argv, environ, 0);
 }
 
@@ -556,7 +554,7 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
     return stack_result.take_error();
   }
 
-  auto mm_state = current_task->mm()->state.Write();
+  auto mm_state = current_task->mm()->state_.Write();
   (*mm_state)->stack_size = *stack_size;
   (*mm_state)->stack_start = stack_result->stack_pointer;
   (*mm_state)->auxv_start = stack_result->auxv_start;

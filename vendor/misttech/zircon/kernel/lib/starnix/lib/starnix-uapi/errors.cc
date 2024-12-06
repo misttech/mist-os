@@ -4,13 +4,32 @@
 // found in the LICENSE file.
 
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/util/bstring.h>
 
 #include <linux/errno.h>
 
-// There isn't really a mapping from zx::Status to Errno. The correct mapping is context-speific
-// but this converter is a reasonable first-approximation. The translation matches
-// fdio_status_to_errno. See https://fxbug.dev/42105838 for more context.
-// TODO: Replace clients with more context-specific mappings.
+namespace starnix_uapi {
+
+BString to_string(const std::source_location& location) {
+  return mtl::format("%s:%d:%d", location.file_name(), location.line(), location.column());
+}
+
+BString ErrnoCode::to_string() const {
+  return mtl::format("%s(%d)", name_ ? name_ : "<null>", code_);
+}
+
+BString Errno::to_string() const {
+  auto location = starnix_uapi::to_string(location_);
+  auto code = code_.to_string();
+  if (context_.has_value()) {
+    return mtl::format("errno %.*s from %.*s, context: %.*s", static_cast<int>(code.size()),
+                       code.data(), static_cast<int>(location.size()), location.data(),
+                       static_cast<int>(context_->size()), context_->data());
+  }
+  return mtl::format("errno %.*s from %.*s", static_cast<int>(code.size()), code.data(),
+                     static_cast<int>(location.size()), location.data());
+}
+
 uint32_t from_status_like_fdio(zx_status_t status) {
   switch (status) {
     case ZX_ERR_NOT_FOUND:
@@ -82,7 +101,7 @@ uint32_t from_status_like_fdio(zx_status_t status) {
 }
 
 /// Maps `Err(EINTR)` to the specified errno.
-fit::result<Errno> map_eintr(fit::result<Errno> result, Errno err) {
+fit::result<Errno> map_eintr(fit::result<Errno> result, const Errno& err) {
   if (result.is_error()) {
     if (result.error_value().error_code() == EINTR) {
       return fit::error(err);
@@ -91,3 +110,5 @@ fit::result<Errno> map_eintr(fit::result<Errno> result, Errno err) {
   }
   return result;
 }
+
+}  // namespace starnix_uapi

@@ -6,6 +6,7 @@
 #include "lib/mistos/starnix/kernel/fs/tmpfs.h"
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
@@ -31,7 +32,6 @@
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
-
 namespace {
 
 class TmpfsSpecialNode : public FsNodeOps {
@@ -233,6 +233,11 @@ fit::result<Errno, FsNodeHandle> create_child_node(const CurrentTask& current_ta
     /* child.write_guard_state.lock().enable_sealing(SealFlags::SEAL); */
   }
   return fit::ok(child);
+}
+
+fit::result<Errno, FileSystemHandle> tmp_fs(const CurrentTask& current_task,
+                                            FileSystemOptions options) {
+  return TmpFs::new_fs_with_options(current_task->kernel(), options);
 }
 
 }  // namespace starnix

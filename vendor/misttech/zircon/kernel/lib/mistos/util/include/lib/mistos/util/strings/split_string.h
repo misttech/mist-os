@@ -28,8 +28,8 @@ enum SplitResult : uint8_t {
 
 // Split the given string on ANY of the given separators, returning copies of
 // the result
-fbl::Vector<BString> SplitStringCopy(ktl::string_view input, ktl::string_view separators,
-                                     WhiteSpaceHandling whitespace, SplitResult result_type);
+fbl::Vector<mtl::BString> SplitStringCopy(ktl::string_view input, ktl::string_view separators,
+                                          WhiteSpaceHandling whitespace, SplitResult result_type);
 
 // Like SplitStringCopy above except it returns a vector of std::string_views which
 // reference the original buffer without copying.

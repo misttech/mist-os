@@ -113,9 +113,8 @@ fit::result<Errno, size_t> FileObject::read(const CurrentTask& current_task,
     auto result = checked_add_offset_and_length(offset, data->available()) _EP(result);
     auto read_result = ops_->read(*this, current_task, offset, data) _EP(read_result);
 
-    auto read = result.value();
-    *offset_guard += static_cast<off_t>(read);
-    return fit::ok(read);
+    *offset_guard += static_cast<off_t>(read_result.value());
+    return read_result.take_value();
   });
 }
 
@@ -185,12 +184,8 @@ fit::result<Errno, size_t> FileObject::write_at(const CurrentTask& current_task,
     //   location at which pwrite() writes data. However, on Linux, if a file is opened with
     //   O_APPEND, pwrite() appends data to the end of the file, regardless of the value of offset.
     if (flags().contains(OpenFlagsEnum::APPEND) && ops().is_seekable()) {
-      if (auto result = checked_add_offset_and_length(offset, data->available()); result.is_error())
-        return result.take_error();
-
-      auto eof_result = default_eof_offset(*this, current_task);
-      if (eof_result.is_error())
-        return eof_result.take_error();
+      auto result = checked_add_offset_and_length(offset, data->available()) _EP(result);
+      auto eof_result = default_eof_offset(*this, current_task) _EP(eof_result);
       offset = static_cast<size_t>(eof_result.value());
     }
 
@@ -209,9 +204,7 @@ fit::result<Errno, off_t> FileObject::seek(const CurrentTask& current_task,
   }
 
   auto offset_guard = offset_.Lock();
-  auto seek_result = ops().seek(*this, current_task, *offset_guard, target);
-  if (seek_result.is_error())
-    return seek_result.take_error();
+  auto seek_result = ops().seek(*this, current_task, *offset_guard, target) _EP(seek_result);
 
   auto new_offset = seek_result.value();
   *offset_guard = new_offset;
@@ -243,15 +236,12 @@ fit::result<Errno, UserAddress> FileObject::mmap(const CurrentTask& current_task
     return fit::error(errno(EACCES));
   }
   // TODO (Herrera): Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
-  return ops().mmap(*this, current_task, addr, vmo_offset, length, prot_flags, options,
-                    ktl::move(filename));
+  return ops().mmap(*this, current_task, addr, vmo_offset, length, prot_flags, options, filename);
 }
 
 fit::result<Errno, off_t> default_eof_offset(const FileObject& file,
                                              const CurrentTask& current_task) {
-  auto stat_result = file.node()->stat(current_task);
-  if (stat_result.is_error())
-    return stat_result.take_error();
+  auto stat_result = file.node()->stat(current_task) _EP(stat_result);
   return fit::ok(static_cast<off_t>(stat_result->st_size));
 }
 

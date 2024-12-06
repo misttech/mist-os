@@ -239,6 +239,8 @@ class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
   /// admitted with no locks held that might be required for dropping entries.
   void purge_old_entries();
 
+  FsStr name() const;
+
   // C++
   ~FileSystem();
 

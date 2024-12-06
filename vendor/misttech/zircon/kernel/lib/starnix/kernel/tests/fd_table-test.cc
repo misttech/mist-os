@@ -19,9 +19,14 @@
 
 namespace unit_testing {
 
-using namespace starnix;
-using namespace starnix_uapi;
-using namespace starnix::testing;
+using starnix::CurrentTask;
+using starnix::FdFlags;
+using starnix::FdFlagsEnum;
+using starnix::FdNumber;
+using starnix::FdTable;
+using starnix::FileHandle;
+using starnix::FileObject;
+using starnix::SyslogFile;
 
 fit::result<Errno, FdNumber> add(const CurrentTask& current_task, const FdTable& files,
                                  FileHandle file) {
@@ -31,7 +36,7 @@ fit::result<Errno, FdNumber> add(const CurrentTask& current_task, const FdTable&
 bool test_fd_table_install() {
   BEGIN_TEST;
 
-  auto [kernel, current_task] = create_kernel_and_task();
+  auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
   auto files = FdTable::Create();
   auto file = SyslogFile::new_file(*current_task);
 
@@ -55,7 +60,7 @@ bool test_fd_table_install() {
 bool test_fd_table_fork() {
   BEGIN_TEST;
 
-  auto [kernel, current_task] = create_kernel_and_task();
+  auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
   auto files = FdTable::Create();
   auto file = SyslogFile::new_file(*current_task);
 
@@ -84,7 +89,7 @@ bool test_fd_table_fork() {
 bool test_fd_table_exec() {
   BEGIN_TEST;
 
-  auto [kernel, current_task] = create_kernel_and_task();
+  auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
   auto files = FdTable::Create();
   auto file = SyslogFile::new_file(*current_task);
 

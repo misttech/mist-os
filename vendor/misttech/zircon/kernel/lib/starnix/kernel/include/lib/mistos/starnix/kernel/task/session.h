@@ -6,8 +6,8 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_SESSION_H_
 
 #include <lib/mistos/linux_uapi/typedefs.h>
-#include <lib/mistos/starnix/kernel/task/internal/tag.h>
 #include <lib/mistos/memory/weak_ptr.h>
+#include <lib/mistos/starnix/kernel/task/internal/tag.h>
 #include <lib/starnix_sync/locks.h>
 
 #include <fbl/canary.h>

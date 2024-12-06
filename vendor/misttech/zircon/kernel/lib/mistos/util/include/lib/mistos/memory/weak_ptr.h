@@ -10,7 +10,6 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_MEMORY_WEAK_PTR_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_MEMORY_WEAK_PTR_H_
 
-#include <inttypes.h>
 #include <zircon/assert.h>
 
 #include <cstddef>
@@ -257,9 +256,9 @@ struct ContainerPtrTraits<::mtl::WeakPtr<T>> {
   static constexpr bool IsManaged = true;
   static constexpr bool CanCopy = true;
 
-  static inline T* GetRaw(const PtrType& ptr) { return ptr.get(); }
+  static T* GetRaw(const PtrType& ptr) { return ptr.get(); }
 
-  static inline PtrType Copy(const RawPtrType& ptr) {
+  static PtrType Copy(const RawPtrType& ptr) {
     auto copy = ::fbl::RefPtr<T>(ptr);
     if (copy) {
       return copy->weak_factory_.GetWeakPtr();
@@ -267,7 +266,7 @@ struct ContainerPtrTraits<::mtl::WeakPtr<T>> {
     return ::mtl::WeakPtr<T>();
   }
 
-  static inline RawPtrType Leak(PtrType& ptr) __WARN_UNUSED_RESULT {
+  static RawPtrType Leak(PtrType& ptr) __WARN_UNUSED_RESULT {
     auto strong = ptr.Lock();
     if (strong) {
       T* result = ::fbl::ExportToRawPtr(&strong);
@@ -277,7 +276,7 @@ struct ContainerPtrTraits<::mtl::WeakPtr<T>> {
     return nullptr;
   }
 
-  static inline PtrType Reclaim(RawPtrType ptr) {
+  static PtrType Reclaim(RawPtrType ptr) {
     auto ref_counted = ::fbl::ImportFromRawPtr(ptr);
     if (ref_counted) {
       return ptr->weak_factory_.GetWeakPtr();

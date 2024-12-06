@@ -14,6 +14,7 @@
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/zx/vmar.h>
 #include <lib/starnix_sync/locks.h>
 #include <zircon/types.h>
 
@@ -52,7 +53,7 @@ fit::result<Errno, TaskInfo> create_zircon_process(
     pid_t pid, fbl::RefPtr<ProcessGroup> process_group, fbl::RefPtr<SignalActions> signal_actions,
     const ktl::string_view& name);
 
-fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, Vmar>> create_process(
+fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, zx::vmar>> create_process(
     fbl::RefPtr<JobDispatcher> job, uint32_t options, const ktl::string_view& name);
 
 fit::result<zx_status_t, KernelHandle<ThreadDispatcher>> create_thread(

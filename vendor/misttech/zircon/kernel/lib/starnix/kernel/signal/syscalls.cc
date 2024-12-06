@@ -183,7 +183,7 @@ fit::result<Errno, ktl::optional<WaitResult>> wait_on_pid(const CurrentTask& cur
       return fit::ok(ktl::nullopt);
     }
 
-    _EP(map_eintr(waiter.wait(current_task), errno(ERESTARTSYS)));
+    _EP(map_eintr(waiter.wait(current_task), starnix_uapi::Errno::New(starnix_uapi::ERESTARTSYS)));
   } while (true);
 }
 }  // namespace

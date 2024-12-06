@@ -16,6 +16,8 @@ namespace starnix {
 
 class CurrentTask;
 
+using starnix_uapi::Errno;
+
 fit::result<Errno> sys_uname(const CurrentTask& current_task,
                              user_out_ptr<struct new_utsname> name);
 

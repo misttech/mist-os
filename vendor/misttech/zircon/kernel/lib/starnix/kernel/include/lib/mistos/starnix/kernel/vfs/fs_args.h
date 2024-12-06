@@ -9,6 +9,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/starnix_uapi/mount_flags.h>
 #include <lib/mistos/util/strings/utf_codecs.h>
 
 #include <charconv>
@@ -18,7 +19,21 @@
 #include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>
 
+namespace unit_testing {
+bool parse_options_with_trailing_comma();
+bool parse_options_last_value_wins();
+bool parse_options_quoted();
+bool parse_options_misquoted();
+bool parse_options_misquoted_tail();
+bool parse_normal_mount_flags();
+bool parse_and_remove_normal_mount_flags();
+}  // namespace unit_testing
+
 namespace starnix {
+
+using starnix_uapi::Errno;
+using starnix_uapi::MountFlags;
+using starnix_uapi::MountFlagsEnum;
 
 struct HashableFsString : public fbl::SinglyLinkedListable<ktl::unique_ptr<HashableFsString>> {
   // Required to instantiate fbl::DefaultKeyedObjectTraits.
@@ -57,18 +72,54 @@ class MountParams {
 
   ktl::optional<FsString> remove(const char* key) {
     auto ptr = options_.erase(key);
-    if (ptr)
+    if (ptr) {
       return ptr->value;
-    else
-      return ktl::nullopt;
+    }
+    return ktl::nullopt;
   }
 
   bool is_empty() const { return options_.is_empty(); }
 
- public:
-  MountParams() = default;
+  MountFlags remove_mount_flags() {
+    MountFlags flags = MountFlags::empty();
+    if (remove("ro")) {
+      flags |= MountFlagsEnum::RDONLY;
+    }
+    if (remove("nosuid")) {
+      flags |= MountFlagsEnum::NOSUID;
+    }
+    if (remove("nodev")) {
+      flags |= MountFlagsEnum::NODEV;
+    }
+    if (remove("noexec")) {
+      flags |= MountFlagsEnum::NOEXEC;
+    }
+    if (remove("noatime")) {
+      flags |= MountFlagsEnum::NOATIME;
+    }
+    if (remove("nodiratime")) {
+      flags |= MountFlagsEnum::NODIRATIME;
+    }
+    if (remove("relatime")) {
+      flags |= MountFlagsEnum::RELATIME;
+    }
+    if (remove("strictatime")) {
+      flags |= MountFlagsEnum::STRICTATIME;
+    }
+    return flags;
+  }
 
+  MountParams() = default;
   MountParams(const MountParams& other);
+
+ private:
+  friend bool unit_testing::parse_options_with_trailing_comma();
+  friend bool unit_testing::parse_options_last_value_wins();
+  friend bool unit_testing::parse_options_quoted();
+  friend bool unit_testing::parse_options_misquoted();
+  friend bool unit_testing::parse_options_misquoted_tail();
+  friend bool unit_testing::parse_normal_mount_flags();
+  friend bool unit_testing::parse_and_remove_normal_mount_flags();
 };
 
 /// Parses `data` slice into another type.
@@ -89,7 +140,7 @@ fit::result<Errno, T> parse(const FsStr& data) {
 
 namespace parse_mount_options {
 
-fit::result<Errno> parse_mount_options(const FsStr& data, FsStringHashTable* out);
+fit::result<Errno> parse_mount_options(const FsStr& input, FsStringHashTable* out);
 
 }
 

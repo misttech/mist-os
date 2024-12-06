@@ -597,7 +597,9 @@ class VecOutputBuffer : public OutputBuffer {
   /// impl VecOutputBuffer
   static VecOutputBuffer New(size_t capacity_) { return VecOutputBuffer(capacity_); }
 
-  const uint8_t* data() const { return buffer_.data(); }
+  ktl::span<const uint8_t> data() const {
+    return ktl::span<const uint8_t>{buffer_.data(), buffer_.size()};
+  }
 
   void reset() { buffer_.reset(); }
 
@@ -618,10 +620,7 @@ class VecOutputBuffer : public OutputBuffer {
     ktl::span spare_capacity{buffer_.data() + buffer_.size(), buffer_.capacity() - buffer_.size()};
     ktl::span buffer{spare_capacity.data(), capacity_ - current_len};
 
-    auto callback_result = callback(buffer);
-    if (callback_result.is_error())
-      return callback_result.take_error();
-
+    auto callback_result = callback(buffer) _EP(callback_result);
     auto written = callback_result.value();
     if (current_len + written > capacity_) {
       return fit::error(errno(EINVAL));
@@ -653,10 +652,7 @@ class VecOutputBuffer : public OutputBuffer {
 
     capacity_ -= length;
     auto current_len = buffer_.size();
-    buffer_.reserve(current_len + length, &ac);
-    if (!ac.check()) {
-      return fit::error(errno(ENOMEM));
-    }
+    buffer_.set_size(current_len + length);
     return fit::ok();
   }
 

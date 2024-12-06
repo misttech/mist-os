@@ -18,17 +18,18 @@
 
 namespace unit_testing {
 
-using namespace starnix;
-using namespace starnix_uapi;
-using namespace starnix::testing;
+using starnix::TaskMemoryAccessor;
+using starnix::VecInputBuffer;
+using starnix::VecOutputBuffer;
 
 bool test_data_input_buffer() {
   BEGIN_TEST;
 
-  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
 
   size_t page_size = PAGE_SIZE;
-  auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), 64ul * page_size);
+  auto addr = starnix::testing::map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(),
+                                           64ul * page_size);
 
   fbl::Vector<uint8_t> data;
   for (int i = 0; i < 1024; ++i) {
@@ -47,8 +48,8 @@ bool test_data_input_buffer() {
     input_iovec.push_back(UserBuffer{.address_ = addr, .length_ = 25});
     input_iovec.push_back(UserBuffer{.address_ = addr + 64ul, .length_ = 12});
 
-    auto input_buffer =
-        UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new(mm, ktl::move(input_iovec));
+    auto input_buffer = starnix::UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new(
+        mm, ktl::move(input_iovec));
     ASSERT_TRUE(input_buffer.is_ok(), "UserBuffersInputBuffer");
     ASSERT_TRUE(
         input_buffer->peek_each([](auto _data) { return fit::ok(_data.size() + 1); }).is_error());
@@ -60,8 +61,8 @@ bool test_data_input_buffer() {
     input_iovec.push_back(UserBuffer{.address_ = addr, .length_ = 25});
     input_iovec.push_back(UserBuffer{.address_ = addr + 64ul, .length_ = 12});
 
-    auto input_buffer =
-        UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new(mm, ktl::move(input_iovec));
+    auto input_buffer = starnix::UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new(
+        mm, ktl::move(input_iovec));
     ASSERT_TRUE(input_buffer.is_ok(), "UserBuffersInputBuffer");
     ASSERT_EQ(37u, input_buffer->available());
     ASSERT_EQ(0u, input_buffer->bytes_read());
@@ -76,8 +77,8 @@ bool test_data_input_buffer() {
     input_iovec.push_back(UserBuffer{.address_ = addr, .length_ = 25});
     input_iovec.push_back(UserBuffer{.address_ = addr + 64ul, .length_ = 12});
 
-    auto input_buffer =
-        UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new(mm, ktl::move(input_iovec));
+    auto input_buffer = starnix::UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new(
+        mm, ktl::move(input_iovec));
     ASSERT_TRUE(input_buffer.is_ok(), "UserBuffersInputBuffer");
     ASSERT_EQ(37u, input_buffer->available());
     ASSERT_EQ(0u, input_buffer->bytes_read());
@@ -100,8 +101,8 @@ bool test_data_input_buffer() {
     input_iovec.push_back(UserBuffer{.address_ = addr, .length_ = 25});
     input_iovec.push_back(UserBuffer{.address_ = addr + 64ul, .length_ = 12});
 
-    auto input_buffer =
-        UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new(mm, ktl::move(input_iovec));
+    auto input_buffer = starnix::UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new(
+        mm, ktl::move(input_iovec));
     ASSERT_TRUE(input_buffer.is_ok(), "UserBuffersInputBuffer");
 
     ktl::array<uint8_t, 50> buffer{0};
@@ -133,10 +134,11 @@ bool test_data_input_buffer() {
 bool test_data_output_buffer() {
   BEGIN_TEST;
 
-  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
 
   size_t page_size = PAGE_SIZE;
-  auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), 64ul * page_size);
+  auto addr = starnix::testing::map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(),
+                                           64ul * page_size);
 
   auto& mm = *current_task;
   fbl::Vector<uint8_t> data;
@@ -152,8 +154,8 @@ bool test_data_output_buffer() {
     output_iovec.push_back(UserBuffer{.address_ = addr, .length_ = 25});
     output_iovec.push_back(UserBuffer{.address_ = addr + 64ul, .length_ = 12});
 
-    auto output_buffer =
-        UserBuffersOutputBuffer<TaskMemoryAccessor>::unified_new(mm, ktl::move(output_iovec));
+    auto output_buffer = starnix::UserBuffersOutputBuffer<TaskMemoryAccessor>::unified_new(
+        mm, ktl::move(output_iovec));
     ASSERT_TRUE(output_buffer.is_ok(), "UserBuffersOutputBuffer");
     ASSERT_TRUE(
         output_buffer->write_each([](auto data) { return fit::ok(data.size() + 1); }).is_error());
@@ -165,8 +167,8 @@ bool test_data_output_buffer() {
     output_iovec.push_back(UserBuffer{.address_ = addr, .length_ = 25});
     output_iovec.push_back(UserBuffer{.address_ = addr + 64ul, .length_ = 12});
 
-    auto output_buffer =
-        UserBuffersOutputBuffer<TaskMemoryAccessor>::unified_new(mm, ktl::move(output_iovec));
+    auto output_buffer = starnix::UserBuffersOutputBuffer<TaskMemoryAccessor>::unified_new(
+        mm, ktl::move(output_iovec));
     ASSERT_TRUE(output_buffer.is_ok(), "UserBuffersOutputBuffer");
     ASSERT_EQ(37u, output_buffer->available());
     ASSERT_EQ(0u, output_buffer->bytes_written());
@@ -270,13 +272,15 @@ bool test_vec_output_buffer() {
   ASSERT_EQ(5u, output_buffer.bytes_written());
   ASSERT_EQ(5u, output_buffer.available());
 
-  ASSERT_BYTES_EQ((const uint8_t*)"hello", output_buffer.data(), 5);
+  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>("hello"), output_buffer.data().data(),
+                  output_buffer.data().size());
 
   ASSERT_EQ(5u, output_buffer.write_all(ktl::span<uint8_t>{(uint8_t*)"world", 5}).value_or(0),
             "write");
   ASSERT_EQ(10u, output_buffer.bytes_written());
   ASSERT_EQ(0u, output_buffer.available());
-  ASSERT_BYTES_EQ((const uint8_t*)"helloworld", output_buffer.data(), 10);
+  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>("helloworld"), output_buffer.data().data(),
+                  output_buffer.data().size());
   ASSERT_TRUE(output_buffer.write_all(ktl::span<uint8_t>{(uint8_t*)"foo", 3}).is_error());
 
   END_TEST;
@@ -285,11 +289,11 @@ bool test_vec_output_buffer() {
 bool test_vec_write_buffer() {
   BEGIN_TEST;
 
-  ktl::span<const uint8_t> data{reinterpret_cast<const uint8_t*>("helloworld"), 10};
-  auto input_buffer = VecInputBuffer::New(data);
+  auto input_buffer = VecInputBuffer::New({reinterpret_cast<const uint8_t*>("helloworld"), 10});
   auto output_buffer = VecOutputBuffer::New(20);
   ASSERT_EQ(10u, output_buffer.write_buffer(input_buffer).value(), "write_buffer");
-  ASSERT_BYTES_EQ(data.data(), output_buffer.data(), data.size());
+  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>("helloworld"), output_buffer.data().data(),
+                  output_buffer.data().size());
 
   END_TEST;
 }

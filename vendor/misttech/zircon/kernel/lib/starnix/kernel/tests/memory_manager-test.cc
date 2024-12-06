@@ -56,7 +56,7 @@ bool test_brk() {
   auto get_range =
       [&mm](
           const UserAddress& addr) -> ktl::optional<ktl::pair<util::Range<UserAddress>, Mapping>> {
-    auto state = mm->state.Read();
+    auto state = mm->state_.Read();
     if (auto opt = state->mappings.get(addr); opt) {
       return ktl::pair(opt->first, opt->second);
     }
@@ -146,7 +146,7 @@ bool test_mm_exec() {
   auto mm = (*current_task)->mm();
 
   auto has = [&mm](const UserAddress& addr) -> bool {
-    auto state = mm->state.Read();
+    auto state = mm->state_.Read();
     return state->mappings.get(addr).has_value();
   };
 
@@ -187,10 +187,10 @@ bool test_get_contiguous_mappings_at() {
 
   // Create four one-page mappings with a hole between the third one and the fourth one.
   size_t page_size = PAGE_SIZE;
-  auto addr_a = mm->base_addr + 10 * page_size;
-  auto addr_b = mm->base_addr + 11 * page_size;
-  auto addr_c = mm->base_addr + 12 * page_size;
-  auto addr_d = mm->base_addr + 14 * page_size;
+  auto addr_a = mm->base_addr_ + 10 * page_size;
+  auto addr_b = mm->base_addr_ + 11 * page_size;
+  auto addr_c = mm->base_addr_ + 12 * page_size;
+  auto addr_d = mm->base_addr_ + 14 * page_size;
 
   ASSERT_EQ(addr_a.ptr(), map_memory(*current_task, addr_a, PAGE_SIZE).ptr());
   ASSERT_EQ(addr_b.ptr(), map_memory(*current_task, addr_b, PAGE_SIZE).ptr());
@@ -198,7 +198,7 @@ bool test_get_contiguous_mappings_at() {
   ASSERT_EQ(addr_d.ptr(), map_memory(*current_task, addr_d, PAGE_SIZE).ptr());
 
   {
-    auto mm_state = mm->state.Read();
+    auto mm_state = mm->state_.Read();
 
     // Verify that requesting an unmapped address returns an empty iterator.
     ASSERT_TRUE(mm_state->get_contiguous_mappings_at(addr_a - 100ul, 50)->is_empty());
@@ -223,7 +223,7 @@ bool test_get_contiguous_mappings_at() {
   {
     ASSERT_EQ(4u, mm->get_mapping_count());
 
-    auto mm_state = mm->state.Read();
+    auto mm_state = mm->state_.Read();
 
     auto [map_a, map_b, map_c,
           map_d] = [&mm_state]() -> std::tuple<Mapping, Mapping, Mapping, Mapping> {
@@ -365,7 +365,7 @@ bool test_read_write_crossing_mappings() {
 
   // Map two contiguous pages at fixed addresses, but backed by distinct mappings.
   size_t page_size = PAGE_SIZE;
-  auto addr = mm->base_addr + 10 * page_size;
+  auto addr = mm->base_addr_ + 10 * page_size;
   ASSERT_EQ(addr.ptr(), map_memory(*current_task, addr, page_size).ptr());
   ASSERT_EQ((addr + page_size).ptr(), map_memory(*current_task, addr + page_size, page_size).ptr());
 #if STARNIX_ANON_ALLOCS
@@ -444,7 +444,7 @@ bool test_read_c_string_to_vec_large() {
 
   uint64_t page_size = PAGE_SIZE;
   auto max_size = 4 * static_cast<size_t>(page_size);
-  auto addr = mm->base_addr + 10 * page_size;
+  auto addr = mm->base_addr_ + 10 * page_size;
 
   ASSERT_EQ(addr.ptr(), map_memory(*current_task, addr, max_size).ptr());
 
@@ -481,7 +481,7 @@ bool test_read_c_string_to_vec() {
 
   size_t page_size = PAGE_SIZE;
   auto max_size = 2 * page_size;
-  auto addr = mm->base_addr + 10 * page_size;
+  auto addr = mm->base_addr_ + 10 * page_size;
 
   // Map a page at a fixed address and write an unterminated string at the end of it.
   ASSERT_TRUE(addr == map_memory(*current_task, addr, page_size));
@@ -536,7 +536,7 @@ bool test_read_c_string() {
 
   size_t page_size = PAGE_SIZE;
   auto buf_cap = 2u * page_size;
-  auto addr = mm->base_addr + 10u * page_size;
+  auto addr = mm->base_addr_ + 10u * page_size;
 
   auto vec = fbl::Vector<uint8_t>();
   fbl::AllocChecker ac;
@@ -587,12 +587,12 @@ bool test_find_next_unused_range() {
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
   auto mm = (*current_task)->mm();
 
-  auto mmap_top = mm->state.Read()->find_next_unused_range(0).value().ptr();
+  auto mmap_top = mm->state_.Read()->find_next_unused_range(0).value().ptr();
   auto page_size = static_cast<size_t>(PAGE_SIZE);
   ASSERT(mmap_top <= ASPACE_HIGHEST_ADDRESS);
 
   // No mappings - top address minus requested size is available
-  ASSERT_EQ(mm->state.Read()->find_next_unused_range(page_size).value().ptr(),
+  ASSERT_EQ(mm->state_.Read()->find_next_unused_range(page_size).value().ptr(),
             UserAddress::from_ptr(mmap_top - page_size).ptr());
 
   // Fill it.
@@ -600,7 +600,7 @@ bool test_find_next_unused_range() {
   ASSERT_EQ(map_memory(*current_task, addr, PAGE_SIZE).ptr(), addr.ptr());
 
   // The next available range is right before the new mapping.
-  ASSERT_EQ(mm->state.Read()->find_next_unused_range(page_size).value().ptr(),
+  ASSERT_EQ(mm->state_.Read()->find_next_unused_range(page_size).value().ptr(),
             UserAddress::from_ptr(addr.ptr() - page_size).ptr());
 
   // Allocate an extra page before a one-page gap.
@@ -608,15 +608,15 @@ bool test_find_next_unused_range() {
   ASSERT_EQ(map_memory(*current_task, addr2, PAGE_SIZE).ptr(), addr2.ptr());
 
   // Searching for one-page range still gives the same result
-  ASSERT_EQ(mm->state.Read()->find_next_unused_range(page_size).value().ptr(),
+  ASSERT_EQ(mm->state_.Read()->find_next_unused_range(page_size).value().ptr(),
             UserAddress::from_ptr(addr.ptr() - page_size).ptr());
 
   // Searching for a bigger range results in the area before the second mapping
-  ASSERT_EQ(mm->state.Read()->find_next_unused_range(2 * page_size).value().ptr(),
+  ASSERT_EQ(mm->state_.Read()->find_next_unused_range(2 * page_size).value().ptr(),
             UserAddress::from_ptr(addr2.ptr() - (2 * page_size)).ptr());
 
   // Searching for more memory than available should fail.
-  ASSERT_TRUE(mm->state.Read()->find_next_unused_range(mmap_top) == ktl::nullopt);
+  ASSERT_TRUE(mm->state_.Read()->find_next_unused_range(mmap_top) == ktl::nullopt);
 
   END_TEST;
 }
@@ -634,7 +634,7 @@ bool test_unmap_returned_mappings() {
 
   fbl::Vector<Mapping> released_mappings;
   auto unmap_result =
-      mm->state.Write()->unmap(mm, addr, static_cast<size_t>(PAGE_SIZE), released_mappings);
+      mm->state_.Write()->unmap(mm, addr, static_cast<size_t>(PAGE_SIZE), released_mappings);
   ASSERT_TRUE(unmap_result.is_ok());
   ASSERT_EQ(1u, released_mappings.size());
 
@@ -653,7 +653,7 @@ bool test_unmap_returns_multiple_mappings() {
 
   fbl::Vector<Mapping> released_mappings;
   auto unmap_result =
-      mm->state.Write()->unmap(mm, addr, static_cast<size_t>(PAGE_SIZE) * 3, released_mappings);
+      mm->state_.Write()->unmap(mm, addr, static_cast<size_t>(PAGE_SIZE) * 3, released_mappings);
   ASSERT_TRUE(unmap_result.is_ok());
   ASSERT_EQ(2u, released_mappings.size());
 
@@ -672,7 +672,7 @@ bool test_unmap_beginning() {
 
   fbl::RefPtr<MemoryObject> original_memory;
   {
-    auto state = mm->state.Read();
+    auto state = mm->state_.Read();
     auto pair = state->mappings.get(addr);
     ASSERT_TRUE(pair.has_value(), "mapping");
 
@@ -705,7 +705,7 @@ bool test_unmap_beginning() {
   ASSERT_TRUE(mm->unmap(addr, PAGE_SIZE).is_ok());
 
   {
-    auto state = mm->state.Read();
+    auto state = mm->state_.Read();
 
     // The first page should be unmapped.
     ASSERT_FALSE(state->mappings.get(addr).has_value());
@@ -729,8 +729,7 @@ bool test_unmap_beginning() {
                      EXPECT_EQ((addr + static_cast<size_t>(PAGE_SIZE)).ptr(), backing.base_.ptr());
                      EXPECT_EQ(0u, backing.memory_offset_);
                      EXPECT_EQ(static_cast<size_t>(PAGE_SIZE), backing.memory_->get_size());
-                     EXPECT_NE(original_memory->as_vmo()->get().dispatcher()->get_koid(),
-                               backing.memory_->as_vmo()->get().dispatcher()->get_koid());
+                     EXPECT_NE(original_memory->get_koid(), backing.memory_->get_koid());
                      END_TEST;
                    },
                },
@@ -753,7 +752,7 @@ bool test_unmap_end() {
 
   fbl::RefPtr<MemoryObject> original_memory;
   {
-    auto state = mm->state.Read();
+    auto state = mm->state_.Read();
     auto pair = state->mappings.get(addr);
     ASSERT_TRUE(pair.has_value(), "mapping");
 
@@ -786,7 +785,7 @@ bool test_unmap_end() {
   ASSERT_TRUE(mm->unmap(addr + static_cast<size_t>(PAGE_SIZE), PAGE_SIZE).is_ok());
 
   {
-    auto state = mm->state.Read();
+    auto state = mm->state_.Read();
 
     // The second page should be unmapped.
     ASSERT_FALSE(state->mappings.get(addr + static_cast<size_t>(PAGE_SIZE)).has_value());
@@ -834,7 +833,7 @@ bool test_unmap_middle() {
 
   fbl::RefPtr<MemoryObject> original_memory;
   {
-    auto state = mm->state.Read();
+    auto state = mm->state_.Read();
     auto pair = state->mappings.get(addr);
     ASSERT_TRUE(pair.has_value(), "mapping");
     auto& [range, mapping] = pair.value();
@@ -867,7 +866,7 @@ bool test_unmap_middle() {
   ASSERT_TRUE(mm->unmap(addr + static_cast<size_t>(PAGE_SIZE), PAGE_SIZE).is_ok());
 
   {
-    auto state = mm->state.Read();
+    auto state = mm->state_.Read();
 
     // The middle page should be unmapped.
     ASSERT_FALSE(state->mappings.get(addr + static_cast<size_t>(PAGE_SIZE)).has_value());
@@ -894,8 +893,7 @@ bool test_unmap_middle() {
                        EXPECT_EQ(addr.ptr(), backing.base_.ptr());
                        EXPECT_EQ(0u, backing.memory_offset_);
                        EXPECT_EQ(static_cast<size_t>(PAGE_SIZE), backing.memory_->get_size());
-                       EXPECT_EQ(original_memory->as_vmo()->get().dispatcher()->get_koid(),
-                                 backing.memory_->as_vmo()->get().dispatcher()->get_koid());
+                       EXPECT_EQ(original_memory->get_koid(), backing.memory_->get_koid());
                        END_TEST;
                      },
                  },
@@ -925,8 +923,7 @@ bool test_unmap_middle() {
                        EXPECT_EQ((addr + PAGE_SIZE * 2u).ptr(), backing.base_.ptr());
                        EXPECT_EQ(0u, backing.memory_offset_);
                        EXPECT_EQ(static_cast<size_t>(PAGE_SIZE), backing.memory_->get_size());
-                       EXPECT_NE(original_memory->as_vmo()->get().dispatcher()->get_koid(),
-                                 backing.memory_->as_vmo()->get().dispatcher()->get_koid());
+                       EXPECT_NE(original_memory->get_koid(), backing.memory_->get_koid());
                        END_TEST;
                      },
                  },
@@ -1088,7 +1085,7 @@ bool test_preserve_name_snapshot() {
   ASSERT_TRUE(result.is_ok(), "snapshot_to failed");
 
   {
-    auto state = (*target)->mm()->state.Read();
+    auto state = (*target)->mm()->state_.Read();
 
     auto pair = state->mappings.get(mapping_addr);
     ASSERT_TRUE(pair.has_value());

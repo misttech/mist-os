@@ -12,7 +12,10 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/vector.h>
 #include <ktl/algorithm.h>
+#include <ktl/forward.h>
 #include <ktl/string_view.h>
+
+namespace mtl {
 
 class BString {
  public:
@@ -116,5 +119,56 @@ inline bool operator>(const BString& lhs, const BString& rhs) { return lhs.compa
 inline bool operator<=(const BString& lhs, const BString& rhs) { return lhs.compare(rhs) <= 0; }
 
 inline bool operator>=(const BString& lhs, const BString& rhs) { return lhs.compare(rhs) >= 0; }
+
+template <typename... Args>
+BString format(const char* fmt, Args&&... args) {
+  // Minimal implementation that uses the format args
+  char buf[512];
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-security"
+  int len = snprintf(buf, sizeof(buf), fmt, ktl::forward<Args>(args)...);
+#pragma GCC diagnostic pop
+#pragma GCC diagnostic pop
+  if (len < 0 || static_cast<size_t>(len) >= sizeof(buf)) {
+    return ktl::move(BString("format error"));
+  }
+  return ktl::move(BString(buf, len));
+}
+
+class ToString {
+ public:
+  virtual ~ToString() = default;
+  virtual BString to_string() const = 0;
+};
+
+BString to_string(const BString& str);
+
+template <typename T>
+BString to_string(const T&) {
+  return ktl::move(BString("unkwon type"));
+}
+
+template <typename T>
+BString to_string(const fbl::Vector<T>& vec) {
+  if (vec.is_empty()) {
+    return ktl::move(BString("[]"));
+  }
+
+  BString result("[");
+  for (size_t i = 0; i < vec.size(); i++) {
+    if (i > 0) {
+      result = format("%.*s, ", static_cast<int>(result.size()), result.data());
+    }
+    BString element = to_string(vec[i]);
+    result = format("%.*s%.*s", static_cast<int>(result.size()), result.data(),
+                    static_cast<int>(element.size()), element.data());
+  }
+  result = format("%.*s]", static_cast<int>(result.size()), result.data());
+  return ktl::move(result);
+}
+
+}  // namespace mtl
 
 #endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_BSTRING_H_

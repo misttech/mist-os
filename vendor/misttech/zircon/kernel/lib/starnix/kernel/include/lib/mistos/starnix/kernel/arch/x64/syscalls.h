@@ -16,6 +16,8 @@
 
 namespace starnix {
 
+using starnix_uapi::Errno;
+
 class CurrentTask;
 
 fit::result<Errno> sys_access(const CurrentTask& current_task, starnix_uapi::UserCString user_path,

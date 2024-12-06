@@ -27,33 +27,26 @@
 #include <ktl/span.h>
 #include <object/vm_object_dispatcher.h>
 
+namespace ktl {
+
+using std::addressof;
+using std::destroy_at;
+
+}  // namespace ktl
+
 #include <ktl/enforce.h>
 
 namespace starnix {
 
 fit::result<Errno, MemoryFileNode*> MemoryFileNode::New() {
-  KernelHandle<VmObjectDispatcher> vmo_kernel_handle;
-  fbl::RefPtr<VmObjectPaged> vmo;
-  zx_rights_t vmo_rights;
-  zx_status_t status =
-      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, 0, &vmo);
-
+  zx::vmo vmo;
+  zx_status_t status = zx::vmo::create(0, ZX_VMO_RESIZABLE, &vmo);
   if (status != ZX_OK) {
-    return fit::error(MemoryManager::get_errno_for_map_err(status));
-  }
-
-  // build and point a dispatcher at it
-  status =
-      VmObjectDispatcher::Create(ktl::move(vmo), 0, VmObjectDispatcher::InitialMutability::kMutable,
-                                 &vmo_kernel_handle, &vmo_rights);
-
-  if (status != ZX_OK) {
-    return fit::error(MemoryManager::get_errno_for_map_err(status));
+    return fit::error(errno(ENOMEM));
   }
 
   fbl::AllocChecker ac;
-  auto ops = new (&ac)
-      MemoryFileNode(MemoryObject::From(Handle::Make(ktl::move(vmo_kernel_handle), vmo_rights)));
+  auto ops = new (&ac) MemoryFileNode(MemoryObject::From(ktl::move(vmo)));
   if (!ac.check()) {
     return fit::error(errno(ENOMEM));
   }
@@ -119,23 +112,19 @@ MemoryFileObject* MemoryFileObject::New(fbl::RefPtr<MemoryObject> memory) {
 fit::result<Errno, size_t> MemoryFileObject::read(const MemoryObject& memory,
                                                   const FileObject& file, size_t offset,
                                                   OutputBuffer* data) {
-  size_t actual;
+  size_t actual = 0;
   auto info = file.node()->info();
   auto file_length = info->size;
   auto want_read = data->available();
   if (offset < file_length) {
-    auto to_read = (file_length < offset + want_read) ? (file_length - offset) : (want_read);
+    auto to_read = (file_length < (offset + want_read)) ? (file_length - offset) : (want_read);
     auto buf = memory.read_to_vec(offset, to_read);
     if (buf.is_error()) {
       return fit::error(errno(EIO));
     }
-    // drop(info);
-    auto result = data->write_all(ktl::span{buf.value().data(), to_read});
-    if (result.is_error())
-      return result.take_error();
+    ktl::destroy_at(ktl::addressof(info));
+    auto result = data->write_all(ktl::span{buf.value().data(), buf.value().size()}) _EP(result);
     actual = to_read;
-  } else {
-    actual = 0;
   }
   return fit::ok(actual);
 }
@@ -145,94 +134,87 @@ fit::result<Errno, size_t> MemoryFileObject::write(const MemoryObject& memory,
                                                    const CurrentTask& current_task, size_t offset,
                                                    InputBuffer* data) {
   auto want_write = data->available();
-  auto result = data->peek_all();
-  if (result.is_error())
-    return result.take_error();
-  auto buf = ktl::move(result.value());
+  auto buf = data->peek_all() _EP(buf);
 
-  auto mutator = [&](FsNodeInfo& info) -> fit::result<Errno, size_t> {
-    auto write_end = offset + want_write;
-    auto update_content_size = false;
+  return file.node()->update_info<fit::result<Errno, size_t>>(
+      [&](FsNodeInfo& info) -> fit::result<Errno, size_t> {
+        auto write_end = offset + want_write;
+        auto update_content_size = false;
 
-    // We must hold the lock till the end of the operation to guarantee that
-    // there is no change to the seals.
-    // let state = file.name.entry.node.write_guard_state.lock();
+        // We must hold the lock till the end of the operation to guarantee that
+        // there is no change to the seals.
+        // let state = file.name.entry.node.write_guard_state.lock();
 
-    // Non-zero writes must pass the write seal check.
-    if (want_write != 0) {
-      // state.check_no_seal(SealFlags::WRITE | SealFlags::FUTURE_WRITE) ? ;
-    }
-
-    // Writing past the file size
-    if (write_end > info.size) {
-      // The grow seal check failed.
-      /*
-        if let Err(e) = state.check_no_seal(SealFlags::GROW) {
-            if offset >= info.size {
-                // Write starts outside the file.
-                // Forbid because nothing can be written without growing.
-                return Err(e);
-            } else if info.size == info.storage_size() {
-                // Write starts inside file and EOF page does not need to grow.
-                // End write at EOF.
-                write_end = info.size;
-                want_write = write_end - offset;
-            } else {
-                // Write starts inside file and EOF page needs to grow.
-                let eof_page_start = info.storage_size() - (*PAGE_SIZE as usize);
-
-                if offset >= eof_page_start {
-                    // Write starts in EOF page.
-                    // Forbid because EOF page cannot grow.
-                    return Err(e);
-                }
-
-                // End write at page before EOF.
-                write_end = eof_page_start;
-                want_write = write_end - offset;
-            }
+        // Non-zero writes must pass the write seal check.
+        if (want_write != 0) {
+          // state.check_no_seal(SealFlags::WRITE | SealFlags::FUTURE_WRITE) ? ;
         }
-      */
-    }
 
-    // Check against the FSIZE limt
-    auto fsize_limit = current_task->thread_group_->get_rlimit({ResourceEnum::FSIZE});
-    if (write_end > fsize_limit) {
-      if (offset >= fsize_limit) {
-        // Write starts beyond the FSIZE limt.
-        // send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
-        return fit::error(errno(EFBIG));
-      }
+        // Writing past the file size
+        if (write_end > info.size) {
+          // The grow seal check failed.
+          /*
+            if let Err(e) = state.check_no_seal(SealFlags::GROW) {
+                if offset >= info.size {
+                    // Write starts outside the file.
+                    // Forbid because nothing can be written without growing.
+                    return Err(e);
+                } else if info.size == info.storage_size() {
+                    // Write starts inside file and EOF page does not need to grow.
+                    // End write at EOF.
+                    write_end = info.size;
+                    want_write = write_end - offset;
+                } else {
+                    // Write starts inside file and EOF page needs to grow.
+                    let eof_page_start = info.storage_size() - (*PAGE_SIZE as usize);
 
-      // End write at FSIZE limit.
-      write_end = fsize_limit;
-      want_write = write_end - offset;
-    }
+                    if offset >= eof_page_start {
+                        // Write starts in EOF page.
+                        // Forbid because EOF page cannot grow.
+                        return Err(e);
+                    }
 
-    if (write_end > info.size) {
-      if (write_end > info.storage_size()) {
-        if (auto result = update_memory_file_size(memory, info, write_end); result.is_error())
-          return result.take_error();
-      }
-      update_content_size = true;
-    }
+                    // End write at page before EOF.
+                    write_end = eof_page_start;
+                    want_write = write_end - offset;
+                }
+            }
+          */
+        }
 
-    auto status = memory.write(ktl::span<const uint8_t>{buf.data(), want_write}, offset);
-    if (status.is_error()) {
-      return fit::error(errno(EIO));
-    }
+        // Check against the FSIZE limt
+        auto fsize_limit = current_task->thread_group_->get_rlimit({ResourceEnum::FSIZE});
+        if (write_end > fsize_limit) {
+          if (offset >= fsize_limit) {
+            // Write starts beyond the FSIZE limt.
+            // send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
+            return fit::error(errno(EFBIG));
+          }
 
-    if (update_content_size) {
-      info.size = write_end;
-    }
-    if (auto result = data->advance(want_write); result.is_error()) {
-      return result.take_error();
-    }
+          // End write at FSIZE limit.
+          write_end = fsize_limit;
+          want_write = write_end - offset;
+        }
 
-    return fit::ok(want_write);
-  };
+        if (write_end > info.size) {
+          if (write_end > info.storage_size()) {
+            _EP(update_memory_file_size(memory, info, write_end));
+          }
+          update_content_size = true;
+        }
 
-  return file.node()->update_info<fit::result<Errno, size_t>>(mutator);
+        auto status = memory.write(ktl::span<const uint8_t>{buf->data(), want_write}, offset);
+        if (status.is_error()) {
+          return fit::error(errno(EIO));
+        }
+
+        if (update_content_size) {
+          info.size = write_end;
+        }
+
+        _EP(data->advance(want_write));
+        return fit::ok(want_write);
+      });
 }
 
 fit::result<Errno, fbl::RefPtr<MemoryObject>> MemoryFileObject::get_memory(
@@ -269,19 +251,13 @@ fit::result<Errno, fbl::RefPtr<MemoryObject>> MemoryFileObject::get_memory(
 fit::result<Errno, FileHandle> new_memfd(const CurrentTask& current_task, FsString name,
                                          SealFlags seals, OpenFlags flags) {
   auto fs = anon_fs(current_task->kernel());
-
-  auto new_result = MemoryFileNode::New();
-  if (new_result.is_error())
-    return new_result.take_error();
-
+  auto new_result = MemoryFileNode::New() _EP(new_result);
   auto node =
       fs->create_node(current_task, ktl::unique_ptr<FsNodeOps>(new_result.value()),
                       FsNodeInfo::new_factory(FILE_MODE(IFREG, 0600), current_task->as_fscred()));
   /*node.write_guard_state.lock().enable_sealing(seals);*/
 
-  auto open_result = node->open(current_task, MountInfo::detached(), flags, false);
-  if (open_result.is_error())
-    return open_result.take_error();
+  auto open_result = node->open(current_task, MountInfo::detached(), flags, false) _EP(open_result);
 
   // In /proc/[pid]/fd, the target of this memfd's symbolic link is "/memfd:[name]".
   auto local_name = FsString("/memfd:");

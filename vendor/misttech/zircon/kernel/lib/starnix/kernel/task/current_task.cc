@@ -20,6 +20,7 @@
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_registry.h>
 #include <lib/mistos/starnix/kernel/vfs/lookup_context.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
 #include <lib/mistos/starnix/kernel/vfs/symlink_mode.h>
@@ -54,7 +55,14 @@
 
 #include "../kernel_priv.h"
 
-// #include <ktl/enforce.h>
+namespace ktl {
+
+using std::addressof;
+using std::destroy_at;
+
+}  // namespace ktl
+
+#include <ktl/enforce.h>
 
 #include <linux/resource.h>
 #include <linux/sched.h>
@@ -174,7 +182,6 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
 
   auto task =
       create_task(kernel, initial_name, init_task->fs()->fork(), task_info_factory) _EP(task);
-
   {
     auto init_writer = init_task->thread_group_->Write();
     auto new_process_writer = task->thread_group_->Write();
@@ -182,7 +189,6 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
         ThreadGroupParent::From(init_task->thread_group_->weak_factory_.GetWeakPtr());
     init_writer->children_.insert(task->thread_group_->weak_factory_.GetWeakPtr());
   }
-
   // A child process created via fork(2) inherits its parent's
   // resource limits. Resource limits are preserved across execve(2).
   auto limits = init_task->thread_group_->limits.Lock();
@@ -216,19 +222,18 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
   fbl::RefPtr<ProcessGroup> process_group = ProcessGroup::New(pid, {});
   pids->add_process_group(process_group);
 
-  auto task_info = task_info_factory(pid, process_group).value_or(TaskInfo{});
+  auto task_info = task_info_factory(pid, process_group) _EP(task_info);
 
-  process_group->insert(task_info.thread_group);
+  process_group->insert(task_info->thread_group);
 
   // > The timer slack values of init (PID 1), the ancestor of all processes, are 50,000
   // > nanoseconds (50 microseconds).  The timer slack value is inherited by a child created
   // > via fork(2), and is preserved across execve(2).
   // https://man7.org/linux/man-pages/man2/prctl.2.html
   const uint64_t default_timerslack = 50000;
-
   auto builder = TaskBuilder{Task::New(
-      pid, initial_name, task_info.thread_group, ktl::move(task_info.thread), FdTable::Create(),
-      task_info.memory_manager, root_fs, creds, kSIGCHLD, SigSet(), false, default_timerslack)};
+      pid, initial_name, task_info->thread_group, ktl::move(task_info->thread), FdTable::Create(),
+      task_info->memory_manager, root_fs, creds, kSIGCHLD, SigSet(), false, default_timerslack)};
 
   // TODO (Herrera) Add fit::defer
   {
@@ -357,7 +362,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
           return fit::error(errno(EINVAL));
         }
         weak_original_parent = *thread_group_state_inner->parent_;
-        std::destroy_at(std::addressof(thread_group_state_inner));
+        ktl::destroy_at(ktl::addressof(thread_group_state_inner));
         original_parent = weak_original_parent.upgrade();
         return fit::ok(ktl::move(original_parent->Write()));
       }
@@ -403,7 +408,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     // Drop the lock on this task before entering `create_zircon_process`, because it will
     // take a lock on the new thread group, and locks on thread groups have a higher
     // priority than locks on the task in the thread group.
-    std::destroy_at(std::addressof(state));
+    ktl::destroy_at(ktl::addressof(state));
     auto signal_actions = [&]() -> fbl::RefPtr<SignalActions> {
       if (clone_sighand) {
         return task_->thread_group_->signal_actions_;
@@ -434,7 +439,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     if (!clone_thread) {
       pids->add_thread_group(child->thread_group_);
     }
-    std::destroy_at(std::addressof(pids));
+    ktl::destroy_at(ktl::addressof(pids));
 
     // Child lock must be taken before this lock. Drop the lock on the task, take a writable
     // lock on the child and take the current state back.
@@ -762,10 +767,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
     if (!dir.entry_->node_->is_dir()) {
       return fit::error(errno(ENOTDIR));
     }
-    if (auto check_access_result = dir.check_access(*this, Access(Access::EnumType::EXEC));
-        check_access_result.is_error()) {
-      return check_access_result.take_error();
-    }
+    _EP(dir.check_access(*this, Access(Access::EnumType::EXEC)));
   }
 
   return fit::ok(ktl::pair(dir, path));
@@ -1091,7 +1093,23 @@ fit::result<Errno, size_t> CurrentTask::zero(UserAddress addr, size_t length) co
 }
 
 UserAddress CurrentTask::maximum_valid_address() const {
-  return task_->mm()->maximum_valid_user_address;
+  return task_->mm()->maximum_valid_user_address_;
+}
+
+fit::result<Errno, FileSystemHandle> CurrentTask::create_filesystem(
+    const FsStr& fs_type, FileSystemOptions options) const {
+  // Please register new file systems via //src/starnix/modules/lib.rs, even if the file
+  // system is implemented inside starnix_core.
+  //
+  // Most file systems should be implemented as modules. The VFS provides various traits that
+  // let starnix_core integrate file systems without needing to depend on the file systems
+  // directly.
+  auto registry = task_->kernel()->expando_.Get<FsRegistry>();
+  auto result = registry->create(*this, fs_type, options);
+  if (result.is_error()) {
+    return fit::error(errno(ENODEV, fs_type));
+  }
+  return result.take_value();
 }
 
 }  // namespace starnix

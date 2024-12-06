@@ -14,7 +14,6 @@
 #include <lib/unittest/unittest.h>
 
 namespace unit_testing {
-
 namespace {
 
 bool open_device_file() {
@@ -44,7 +43,7 @@ bool open_device_file() {
   // Assert the contents
   ktl::array<uint8_t, CONTENT_LEN> expected = {0};
 
-  ASSERT_BYTES_EQ(expected.data(), buffer.data(), CONTENT_LEN);
+  ASSERT_BYTES_EQ(expected.data(), buffer.data().data(), CONTENT_LEN);
 
   END_TEST;
 }
@@ -98,7 +97,6 @@ bool node_info_is_reflected_in_stat() {
 }
 
 }  // namespace
-
 }  // namespace unit_testing
 
 UNITTEST_START_TESTCASE(starnix_fs_node)

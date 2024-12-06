@@ -5,15 +5,15 @@
 #include "lib/mistos/starnix/kernel/fs/mistos/bootfs.h"
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/fs/mistos/tree_builder.h>
 #include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/memory_file.h>
-#include <lib/mistos/starnix/kernel/vfs/simple_directory.h>
 #include <lib/mistos/util/status.h>
+#include <lib/mistos/zx/vmar.h>
+#include <lib/mistos/zx/vmo.h>
 #include <lib/zbi-format/internal/bootfs.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/view.h>
@@ -27,14 +27,19 @@
 #include <vm/pinned_vm_object.h>
 #include <vm/vm_object.h>
 
-#define LOCAL_TRACE 0
+#include "../kernel_priv.h"
+#include "simple_directory.h"
+#include "tree_builder.h"
+
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
 namespace {
 
-using ZbiView = zbitl::View<fbl::RefPtr<VmObject>>;
-using ZbiCopyError = ZbiView::CopyError<fbl::RefPtr<VmObject>>;
+using ZbiView = zbitl::View<zx::unowned_vmo>;
+using ZbiError = ZbiView::Error;
+using ZbiCopyError = ZbiView::CopyError<zx::vmo>;
 
 constexpr const char kBootfsVmoName[] = "uncompressed-bootfs";
 constexpr const char kScratchVmoName[] = "bootfs-decompression-scratch";
@@ -101,6 +106,7 @@ class ScratchAllocator {
     }
 
    private:
+    // zx::unowned_vmar vmar_;
     PinnedVmObject pinned_vmo_;
     fbl::RefPtr<VmMapping> mapping_;
   };
@@ -166,8 +172,7 @@ fbl::Vector<ktl::string_view> split_and_filter(const ktl::string_view& str, char
 
 }  // namespace
 
-FileSystemHandle BootFs::new_fs(const fbl::RefPtr<Kernel>& kernel,
-                                fbl::RefPtr<VmObjectDispatcher> vmo) {
+FileSystemHandle BootFs::new_fs(const fbl::RefPtr<Kernel>& kernel, zx::unowned_vmo vmo) {
   if (auto result = BootFs::new_fs_with_options(kernel, ktl::move(vmo), {}); result.is_error()) {
     ZX_PANIC("empty options cannot fail");
   } else {
@@ -175,11 +180,11 @@ FileSystemHandle BootFs::new_fs(const fbl::RefPtr<Kernel>& kernel,
   }
 }
 
-fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(
-    const fbl::RefPtr<Kernel>& kernel, fbl::RefPtr<VmObjectDispatcher> vmo,
-    FileSystemOptions options) {
+fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(const fbl::RefPtr<Kernel>& kernel,
+                                                                 zx::unowned_vmo vmo,
+                                                                 FileSystemOptions options) {
   fbl::AllocChecker ac;
-  auto bootfs = new (&ac) BootFs(vmo);
+  auto bootfs = new (&ac) BootFs(zx::vmar::kernel_vmar(), ktl::move(vmo));
   if (!ac.check()) {
     return fit::error(errno(ENOMEM));
   }
@@ -195,11 +200,12 @@ fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(
     if (vmo_range.is_error()) {
       return fit::error(errno(EIO));
     }
-    auto memory = bootfs->create_vmo_from_bootfs(vmo_range.value(), item.size);
-    if (memory.is_error()) {
+    auto file_vmo = bootfs->create_vmo_from_bootfs(vmo_range.value(), item.size);
+    if (file_vmo.is_error()) {
       return fit::error(errno(EIO));
     }
-    auto node = MemoryFileNode::from_memory(ktl::move(memory.value()));
+
+    auto node = MemoryFileNode::from_memory(MemoryObject::From(ktl::move(file_vmo.value())));
     auto result =
         tree.add_entry(split_and_filter(item.name, '/'), ktl::unique_ptr<FsNodeOps>(node));
     ZX_ASSERT(result.is_ok());
@@ -233,9 +239,10 @@ fit::result<Errno, struct statfs> BootFs::statfs(const FileSystem& fs,
   return fit::ok(stat);
 }
 
-BootFs::BootFs(const fbl::RefPtr<VmObjectDispatcher>& vmo) {
-  ZbiView zbi(vmo->vmo());
-  fbl::RefPtr<VmObject> bootfs_vmo;
+BootFs::BootFs(zx::unowned<zx::vmar> vmar, zx::unowned_vmo bootfs) {
+  ZbiView zbi(zx::unowned_vmo{bootfs});
+
+  zx::vmo bootfs_vmo;
   for (auto it = zbi.begin(); it != zbi.end(); ++it) {
     if (it->header->type == ZBI_TYPE_STORAGE_BOOTFS) {
       auto result = zbi.CopyStorageItem(it, ScratchAllocator());
@@ -244,9 +251,10 @@ BootFs::BootFs(const fbl::RefPtr<VmObjectDispatcher>& vmo) {
         FailFromZbiCopyError(result.error_value());
       }
 
-      bootfs_vmo = ktl::move(result).value();
-      zx_status_t status = bootfs_vmo->set_name(kBootfsVmoName, strlen(kBootfsVmoName) - 1);
-      ZX_ASSERT(status == ZX_OK);
+      bootfs_vmo = zx::vmo(ktl::move(result).value().release());
+      zx_status_t status =
+          bootfs_vmo.set_property(ZX_PROP_NAME, kBootfsVmoName, sizeof(kBootfsVmoName) - 1);
+      ZX_ASSERT_MSG(status == ZX_OK, "cannot set name of uncompressed BOOTFS VMO");
 
 #if 0
       // Signal that we've already processed this one.
@@ -265,7 +273,7 @@ BootFs::BootFs(const fbl::RefPtr<VmObjectDispatcher>& vmo) {
     }
   }
 
-  if (bootfs_vmo) {
+  if (bootfs_vmo.is_valid()) {
     if (auto result = BootfsReader::Create(ktl::move(bootfs_vmo)); result.is_error()) {
       zbitl::PrintBootfsError(result.error_value(), [&](const char* fmt, ...) {
         va_list args;
@@ -280,40 +288,29 @@ BootFs::BootFs(const fbl::RefPtr<VmObjectDispatcher>& vmo) {
   }
 }
 
-fit::result<Errno, fbl::RefPtr<MemoryObject>> BootFs::create_vmo_from_bootfs(
-    util::Range<uint64_t> range, uint64_t original_size) {
+fit::result<BootfsError, zx::vmo> BootFs::create_vmo_from_bootfs(const util::Range<uint64_t>& range,
+                                                                 uint64_t original_size) {
   auto aligned_size = range.end - range.start;
+  zx::vmo vmo;
+  zx_status_t status = zx::vmo::create(aligned_size, ZX_VMO_RESIZABLE, &vmo);
+  if (status != ZX_OK) {
+    return fit::error{BootfsError(BootfsError::Code::kVmo, status)};
+  }
 
-  fbl::RefPtr<VmObjectPaged> vmo;
-  uint64_t size;
-  zx_status_t status = VmObject::RoundSize(aligned_size, &size);
-  ZX_ASSERT(status == ZX_OK);
-  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, size, &vmo);
-  ZX_ASSERT(status == ZX_OK);
-
-  // zx_vmo_transfer_data
-  VmPageSpliceList pages;
-  status = bootfs_reader_.storage()->TakePages(range.start, aligned_size, &pages);
-  ZX_ASSERT(status == ZX_OK);
-
-  // TODO(https://fxbug.dev/42082399): Stop decompressing compressed pages from the source range.
-  status = vmo->SupplyPages(0, aligned_size, &pages, SupplyOptions::TransferData);
-  ZX_ASSERT(status == ZX_OK);
-
-  // create a Vm Object dispatcher
-  KernelHandle<VmObjectDispatcher> kernel_handle;
-  zx_rights_t rights;
-  status = VmObjectDispatcher::Create(ktl::move(vmo), size,
-                                      VmObjectDispatcher::InitialMutability::kMutable,
-                                      &kernel_handle, &rights);
-  ZX_ASSERT(status == ZX_OK);
+  status = vmo.transfer_data(0, 0, aligned_size, &bootfs_reader_.storage(), range.start);
+  if (status != ZX_OK) {
+    return fit::error{BootfsError(BootfsError::Code::kVmo, status)};
+  }
 
   // Set the VMO content size back to the original size.
-  kernel_handle.dispatcher()->SetSize(original_size);
+  status = vmo.set_size(original_size);
+  if (status != ZX_OK) {
+    return fit::error{BootfsError(BootfsError::Code::kVmo, status)};
+  }
 
-  return fit::ok(MemoryObject::From(Handle::Make(ktl::move(kernel_handle), rights)));
+  return fit::ok(ktl::move(vmo));
 }
 
-BootFs::~BootFs() = default;
+BootFs::~BootFs() { LTRACE_ENTRY_OBJ; }
 
 }  // namespace starnix

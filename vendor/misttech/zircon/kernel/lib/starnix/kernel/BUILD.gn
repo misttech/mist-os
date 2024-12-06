@@ -16,6 +16,7 @@ zx_library("starnix_core") {
     "device/mem.cc",
     "execution/executor.cc",
     "fs/mistos/bootfs.cc",
+    "fs/mistos/simple_directory.cc",
     "fs/mistos/syslog.cc",
     "fs/mistos/tree_builder.cc",
     "fs/sysfs/fs.cc",
@@ -55,13 +56,13 @@ zx_library("starnix_core") {
     "vfs/fs_context.cc",
     "vfs/fs_node.cc",
     "vfs/fs_node_ops.cc",
+    "vfs/fs_registry.cc",
     "vfs/memory_file.cc",
     "vfs/module.cc",
     "vfs/mount.cc",
     "vfs/namespace.cc",
     "vfs/namespace_node.cc",
     "vfs/path.cc",
-    "vfs/simple_directory.cc",
     "vfs/syscalls.cc",
     "vfs/xattr.cc",
   ]
@@ -70,8 +71,10 @@ zx_library("starnix_core") {
     "//src/lib/elfldltl:headers",
     "//vendor/misttech/third_party/linux_uapi",
     "//vendor/misttech/zircon/kernel/lib/mistos/util:headers",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx:headers",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/bootfs",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/elfldltl",
+    "//vendor/misttech/zircon/kernel/lib/starnix/lib/expando",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-sync",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-syscalls",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-uapi:headers",
@@ -89,6 +92,7 @@ zx_library("starnix_runner") {
   sources = [
     "debugcommands.cc",
     "runner/container.cc",
+    "runner/mounts.cc",
   ]
 
   deps = [
