@@ -26,6 +26,7 @@ if (is_host) {
       "//src/developer/ffx/lib/metrics:lib",
       "//src/developer/ffx/lib/rcs:lib",
       "//src/developer/ffx/lib/target:lib",
+      "//src/developer/ffx/lib/target_errors:lib",
       "//src/developer/ffx/lib/timeout:lib",
       "//src/developer/ffx/lib/version:lib",
       "//src/lib/fdomain/client",

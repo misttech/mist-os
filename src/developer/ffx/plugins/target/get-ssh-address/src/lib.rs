@@ -5,7 +5,6 @@
 use addr::TargetAddr;
 use anyhow::Result;
 use async_trait::async_trait;
-use errors::FfxError;
 use ffx_config::EnvironmentContext;
 use ffx_get_ssh_address_args::GetSshAddressCommand;
 use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
@@ -15,6 +14,7 @@ use fidl_fuchsia_developer_ffx::{
 use std::io::Write;
 use std::net::IpAddr;
 use std::time::Duration;
+use target_errors::FfxTargetError;
 use timeout::timeout;
 
 #[derive(FfxTool)]
@@ -57,12 +57,12 @@ async fn get_ssh_address_impl<W: Write>(
             .open_target(&TargetQuery { string_matcher: target_spec, ..Default::default() }, handle)
             .await?
             .map_err(|err| {
-                anyhow::Error::from(FfxError::OpenTargetError { err, target: ts_clone_2 })
+                anyhow::Error::from(FfxTargetError::OpenTargetError { err, target: ts_clone_2 })
             })?;
         proxy.get_ssh_address().await.map_err(anyhow::Error::from)
     })
     .await
-    .map_err(|_| FfxError::DaemonError { err: DaemonError::Timeout, target: ts_clone })??;
+    .map_err(|_| FfxTargetError::DaemonError { err: DaemonError::Timeout, target: ts_clone })??;
 
     let (addr, port) = match res {
         TargetAddrInfo::Ip(ref _info) => {

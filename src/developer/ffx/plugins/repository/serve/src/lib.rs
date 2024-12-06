@@ -27,7 +27,7 @@ use signal_hook::iterator::Signals;
 use std::fs;
 use std::io::Write;
 use std::sync::Arc;
-
+use target_errors::FfxTargetError;
 use tuf::metadata::RawSignedMetadata;
 
 // LINT.IfChange
@@ -214,10 +214,10 @@ ffx config remove repository.server.enabled && ffx doctor --restart-daemon
             "Validating RCS proxy: Waiting for target '{target:?}' to return error: {err:?}"
         );
                 if target.is_none() {
-                    return Err(errors::FfxError::OpenTargetError {
+                    return Err(Into::<errors::FfxError>::into(FfxTargetError::OpenTargetError {
                         err: fidl_fuchsia_developer_ffx::OpenTargetError::TargetNotFound,
                         target: None,
-                    }
+                    })
                     .into());
                 } else {
                     Ok(())
@@ -228,9 +228,9 @@ ffx config remove repository.server.enabled && ffx doctor --restart-daemon
             //  For validating the arguments to this command, we're only checking for there being
             // 1 device identified as the target. If there is more than one or zero, print an error.
             Err(fho::Error::User(e)) => {
-                if let Some(ee) = e.downcast_ref::<errors::FfxError>() {
+                if let Some(ee) = e.downcast_ref::<FfxTargetError>() {
                     match ee {
-                        errors::FfxError::OpenTargetError { err, .. } => {
+                        FfxTargetError::OpenTargetError { err, .. } => {
                             if err == &fidl_fuchsia_developer_ffx::OpenTargetError::TargetNotFound
                                 || err
                                     == &fidl_fuchsia_developer_ffx::OpenTargetError::QueryAmbiguous
