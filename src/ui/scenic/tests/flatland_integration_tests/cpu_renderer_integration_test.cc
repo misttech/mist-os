@@ -261,4 +261,45 @@ TEST_F(CpuRendererIntegrationTest, RendersSolidFill) {
   EXPECT_EQ(histogram[utils::kRed], display_width_ * display_height_);
 }
 
+TEST_F(CpuRendererIntegrationTest, BlendsImages) {
+  root_flatland_->CreateTransform(kRootTransform);
+  root_flatland_->SetRootTransform(kRootTransform);
+
+  // Create a red solid fill.
+  TransformId kFilledRectTransformId{.value = kRootTransform.value + 1};
+  root_flatland_->CreateTransform(kFilledRectTransformId);
+  ContentId kFilledRectContentId{.value = 1};
+  root_flatland_->CreateFilledRect(kFilledRectContentId);
+  const fuchsia::ui::composition::ColorRgba kRed{
+      .red = 1.f, .green = 0.f, .blue = 0.f, .alpha = 1.f};
+  root_flatland_->SetSolidFill(kFilledRectContentId, kRed,
+                               {.width = display_width_, .height = display_height_});
+  root_flatland_->SetContent(kFilledRectTransformId, kFilledRectContentId);
+  root_flatland_->AddChild(kRootTransform, kFilledRectTransformId);
+
+  // Create a blue solid fill. Set Opacity to 0.5.
+  ++kFilledRectTransformId.value;
+  root_flatland_->CreateTransform(kFilledRectTransformId);
+  ++kFilledRectContentId.value;
+  root_flatland_->CreateFilledRect(kFilledRectContentId);
+  const fuchsia::ui::composition::ColorRgba kBlue{
+      .red = 0.f, .green = 0.f, .blue = 1.f, .alpha = 1.f};
+  root_flatland_->SetSolidFill(kFilledRectContentId, kBlue,
+                               {.width = display_width_, .height = display_height_});
+  root_flatland_->SetOpacity(kFilledRectTransformId, 0.5f);
+  root_flatland_->SetImageBlendingFunction(kFilledRectContentId,
+                                           fuchsia::ui::composition::BlendMode::SRC_OVER);
+  root_flatland_->SetContent(kFilledRectTransformId, kFilledRectContentId);
+  root_flatland_->AddChild(kRootTransform, kFilledRectTransformId);
+
+  // Present the created solid fills.
+  BlockingPresent(this, root_flatland_);
+
+  auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
+  auto histogram = screenshot.Histogram();
+
+  const utils::Pixel kExpectedBlend(/*blue=*/255, /*green=*/0, /*red=*/127, /*alpha=*/254);
+  EXPECT_EQ(display_width_ * display_height_, histogram[kExpectedBlend]);
+}
+
 }  // namespace integration_tests
