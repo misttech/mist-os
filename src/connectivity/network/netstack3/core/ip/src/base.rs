@@ -38,9 +38,9 @@ use netstack3_base::{
     TimerHandler, TracingContext, WeakIpAddressId, WrapBroadcastMarker,
 };
 use netstack3_filter::{
-    self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
-    FilterHandler as _, FilterIpContext, FilterIpExt, FilterIpMetadata, FilterTimerId,
-    ForwardedPacket, IngressVerdict, IpPacket, TransportPacketSerializer, Tuple,
+    self as filter, ConnectionDirection, ConntrackConnection, FilterBindingsContext,
+    FilterBindingsTypes, FilterHandler as _, FilterIpContext, FilterIpExt, FilterIpMetadata,
+    FilterTimerId, ForwardedPacket, IngressVerdict, IpPacket, TransportPacketSerializer, Tuple,
     WeakConnectionError, WeakConntrackConnection,
 };
 use packet::{
@@ -157,7 +157,8 @@ impl TransportReceiveError {
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub struct IpLayerPacketMetadata<I: packet_formats::ip::IpExt, A, BT: FilterBindingsTypes> {
-    conntrack_connection: Option<ConntrackConnection<I, A, BT>>,
+    conntrack_connection_and_direction:
+        Option<(ConntrackConnection<I, A, BT>, ConnectionDirection)>,
     #[cfg(debug_assertions)]
     drop_check: IpLayerPacketMetadataDropCheck,
 }
@@ -185,7 +186,7 @@ pub struct DeviceIpLayerMetadata {
     /// packets with the same connection at every filtering hook even when NAT may
     /// have been performed on them, causing them to no longer match the original or
     /// reply tuples of the connection.
-    conntrack_entry: Option<WeakConntrackConnection>,
+    conntrack_entry: Option<(WeakConntrackConnection, ConnectionDirection)>,
 }
 
 impl<I: IpLayerIpExt, A: WeakIpAddressId<I::Addr>, BT: FilterBindingsTypes>
@@ -198,10 +199,16 @@ impl<I: IpLayerIpExt, A: WeakIpAddressId<I::Addr>, BT: FilterBindingsTypes>
     where
         CC: CounterContext<IpCounters<I>>,
     {
-        match conntrack_entry.map(WeakConntrackConnection::into_inner).transpose() {
+        match conntrack_entry
+            .map(|(conn, dir)| conn.into_inner().map(|conn| (conn, dir)))
+            .transpose()
+        {
             // Either the packet was tracked and we've preserved its conntrack entry across
             // loopback, or it was untracked and we just stash the `None`.
-            Ok(conn) => IpLayerPacketMetadata { conntrack_connection: conn, ..Default::default() },
+            Ok(conn_and_dir) => IpLayerPacketMetadata {
+                conntrack_connection_and_direction: conn_and_dir,
+                ..Default::default()
+            },
             // Conntrack entry was removed from table after packet was enqueued in loopback.
             Err(WeakConnectionError::EntryRemoved) => IpLayerPacketMetadata::default(),
             // Conntrack entry no longer matches the packet (for example, it could be that
@@ -243,15 +250,18 @@ impl Drop for IpLayerPacketMetadataDropCheck {
 impl<I: packet_formats::ip::IpExt, A, BT: FilterBindingsTypes> FilterIpMetadata<I, A, BT>
     for IpLayerPacketMetadata<I, A, BT>
 {
-    fn take_conntrack_connection(&mut self) -> Option<ConntrackConnection<I, A, BT>> {
-        self.conntrack_connection.take()
+    fn take_connection_and_direction(
+        &mut self,
+    ) -> Option<(ConntrackConnection<I, A, BT>, ConnectionDirection)> {
+        self.conntrack_connection_and_direction.take()
     }
 
-    fn replace_conntrack_connection(
+    fn replace_connection_and_direction(
         &mut self,
         conn: ConntrackConnection<I, A, BT>,
+        direction: ConnectionDirection,
     ) -> Option<ConntrackConnection<I, A, BT>> {
-        self.conntrack_connection.replace(conn)
+        self.conntrack_connection_and_direction.replace((conn, direction)).map(|(conn, _dir)| conn)
     }
 }
 
@@ -2745,9 +2755,9 @@ where
     // device layer so it can be reused on ingress to the IP layer.
     let conntrack_entry = if device.is_loopback() {
         packet_metadata
-            .conntrack_connection
+            .conntrack_connection_and_direction
             .take()
-            .and_then(|conn| WeakConntrackConnection::new(&conn))
+            .and_then(|(conn, dir)| WeakConntrackConnection::new(&conn).map(|conn| (conn, dir)))
     } else {
         None
     };

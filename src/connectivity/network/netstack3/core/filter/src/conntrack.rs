@@ -289,27 +289,30 @@ impl<I: IpExt, E: Default, BC: FilterBindingsContext> Table<I, E, BC> {
         &self,
         bindings_ctx: &BC,
         packet: &P,
-    ) -> Result<Option<Connection<I, E, BC>>, GetConnectionError<I, E, BC>> {
+    ) -> Result<Option<(Connection<I, E, BC>, ConnectionDirection)>, GetConnectionError<I, E, BC>>
+    {
         let Some(packet) = PacketMetadata::new(packet) else {
             return Ok(None);
         };
 
         let mut connection = match self.inner.lock().table.get(&packet.tuple) {
             Some(connection) => Connection::Shared(connection.clone()),
-            None => Connection::Exclusive(
-                match ConnectionExclusive::from_deconstructed_packet(bindings_ctx, &packet) {
-                    None => return Ok(None),
-                    Some(c) => c,
-                },
-            ),
+            None => match ConnectionExclusive::from_deconstructed_packet(bindings_ctx, &packet) {
+                None => return Ok(None),
+                Some(c) => Connection::Exclusive(c),
+            },
         };
 
-        match connection.update(bindings_ctx, &packet) {
-            Ok(ConnectionUpdateAction::NoAction) => Ok(Some(connection)),
+        let direction = connection
+            .direction(&packet.tuple)
+            .expect("tuple must match connection as we just looked up connection by tuple");
+
+        match connection.update(bindings_ctx, &packet, direction) {
+            Ok(ConnectionUpdateAction::NoAction) => Ok(Some((connection, direction))),
             Ok(ConnectionUpdateAction::RemoveEntry) => match connection {
                 Connection::Exclusive(mut conn) => {
                     conn.do_not_insert = true;
-                    Ok(Some(Connection::Exclusive(conn)))
+                    Ok(Some((Connection::Exclusive(conn), direction)))
                 }
                 Connection::Shared(conn) => {
                     // RACE: It's possible that GC already removed the
@@ -323,22 +326,12 @@ impl<I: IpExt, E: Default, BC: FilterBindingsContext> Table<I, E, BC> {
                         guard.num_connections -= 1;
                     }
 
-                    Ok(Some(Connection::Shared(conn)))
+                    Ok(Some((Connection::Shared(conn), direction)))
                 }
             },
-            Err(e) => match e {
-                ConnectionUpdateError::NonMatchingTuple => {
-                    panic!(
-                        "Tuple didn't match. tuple={:?}, conn.original={:?}, conn.reply={:?}",
-                        &packet.tuple,
-                        connection.original_tuple(),
-                        connection.reply_tuple()
-                    );
-                }
-                ConnectionUpdateError::InvalidPacket => {
-                    Err(GetConnectionError::InvalidPacket(connection))
-                }
-            },
+            Err(ConnectionUpdateError::InvalidPacket) => {
+                Err(GetConnectionError::InvalidPacket(connection, direction))
+            }
         }
     }
 
@@ -433,6 +426,7 @@ impl<I: IpExt> Tuple<I> {
     /// Creates a `Tuple` from an `IpPacket`, if possible.
     ///
     /// Returns `None` if the packet doesn't have an inner transport packet.
+    #[cfg(test)]
     pub(crate) fn from_packet<'a, P: IpPacket<I>>(packet: &'a P) -> Option<Self> {
         // Subtlety: For ICMP packets, only request/response messages will have
         // a transport packet defined (and currently only ECHO messages do).
@@ -494,9 +488,9 @@ impl<I: IpExt> Inspectable for Tuple<I> {
     }
 }
 
-/// The direction of a packet when compared to the given connection.
+/// The direction of a packet when compared to a given connection.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) enum ConnectionDirection {
+pub enum ConnectionDirection {
     /// The packet is traveling in the same direction as the first packet seen
     /// for the [`Connection`].
     Original,
@@ -530,9 +524,6 @@ enum ConnectionUpdateAction {
 /// An error returned from [`Connection::update`].
 #[derive(Debug, PartialEq, Eq)]
 enum ConnectionUpdateError {
-    /// The provided tuple doesn't belong to the connection being updated.
-    NonMatchingTuple,
-
     /// The packet was invalid. The caller may decide whether to drop this
     /// packet or not.
     InvalidPacket,
@@ -543,7 +534,7 @@ enum ConnectionUpdateError {
 #[derivative(Debug(bound = "E: Debug"))]
 pub(crate) enum GetConnectionError<I: IpExt, E, BT: FilterBindingsTypes> {
     /// The packet was invalid. The caller may decide whether to drop it or not.
-    InvalidPacket(Connection<I, E, BT>),
+    InvalidPacket(Connection<I, E, BT>, ConnectionDirection),
 }
 
 /// A `Connection` contains all of the information about a single connection
@@ -682,12 +673,8 @@ impl<I: IpExt, E, BC: FilterBindingsContext> Connection<I, E, BC> {
         &mut self,
         bindings_ctx: &BC,
         packet: &PacketMetadata<I>,
+        direction: ConnectionDirection,
     ) -> Result<ConnectionUpdateAction, ConnectionUpdateError> {
-        let direction = match self.direction(&packet.tuple) {
-            Some(d) => d,
-            None => return Err(ConnectionUpdateError::NonMatchingTuple),
-        };
-
         let now = bindings_ctx.now();
 
         match self {
@@ -1363,13 +1350,6 @@ mod tests {
         })
         .unwrap();
 
-        let other_packet = PacketMetadata::new(&FakeIpPacket::<I, _> {
-            src_ip: I::DST_ADDR,
-            dst_ip: I::SRC_ADDR,
-            body: FakeUdpPacket { src_port: I::DST_PORT, dst_port: I::SRC_PORT + 1 },
-        })
-        .unwrap();
-
         let connection =
             ConnectionExclusive::<_, (), _>::from_deconstructed_packet(&bindings_ctx, &packet)
                 .unwrap();
@@ -1379,7 +1359,7 @@ mod tests {
         };
 
         assert_matches!(
-            connection.update(&bindings_ctx, &packet),
+            connection.update(&bindings_ctx, &packet, ConnectionDirection::Original),
             Ok(ConnectionUpdateAction::NoAction)
         );
         let state = connection.state();
@@ -1390,20 +1370,10 @@ mod tests {
         // update last packet time.
         bindings_ctx.sleep(Duration::from_secs(1));
         assert_matches!(
-            connection.update(&bindings_ctx, &reply_packet),
+            connection.update(&bindings_ctx, &reply_packet, ConnectionDirection::Reply),
             Ok(ConnectionUpdateAction::NoAction)
         );
         let state = connection.state();
-        assert_matches!(state.establishment_lifecycle, EstablishmentLifecycle::SeenReply);
-        assert_eq!(state.last_packet_time.offset, Duration::from_secs(2));
-
-        // Unrelated connection should return an error and otherwise not touch
-        // anything.
-        bindings_ctx.sleep(Duration::from_secs(100));
-        assert_matches!(
-            connection.update(&bindings_ctx, &other_packet),
-            Err(ConnectionUpdateError::NonMatchingTuple)
-        );
         assert_matches!(state.establishment_lifecycle, EstablishmentLifecycle::SeenReply);
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(2));
     }
@@ -1429,7 +1399,7 @@ mod tests {
         let original_tuple = Tuple::from_packet(&packet).expect("packet should be valid");
         let reply_tuple = Tuple::from_packet(&reply_packet).expect("packet should be valid");
 
-        let conn = table
+        let (conn, dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("connection should be present");
@@ -1441,6 +1411,7 @@ mod tests {
         // freshly-allocated exclusive connection and the map should not have
         // been touched.
         assert_matches!(conn, Connection::Exclusive(_));
+        assert_eq!(dir, ConnectionDirection::Original);
         assert!(!table.contains_tuple(&original_tuple));
         assert!(!table.contains_tuple(&reply_tuple));
 
@@ -1452,20 +1423,22 @@ mod tests {
         // We should now get a shared connection back for packets in either
         // direction now that the connection is present in the table.
         bindings_ctx.sleep(Duration::from_secs(1));
-        let conn = table
+        let (conn, dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
-            .expect("packet should be valid");
-        let conn = assert_matches!(conn, Some(conn) => conn);
+            .expect("packet should be valid")
+            .expect("connection should be present");
+        assert_eq!(dir, ConnectionDirection::Original);
         let state = conn.state();
         assert_matches!(state.establishment_lifecycle, EstablishmentLifecycle::SeenOriginal);
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(2));
         let conn = assert_matches!(conn, Connection::Shared(conn) => conn);
 
         bindings_ctx.sleep(Duration::from_secs(1));
-        let reply_conn = table
+        let (reply_conn, dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
-            .expect("packet should be valid");
-        let reply_conn = assert_matches!(reply_conn, Some(conn) => conn);
+            .expect("packet should be valid")
+            .expect("connection should be present");
+        assert_eq!(dir, ConnectionDirection::Reply);
         let state = reply_conn.state();
         assert_matches!(state.establishment_lifecycle, EstablishmentLifecycle::SeenReply);
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(3));
@@ -1475,7 +1448,7 @@ mod tests {
         assert!(Arc::ptr_eq(&conn, &reply_conn));
 
         // Inserting the connection a second time shouldn't change the map.
-        let conn = table
+        let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .unwrap();
@@ -1637,7 +1610,7 @@ mod tests {
             Tuple::from_packet(&second_packet_reply).expect("packet should be valid");
 
         // T=0: Packets for two connections come in.
-        let conn = core_ctx
+        let (conn, _dir) = core_ctx
             .conntrack()
             .get_connection_for_packet_and_update(&bindings_ctx, &first_packet)
             .expect("packet should be valid")
@@ -1649,7 +1622,7 @@ mod tests {
                 .expect("connection finalize should succeed"),
             (true, Some(_))
         );
-        let conn = core_ctx
+        let (conn, _dir) = core_ctx
             .conntrack()
             .get_connection_for_packet_and_update(&bindings_ctx, &second_packet)
             .expect("packet should be valid")
@@ -1676,7 +1649,7 @@ mod tests {
         assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
 
         // T=GC_INTERVAL a packet for just the second connection comes in.
-        let conn = core_ctx
+        let (conn, _dir) = core_ctx
             .conntrack()
             .get_connection_for_packet_and_update(&bindings_ctx, &second_packet_reply)
             .expect("packet should be valid")
@@ -1770,7 +1743,7 @@ mod tests {
         // Fill up the table so that the next insertion will fail.
         for i in 0..MAXIMUM_CONNECTIONS {
             let (packet, reply_packet) = make_packets(i);
-            let conn = table
+            let (conn, _dir) = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
                 .expect("packet should be valid")
                 .expect("packet should be trackable");
@@ -1784,7 +1757,7 @@ mod tests {
             // Whether to update the connection to be established by sending
             // through the reply packet.
             if established {
-                let conn = table
+                let (conn, _dir) = table
                     .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
                     .expect("packet should be valid")
                     .expect("packet should be trackable");
@@ -1803,7 +1776,7 @@ mod tests {
         assert_eq!(table.inner.lock().num_connections, MAXIMUM_CONNECTIONS);
 
         let (packet, _) = make_packets(MAXIMUM_CONNECTIONS);
-        let conn = table
+        let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -1818,7 +1791,7 @@ mod tests {
             // Inserting an existing connection again should succeed because
             // it's not growing the table.
             let (packet, _) = make_packets(MAXIMUM_CONNECTIONS - 1);
-            let conn = table
+            let (conn, _dir) = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
                 .expect("packet should be valid")
                 .expect("packet should be trackable");
@@ -1866,7 +1839,7 @@ mod tests {
         // Insert the first connection into the table in an unestablished state.
         // This will later be evicted when the table fills up.
         let (packet, _) = make_packets::<I>(0);
-        let conn = table
+        let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -1914,7 +1887,7 @@ mod tests {
         // Fill the table up the rest of the way.
         for i in 1..MAXIMUM_CONNECTIONS {
             let (packet, reply_packet) = make_packets(i);
-            let conn = table
+            let (conn, _dir) = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
                 .expect("packet should be valid")
                 .expect("packet should be trackable");
@@ -1925,7 +1898,7 @@ mod tests {
                 (true, Some(_))
             );
 
-            let conn = table
+            let (conn, _dir) = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
                 .expect("packet should be valid")
                 .unwrap();
@@ -1942,7 +1915,7 @@ mod tests {
         // This first one should succeed because it can evict the
         // non-established connection.
         let (packet, reply_packet) = make_packets(MAXIMUM_CONNECTIONS);
-        let conn = table
+        let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -1952,7 +1925,7 @@ mod tests {
                 .expect("connection finalize should succeed"),
             (true, Some(_))
         );
-        let conn = table
+        let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -1966,7 +1939,7 @@ mod tests {
         // This next one should fail because there are no connections left to
         // evict.
         let (packet, _) = make_packets(MAXIMUM_CONNECTIONS + 1);
-        let conn = table
+        let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -2004,7 +1977,7 @@ mod tests {
 
         assert_eq!(tuple, reply_tuple);
 
-        let conn = table
+        let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -2074,7 +2047,7 @@ mod tests {
         let tuple = Tuple::from_packet(&original_packet).expect("packet should be valid");
         let reply_tuple = tuple.clone().invert();
 
-        let conn = table
+        let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &original_packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -2085,7 +2058,7 @@ mod tests {
 
         // Sending the reply RST through should result in the connection being
         // removed from the table.
-        let conn = table
+        let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -2120,7 +2093,7 @@ mod tests {
         let tuple = Tuple::from_packet(&packet).expect("packet should be valid");
         let reply_tuple = tuple.clone().invert();
 
-        let conn = table
+        let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");

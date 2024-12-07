@@ -18,7 +18,7 @@ use net_types::ip::{GenericOverIp, Ip};
 use netstack3_base::{CoreTimerContext, Inspectable, InspectableValue, Inspector as _};
 use packet_formats::ip::IpExt;
 
-use crate::conntrack;
+use crate::conntrack::{self, ConnectionDirection};
 use crate::context::{FilterBindingsContext, FilterBindingsTypes};
 use crate::logic::nat::NatConfig;
 use crate::logic::FilterTimerId;
@@ -485,15 +485,16 @@ impl<I: IpExt, A, BT: FilterBindingsTypes> Inspectable for State<I, A, BT> {
 /// A trait for interacting with the pieces of packet metadata that are
 /// important for filtering.
 pub trait FilterIpMetadata<I: IpExt, A, BT: FilterBindingsTypes> {
-    /// Removes the conntrack connection, if it exists.
-    fn take_conntrack_connection(
+    /// Removes the conntrack connection and packet direction, if they exist.
+    fn take_connection_and_direction(
         &mut self,
-    ) -> Option<conntrack::Connection<I, NatConfig<I, A>, BT>>;
+    ) -> Option<(conntrack::Connection<I, NatConfig<I, A>, BT>, ConnectionDirection)>;
 
-    /// Puts a new conntrack connection into the metadata struct, returning the
-    /// previous value.
-    fn replace_conntrack_connection(
+    /// Puts a new conntrack connection and packet direction into the metadata
+    /// struct, returning the previous connection value, if one existed.
+    fn replace_connection_and_direction(
         &mut self,
         conn: conntrack::Connection<I, NatConfig<I, A>, BT>,
+        direction: ConnectionDirection,
     ) -> Option<conntrack::Connection<I, NatConfig<I, A>, BT>>;
 }

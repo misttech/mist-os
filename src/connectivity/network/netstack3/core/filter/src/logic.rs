@@ -360,15 +360,15 @@ where
             // There usually isn't going to be an existing connection in the metadata before
             // this hook, but it's possible in the case of looped-back packets, so check for
             // one first before looking in the conntrack table.
-            let conn = match metadata.take_conntrack_connection() {
-                Some(c) => Some(c),
+            let conn = match metadata.take_connection_and_direction() {
+                Some((c, d)) => Some((c, d)),
                 None => {
                     match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
                     {
-                        Ok(c) => c,
+                        Ok(result) => result,
                         // TODO(https://fxbug.dev/328064909): Support configurable dropping of
                         // invalid packets.
-                        Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                        Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
                     }
                 }
             };
@@ -383,7 +383,7 @@ where
                 | v @ IngressVerdict::TransparentLocalDelivery { .. } => v,
             };
 
-            if let Some(mut conn) = conn {
+            if let Some((mut conn, direction)) = conn {
                 // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
                 // post-NAT, but in the same hook. Currently all filter routines are run before
                 // all NAT routines in the same hook.
@@ -393,6 +393,7 @@ where
                     state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
+                    direction,
                     &state.installed_routines.get().nat.ingress,
                     packet,
                     Interfaces { ingress: Some(interface), egress: None },
@@ -407,7 +408,7 @@ where
                     }
                 }
 
-                let res = metadata.replace_conntrack_connection(conn);
+                let res = metadata.replace_connection_and_direction(conn, direction);
                 debug_assert!(res.is_none());
             }
 
@@ -428,18 +429,18 @@ where
     {
         let Self(this) = self;
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
-            let conn = match metadata.take_conntrack_connection() {
-                Some(c) => Some(c),
+            let conn = match metadata.take_connection_and_direction() {
+                Some((c, d)) => Some((c, d)),
                 // It's possible that there won't be a connection in the metadata by this point;
                 // this could be, for example, because the packet is for a protocol not tracked
                 // by conntrack.
                 None => {
                     match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
                     {
-                        Ok(c) => c,
+                        Ok(result) => result,
                         // TODO(https://fxbug.dev/328064909): Support configurable dropping of
                         // invalid packets.
-                        Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                        Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
                     }
                 }
             };
@@ -453,7 +454,7 @@ where
                 Verdict::Accept(()) => Verdict::Accept(()),
             };
 
-            if let Some(mut conn) = conn {
+            if let Some((mut conn, direction)) = conn {
                 // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
                 // post-NAT, but in the same hook. Currently all filter routines are run before
                 // all NAT routines in the same hook.
@@ -463,6 +464,7 @@ where
                     state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
+                    direction,
                     &state.installed_routines.get().nat.local_ingress,
                     packet,
                     Interfaces { ingress: Some(interface), egress: None },
@@ -523,10 +525,10 @@ where
             // before this hook, so we don't have to look.
             let conn =
                 match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet) {
-                    Ok(c) => c,
+                    Ok(result) => result,
                     // TODO(https://fxbug.dev/328064909): Support configurable dropping of invalid
                     // packets.
-                    Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                    Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
                 };
 
             let verdict = match check_routines_for_hook(
@@ -538,7 +540,7 @@ where
                 Verdict::Accept(()) => Verdict::Accept(()),
             };
 
-            if let Some(mut conn) = conn {
+            if let Some((mut conn, direction)) = conn {
                 // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
                 // post-NAT, but in the same hook. Currently all filter routines are run before
                 // all NAT routines in the same hook.
@@ -548,6 +550,7 @@ where
                     state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
+                    direction,
                     &state.installed_routines.get().nat.local_egress,
                     packet,
                     Interfaces { ingress: None, egress: Some(interface) },
@@ -556,7 +559,7 @@ where
                     Verdict::Accept(()) => {}
                 }
 
-                let res = metadata.replace_conntrack_connection(conn);
+                let res = metadata.replace_connection_and_direction(conn, direction);
                 debug_assert!(res.is_none());
             }
 
@@ -577,18 +580,18 @@ where
     {
         let Self(this) = self;
         let verdict = this.with_filter_state_and_nat_ctx(|state, core_ctx| {
-            let conn = match metadata.take_conntrack_connection() {
-                Some(c) => Some(c),
+            let conn = match metadata.take_connection_and_direction() {
+                Some((c, d)) => Some((c, d)),
                 // It's possible that there won't be a connection in the metadata by this point;
                 // this could be, for example, because the packet is for a protocol not tracked
                 // by conntrack.
                 None => {
                     match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
                     {
-                        Ok(c) => c,
+                        Ok(result) => result,
                         // TODO(https://fxbug.dev/328064909): Support configurable dropping of
                         // invalid packets.
-                        Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                        Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
                     }
                 }
             };
@@ -602,7 +605,7 @@ where
                 Verdict::Accept(()) => Verdict::Accept(()),
             };
 
-            if let Some(mut conn) = conn {
+            if let Some((mut conn, direction)) = conn {
                 // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
                 // post-NAT, but in the same hook. Currently all filter routines are run before
                 // all NAT routines in the same hook.
@@ -612,6 +615,7 @@ where
                     state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
+                    direction,
                     &state.installed_routines.get().nat.egress,
                     packet,
                     Interfaces { ingress: None, egress: Some(interface) },
@@ -623,8 +627,10 @@ where
                 match state.conntrack.finalize_connection(bindings_ctx, conn) {
                     Ok((_inserted, conn)) => {
                         if let Some(conn) = conn {
-                            let res =
-                                metadata.replace_conntrack_connection(Connection::Shared(conn));
+                            let res = metadata.replace_connection_and_direction(
+                                Connection::Shared(conn),
+                                direction,
+                            );
                             debug_assert!(res.is_none());
                         }
                     }
@@ -802,7 +808,7 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::conntrack::{self, Tuple};
+    use crate::conntrack::{self, ConnectionDirection, Tuple};
     use crate::context::testutil::{FakeBindingsCtx, FakeCtx, FakeDeviceClass};
     use crate::logic::nat::NatConfig;
     use crate::matchers::testutil::{ethernet_interface, wlan_interface, FakeDeviceId};
@@ -860,13 +866,16 @@ mod tests {
     struct NullMetadata {}
 
     impl<I: IpExt, A, BT: FilterBindingsTypes> FilterIpMetadata<I, A, BT> for NullMetadata {
-        fn take_conntrack_connection(&mut self) -> Option<Connection<I, NatConfig<I, A>, BT>> {
+        fn take_connection_and_direction(
+            &mut self,
+        ) -> Option<(Connection<I, NatConfig<I, A>, BT>, ConnectionDirection)> {
             None
         }
 
-        fn replace_conntrack_connection(
+        fn replace_connection_and_direction(
             &mut self,
             _conn: Connection<I, NatConfig<I, A>, BT>,
+            _direction: ConnectionDirection,
         ) -> Option<Connection<I, NatConfig<I, A>, BT>> {
             None
         }
@@ -875,23 +884,26 @@ mod tests {
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
     struct PacketMetadata<I: IpExt + AssignedAddrIpExt, A, BT: FilterBindingsTypes>(
-        Option<Connection<I, NatConfig<I, A>, BT>>,
+        Option<(Connection<I, NatConfig<I, A>, BT>, ConnectionDirection)>,
     );
 
     impl<I: TestIpExt, A, BT: FilterBindingsTypes> FilterIpMetadata<I, A, BT>
         for PacketMetadata<I, A, BT>
     {
-        fn take_conntrack_connection(&mut self) -> Option<Connection<I, NatConfig<I, A>, BT>> {
+        fn take_connection_and_direction(
+            &mut self,
+        ) -> Option<(Connection<I, NatConfig<I, A>, BT>, ConnectionDirection)> {
             let Self(inner) = self;
             inner.take()
         }
 
-        fn replace_conntrack_connection(
+        fn replace_connection_and_direction(
             &mut self,
             conn: Connection<I, NatConfig<I, A>, BT>,
+            direction: ConnectionDirection,
         ) -> Option<Connection<I, NatConfig<I, A>, BT>> {
             let Self(inner) = self;
-            inner.replace(conn)
+            inner.replace((conn, direction)).map(|(conn, _dir)| conn)
         }
     }
 
@@ -1408,8 +1420,8 @@ mod tests {
         assert_eq!(verdict, Verdict::Accept(()));
 
         // The stashed reference should point to the connection that is in the table.
-        let stashed =
-            metadata.take_conntrack_connection().expect("metadata should include connection");
+        let (stashed, _dir) =
+            metadata.take_connection_and_direction().expect("metadata should include connection");
         let tuple = Tuple::from_packet(&packet).expect("packet should be trackable");
         let table = core_ctx
             .conntrack()
@@ -1434,8 +1446,8 @@ mod tests {
 
         // As a result, rather than there being a new connection in the packet metadata,
         // it should contain the same connection that is still in the table.
-        let after_ingress =
-            metadata.take_conntrack_connection().expect("metadata should include connection");
+        let (after_ingress, _dir) =
+            metadata.take_connection_and_direction().expect("metadata should include connection");
         let table = core_ctx
             .conntrack()
             .get_connection(&tuple)
@@ -1591,13 +1603,70 @@ mod tests {
         assert_eq!(second_packet.body.src_port, first_packet.body.src_port);
         assert_eq!(verdict, Verdict::Accept(()));
 
-        let first_conn = first_metadata.take_conntrack_connection().unwrap();
-        let second_conn = second_metadata.take_conntrack_connection().unwrap();
+        let (first_conn, _dir) = first_metadata.take_connection_and_direction().unwrap();
+        let (second_conn, _dir) = second_metadata.take_connection_and_direction().unwrap();
         assert_matches!(
             (first_conn, second_conn),
             (Connection::Shared(first), Connection::Shared(second)) => {
                 assert!(Arc::ptr_eq(&first, &second));
             }
         );
+    }
+
+    #[ip_test(I)]
+    fn both_source_and_destination_nat_configured<I: TestIpExt>() {
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        // Install NAT rules to perform both DNAT (in LOCAL_EGRESS) and SNAT (in
+        // EGRESS).
+        let mut core_ctx = FakeCtx::with_nat_routines_and_device_addrs(
+            &mut bindings_ctx,
+            NatRoutines {
+                local_egress: Hook {
+                    routines: vec![Routine {
+                        rules: vec![Rule::new(
+                            PacketMatcher::default(),
+                            Action::Redirect { dst_port: None },
+                        )],
+                    }],
+                },
+                egress: Hook {
+                    routines: vec![Routine {
+                        rules: vec![Rule::new(
+                            PacketMatcher::default(),
+                            Action::Masquerade { src_port: None },
+                        )],
+                    }],
+                },
+                ..Default::default()
+            },
+            HashMap::from([(
+                ethernet_interface(),
+                AddrSubnet::new(I::SRC_IP_2, I::SUBNET.prefix()).unwrap(),
+            )]),
+        );
+
+        // Even though the packet is modified after the first hook, where DNAT is
+        // configured...
+        let mut packet = FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value();
+        let mut metadata = PacketMetadata::default();
+        let verdict = FilterImpl(&mut core_ctx).local_egress_hook(
+            &mut bindings_ctx,
+            &mut packet,
+            &ethernet_interface(),
+            &mut metadata,
+        );
+        assert_eq!(verdict, Verdict::Accept(()));
+        assert_eq!(packet.dst_ip, *I::LOOPBACK_ADDRESS);
+
+        // ...SNAT is also successfully configured for the packet, because the packet's
+        // [`ConnectionDirection`] is cached in the metadata.
+        let (verdict, _proof) = FilterImpl(&mut core_ctx).egress_hook(
+            &mut bindings_ctx,
+            &mut packet,
+            &ethernet_interface(),
+            &mut metadata,
+        );
+        assert_eq!(verdict, Verdict::Accept(()));
+        assert_eq!(packet.src_ip, I::SRC_IP_2);
     }
 }

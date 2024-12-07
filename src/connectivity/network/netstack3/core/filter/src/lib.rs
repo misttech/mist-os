@@ -24,7 +24,8 @@ pub type ConntrackConnection<I, A, BT> = conntrack::Connection<I, NatConfig<I, A
 
 pub use api::FilterApi;
 pub use conntrack::{
-    Table, TransportProtocol, Tuple, WeakConnection as WeakConntrackConnection, WeakConnectionError,
+    ConnectionDirection, Table, TransportProtocol, Tuple,
+    WeakConnection as WeakConntrackConnection, WeakConnectionError,
 };
 pub use context::{
     FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext, NatContext,

@@ -22,7 +22,6 @@ use rand::Rng as _;
 
 use crate::conntrack::{
     CompatibleWith, Connection, ConnectionDirection, ConnectionExclusive, Table, TransportProtocol,
-    Tuple,
 };
 use crate::context::{FilterBindingsContext, FilterBindingsTypes, NatContext};
 use crate::logic::{IngressVerdict, Interfaces, RoutineResult, Verdict};
@@ -635,6 +634,7 @@ pub(crate) fn perform_nat<N, I, P, CC, BC>(
     nat_installed: bool,
     table: &Table<I, NatConfig<I, CC::WeakAddressId>, BC>,
     conn: &mut Connection<I, NatConfig<I, CC::WeakAddressId>, BC>,
+    direction: ConnectionDirection,
     hook: &Hook<I, BC::DeviceClass, ()>,
     packet: &mut P,
     interfaces: Interfaces<'_, CC::DeviceId>,
@@ -649,20 +649,6 @@ where
     if !nat_installed {
         return Verdict::Accept(()).into();
     }
-
-    let Some(tuple) = Tuple::from_packet(packet) else {
-        return Verdict::Accept(()).into();
-    };
-    let Some(direction) = conn.direction(&tuple) else {
-        // If the packet does not match the connection, that likely means that it's been
-        // NATed already.
-        //
-        // TODO(https://fxbug.dev/371017876): retrieve the packet's tuple and/or
-        // direction from its IP layer metadata, once it is cached there, so that we can
-        // reliably tell the direction of a packet with respect to its flow even after
-        // it has had NAT performed on it.
-        return Verdict::Accept(()).into();
-    };
 
     let nat_config = if let Some(nat) = conn.nat_config(N::NAT_TYPE, direction) {
         nat
@@ -684,21 +670,13 @@ where
                 (Verdict::Accept(NatConfigurationResult::Result(ShouldNat::No)).into(), true)
             }
             (Connection::Shared(_), _) => {
-                // TODO(https://fxbug.dev/371017876): once we cache the packet's tuple and/or
-                // direction in its IP layer metadata, replace this logic with `unreachable!`.
-                //
-                // NAT ideally should be configured for every connection before it is inserted
-                // in the conntrack table, at which point it becomes a shared connection. (This
-                // should apply whether or not NAT will actually be performed; the configuration
-                // could be `false`, i.e. "do not perform NAT for this connection".) However,
-                // because the connection direction for a packet is recalculated at every NAT
-                // hook, once a packet has had NAT performed on it, it may no longer match
-                // either the original or reply tuple of the connection. In this case, we bail
-                // at the top of this function.
-                //
-                // This can result in some connections not having both source and destination
-                // NAT configured by the time they're finalized. To handle this, just configure
-                // the connection not to be NATed.
+                // In most scenarios, NAT should be configured for every connection before it is
+                // inserted in the conntrack table, at which point it becomes a shared
+                // connection. (This should apply whether or not NAT will actually be performed;
+                // the configuration could be `DoNotNat`.) However, as an optimization, when no
+                // NAT rules have been installed, performing NAT is skipped entirely, which can
+                // result in some connections being finalized without NAT being configured for
+                // them. To handle this, just don't NAT the connection.
                 (Verdict::Accept(NatConfigurationResult::Result(ShouldNat::No)).into(), false)
             }
             (Connection::Exclusive(conn), ConnectionDirection::Original) => {
@@ -1174,7 +1152,7 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::conntrack::PacketMetadata;
+    use crate::conntrack::{PacketMetadata, Tuple};
     use crate::context::testutil::{
         FakeBindingsCtx, FakeDeviceClass, FakeNatCtx, FakePrimaryAddressId, FakeWeakAddressId,
     };
@@ -1588,7 +1566,7 @@ mod tests {
             dst_ip: I::SRC_IP,
             body: FakeUdpPacket { src_port: 22222, dst_port: 22222 },
         };
-        let mut conn = conntrack
+        let (mut conn, direction) = conntrack
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -1602,6 +1580,7 @@ mod tests {
             NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
+            direction,
             &Hook {
                 routines: vec![Routine {
                     rules: vec![Rule::new(
@@ -1621,6 +1600,7 @@ mod tests {
             NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
+            direction,
             &Hook {
                 routines: vec![Routine {
                     rules: vec![Rule::new(
@@ -1644,55 +1624,42 @@ mod tests {
         let conntrack = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
         let mut core_ctx = FakeNatCtx::default();
 
-        // With a Redirect NAT rule configured in LOCAL_EGRESS, send an outgoing packet
-        // through LOCAL_EGRESS and EGRESS, and finalize the packet's connection in
-        // conntrack.
         let mut packet = FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value();
-        let mut conn = conntrack
+        let (mut conn, direction) = conntrack
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
 
-        let nat_routines = Hook {
-            routines: vec![Routine {
-                rules: vec![Rule::new(
-                    PacketMatcher::default(),
-                    Action::Redirect { dst_port: None },
-                )],
-            }],
-        };
+        // Skip NAT so the connection is finalized without DNAT configured for it.
         let verdict = perform_nat::<LocalEgressHook, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
-            NAT_ENABLED_FOR_TESTS,
+            false, /* nat_installed */
             &conntrack,
             &mut conn,
-            &nat_routines,
+            direction,
+            &Hook::default(),
             &mut packet,
             <LocalEgressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
         );
         assert_eq!(verdict, Verdict::Accept(()).into());
-        assert_eq!(conn.external_data().destination.get(), Some(&ShouldNat::Yes(None)));
+        assert_eq!(conn.external_data().destination.get(), None);
         assert_eq!(conn.external_data().source.get(), None);
 
-        // DNAT was configured in the LOCAL_EGRESS hook, but SNAT is not configured as
-        // it typically should be in EGRESS because the post-NAT packet no longer
-        // matches its connection, so it's ignored.
-        //
-        // TODO(https://fxbug.dev/371017876): expect both DNAT and SNAT to be
-        // configured.
+        // Skip NAT so the connection is finalized without SNAT configured for it.
         let verdict = perform_nat::<EgressHook, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
-            NAT_ENABLED_FOR_TESTS,
+            false, /* nat_installed */
             &conntrack,
             &mut conn,
+            direction,
             &Hook::default(),
             &mut packet,
             <EgressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
         );
         assert_eq!(verdict, Verdict::Accept(()).into());
-        assert_eq!(conn.external_data().destination.get(), Some(&ShouldNat::Yes(None)));
+        assert_eq!(conn.external_data().destination.get(), None);
         assert_eq!(conn.external_data().source.get(), None);
 
         let (inserted, _weak) = conntrack
@@ -1701,9 +1668,9 @@ mod tests {
         assert!(inserted);
 
         // Now, when a reply comes in to INGRESS, expect that SNAT will be configured as
-        // `false` given it has not already been configured for the connection.
+        // `DoNotNat` given it has not already been configured for the connection.
         let mut reply = packet.reply();
-        let mut conn = conntrack
+        let (mut conn, direction) = conntrack
             .get_connection_for_packet_and_update(&bindings_ctx, &reply)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -1713,12 +1680,29 @@ mod tests {
             NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
+            direction,
             &Hook::default(),
             &mut reply,
             <IngressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
         );
         assert_eq!(verdict, Verdict::Accept(()).into());
-        assert_eq!(conn.external_data().destination.get(), Some(&ShouldNat::Yes(None)));
+        assert_eq!(conn.external_data().destination.get(), None);
+        assert_eq!(conn.external_data().source.get(), Some(&ShouldNat::No));
+
+        // And finally, on LOCAL_INGRESS, DNAT should also be configured as `DoNotNat`.
+        let verdict = perform_nat::<LocalIngressHook, _, _, _, _>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
+            &conntrack,
+            &mut conn,
+            direction,
+            &Hook::default(),
+            &mut reply,
+            <IngressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
+        );
+        assert_eq!(verdict, Verdict::Accept(()).into());
+        assert_eq!(conn.external_data().destination.get(), Some(&ShouldNat::No));
         assert_eq!(conn.external_data().source.get(), Some(&ShouldNat::No));
     }
 
@@ -1756,7 +1740,7 @@ mod tests {
         // Create a packet and get the corresponding connection from conntrack.
         let mut packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
         let pre_nat_packet = packet.clone();
-        let mut conn = conntrack
+        let (mut conn, direction) = conntrack
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -1779,6 +1763,7 @@ mod tests {
             NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
+            direction,
             &nat_routines,
             &mut packet,
             Original::interfaces(&ethernet_interface()),
@@ -1833,6 +1818,7 @@ mod tests {
             NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
+            ConnectionDirection::Reply,
             &nat_routines,
             &mut reply_packet,
             Reply::interfaces(&ethernet_interface()),
@@ -1853,7 +1839,7 @@ mod tests {
         // Create a packet and get the corresponding connection from conntrack.
         let mut packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
         let pre_nat_packet = packet.clone();
-        let mut conn = conntrack
+        let (mut conn, direction) = conntrack
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -1874,6 +1860,7 @@ mod tests {
             NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
+            direction,
             &nat_routines,
             &mut packet,
             Interfaces { ingress: None, egress: Some(&ethernet_interface()) },
@@ -1922,6 +1909,7 @@ mod tests {
             NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
+            ConnectionDirection::Reply,
             &nat_routines,
             &mut reply_packet,
             Interfaces { ingress: Some(&ethernet_interface()), egress: None },
@@ -1950,7 +1938,7 @@ mod tests {
         // First, insert a connection in conntrack with the same the source address the
         // packet will be masqueraded to, and the same source port, to cause a conflict.
         let reply = FakeIpPacket { src_ip: I::SRC_IP_2, ..packet.clone() };
-        let conn = conntrack
+        let (conn, _dir) = conntrack
             .get_connection_for_packet_and_update(&bindings_ctx, &reply)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -2010,7 +1998,7 @@ mod tests {
 
         // Create a packet and get the corresponding connection from conntrack.
         let mut packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
-        let mut conn = conntrack
+        let (mut conn, direction) = conntrack
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -2025,6 +2013,7 @@ mod tests {
             NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
+            direction,
             &nat_routines,
             &mut packet,
             N::interfaces(&ethernet_interface()),
@@ -2055,6 +2044,7 @@ mod tests {
             NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
+            ConnectionDirection::Original,
             &nat_routines,
             &mut FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value(),
             N::interfaces(&ethernet_interface()),
@@ -2079,6 +2069,7 @@ mod tests {
             NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
+            ConnectionDirection::Original,
             &nat_routines,
             &mut FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value(),
             N::interfaces(&ethernet_interface()),
@@ -2196,7 +2187,7 @@ mod tests {
         // with a tuple already in the table, rewriting should fail and the packet
         // should be dropped.
         let packet = packet_with_port(which, LOCAL_PORT.get());
-        let conn = table
+        let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
@@ -2233,7 +2224,7 @@ mod tests {
         const MAX_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(LOCAL_PORT.get() + 100));
         for port in LOCAL_PORT.get()..=MAX_PORT.get() {
             let packet = packet_with_port(which, port);
-            let conn = table
+            let (conn, _dir) = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
                 .expect("packet should be valid")
                 .expect("packet should be trackable");
@@ -2281,7 +2272,7 @@ mod tests {
         // the one we are NATing, and the one in the table is a match, the existing
         // connection should be adopted.
         let packet = packet_with_port(which, LOCAL_PORT.get());
-        let conn = table
+        let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
