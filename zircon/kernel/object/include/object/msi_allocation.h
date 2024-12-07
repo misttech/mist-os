@@ -16,6 +16,7 @@
 #include <dev/interrupt.h>
 #include <fbl/ref_counted.h>
 #include <kernel/spinlock.h>
+#include <ktl/atomic.h>
 #include <ktl/limits.h>
 #include <ktl/move.h>
 #include <object/resource_dispatcher.h>
@@ -64,16 +65,16 @@ class MsiAllocation : public fbl::RefCounted<MsiAllocation> {
   explicit MsiAllocation(const msi_block_t block, MsiFreeFn msi_free_fn)
       : msi_free_fn_(msi_free_fn), block_(block) {}
 
+  // Used to synchronize access to an MSI vector control register for MSI blocks
+  // that consist of multiple vectors and MsiInterruptDispatchers. It is not
+  // used to guard access to anything within the MsiAllocation itself.
+  mutable DECLARE_SPINLOCK(MsiAllocation) lock_;
   // A pointer to the function to free the block when the object is released.
   MsiFreeFn msi_free_fn_;
   // Function pointers for MSI platform functions to facilitate unit tests.
   const msi_block_t block_;
   // A bitfield of MSI ids currently associated with MsiInterruptDispatchers.
-  IdBitMaskType ids_in_use_ TA_GUARDED(lock_) = 0;
-  // Used to synchronize access to an MSI vector control register for
-  // MSI blocks that consist of multiple vectors and MsiInterruptDispatchers.
-  // It is not used to protect the MsiAllocation itself.
-  mutable DECLARE_SPINLOCK(MsiAllocation) lock_;
+  ktl::atomic<IdBitMaskType> ids_in_use_ = 0;
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_MSI_ALLOCATION_H_

@@ -48,6 +48,7 @@ zx_status_t MsiAllocation::Create(uint32_t irq_cnt, fbl::RefPtr<MsiAllocation>* 
   if (st != ZX_OK) {
     return st;
   }
+  ZX_DEBUG_ASSERT(block.allocated);
 
   LTRACEF("MSI Allocation: { tgr_addr = 0x%lx, tgt_data = 0x%08x, base_irq_id = %u }\n",
           block.tgt_addr, block.tgt_data, block.base_irq_id);
@@ -56,7 +57,7 @@ zx_status_t MsiAllocation::Create(uint32_t irq_cnt, fbl::RefPtr<MsiAllocation>* 
   if (block.num_irq == 1) {
     snprintf(name.data(), name.max_size(), "MSI vector %u", block.base_irq_id);
   } else {
-    snprintf(name.data(), name.max_size(), "MSI vectors %u-%u", block.base_irq_id,
+    snprintf(name.data(), name.max_size(), "MSI vectors [%u, %u)", block.base_irq_id,
              block.base_irq_id + block.num_irq - 1);
   }
 
@@ -77,13 +78,11 @@ zx_status_t MsiAllocation::ReserveId(MsiId msi_id) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  auto id_mask = (1u << msi_id);
-  if (ids_in_use_ & id_mask) {
+  const IdBitMaskType mask = (1 << msi_id);
+  const IdBitMaskType prev_value = ids_in_use_.fetch_or(mask, ktl::memory_order_relaxed);
+  if (prev_value & mask) {
     return ZX_ERR_ALREADY_BOUND;
   }
-
-  ids_in_use_ |= id_mask;
   return ZX_OK;
 }
 
@@ -92,22 +91,19 @@ zx_status_t MsiAllocation::ReleaseId(MsiId msi_id) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  auto id_mask = (1u << msi_id);
-  if (!(ids_in_use_ & id_mask)) {
+  const IdBitMaskType mask = (1 << msi_id);
+  const IdBitMaskType prev_value = ids_in_use_.fetch_and(~mask, ktl::memory_order_relaxed);
+  if (!(prev_value & mask)) {
     return ZX_ERR_BAD_STATE;
   }
-
-  ids_in_use_ &= ~id_mask;
   return ZX_OK;
 }
 
 MsiAllocation::~MsiAllocation() {
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  DEBUG_ASSERT(ids_in_use_ == 0);
+  DEBUG_ASSERT(ids_in_use_.load() == 0);
 
   msi_block_t block = block_;
-  if (block_.allocated) {
+  if (block.allocated) {
     msi_free_fn_(&block);
   }
   DEBUG_ASSERT(!block.allocated);
@@ -116,10 +112,9 @@ MsiAllocation::~MsiAllocation() {
 
 void MsiAllocation::GetInfo(zx_info_msi* info) const TA_EXCL(lock_) {
   DEBUG_ASSERT(info);
-  Guard<SpinLock, IrqSave> guard{&lock_};
   info->target_addr = block_.tgt_addr;
   info->target_data = block_.tgt_data;
   info->base_irq_id = block_.base_irq_id;
-  info->interrupt_count = ktl::popcount(ids_in_use_);
   info->num_irq = block_.num_irq;
+  info->interrupt_count = ktl::popcount(ids_in_use_.load());
 }
