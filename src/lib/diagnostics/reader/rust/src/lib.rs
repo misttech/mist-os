@@ -11,7 +11,6 @@ use fidl_fuchsia_diagnostics::{
 };
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_component::client;
-use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::sink::SinkExt;
@@ -214,7 +213,7 @@ impl RetryConfig {
 /// Reader service.
 #[derive(Clone)]
 pub struct ArchiveReader {
-    archive: Arc<Mutex<Option<ArchiveAccessorProxy>>>,
+    archive: Option<ArchiveAccessorProxy>,
     selectors: Vec<SelectorArgument>,
     retry_config: RetryConfig,
     timeout: Option<MonotonicDuration>,
@@ -228,7 +227,7 @@ impl Default for ArchiveReader {
             timeout: None,
             selectors: vec![],
             retry_config: RetryConfig::always(),
-            archive: Arc::new(Mutex::new(None)),
+            archive: None,
             batch_retrieval_timeout_seconds: None,
             max_aggregated_content_size_bytes: None,
         }
@@ -244,10 +243,7 @@ impl ArchiveReader {
     }
 
     pub fn with_archive(&mut self, archive: ArchiveAccessorProxy) -> &mut Self {
-        {
-            let mut arc = self.archive.lock();
-            *arc = Some(archive);
-        }
+        self.archive = Some(archive);
         self
     }
 
@@ -363,7 +359,7 @@ impl ArchiveReader {
     {
         loop {
             let iterator = self.batch_iterator::<D>(StreamMode::Snapshot, format)?;
-            let result = drain_batch_iterator::<T>(Arc::new(Mutex::new(iterator)))
+            let result = drain_batch_iterator::<T>(Arc::new(iterator))
                 .filter_map(|value| ready(value.ok()))
                 .collect::<Vec<_>>()
                 .await;
@@ -387,16 +383,11 @@ impl ArchiveReader {
     where
         D: DiagnosticsData,
     {
-        // TODO(https://fxbug.dev/42135966) this should be done in an ArchiveReaderBuilder -> Reader init
-        let mut archive = self.archive.lock();
-        if archive.is_none() {
-            *archive = Some(
-                client::connect_to_protocol::<ArchiveAccessorMarker>()
-                    .map_err(Error::ConnectToArchive)?,
-            )
-        }
-
-        let archive = archive.as_ref().unwrap();
+        let archive = match &self.archive {
+            Some(archive) => archive.clone(),
+            None => client::connect_to_protocol::<ArchiveAccessorMarker>()
+                .map_err(Error::ConnectToArchive)?,
+        };
 
         let (iterator, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>();
 
@@ -431,9 +422,8 @@ enum OneOrMany<T> {
     One(T),
 }
 
-#[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
 fn drain_batch_iterator<T>(
-    iterator: Arc<Mutex<BatchIteratorProxy>>,
+    iterator: Arc<BatchIteratorProxy>,
 ) -> impl Stream<Item = Result<T, Error>>
 where
     T: for<'a> Deserialize<'a>,
@@ -441,7 +431,6 @@ where
     stream! {
         loop {
             let next_batch = iterator
-                .lock()
                 .get_next()
                 .await
                 .map_err(Error::GetNextCall)?
@@ -484,7 +473,7 @@ where
 pub struct Subscription<T> {
     #[pin]
     recv: Pin<Box<dyn FusedStream<Item = Result<T, Error>> + Send>>,
-    iterator: Arc<Mutex<BatchIteratorProxy>>,
+    iterator: Arc<BatchIteratorProxy>,
 }
 
 const DATA_CHANNEL_SIZE: usize = 32;
@@ -497,7 +486,7 @@ where
     /// Creates a new subscription stream to a batch iterator.
     /// The stream will return diagnostics data structures.
     pub fn new(iterator: BatchIteratorProxy) -> Self {
-        let iterator = Arc::new(Mutex::new(iterator));
+        let iterator = Arc::new(iterator);
         Subscription {
             recv: Box::pin(drain_batch_iterator::<T>(iterator.clone()).fuse()),
             iterator,
@@ -505,9 +494,8 @@ where
     }
 
     /// Wait for the connection with the server to be established.
-    #[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
     pub async fn wait_for_ready(&self) {
-        self.iterator.lock().wait_for_ready().await.expect("doesn't disconnect");
+        self.iterator.wait_for_ready().await.expect("doesn't disconnect");
     }
 
     /// Splits the subscription into two separate streams: results and errors.

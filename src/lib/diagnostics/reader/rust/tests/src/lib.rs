@@ -30,7 +30,7 @@ async fn verify_proxy_reuse() -> Result<(), Error> {
     assert_data_tree!(results[0].payload.as_ref().unwrap(), root: {
         archive_accessor_stats: {
             all: {
-                connections_opened: 1u64,
+                connections_opened: 2u64,
             }
         }
     });
@@ -45,7 +45,7 @@ async fn verify_proxy_reuse() -> Result<(), Error> {
     assert_data_tree!(results[0].payload.as_ref().unwrap(), root: {
         archive_accessor_stats: {
             all: {
-                connections_opened: 2u64,
+                connections_opened: 3u64,
             }
         }
     });
