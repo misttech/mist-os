@@ -8,6 +8,7 @@
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <map>
 #include <mutex>
