@@ -4,20 +4,18 @@
 
 use fuchsia_criterion::criterion::{self, Criterion};
 use fuchsia_criterion::FuchsiaCriterion;
-
 use selectors::FastError;
-use std::mem;
 use std::time::Duration;
+use std::{fmt, mem};
 
 struct Case {
     name: &'static str,
     val: String,
 }
 
-impl Case {
-    #[allow(clippy::inherent_to_string, reason = "mass allow for https://fxbug.dev/381896734")]
-    fn to_string(&self) -> String {
-        format!("{}/{}", self.name, self.val.len())
+impl fmt::Display for Case {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.name, self.val.len())
     }
 }
 

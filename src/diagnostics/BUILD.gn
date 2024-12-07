@@ -51,5 +51,8 @@ group("tests") {
 
 group("benchmarks") {
   testonly = true
-  deps = [ "archivist:benchmarks" ]
+  deps = [
+    "archivist:benchmarks",
+    "//src/lib/diagnostics:benchmarks",
+  ]
 }

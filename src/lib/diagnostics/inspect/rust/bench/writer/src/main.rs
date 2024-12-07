@@ -511,8 +511,7 @@ fn bench_write_after_tree_cow_read(mut bench: criterion::Benchmark) -> criterion
     let (proxy, tree_server_fut) = fuchsia_inspect_bench_utils::spawn_server(inspector).unwrap();
     let task = fasync::Task::spawn(tree_server_fut);
     // Force TLB shootdown for following writes on the local inspector
-    #[allow(clippy::let_underscore_future, reason = "mass allow for https://fxbug.dev/381896734")]
-    let _ = proxy.vmo();
+    executor.run_singlethreaded(proxy.vmo()).expect("fetch vmo");
 
     bench = bench.with_function("Node/IntProperty::CoW::Add", move |b| {
         b.iter(|| {
