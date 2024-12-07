@@ -2,13 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/dist/resource.gni")
 import("//build/zircon/migrated_targets.gni")
 
 group("kernel") {
-  deps = [ ":starnix_runner" ]
+  deps = [ ":starnix_kernel_runner" ]
 }
 
 zx_library("starnix_core") {
+  sdk = "source"
+
   sources = [
     "arch/${current_cpu}/loader.cc",
     "arch/${current_cpu}/syscalls.cc",
@@ -88,7 +91,9 @@ zx_library("starnix_core") {
   ]
 }
 
-zx_library("starnix_runner") {
+zx_library("starnix_kernel_runner") {
+  sdk = "source"
+
   sources = [
     "debugcommands.cc",
     "runner/container.cc",
@@ -101,6 +106,14 @@ zx_library("starnix_runner") {
     "//vendor/misttech/zircon/kernel/lib/starnix/modules",
     "//zircon/kernel/lib/console",
   ]
+}
+
+resource("starnix-test-files") {
+  sources = [
+    "//src/starnix/kernel/data/testfile.txt",
+    "//src/starnix/kernel/data/testfile2.txt",
+  ]
+  outputs = [ "data/{{source_file_part}}" ]
 }
 
 group("tests") {

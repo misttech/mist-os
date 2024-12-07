@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_SYSCALLS_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_SYSCALLS_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_SYSCALLS_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_SYSCALLS_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
@@ -115,6 +115,14 @@ fit::result<Errno, size_t> sys_readlinkat(const CurrentTask& current_task, FdNum
 fit::result<Errno> sys_mkdirat(const CurrentTask& current_task, FdNumber dir_fd,
                                starnix_uapi::UserCString user_path, starnix_uapi::FileMode mode);
 
+fit::result<Errno, size_t> sys_getcwd(const CurrentTask& current_task,
+                                      starnix_uapi::UserAddress buf, size_t size);
+
+fit::result<Errno, FdNumber> sys_dup(const CurrentTask& current_task, FdNumber oldfd);
+
+fit::result<Errno, FdNumber> sys_dup3(const CurrentTask& current_task, FdNumber oldfd,
+                                      FdNumber newfd, uint32_t flags);
+
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_SYSCALLS_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_SYSCALLS_H_

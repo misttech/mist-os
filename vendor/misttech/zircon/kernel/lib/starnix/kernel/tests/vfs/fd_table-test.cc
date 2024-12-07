@@ -15,9 +15,12 @@
 #include <lib/mistos/starnix/testing/testing.h>
 #include <lib/unittest/unittest.h>
 
+#include <utility>
+
 #include <fbl/ref_ptr.h>
 
 namespace unit_testing {
+namespace {
 
 using starnix::CurrentTask;
 using starnix::FdFlags;
@@ -30,7 +33,7 @@ using starnix::SyslogFile;
 
 fit::result<Errno, FdNumber> add(const CurrentTask& current_task, const FdTable& files,
                                  FileHandle file) {
-  return files.add_with_flags(*current_task.task(), file, FdFlags::empty());
+  return files.add_with_flags(*current_task.task(), ktl::move(file), FdFlags::empty());
 }
 
 bool test_fd_table_install() {
@@ -139,6 +142,7 @@ bool test_fd_table_pack_values() {
   END_TEST;
 }
 
+}  // namespace
 }  // namespace unit_testing
 
 UNITTEST_START_TESTCASE(starnix_fd_table)

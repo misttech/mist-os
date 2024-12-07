@@ -26,8 +26,6 @@
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
-using namespace starnix_uapi;
-
 namespace starnix {
 
 FdTableEntry::FdTableEntry(FileHandle file, FdTableId fd_table_id, FdFlags flags)
@@ -65,11 +63,9 @@ fit::result<Errno, ktl::optional<FdTableEntry>> FdTableStore::insert_entry(FdNum
   if (static_cast<uint64_t>(raw_fd) >= rlimit) {
     return fit::error(errno(EMFILE));
   }
-
   if (raw_fd == next_fd_.raw()) {
     next_fd_ = calculate_lowest_available_fd(FdNumber::from_raw(raw_fd + 1));
   }
-
   auto raw_fd_size = static_cast<size_t>(raw_fd);
   if (raw_fd_size >= entries_.size()) {
     fbl::AllocChecker ac;
@@ -79,10 +75,9 @@ fit::result<Errno, ktl::optional<FdTableEntry>> FdTableStore::insert_entry(FdNum
     }
   }
 
-  auto _entry = ktl::optional(entry);
-  LTRACEF("insert @ %zu\n", raw_fd_size);
-  entries_[raw_fd_size] = _entry;
-  return fit::ok(_entry);
+  auto local_entry = ktl::optional(entry);
+  local_entry.swap(entries_[raw_fd_size]);
+  return fit::ok(local_entry);
 }
 
 ktl::optional<FdTableEntry> FdTableStore::remove_entry(const FdNumber& fd) {
@@ -117,12 +112,17 @@ ktl::optional<std::reference_wrapper<ktl::optional<FdTableEntry>>> FdTableStore:
   return entries_[fd.raw()];
 }
 
-FdNumber FdTableStore::calculate_lowest_available_fd(FdNumber minfd) const {
-  LTRACEF("minfd %d\n", minfd.raw());
+FdNumber FdTableStore::get_lowest_available_fd(FdNumber minfd) const {
+  if (minfd.raw() > next_fd_.raw()) {
+    return calculate_lowest_available_fd(minfd);
+  }
+  return next_fd_;
+}
+
+FdNumber FdTableStore::calculate_lowest_available_fd(const FdNumber& minfd) const {
   auto fd = minfd;
   while (get(fd).has_value()) {
     fd = FdNumber::from_raw(fd.raw() + 1);
-    LTRACEF("fd %d\n", fd.raw());
   }
   return fd;
 }
@@ -176,12 +176,57 @@ fit::result<Errno, FdNumber> FdTable::add_with_flags(const Task& task, FileHandl
   return fit::ok(fd);
 }
 
-fit::result<Errno, FileHandle> FdTable::get_allowing_opath(FdNumber fd) const {
-  LTRACEF("fd %d\n", fd.raw());
-  auto result = get_allowing_opath_with_flags(fd);
-  if (result.is_error())
-    return result.take_error();
+fit::result<Errno, FdNumber> FdTable::duplicate(const Task& task, FdNumber oldfd,
+                                                TargetFdNumber target, FdFlags flags) const {
+  // profile_duration!("DuplicateFd");
+  // Drop the removed entry only after releasing the writer lock in case
+  // the close() function on the FileOps calls back into the FdTable.
+  ktl::optional<FdTableEntry> _removed_entry;
+  auto result = [&]() -> fit::result<Errno, FdNumber> {
+    auto rlimit = task.thread_group_->get_rlimit({ResourceEnum::NOFILE});
+    auto id_ = id();
+    auto inner = inner_.Lock();
+    auto state = inner->get()->store_.Lock();
 
+    auto entry = state->get(oldfd);
+    if (!entry.has_value()) {
+      return fit::error(errno(EBADF));
+    }
+    auto file = entry->file_;
+
+    auto fd =
+        ktl::visit(TargetFdNumber::overloaded{
+                       [&](const SpecificFd& s) -> fit::result<Errno, FdNumber> {
+                         // We need to check the rlimit before we remove the entry from
+                         // state because we cannot error out after removing the entry.
+                         if (static_cast<uint64_t>(s.fd.raw()) >= rlimit) {
+                           // ltp_dup201 shows that we're supposed to return EBADF in this
+                           // situtation, instead of EMFILE, which is what we normally
+                           // return when we're past the rlimit.
+                           return fit::error(errno(EBADF));
+                         }
+                         _removed_entry = state->remove_entry(s.fd);
+                         return fit::ok(s.fd);
+                       },
+                       [&](const MinimumFd& m) -> fit::result<Errno, FdNumber> {
+                         return fit::ok(state->get_lowest_available_fd(m.fd));
+                       },
+                       [&](const ktl::monostate&) -> fit::result<Errno, FdNumber> {
+                         return fit::ok(state->get_lowest_available_fd(FdNumber::from_raw(0)));
+                       },
+                   },
+                   target.value_) _EP(fd);
+
+    auto existing_entry =
+        state->insert_entry(fd.value(), rlimit, {ktl::move(file), id_, flags}) _EP(existing_entry);
+    ZX_ASSERT(!existing_entry.value().has_value());
+    return fit::ok(fd.value());
+  }();
+  return result;
+}
+
+fit::result<Errno, FileHandle> FdTable::get_allowing_opath(FdNumber fd) const {
+  auto result = get_allowing_opath_with_flags(fd) _EP(result);
   auto [file, _] = result.value();
   return fit::ok(file);
 }
@@ -202,17 +247,12 @@ fit::result<Errno, ktl::pair<FileHandle, FdFlags>> FdTable::get_allowing_opath_w
 
 fit::result<Errno, FileHandle> FdTable::get(FdNumber fd) const {
   LTRACEF("fd %d\n", fd.raw());
-  auto file_result = get_allowing_opath(fd);
-  if (file_result.is_error())
-    return file_result.take_error();
-
-  auto file = file_result.value();
-  LTRACEF("file 0x%p\n", file.get());
+  auto file = get_allowing_opath(fd) _EP(file);
   if (file->flags().contains(OpenFlagsEnum::PATH)) {
     LTRACEF("ERROR:constains OpenFlagsEnum::PATH\n");
     return fit::error(errno(EBADF));
   }
-  return fit::ok(ktl::move(file));
+  return fit::ok(ktl::move(file.value()));
 }
 
 fit::result<Errno> FdTable::close(FdNumber fd) const {
@@ -230,6 +270,11 @@ fit::result<Errno> FdTable::close(FdNumber fd) const {
     return fit::ok();
   }
   return fit::error(errno(EBADF));
+}
+
+fit::result<Errno, FdFlags> FdTable::get_fd_flags_allowing_opath(FdNumber fd) const {
+  auto result = get_allowing_opath_with_flags(fd) _EP(result);
+  return fit::ok(result->second);
 }
 
 fit::result<Errno, FdFlags> FdTable::get_fd_flags(FdNumber fd) const {

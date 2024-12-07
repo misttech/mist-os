@@ -28,12 +28,9 @@
 #include <fbl/ref_ptr.h>
 
 namespace starnix::testing {
-
-fbl::RefPtr<Kernel> create_test_kernel(/*security_server: Arc<SecurityServer>*/) {
-  return Kernel::New("").value();
-}
-
 namespace {
+
+fbl::RefPtr<Kernel> create_test_kernel() { return Kernel::New("").value(); }
 
 template <typename CreateFsFn>
 fbl::RefPtr<FsContext> create_test_fs_context(const fbl::RefPtr<Kernel>& kernel,
@@ -43,8 +40,7 @@ fbl::RefPtr<FsContext> create_test_fs_context(const fbl::RefPtr<Kernel>& kernel,
 
 template <typename CreateFsFn>
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
-create_kernel_task_and_unlocked_with_fs(
-    CreateFsFn&& create_fs /*,security_server: Arc<SecurityServer>*/) {
+create_kernel_task_and_unlocked_with_fs(CreateFsFn&& create_fs) {
   auto kernel = create_test_kernel();
   auto fs = create_fs(kernel);
   auto fs_context = create_test_fs_context(kernel, [&fs](const fbl::RefPtr<Kernel>&) {
@@ -86,6 +82,8 @@ TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsCont
   return ktl::move(init_task.value());
 }
 
+namespace {
+
 /// Create a FileSystemHandle for use in testing.
 ///
 /// Open "/boot" and returns an FsContext rooted in that directory.
@@ -101,6 +99,8 @@ FileSystemHandle create_bootfs(const fbl::RefPtr<Kernel>& kernel) {
 FileSystemHandle create_bootfs_current_zbi(const fbl::RefPtr<Kernel>& kernel) {
   return BootFs::new_fs(kernel, GetZbi());
 }
+
+}  // namespace
 
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked_with_bootfs() {

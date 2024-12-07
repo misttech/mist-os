@@ -11,6 +11,7 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_number.h>
+#include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/syscalls.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/signals.h>
@@ -66,6 +67,21 @@ fit::result<Errno, FdNumber> sys_creat(const CurrentTask& current_task,
                    OpenFlags(OpenFlagsEnum::TRUNC))
                       .bits(),
                   mode);
+}
+
+fit::result<Errno, FdNumber> sys_dup2(const CurrentTask& current_task, FdNumber oldfd,
+                                      FdNumber newfd) {
+  if (oldfd == newfd) {
+    // O_PATH allowed for:
+    //
+    //  Duplicating the file descriptor (dup(2), fcntl(2)
+    //  F_DUPFD, etc.).
+    //
+    // See https://man7.org/linux/man-pages/man2/open.2.html
+    _EP(current_task->files_.get_allowing_opath(oldfd));
+    return fit::ok(newfd);
+  }
+  return sys_dup3(current_task, oldfd, newfd, 0);
 }
 
 fit::result<Errno, pid_t> sys_getpgrp(const CurrentTask& current_task) {
