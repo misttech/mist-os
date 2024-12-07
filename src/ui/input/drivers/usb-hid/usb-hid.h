@@ -10,6 +10,7 @@
 #include <fuchsia/hardware/usb/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/driver/power/cpp/wake-lease.h>
 #include <lib/sync/completion.h>
 
 #include <memory>
@@ -35,7 +36,8 @@ class UsbHidbus : public DeviceType,
   explicit UsbHidbus(zx_device_t* device)
       : DeviceType(device),
         dispatcher_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        outgoing_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {}
+        outgoing_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+        wake_lease_(fdf::Dispatcher::GetCurrent()->async_dispatcher(), "usb-hid", {}) {}
 
   // Methods required by the ddk mixins.
   // fuchsia_hardware_hidbus methods.
@@ -103,6 +105,8 @@ class UsbHidbus : public DeviceType,
 
   std::thread unbind_thread_;
   std::optional<SetReportCompleter::Async> set_report_completer_;
+
+  fdf_power::WakeLease wake_lease_;
 
   // Interrupt endpoint
   usb::EndpointClient<UsbHidbus> ep_in_{usb::EndpointType::INTERRUPT, this,
