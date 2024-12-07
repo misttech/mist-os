@@ -12,6 +12,8 @@ extend uint fuchsia.BIND_SDIO_PID {
     BCM4359 = 0x4359,
     BCM4345 = 0x4345,
     BCM4356 = 0x4356,
+    // Chip currently marketed by Synaptics
+    SYN4381 = 0x4381,
 };
 
 extend uint fuchsia.BIND_SDIO_FUNCTION {
