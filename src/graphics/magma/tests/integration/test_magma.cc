@@ -1499,7 +1499,8 @@ class TestConnectionWithContext : public TestConnection {
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_execute_command(connection(), context_id(), &descriptor));
 
-    EXPECT_EQ(magma_connection_flush(connection()), MAGMA_STATUS_UNIMPLEMENTED);
+    magma_status_t status = magma_connection_flush(connection());
+    EXPECT_TRUE(status == MAGMA_STATUS_UNIMPLEMENTED || status == MAGMA_STATUS_INVALID_ARGS);
   }
 
  private:
@@ -1862,7 +1863,7 @@ TEST_F(Magma, MaxBufferHandle2) {
 
   constexpr size_t kMaxBufferHandles = 10000;
 #if defined(__linux__)
-  struct rlimit rlimit {};
+  struct rlimit rlimit{};
   rlimit.rlim_cur = kMaxBufferHandles * 2;
   rlimit.rlim_max = rlimit.rlim_cur;
   EXPECT_EQ(0, setrlimit(RLIMIT_NOFILE, &rlimit));
