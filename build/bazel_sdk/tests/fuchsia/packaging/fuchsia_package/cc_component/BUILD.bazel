@@ -16,8 +16,10 @@ load(
     "fuchsia_test_package",
     "fuchsia_unittest_package",
 )
+load("//test_utils:api_levels.bzl", "some_valid_numerical_api_level_as_string")
 load("//test_utils:make_file.bzl", "make_file")
 
+# Also serves the purpose of "pkg_at_head".
 fuchsia_package(
     name = "pkg",
     package_name = "pkg_for_test",
@@ -72,6 +74,68 @@ fuchsia_unittest_package(
     fuchsia_api_level = "HEAD",
     unit_tests = [
         ":cc_unit_test",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_package(
+    name = "pkg_at_numerical_api_level",
+    package_name = "pkg_at_numerical_api_level_for_test",
+    components = [
+        ":cc_component",
+        ":empty_component",
+    ],
+    fuchsia_api_level = some_valid_numerical_api_level_as_string(),
+    resources = [
+        ":sc-values",
+        ":simple_file_resource",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Same as `pkg_at_numerical_api_level` but without `cc_component`.
+# TODO(https://fxbug.dev/382560521): Remove once the test can use `pkg_at_numerical_api_level`.
+fuchsia_package(
+    name = "pkg_at_numerical_api_level_without_cc_component",
+    package_name = "pkg_at_numerical_api_level_without_cc_component_for_test",
+    components = [
+        ":empty_component",
+    ],
+    fuchsia_api_level = some_valid_numerical_api_level_as_string(),
+    resources = [
+        ":sc-values",
+        ":simple_file_resource",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_package(
+    name = "pkg_at_next_api_level",
+    package_name = "pkg_at_next_api_level_for_test",
+    components = [
+        ":cc_component",
+        ":empty_component",
+    ],
+    fuchsia_api_level = "NEXT",
+    resources = [
+        ":sc-values",
+        ":simple_file_resource",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Same as `pkg_at_next_api_level` but without `cc_component`.
+# TODO(https://fxbug.dev/382560521): Remove once the test can use `pkg_at_next_api_level`.
+fuchsia_package(
+    name = "pkg_at_next_api_level_without_cc_component",
+    package_name = "pkg_at_next_api_level_without_cc_component_for_test",
+    components = [
+        ":empty_component",
+    ],
+    fuchsia_api_level = "NEXT",
+    resources = [
+        ":sc-values",
+        ":simple_file_resource",
     ],
     visibility = ["//visibility:public"],
 )

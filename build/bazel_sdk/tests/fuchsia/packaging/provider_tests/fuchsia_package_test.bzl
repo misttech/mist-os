@@ -200,12 +200,30 @@ def _test_package_deps():
         ],
     )
 
+def _test_api_levels():
+    fuchsia_package(
+        name = "pkg_at_next_api_level",
+        package_name = "pkg_at_next_api_level_for_test",
+        archive_name = "pkg_at_next_api_level_archive",
+        fuchsia_api_level = "NEXT",
+        components = [":component_1"],
+        tags = ["manual"],
+    )
+
+    name_test(
+        name = "next_api_level",
+        target_under_test = ":pkg_at_next_api_level",
+        package_name = "pkg_at_next_api_level_for_test",
+        archive_name = "pkg_at_next_api_level_archive.far",
+    )
+
 # Entry point from the BUILD file; macro for running each test case's macro and
 # declaring a test suite that wraps them together.
 def fuchsia_package_test_suite(name, **kwargs):
     # Call all test functions and wrap their targets in a suite.
     _test_package_and_archive_name()
     _test_package_deps()
+    _test_api_levels()
 
     native.test_suite(
         name = name,
@@ -215,6 +233,7 @@ def fuchsia_package_test_suite(name, **kwargs):
             ":dependencies_test_single_component",
             ":dependencies_test_single_driver",
             ":dependencies_test_composite",
+            ":next_api_level",
         ],
         **kwargs
     )

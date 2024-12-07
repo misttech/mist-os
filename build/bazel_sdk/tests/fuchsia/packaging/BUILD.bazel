@@ -5,13 +5,7 @@
 test_suite(
     name = "tests",
     tests = [
-        "//fuchsia/packaging/fuchsia_package:cc_driver_pkg_test",
-        "//fuchsia/packaging/fuchsia_package:cc_driver_pkg_with_tool_test",
-        "//fuchsia/packaging/fuchsia_package:cc_pkg_test",
-        "//fuchsia/packaging/fuchsia_package:cc_pkg_with_static_cpp_test",
-        "//fuchsia/packaging/fuchsia_package:cc_test_pkg_test",
-        "//fuchsia/packaging/fuchsia_package:cc_unittest_pkg_test",
-        "//fuchsia/packaging/fuchsia_package:subpkg_test",
+        "//fuchsia/packaging/fuchsia_package:tests",
         "//fuchsia/packaging/provider_tests:tests",
     ],
     visibility = ["//visibility:public"],
