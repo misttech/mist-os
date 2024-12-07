@@ -69,7 +69,12 @@ magma_status_t msd_context_execute_command_buffers(struct MsdContext* msd_contex
 
 struct MsdBuffer* msd_driver_import_buffer(magma_handle_t buffer_handle, uint64_t client_id);
 
+magma_status_t msd_driver_import_semaphore(magma_handle_t semaphore_handle, uint64_t client_id,
+                                           uint64_t flags, struct MsdSemaphore** semaphore_out);
+
 void msd_buffer_release(struct MsdBuffer* msd_buffer);
+
+void msd_semaphore_release(struct MsdSemaphore* msd_semaphore);
 
 #ifdef __cplusplus
 }
