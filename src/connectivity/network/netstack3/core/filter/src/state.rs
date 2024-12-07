@@ -422,7 +422,7 @@ impl OneWayBoolean {
 }
 
 /// IP version-specific filtering state.
-pub struct State<I: IpExt, BT: FilterBindingsTypes> {
+pub struct State<I: IpExt, A, BT: FilterBindingsTypes> {
     /// Routines used for filtering packets that are installed on hooks.
     pub installed_routines: ValidRoutines<I, BT::DeviceClass>,
     /// Routines that are only executed if jumped to from other routines.
@@ -432,7 +432,7 @@ pub struct State<I: IpExt, BT: FilterBindingsTypes> {
     /// that have any references in order to report them in inspect data.
     pub(crate) uninstalled_routines: Vec<UninstalledRoutine<I, BT::DeviceClass, ()>>,
     /// Connection tracking state.
-    pub conntrack: conntrack::Table<I, BT, NatConfig>,
+    pub conntrack: conntrack::Table<I, NatConfig<I, A>, BT>,
     /// One-way boolean toggle indicating whether any rules have ever been added to
     /// an installed NAT routine. If not, performing NAT can safely be skipped.
     ///
@@ -450,7 +450,7 @@ pub struct State<I: IpExt, BT: FilterBindingsTypes> {
     pub nat_installed: OneWayBoolean,
 }
 
-impl<I: IpExt, BC: FilterBindingsContext> State<I, BC> {
+impl<I: IpExt, A, BC: FilterBindingsContext> State<I, A, BC> {
     /// Create a new State.
     pub fn new<CC: CoreTimerContext<FilterTimerId<I>, BC>>(bindings_ctx: &mut BC) -> Self {
         Self {
@@ -462,7 +462,7 @@ impl<I: IpExt, BC: FilterBindingsContext> State<I, BC> {
     }
 }
 
-impl<I: IpExt, BT: FilterBindingsTypes> Inspectable for State<I, BT> {
+impl<I: IpExt, A, BT: FilterBindingsTypes> Inspectable for State<I, A, BT> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         let Self { installed_routines, uninstalled_routines, conntrack, nat_installed: _ } = self;
         let Routines { ip, nat } = installed_routines.get();
@@ -484,14 +484,16 @@ impl<I: IpExt, BT: FilterBindingsTypes> Inspectable for State<I, BT> {
 
 /// A trait for interacting with the pieces of packet metadata that are
 /// important for filtering.
-pub trait FilterIpMetadata<I: IpExt, BT: FilterBindingsTypes> {
+pub trait FilterIpMetadata<I: IpExt, A, BT: FilterBindingsTypes> {
     /// Removes the conntrack connection, if it exists.
-    fn take_conntrack_connection(&mut self) -> Option<conntrack::Connection<I, BT, NatConfig>>;
+    fn take_conntrack_connection(
+        &mut self,
+    ) -> Option<conntrack::Connection<I, NatConfig<I, A>, BT>>;
 
     /// Puts a new conntrack connection into the metadata struct, returning the
     /// previous value.
     fn replace_conntrack_connection(
         &mut self,
-        conn: conntrack::Connection<I, BT, NatConfig>,
-    ) -> Option<conntrack::Connection<I, BT, NatConfig>>;
+        conn: conntrack::Connection<I, NatConfig<I, A>, BT>,
+    ) -> Option<conntrack::Connection<I, NatConfig<I, A>, BT>>;
 }

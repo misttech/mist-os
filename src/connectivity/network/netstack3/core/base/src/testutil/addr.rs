@@ -11,6 +11,7 @@ use net_types::{
     MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, UnicastAddress, Witness as _,
 };
 
+use crate::device::address::AssignedAddrIpExt;
 use crate::socket::DualStackIpExt;
 
 /// An extension trait for `Ip` providing test-related functionality.
@@ -22,7 +23,7 @@ pub trait TestDualStackIpExt: TestIpExt + DualStackIpExt<OtherVersion: TestIpExt
 impl<I> TestDualStackIpExt for I where I: TestIpExt + DualStackIpExt<OtherVersion: TestIpExt> {}
 
 /// An extension trait for `Ip` providing test-related functionality.
-pub trait TestIpExt: Ip + packet_formats::ip::IpExt {
+pub trait TestIpExt: Ip + packet_formats::ip::IpExt + AssignedAddrIpExt {
     /// An instance of [`TestAddrs`] providing addresses for use in tests.
     const TEST_ADDRS: TestAddrs<Self::Addr>;
 

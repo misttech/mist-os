@@ -7,7 +7,7 @@ use core::fmt::Debug;
 use net_types::ip::{Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, InstantBindingsTypes, IpDeviceAddr, RngContext, TimerBindingsTypes,
+    InstantBindingsTypes, IpDeviceAddr, IpDeviceAddressIdContext, RngContext, TimerBindingsTypes,
     TimerContext,
 };
 use packet_formats::ip::IpExt;
@@ -38,20 +38,31 @@ impl<BC: TimerContext + RngContext + FilterBindingsTypes> FilterBindingsContext 
 /// ordering types to enforce that filtering state is only acquired at or before
 /// a given lock level, while keeping test code free of locking concerns.
 pub trait FilterIpContext<I: IpExt, BT: FilterBindingsTypes>:
-    DeviceIdContext<AnyDevice, DeviceId: InterfaceProperties<BT::DeviceClass>>
+    IpDeviceAddressIdContext<I, DeviceId: InterfaceProperties<BT::DeviceClass>>
 {
     /// The execution context that allows the filtering engine to perform
     /// Network Address Translation (NAT).
-    type NatCtx<'a>: NatContext<I, BT, DeviceId = Self::DeviceId>;
+    type NatCtx<'a>: NatContext<
+        I,
+        BT,
+        DeviceId = Self::DeviceId,
+        WeakAddressId = Self::WeakAddressId,
+    >;
 
     /// Calls the function with a reference to filtering state.
-    fn with_filter_state<O, F: FnOnce(&State<I, BT>) -> O>(&mut self, cb: F) -> O {
+    fn with_filter_state<O, F: FnOnce(&State<I, Self::WeakAddressId, BT>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
         self.with_filter_state_and_nat_ctx(|state, _ctx| cb(state))
     }
 
     /// Calls the function with a reference to filtering state and the NAT
     /// context.
-    fn with_filter_state_and_nat_ctx<O, F: FnOnce(&State<I, BT>, &mut Self::NatCtx<'_>) -> O>(
+    fn with_filter_state_and_nat_ctx<
+        O,
+        F: FnOnce(&State<I, Self::WeakAddressId, BT>, &mut Self::NatCtx<'_>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O;
@@ -59,21 +70,38 @@ pub trait FilterIpContext<I: IpExt, BT: FilterBindingsTypes>:
 
 /// The execution context for Network Address Translation (NAT).
 pub trait NatContext<I: IpExt, BT: FilterBindingsTypes>:
-    DeviceIdContext<AnyDevice, DeviceId: InterfaceProperties<BT::DeviceClass>>
+    IpDeviceAddressIdContext<I, DeviceId: InterfaceProperties<BT::DeviceClass>>
 {
     /// Returns the best local address for communicating with the remote.
     fn get_local_addr_for_remote(
         &mut self,
         device_id: &Self::DeviceId,
         remote: Option<SpecifiedAddr<I::Addr>>,
-    ) -> Option<IpDeviceAddr<I::Addr>>;
+    ) -> Option<Self::AddressId>;
+
+    /// Returns a strongly-held reference to the provided address, if it is assigned
+    /// to the specified device.
+    fn get_address_id(
+        &mut self,
+        device_id: &Self::DeviceId,
+        addr: IpDeviceAddr<I::Addr>,
+    ) -> Option<Self::AddressId>;
 }
 
 /// A context for mutably accessing all filtering state at once, to allow IPv4
 /// and IPv6 filtering state to be modified atomically.
-pub trait FilterContext<BT: FilterBindingsTypes> {
+pub trait FilterContext<BT: FilterBindingsTypes>:
+    IpDeviceAddressIdContext<Ipv4, DeviceId: InterfaceProperties<BT::DeviceClass>>
+    + IpDeviceAddressIdContext<Ipv6, DeviceId: InterfaceProperties<BT::DeviceClass>>
+{
     /// Calls the function with a mutable reference to all filtering state.
-    fn with_all_filter_state_mut<O, F: FnOnce(&mut State<Ipv4, BT>, &mut State<Ipv6, BT>) -> O>(
+    fn with_all_filter_state_mut<
+        O,
+        F: FnOnce(
+            &mut State<Ipv4, <Self as IpDeviceAddressIdContext<Ipv4>>::WeakAddressId, BT>,
+            &mut State<Ipv6, <Self as IpDeviceAddressIdContext<Ipv6>>::WeakAddressId, BT>,
+        ) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O;
@@ -94,15 +122,22 @@ impl<
 #[cfg(test)]
 pub(crate) mod testutil {
     use alloc::collections::HashMap;
+    use alloc::sync::{Arc, Weak};
     use alloc::vec::Vec;
+    use core::hash::{Hash, Hasher};
+    use core::ops::Deref;
     use core::time::Duration;
 
-    use net_types::ip::Ip;
+    use derivative::Derivative;
+    use net_types::ip::{AddrSubnet, GenericOverIp, Ip};
     use netstack3_base::testutil::{
         FakeAtomicInstant, FakeCryptoRng, FakeInstant, FakeTimerCtx, FakeWeakDeviceId,
         WithFakeTimerContext,
     };
-    use netstack3_base::{InstantContext, IntoCoreTimerCtx};
+    use netstack3_base::{
+        AnyDevice, AssignedAddrIpExt, DeviceIdContext, InstantContext, IntoCoreTimerCtx,
+        IpAddressId, WeakIpAddressId,
+    };
 
     use super::*;
     use crate::conntrack;
@@ -112,23 +147,108 @@ pub(crate) mod testutil {
     use crate::state::validation::ValidRoutines;
     use crate::state::{IpRoutines, NatRoutines, OneWayBoolean, Routines};
 
+    pub trait TestIpExt: IpExt + AssignedAddrIpExt {}
+
+    impl<I: IpExt + AssignedAddrIpExt> TestIpExt for I {}
+
+    #[derive(Debug)]
+    pub struct FakePrimaryAddressId<I: AssignedAddrIpExt>(
+        pub Arc<AddrSubnet<I::Addr, I::AssignedWitness>>,
+    );
+
+    #[derive(Clone, Debug, Hash, Eq, PartialEq)]
+    pub struct FakeAddressId<I: AssignedAddrIpExt>(Arc<AddrSubnet<I::Addr, I::AssignedWitness>>);
+
+    #[derive(Clone, Debug)]
+    pub struct FakeWeakAddressId<I: AssignedAddrIpExt>(
+        pub Weak<AddrSubnet<I::Addr, I::AssignedWitness>>,
+    );
+
+    impl<I: AssignedAddrIpExt> PartialEq for FakeWeakAddressId<I> {
+        fn eq(&self, other: &Self) -> bool {
+            let Self(lhs) = self;
+            let Self(rhs) = other;
+            Weak::ptr_eq(lhs, rhs)
+        }
+    }
+
+    impl<I: AssignedAddrIpExt> Eq for FakeWeakAddressId<I> {}
+
+    impl<I: AssignedAddrIpExt> Hash for FakeWeakAddressId<I> {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            let Self(this) = self;
+            this.as_ptr().hash(state)
+        }
+    }
+
+    impl<I: AssignedAddrIpExt> WeakIpAddressId<I::Addr> for FakeWeakAddressId<I> {
+        type Strong = FakeAddressId<I>;
+
+        fn upgrade(&self) -> Option<Self::Strong> {
+            let Self(inner) = self;
+            inner.upgrade().map(FakeAddressId)
+        }
+
+        fn is_assigned(&self) -> bool {
+            let Self(inner) = self;
+            inner.strong_count() != 0
+        }
+    }
+
+    impl<I: AssignedAddrIpExt> Deref for FakeAddressId<I> {
+        type Target = AddrSubnet<I::Addr, I::AssignedWitness>;
+
+        fn deref(&self) -> &Self::Target {
+            let Self(inner) = self;
+            inner.deref()
+        }
+    }
+
+    impl<I: AssignedAddrIpExt> IpAddressId<I::Addr> for FakeAddressId<I> {
+        type Weak = FakeWeakAddressId<I>;
+
+        fn downgrade(&self) -> Self::Weak {
+            let Self(inner) = self;
+            FakeWeakAddressId(Arc::downgrade(inner))
+        }
+
+        fn addr(&self) -> IpDeviceAddr<I::Addr> {
+            let Self(inner) = self;
+
+            #[derive(GenericOverIp)]
+            #[generic_over_ip(I, Ip)]
+            struct WrapIn<I: AssignedAddrIpExt>(I::AssignedWitness);
+            I::map_ip(
+                WrapIn(inner.addr()),
+                |WrapIn(v4_addr)| IpDeviceAddr::new_from_witness(v4_addr),
+                |WrapIn(v6_addr)| IpDeviceAddr::new_from_ipv6_device_addr(v6_addr),
+            )
+        }
+
+        fn addr_sub(&self) -> AddrSubnet<I::Addr, I::AssignedWitness> {
+            let Self(inner) = self;
+            **inner
+        }
+    }
+
     #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
     pub enum FakeDeviceClass {
         Ethernet,
         Wlan,
     }
 
-    pub struct FakeCtx<I: IpExt> {
-        state: State<I, FakeBindingsCtx<I>>,
+    pub struct FakeCtx<I: TestIpExt> {
+        state: State<I, FakeWeakAddressId<I>, FakeBindingsCtx<I>>,
         nat: FakeNatCtx<I>,
     }
 
-    #[derive(Default)]
-    pub struct FakeNatCtx<I: IpExt> {
-        pub(crate) device_addrs: HashMap<FakeDeviceId, IpDeviceAddr<I::Addr>>,
+    #[derive(Derivative)]
+    #[derivative(Default(bound = ""))]
+    pub struct FakeNatCtx<I: TestIpExt> {
+        pub(crate) device_addrs: HashMap<FakeDeviceId, FakePrimaryAddressId<I>>,
     }
 
-    impl<I: IpExt> FakeCtx<I> {
+    impl<I: TestIpExt> FakeCtx<I> {
         pub fn new(bindings_ctx: &mut FakeBindingsCtx<I>) -> Self {
             Self {
                 state: State {
@@ -162,7 +282,9 @@ pub(crate) mod testutil {
         pub fn with_nat_routines_and_device_addrs(
             bindings_ctx: &mut FakeBindingsCtx<I>,
             routines: NatRoutines<I, FakeDeviceClass, ()>,
-            device_addrs: HashMap<FakeDeviceId, IpDeviceAddr<I::Addr>>,
+            device_addrs: impl IntoIterator<
+                Item = (FakeDeviceId, AddrSubnet<I::Addr, I::AssignedWitness>),
+            >,
         ) -> Self {
             let (installed_routines, uninstalled_routines) =
                 ValidRoutines::new(Routines { nat: routines, ..Default::default() })
@@ -174,26 +296,38 @@ pub(crate) mod testutil {
                     conntrack: conntrack::Table::new::<IntoCoreTimerCtx>(bindings_ctx),
                     nat_installed: OneWayBoolean::TRUE,
                 },
-                nat: FakeNatCtx { device_addrs },
+                nat: FakeNatCtx {
+                    device_addrs: device_addrs
+                        .into_iter()
+                        .map(|(device, addr)| (device, FakePrimaryAddressId(Arc::new(addr))))
+                        .collect(),
+                },
             }
         }
 
-        pub fn conntrack(&mut self) -> &conntrack::Table<I, FakeBindingsCtx<I>, NatConfig> {
+        pub fn conntrack(
+            &mut self,
+        ) -> &conntrack::Table<I, NatConfig<I, FakeWeakAddressId<I>>, FakeBindingsCtx<I>> {
             &self.state.conntrack
         }
     }
 
-    impl<I: IpExt> DeviceIdContext<AnyDevice> for FakeCtx<I> {
+    impl<I: TestIpExt> DeviceIdContext<AnyDevice> for FakeCtx<I> {
         type DeviceId = FakeDeviceId;
         type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
     }
 
-    impl<I: IpExt> FilterIpContext<I, FakeBindingsCtx<I>> for FakeCtx<I> {
+    impl<I: TestIpExt> IpDeviceAddressIdContext<I> for FakeCtx<I> {
+        type AddressId = FakeAddressId<I>;
+        type WeakAddressId = FakeWeakAddressId<I>;
+    }
+
+    impl<I: TestIpExt> FilterIpContext<I, FakeBindingsCtx<I>> for FakeCtx<I> {
         type NatCtx<'a> = FakeNatCtx<I>;
 
         fn with_filter_state_and_nat_ctx<
             O,
-            F: FnOnce(&State<I, FakeBindingsCtx<I>>, &mut Self::NatCtx<'_>) -> O,
+            F: FnOnce(&State<I, FakeWeakAddressId<I>, FakeBindingsCtx<I>>, &mut Self::NatCtx<'_>) -> O,
         >(
             &mut self,
             cb: F,
@@ -203,18 +337,53 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpExt> DeviceIdContext<AnyDevice> for FakeNatCtx<I> {
+    impl<I: TestIpExt> FakeNatCtx<I> {
+        pub fn new(
+            device_addrs: impl IntoIterator<
+                Item = (FakeDeviceId, AddrSubnet<I::Addr, I::AssignedWitness>),
+            >,
+        ) -> Self {
+            Self {
+                device_addrs: device_addrs
+                    .into_iter()
+                    .map(|(device, addr)| (device, FakePrimaryAddressId(Arc::new(addr))))
+                    .collect(),
+            }
+        }
+    }
+
+    impl<I: TestIpExt> DeviceIdContext<AnyDevice> for FakeNatCtx<I> {
         type DeviceId = FakeDeviceId;
         type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
     }
 
-    impl<I: IpExt> NatContext<I, FakeBindingsCtx<I>> for FakeNatCtx<I> {
+    impl<I: TestIpExt> IpDeviceAddressIdContext<I> for FakeNatCtx<I> {
+        type AddressId = FakeAddressId<I>;
+        type WeakAddressId = FakeWeakAddressId<I>;
+    }
+
+    impl<I: TestIpExt> NatContext<I, FakeBindingsCtx<I>> for FakeNatCtx<I> {
         fn get_local_addr_for_remote(
             &mut self,
             device_id: &Self::DeviceId,
             _remote: Option<SpecifiedAddr<I::Addr>>,
-        ) -> Option<IpDeviceAddr<I::Addr>> {
-            self.device_addrs.get(device_id).cloned()
+        ) -> Option<Self::AddressId> {
+            let FakePrimaryAddressId(primary) = self.device_addrs.get(device_id)?;
+            Some(FakeAddressId(primary.clone()))
+        }
+
+        fn get_address_id(
+            &mut self,
+            device_id: &Self::DeviceId,
+            addr: IpDeviceAddr<I::Addr>,
+        ) -> Option<Self::AddressId> {
+            let FakePrimaryAddressId(id) = self.device_addrs.get(device_id)?;
+            let id = FakeAddressId(id.clone());
+            if id.addr() == addr {
+                Some(id)
+            } else {
+                None
+            }
         }
     }
 
@@ -297,7 +466,10 @@ pub(crate) mod testutil {
     }
 
     impl<I: Ip> RngContext for FakeBindingsCtx<I> {
-        type Rng<'a> = FakeCryptoRng where Self: 'a;
+        type Rng<'a>
+            = FakeCryptoRng
+        where
+            Self: 'a;
 
         fn rng(&mut self) -> Self::Rng<'_> {
             self.rng.clone()

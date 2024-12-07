@@ -9,7 +9,7 @@ use core::ops::RangeInclusive;
 
 use log::error;
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
-use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer};
+use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer, IpDeviceAddressIdContext};
 use packet_formats::ip::IpExt;
 
 use crate::conntrack::{Connection, FinalizeConnectionError, GetConnectionError};
@@ -64,6 +64,7 @@ impl ProofOfEgressCheck {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct Interfaces<'a, D> {
     pub ingress: Option<&'a D>,
     pub egress: Option<&'a D>,
@@ -249,7 +250,7 @@ where
 /// An implementation of packet filtering logic, providing entry points at
 /// various stages of packet processing.
 pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
-    DeviceIdContext<AnyDevice, DeviceId: InterfaceProperties<BC::DeviceClass>>
+    IpDeviceAddressIdContext<I, DeviceId: InterfaceProperties<BC::DeviceClass>>
 {
     /// The ingress hook intercepts incoming traffic before a routing decision
     /// has been made.
@@ -262,7 +263,7 @@ pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
     ) -> IngressVerdict<I>
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>;
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>;
 
     /// The local ingress hook intercepts incoming traffic that is destined for
     /// the local host.
@@ -275,7 +276,7 @@ pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
     ) -> Verdict
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>;
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>;
 
     /// The forwarding hook intercepts incoming traffic that is destined for
     /// another host.
@@ -288,7 +289,7 @@ pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
     ) -> Verdict
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>;
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>;
 
     /// The local egress hook intercepts locally-generated traffic before a
     /// routing decision has been made.
@@ -301,7 +302,7 @@ pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
     ) -> Verdict
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>;
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>;
 
     /// The egress hook intercepts all outgoing traffic after a routing decision
     /// has been made.
@@ -314,7 +315,7 @@ pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
     ) -> (Verdict, ProofOfEgressCheck)
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>;
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>;
 }
 
 /// The "production" implementation of packet filtering.
@@ -326,6 +327,15 @@ pub struct FilterImpl<'a, CC>(pub &'a mut CC);
 impl<CC: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice> for FilterImpl<'_, CC> {
     type DeviceId = CC::DeviceId;
     type WeakDeviceId = CC::WeakDeviceId;
+}
+
+impl<I, CC> IpDeviceAddressIdContext<I> for FilterImpl<'_, CC>
+where
+    I: IpExt,
+    CC: IpDeviceAddressIdContext<I>,
+{
+    type AddressId = CC::AddressId;
+    type WeakAddressId = CC::WeakAddressId;
 }
 
 impl<I, BC, CC> FilterHandler<I, BC> for FilterImpl<'_, CC>
@@ -343,7 +353,7 @@ where
     ) -> IngressVerdict<I>
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>,
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
     {
         let Self(this) = self;
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
@@ -414,7 +424,7 @@ where
     ) -> Verdict
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>,
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
     {
         let Self(this) = self;
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
@@ -484,7 +494,7 @@ where
     ) -> Verdict
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>,
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
@@ -505,7 +515,7 @@ where
     ) -> Verdict
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>,
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
     {
         let Self(this) = self;
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
@@ -563,7 +573,7 @@ where
     ) -> (Verdict, ProofOfEgressCheck)
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>,
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
     {
         let Self(this) = self;
         let verdict = this.with_filter_state_and_nat_ctx(|state, core_ctx| {
@@ -655,11 +665,13 @@ impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> Handleable
     }
 }
 
-#[cfg(feature = "testutils")]
+#[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     use core::marker::PhantomData;
 
-    use netstack3_base::testutil::{FakeStrongDeviceId, FakeWeakDeviceId};
+    use net_types::ip::AddrSubnet;
+    use netstack3_base::testutil::{FakeStrongDeviceId, FakeWeakAddressId, FakeWeakDeviceId};
+    use netstack3_base::AssignedAddrIpExt;
 
     use super::*;
 
@@ -682,9 +694,16 @@ pub mod testutil {
         type WeakDeviceId = FakeWeakDeviceId<DeviceId>;
     }
 
+    impl<I: AssignedAddrIpExt, DeviceId: FakeStrongDeviceId> IpDeviceAddressIdContext<I>
+        for NoopImpl<DeviceId>
+    {
+        type AddressId = AddrSubnet<I::Addr, I::AssignedWitness>;
+        type WeakAddressId = FakeWeakAddressId<Self::AddressId>;
+    }
+
     impl<I, BC, DeviceId> FilterHandler<I, BC> for NoopImpl<DeviceId>
     where
-        I: IpExt,
+        I: IpExt + AssignedAddrIpExt,
         BC: FilterBindingsContext,
         DeviceId: FakeStrongDeviceId + InterfaceProperties<BC::DeviceClass>,
     {
@@ -697,7 +716,7 @@ pub mod testutil {
         ) -> IngressVerdict<I>
         where
             P: IpPacket<I>,
-            M: FilterIpMetadata<I, BC>,
+            M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
         {
             Verdict::Accept(()).into()
         }
@@ -711,7 +730,7 @@ pub mod testutil {
         ) -> Verdict
         where
             P: IpPacket<I>,
-            M: FilterIpMetadata<I, BC>,
+            M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
         {
             Verdict::Accept(())
         }
@@ -725,7 +744,7 @@ pub mod testutil {
         ) -> Verdict
         where
             P: IpPacket<I>,
-            M: FilterIpMetadata<I, BC>,
+            M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
         {
             Verdict::Accept(())
         }
@@ -739,7 +758,7 @@ pub mod testutil {
         ) -> Verdict
         where
             P: IpPacket<I>,
-            M: FilterIpMetadata<I, BC>,
+            M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
         {
             Verdict::Accept(())
         }
@@ -753,7 +772,7 @@ pub mod testutil {
         ) -> (Verdict, ProofOfEgressCheck)
         where
             P: IpPacket<I>,
-            M: FilterIpMetadata<I, BC>,
+            M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
         {
             (Verdict::Accept(()), ProofOfEgressCheck::forge_proof_for_test())
         }
@@ -778,8 +797,8 @@ mod tests {
     use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
     use ip_test_macro::ip_test;
-    use net_types::ip::Ipv4;
-    use netstack3_base::{IpDeviceAddr, SegmentHeader};
+    use net_types::ip::{AddrSubnet, Ipv4};
+    use netstack3_base::{AssignedAddrIpExt, SegmentHeader};
     use test_case::test_case;
 
     use super::*;
@@ -792,9 +811,10 @@ mod tests {
         TransportProtocolMatcher,
     };
     use crate::packets::testutil::internal::{
-        ArbitraryValue, FakeIpPacket, FakeTcpSegment, FakeUdpPacket, TestIpExt, TransportPacketExt,
+        ArbitraryValue, FakeIpPacket, FakeTcpSegment, FakeUdpPacket, TransportPacketExt,
     };
     use crate::state::{IpRoutines, NatRoutines, UninstalledRoutine};
+    use crate::testutil::TestIpExt;
 
     impl<I: IpExt> Rule<I, FakeDeviceClass, ()> {
         pub(crate) fn new(
@@ -839,33 +859,37 @@ mod tests {
 
     struct NullMetadata {}
 
-    impl<I: IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, BT> for NullMetadata {
-        fn take_conntrack_connection(&mut self) -> Option<Connection<I, BT, NatConfig>> {
+    impl<I: IpExt, A, BT: FilterBindingsTypes> FilterIpMetadata<I, A, BT> for NullMetadata {
+        fn take_conntrack_connection(&mut self) -> Option<Connection<I, NatConfig<I, A>, BT>> {
             None
         }
 
         fn replace_conntrack_connection(
             &mut self,
-            _conn: Connection<I, BT, NatConfig>,
-        ) -> Option<Connection<I, BT, NatConfig>> {
+            _conn: Connection<I, NatConfig<I, A>, BT>,
+        ) -> Option<Connection<I, NatConfig<I, A>, BT>> {
             None
         }
     }
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
-    struct PacketMetadata<I: IpExt, BT: FilterBindingsTypes>(Option<Connection<I, BT, NatConfig>>);
+    struct PacketMetadata<I: IpExt + AssignedAddrIpExt, A, BT: FilterBindingsTypes>(
+        Option<Connection<I, NatConfig<I, A>, BT>>,
+    );
 
-    impl<I: IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, BT> for PacketMetadata<I, BT> {
-        fn take_conntrack_connection(&mut self) -> Option<Connection<I, BT, NatConfig>> {
+    impl<I: TestIpExt, A, BT: FilterBindingsTypes> FilterIpMetadata<I, A, BT>
+        for PacketMetadata<I, A, BT>
+    {
+        fn take_conntrack_connection(&mut self) -> Option<Connection<I, NatConfig<I, A>, BT>> {
             let Self(inner) = self;
             inner.take()
         }
 
         fn replace_conntrack_connection(
             &mut self,
-            conn: Connection<I, BT, NatConfig>,
-        ) -> Option<Connection<I, BT, NatConfig>> {
+            conn: Connection<I, NatConfig<I, A>, BT>,
+        ) -> Option<Connection<I, NatConfig<I, A>, BT>> {
             let Self(inner) = self;
             inner.replace(conn)
         }
@@ -1026,7 +1050,10 @@ mod tests {
                 &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
-            IngressVerdict::TransparentLocalDelivery { addr: Ipv4::DST_IP, port: TPROXY_PORT }
+            IngressVerdict::TransparentLocalDelivery {
+                addr: <Ipv4 as crate::packets::testutil::internal::TestIpExt>::DST_IP,
+                port: TPROXY_PORT
+            }
         );
     }
 
@@ -1477,7 +1504,10 @@ mod tests {
                 },
                 ..Default::default()
             },
-            HashMap::from([(ethernet_interface(), IpDeviceAddr::new(I::SRC_IP).unwrap())]),
+            HashMap::from([(
+                ethernet_interface(),
+                AddrSubnet::new(I::SRC_IP, I::SUBNET.prefix()).unwrap(),
+            )]),
         );
 
         // Simulate a forwarded packet, originally from I::SRC_IP_2, that is masqueraded

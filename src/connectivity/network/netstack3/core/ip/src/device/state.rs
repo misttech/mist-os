@@ -272,6 +272,11 @@ where
         let Self(inner) = self;
         inner.upgrade().map(AddressId)
     }
+
+    fn is_assigned(&self) -> bool {
+        let Self(inner) = self;
+        inner.strong_count() != 0
+    }
 }
 
 /// The flags for an IP device.

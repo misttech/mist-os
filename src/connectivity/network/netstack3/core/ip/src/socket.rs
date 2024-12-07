@@ -389,7 +389,7 @@ where
         bindings_ctx: &mut BC,
         meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
         body: S,
-        packet_metadata: IpLayerPacketMetadata<I, BC>,
+        packet_metadata: IpLayerPacketMetadata<I, Self::WeakAddressId, BC>,
     ) -> Result<(), IpSendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,

@@ -674,6 +674,12 @@ impl<T> Weak<T> {
         }
     }
 
+    /// Gets the number of [`Primary`] and [`Strong`] references to this allocation.
+    pub fn strong_count(&self) -> usize {
+        let Self(weak) = self;
+        weak.strong_count()
+    }
+
     /// Creates a [`DebugReferences`] instance.
     pub fn debug_references(&self) -> DebugReferences<T> {
         let Self(inner) = self;

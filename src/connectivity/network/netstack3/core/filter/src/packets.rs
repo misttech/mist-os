@@ -1507,19 +1507,19 @@ pub mod testutil {
         impl TestIpExt for Ipv4 {
             const SRC_IP: Self::Addr = net_ip_v4!("192.0.2.1");
             const DST_IP: Self::Addr = net_ip_v4!("192.0.2.2");
-            const SRC_IP_2: Self::Addr = net_ip_v4!("192.0.2.8");
-            const DST_IP_2: Self::Addr = net_ip_v4!("192.0.2.9");
-            const IP_OUTSIDE_SUBNET: Self::Addr = net_ip_v4!("192.0.2.4");
-            const SUBNET: Subnet<Self::Addr> = net_subnet_v4!("192.0.2.0/30");
+            const SRC_IP_2: Self::Addr = net_ip_v4!("192.0.2.3");
+            const DST_IP_2: Self::Addr = net_ip_v4!("192.0.2.4");
+            const IP_OUTSIDE_SUBNET: Self::Addr = net_ip_v4!("192.0.3.1");
+            const SUBNET: Subnet<Self::Addr> = net_subnet_v4!("192.0.2.0/24");
         }
 
         impl TestIpExt for Ipv6 {
             const SRC_IP: Self::Addr = net_ip_v6!("2001:db8::1");
             const DST_IP: Self::Addr = net_ip_v6!("2001:db8::2");
-            const SRC_IP_2: Self::Addr = net_ip_v6!("2001:db8::8");
-            const DST_IP_2: Self::Addr = net_ip_v6!("2001:db8::9");
-            const IP_OUTSIDE_SUBNET: Self::Addr = net_ip_v6!("2001:db8::4");
-            const SUBNET: Subnet<Self::Addr> = net_subnet_v6!("2001:db8::/126");
+            const SRC_IP_2: Self::Addr = net_ip_v6!("2001:db8::3");
+            const DST_IP_2: Self::Addr = net_ip_v6!("2001:db8::4");
+            const IP_OUTSIDE_SUBNET: Self::Addr = net_ip_v6!("2001:db8:ffff::1");
+            const SUBNET: Subnet<Self::Addr> = net_subnet_v6!("2001:db8::/64");
         }
 
         #[derive(Clone, Debug, PartialEq)]

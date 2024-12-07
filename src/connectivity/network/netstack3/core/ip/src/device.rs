@@ -58,11 +58,11 @@ use crate::internal::device::router_solicitation::{RsHandler, RsTimerId};
 use crate::internal::device::slaac::{SlaacHandler, SlaacTimerId};
 use crate::internal::device::state::{
     IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateBindingsTypes,
-    IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressState, Ipv4DeviceConfiguration,
-    Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig,
-    Ipv6AddrSlaacConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration,
-    Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState, Ipv6NetworkLearnedParameters, Lifetime,
-    PreferredLifetime,
+    IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressEntry, Ipv4AddressState,
+    Ipv4DeviceConfiguration, Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig,
+    Ipv6AddrManualConfig, Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags,
+    Ipv6AddressState, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState,
+    Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, WeakAddressId,
 };
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
@@ -528,6 +528,18 @@ pub trait IpAddressIdSpec {
     type WeakV4: WeakIpAddressId<Ipv4Addr>;
     /// The weak V6 address ID.
     type WeakV6: WeakIpAddressId<Ipv6Addr>;
+}
+
+pub trait IpAddressIdExt: Ip {
+    type Weak<BT: IpDeviceStateBindingsTypes>: WeakIpAddressId<Self::Addr>;
+}
+
+impl IpAddressIdExt for Ipv4 {
+    type Weak<BT: IpDeviceStateBindingsTypes> = WeakAddressId<Ipv4AddressEntry<BT>>;
+}
+
+impl IpAddressIdExt for Ipv6 {
+    type Weak<BT: IpDeviceStateBindingsTypes> = WeakAddressId<Ipv6AddressEntry<BT>>;
 }
 
 /// Ties an [`IpAddressIdSpec`] to a core context implementation.

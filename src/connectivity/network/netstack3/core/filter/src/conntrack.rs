@@ -46,14 +46,14 @@ pub(crate) const MAXIMUM_CONNECTIONS: usize = 50_000;
 /// The `E` parameter is for external data that is stored in the [`Connection`]
 /// struct and can be extracted with the [`Connection::external_data()`]
 /// function.
-pub struct Table<I: IpExt, BT: FilterBindingsTypes, E> {
-    inner: Mutex<TableInner<I, BT, E>>,
+pub struct Table<I: IpExt, E, BT: FilterBindingsTypes> {
+    inner: Mutex<TableInner<I, E, BT>>,
 }
 
-struct TableInner<I: IpExt, BT: FilterBindingsTypes, E> {
+struct TableInner<I: IpExt, E, BT: FilterBindingsTypes> {
     /// A connection is inserted into the map twice: once for the original
     /// tuple, and once for the reply tuple.
-    table: HashMap<Tuple<I>, Arc<ConnectionShared<I, BT, E>>>,
+    table: HashMap<Tuple<I>, Arc<ConnectionShared<I, E, BT>>>,
     /// The number of connections in the table.
     ///
     /// We can't use the size of the HashMap because connections that have
@@ -69,7 +69,7 @@ struct TableInner<I: IpExt, BT: FilterBindingsTypes, E> {
     table_limit_drops: u32,
 }
 
-impl<I: IpExt, BT: FilterBindingsTypes, E> Table<I, BT, E> {
+impl<I: IpExt, E, BT: FilterBindingsTypes> Table<I, E, BT> {
     /// Returns whether the table contains a connection for the specified tuple.
     ///
     /// This is for NAT to determine whether a generated tuple will clash with
@@ -84,14 +84,14 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> Table<I, BT, E> {
     pub(crate) fn get_shared_connection(
         &self,
         tuple: &Tuple<I>,
-    ) -> Option<Arc<ConnectionShared<I, BT, E>>> {
+    ) -> Option<Arc<ConnectionShared<I, E, BT>>> {
         let guard = self.inner.lock();
         let conn = guard.table.get(&tuple)?;
         Some(conn.clone())
     }
 
     /// Returns a [`Connection`] for the flow indexed by `tuple`, if one exists.
-    pub fn get_connection(&self, tuple: &Tuple<I>) -> Option<Connection<I, BT, E>> {
+    pub fn get_connection(&self, tuple: &Tuple<I>) -> Option<Connection<I, E, BT>> {
         let guard = self.inner.lock();
         let conn = guard.table.get(&tuple)?;
         Some(Connection::Shared(conn.clone()))
@@ -106,7 +106,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> Table<I, BT, E> {
     /// Removes the [`Connection`] for the flow indexed by `tuple`, if one exists,
     /// and returns it to the caller.
     #[cfg(feature = "testutils")]
-    pub fn remove_connection(&mut self, tuple: &Tuple<I>) -> Option<Connection<I, BT, E>> {
+    pub fn remove_connection(&mut self, tuple: &Tuple<I>) -> Option<Connection<I, E, BT>> {
         let mut guard = self.inner.lock();
 
         // Remove the entry indexed by the tuple.
@@ -136,12 +136,7 @@ where
     let _ = bindings_ctx.schedule_timer(GC_INTERVAL, timer);
 }
 
-impl<
-        I: IpExt,
-        BC: FilterBindingsContext,
-        E: Default + Send + Sync + Debug + PartialEq + CompatibleWith + 'static,
-    > Table<I, BC, E>
-{
+impl<I: IpExt, E, BC: FilterBindingsContext> Table<I, E, BC> {
     pub(crate) fn new<CC: CoreTimerContext<FilterTimerId<I>, BC>>(bindings_ctx: &mut BC) -> Self {
         Self {
             inner: Mutex::new(TableInner {
@@ -156,7 +151,14 @@ impl<
             }),
         }
     }
+}
 
+impl<
+        I: IpExt,
+        E: Default + Send + Sync + PartialEq + CompatibleWith + 'static,
+        BC: FilterBindingsContext,
+    > Table<I, E, BC>
+{
     /// Attempts to insert the `Connection` into the table.
     ///
     /// To be called once a packet for the connection has passed all filtering.
@@ -168,8 +170,8 @@ impl<
     pub(crate) fn finalize_connection(
         &self,
         bindings_ctx: &mut BC,
-        connection: Connection<I, BC, E>,
-    ) -> Result<(bool, Option<Arc<ConnectionShared<I, BC, E>>>), FinalizeConnectionError> {
+        connection: Connection<I, E, BC>,
+    ) -> Result<(bool, Option<Arc<ConnectionShared<I, E, BC>>>), FinalizeConnectionError> {
         let exclusive = match connection {
             Connection::Exclusive(c) => c,
             // Given that make_shared is private, the only way for us to receive
@@ -271,7 +273,9 @@ impl<
             Ok((true, Some(clone)))
         }
     }
+}
 
+impl<I: IpExt, E: Default, BC: FilterBindingsContext> Table<I, E, BC> {
     /// Returns a [`Connection`] for the packet's flow. If a connection does not
     /// currently exist, a new one is created.
     ///
@@ -285,7 +289,7 @@ impl<
         &self,
         bindings_ctx: &BC,
         packet: &P,
-    ) -> Result<Option<Connection<I, BC, E>>, GetConnectionError<I, BC, E>> {
+    ) -> Result<Option<Connection<I, E, BC>>, GetConnectionError<I, E, BC>> {
         let Some(packet) = PacketMetadata::new(packet) else {
             return Ok(None);
         };
@@ -381,7 +385,7 @@ impl<
     }
 }
 
-impl<I: IpExt, BT: FilterBindingsTypes, E: Inspectable> Inspectable for Table<I, BT, E> {
+impl<I: IpExt, E: Inspectable, BT: FilterBindingsTypes> Inspectable for Table<I, E, BT> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         let guard = self.inner.lock();
 
@@ -537,23 +541,23 @@ enum ConnectionUpdateError {
 /// An error returned from [`Table::get_connection_for_packet_and_update`].
 #[derive(Derivative)]
 #[derivative(Debug(bound = "E: Debug"))]
-pub(crate) enum GetConnectionError<I: IpExt, BT: FilterBindingsTypes, E> {
+pub(crate) enum GetConnectionError<I: IpExt, E, BT: FilterBindingsTypes> {
     /// The packet was invalid. The caller may decide whether to drop it or not.
-    InvalidPacket(Connection<I, BT, E>),
+    InvalidPacket(Connection<I, E, BT>),
 }
 
 /// A `Connection` contains all of the information about a single connection
 /// tracked by conntrack.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "E: Debug"))]
-pub enum Connection<I: IpExt, BT: FilterBindingsTypes, E> {
+pub enum Connection<I: IpExt, E, BT: FilterBindingsTypes> {
     /// A connection that is directly owned by the packet that originated the
     /// connection and no others. All fields are modifiable.
-    Exclusive(ConnectionExclusive<I, BT, E>),
+    Exclusive(ConnectionExclusive<I, E, BT>),
 
     /// This is an existing connection, and there are possibly many other
     /// packets that are concurrently modifying it.
-    Shared(Arc<ConnectionShared<I, BT, E>>),
+    Shared(Arc<ConnectionShared<I, E, BT>>),
 }
 
 /// An error when attempting to retrieve the underlying conntrack entry from a
@@ -583,7 +587,7 @@ impl WeakConnection {
     /// Creates a new type-erased weak handle to the provided conntrack entry,
     /// provided it is a shared entry.
     pub fn new<I: IpExt, BT: FilterBindingsTypes + 'static, E: Send + Sync + 'static>(
-        conn: &Connection<I, BT, E>,
+        conn: &Connection<I, E, BT>,
     ) -> Option<Self> {
         let shared = match conn {
             Connection::Exclusive(_) => return None,
@@ -603,7 +607,7 @@ impl WeakConnection {
     /// connection).
     pub fn into_inner<I: IpExt, BT: FilterBindingsTypes + 'static, E: Send + Sync + 'static>(
         self,
-    ) -> Result<Connection<I, BT, E>, WeakConnectionError> {
+    ) -> Result<Connection<I, E, BT>, WeakConnectionError> {
         let Self(inner) = self;
         let shared = inner
             .upgrade()
@@ -614,7 +618,7 @@ impl WeakConnection {
     }
 }
 
-impl<I: IpExt, BT: FilterBindingsTypes, E> Connection<I, BT, E> {
+impl<I: IpExt, E, BT: FilterBindingsTypes> Connection<I, E, BT> {
     /// Returns the tuple of the original direction of this connection.
     pub fn original_tuple(&self) -> &Tuple<I> {
         match self {
@@ -673,7 +677,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> Connection<I, BT, E> {
     }
 }
 
-impl<I: IpExt, BC: FilterBindingsContext, E> Connection<I, BC, E> {
+impl<I: IpExt, E, BC: FilterBindingsContext> Connection<I, E, BC> {
     fn update(
         &mut self,
         bindings_ctx: &BC,
@@ -855,7 +859,7 @@ impl<BT: FilterBindingsTypes> Inspectable for ConnectionState<BT> {
 /// has been inserted).
 #[derive(Derivative)]
 #[derivative(Debug(bound = "E: Debug"))]
-pub struct ConnectionExclusive<I: IpExt, BT: FilterBindingsTypes, E> {
+pub struct ConnectionExclusive<I: IpExt, E, BT: FilterBindingsTypes> {
     pub(crate) inner: ConnectionCommon<I, E>,
     pub(crate) state: ConnectionState<BT>,
 
@@ -866,10 +870,10 @@ pub struct ConnectionExclusive<I: IpExt, BT: FilterBindingsTypes, E> {
     do_not_insert: bool,
 }
 
-impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionExclusive<I, BT, E> {
+impl<I: IpExt, E, BT: FilterBindingsTypes> ConnectionExclusive<I, E, BT> {
     /// Turn this exclusive connection into a shared one. This is required in
     /// order to insert into the [`Table`] table.
-    fn make_shared(self) -> Arc<ConnectionShared<I, BT, E>> {
+    fn make_shared(self) -> Arc<ConnectionShared<I, E, BT>> {
         Arc::new(ConnectionShared { inner: self.inner, state: Mutex::new(self.state) })
     }
 
@@ -878,7 +882,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionExclusive<I, BT, E> {
     }
 }
 
-impl<I: IpExt, BC: FilterBindingsContext, E: Default> ConnectionExclusive<I, BC, E> {
+impl<I: IpExt, E: Default, BC: FilterBindingsContext> ConnectionExclusive<I, E, BC> {
     pub(crate) fn from_deconstructed_packet(
         bindings_ctx: &BC,
         PacketMetadata { tuple, transport_data }: &PacketMetadata<I>,
@@ -925,7 +929,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> ConnectionExclusive<I, BC,
 /// through the associated methods.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "E: Debug"))]
-pub struct ConnectionShared<I: IpExt, BT: FilterBindingsTypes, E> {
+pub struct ConnectionShared<I: IpExt, E, BT: FilterBindingsTypes> {
     inner: ConnectionCommon<I, E>,
     state: Mutex<ConnectionState<BT>>,
 }
@@ -990,7 +994,7 @@ impl Debug for TransportProtocol {
     }
 }
 
-impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionShared<I, BT, E> {
+impl<I: IpExt, E, BT: FilterBindingsTypes> ConnectionShared<I, E, BT> {
     fn is_expired(&self, now: BT::Instant) -> bool {
         let state = self.state.lock().clone();
         let duration = now.saturating_duration_since(state.last_packet_time);
@@ -1009,18 +1013,18 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionShared<I, BT, E> {
     }
 }
 
-impl<I: IpExt, BT: FilterBindingsTypes, E: CompatibleWith> ConnectionShared<I, BT, E> {
+impl<I: IpExt, E: CompatibleWith, BT: FilterBindingsTypes> ConnectionShared<I, E, BT> {
     /// Returns whether the provided exclusive connection is compatible with this
     /// one, to the extent that a shared reference to this tracked connection could
     /// be adopted in place of the exclusive connection.
-    pub(crate) fn compatible_with(&self, conn: &ConnectionExclusive<I, BT, E>) -> bool {
+    pub(crate) fn compatible_with(&self, conn: &ConnectionExclusive<I, E, BT>) -> bool {
         self.inner.original_tuple == conn.inner.original_tuple
             && self.inner.reply_tuple == conn.inner.reply_tuple
             && self.inner.external_data.compatible_with(&conn.inner.external_data)
     }
 }
 
-impl<I: IpExt, BT: FilterBindingsTypes, E: Inspectable> Inspectable for ConnectionShared<I, BT, E> {
+impl<I: IpExt, E: Inspectable, BT: FilterBindingsTypes> Inspectable for ConnectionShared<I, E, BT> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         inspector.delegate_inspectable(&self.inner);
         inspector.delegate_inspectable(&*self.state.lock());
@@ -1086,7 +1090,7 @@ mod tests {
     use crate::packets::MaybeTransportPacketMut;
     use crate::state::IpRoutines;
 
-    trait TestIpExt: Ip {
+    trait TestIpExt: IpExt + crate::context::testutil::TestIpExt {
         const SRC_ADDR: Self::Addr;
         const SRC_PORT: u16 = 1234;
         const DST_ADDR: Self::Addr;
@@ -1244,7 +1248,7 @@ mod tests {
         let reply_tuple = original_tuple.clone().invert();
 
         let connection =
-            ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(&bindings_ctx, &packet)
+            ConnectionExclusive::<_, (), _>::from_deconstructed_packet(&bindings_ctx, &packet)
                 .unwrap();
 
         assert_eq!(&connection.inner.original_tuple, &original_tuple);
@@ -1326,7 +1330,7 @@ mod tests {
         let mut other_tuple = original_tuple.clone();
         other_tuple.src_port_or_id += 1;
 
-        let connection: ConnectionExclusive<_, _, ()> =
+        let connection: ConnectionExclusive<_, (), _> =
             ConnectionExclusive::from_deconstructed_packet(&bindings_ctx, &packet).unwrap();
         let connection = match connection_kind {
             ConnectionKind::Exclusive => Connection::Exclusive(connection),
@@ -1367,7 +1371,7 @@ mod tests {
         .unwrap();
 
         let connection =
-            ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(&bindings_ctx, &packet)
+            ConnectionExclusive::<_, (), _>::from_deconstructed_packet(&bindings_ctx, &packet)
                 .unwrap();
         let mut connection = match connection_kind {
             ConnectionKind::Exclusive => Connection::Exclusive(connection),
@@ -1408,7 +1412,7 @@ mod tests {
     fn table_get_exclusive_connection_and_finalize_shared<I: IpExt + TestIpExt>() {
         let mut bindings_ctx = FakeBindingsCtx::new();
         bindings_ctx.sleep(Duration::from_secs(1));
-        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
 
         let packet = FakeIpPacket::<I, _> {
             src_ip: I::SRC_ADDR,
@@ -1483,7 +1487,7 @@ mod tests {
     #[ip_test(I)]
     fn table_conflict<I: IpExt + TestIpExt>() {
         let mut bindings_ctx = FakeBindingsCtx::new();
-        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
 
         let original_packet = PacketMetadata::new(&FakeIpPacket::<I, _> {
             src_ip: I::SRC_ADDR,
@@ -1500,7 +1504,7 @@ mod tests {
         .unwrap();
 
         let conn1 = Connection::Exclusive(
-            ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(
+            ConnectionExclusive::<_, (), _>::from_deconstructed_packet(
                 &bindings_ctx,
                 &original_packet,
             )
@@ -1509,7 +1513,7 @@ mod tests {
 
         // Fake NAT that ends up allocating the same reply tuple as an existing
         // connection.
-        let mut conn2 = ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(
+        let mut conn2 = ConnectionExclusive::<_, (), _>::from_deconstructed_packet(
             &bindings_ctx,
             &original_packet,
         )
@@ -1519,7 +1523,7 @@ mod tests {
 
         // Fake NAT that ends up allocating the same original tuple as an
         // existing connection.
-        let mut conn3 = ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(
+        let mut conn3 = ConnectionExclusive::<_, (), _>::from_deconstructed_packet(
             &bindings_ctx,
             &original_packet,
         )
@@ -1543,7 +1547,7 @@ mod tests {
         I: IpExt + crate::packets::testutil::internal::TestIpExt,
     >() {
         let mut bindings_ctx = FakeBindingsCtx::new();
-        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
 
         let original_packet =
             PacketMetadata::new(&FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value()).unwrap();
@@ -1552,7 +1556,7 @@ mod tests {
         // creating identical exclusive connections.
 
         let conn = Connection::Exclusive(
-            ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(
+            ConnectionExclusive::<_, (), _>::from_deconstructed_packet(
                 &bindings_ctx,
                 &original_packet,
             )
@@ -1564,7 +1568,7 @@ mod tests {
         );
 
         let conn = Connection::Exclusive(
-            ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(
+            ConnectionExclusive::<_, (), _>::from_deconstructed_packet(
                 &bindings_ctx,
                 &original_packet,
             )
@@ -1588,8 +1592,8 @@ mod tests {
     #[ip_test(I)]
     #[test_case(GcTrigger::Direct)]
     #[test_case(GcTrigger::Timer)]
-    fn garbage_collection<I: IpExt + TestIpExt>(gc_trigger: GcTrigger) {
-        fn perform_gc<I: IpExt>(
+    fn garbage_collection<I: TestIpExt>(gc_trigger: GcTrigger) {
+        fn perform_gc<I: TestIpExt>(
             core_ctx: &mut FakeCtx<I>,
             bindings_ctx: &mut FakeBindingsCtx<I>,
             gc_trigger: GcTrigger,
@@ -1761,7 +1765,7 @@ mod tests {
     fn table_size_limit<I: IpExt + TestIpExt>(established: bool) {
         let mut bindings_ctx = FakeBindingsCtx::<I>::new();
         bindings_ctx.sleep(Duration::from_secs(1));
-        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
 
         // Fill up the table so that the next insertion will fail.
         for i in 0..MAXIMUM_CONNECTIONS {
@@ -1844,7 +1848,7 @@ mod tests {
 
         let mut bindings_ctx = FakeBindingsCtx::<I>::new();
         bindings_ctx.sleep(Duration::from_secs(1));
-        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
 
         {
             let inspector = Inspector::new(Default::default());
@@ -1987,7 +1991,7 @@ mod tests {
     #[ip_test(I)]
     fn self_connected_socket<I: IpExt + TestIpExt>() {
         let mut bindings_ctx = FakeBindingsCtx::new();
-        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
 
         let packet = FakeIpPacket::<I, _> {
             src_ip: I::SRC_ADDR,
@@ -2031,7 +2035,7 @@ mod tests {
     #[ip_test(I)]
     fn remove_entry_on_update<I: IpExt + TestIpExt>() {
         let mut bindings_ctx = FakeBindingsCtx::new();
-        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
 
         let original_packet = FakeIpPacket::<I, _> {
             src_ip: I::SRC_ADDR,
@@ -2105,7 +2109,7 @@ mod tests {
     #[ip_test(I)]
     fn do_not_insert<I: IpExt + TestIpExt>() {
         let mut bindings_ctx = FakeBindingsCtx::new();
-        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
 
         let packet = FakeIpPacket::<I, _> {
             src_ip: I::SRC_ADDR,
