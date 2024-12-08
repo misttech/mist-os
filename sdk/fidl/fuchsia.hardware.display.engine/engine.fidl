@@ -298,7 +298,7 @@ open protocol EngineListener {
     flexible OnDisplayVsync(struct {
         display_id uint64;
         timestamp zx.Time;
-        config_stamp box<fuchsia.hardware.display.types.ConfigStamp>;
+        config_stamp fuchsia.hardware.display.types.ConfigStamp;
     });
 
     /// Called when a previous display capture triggered by
