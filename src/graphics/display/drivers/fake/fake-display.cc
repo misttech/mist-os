@@ -145,7 +145,7 @@ zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
   return ZX_OK;
 }
 
-void FakeDisplay::DisplayEngineRegisterDisplayEngineListener(
+void FakeDisplay::DisplayEngineSetListener(
     const display_engine_listener_protocol_t* engine_listener) {
   fbl::AutoLock engine_listener_lock(&engine_listener_mutex_);
   engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
@@ -155,7 +155,7 @@ void FakeDisplay::DisplayEngineRegisterDisplayEngineListener(
   engine_listener_client_.OnDisplayAdded(&banjo_display_info);
 }
 
-void FakeDisplay::DisplayEngineDeregisterDisplayEngineListener() {
+void FakeDisplay::DisplayEngineUnsetListener() {
   fbl::AutoLock engine_listener_lock(&engine_listener_mutex_);
   engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient();
 }

@@ -776,15 +776,14 @@ zx_status_t Controller::AddDisplay(std::unique_ptr<DisplayDevice> display) {
 
 // DisplayEngine methods
 
-void Controller::DisplayEngineRegisterDisplayEngineListener(
+void Controller::DisplayEngineSetListener(
     const display_engine_listener_protocol_t* engine_listener) {
   fbl::AutoLock lock(&display_lock_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
 
-  // If `RegisterDisplayEngineListener` occurs **after** driver initialization
-  // (i.e. `driver_initialized_` is true), `RegisterDisplayEngineListener`
-  // should be responsible for notifying the coordinator of existing display
-  // devices.
+  // If `SetListener` occurs **after** driver initialization (i.e.
+  // `driver_initialized_` is true), `SetListener` should be responsible for
+  // notifying the coordinator of existing display devices.
   //
   // Otherwise, the driver initialization logic (`DdkInit()`) should be
   // responsible for notifying the coordinator of existing display devices.
@@ -796,7 +795,7 @@ void Controller::DisplayEngineRegisterDisplayEngineListener(
   }
 }
 
-void Controller::DisplayEngineDeregisterDisplayEngineListener() {
+void Controller::DisplayEngineUnsetListener() {
   fbl::AutoLock lock(&display_lock_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
@@ -2105,12 +2104,12 @@ void Controller::Start(fdf::StartCompleter completer) {
   {
     fbl::AutoLock lock(&display_lock_);
 
-    // If `RegisterDisplayEngineListener` occurs **before** driver
-    // initialization (i.e. `engine_listener_` is valid), `DdkInit()` should be
-    // responsible for notifying the coordinator of existing display devices.
-    //
-    // Otherwise, `RegisterDisplayEngineListener` should be responsible for
+    // If `SetListener` occurs **before** driver initialization (i.e.
+    // `engine_listener_` is valid), `DdkInit()` should be responsible for
     // notifying the coordinator of existing display devices.
+    //
+    // Otherwise, `SetListener` should be responsible for notifying the
+    // coordinator of existing display devices.
     if ((!display_devices_.is_empty()) && engine_listener_.is_valid()) {
       for (const std::unique_ptr<DisplayDevice>& display_device : display_devices_) {
         const raw_display_info_t banjo_display_info = display_device->CreateRawDisplayInfo();

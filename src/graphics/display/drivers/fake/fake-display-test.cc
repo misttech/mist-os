@@ -570,7 +570,7 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   DisplayCaptureCompletion display_capture_completion = {};
   const display_engine_listener_protocol_t& controller_protocol =
       display_capture_completion.GetDisplayEngineListenerProtocol();
-  display()->DisplayEngineRegisterDisplayEngineListener(&controller_protocol);
+  display()->DisplayEngineSetListener(&controller_protocol);
 
   constexpr display::DriverBufferCollectionId kCaptureBufferCollectionId(1);
   constexpr uint64_t kBanjoCaptureBufferCollectionId =

@@ -163,7 +163,7 @@ class Device : public DeviceType {
   zx_status_t Bind() { return ZX_OK };
 
   // Functionality needed by the common display driver core.
-  void DisplayEngineRegisterDisplayEngineListener(
+  void DisplayEngineSetListener(
       const display_engine_listener_protocol* interface) {}
 
   zx_status_t DisplayEngineImportBufferCollection(

@@ -107,7 +107,7 @@ zx::result<> DisplayEngine::Initialize() {
   return zx::ok();
 }
 
-void DisplayEngine::DisplayEngineRegisterDisplayEngineListener(
+void DisplayEngine::DisplayEngineSetListener(
     const display_engine_listener_protocol_t* engine_listener) {
   const int32_t width = primary_display_device_.width_px;
   const int32_t height = primary_display_device_.height_px;
@@ -154,7 +154,7 @@ void DisplayEngine::DisplayEngineRegisterDisplayEngineListener(
   }
 }
 
-void DisplayEngine::DisplayEngineDeregisterDisplayEngineListener() {
+void DisplayEngine::DisplayEngineUnsetListener() {
   fbl::AutoLock lock(&flush_lock_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }

@@ -91,7 +91,7 @@ zx_koid_t GetCurrentProcessKoid() {
 
 // implement display controller protocol:
 
-void FramebufferDisplay::DisplayEngineRegisterDisplayEngineListener(
+void FramebufferDisplay::DisplayEngineSetListener(
     const display_engine_listener_protocol_t* engine_listener) {
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
 
@@ -134,7 +134,7 @@ void FramebufferDisplay::DisplayEngineRegisterDisplayEngineListener(
   engine_listener_.OnDisplayAdded(&banjo_display_info);
 }
 
-void FramebufferDisplay::DisplayEngineDeregisterDisplayEngineListener() {
+void FramebufferDisplay::DisplayEngineUnsetListener() {
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
 

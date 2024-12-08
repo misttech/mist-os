@@ -54,9 +54,8 @@ class DisplayEngineBanjoAdapter : public ddk::DisplayEngineProtocol<DisplayEngin
   compat::DeviceServer::BanjoConfig CreateBanjoConfig();
 
   // ddk::DisplayEngineProtocol
-  void DisplayEngineRegisterDisplayEngineListener(
-      const display_engine_listener_protocol_t* display_engine_listener);
-  void DisplayEngineDeregisterDisplayEngineListener();
+  void DisplayEngineSetListener(const display_engine_listener_protocol_t* display_engine_listener);
+  void DisplayEngineUnsetListener();
   zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
                                                   zx::channel buffer_collection_token);
   zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);

@@ -46,17 +46,17 @@ compat::DeviceServer::BanjoConfig DisplayEngineBanjoAdapter::CreateBanjoConfig()
   return banjo_config;
 }
 
-void DisplayEngineBanjoAdapter::DisplayEngineRegisterDisplayEngineListener(
+void DisplayEngineBanjoAdapter::DisplayEngineSetListener(
     const display_engine_listener_protocol_t* display_engine_listener) {
   ZX_DEBUG_ASSERT(display_engine_listener);
-  engine_events_.RegisterDisplayEngineListener(display_engine_listener);
+  engine_events_.SetListener(display_engine_listener);
   if (display_engine_listener != nullptr) {
     engine_.OnCoordinatorConnected();
   }
 }
 
-void DisplayEngineBanjoAdapter::DisplayEngineDeregisterDisplayEngineListener() {
-  engine_events_.RegisterDisplayEngineListener(nullptr);
+void DisplayEngineBanjoAdapter::DisplayEngineUnsetListener() {
+  engine_events_.SetListener(nullptr);
 }
 
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineImportBufferCollection(

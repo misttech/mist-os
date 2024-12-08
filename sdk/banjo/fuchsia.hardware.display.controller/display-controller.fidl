@@ -329,18 +329,18 @@ type LayerCompositionOperations = strict bits : uint32 {
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
 closed protocol DisplayEngine {
-    /// Registers a `DisplayEngineListener` that listens to display events
+    /// Sets a `DisplayEngineListener` that listens to display events
     /// on this display engine.
     ///
-    /// There must be exactly one `DisplayEngineListener` registered to
+    /// There must be exactly one `DisplayEngineListener` set to
     /// the display engine before any other functions are called.
-    strict RegisterDisplayEngineListener(resource struct {
+    strict SetListener(resource struct {
         engine_listener client_end:DisplayEngineListener;
     }) -> ();
 
-    /// Deregisters the `DisplayEngineListener` connection previously
-    /// registered to the Engine if there is any. No-op otherwise.
-    strict DeregisterDisplayEngineListener() -> ();
+    /// Unsets the `DisplayEngineListener` connection previously
+    /// registered to the Engine.
+    strict UnsetListener() -> ();
 
     /// Import a sysmem buffer collection token.
     ///
