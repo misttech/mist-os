@@ -12,11 +12,18 @@
 
 use core::num::NonZeroU8;
 
+use alloc::collections::HashSet;
 use const_unwrap::const_unwrap_option;
+use core::time::Duration;
 use net_types::ip::Ip;
+use net_types::{MulticastAddr, Witness as _};
+use netstack3_base::Instant as _;
 use packet_formats::utils::NonZeroDuration;
 
-use crate::internal::gmp::{self, GmpBindingsContext, GmpContext, GmpMode, IpExt, NotAMemberErr};
+use crate::internal::gmp::{
+    self, GmpBindingsContext, GmpContext, GmpContextInner, GmpGroupState, GmpMode, GmpStateRef,
+    GmpTypeLayout, GroupJoinResult, IpExt, NotAMemberErr, QueryTarget,
+};
 
 /// The default value for Query Response Interval defined in [RFC 3810
 /// section 9.3] and [RFC 3376 section 8.3].
@@ -35,7 +42,7 @@ pub(super) const DEFAULT_QUERY_RESPONSE_INTERVAL: NonZeroDuration =
 ///     https://datatracker.ietf.org/doc/html/rfc3810#section-9.1
 /// [RFC 3376 section 8.1]:
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-8.1
-const DEFAULT_ROBUSTNESS_VARIABLE: NonZeroU8 = const_unwrap_option(NonZeroU8::new(2));
+pub(super) const DEFAULT_ROBUSTNESS_VARIABLE: NonZeroU8 = const_unwrap_option(NonZeroU8::new(2));
 
 /// The default value for the Query Interval defined in [RFC 3810
 /// section 9.2] and [RFC 3376 section 8.2].
@@ -44,16 +51,24 @@ const DEFAULT_ROBUSTNESS_VARIABLE: NonZeroU8 = const_unwrap_option(NonZeroU8::ne
 ///     https://datatracker.ietf.org/doc/html/rfc3810#section-9.2
 /// [RFC 3376 section 8.2]:
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-8.2
-const DEFAULT_QUERY_INTERVAL: NonZeroDuration =
+pub(super) const DEFAULT_QUERY_INTERVAL: NonZeroDuration =
     const_unwrap_option(NonZeroDuration::from_secs(125));
 
 #[cfg_attr(test, derive(Debug))]
-pub(super) struct GroupState;
+pub(super) struct GroupState<I: Ip> {
+    recorded_sources: HashSet<I::Addr>,
+}
 
-impl GroupState {
+impl<I: Ip> GroupState<I> {
     pub(super) fn new_for_mode_transition() -> Self {
-        Self
+        Self { recorded_sources: Default::default() }
     }
+}
+
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+pub(super) enum TimerId<I: Ip> {
+    GeneralQuery,
+    MulticastAddress(MulticastAddr<I::Addr>),
 }
 
 /// Global protocol state required for v2 support.
@@ -138,11 +153,43 @@ pub trait ProtocolConfig {
 }
 
 /// Trait abstracting a GMPv2 query.
+///
+/// The getters in this trait represent fields in the membership query messages
+/// defined in [RFC 3376 section 4.1] and [RFC 3810 section 5.1].
+///
+/// [RFC 3376 section 4.1]:
+///     https://datatracker.ietf.org/doc/html/rfc3376#section-4.1
+/// [RFC 3810 section 5.1]:
+///     https://datatracker.ietf.org/doc/html/rfc3810#section-5.1
 pub(super) trait QueryMessage<I: Ip> {
     /// Reinterprets this as a v1 query message.
     fn as_v1(&self) -> impl gmp::v1::QueryMessage<I> + '_;
+
+    /// Gets the Querier's Robustness Variable (QRV).
+    fn robustness_variable(&self) -> u8;
+
+    /// Gets the Querier's Query Interval Code (QQIC) interpreted as a duration.
+    fn query_interval(&self) -> Duration;
+
+    /// Gets the group address.
+    fn group_address(&self) -> I::Addr;
+
+    /// Gets the maximum response time.
+    fn max_response_time(&self) -> Duration;
+
+    /// Gets an iterator to the source addresses being queried.
+    fn sources(&self) -> impl Iterator<Item = I::Addr> + '_;
 }
 
+/// Handles a query message from the network.
+///
+/// The RFC algorithm is specified on [RFC 3376 section 5.2] and [RFC 3810
+/// section 6.2].
+///
+/// [RFC 3376 section 5.2]:
+///     https://datatracker.ietf.org/doc/html/rfc3376#section-5.2
+/// [RFC 3810 section 6.2]:
+///     https://datatracker.ietf.org/doc/html/rfc3810#section-6.2
 pub(super) fn handle_query_message<
     I: IpExt,
     CC: GmpContext<I, BC>,
@@ -167,24 +214,196 @@ pub(super) fn handle_query_message<
             }
             GmpMode::V2 => {}
         }
-        // TODO(https://fxbug.dev/42071006): Handle v2 queries.
+        let GmpStateRef { enabled: _, groups, gmp, config: _ } = state;
+        // Update parameters if non zero given in query.
+        if let Some(qrv) = NonZeroU8::new(query.robustness_variable()) {
+            gmp.v2_proto.robustness_variable = qrv;
+        }
+        if let Some(qqic) = NonZeroDuration::new(query.query_interval()) {
+            gmp.v2_proto.query_interval = qqic;
+        }
+
+        let target = query.group_address();
+        let target = QueryTarget::new(target).ok_or_else(|| NotAMemberErr(target))?;
+
+        // Common early bailout.
+        let target = match target {
+            // General query.
+            QueryTarget::Unspecified => {
+                // RFC: When a new valid General Query arrives on an interface,
+                // the node checks whether it has any per-interface listening
+                // state record to report on, or not.
+                if groups.is_empty() {
+                    return Ok(());
+                }
+
+                // None target from now on marks a general query.
+                None
+            }
+            // Group-Specific or Group-And-Source-Specific query.
+            QueryTarget::Specified(multicast_addr) => {
+                // RFC: Similarly, when a new valid Multicast Address (and
+                // Source) Specific Query arrives on an interface, the node
+                // checks whether it has a per-interface listening state record
+                // that corresponds to the queried multicast address (and
+                // source), or not.
+
+                // TODO(https://fxbug.dev/381241191): We should also consider
+                // source lists here when we support SSM.
+
+                let group = groups
+                    .get_mut(&multicast_addr)
+                    .ok_or_else(|| NotAMemberErr(multicast_addr.get()))?;
+
+                // `Some` target marks a specific query.
+                Some((group.v2_mut(), multicast_addr))
+            }
+        };
+
+        // RFC: If it does, a delay for a response is randomly selected
+        // in the range (0, [Maximum Response Delay]).
+        let now = bindings_ctx.now();
+        let delay = now.saturating_add(gmp::random_report_timeout(
+            &mut bindings_ctx.rng(),
+            query.max_response_time(),
+        ));
+
+        // RFC: If there is a pending response to a previous General Query
+        // scheduled sooner than the selected delay, no additional response
+        // needs to be scheduled.
+        match gmp.timers.get(&TimerId::GeneralQuery.into()) {
+            Some((instant, ())) => {
+                if instant <= delay {
+                    return Ok(());
+                }
+            }
+            None => {}
+        }
+
+        let (group, addr) = match target {
+            // RFC: If the received Query is a General Query, the Interface
+            // Timer is used to schedule a response to the General Query after
+            // the selected delay.  Any previously pending response to a General
+            // Query is canceled.
+            None => {
+                let _: Option<_> = gmp.timers.schedule_instant(
+                    bindings_ctx,
+                    TimerId::GeneralQuery.into(),
+                    (),
+                    delay,
+                );
+                return Ok(());
+            }
+            Some(specific) => specific,
+        };
+
+        // The RFC quote for the next part is a bit long-winded but the
+        // algorithm is simple. Full quote:
+        //
+        //  If the received Query is a Multicast Address Specific Query or a
+        //  Multicast Address and Source Specific Query and there is no pending
+        //  response to a previous Query for this multicast address, then the
+        //  Multicast Address Timer is used to schedule a report.  If the
+        //  received Query is a Multicast Address and Source Specific Query, the
+        //  list of queried sources is recorded to be used when generating a
+        //  response.
+        //
+        //  If there is already a pending response to a previous Query scheduled
+        //  for this multicast address, and either the new Query is a Multicast
+        //  Address Specific Query or the recorded source list associated with
+        //  the multicast address is empty, then the multicast address source
+        //  list is cleared and a single response is scheduled, using the
+        //  Multicast Address Timer.  The new response is scheduled to be sent
+        //  at the earliest of the remaining time for the pending report and the
+        //  selected delay.
+        //
+        //  If the received Query is a Multicast Address and Source Specific
+        //  Query and there is a pending response for this multicast address
+        //  with a non-empty source list, then the multicast address source list
+        //  is augmented to contain the list of sources in the new Query, and a
+        //  single response is scheduled using the Multicast Address Timer.  The
+        //  new response is scheduled to be sent at the earliest of the
+        //  remaining time for the pending report and the selected delay.
+
+        let timer_id = TimerId::MulticastAddress(addr).into();
+        let scheduled = gmp.timers.get(&timer_id);
+        let mut sources = query.sources().peekable();
+
+        let (delay, clear_sources) = match scheduled {
+            // There is a scheduled report.
+            Some((t, ())) => {
+                // Only reschedule the timer if scheduling for earlier.
+                let delay = (delay < t).then_some(delay);
+                // Per the second paragraph above, clear sources if address
+                // query or if the pending report is already for an empty source
+                // list (meaning we don't restrict the old report to the new
+                // sources).
+                let is_address_query = sources.peek().is_none();
+                let clear_sources = group.recorded_sources.is_empty() || is_address_query;
+                (delay, clear_sources)
+            }
+            // No scheduled report, use new delay and record sources.
+            None => (Some(delay), false),
+        };
+
+        if clear_sources {
+            group.recorded_sources = Default::default();
+        } else {
+            group.recorded_sources.extend(sources);
+        }
+
+        if let Some(delay) = delay {
+            let _: Option<_> = gmp.timers.schedule_instant(bindings_ctx, timer_id, (), delay);
+        }
+
         Ok(())
+    })
+}
+
+pub(super) fn join_group<
+    I: IpExt,
+    CC: GmpContextInner<I, BC>,
+    BC: GmpBindingsContext,
+    T: GmpTypeLayout<I, BC>,
+>(
+    _core_ctx: &mut CC,
+    _bindings_ctx: &mut BC,
+    _device: &CC::DeviceId,
+    group_addr: MulticastAddr<I::Addr>,
+    state: GmpStateRef<'_, I, T, BC>,
+) -> GroupJoinResult {
+    let GmpStateRef { enabled, groups, gmp, config: _ } = state;
+    debug_assert!(gmp.mode.is_v2());
+    let gmp_enabled = enabled && I::should_perform_gmp(group_addr);
+    groups.join_group_with(group_addr, || {
+        let state = GroupState { recorded_sources: Default::default() };
+        if gmp_enabled {
+            // TODO(https://fxbug.dev/42071006): Operate unsolicited reports.
+        }
+
+        (GmpGroupState::new_v2(state), ())
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use core::time::Duration;
-
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_types::Witness as _;
     use netstack3_base::testutil::{FakeDeviceId, FakeTimerCtxExt, FakeWeakDeviceId};
+    use netstack3_base::InstantContext as _;
+    use test_case::test_matrix;
 
     use super::*;
     use crate::gmp::GmpTimerId;
     use crate::internal::gmp::testutil::{self, FakeCtx, FakeV2Query, TestIpExt};
     use crate::internal::gmp::{GmpHandler as _, GroupJoinResult};
+
+    #[derive(Debug, Eq, PartialEq)]
+    enum SpecificQuery {
+        Multicast,
+        MulticastAndSource,
+    }
 
     #[ip_test(I)]
     fn v2_query_handoff_in_v1_mode<I: TestIpExt>() {
@@ -207,10 +426,7 @@ mod tests {
             &mut core_ctx,
             &mut bindings_ctx,
             &FakeDeviceId,
-            &FakeV2Query {
-                group_addr: I::GROUP_ADDR1.get(),
-                max_response_time: Duration::from_secs(1),
-            },
+            &FakeV2Query { group_addr: I::GROUP_ADDR1.get(), ..Default::default() },
         )
         .expect("handle query");
         // v1 group reacts to the query.
@@ -218,5 +434,164 @@ mod tests {
             core_ctx.groups.get(&I::GROUP_ADDR1).unwrap().v1().get_inner(),
             gmp::v1::MemberState::Delaying(_)
         );
+    }
+
+    #[ip_test(I)]
+    fn general_query_ignored_if_no_groups<I: TestIpExt>() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V2);
+        handle_query_message(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &FakeDeviceId,
+            &FakeV2Query { group_addr: I::UNSPECIFIED_ADDRESS, ..Default::default() },
+        )
+        .expect("handle query");
+        assert_eq!(core_ctx.gmp.timers.get(&TimerId::GeneralQuery.into()), None);
+    }
+
+    #[ip_test(I)]
+    fn query_errors_if_not_multicast<I: TestIpExt>() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V2);
+        let query = FakeV2Query { group_addr: I::LOOPBACK_ADDRESS.get(), ..Default::default() };
+        assert_eq!(
+            handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query,),
+            Err(NotAMemberErr(query.group_addr))
+        );
+    }
+
+    #[ip_test(I)]
+    fn general_query_scheduled<I: TestIpExt>() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V2);
+        assert_eq!(
+            core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
+            GroupJoinResult::Joined(())
+        );
+        let query = FakeV2Query { group_addr: I::UNSPECIFIED_ADDRESS, ..Default::default() };
+
+        let general_query_timer = TimerId::GeneralQuery.into();
+
+        handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query)
+            .expect("handle query");
+        let now = bindings_ctx.now();
+        let (scheduled, ()) = core_ctx.gmp.timers.assert_range_single(
+            &general_query_timer,
+            now..=now.panicking_add(query.max_response_time),
+        );
+
+        // Any further queries are ignored  if we have a pending general query
+        // in the past.
+
+        // Advance time enough to guarantee we can't pick an earlier time.
+        bindings_ctx.timers.instant.sleep(query.max_response_time);
+
+        let query = FakeV2Query { group_addr: I::UNSPECIFIED_ADDRESS, ..Default::default() };
+        handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query)
+            .expect("handle query");
+        assert_eq!(core_ctx.gmp.timers.get(&general_query_timer), Some((scheduled, &())));
+
+        let query = FakeV2Query { group_addr: I::GROUP_ADDR1.get(), ..Default::default() };
+        handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query)
+            .expect("handle query");
+        assert_eq!(
+            core_ctx.gmp.timers.get(&TimerId::MulticastAddress(I::GROUP_ADDR1).into()),
+            None
+        );
+    }
+
+    #[ip_test(I)]
+    fn specific_query_ignored_if_not_member<I: TestIpExt>() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V2);
+        assert_eq!(
+            core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, I::GROUP_ADDR2),
+            GroupJoinResult::Joined(())
+        );
+        let query = FakeV2Query { group_addr: I::GROUP_ADDR1.get(), ..Default::default() };
+        assert_eq!(
+            handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query),
+            Err(NotAMemberErr(query.group_addr))
+        );
+    }
+
+    #[ip_test(I)]
+    #[test_matrix(
+        [SpecificQuery::Multicast, SpecificQuery::MulticastAndSource],
+        [SpecificQuery::Multicast, SpecificQuery::MulticastAndSource]
+    )]
+    fn schedule_specific_query<I: TestIpExt>(first: SpecificQuery, second: SpecificQuery) {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V2);
+        assert_eq!(
+            core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
+            GroupJoinResult::Joined(())
+        );
+
+        let sources = match first {
+            SpecificQuery::Multicast => Default::default(),
+            SpecificQuery::MulticastAndSource => {
+                (1..3).map(|i| I::get_other_ip_address(i).get()).collect()
+            }
+        };
+
+        let query1 =
+            FakeV2Query { group_addr: I::GROUP_ADDR1.get(), sources, ..Default::default() };
+        handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query1)
+            .expect("handle query");
+        // Sources are recorded.
+        assert_eq!(
+            core_ctx.groups.get(&I::GROUP_ADDR1).unwrap().v2().recorded_sources,
+            query1.sources.iter().copied().collect()
+        );
+        // Timer is scheduled.
+        let now = bindings_ctx.now();
+        let (scheduled, ()) = core_ctx.gmp.timers.assert_range_single(
+            &TimerId::MulticastAddress(I::GROUP_ADDR1).into(),
+            now..=now.panicking_add(query1.max_response_time),
+        );
+
+        let sources = match second {
+            SpecificQuery::Multicast => Default::default(),
+            SpecificQuery::MulticastAndSource => {
+                (3..5).map(|i| I::get_other_ip_address(i).get()).collect()
+            }
+        };
+        let query2 = FakeV2Query {
+            group_addr: I::GROUP_ADDR1.get(),
+            // Send a follow up query on a shorter timeline.
+            max_response_time: DEFAULT_QUERY_RESPONSE_INTERVAL.get() / 2,
+            sources,
+            ..Default::default()
+        };
+        handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query2)
+            .expect("handle query");
+
+        let (new_scheduled, ()) = core_ctx.gmp.timers.assert_range_single(
+            &TimerId::MulticastAddress(I::GROUP_ADDR1).into(),
+            now..=now.panicking_add(query2.max_response_time),
+        );
+        // Scheduled time is allowed to change, but always to an earlier time.
+        assert!(new_scheduled <= scheduled, "{new_scheduled:?} <= {scheduled:?}");
+        // Now check the group state.
+        let recorded_sources = &core_ctx.groups.get(&I::GROUP_ADDR1).unwrap().v2().recorded_sources;
+        match (first, second) {
+            (SpecificQuery::Multicast, _) | (_, SpecificQuery::Multicast) => {
+                // If any of the queries is multicast-specific then:
+                // - Never added any sources.
+                // - Newer sources must not override previous
+                //   multicast-specific.
+                // - New multicast-specific overrides previous sources.
+                assert_eq!(recorded_sources, &HashSet::new());
+            }
+            (SpecificQuery::MulticastAndSource, SpecificQuery::MulticastAndSource) => {
+                // List is augmented with the union.
+                assert_eq!(
+                    recorded_sources,
+                    &query1.sources.iter().chain(query2.sources.iter()).copied().collect()
+                );
+            }
+        }
     }
 }

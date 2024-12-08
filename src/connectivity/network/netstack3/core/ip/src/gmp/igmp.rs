@@ -78,7 +78,7 @@ pub trait IgmpStateContext<BT: IgmpBindingsTypes>:
 {
     /// Calls the function with an immutable reference to the device's IGMP
     /// state.
-    fn with_igmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<BT>>) -> O>(
+    fn with_igmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, BT>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -201,6 +201,26 @@ impl<B: SplitByteSlice> gmp::v2::QueryMessage<Ipv4> for IgmpMessage<B, IgmpMembe
     fn as_v1(&self) -> impl gmp::v1::QueryMessage<Ipv4> + '_ {
         self.as_v2_query()
     }
+
+    fn robustness_variable(&self) -> u8 {
+        self.header().querier_robustness_variable()
+    }
+
+    fn query_interval(&self) -> Duration {
+        self.header().querier_query_interval()
+    }
+
+    fn group_address(&self) -> Ipv4Addr {
+        self.header().group_address()
+    }
+
+    fn max_response_time(&self) -> Duration {
+        self.max_response_time().into()
+    }
+
+    fn sources(&self) -> impl Iterator<Item = Ipv4Addr> + '_ {
+        self.body().iter().copied()
+    }
 }
 
 impl IpExt for Ipv4 {
@@ -230,7 +250,7 @@ impl<BT: IgmpBindingsTypes, CC: DeviceIdContext<AnyDevice> + IgmpContextMarker>
 }
 
 impl<BT: IgmpBindingsTypes, CC: IgmpStateContext<BT>> GmpStateContext<Ipv4, BT> for CC {
-    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<BT>>) -> O>(
+    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, BT>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -624,7 +644,7 @@ mod tests {
 
     /// The parts of `FakeIgmpCtx` that are behind a RefCell, mocking a lock.
     struct Shared {
-        groups: MulticastGroupSet<Ipv4Addr, GmpGroupState<FakeBindingsCtx>>,
+        groups: MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, FakeBindingsCtx>>,
         igmp_state: IgmpState<FakeBindingsCtx>,
         gmp_state: GmpState<Ipv4, FakeBindingsCtx>,
         config: IgmpConfig,
@@ -635,7 +655,9 @@ mod tests {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().gmp_state
         }
 
-        fn groups(&mut self) -> &mut MulticastGroupSet<Ipv4Addr, GmpGroupState<FakeBindingsCtx>> {
+        fn groups(
+            &mut self,
+        ) -> &mut MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, FakeBindingsCtx>> {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().groups
         }
 
@@ -664,7 +686,7 @@ mod tests {
     impl IgmpStateContext<FakeBindingsCtx> for FakeCoreCtx {
         fn with_igmp_state<
             O,
-            F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<FakeBindingsCtx>>) -> O,
+            F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, FakeBindingsCtx>>) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,

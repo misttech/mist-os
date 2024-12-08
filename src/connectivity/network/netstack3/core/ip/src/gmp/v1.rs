@@ -220,14 +220,14 @@ fn member_query_received<R: Rng, I: Instant, C: ProtocolConfig>(
         ),
         Some(max_resp_time) => {
             let max_resp_time = max_resp_time.get();
-            let new_deadline = now.checked_add(max_resp_time).unwrap();
+            let new_deadline = now.saturating_add(max_resp_time);
 
             let (timer_expiration, action) = match timer_expiration {
                 Some(old) if new_deadline >= old => (old, None),
                 None | Some(_) => {
                     let delay = gmp::random_report_timeout(rng, max_resp_time);
                     (
-                        now.checked_add(delay).unwrap(),
+                        now.saturating_add(delay),
                         Some(QueryReceivedGenericAction::ScheduleTimer(delay)),
                     )
                 }
@@ -821,6 +821,7 @@ mod test {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::{new_rng, FakeDeviceId, FakeInstant};
+    use test_util::assert_lt;
 
     use super::*;
 
@@ -899,17 +900,24 @@ mod test {
 
     #[test]
     fn test_gmp_state_delay_reset_timer() {
-        let mut rng = new_rng(0);
+        let mut rng = new_rng(10);
         let cfg = FakeConfig::default();
-        let (mut s, _actions) =
+        let (mut s, JoinGroupActions { send_report_and_schedule_timer }) =
             FakeGmpStateMachine::join_group(&mut rng, FakeInstant::default(), false, &cfg);
-        assert_eq!(
-            s.query_received(&mut rng, Duration::from_millis(1), FakeInstant::default(), &cfg),
-            QueryReceivedActions {
-                generic: Some(QueryReceivedGenericAction::ScheduleTimer(Duration::from_micros(1))),
-                protocol_specific: None
-            }
+        let first_duration = send_report_and_schedule_timer.expect("starts delaying member");
+        let actions = s.query_received(
+            &mut rng,
+            first_duration.checked_sub(Duration::from_micros(1)).unwrap(),
+            FakeInstant::default(),
+            &cfg,
         );
+        let new_duration = assert_matches!(actions,
+            QueryReceivedActions {
+                generic: Some(QueryReceivedGenericAction::ScheduleTimer(d)),
+                protocol_specific: None
+            } => d
+        );
+        assert_lt!(new_duration, first_duration);
     }
 
     #[test]

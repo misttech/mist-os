@@ -390,6 +390,20 @@ mod testutil {
                 assert!(range.contains(&time), "timer {timer:?} is at {time:?} not in {range:?}");
             }
         }
+
+        /// Asserts that the given timer is installed with an instant at the
+        /// provided range, returning its information.
+        #[track_caller]
+        pub fn assert_range_single<'a, R: RangeBounds<BC::Instant> + Debug>(
+            &'a self,
+            timer: &K,
+            range: R,
+        ) -> (BC::Instant, &V) {
+            let (time, value) =
+                self.get(timer).unwrap_or_else(|| panic!("timer {timer:?} not present"));
+            assert!(range.contains(&time), "timer {timer:?} is at {time:?} not in {range:?}");
+            (time, value)
+        }
     }
 }
 

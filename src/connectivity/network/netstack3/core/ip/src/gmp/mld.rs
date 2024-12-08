@@ -53,7 +53,7 @@ pub trait MldStateContext<BT: MldBindingsTypes>:
 {
     /// Calls the function with an immutable reference to the device's MLD
     /// state.
-    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<BT>>) -> O>(
+    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BT>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -161,6 +161,26 @@ impl<B: SplitByteSlice> gmp::v2::QueryMessage<Ipv6> for Mldv2QueryBody<B> {
     fn as_v1(&self) -> impl gmp::v1::QueryMessage<Ipv6> + '_ {
         self.as_v1_query()
     }
+
+    fn robustness_variable(&self) -> u8 {
+        self.header().querier_robustness_variable()
+    }
+
+    fn query_interval(&self) -> Duration {
+        self.header().querier_query_interval()
+    }
+
+    fn group_address(&self) -> Ipv6Addr {
+        self.header().group_address()
+    }
+
+    fn max_response_time(&self) -> Duration {
+        self.header().max_response_delay().into()
+    }
+
+    fn sources(&self) -> impl Iterator<Item = Ipv6Addr> + '_ {
+        self.sources().iter().copied()
+    }
 }
 
 impl IpExt for Ipv6 {
@@ -191,7 +211,7 @@ impl<BT: MldBindingsTypes, CC: DeviceIdContext<AnyDevice> + MldContextMarker>
 }
 
 impl<BT: MldBindingsTypes, CC: MldStateContext<BT>> GmpStateContext<Ipv6, BT> for CC {
-    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<BT>>) -> O>(
+    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BT>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -461,14 +481,14 @@ mod tests {
 
         fn groups(
             &mut self,
-        ) -> &mut MulticastGroupSet<Ipv6Addr, GmpGroupState<FakeBindingsCtxImpl>> {
+        ) -> &mut MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, FakeBindingsCtxImpl>> {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().groups
         }
     }
 
     /// The parts of `FakeMldCtx` that are behind a RefCell, mocking a lock.
     struct Shared {
-        groups: MulticastGroupSet<Ipv6Addr, GmpGroupState<FakeBindingsCtxImpl>>,
+        groups: MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, FakeBindingsCtxImpl>>,
         gmp_state: GmpState<Ipv6, FakeBindingsCtxImpl>,
         config: MldConfig,
     }
@@ -509,7 +529,7 @@ mod tests {
     impl MldStateContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_mld_state<
             O,
-            F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<FakeBindingsCtxImpl>>) -> O,
+            F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, FakeBindingsCtxImpl>>) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,

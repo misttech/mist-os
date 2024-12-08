@@ -269,6 +269,11 @@ impl<B: SplitByteSlice, M: MessageType<B>> IgmpMessage<B, M> {
         M::MaxRespTime::from_code(self.prefix.max_resp_code)
     }
 
+    /// Returns the header.
+    pub fn header(&self) -> &M::FixedHeader {
+        &self.header
+    }
+
     /// Returns the body.
     pub fn body(&self) -> &M::VariableBody {
         &self.body
