@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <zircon/assert.h>
 
 #include <cstdint>
@@ -441,8 +440,6 @@ DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode);
 
 // `display_timing_params.pixel_repetition` must be 0 or 1.
 display_mode_t ToBanjoDisplayMode(const DisplayTiming& display_timing_params);
-
-DisplayTiming ToDisplayTiming(const display_setting_t& banjo_display_setting);
 
 }  // namespace display
 
