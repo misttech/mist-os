@@ -102,17 +102,6 @@ zx_status_t zxio_default_shutdown(zxio_t* io, zxio_shutdown_options_t options, i
   return ZX_OK;
 }
 
-zx_status_t zxio_default_open(zxio_t* io, uint32_t flags, const char* path, size_t path_len,
-                              zxio_storage_t* storage) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t zxio_default_open_async(zxio_t* io, uint32_t flags, const char* path, size_t path_len,
-                                    zx_handle_t request) {
-  zx_handle_close(request);
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 zx_status_t zxio_default_unlink(zxio_t* io, const char* name, size_t name_len, int flags) {
   return ZX_ERR_NOT_SUPPORTED;
 }
@@ -320,12 +309,8 @@ zx_status_t zxio_default_enable_verity(zxio_t* io, const zxio_fsverity_descripto
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t zxio_default_get_descriptor(zxio_t* io, zxio_fsverity_descriptor_t* out_descriptor) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t zxio_default_open3(zxio_t* directory, const char* path, size_t path_len,
-                               zxio_open_flags_t flags, const zxio_open_options_t* options,
-                               zxio_storage_t* storage) {
+zx_status_t zxio_default_open(zxio_t* directory, const char* path, size_t path_len,
+                              zxio_open_flags_t flags, const zxio_open_options_t* options,
+                              zxio_storage_t* storage) {
   return ZX_ERR_NOT_SUPPORTED;
 }

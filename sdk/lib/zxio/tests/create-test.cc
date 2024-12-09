@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.pty/cpp/wire_test_base.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/zx/channel.h>
@@ -46,7 +47,7 @@ TEST(Create, NotSupported) {
   ASSERT_OK(zxio_close(io, /*should_wait=*/true));
 
   zx_info_handle_basic_t info = {};
-  ASSERT_OK(handle.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+  ASSERT_OK(handle.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof info, nullptr, nullptr));
   EXPECT_EQ(info.type, ZX_OBJ_TYPE_EVENT);
 }
 
@@ -380,8 +381,9 @@ class CreateTestBase : public zxtest::Test {
   zxio_t* zxio() { return &storage_.io; }
   zxio_storage_t* storage() { return &storage_; }
 
-  void SendOnOpenEvent(fuchsia_io::wire::NodeInfoDeprecated node_info) {
-    ASSERT_OK(fidl::WireSendEvent(node_server_end_)->OnOpen(ZX_OK, std::move(node_info)));
+  void SendRepresentation(fuchsia_io::Representation representation) {
+    auto result = fidl::SendEvent(node_server_end_)->OnRepresentation(std::move(representation));
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
   }
 
   NodeServer& node_server() { return node_server_; }
@@ -394,7 +396,7 @@ class CreateTestBase : public zxtest::Test {
   async::Loop control_loop_;
 };
 
-using CreateWithOnOpenTest = CreateTestBase<zxio_tests::CloseOnlyNodeServer>;
+using CreateWithRepresentationTest = CreateTestBase<zxio_tests::CloseOnlyNodeServer>;
 
 class SyncNodeServer : public zxio_tests::CloseOnlyNodeServer {
  public:
@@ -414,46 +416,33 @@ using CreateDirectoryTest = CreateTestBase<SyncDirectoryServer>;
 
 TEST_F(CreateDirectoryTest, Directory) {
   StartServerThread();
-
   ASSERT_OK(zxio_create(TakeClientChannel().release(), storage()));
-
   EXPECT_OK(zxio_sync(zxio()));
-
   ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
 TEST_F(CreateDirectoryTest, DirectoryWithType) {
   StartServerThread();
-
   ASSERT_OK(zxio_create_with_type(storage(), ZXIO_OBJECT_TYPE_DIR, TakeClientChannel().release()));
-
   EXPECT_OK(zxio_sync(zxio()));
-
   ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
 TEST_F(CreateDirectoryTest, DirectoryWithTypeWrapper) {
   StartServerThread();
-
   ASSERT_OK(zxio::CreateDirectory(storage(),
                                   fidl::ClientEnd<fuchsia_io::Directory>(TakeClientChannel())));
-
   EXPECT_OK(zxio_sync(zxio()));
-
   ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
-using CreateDirectoryWithOnOpenTest = CreateTestBase<SyncNodeServer>;
+using CreateDirectoryWithRepresentationTest = CreateTestBase<SyncNodeServer>;
 
-TEST_F(CreateDirectoryWithOnOpenTest, Directory) {
-  SendOnOpenEvent(fuchsia_io::wire::NodeInfoDeprecated::WithDirectory({}));
-
-  ASSERT_OK(zxio_create_with_on_open(TakeClientChannel().release(), storage()));
-
+TEST_F(CreateDirectoryWithRepresentationTest, Directory) {
+  ASSERT_NO_FATAL_FAILURE(SendRepresentation(fuchsia_io::Representation::WithConnector({})));
+  ASSERT_OK(zxio_create_with_on_representation(TakeClientChannel().release(), nullptr, storage()));
   StartServerThread();
-
   EXPECT_OK(zxio_sync(zxio()));
-
   ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
@@ -473,46 +462,62 @@ using CreateFileTest = CreateTestBase<TestFileServerWithDescribe>;
 
 TEST_F(CreateFileTest, File) {
   StartServerThread();
-
   ASSERT_OK(zxio_create(TakeClientChannel().release(), storage()));
-
-  // Sanity check the zxio by reading some test data from the server.
-  char buffer[sizeof(zxio_tests::TestReadFileServer::kTestData)];
+  // Check the zxio by reading some test data from the server.
+  char buffer[sizeof zxio_tests::TestReadFileServer::kTestData];
   size_t actual = 0u;
-
-  ASSERT_OK(zxio_read(zxio(), buffer, sizeof(buffer), 0u, &actual));
-
-  EXPECT_EQ(sizeof(buffer), actual);
-  EXPECT_BYTES_EQ(buffer, zxio_tests::TestReadFileServer::kTestData, sizeof(buffer));
+  ASSERT_OK(zxio_read(zxio(), buffer, sizeof buffer, 0u, &actual));
+  EXPECT_EQ(sizeof buffer, actual);
+  EXPECT_BYTES_EQ(buffer, zxio_tests::TestReadFileServer::kTestData, sizeof buffer);
 }
 
-using CreateFileWithOnOpenTest = CreateTestBase<zxio_tests::TestReadFileServer>;
+using CreateFileWithRepresentationTest = CreateTestBase<zxio_tests::TestReadFileServer>;
 
-TEST_F(CreateFileWithOnOpenTest, File) {
+TEST_F(CreateFileWithRepresentationTest, FileWithObserver) {
   zx::event file_event;
   ASSERT_OK(zx::event::create(0u, &file_event));
-  zx::stream stream;
+  fuchsia_io::FileInfo file;
+  file.observer() = std::move(file_event);
+  ASSERT_NO_FATAL_FAILURE(
+      SendRepresentation(fuchsia_io::Representation::WithFile(std::move(file))));
+  ASSERT_OK(zxio_create_with_on_representation(TakeClientChannel().release(), nullptr, storage()));
 
-  fuchsia_io::wire::FileObject file = {
-      .event = std::move(file_event),
-      .stream = std::move(stream),
-  };
-  SendOnOpenEvent(fuchsia_io::wire::NodeInfoDeprecated::WithFile(
-      fidl::ObjectView<decltype(file)>::FromExternal(&file)));
-
-  ASSERT_OK(zxio_create_with_on_open(TakeClientChannel().release(), storage()));
-
+  // Check the zxio by reading some test data from the server.
   StartServerThread();
-
-  // Sanity check the zxio by reading some test data from the server.
-  char buffer[sizeof(zxio_tests::TestReadFileServer::kTestData)];
+  constexpr size_t kContentLen = sizeof zxio_tests::TestReadFileServer::kTestData;
+  char buffer[kContentLen];
   size_t actual = 0u;
+  ASSERT_OK(zxio_read(zxio(), buffer, kContentLen, 0u, &actual));
+  EXPECT_EQ(actual, kContentLen);
+  EXPECT_BYTES_EQ(buffer, zxio_tests::TestReadFileServer::kTestData, kContentLen);
+  ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
+}
 
-  ASSERT_OK(zxio_read(zxio(), buffer, sizeof(buffer), 0u, &actual));
+TEST_F(CreateFileWithRepresentationTest, FileWithStream) {
+  fuchsia_io::FileInfo file;
 
-  EXPECT_EQ(sizeof(buffer), actual);
-  EXPECT_BYTES_EQ(buffer, zxio_tests::TestReadFileServer::kTestData, sizeof(buffer));
+  constexpr size_t kContentLen = sizeof zxio_tests::TestReadFileServer::kTestData;
 
+  // Initialize a VMO to back the stream and make sure it has the correct contents, since reads from
+  // the file will be served via the stream.
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
+  vmo.write(zxio_tests::TestReadFileServer::kTestData, 0, kContentLen);
+  zx::stream stream;
+  ASSERT_OK(zx::stream::create(ZX_STREAM_MODE_READ, vmo, 0, &stream));
+  file.stream() = std::move(stream);
+
+  ASSERT_NO_FATAL_FAILURE(
+      SendRepresentation(fuchsia_io::Representation::WithFile(std::move(file))));
+  ASSERT_OK(zxio_create_with_on_representation(TakeClientChannel().release(), nullptr, storage()));
+
+  // Check the zxio by reading some test data from the server.
+  StartServerThread();
+  char buffer[kContentLen];
+  size_t actual = 0u;
+  ASSERT_OK(zxio_read(zxio(), buffer, sizeof buffer, 0u, &actual));
+  EXPECT_EQ(sizeof buffer, actual);
+  EXPECT_BYTES_EQ(buffer, zxio_tests::TestReadFileServer::kTestData, sizeof buffer);
   ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
@@ -521,22 +526,22 @@ TEST(CreateWithTypeTest, Pipe) {
   ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
 
   zx_info_socket_t info = {};
-  ASSERT_OK(socket0.get_info(ZX_INFO_SOCKET, &info, sizeof(info), nullptr, nullptr));
+  ASSERT_OK(socket0.get_info(ZX_INFO_SOCKET, &info, sizeof info, nullptr, nullptr));
 
   zxio_storage_t storage;
   ASSERT_OK(zxio_create_with_type(&storage, ZXIO_OBJECT_TYPE_PIPE, socket0.release(), &info));
   zxio_t* zxio = &storage.io;
 
   // Send some data through the kernel socket object and read it through zxio to
-  // sanity check that the pipe is functional.
+  // Check that the pipe is functional.
   int32_t data = 0x1a2a3a4a;
   size_t actual = 0u;
-  ASSERT_OK(socket1.write(0u, &data, sizeof(data), &actual));
-  EXPECT_EQ(actual, sizeof(data));
+  ASSERT_OK(socket1.write(0u, &data, sizeof data, &actual));
+  EXPECT_EQ(actual, sizeof data);
 
   int32_t buffer = 0;
-  ASSERT_OK(zxio_read(zxio, &buffer, sizeof(buffer), 0u, &actual));
-  EXPECT_EQ(actual, sizeof(buffer));
+  ASSERT_OK(zxio_read(zxio, &buffer, sizeof buffer, 0u, &actual));
+  EXPECT_EQ(actual, sizeof buffer);
   EXPECT_EQ(buffer, data);
 
   ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
@@ -547,54 +552,25 @@ TEST(CreateWithTypeWrapperTest, Pipe) {
   ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
 
   zx_info_socket_t info = {};
-  ASSERT_OK(socket0.get_info(ZX_INFO_SOCKET, &info, sizeof(info), nullptr, nullptr));
+  ASSERT_OK(socket0.get_info(ZX_INFO_SOCKET, &info, sizeof info, nullptr, nullptr));
 
   zxio_storage_t storage;
   ASSERT_OK(zxio::CreatePipe(&storage, std::move(socket0), info));
   zxio_t* zxio = &storage.io;
 
   // Send some data through the kernel socket object and read it through zxio to
-  // sanity check that the pipe is functional.
+  // Check that the pipe is functional.
   int32_t data = 0x1a2a3a4a;
   size_t actual = 0u;
-  ASSERT_OK(socket1.write(0u, &data, sizeof(data), &actual));
-  EXPECT_EQ(actual, sizeof(data));
+  ASSERT_OK(socket1.write(0u, &data, sizeof data, &actual));
+  EXPECT_EQ(actual, sizeof data);
 
   int32_t buffer = 0;
-  ASSERT_OK(zxio_read(zxio, &buffer, sizeof(buffer), 0u, &actual));
-  EXPECT_EQ(actual, sizeof(buffer));
+  ASSERT_OK(zxio_read(zxio, &buffer, sizeof buffer, 0u, &actual));
+  EXPECT_EQ(actual, sizeof buffer);
   EXPECT_EQ(buffer, data);
 
   ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
-}
-
-class ServiceServer : public zxio_tests::CloseOnlyNodeServer {
-  void Query(QueryCompleter::Sync& completer) final {
-    constexpr std::string_view kProtocol = "some.unknown.service";
-    // TODO(https://fxbug.dev/42052765): avoid the const cast.
-    uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
-    completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
-  }
-};
-
-using CreateServiceTest = CreateTestBase<ServiceServer>;
-
-TEST_F(CreateServiceTest, Service) {
-  StartServerThread();
-
-  ASSERT_OK(zxio_create(TakeClientChannel().release(), storage()));
-
-  ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
-}
-
-TEST_F(CreateWithOnOpenTest, Service) {
-  SendOnOpenEvent(fuchsia_io::wire::NodeInfoDeprecated::WithService({}));
-
-  ASSERT_OK(zxio_create_with_on_open(TakeClientChannel().release(), storage()));
-
-  StartServerThread();
-
-  ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
 class DeviceServer : public fidl::testing::WireTestBase<fuchsia_hardware_pty::Device> {

@@ -63,37 +63,6 @@ void zxio_handle_holder_init(zxio_storage_t* storage, zx::handle handle) {
   zxio_init(&holder->io, &zxio_handle_holder_ops);
 }
 
-class ZxioCreateOnOpenEventHandler final : public fidl::WireSyncEventHandler<fio::Node> {
- public:
-  ZxioCreateOnOpenEventHandler(fidl::ClientEnd<fio::Node> node, zxio_storage_t* storage,
-                               zx_status_t& status)
-      : node_(std::move(node)), storage_(storage), status_(status) {}
-
- protected:
-  void OnOpen(fidl::WireEvent<fio::Node::OnOpen>* event) final {
-    status_ = [&event = *event, this] {
-      if (event.s != ZX_OK) {
-        return event.s;
-      }
-      if (!event.info.has_value()) {
-        return ZX_ERR_INVALID_ARGS;
-      }
-      return zxio_create_with_nodeinfo_deprecated(std::move(node_), event.info.value(), storage_);
-    }();
-  }
-
-  void OnRepresentation(fidl::WireEvent<fio::Node::OnRepresentation>* event) final {
-    status_ = ZX_ERR_NOT_SUPPORTED;
-  }
-
-  void handle_unknown_event(fidl::UnknownEventMetadata<fio::Node> metadata) final {}
-
- private:
-  fidl::ClientEnd<fio::Node> node_;
-  zxio_storage_t* storage_;
-  zx_status_t& status_;
-};
-
 class ZxioCreateOnRepresentationEventHandler final : public fidl::WireSyncEventHandler<fio::Node> {
  public:
   ZxioCreateOnRepresentationEventHandler(fidl::ClientEnd<fio::Node> node,
@@ -102,13 +71,15 @@ class ZxioCreateOnRepresentationEventHandler final : public fidl::WireSyncEventH
       : node_(std::move(node)), attr_(attr), storage_(storage), status_(status) {}
 
  protected:
-  void OnOpen(fidl::WireEvent<fio::Node::OnOpen>* event) final { status_ = ZX_ERR_NOT_SUPPORTED; }
-
   void OnRepresentation(fidl::WireEvent<fio::Node::OnRepresentation>* event) final {
     status_ = zxio_create_with_representation(std::move(node_), *event, attr_, storage_);
   }
 
-  void handle_unknown_event(fidl::UnknownEventMetadata<fio::Node> metadata) final {}
+  void OnOpen(fidl::WireEvent<fio::Node::OnOpen>* event) final { status_ = ZX_ERR_NOT_SUPPORTED; }
+
+  void handle_unknown_event(fidl::UnknownEventMetadata<fio::Node> metadata) final {
+    status_ = ZX_ERR_NOT_SUPPORTED;
+  }
 
  private:
   fidl::ClientEnd<fio::Node> node_;
@@ -458,24 +429,6 @@ zx_status_t zxio_create(zx_handle_t raw_handle, zxio_storage_t* storage) {
   return zxio_create_with_info(handle.release(), &info, storage);
 }
 
-zx_status_t zxio_create_with_on_open(zx_handle_t raw_handle, zxio_storage_t* storage) {
-  fidl::ClientEnd<fio::Node> node{zx::channel(raw_handle)};
-  if (!node.is_valid() || storage == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  const fidl::UnownedClientEnd unowned_node = node.borrow();
-  zx_status_t handler_status;
-  ZxioCreateOnOpenEventHandler handler(std::move(node), storage, handler_status);
-  const fidl::Status status = handler.HandleOneEvent(unowned_node);
-  if (!status.ok()) {
-    if (status.reason() == fidl::Reason::kUnexpectedMessage) {
-      return ZX_ERR_IO;
-    }
-    return status.status();
-  }
-  return handler_status;
-}
-
 zx_status_t zxio_create_with_on_representation(zx_handle_t raw_handle,
                                                zxio_node_attributes_t* inout_attr,
                                                zxio_storage_t* storage) {
@@ -495,34 +448,6 @@ zx_status_t zxio_create_with_on_representation(zx_handle_t raw_handle,
     return status.status();
   }
   return handler_status;
-}
-
-zx_status_t zxio_create_with_nodeinfo_deprecated(fidl::ClientEnd<fio::Node> node,
-                                                 fio::wire::NodeInfoDeprecated& info,
-                                                 zxio_storage_t* storage) {
-  switch (info.Which()) {
-    case fio::wire::NodeInfoDeprecated::Tag::kDirectory: {
-      return zxio_dir_init(storage, fidl::ClientEnd<fio::Directory>(node.TakeChannel()));
-    }
-    case fio::wire::NodeInfoDeprecated::Tag::kFile: {
-      fio::wire::FileObject& file = info.file();
-      zx::event event = std::move(file.event);
-      zx::stream stream = std::move(file.stream);
-      return zxio_file_init(storage, std::move(event), std::move(stream),
-                            fidl::ClientEnd<fio::File>(node.TakeChannel()));
-    }
-    case fio::wire::NodeInfoDeprecated::Tag::kService: {
-      return zxio_node_init(storage, std::move(node));
-    }
-#if FUCHSIA_API_LEVEL_AT_LEAST(18)
-    case fio::wire::NodeInfoDeprecated::Tag::kSymlink: {
-      fio::wire::SymlinkObject& symlink = info.symlink();
-      const auto& span = symlink.target.get();
-      return zxio_symlink_init(storage, fidl::ClientEnd<fio::Symlink>(node.TakeChannel()),
-                               std::vector(span.begin(), span.end()));
-    }
-#endif
-  }
 }
 
 zx_status_t zxio_create_with_representation(fidl::ClientEnd<fio::Node> node,

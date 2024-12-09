@@ -54,13 +54,6 @@ struct fdio_namespace : public fbl::RefCounted<fdio_namespace> {
   zx_status_t Readdir(const LocalVnode& vn, DirentIteratorState* state,
                       zxio_dirent_t* inout_entry) const;
 
-  // Create a new object referring to the object at |path|.
-  //
-  // This object may represent either a local node, or a remote object.
-  // TODO(https://fxbug.dev/324111518): Remove this after a replacement using Open3 is available.
-  zx::result<fbl::RefPtr<fdio>> OpenAtDeprecated(fbl::RefPtr<LocalVnode> vn, std::string_view path,
-                                                 fuchsia_io::wire::OpenFlags flags) const;
-
   // Open a remote object within the namespace using deprecated fuchsia.io/Directory.Open1.
   //
   // Returns an error if |path| does not exist.

@@ -28,74 +28,6 @@
 
 namespace fio = fuchsia_io;
 
-namespace {
-
-// Translates legacy `fuchsia.io/OpenFlags` to an equivalent set of `fuchsia.io/Flags` for callers
-// that still are using deprecated FDIO functions.
-constexpr fio::Flags TranslateFlags(fio::wire::OpenFlags legacy_flags) {
-  fio::Flags flags = fio::Flags::kPermGetAttributes;
-
-  if (legacy_flags & fio::OpenFlags::kNodeReference) {
-    flags |= fio::Flags::kProtocolNode;
-    if (legacy_flags & fio::OpenFlags::kDirectory) {
-      flags |= fio::Flags::kProtocolDirectory;
-    } else if (legacy_flags & fio::OpenFlags::kNotDirectory) {
-      flags |= fio::Flags::kProtocolFile;
-    }
-  } else {
-    // Permissions
-    if (legacy_flags & fio::OpenFlags::kRightReadable) {
-      flags |= static_cast<fio::Flags>(static_cast<uint64_t>(fio::wire::kRStarDir));
-    }
-    if (legacy_flags & fio::OpenFlags::kRightWritable) {
-      flags |= static_cast<fio::Flags>(static_cast<uint64_t>(fio::wire::kWStarDir));
-    }
-    if (legacy_flags & fio::OpenFlags::kRightExecutable) {
-      flags |= static_cast<fio::Flags>(static_cast<uint64_t>(fio::wire::kXStarDir));
-    }
-
-    // POSIX flags
-    if (legacy_flags & fio::OpenFlags::kPosixWritable) {
-      flags |= fio::Flags::kPermInheritWrite;
-    }
-    if (legacy_flags & fio::OpenFlags::kPosixExecutable) {
-      flags |= fio::Flags::kPermInheritExecute;
-    }
-
-    // Type flags
-    if (legacy_flags & fio::OpenFlags::kDirectory) {
-      flags |= fio::Flags::kProtocolDirectory;
-    } else if (legacy_flags & fio::OpenFlags::kNotDirectory) {
-      flags |= fio::Flags::kProtocolFile;
-    }
-
-    // Create flags
-    if (legacy_flags & fio::OpenFlags::kCreateIfAbsent) {
-      flags |= fio::Flags::kFlagMustCreate;
-    } else if (legacy_flags & fio::OpenFlags::kCreate) {
-      flags |= fio::Flags::kFlagMaybeCreate;
-    }
-
-    if (legacy_flags & (fio::OpenFlags::kCreateIfAbsent | fio::OpenFlags::kCreate) &&
-        !(flags & fio::wire::kMaskKnownProtocols)) {
-      // A protocol must be specified when creating a node. If the DIRECTORY flag wasn't specified,
-      // we ensure that we will create a file.
-      flags |= fio::Flags::kProtocolFile;
-    }
-
-    // File flags
-    if (legacy_flags & fio::OpenFlags::kTruncate) {
-      flags |= fio::Flags::kFileTruncate;
-    }
-    if (legacy_flags & fio::OpenFlags::kAppend) {
-      flags |= fio::Flags::kFileAppend;
-    }
-  }
-
-  return flags;
-}
-}  // namespace
-
 namespace fdio_internal {
 
 zx::result<fdio_ptr> zxio::create() {
@@ -303,24 +235,12 @@ zx_status_t pipe::recvmsg(struct msghdr* msg, int flags, size_t* out_actual, int
   return status;
 }
 
-zx::result<fdio_ptr> open_async_deprecated(zxio_t* directory, std::string_view path,
-                                           fio::wire::OpenFlags legacy_flags) {
-  return open_async(directory, path, TranslateFlags(legacy_flags));
-}
-
-zx::result<fdio_ptr> open_async(zxio_t* directory, std::string_view path, fio::Flags flags) {
-  fdio_ptr io = fbl::MakeRefCounted<remote>();
-  return zx::make_result(zxio_open3(directory, path.data(), path.length(), zxio_open_flags_t{flags},
-                                    /*options*/ {}, &io->zxio_storage()),
-                         io);
-}
-
-zx::result<fdio_ptr> remote::open_deprecated(std::string_view path, fio::wire::OpenFlags flags) {
-  return open_async_deprecated(&zxio_storage().io, path, flags);
-}
-
 zx::result<fdio_ptr> remote::open(std::string_view path, fio::Flags flags) {
-  return open_async(&zxio_storage().io, path, flags);
+  fdio_ptr io = fbl::MakeRefCounted<remote>();
+  return zx::make_result(
+      zxio_open(&zxio_storage().io, path.data(), path.length(), zxio_open_flags_t{flags},
+                /*options*/ {}, &io->zxio_storage()),
+      io);
 }
 
 void remote::wait_begin(uint32_t events, zx_handle_t* handle, zx_signals_t* out_signals) {

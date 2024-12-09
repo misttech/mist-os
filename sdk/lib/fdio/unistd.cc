@@ -6,7 +6,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fdio/io.h>
 #include <lib/fdio/namespace.h>
@@ -83,8 +83,72 @@ constexpr fio::OpenFlags kZxioFsMask = fio::OpenFlags::kNodeReference | fio::Ope
                                        fio::OpenFlags::kCreateIfAbsent | fio::OpenFlags::kTruncate |
                                        fio::OpenFlags::kDirectory | fio::OpenFlags::kAppend;
 
+// Translates legacy `fuchsia.io/OpenFlags` (io1) to an equivalent set of `fuchsia.io/Flags` (io2).
+constexpr fio::Flags Io1FlagsToIo2(fio::OpenFlags legacy_flags) {
+  fio::Flags flags = fio::Flags::kPermGetAttributes;
+
+  if (legacy_flags & fio::OpenFlags::kNodeReference) {
+    flags |= fio::Flags::kProtocolNode;
+    if (legacy_flags & fio::OpenFlags::kDirectory) {
+      flags |= fio::Flags::kProtocolDirectory;
+    } else if (legacy_flags & fio::OpenFlags::kNotDirectory) {
+      flags |= fio::Flags::kProtocolFile;
+    }
+  } else {
+    // Permissions
+    if (legacy_flags & fio::OpenFlags::kRightReadable) {
+      flags |= fio::kPermReadable;
+    }
+    if (legacy_flags & fio::OpenFlags::kRightWritable) {
+      flags |= fio::kPermWritable;
+    }
+    if (legacy_flags & fio::OpenFlags::kRightExecutable) {
+      flags |= fio::kPermExecutable;
+    }
+
+    // POSIX flags
+    if (legacy_flags & fio::OpenFlags::kPosixWritable) {
+      flags |= fio::Flags::kPermInheritWrite;
+    }
+    if (legacy_flags & fio::OpenFlags::kPosixExecutable) {
+      flags |= fio::Flags::kPermInheritExecute;
+    }
+
+    // Type flags
+    if (legacy_flags & fio::OpenFlags::kDirectory) {
+      flags |= fio::Flags::kProtocolDirectory;
+    } else if (legacy_flags & fio::OpenFlags::kNotDirectory) {
+      flags |= fio::Flags::kProtocolFile;
+    }
+
+    // Create flags
+    if (legacy_flags & fio::OpenFlags::kCreateIfAbsent) {
+      flags |= fio::Flags::kFlagMustCreate;
+    } else if (legacy_flags & fio::OpenFlags::kCreate) {
+      flags |= fio::Flags::kFlagMaybeCreate;
+    }
+
+    if (legacy_flags & (fio::OpenFlags::kCreateIfAbsent | fio::OpenFlags::kCreate) &&
+        !(flags & fio::wire::kMaskKnownProtocols)) {
+      // A protocol must be specified when creating a node. If the DIRECTORY flag wasn't specified,
+      // we ensure that we will create a file.
+      flags |= fio::Flags::kProtocolFile;
+    }
+
+    // File flags
+    if (legacy_flags & fio::OpenFlags::kTruncate) {
+      flags |= fio::Flags::kFileTruncate;
+    }
+    if (legacy_flags & fio::OpenFlags::kAppend) {
+      flags |= fio::Flags::kFileAppend;
+    }
+  }
+
+  return flags;
+}
+
 // Map POSIX O_* flags to equivalent fuchsia.io OpenFlags.
-fio::OpenFlags posix_flags_to_fio(int32_t flags) {
+constexpr fio::OpenFlags PosixToOpenFlags(int32_t flags) {
   fio::OpenFlags rights = {};
   switch (flags & O_ACCMODE) {
     case O_RDONLY:
@@ -110,7 +174,7 @@ fio::OpenFlags posix_flags_to_fio(int32_t flags) {
 }
 
 // Map fuchsia.io OpenFlags to equivalent POSIX O_* flags.
-int32_t fio_flags_to_posix(fio::OpenFlags flags) {
+int32_t OpenFlagsToPosix(fio::OpenFlags flags) {
   int32_t result = static_cast<int32_t>(static_cast<uint32_t>(flags & kZxioFsMask));
   if ((flags & (fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable)) ==
       (fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable)) {
@@ -165,7 +229,7 @@ zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, int flags, uint32
   // http://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html
   const bool flags_incompatible_with_directory =
       ((flags & ~O_PATH & O_ACCMODE) != O_RDONLY) || (flags & O_CREAT);
-  fio::OpenFlags fio_flags = posix_flags_to_fio(flags);
+  fio::OpenFlags fio_flags = PosixToOpenFlags(flags);
   if (S_ISDIR(mode)) {
     fio_flags |= fio::OpenFlags::kDirectory;
   }
@@ -228,7 +292,7 @@ zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, fio::OpenFlags fl
   if (flags & fio::OpenFlags::kNodeReference) {
     flags &= fio::wire::kOpenFlagsAllowedWithNodeReference;
   }
-  return iodir->open_deprecated(clean, flags);
+  return iodir->open(clean, Io1FlagsToIo2(flags));
 }
 
 zx::result<fdio_ptr> open3_at_impl(int dirfd, const char* path, fio::Flags flags,
@@ -409,7 +473,8 @@ zx::result<fdio_ptr> opendir_containing_at(int dirfd, const char* path, NameBuff
     base = ".";
   }
 
-  return iodir->open_deprecated(base, posix_flags_to_fio(O_RDONLY | O_DIRECTORY));
+  constexpr int32_t kPosixFlags = O_RDONLY | O_DIRECTORY;
+  return iodir->open(base, Io1FlagsToIo2(PosixToOpenFlags(kPosixFlags)));
 }
 
 zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
@@ -901,7 +966,7 @@ int fcntl(int fd, int cmd, ...) {
       if (status != ZX_OK) {
         return ERROR(status);
       }
-      int32_t fdio_flags = fdio_internal::fio_flags_to_posix(flags);
+      int32_t fdio_flags = fdio_internal::OpenFlagsToPosix(flags);
       if (io->ioflag() & IOFLAG_NONBLOCK) {
         fdio_flags |= O_NONBLOCK;
       }
@@ -914,7 +979,7 @@ int fcntl(int fd, int cmd, ...) {
       }
       GET_INT_ARG(fdio_flags);
 
-      const fio::OpenFlags flags = fdio_internal::posix_flags_to_fio(fdio_flags & ~O_NONBLOCK);
+      const fio::OpenFlags flags = fdio_internal::PosixToOpenFlags(fdio_flags & ~O_NONBLOCK);
       zx_status_t status = io->set_flags(flags);
 
       // Some remotes don't support setting flags; we

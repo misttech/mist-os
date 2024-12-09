@@ -49,10 +49,6 @@ zx_status_t zxio_default_vmo_get(zxio_t* io, zxio_vmo_flags_t flags, zx_handle_t
 zx_status_t zxio_default_on_mapped(zxio_t* io, void* ptr);
 zx_status_t zxio_default_get_read_buffer_available(zxio_t* io, size_t* out_available);
 zx_status_t zxio_default_shutdown(zxio_t* io, zxio_shutdown_options_t options, int16_t* out_code);
-zx_status_t zxio_default_open(zxio_t* io, uint32_t flags, const char* path, size_t path_len,
-                              zxio_storage_t* storage);
-zx_status_t zxio_default_open_async(zxio_t* io, uint32_t flags, const char* path, size_t path_len,
-                                    zx_handle_t request);
 zx_status_t zxio_default_unlink(zxio_t* io, const char* name, size_t name_len, int flags);
 zx_status_t zxio_default_token_get(zxio_t* io, zx_handle_t* out_token);
 zx_status_t zxio_default_rename(zxio_t* io, const char* old_path, size_t old_path_len,
@@ -110,9 +106,9 @@ zx_status_t zxio_default_xattr_remove(zxio_t* io, const uint8_t* name, size_t na
 zx_status_t zxio_default_allocate(zxio_t* io, uint64_t offset, uint64_t len,
                                   zxio_allocate_mode_t mode);
 zx_status_t zxio_default_enable_verity(zxio_t* io, const zxio_fsverity_descriptor_t* descriptor);
-zx_status_t zxio_default_open3(zxio_t* directory, const char* path, size_t path_len,
-                               zxio_open_flags_t flags, const zxio_open_options_t* options,
-                               zxio_storage_t* storage);
+zx_status_t zxio_default_open(zxio_t* directory, const char* path, size_t path_len,
+                              zxio_open_flags_t flags, const zxio_open_options_t* options,
+                              zxio_storage_t* storage);
 
 // An ops table filled with the default implementations.
 //
@@ -141,8 +137,6 @@ static __CONSTEXPR const zxio_ops_t zxio_default_ops = {
     .on_mapped = zxio_default_on_mapped,
     .get_read_buffer_available = zxio_default_get_read_buffer_available,
     .shutdown = zxio_default_shutdown,
-    .open = zxio_default_open,
-    .open_async = zxio_default_open_async,
     .unlink = zxio_default_unlink,
     .token_get = zxio_default_token_get,
     .rename = zxio_default_rename,
@@ -174,7 +168,7 @@ static __CONSTEXPR const zxio_ops_t zxio_default_ops = {
     .xattr_get = zxio_default_xattr_get,
     .xattr_set = zxio_default_xattr_set,
     .xattr_remove = zxio_default_xattr_remove,
-    .open3 = zxio_default_open3,
+    .open = zxio_default_open,
     .allocate = zxio_default_allocate,
     .enable_verity = zxio_default_enable_verity,
 };

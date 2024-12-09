@@ -13,7 +13,6 @@ Symbols:
   - { Name: zxio_create, Type: Func }
   - { Name: zxio_create_symlink, Type: Func }
   - { Name: zxio_create_with_info, Type: Func }
-  - { Name: zxio_create_with_on_open, Type: Func }
   - { Name: zxio_create_with_on_representation, Type: Func }
   - { Name: zxio_default_maybe_faultable_copy, Type: Func }
   - { Name: zxio_dirent_iterator_destroy, Type: Func }
@@ -36,8 +35,6 @@ Symbols:
   - { Name: zxio_listen, Type: Func }
   - { Name: zxio_maybe_faultable_copy, Type: Func, Weak: true }
   - { Name: zxio_open, Type: Func }
-  - { Name: zxio_open3, Type: Func }
-  - { Name: zxio_open_async, Type: Func }
   - { Name: zxio_read, Type: Func }
   - { Name: zxio_read_at, Type: Func }
   - { Name: zxio_read_link, Type: Func }

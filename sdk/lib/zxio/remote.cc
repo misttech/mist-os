@@ -1300,19 +1300,8 @@ class Directory : public Remote<fio::Directory> {
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
   }
 
-  zx_status_t Open(uint32_t flags, const char* path, size_t path_len, zxio_storage_t* storage) {
-    auto [client_end, server_end] = fidl::Endpoints<fio::Node>::Create();
-    const fidl::Status result =
-        client()->Open(static_cast<fio::wire::OpenFlags>(flags) | fio::wire::OpenFlags::kDescribe,
-                       {}, fidl::StringView::FromExternal(path, path_len), std::move(server_end));
-    if (!result.ok()) {
-      return result.status();
-    }
-    return zxio_create_with_on_open(client_end.TakeChannel().release(), storage);
-  }
-
-  zx_status_t Open3(const char* path, size_t path_len, zxio_open_flags_t flags,
-                    const zxio_open_options_t* options, zxio_storage_t* storage) {
+  zx_status_t Open(const char* path, size_t path_len, zxio_open_flags_t flags,
+                   const zxio_open_options_t* options, zxio_storage_t* storage) {
     zx::channel client_end, server_end;
     if (zx_status_t status = zx::channel::create(0, &client_end, &server_end); status != ZX_OK) {
       return status;
@@ -1363,14 +1352,6 @@ class Directory : public Remote<fio::Directory> {
     }
     return zxio_create_with_on_representation(client_end.release(),
                                               options ? options->inout_attr : nullptr, storage);
-  }
-
-  zx_status_t OpenAsync(uint32_t flags, const char* path, size_t path_len, zx_handle_t request) {
-    fidl::ServerEnd<fio::Node> node_request{zx::channel(request)};
-    const fidl::Status result =
-        client()->Open(static_cast<fio::wire::OpenFlags>(flags), {},
-                       fidl::StringView::FromExternal(path, path_len), std::move(node_request));
-    return result.status();
   }
 
   zx_status_t Unlink(const char* name, size_t name_len, int flags) {
@@ -1463,8 +1444,6 @@ constexpr zxio_ops_t Directory::kOps = ([]() {
   ops.readv = Adaptor::From<&Directory::Readv>;
   ops.readv_at = Adaptor::From<&Directory::ReadvAt>;
   ops.open = Adaptor::From<&Directory::Open>;
-  ops.open3 = Adaptor::From<&Directory::Open3>;
-  ops.open_async = Adaptor::From<&Directory::OpenAsync>;
   ops.unlink = Adaptor::From<&Directory::Unlink>;
   ops.token_get = Adaptor::From<&Directory::TokenGet>;
   ops.rename = Adaptor::From<&Directory::Rename>;
