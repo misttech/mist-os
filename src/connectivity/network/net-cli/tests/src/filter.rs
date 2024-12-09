@@ -240,14 +240,6 @@ async fn filter_create_routine_error(args: &[&'static str]) {
 )]
 #[test_case(&["tproxy"]; "transparent proxy with neither address nor port")]
 #[test_case(&["tproxy", "--addr", "not-an-ip"]; "transparent proxy with invalid IP address")]
-#[test_case(
-    &["redirect", "--min-dst-port", "33333"];
-    "redirect with only minimum of dst port range specified"
-)]
-#[test_case(
-    &["redirect", "--max-dst-port", "33333"];
-    "redirect with only maximum of dst port range specified"
-)]
 #[fuchsia_async::run_singlethreaded(test)]
 async fn filter_create_rule_error(args: &[&'static str]) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");

@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use std::num::{NonZeroU16, NonZeroU64};
+use std::ops::RangeInclusive;
 use std::str::FromStr;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context as _};
 use argh::{ArgsInfo, FromArgs};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
@@ -397,6 +398,7 @@ pub enum Action {
     Return(Return),
     TransparentProxy(TransparentProxy),
     Redirect(Redirect),
+    Masquerade(Masquerade),
 }
 
 /// The `fuchsia.net.filter/Action.Accept` action.
@@ -437,6 +439,23 @@ pub struct TransparentProxy {
     pub port: Option<NonZeroU16>,
 }
 
+/// An inclusive range of nonzero ports
+#[derive(Clone, Debug, PartialEq)]
+pub struct PortRange(pub RangeInclusive<NonZeroU16>);
+
+impl FromStr for PortRange {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (start, end) = s.split_once("..=").ok_or_else(|| {
+            anyhow!("expected inclusive port range to be specified in the form $start..=$end")
+        })?;
+        let start = NonZeroU16::new(start.parse::<u16>()?).context("port must be nonzero")?;
+        let end = NonZeroU16::new(end.parse::<u16>()?).context("port must be nonzero")?;
+        Ok(Self(start..=end))
+    }
+}
+
 /// The `fuchsia.net.filter/Action.Redirect` action.
 ///
 /// The destination port range to which to redirect the packet is optional, but
@@ -445,12 +464,22 @@ pub struct TransparentProxy {
 #[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "redirect")]
 pub struct Redirect {
-    /// the minimum destination port used to rewrite the packet (optional)
+    /// the destination port range used to rewrite the packet (optional)
     #[argh(option)]
-    pub min_dst_port: Option<NonZeroU16>,
-    /// the maximum destination port used to rewrite the packet (optional)
+    pub dst_port: Option<PortRange>,
+}
+
+/// The `fuchsia.net.filter/Action.Masquerade` action.
+///
+/// The source port range to use to rewrite the packet is optional, but
+/// --min-src-port and --max-src-port must either both be specified, or
+/// neither.
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
+#[argh(subcommand, name = "masquerade")]
+pub struct Masquerade {
+    /// the source port range used to rewrite the packet (optional)
     #[argh(option)]
-    pub max_dst_port: Option<NonZeroU16>,
+    pub src_port: Option<PortRange>,
 }
 
 /// A command to remove existing filtering resources
@@ -647,5 +676,21 @@ mod tests {
     )]
     fn port_matcher(s: &str) -> Result<PortMatcher, ()> {
         s.parse::<PortMatcher>().map_err(|_| ())
+    }
+
+    #[test_case("22" => Err(()); "must be specified as range")]
+    #[test_case("22..22" => Err(()); "must be written as ..=")]
+    #[test_case("0..=1" => Err(()); "must be nonzero")]
+    #[test_case("65536..=65536" => Err(()); "invalid u16")]
+    #[test_case(
+        "22..=22" => Ok(PortRange(NonZeroU16::new(22).unwrap()..=NonZeroU16::new(22).unwrap()));
+        "valid single port matcher"
+    )]
+    #[test_case(
+        "1..=65535" => Ok(PortRange(NonZeroU16::new(1).unwrap()..=NonZeroU16::MAX));
+        "valid port range matcher"
+    )]
+    fn port_range(s: &str) -> Result<PortRange, ()> {
+        s.parse::<PortRange>().map_err(|_| ())
     }
 }

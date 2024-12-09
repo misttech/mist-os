@@ -1,6 +1,6 @@
 {
-  "name": "redirect",
-  "description": "The `fuchsia.net.filter/Action.Redirect` action. The destination port range to which to redirect the packet is optional, but --min-dst-port and --max-dst-port must either both be specified, or neither.",
+  "name": "masquerade",
+  "description": "The `fuchsia.net.filter/Action.Masquerade` action. The source port range to use to rewrite the packet is optional, but --min-src-port and --max-src-port must either both be specified, or neither.",
   "examples": [],
   "flags": [
     {
@@ -14,13 +14,13 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "dst-port"
+          "arg_name": "src-port"
         }
       },
       "optionality": "optional",
-      "long": "--dst-port",
+      "long": "--src-port",
       "short": null,
-      "description": "the destination port range used to rewrite the packet (optional)",
+      "description": "the source port range used to rewrite the packet (optional)",
       "hidden": false
     }
   ],

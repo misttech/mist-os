@@ -187,6 +187,7 @@ ffx/net/filter/create/rule.golden
 ffx/net/filter/create/rule/accept.golden
 ffx/net/filter/create/rule/drop.golden
 ffx/net/filter/create/rule/jump.golden
+ffx/net/filter/create/rule/masquerade.golden
 ffx/net/filter/create/rule/redirect.golden
 ffx/net/filter/create/rule/return.golden
 ffx/net/filter/create/rule/tproxy.golden
