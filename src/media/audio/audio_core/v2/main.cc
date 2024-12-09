@@ -57,5 +57,6 @@ int main(int argc, const char** argv) {
   }
   main_loop.Run();
 
-  return 0;
+  // In normal operation this loop will run perpetually, so exiting represents an error condition.
+  return -1;
 }
