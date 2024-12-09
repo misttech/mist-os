@@ -95,7 +95,7 @@ debug::Status LinuxProcessHandle::Kill() {
   return debug::ErrnoStatus(errno);
 }
 
-debug::Status LinuxProcessHandle::Attach(ProcessHandleObserver* observer) {
+debug::Status LinuxProcessHandle::Attach(ProcessHandleObserver* observer, AttachConfig config) {
   observer_ = observer;
   return task_->Attach();
 }

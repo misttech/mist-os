@@ -101,10 +101,15 @@ class ProcessHandle {
   // still running (as defined by the kernel).
   virtual int64_t GetReturnCode() const = 0;
 
+  struct AttachConfig {
+    AttachConfig() = default;
+    bool claim_exception_channel = true;
+  };
+
   // Registers for process notifications on the given interface. The pointer must outlive this class
   // or until Detach() is called. The observer must not be null (use Detach() instead). Calling
   // multiple times will replace the observer pointer.
-  virtual debug::Status Attach(ProcessHandleObserver* observer) = 0;
+  virtual debug::Status Attach(ProcessHandleObserver* observer, AttachConfig config) = 0;
 
   virtual bool IsAttached() const = 0;
 

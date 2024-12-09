@@ -122,13 +122,13 @@ void DebuggedProcess::DetachFromProcess() {
 }
 
 debug::Status DebuggedProcess::Init(DebuggedProcessCreateInfo create_info) {
-  if (!create_info.deferred_attach) {
-    // When we defer attaching, we explicitly do not attempt to claim the process's exception
-    // channels. Typically this means we're attached to the parent job and watching for exceptions
-    // there, giving other tools the ability to attach to the process's exception channel directly.
-    if (debug::Status status = create_info.handle->Attach(this); status.has_error())
-      return status;
-  }
+  ProcessHandle::AttachConfig config;
+  // If |deferred_attach| is true, we should not claim the process's exception channel. We always
+  // want process termination notifications, so that watcher is always registered.
+  config.claim_exception_channel = !create_info.deferred_attach;
+
+  if (debug::Status status = create_info.handle->Attach(this, config); status.has_error())
+    return status;
 
   process_handle_ = std::move(create_info.handle);
   from_limbo_ = create_info.from_limbo;
@@ -176,7 +176,7 @@ debug::Status DebuggedProcess::AttachNow() {
   // This object should have already been initialized.
   FX_DCHECK(process_handle_);
 
-  return process_handle_->Attach(this);
+  return process_handle_->Attach(this, ProcessHandle::AttachConfig());
 }
 
 bool DebuggedProcess::IsAttached() const {

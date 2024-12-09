@@ -83,6 +83,7 @@ class MessageLoopFuchsia : public MessageLoop {
     zx_handle_t process_handle;
     zx_koid_t process_koid;
     ZirconExceptionWatcher* watcher = nullptr;
+    bool claim_exception_channel = true;
   };
   virtual zx_status_t WatchProcessExceptions(WatchProcessConfig config, WatchHandle* out);
 
@@ -197,6 +198,7 @@ struct MessageLoopFuchsia::WatchInfo {
   ZirconExceptionWatcher* exception_watcher = nullptr;
   zx_koid_t task_koid = 0;
   zx_handle_t task_handle = ZX_HANDLE_INVALID;
+  bool uses_exception_channel = true;
 
   // This makes easier the lookup of the associated ExceptionHandler with this watch id.
   const async_wait_t* signal_handler_key = nullptr;

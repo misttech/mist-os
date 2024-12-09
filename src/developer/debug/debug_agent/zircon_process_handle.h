@@ -24,7 +24,7 @@ class ZirconProcessHandle final : public ProcessHandle, public debug::ZirconExce
   zx_koid_t GetJobKoid() const override;
   debug::Status Kill() override;
   int64_t GetReturnCode() const override;
-  debug::Status Attach(ProcessHandleObserver* observer) override;
+  debug::Status Attach(ProcessHandleObserver* observer, AttachConfig attach_config) override;
   bool IsAttached() const override;
   void Detach() override;
   uint64_t GetLoaderBreakpointAddress() override;

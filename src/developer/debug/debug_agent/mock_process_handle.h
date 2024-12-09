@@ -53,7 +53,7 @@ class MockProcessHandle final : public ProcessHandle {
   zx_koid_t GetJobKoid() const override { return job_koid_; }
   debug::Status Kill() override;
   int64_t GetReturnCode() const override;
-  debug::Status Attach(ProcessHandleObserver* observer) override;
+  debug::Status Attach(ProcessHandleObserver* observer, AttachConfig config) override;
   bool IsAttached() const override { return is_attached_; }
   void Detach() override;
   uint64_t GetLoaderBreakpointAddress() override;

@@ -90,7 +90,8 @@ int64_t ZirconProcessHandle::GetReturnCode() const {
   return 0;
 }
 
-debug::Status ZirconProcessHandle::Attach(ProcessHandleObserver* observer) {
+debug::Status ZirconProcessHandle::Attach(ProcessHandleObserver* observer,
+                                          AttachConfig attach_config) {
   FX_DCHECK(observer);
   observer_ = observer;
 
@@ -105,23 +106,27 @@ debug::Status ZirconProcessHandle::Attach(ProcessHandleObserver* observer) {
     config.process_handle = process_.get();
     config.process_koid = GetKoid();
     config.watcher = this;
+    config.claim_exception_channel = attach_config.claim_exception_channel;
     if (auto status = debug::ZxStatus(
             loop->WatchProcessExceptions(std::move(config), &process_watch_handle_));
         status.has_error()) {
       return status;
     }
 
-    // Check and set ZX_PROP_PROCESS_BREAK_ON_LOAD.
-    uintptr_t break_on_load;
-    zx_status_t status =
-        process_.get_property(ZX_PROP_PROCESS_BREAK_ON_LOAD, &break_on_load, sizeof(break_on_load));
-    FX_CHECK(status == ZX_OK);
-    // This check should never fail because the debug exception channel obtained above is exclusive.
-    FX_CHECK(break_on_load == 0);
-    break_on_load = 1;
-    status =
-        process_.set_property(ZX_PROP_PROCESS_BREAK_ON_LOAD, &break_on_load, sizeof(break_on_load));
-    FX_CHECK(status == ZX_OK);
+    // Check and set ZX_PROP_PROCESS_BREAK_ON_LOAD if we're taking the exception channel.
+    if (config.claim_exception_channel) {
+      uintptr_t break_on_load;
+      zx_status_t status = process_.get_property(ZX_PROP_PROCESS_BREAK_ON_LOAD, &break_on_load,
+                                                 sizeof(break_on_load));
+      FX_CHECK(status == ZX_OK);
+      // This check should never fail because the debug exception channel obtained above is
+      // exclusive.
+      FX_CHECK(break_on_load == 0);
+      break_on_load = 1;
+      status = process_.set_property(ZX_PROP_PROCESS_BREAK_ON_LOAD, &break_on_load,
+                                     sizeof(break_on_load));
+      FX_CHECK(status == ZX_OK);
+    }
   }
   return debug::Status();
 }
