@@ -7,7 +7,6 @@
 #include <gmock/gmock.h>
 
 #include "src/media/audio/audio_core/shared/process_config.h"
-#include "src/media/audio/audio_core/shared/usage_settings.h"
 #include "src/media/audio/audio_core/v1/packet_queue.h"
 #include "src/media/audio/audio_core/v1/testing/fake_stream.h"
 #include "src/media/audio/audio_core/v1/testing/packet_factory.h"
@@ -15,7 +14,6 @@
 #include "src/media/audio/effects/test_effects/test_effects_v2.h"
 #include "src/media/audio/lib/clock/clone_mono.h"
 #include "src/media/audio/lib/clock/testing/clock_test.h"
-#include "src/media/audio/lib/clock/utils.h"
 #include "src/media/audio/lib/effects_loader/testing/test_effects_v1.h"
 
 using testing::Each;
@@ -26,7 +24,7 @@ namespace media::audio {
 namespace {
 
 // Used when the ReadLockContext is unused by the test.
-static media::audio::ReadableStream::ReadLockContext rlctx;
+media::audio::ReadableStream::ReadLockContext rlctx;
 
 constexpr uint32_t kDefaultFrameRate = 48000;
 const Format kDefaultFormat =
@@ -40,7 +38,7 @@ const Format kDefaultFormat =
 const TimelineFunction kDefaultTransform = TimelineFunction(
     TimelineRate(Fixed(kDefaultFormat.frames_per_second()).raw_value(), zx::sec(1).to_nsecs()));
 
-enum ClockMode { SAME, WITH_OFFSET, RATE_ADJUST };
+enum ClockMode : uint8_t { SAME, WITH_OFFSET, RATE_ADJUST };
 
 class OutputPipelineTest : public testing::ThreadingModelFixture {
  protected:
@@ -101,10 +99,10 @@ class OutputPipelineTest : public testing::ThreadingModelFixture {
     auto pipeline_config = PipelineConfig(root);
     return std::make_shared<OutputPipelineImpl>(pipeline_config, volume_curve,
                                                 nullptr /* EffectsLoaderV2 */, 128,
-                                                kDefaultTransform, device_clock_);
+                                                kDefaultTransform, device_clock());
   }
 
-  int64_t duration_to_frames(zx::duration delta) {
+  static int64_t duration_to_frames(zx::duration delta) {
     return kDefaultFormat.frames_per_ns().Scale(delta.to_nsecs());
   }
   std::shared_ptr<Clock> SetPacketFactoryWithOffsetAudioClock(zx::duration clock_offset,
@@ -122,11 +120,11 @@ class OutputPipelineTest : public testing::ThreadingModelFixture {
   }
 
   // If tolerance is not supplied, we FLOAT_EQ compare.
-  void CheckBuffer(void* buffer, float expected_sample, size_t num_samples,
-                   float tolerance = 0.0f) {
+  static void CheckBuffer(void* buffer, float expected_sample, size_t num_samples,
+                          float tolerance = 0.0f) {
     float* floats = reinterpret_cast<float*>(buffer);
     for (size_t i = 0; i < num_samples; ++i) {
-      if (tolerance) {
+      if (tolerance != 0.0f) {
         EXPECT_NEAR(expected_sample, floats[i], std::abs(tolerance))
             << "failed at sample " << i << " of " << num_samples << ": {"
             << ([floats, num_samples]() {
@@ -155,6 +153,9 @@ class OutputPipelineTest : public testing::ThreadingModelFixture {
   void TestOutputPipelineTrim(ClockMode clock_mode);
   void TestDifferentMixRates(ClockMode clock_mode);
 
+  std::shared_ptr<Clock> device_clock() { return device_clock_; }
+
+ private:
   std::shared_ptr<Clock> device_clock_ = context().clock_factory()->CreateDeviceFixed(
       clock::CloneOfMonotonic(), Clock::kMonotonicDomain);
 };
@@ -169,8 +170,9 @@ std::shared_ptr<Clock> OutputPipelineTest::SetPacketFactoryWithOffsetAudioClock(
 
   auto actual_offset = clock::testing::GetOffsetFromMonotonic(custom_clock).take_value();
 
-  int64_t seek_frame = round(
-      static_cast<double>(kDefaultFormat.frames_per_second() * actual_offset.get()) / ZX_SEC(1));
+  // This will not overflow int64, as long as actual_offset <= ~13 hours (for max FPS 192k).
+  EXPECT_LE(actual_offset.get(), ZX_HOUR(13));
+  int64_t seek_frame = (kDefaultFormat.frames_per_second() * actual_offset.get()) / ZX_SEC(1);
   factory.SeekToFrame(Fixed(seek_frame));
 
   return context().clock_factory()->CreateClientFixed(std::move(custom_clock));
@@ -264,7 +266,7 @@ void OutputPipelineTest::TestOutputPipelineTrim(ClockMode clock_mode) {
 }
 
 TEST_F(OutputPipelineTest, Trim) { TestOutputPipelineTrim(ClockMode::SAME); }
-TEST_F(OutputPipelineTest, Trim_ClockOffset) { TestOutputPipelineTrim(ClockMode::WITH_OFFSET); }
+TEST_F(OutputPipelineTest, TrimClockOffset) { TestOutputPipelineTrim(ClockMode::WITH_OFFSET); }
 
 TEST_F(OutputPipelineTest, Loopback) {
   auto test_effects = testing::TestEffectsV1Module::Open();
@@ -314,14 +316,14 @@ TEST_F(OutputPipelineTest, Loopback) {
   auto volume_curve = VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume);
   auto pipeline = std::make_shared<OutputPipelineImpl>(pipeline_config, volume_curve,
                                                        nullptr /* EffectsLoaderV2 */, 128,
-                                                       kDefaultTransform, device_clock_);
+                                                       kDefaultTransform, device_clock());
 
   // Add an input into our pipeline so that we have some frames to mix.
   const auto stream_usage = StreamUsage::WithRenderUsage(RenderUsage::MEDIA);
   pipeline->AddInput(CreateFakeStream(stream_usage), stream_usage);
 
   // Present frames ahead of now to stay ahead of the safe_write_frame.
-  auto ref_start = device_clock_->now();
+  auto ref_start = device_clock()->now();
   auto loopback = pipeline->dup_loopback();
   auto transform = loopback->ref_time_to_frac_presentation_frame();
   auto loopback_frame = Fixed::FromRaw(transform.timeline_function.Apply(ref_start.get())).Floor();
@@ -409,14 +411,14 @@ TEST_F(OutputPipelineTest, LoopbackWithUpsample) {
   auto volume_curve = VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume);
   auto pipeline = std::make_shared<OutputPipelineImpl>(pipeline_config, volume_curve,
                                                        nullptr /* EffectsLoaderV2 */, 128,
-                                                       kDefaultTransform, device_clock_);
+                                                       kDefaultTransform, device_clock());
 
   // Add an input into our pipeline so that we have some frames to mix.
   const auto stream_usage = StreamUsage::WithRenderUsage(RenderUsage::MEDIA);
   pipeline->AddInput(CreateFakeStream(stream_usage), stream_usage);
 
   // Present frames ahead of now to stay ahead of the safe_write_frame.
-  auto ref_start = device_clock_->now();
+  auto ref_start = device_clock()->now();
   auto loopback = pipeline->dup_loopback();
   auto transform = loopback->ref_time_to_frac_presentation_frame();
   auto loopback_frame = Fixed::FromRaw(transform.timeline_function.Apply(ref_start.get())).Floor();
@@ -454,8 +456,8 @@ TEST_F(OutputPipelineTest, LoopbackWithUpsample) {
   }
 }
 
-static const std::string kInstanceName = "instance name";
-static const std::string kConfig = "config";
+const std::string kInstanceName = "instance name";
+const std::string kConfig = "config";
 
 TEST_F(OutputPipelineTest, UpdateEffect) {
   auto test_effects = testing::TestEffectsV1Module::Open();
@@ -496,7 +498,7 @@ TEST_F(OutputPipelineTest, UpdateEffect) {
   auto volume_curve = VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume);
   auto pipeline = std::make_shared<OutputPipelineImpl>(pipeline_config, volume_curve,
                                                        nullptr /* EffectsLoaderV2 */, 128,
-                                                       kDefaultTransform, device_clock_);
+                                                       kDefaultTransform, device_clock());
 
   // Add an input into our pipeline so that we have some frames to mix.
   const auto stream_usage = StreamUsage::WithRenderUsage(RenderUsage::MEDIA);
@@ -574,7 +576,7 @@ TEST_F(OutputPipelineTest, ReportPresentationDelay) {
   auto volume_curve = VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume);
   auto pipeline = std::make_shared<OutputPipelineImpl>(
       pipeline_config, volume_curve, nullptr /* EffectsLoaderV2 */, 128, kDefaultTransform,
-      device_clock_, Mixer::Resampler::SampleAndHold);
+      device_clock(), Mixer::Resampler::SampleAndHold);
 
   // Add 2 streams, one with a MEDIA usage and one with COMMUNICATION usage. These should receive
   // different lead times since they have different effects (with different latencies) applied.
@@ -651,7 +653,7 @@ void OutputPipelineTest::TestDifferentMixRates(ClockMode clock_mode) {
   auto timeline_function = fbl::MakeRefCounted<VersionedTimelineFunction>(kDefaultTransform);
 
   testing::PacketFactory packet_factory(dispatcher(), kDefaultFormat,
-                                        2 * zx_system_get_page_size());
+                                        2ul * zx_system_get_page_size());
   std::shared_ptr<PacketQueue> stream;
 
   if (clock_mode == ClockMode::SAME) {
@@ -668,9 +670,9 @@ void OutputPipelineTest::TestDifferentMixRates(ClockMode clock_mode) {
 
   auto pipeline_config = PipelineConfig(root);
   auto volume_curve = VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume);
-  auto pipeline = std::make_shared<OutputPipelineImpl>(pipeline_config, volume_curve,
-                                                       nullptr /* EffectsLoaderV2 */, 480,
-                                                       kDefaultTransform, device_clock_, resampler);
+  auto pipeline = std::make_shared<OutputPipelineImpl>(
+      pipeline_config, volume_curve, nullptr /* EffectsLoaderV2 */, 480, kDefaultTransform,
+      device_clock(), resampler);
 
   pipeline->AddInput(stream, StreamUsage::WithRenderUsage(RenderUsage::MEDIA), std::nullopt,
                      resampler);
@@ -733,7 +735,7 @@ void OutputPipelineTest::TestDifferentMixRates(ClockMode clock_mode) {
 
   {
     SCOPED_TRACE("Read3");
-    auto buf = pipeline->ReadLock(rlctx, Fixed(kFramesPerRead * 2), kFramesPerRead);
+    auto buf = pipeline->ReadLock(rlctx, Fixed(kFramesPerRead * 2ul), kFramesPerRead);
     RunLoopUntilIdle();
 
     EXPECT_TRUE(buf);
@@ -742,7 +744,7 @@ void OutputPipelineTest::TestDifferentMixRates(ClockMode clock_mode) {
 }
 
 TEST_F(OutputPipelineTest, DifferentMixRates) { TestDifferentMixRates(ClockMode::SAME); }
-TEST_F(OutputPipelineTest, DifferentMixRates_ClockOffset) {
+TEST_F(OutputPipelineTest, DifferentMixRatesClockOffset) {
   TestDifferentMixRates(ClockMode::WITH_OFFSET);
 }
 
@@ -795,7 +797,7 @@ TEST_F(OutputPipelineTest, PipelineWithRechannelEffects) {
   auto volume_curve = VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume);
   auto pipeline = std::make_shared<OutputPipelineImpl>(pipeline_config, volume_curve,
                                                        nullptr /* EffectsLoaderV2 */, 128,
-                                                       kDefaultTransform, device_clock_);
+                                                       kDefaultTransform, device_clock());
 
   // Verify the pipeline format includes the rechannel effect.
   EXPECT_EQ(4, pipeline->format().channels());
@@ -851,7 +853,7 @@ TEST_F(OutputPipelineTest, LoopbackClock) {
   auto volume_curve = VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume);
   auto pipeline = std::make_shared<OutputPipelineImpl>(pipeline_config, volume_curve,
                                                        nullptr /* EffectsLoaderV2 */, 128,
-                                                       kDefaultTransform, device_clock_);
+                                                       kDefaultTransform, device_clock());
 
   clock::testing::VerifyReadOnlyRights(*pipeline->reference_clock());
   clock::testing::VerifyAdvances(*pipeline->reference_clock(),
@@ -872,11 +874,12 @@ TEST_F(OutputPipelineTest, PipelineWithEffectsV2) {
       .name = "AddOne",
       .process =
           [&arena](
-              uint64_t num_frames, float* input, float* output, float total_applied_gain_for_input,
+              uint64_t num_frames, const float* input, float* output,
+              float total_applied_gain_for_input,
               std::vector<fuchsia_audio_effects::wire::ProcessMetrics>& metrics_vector) mutable {
             for (uint64_t k = 0; k < num_frames; k++) {
               for (int c = 0; c < 2; c++) {
-                output[k * 2 + c] = input[k * 2 + c] + 1;
+                output[(k * 2) + c] = input[(k * 2) + c] + 1;
               }
             }
             fuchsia_audio_effects::wire::ProcessMetrics metrics(arena);
@@ -925,14 +928,14 @@ TEST_F(OutputPipelineTest, PipelineWithEffectsV2) {
   auto volume_curve = VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume);
   auto pipeline = std::make_shared<OutputPipelineImpl>(pipeline_config, volume_curve,
                                                        effects_loader_v2.value().get(), 128,
-                                                       kDefaultTransform, device_clock_);
+                                                       kDefaultTransform, device_clock());
 
   // Add an input into our pipeline so that we have some frames to mix.
   const auto stream_usage = StreamUsage::WithRenderUsage(RenderUsage::MEDIA);
   pipeline->AddInput(CreateFakeStream(stream_usage), stream_usage);
 
   // Present frames ahead of now to stay ahead of the safe_write_frame.
-  auto ref_start = device_clock_->now();
+  auto ref_start = device_clock()->now();
   auto loopback = pipeline->dup_loopback();
   auto transform = loopback->ref_time_to_frac_presentation_frame();
   auto loopback_frame = Fixed::FromRaw(transform.timeline_function.Apply(ref_start.get())).Floor();

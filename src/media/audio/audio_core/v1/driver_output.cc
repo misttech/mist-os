@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <iomanip>
+#include <limits>
 #include <utility>
 
 #include "src/media/audio/audio_core/shared/device_id.h"
@@ -261,7 +262,8 @@ std::optional<AudioOutput::FrameSpan> DriverOutput::StartMixJob(zx::time ref_tim
   // yet.  The distance between frames_sent_ and output_frames_transmitted
   // should give us this number.
   int64_t frames_in_flight = frames_sent_ - output_frames_transmitted;
-  FX_DCHECK((frames_in_flight >= 0) && (frames_in_flight <= rb.frames()));
+  FX_DCHECK(frames_in_flight >= 0);
+  FX_DCHECK(frames_in_flight <= rb.frames());
   FX_DCHECK(frames_sent_ <= fill_target);
   int64_t desired_frames = fill_target - frames_sent_;
 
@@ -270,7 +272,7 @@ std::optional<AudioOutput::FrameSpan> DriverOutput::StartMixJob(zx::time ref_tim
     return std::nullopt;
   }
 
-  uint32_t rb_space = rb.frames() - static_cast<uint32_t>(frames_in_flight);
+  uint32_t rb_space = static_cast<uint32_t>(rb.frames() - frames_in_flight);
   if (desired_frames > rb.frames()) {
     FX_LOGS(ERROR) << "OUTPUT OVERFLOW: want to produce " << desired_frames
                    << " but the ring buffer is only " << rb.frames() << " frames long.";
@@ -296,9 +298,7 @@ void DriverOutput::WriteMixOutput(int64_t start, int64_t frames_left, const floa
     int64_t wr_ptr = (start + offset) % rb->frames();
     int64_t contig_space = rb->frames() - wr_ptr;
     int64_t to_send = frames_left;
-    if (to_send > contig_space) {
-      to_send = contig_space;
-    }
+    to_send = std::min(to_send, contig_space);
     void* dest_buf = rb->virt() + (rb->format().bytes_per_frame() * wr_ptr);
 
     if (!buffer) {
@@ -317,7 +317,8 @@ void DriverOutput::WriteMixOutput(int64_t start, int64_t frames_left, const floa
       }
     }
     size_t dest_buf_len = to_send * output_producer_->bytes_per_frame();
-    wav_writer_.Write(dest_buf, dest_buf_len);
+    FX_DCHECK(dest_buf_len <= std::numeric_limits<uint32_t>::max());
+    wav_writer_.Write(dest_buf, static_cast<uint32_t>(dest_buf_len));
     wav_writer_.UpdateHeader();
     zx_cache_flush(dest_buf, dest_buf_len, ZX_CACHE_FLUSH_DATA);
 
@@ -429,7 +430,7 @@ void DriverOutput::OnDriverInfoFetched() {
 
   auto format_result = Format::Create(fuchsia::media::AudioStreamType{
       .sample_format = pref_fmt,
-      .channels = static_cast<uint32_t>(pref_chan),
+      .channels = pref_chan,
       .frames_per_second = pref_fps,
   });
   if (format_result.is_error()) {
@@ -507,7 +508,7 @@ void DriverOutput::OnDriverInfoFetched() {
     uint32_t instance_count = final_mix_instance_num_.fetch_add(1);
     file_name_ += (std::to_string(instance_count) + kWavFileExtension);
     wav_writer_.Initialize(file_name_.c_str(), pref_fmt, num_chans, frame_rate,
-                           format.bytes_per_frame() * 8 / num_chans);
+                           static_cast<uint16_t>(format.bytes_per_frame() * 8 / num_chans));
   }
 
   if constexpr (kEnableDropoutChecks) {
@@ -642,9 +643,11 @@ void DriverOutput::OnDriverStartComplete() {
     FX_CHECK(driver()->driver_transfer_frames());
     auto fd_frames = *driver()->driver_transfer_frames();
     FX_LOGS(INFO) << "Audio output: FIFO depth (" << fd_frames << " frames " << std::fixed
-                  << std::setprecision(3) << rate.Inverse().Scale(fd_frames) / 1000000.0
+                  << std::setprecision(3)
+                  << static_cast<double>(rate.Inverse().Scale(fd_frames)) / 1000000.0
                   << " mSec) Low Water (" << frames_sent_ << " frames " << std::fixed
-                  << std::setprecision(3) << rate.Inverse().Scale(frames_sent_) / 1000000.0
+                  << std::setprecision(3)
+                  << static_cast<double>(rate.Inverse().Scale(frames_sent_)) / 1000000.0
                   << " mSec)";
   }
 

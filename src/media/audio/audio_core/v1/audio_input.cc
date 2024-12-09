@@ -215,7 +215,7 @@ void AudioInput::ApplyGainLimits(fuchsia::media::AudioGainInfo* in_out_info,
 
     // If the hardware has not supplied a valid gain step size, or an
     // ridiculously small step size, just apply a clamp based on min/max.
-    constexpr float kStepSizeLimit = 1e-6;
+    constexpr float kStepSizeLimit = .000001f;
     if (caps.gain_step <= kStepSizeLimit) {
       in_out_info->gain_db = std::clamp(in_out_info->gain_db, caps.min_gain, caps.max_gain);
     } else {

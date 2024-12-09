@@ -90,7 +90,7 @@ std::shared_ptr<EffectsStageV1> EffectsStageV1::Create(
 
   MultiLibEffectsLoader loader;
   uint32_t frame_rate = source->format().frames_per_second();
-  uint16_t channels_in = source->format().channels();
+  uint16_t channels_in = static_cast<uint16_t>(source->format().channels());
   for (const auto& effect_spec : effects) {
     uint16_t channels_out = effect_spec.output_channels.value_or(channels_in);
     auto effect = loader.CreateEffectByName(effect_spec.lib_name, effect_spec.effect_name,
@@ -356,7 +356,7 @@ fpromise::result<void, fuchsia::media::audio::UpdateEffectError> EffectsStageV1:
 
 zx::duration EffectsStageV1::ComputeIntrinsicMinLeadTime() const {
   TimelineRate ticks_per_frame = format().frames_per_ns().Inverse();
-  uint32_t lead_frames = effects_processor_->delay_frames();
+  uint32_t lead_frames = static_cast<uint32_t>(effects_processor_->delay_frames());
   // Lead time must be extended to fill at least one complete block.
   if (block_size_frames_ > 0) {
     lead_frames += block_size_frames_ - 1;
