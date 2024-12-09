@@ -48,36 +48,39 @@ pub(crate) async fn serve_monitor_requests(
 ) -> Result<(), Error> {
     while let Some(req) = req_stream.try_next().await.context("error running DeviceService")? {
         match req {
-            DeviceMonitorRequest::ListPhys { responder } => responder.send(&list_phys(&phys)),
-            DeviceMonitorRequest::ListIfaces { responder } => responder.send(&list_ifaces(&ifaces)),
+            DeviceMonitorRequest::ListPhys { responder } => responder.send(&list_phys(&phys))?,
+            DeviceMonitorRequest::ListIfaces { responder } => {
+                responder.send(&list_ifaces(&ifaces))?
+            }
             DeviceMonitorRequest::GetDevPath { phy_id, responder } => {
-                responder.send(get_dev_path(&phys, phy_id).as_deref())
+                responder.send(get_dev_path(&phys, phy_id).as_deref())?
             }
             DeviceMonitorRequest::GetSupportedMacRoles { phy_id, responder } => responder
-                .send(get_supported_mac_roles(&phys, phy_id).await.as_deref().map_err(|e| *e)),
+                .send(get_supported_mac_roles(&phys, phy_id).await.as_deref().map_err(|e| *e))?,
             DeviceMonitorRequest::WatchDevices { watcher, control_handle: _ } => {
                 watcher_service
                     .add_watcher(watcher)
                     .unwrap_or_else(|e| error!("error registering a device watcher: {}", e));
-                Ok(())
             }
             DeviceMonitorRequest::GetCountry { phy_id, responder } => {
-                responder.send(get_country(&phys, phy_id).await.as_ref().map_err(|s| s.into_raw()))
+                responder
+                    .send(get_country(&phys, phy_id).await.as_ref().map_err(|s| s.into_raw()))?;
             }
             DeviceMonitorRequest::SetCountry { req, responder } => {
                 let status = set_country(&phys, req).await;
-                responder.send(status.into_raw())
+                responder.send(status.into_raw())?;
             }
             DeviceMonitorRequest::ClearCountry { req, responder } => {
                 let status = clear_country(&phys, req).await;
-                responder.send(status.into_raw())
+                responder.send(status.into_raw())?;
             }
             DeviceMonitorRequest::SetPowerSaveMode { req, responder } => {
                 let status = set_power_save_mode(&phys, req).await;
-                responder.send(status.into_raw())
+                responder.send(status.into_raw())?;
             }
-            DeviceMonitorRequest::GetPowerSaveMode { phy_id, responder } => responder
-                .send(get_power_save_mode(&phys, phy_id).await.as_ref().map_err(|s| s.into_raw())),
+            DeviceMonitorRequest::GetPowerSaveMode { phy_id, responder } => responder.send(
+                get_power_save_mode(&phys, phy_id).await.as_ref().map_err(|s| s.into_raw()),
+            )?,
             DeviceMonitorRequest::CreateIface { payload, responder } => {
                 let ((phy_id, role, sta_address), responder) = match responder
                     .unpack_fields_or_else_send(
@@ -129,29 +132,29 @@ pub(crate) async fn serve_monitor_requests(
                     iface_id: Some(new_iface.id),
                     ..Default::default()
                 };
-                responder.send(Ok(&resp))
+                responder.send(Ok(&resp))?;
             }
             DeviceMonitorRequest::QueryIface { iface_id, responder } => {
                 let result = query_iface(&ifaces, iface_id).await;
-                responder.send(result.as_ref().map_err(|e| e.into_raw()))
+                responder.send(result.as_ref().map_err(|e| e.into_raw()))?;
             }
             DeviceMonitorRequest::DestroyIface { req, responder } => {
                 let result =
                     destroy_iface(&phys, &ifaces, Arc::clone(&ifaces_tree), req.iface_id).await;
                 let status = into_status_and_opt(result).0;
-                responder.send(status.into_raw())
+                responder.send(status.into_raw())?;
             }
             DeviceMonitorRequest::GetClientSme { iface_id, sme_server, responder } => {
                 let result = get_client_sme(&ifaces, iface_id, sme_server).await;
-                responder.send(result.map_err(|e| e.into_raw()))
+                responder.send(result.map_err(|e| e.into_raw()))?;
             }
             DeviceMonitorRequest::GetApSme { iface_id, sme_server, responder } => {
                 let result = get_ap_sme(&ifaces, iface_id, sme_server).await;
-                responder.send(result.map_err(|e| e.into_raw()))
+                responder.send(result.map_err(|e| e.into_raw()))?;
             }
             DeviceMonitorRequest::GetSmeTelemetry { iface_id, telemetry_server, responder } => {
                 let result = get_sme_telemetry(&ifaces, iface_id, telemetry_server).await;
-                responder.send(result.map_err(|e| e.into_raw()))
+                responder.send(result.map_err(|e| e.into_raw()))?;
             }
             DeviceMonitorRequest::GetFeatureSupport {
                 iface_id,
@@ -159,9 +162,9 @@ pub(crate) async fn serve_monitor_requests(
                 responder,
             } => {
                 let result = get_feature_support(&ifaces, iface_id, feature_support_server).await;
-                responder.send(result.map_err(|e| e.into_raw()))
+                responder.send(result.map_err(|e| e.into_raw()))?;
             }
-        }?;
+        }
     }
 
     Ok(())
