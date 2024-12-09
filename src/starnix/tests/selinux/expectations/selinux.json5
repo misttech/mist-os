@@ -65,6 +65,7 @@
                 "filesystem",
                 "fs_filesystem",
                 "glblub",
+                "overlay",
                 "userfaultfd",
                 "watchkey",
 

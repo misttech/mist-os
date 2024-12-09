@@ -87,6 +87,15 @@ impl ProcDirectory {
                 SimpleFileNode::new(|| Ok(ProcKmsgFile)),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o100), FsCred::root()),
             ),
+            // Report just enough symbols to allow some tests to run.
+            "kallsyms".into() => fs.create_node(
+                current_task,
+                SimpleFileNode::new(|| {
+                    track_stub!(TODO("https://fxbug.dev/369067922"), "Provide a real /proc/kallsyms");
+                    Ok(BytesFile::new(b"0000000000000000 T security_inode_copy_up".to_vec()))
+                }),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
             "mounts".into() => MountsSymlink::new_node(current_task, fs),
             // File must exist to pass the CgroupsAvailable check, which is a little bit optional
             // for init but not optional for a lot of the system!
