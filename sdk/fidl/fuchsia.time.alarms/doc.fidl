@@ -1,0 +1,16 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+/// APIs for handling wake alarms.
+///
+/// NOTE: This is not the final form of the API. There are a number of roughly
+/// equivalent alternatives, and we'll be exploring some of them in this
+/// proposal.
+///
+/// # Summary
+///
+/// * [WakeAlarms]: Provides scheduling platform-wide wake alarms.  These alarms
+///   can wake a suspended system if needed.
+@available(added=HEAD)
+library fuchsia.time.alarms;
