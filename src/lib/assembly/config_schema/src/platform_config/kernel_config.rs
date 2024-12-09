@@ -58,6 +58,10 @@ pub struct PlatformKernelConfig {
     /// Enables the `kernel_evict_continuous` assembly input bundle.
     pub continuous_eviction: bool,
 
+    /// Configures cprng related behaviors
+    #[serde(default)]
+    pub cprng: CprngConfig,
+
     /// For address spaces that use ASLR this controls the number of bits of
     /// entropy in the randomization. Higher entropy results in a sparser
     /// address space and uses more memory for page tables. Valid values range
@@ -73,6 +77,24 @@ pub struct PlatformKernelConfig {
 
     /// Configurations related to page scanner behavior.
     pub page_scanner: Option<PageScannerConfig>,
+}
+
+/// Options for cprng behaviors
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CprngConfig {
+    /// When enabled and if jitterentropy fails at initial seeding, CPRNG panics.
+    #[serde(default)]
+    pub seed_require_jitterentropy: bool,
+
+    /// When enabled and if you do not provide entropy input from the kernel
+    /// command line, CPRNG panics.
+    #[serde(default)]
+    pub seed_require_cmdline: bool,
+
+    /// When enabled and if jitterentropy fails at reseeding, CPRNG panics.
+    #[serde(default)]
+    pub reseed_require_jitterentropy: bool,
 }
 
 /// Options for user page tables the reclamation policy.

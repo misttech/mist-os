@@ -69,6 +69,16 @@ pub enum KernelArg {
     /// more memory for page tables. Valid values range from 0-36.
     AslrEntropyBits(u8),
 
+    /// When enabled and if jitterentropy fails at initial seeding, CPRNG panics.
+    CprngSeedRequireJitterEntropy(bool),
+
+    /// When enabled and if you do not provide entropy input from the kernel
+    /// command line, CPRNG panics.
+    CprngSeedRequireCmdline(bool),
+
+    /// When enabled and if jitterentropy fails at reseeding, CPRNG panics.
+    CprngReseedRequireJitterEntropy(bool),
+
     /// This option sets an upper-bound in megabytes for the system memory.
     /// If set to zero, then no upper-bound is set.
     ///
@@ -190,6 +200,15 @@ impl KernelArg {
             Self::OomWarningMib(i) => ("kernel.oom.warning-mb", i.to_string()),
             Self::HaltOnPanic(b) => ("kernel.halt-on-panic", b.to_string()),
             Self::AslrEntropyBits(i) => ("aslr.entropy_bits", i.to_string()),
+            Self::CprngSeedRequireJitterEntropy(b) => {
+                ("kernel.cprng-seed-require.jitterentropy", b.to_string())
+            }
+            Self::CprngSeedRequireCmdline(b) => {
+                ("kernel.cprng-seed-require.cmdline", b.to_string())
+            }
+            Self::CprngReseedRequireJitterEntropy(b) => {
+                ("kernel.cprng-reseed-require.jitterentropy", b.to_string())
+            }
             Self::MemoryLimitMib(i) => ("kernel.memory-limit-mb", i.to_string()),
             Self::Arm64DebugDap(s) => ("kernel.arm64.debug.dap-rom-soc", s.to_string()),
             Self::PageScannerStartAtBoot(b) => ("kernel.page-scanner.start-at-boot", b.to_string()),
@@ -215,7 +234,10 @@ impl KernelArg {
             | Self::HaltOnPanic(_)
             | Self::PageScannerStartAtBoot(_)
             | Self::PhysVerbose(_)
-            | Self::PageScannerEnableEviction(_) => {
+            | Self::PageScannerEnableEviction(_)
+            | Self::CprngReseedRequireJitterEntropy(_)
+            | Self::CprngSeedRequireCmdline(_)
+            | Self::CprngSeedRequireJitterEntropy(_) => {
                 vec![format!("{}=true", key), format!("{}=false", key)]
             }
 
