@@ -330,7 +330,7 @@ pub struct ResolvedInstanceState {
 
     /// Hosts a directory mapping the component's exposed capabilities, generated from `exposed_dict`.
     /// Created on demand.
-    exposed_dir: Once<DirEntry>,
+    exposed_dir: Once<Arc<dyn DirectoryEntry>>,
 
     /// Dynamic offers targeting this component's dynamic children.
     ///
@@ -729,15 +729,20 @@ impl ResolvedInstanceState {
     }
 
     /// Returns a [`Dict`] with contents similar to `component_output_dict`, but adds capabilities
-    /// backed by legacy routing, and hosts [`Open`]s instead of [`Router`]s. This [`Dict`] is used
-    /// to generate the `exposed_dir`.
+    /// backed by legacy routing. This [`Dict`] is used to generate the `exposed_dir`.
     pub async fn get_exposed_dict(&self) -> &Dict {
         let create_exposed_dict = async {
             let component = self.weak_component.upgrade().unwrap();
-            let dict = sandbox::dict_routers_to_dir_entry(
-                &component.execution_scope,
-                &self.sandbox.component_output_dict,
-            );
+            let dict = Dict::new();
+            for (key, value) in self.sandbox.component_output_dict.enumerate() {
+                let Ok(value) = value else {
+                    // This capability is not cloneable. Skip it.
+                    warn!(moniker=%self.moniker(), key=%format!("{key}"),
+                          "Exposed dict contains non-cloneable. Eliding it from exposed dir.");
+                    continue;
+                };
+                let _ = dict.insert(key, value);
+            }
             Self::extend_exposed_dict_with_legacy(&component, self.decl(), &dict);
             dict
         };
@@ -769,16 +774,14 @@ impl ResolvedInstanceState {
         }
     }
 
-    pub async fn get_exposed_dir(&self) -> &DirEntry {
+    pub async fn get_exposed_dir(&self) -> Arc<dyn DirectoryEntry> {
         let create_exposed_dir = async {
             let exposed_dict = self.get_exposed_dict().await.clone();
-            DirEntry::new(
-                exposed_dict
-                    .try_into_directory_entry(self.execution_scope.clone())
-                    .expect("converting exposed dict to open should always succeed"),
-            )
+            exposed_dict
+                .try_into_directory_entry(self.execution_scope.clone())
+                .expect("converting exposed dict to open should always succeed")
         };
-        self.exposed_dir.get_or_init(create_exposed_dir).await
+        self.exposed_dir.get_or_init(create_exposed_dir).await.clone()
     }
 
     /// Returns the resolved structured configuration of this instance, if any.

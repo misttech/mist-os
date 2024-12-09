@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::fidl::RemotableCapability;
-use crate::{Capability, CapabilityBound, Dict, DirEntry, Request, Router, RouterResponse};
+use crate::{Capability, CapabilityBound, Dict, Request, Router, RouterResponse};
 use fidl::AsHandleRef;
 use router_error::{Explain, RouterError};
 use std::sync::Arc;
@@ -71,54 +71,11 @@ where
     resp.try_into()
 }
 
-/// Returns a [Dict] equivalent to `dict`, but with all routers replaced with [DirEntry].
-///
-/// This is an alternative to [Dict::try_into_directory_entry] when the [Dict] contains routers,
-/// because at one time routers were not part the sandbox library.
-// TODO:(https://fxrev.dev/374983288): Merge this with [Dict::try_into_directory_entry].
-pub fn dict_routers_to_dir_entry(scope: &ExecutionScope, dict: &Dict) -> Dict {
-    let out = Dict::new();
-    for (key, value) in dict.enumerate() {
-        let Ok(value) = value else {
-            // This capability is not cloneable. Skip it.
-            continue;
-        };
-        let value = match value {
-            Capability::Dictionary(dict) => {
-                Capability::Dictionary(dict_routers_to_dir_entry(scope, &dict))
-            }
-            Capability::ConnectorRouter(router) => Capability::DirEntry(DirEntry::new(
-                router.into_directory_entry(fio::DirentType::Service, scope.clone()),
-            )),
-            Capability::DictionaryRouter(router) => {
-                Capability::DirEntry(DirEntry::new(router.into_directory_entry(
-                    // TODO: Should we convert the DirEntry to a Directory here?
-                    fio::DirentType::Service,
-                    scope.clone(),
-                )))
-            }
-            Capability::DirEntryRouter(router) => {
-                Capability::DirEntry(DirEntry::new(router.into_directory_entry(
-                    // TODO(https://fxbug.dev/340891837): This assumes the DirEntry type is
-                    // Service. Unfortunately, with the current API there is no good way to get the
-                    // DirEntry type in advance. This problem should go away once we revamp or
-                    // remove DirEntry.
-                    fio::DirentType::Service,
-                    scope.clone(),
-                )))
-            }
-            other => other,
-        };
-        out.insert(key, value).ok();
-    }
-    out
-}
-
 impl<T: CapabilityBound + Clone> Router<T>
 where
     Capability: From<T>,
 {
-    pub fn into_directory_entry(
+    pub(crate) fn into_directory_entry(
         self,
         entry_type: fio::DirentType,
         scope: ExecutionScope,
@@ -175,16 +132,6 @@ where
                 };
                 let error = match result {
                     Ok(capability) => {
-                        let capability = match capability {
-                            // HACK: Dict needs special casing because [Dict::try_into_open]
-                            // is unaware of routers.
-                            // TODO:(https://fxrev.dev/374983288): Merge this with
-                            // [Dict::try_into_directory_entry].
-                            Capability::Dictionary(d) => {
-                                dict_routers_to_dir_entry(&self.scope, &d).into()
-                            }
-                            cap => cap,
-                        };
                         match capability.try_into_directory_entry(self.scope.clone()) {
                             Ok(open) => return open.open_entry(open_request),
                             Err(_) => RouterError::NotSupported,
