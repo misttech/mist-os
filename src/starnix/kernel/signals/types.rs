@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::signals::DeliveryAction;
 use crate::task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, WaiterRef};
 use starnix_sync::{InterruptibleEvent, RwLock};
 use starnix_uapi::errors::Errno;
@@ -18,6 +19,40 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+
+/// Internal signal that cannot be masked, blocked or ignored.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum KernelSignal {
+    Freeze,
+}
+
+impl KernelSignal {
+    pub fn action(&self) -> DeliveryAction {
+        match self {
+            KernelSignal::Freeze => DeliveryAction::Freeze,
+        }
+    }
+}
+
+/// Signal info wrapper around user and internal signals.
+pub enum KernelSignalInfo {
+    User(SignalInfo),
+    Freeze,
+}
+
+impl From<KernelSignal> for KernelSignalInfo {
+    fn from(value: KernelSignal) -> Self {
+        match value {
+            KernelSignal::Freeze => KernelSignalInfo::Freeze,
+        }
+    }
+}
+
+impl From<SignalInfo> for KernelSignalInfo {
+    fn from(value: SignalInfo) -> Self {
+        KernelSignalInfo::User(value)
+    }
+}
 
 /// `SignalActions` contains a `sigaction` for each valid signal.
 #[derive(Debug)]

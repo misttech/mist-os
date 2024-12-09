@@ -623,7 +623,7 @@ fn process_completed_exception(
                 if let Some(status) = deliver_signal(
                     current_task,
                     task_state,
-                    signal,
+                    signal.into(),
                     &mut registers,
                     &current_task.thread_state.extended_pstate,
                 ) {

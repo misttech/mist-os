@@ -5,7 +5,7 @@
 use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor};
 use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
-use crate::signals::{RunState, SignalInfo, SignalState};
+use crate::signals::{KernelSignal, RunState, SignalInfo, SignalState};
 use crate::task::{
     set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
     EventHandler, Kernel, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData,
@@ -37,6 +37,7 @@ use starnix_uapi::{
     errno, error, from_status_like_fdio, pid_t, robust_list_head, sigaction, sigaltstack, ucred,
     CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
 };
+use std::collections::VecDeque;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
@@ -328,6 +329,15 @@ pub struct TaskMutableState {
     /// signal sending and delivery.
     signals: SignalState,
 
+    /// Internal signals that have a higher priority than a regular signal.
+    ///
+    /// Storing in a separate queue outside of `SignalState` ensures the internal signals will
+    /// never be ignored or masked when dequeuing. Higher priority ensures that no user signals
+    /// will jump the queue, e.g. ptrace, which delays the delivery.
+    ///
+    /// This design is not about observable consequence, but about convenient implementation.
+    kernel_signals: VecDeque<KernelSignal>,
+
     /// The exit status that this task exited with.
     exit_status: Option<ExitStatus>,
 
@@ -384,6 +394,9 @@ pub struct TaskMutableState {
 
     /// Information that a tracer needs to inspect this process.
     pub captured_thread_state: Option<CapturedThreadState>,
+
+    /// Whether this process is frozen by the cgroup freezer.
+    pub frozen: bool,
 }
 
 impl TaskMutableState {
@@ -480,6 +493,11 @@ impl TaskMutableState {
     /// Note that the current signal mask may still not be blocking the signal.
     pub fn is_signal_masked_by_saved_mask(&self, signal: Signal) -> bool {
         self.signals.saved_mask().is_some_and(|mask| mask.has_signal(signal))
+    }
+
+    /// Enqueues an internal signal at the back of the task's kernel signal queue.
+    pub fn enqueue_kernel_signal(&mut self, signal: KernelSignal) {
+        self.kernel_signals.push_back(signal);
     }
 
     /// Enqueues a signal at the back of the task's signal queue.
@@ -736,6 +754,13 @@ impl TaskMutableState<Base = Task> {
     pub fn take_signal_with_mask(&mut self, signal_mask: SigSet) -> Option<SignalInfo> {
         let predicate = |s: &SignalInfo| !signal_mask.has_signal(s.signal) || s.force;
         self.take_next_signal_where(predicate)
+    }
+
+    /// Removes and returns a pending internal signal.
+    ///
+    /// Returns `None` if there are no signals pending.
+    pub fn take_kernel_signal(&mut self) -> Option<KernelSignal> {
+        self.kernel_signals.pop_front()
     }
 
     #[cfg(test)]
@@ -1079,6 +1104,7 @@ impl Task {
             mutable_state: RwLock::new(TaskMutableState {
                 clear_child_tid: UserRef::default(),
                 signals: SignalState::with_mask(signal_mask),
+                kernel_signals: Default::default(),
                 exit_status: None,
                 scheduler_policy,
                 uts_ns,
@@ -1091,6 +1117,7 @@ impl Task {
                 default_timerslack_ns: timerslack_ns,
                 ptrace: None,
                 captured_thread_state: None,
+                frozen: false,
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,

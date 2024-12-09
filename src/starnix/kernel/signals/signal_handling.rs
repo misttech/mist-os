@@ -8,7 +8,7 @@ use crate::arch::signal_handling::{
     RED_ZONE_SIZE, SIG_STACK_SIZE, SYSCALL_INSTRUCTION_SIZE_BYTES,
 };
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
-use crate::signals::{SignalDetail, SignalInfo, SignalState};
+use crate::signals::{KernelSignal, KernelSignalInfo, SignalDetail, SignalInfo, SignalState};
 use crate::task::{CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::{log_trace, log_warn};
@@ -42,7 +42,7 @@ enum SignalPriority {
 // `send_signal*()` calls below may fail only for real-time signals (with EAGAIN). They are
 // expected to succeed for all other signals.
 pub fn send_signal_first(task: &Task, task_state: TaskWriteGuard<'_>, siginfo: SignalInfo) {
-    send_signal_prio(task, task_state, siginfo, SignalPriority::First, true)
+    send_signal_prio(task, task_state, siginfo.into(), SignalPriority::First, true)
         .expect("send_signal(SignalPriority::First) is not expected to fail")
 }
 
@@ -50,28 +50,51 @@ pub fn send_signal_first(task: &Task, task_state: TaskWriteGuard<'_>, siginfo: S
 pub fn send_standard_signal(task: &Task, siginfo: SignalInfo) {
     debug_assert!(!siginfo.signal.is_real_time());
     let state = task.write();
-    send_signal_prio(task, state, siginfo, SignalPriority::Last, false)
+    send_signal_prio(task, state, siginfo.into(), SignalPriority::Last, false)
         .expect("send_signal(SignalPriority::First) is not expected to fail for standard signals.")
 }
 
 pub fn send_signal(task: &Task, siginfo: SignalInfo) -> Result<(), Errno> {
     let state = task.write();
-    send_signal_prio(task, state, siginfo, SignalPriority::Last, false)
+    send_signal_prio(task, state, siginfo.into(), SignalPriority::Last, false)
+}
+
+pub fn send_kernel_signal(task: &Task, kernel_siginfo: KernelSignal) -> Result<(), Errno> {
+    let state = task.write();
+    send_signal_prio(task, state, kernel_siginfo.into(), SignalPriority::First, true)
 }
 
 fn send_signal_prio(
     task: &Task,
     mut task_state: TaskWriteGuard<'_>,
-    siginfo: SignalInfo,
+    kernel_siginfo: KernelSignalInfo,
     prio: SignalPriority,
     force_wake: bool,
 ) -> Result<(), Errno> {
-    let is_masked = task_state.is_signal_masked(siginfo.signal);
-    let was_masked = task_state.is_signal_masked_by_saved_mask(siginfo.signal);
-    let sigaction = task.get_signal_action(siginfo.signal);
-    let action = action_for_signal(&siginfo, sigaction);
+    let (siginfo, signal, is_masked, was_masked, is_real_time, sigaction, action) =
+        match kernel_siginfo {
+            KernelSignalInfo::User(ref user_siginfo) => {
+                let signal = user_siginfo.signal;
+                let is_masked = task_state.is_signal_masked(signal);
+                let was_masked = task_state.is_signal_masked_by_saved_mask(signal);
+                let sigaction = task.get_signal_action(signal);
+                let action = action_for_signal(&user_siginfo, sigaction);
+                (
+                    Some(user_siginfo.clone()),
+                    Some(signal),
+                    is_masked,
+                    was_masked,
+                    signal.is_real_time(),
+                    Some(sigaction),
+                    action,
+                )
+            }
+            KernelSignalInfo::Freeze => {
+                (None, None, false, false, false, None, KernelSignal::Freeze.action())
+            }
+        };
 
-    if siginfo.signal.is_real_time() && prio != SignalPriority::First {
+    if is_real_time && prio != SignalPriority::First {
         if task_state.pending_signal_count()
             >= task.thread_group.get_rlimit(Resource::SIGPENDING) as usize
         {
@@ -86,12 +109,17 @@ fn send_signal_prio(
     let is_queued =
         action != DeliveryAction::Ignore || is_masked || was_masked || task_state.is_ptraced();
     if is_queued {
-        if prio == SignalPriority::First {
-            task_state.enqueue_signal_front(siginfo.clone());
-        } else {
-            task_state.enqueue_signal(siginfo.clone());
+        match kernel_siginfo {
+            KernelSignalInfo::User(ref siginfo) => {
+                if prio == SignalPriority::First {
+                    task_state.enqueue_signal_front(siginfo.clone());
+                } else {
+                    task_state.enqueue_signal(siginfo.clone());
+                }
+                task_state.set_flags(TaskFlags::SIGNALS_AVAILABLE, true);
+            }
+            KernelSignalInfo::Freeze => task_state.enqueue_kernel_signal(KernelSignal::Freeze),
         }
-        task_state.set_flags(TaskFlags::SIGNALS_AVAILABLE, true);
     }
 
     drop(task_state);
@@ -104,11 +132,11 @@ fn send_signal_prio(
 
     // Unstop the process for SIGCONT. Also unstop for SIGKILL, the only signal that can interrupt
     // a stopped process.
-    if siginfo.signal == SIGKILL {
-        task.thread_group.set_stopped(StopState::ForceWaking, Some(siginfo), false);
+    if signal == Some(SIGKILL) {
+        task.thread_group.set_stopped(StopState::ForceWaking, siginfo, false);
         task.write().set_stopped(StopState::ForceWaking, None, None, None);
-    } else if siginfo.signal == SIGCONT || force_wake {
-        task.thread_group.set_stopped(StopState::Waking, Some(siginfo), false);
+    } else if signal == Some(SIGCONT) || force_wake {
+        task.thread_group.set_stopped(StopState::Waking, siginfo, false);
         task.write().set_stopped(StopState::Waking, None, None, None);
     }
 
@@ -126,6 +154,8 @@ pub enum DeliveryAction {
     CoreDump,
     Stop,
     Continue,
+    /// Cgroup freezer
+    Freeze,
 }
 
 impl DeliveryAction {
@@ -133,10 +163,10 @@ impl DeliveryAction {
     ///
     /// The task will not be interrupted if the signal is the action is the Continue action, or if
     /// the action is Ignore and the user specifically requested to ignore the signal.
-    pub fn must_interrupt(&self, sigaction: sigaction_t) -> bool {
+    pub fn must_interrupt(&self, sigaction: Option<sigaction_t>) -> bool {
         match *self {
             Self::Continue => false,
-            Self::Ignore => sigaction.sa_handler == SIG_IGN,
+            Self::Ignore => sigaction.map_or(false, |sa| sa.sa_handler == SIG_IGN),
             _ => true,
         }
     }
@@ -174,7 +204,10 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
     if task.load_stopped().is_stopping_or_stopped() {
         return;
     }
-    let siginfo = task_state.take_any_signal();
+
+    // If there is a kernel signal needs to handle, deliver the signal right away.
+    let kernel_signal = task_state.take_kernel_signal();
+    let siginfo = if kernel_signal.is_some() { None } else { task_state.take_any_signal() };
     prepare_to_restart_syscall(
         &mut thread_state.registers,
         siginfo.as_ref().map(|siginfo| task.thread_group.signal_actions.get(siginfo.signal)),
@@ -208,14 +241,22 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
         task_state.update_flags(clear | TaskFlags::TEMPORARY_SIGNAL_MASK, set);
     };
 
-    if let Some(siginfo) = siginfo {
+    let kernel_signal_info: Option<KernelSignalInfo> = if let Some(kernel_signal) = kernel_signal {
+        Some(kernel_signal.into())
+    } else if let Some(ref siginfo) = siginfo {
         if let SignalDetail::Timer { timer } = &siginfo.detail {
             timer.on_signal_delivered();
         }
+        Some(siginfo.clone().into())
+    } else {
+        None
+    };
+
+    if let Some(kernel_signal_info) = kernel_signal_info {
         if let Some(status) = deliver_signal(
             &task,
             task_state,
-            siginfo,
+            kernel_signal_info,
             &mut current_task.thread_state.registers,
             &current_task.thread_state.extended_pstate,
         ) {
@@ -227,17 +268,27 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
 pub fn deliver_signal(
     task: &Task,
     mut task_state: TaskWriteGuard<'_>,
-    mut siginfo: SignalInfo,
+    mut kernel_siginfo: KernelSignalInfo,
     registers: &mut RegisterState,
     extended_pstate: &ExtendedPstateState,
 ) -> Option<ExitStatus> {
     loop {
-        let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
-        let action = action_for_signal(&siginfo, sigaction);
-        log_trace!("handling signal {:?} with action {:?}", siginfo, action);
+        let (siginfo, action) = match kernel_siginfo {
+            KernelSignalInfo::Freeze => {
+                // Create a default SIGSTOP signal info, it should not be used to stop the thread.
+                (SignalInfo::default(SIGSTOP), KernelSignal::Freeze.action())
+            }
+            KernelSignalInfo::User(ref signal_info) => {
+                let sigaction = task.thread_group.signal_actions.get(signal_info.signal);
+                let action = action_for_signal(signal_info, sigaction);
+                log_trace!("handling signal {:?} with action {:?}", signal_info, action);
+                (signal_info.clone(), action)
+            }
+        };
         match action {
             DeliveryAction::Ignore => {}
             DeliveryAction::CallHandler => {
+                let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
                 let signal = siginfo.signal;
                 match dispatch_signal_handler(
                     task,
@@ -261,14 +312,15 @@ pub fn deliver_signal(
                     Err(err) => {
                         log_warn!("failed to deliver signal {:?}: {:?}", signal, err);
 
-                        siginfo = SignalInfo::default(SIGSEGV);
+                        let segv_siginfo = SignalInfo::default(SIGSEGV);
+                        kernel_siginfo = KernelSignalInfo::User(segv_siginfo.clone());
                         // The behavior that we want is:
                         //  1. If we failed to send a SIGSEGV, or SIGSEGV is masked, or SIGSEGV is
                         //  ignored, we reset the signal disposition and unmask SIGSEGV.
                         //  2. Send a SIGSEGV to the program, with the (possibly) updated signal
                         //  disposition and mask.
-                        let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
-                        let action = action_for_signal(&siginfo, sigaction);
+                        let sigaction = task.thread_group.signal_actions.get(segv_siginfo.signal);
+                        let action = action_for_signal(&segv_siginfo, sigaction);
                         let masked_signals = task_state.signal_mask();
                         if signal == SIGSEGV
                             || masked_signals.has_signal(SIGSEGV)
@@ -305,6 +357,13 @@ pub fn deliver_signal(
             }
             DeliveryAction::Continue => {
                 // Nothing to do. Effect already happened when the signal was raised.
+            }
+            DeliveryAction::Freeze => {
+                // `siginfo` should never be used in this case.
+                drop(siginfo);
+                // TODO(https://fxbug.dev/333766695): Use WaitObject to block the thread.
+                task_state.frozen = true;
+                drop(task_state);
             }
         };
         break;
