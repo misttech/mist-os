@@ -36,7 +36,7 @@ function main {
   fi
 
   if [[ -z "${build_dir}" ]]; then
-    fx-warn "no new build dir selected, listing build directories:"
+    fx-info "listing build directories:"
     fx-build-dir-if-present
     local current="${FUCHSIA_BUILD_DIR##"${FUCHSIA_DIR}"/}"
     if [[ -n "${current}" ]]; then
@@ -46,7 +46,10 @@ function main {
       local build_dir="${d##"${FUCHSIA_DIR}"/}"
       if [[ "${build_dir}" != out/*.zircon && "${build_dir}" != out/*.device \
         && "${build_dir}" != "${current}" && "${build_dir}" != out/*crash.log
-        && "${build_dir}" != out/*.json ]]; then
+        && "${build_dir}" != out/*.json
+        && "${build_dir}" != out/\_* # Ignore dirs that start with `_` (e.g. _bazel_rbe_test)
+        && "${build_dir}" != out/rust-analyzer ]]; # This is a symbolink link to ${FUCHSIA_BUILD_DIR}/rust-analyzer
+      then
         echo "${build_dir}"
       fi
     done
