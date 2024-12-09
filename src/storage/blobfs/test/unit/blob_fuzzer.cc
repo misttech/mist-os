@@ -7,6 +7,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/zx/resource.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <unistd.h>
 
 #include <cstddef>
@@ -28,7 +29,6 @@
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/blobfs/test/unit/local_decompressor_creator.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
-#include "zircon/third_party/ulib/musl/include/sys/mman.h"
 
 namespace blobfs {
 namespace {

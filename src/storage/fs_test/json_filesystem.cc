@@ -5,12 +5,12 @@
 #include "src/storage/fs_test/json_filesystem.h"
 
 #include <lib/component/incoming/cpp/protocol.h>
+#include <stdlib.h>
 #include <zircon/errors.h>
 
 #include "src/storage/fs_test/crypt_service.h"
 #include "src/storage/fs_test/fs_test.h"
 #include "src/storage/lib/fs_management/cpp/mount.h"
-#include "zircon/third_party/ulib/musl/include/stdlib.h"
 
 namespace fs_test {
 
