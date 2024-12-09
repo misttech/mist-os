@@ -249,7 +249,7 @@ case "$loas_type" in
   skip) ;;
   unrestricted)
     # Eligible to use credential helper to refresh OAuth from LOAS.
-    gcertstatus --check_remaining=2h > /dev/null || gcert || {
+    gcertstatus -check_ssh=false --check_remaining=2h > /dev/null || gcert || {
       echo "Please run gcert to get a valid LOAS certificate."
       exit 1
     }
