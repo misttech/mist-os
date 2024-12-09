@@ -272,9 +272,8 @@ impl ImageAssemblyConfigBuilder {
                 anyhow!("Only one input bundle can specify a kernel path"),
             )?;
 
-            self.kernel_args
-                .try_insert_all_unique(kernel.args)
-                .map_err(|arg| anyhow!("duplicate kernel arg found: {}", arg))?;
+            // TODO(b/382424248): Revert to try_insert_all_unique when soft transition is done.
+            self.kernel_args.extend(kernel.args);
         }
 
         for (package, entries) in config_data {
@@ -358,9 +357,8 @@ impl ImageAssemblyConfigBuilder {
             }
         }
 
-        self.kernel_args
-            .try_insert_all_unique(bundle.kernel_boot_args)
-            .map_err(|arg| anyhow!("duplicate boot_arg found: {}", arg))?;
+        // TODO(b/382424248): Revert to try_insert_all_unique when soft transition is done.
+        self.kernel_args.extend(bundle.kernel_boot_args);
 
         Ok(())
     }
@@ -400,9 +398,8 @@ impl ImageAssemblyConfigBuilder {
 
     /// Add kernel args to the builder
     pub fn add_kernel_args(&mut self, args: impl IntoIterator<Item = String>) -> Result<()> {
-        self.kernel_args
-            .try_insert_all_unique(args)
-            .map_err(|arg| anyhow!("duplicate boot_arg found: {}", arg))?;
+        // TODO(b/382424248): Revert to try_insert_all_unique when soft transition is done.
+        self.kernel_args.extend(args);
         Ok(())
     }
 
