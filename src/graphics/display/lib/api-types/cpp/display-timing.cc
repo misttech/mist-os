@@ -37,6 +37,30 @@ constexpr uint32_t ToBanjoModeFlag(const DisplayTiming& display_timing_params) {
   return banjo_mode_flag;
 }
 
+constexpr fuchsia_hardware_display_engine::wire::ModeFlag ToFidlModeFlag(
+    const DisplayTiming& display_timing_params) {
+  fuchsia_hardware_display_engine::wire::ModeFlag fidl_mode_flag{};
+  if (display_timing_params.vsync_polarity == SyncPolarity::kPositive) {
+    fidl_mode_flag |= fuchsia_hardware_display_engine::wire::ModeFlag::kVsyncPositive;
+  }
+  if (display_timing_params.hsync_polarity == SyncPolarity::kPositive) {
+    fidl_mode_flag |= fuchsia_hardware_display_engine::wire::ModeFlag::kHsyncPositive;
+  }
+  if (display_timing_params.fields_per_frame == FieldsPerFrame::kInterlaced) {
+    fidl_mode_flag |= fuchsia_hardware_display_engine::wire::ModeFlag::kInterlaced;
+  }
+  if (display_timing_params.vblank_alternates) {
+    fidl_mode_flag |= fuchsia_hardware_display_engine::wire::ModeFlag::kAlternatingVblank;
+  }
+  ZX_DEBUG_ASSERT_MSG(
+      display_timing_params.pixel_repetition == 0 || display_timing_params.pixel_repetition == 1,
+      "Unsupported pixel_repetition: %d", display_timing_params.pixel_repetition);
+  if (display_timing_params.pixel_repetition == 1) {
+    fidl_mode_flag |= fuchsia_hardware_display_engine::wire::ModeFlag::kDoubleClocked;
+  }
+  return fidl_mode_flag;
+}
+
 constexpr void DebugAssertBanjoDisplayModeIsValid(const display_mode_t& display_mode) {
   // The >= 0 assertions are always true for uint32_t members in the
   // `display_mode_t` struct and will be eventually optimized by the compiler.
@@ -234,27 +258,52 @@ DisplayTiming ToDisplayTiming(
   };
 }
 
-display_mode_t ToBanjoDisplayMode(const DisplayTiming& display_timing_params) {
-  display_timing_params.DebugAssertIsValid();
+display_mode_t ToBanjoDisplayMode(const DisplayTiming& display_timing) {
+  display_timing.DebugAssertIsValid();
   return display_mode_t{
-      .pixel_clock_hz = display_timing_params.pixel_clock_frequency_hz,
-      .h_addressable = static_cast<uint32_t>(display_timing_params.horizontal_active_px),
-      .h_front_porch = static_cast<uint32_t>(display_timing_params.horizontal_front_porch_px),
-      .h_sync_pulse = static_cast<uint32_t>(display_timing_params.horizontal_sync_width_px),
+      .pixel_clock_hz = display_timing.pixel_clock_frequency_hz,
+      .h_addressable = static_cast<uint32_t>(display_timing.horizontal_active_px),
+      .h_front_porch = static_cast<uint32_t>(display_timing.horizontal_front_porch_px),
+      .h_sync_pulse = static_cast<uint32_t>(display_timing.horizontal_sync_width_px),
       // Hfront, hsync and hback are all within [0, kMaxTimingValue], so the
       // sum is also a valid 32-bit unsigned integer.
-      .h_blanking = static_cast<uint32_t>(display_timing_params.horizontal_front_porch_px +
-                                          display_timing_params.horizontal_sync_width_px +
-                                          display_timing_params.horizontal_back_porch_px),
-      .v_addressable = static_cast<uint32_t>(display_timing_params.vertical_active_lines),
-      .v_front_porch = static_cast<uint32_t>(display_timing_params.vertical_front_porch_lines),
-      .v_sync_pulse = static_cast<uint32_t>(display_timing_params.vertical_sync_width_lines),
+      .h_blanking = static_cast<uint32_t>(display_timing.horizontal_front_porch_px +
+                                          display_timing.horizontal_sync_width_px +
+                                          display_timing.horizontal_back_porch_px),
+      .v_addressable = static_cast<uint32_t>(display_timing.vertical_active_lines),
+      .v_front_porch = static_cast<uint32_t>(display_timing.vertical_front_porch_lines),
+      .v_sync_pulse = static_cast<uint32_t>(display_timing.vertical_sync_width_lines),
       // Vfront, vsync and vback are all within [0, kMaxTimingValue], so the
       // sum is also a valid 32-bit unsigned integer.
-      .v_blanking = static_cast<uint32_t>(display_timing_params.vertical_front_porch_lines +
-                                          display_timing_params.vertical_sync_width_lines +
-                                          display_timing_params.vertical_back_porch_lines),
-      .flags = ToBanjoModeFlag(display_timing_params),
+      .v_blanking = static_cast<uint32_t>(display_timing.vertical_front_porch_lines +
+                                          display_timing.vertical_sync_width_lines +
+                                          display_timing.vertical_back_porch_lines),
+      .flags = ToBanjoModeFlag(display_timing),
+  };
+}
+
+fuchsia_hardware_display_engine::wire::DisplayMode ToFidlDisplayMode(
+    const DisplayTiming& display_timing) {
+  display_timing.DebugAssertIsValid();
+  return fuchsia_hardware_display_engine::wire::DisplayMode{
+      .pixel_clock_hz = display_timing.pixel_clock_frequency_hz,
+      .h_addressable = static_cast<uint32_t>(display_timing.horizontal_active_px),
+      .h_front_porch = static_cast<uint32_t>(display_timing.horizontal_front_porch_px),
+      .h_sync_pulse = static_cast<uint32_t>(display_timing.horizontal_sync_width_px),
+      // Hfront, hsync and hback are all within [0, kMaxTimingValue], so the
+      // sum is also a valid 32-bit unsigned integer.
+      .h_blanking = static_cast<uint32_t>(display_timing.horizontal_front_porch_px +
+                                          display_timing.horizontal_sync_width_px +
+                                          display_timing.horizontal_back_porch_px),
+      .v_addressable = static_cast<uint32_t>(display_timing.vertical_active_lines),
+      .v_front_porch = static_cast<uint32_t>(display_timing.vertical_front_porch_lines),
+      .v_sync_pulse = static_cast<uint32_t>(display_timing.vertical_sync_width_lines),
+      // Vfront, vsync and vback are all within [0, kMaxTimingValue], so the
+      // sum is also a valid 32-bit unsigned integer.
+      .v_blanking = static_cast<uint32_t>(display_timing.vertical_front_porch_lines +
+                                          display_timing.vertical_sync_width_lines +
+                                          display_timing.vertical_back_porch_lines),
+      .flags = ToFidlModeFlag(display_timing),
   };
 }
 
