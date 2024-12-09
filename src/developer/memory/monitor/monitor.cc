@@ -357,105 +357,113 @@ void Monitor::PrintHelp() {
 inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& bucket_matches) {
   inspect::Inspector inspector(inspect::InspectSettings{.maximum_size = 1024ul * 1024});
   auto& root = inspector.GetRoot();
-  Capture capture;
 
-  zx_status_t rc = capture_maker_->GetCapture(&capture, CaptureLevel::VMO);
-  if (rc != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to create capture with error: " << zx_status_get_string(rc);
-    return inspector;
-  }
-
-  Summary summary(capture, Summary::kNameMatches);
-  std::ostringstream summary_stream;
-  TextPrinter summary_printer(summary_stream);
-  summary_printer.PrintSummary(summary, CaptureLevel::VMO, SORTED);
-  auto current_string = summary_stream.str();
   auto high_water_string = high_water_->GetHighWater();
-  auto previous_high_water_string = high_water_->GetPreviousHighWater();
-  if (!current_string.empty()) {
-    root.CreateString("current", current_string, &inspector);
-  }
   if (!high_water_string.empty()) {
-    root.CreateString("high_water", high_water_string, &inspector);
-  }
-  if (!previous_high_water_string.empty()) {
-    root.CreateString("high_water_previous_boot", previous_high_water_string, &inspector);
-  }
-  // Expose raw values for downstream computation.
-  {
-    auto values = root.CreateChild("values");
-    const auto& stats = capture.kmem_extended().value();
-    values.CreateUint("total_bytes", stats.total_bytes, &inspector);
-    values.CreateUint("free_bytes", stats.free_bytes, &inspector);
-    values.CreateUint("wired_bytes", stats.wired_bytes, &inspector);
-    values.CreateUint("total_heap_bytes", stats.total_heap_bytes, &inspector);
-    values.CreateUint("free_heap_bytes", stats.free_heap_bytes, &inspector);
-    values.CreateUint("vmo_bytes", stats.vmo_bytes, &inspector);
-    values.CreateUint("vmo_pager_total_bytes", stats.vmo_pager_total_bytes, &inspector);
-    values.CreateUint("vmo_pager_newest_bytes", stats.vmo_pager_newest_bytes, &inspector);
-    values.CreateUint("vmo_pager_oldest_bytes", stats.vmo_pager_oldest_bytes, &inspector);
-    values.CreateUint("vmo_discardable_locked_bytes", stats.vmo_discardable_locked_bytes,
-                      &inspector);
-    values.CreateUint("vmo_discardable_unlocked_bytes", stats.vmo_discardable_unlocked_bytes,
-                      &inspector);
-    values.CreateUint("mmu_overhead_bytes", stats.mmu_overhead_bytes, &inspector);
-    values.CreateUint("ipc_bytes", stats.ipc_bytes, &inspector);
-    values.CreateUint("other_bytes", stats.other_bytes, &inspector);
-    values.CreateUint("vmo_reclaim_disabled_bytes", stats.vmo_reclaim_disabled_bytes, &inspector);
-    inspector.emplace(std::move(values));
-  }
-  if (capture.kmem_compression()) {
-    const auto& stats = capture.kmem_compression().value();
-    auto values = root.CreateChild("kmem_stats_compression");
-    values.CreateUint("uncompressed_storage_bytes", stats.uncompressed_storage_bytes, &inspector);
-    values.CreateUint("compressed_storage_bytes", stats.compressed_storage_bytes, &inspector);
-    values.CreateUint("compressed_fragmentation_bytes", stats.compressed_fragmentation_bytes,
-                      &inspector);
-    values.CreateUint("compression_time", stats.compression_time, &inspector);
-    values.CreateUint("decompression_time", stats.decompression_time, &inspector);
-    values.CreateUint("total_page_compression_attempts", stats.total_page_compression_attempts,
-                      &inspector);
-    values.CreateUint("failed_page_compression_attempts", stats.failed_page_compression_attempts,
-                      &inspector);
-    values.CreateUint("total_page_decompressions", stats.total_page_decompressions, &inspector);
-    values.CreateUint("compressed_page_evictions", stats.compressed_page_evictions, &inspector);
-    values.CreateUint("eager_page_compressions", stats.eager_page_compressions, &inspector);
-    values.CreateUint("memory_pressure_page_compressions", stats.memory_pressure_page_compressions,
-                      &inspector);
-    values.CreateUint("critical_memory_page_compressions", stats.critical_memory_page_compressions,
-                      &inspector);
-    values.CreateUint("pages_decompressed_unit_ns", stats.pages_decompressed_unit_ns, &inspector);
-    constexpr size_t log_time_size =
-        sizeof(zx_info_kmem_stats_compression_t::pages_decompressed_within_log_time) /
-        sizeof(zx_info_kmem_stats_compression_t::pages_decompressed_within_log_time[0]);
-    inspect::UintArray array =
-        values.CreateUintArray("pages_decompressed_within_log_time", log_time_size);
-
-    for (size_t i = 0; i < log_time_size; i++) {
-      array.Set(i, stats.pages_decompressed_within_log_time[i]);
-    }
-    inspector.emplace(std::move(array));
-    inspector.emplace(std::move(values));
+    root.RecordString("high_water", high_water_string);
   }
 
-  Digest digest;
-  digester_->Digest(capture, &digest);
-  std::ostringstream digest_stream;
-  TextPrinter digest_printer(digest_stream);
-  digest_printer.PrintDigest(digest);
-  auto current_digest_string = digest_stream.str();
   auto high_water_digest_string = high_water_->GetHighWaterDigest();
-  auto previous_high_water_digest_string = high_water_->GetPreviousHighWaterDigest();
-  if (!current_digest_string.empty()) {
-    root.CreateString("current_digest", current_digest_string, &inspector);
-  }
   if (!high_water_digest_string.empty()) {
-    root.CreateString("high_water_digest", high_water_digest_string, &inspector);
+    root.RecordString("high_water_digest", high_water_digest_string);
   }
+
+  auto previous_high_water_string = high_water_->GetPreviousHighWater();
+  if (!previous_high_water_string.empty()) {
+    root.RecordString("high_water_previous_boot", previous_high_water_string);
+  }
+
+  auto previous_high_water_digest_string = high_water_->GetPreviousHighWaterDigest();
   if (!previous_high_water_digest_string.empty()) {
-    root.CreateString("high_water_digest_previous_boot", previous_high_water_digest_string,
-                      &inspector);
+    root.RecordString("high_water_digest_previous_boot", previous_high_water_digest_string);
   }
+
+  root.RecordLazyValues("lazynode", [this, bucket_matches] {
+    inspect::Inspector inspector(inspect::InspectSettings{.maximum_size = 1024ul * 1024});
+    auto& root = inspector.GetRoot();
+    Capture capture;
+    zx_status_t rc = capture_maker_->GetCapture(&capture, CaptureLevel::VMO);
+    if (rc != ZX_OK) {
+      FX_LOGS(ERROR) << "Failed to create capture with error: " << zx_status_get_string(rc);
+      return fpromise::make_result_promise(fpromise::ok(inspector));
+    }
+
+    Summary summary(capture, Summary::kNameMatches);
+    std::ostringstream summary_stream;
+    TextPrinter summary_printer(summary_stream);
+    summary_printer.PrintSummary(summary, CaptureLevel::VMO, SORTED);
+    auto current_string = summary_stream.str();
+    if (!current_string.empty()) {
+      root.RecordString("current", current_string);
+    }
+    // Expose raw values for downstream computation.
+    {
+      auto values = root.CreateChild("values");
+      const auto& stats = capture.kmem_extended().value();
+      values.CreateUint("total_bytes", stats.total_bytes, &inspector);
+      values.CreateUint("free_bytes", stats.free_bytes, &inspector);
+      values.CreateUint("wired_bytes", stats.wired_bytes, &inspector);
+      values.CreateUint("total_heap_bytes", stats.total_heap_bytes, &inspector);
+      values.CreateUint("free_heap_bytes", stats.free_heap_bytes, &inspector);
+      values.CreateUint("vmo_bytes", stats.vmo_bytes, &inspector);
+      values.CreateUint("vmo_pager_total_bytes", stats.vmo_pager_total_bytes, &inspector);
+      values.CreateUint("vmo_pager_newest_bytes", stats.vmo_pager_newest_bytes, &inspector);
+      values.CreateUint("vmo_pager_oldest_bytes", stats.vmo_pager_oldest_bytes, &inspector);
+      values.CreateUint("vmo_discardable_locked_bytes", stats.vmo_discardable_locked_bytes,
+                        &inspector);
+      values.CreateUint("vmo_discardable_unlocked_bytes", stats.vmo_discardable_unlocked_bytes,
+                        &inspector);
+      values.CreateUint("mmu_overhead_bytes", stats.mmu_overhead_bytes, &inspector);
+      values.CreateUint("ipc_bytes", stats.ipc_bytes, &inspector);
+      values.CreateUint("other_bytes", stats.other_bytes, &inspector);
+      values.CreateUint("vmo_reclaim_disabled_bytes", stats.vmo_reclaim_disabled_bytes, &inspector);
+      inspector.emplace(std::move(values));
+    }
+    if (capture.kmem_compression()) {
+      const auto& stats = capture.kmem_compression().value();
+      auto values = root.CreateChild("kmem_stats_compression");
+      values.CreateUint("uncompressed_storage_bytes", stats.uncompressed_storage_bytes, &inspector);
+      values.CreateUint("compressed_storage_bytes", stats.compressed_storage_bytes, &inspector);
+      values.CreateUint("compressed_fragmentation_bytes", stats.compressed_fragmentation_bytes,
+                        &inspector);
+      values.CreateUint("compression_time", stats.compression_time, &inspector);
+      values.CreateUint("decompression_time", stats.decompression_time, &inspector);
+      values.CreateUint("total_page_compression_attempts", stats.total_page_compression_attempts,
+                        &inspector);
+      values.CreateUint("failed_page_compression_attempts", stats.failed_page_compression_attempts,
+                        &inspector);
+      values.CreateUint("total_page_decompressions", stats.total_page_decompressions, &inspector);
+      values.CreateUint("compressed_page_evictions", stats.compressed_page_evictions, &inspector);
+      values.CreateUint("eager_page_compressions", stats.eager_page_compressions, &inspector);
+      values.CreateUint("memory_pressure_page_compressions",
+                        stats.memory_pressure_page_compressions, &inspector);
+      values.CreateUint("critical_memory_page_compressions",
+                        stats.critical_memory_page_compressions, &inspector);
+      values.CreateUint("pages_decompressed_unit_ns", stats.pages_decompressed_unit_ns, &inspector);
+      constexpr size_t log_time_size =
+          sizeof(zx_info_kmem_stats_compression_t::pages_decompressed_within_log_time) /
+          sizeof(zx_info_kmem_stats_compression_t::pages_decompressed_within_log_time[0]);
+      inspect::UintArray array =
+          values.CreateUintArray("pages_decompressed_within_log_time", log_time_size);
+
+      for (size_t i = 0; i < log_time_size; i++) {
+        array.Set(i, stats.pages_decompressed_within_log_time[i]);
+      }
+      inspector.emplace(std::move(array));
+      inspector.emplace(std::move(values));
+    }
+
+    Digest digest;
+    digester_->Digest(capture, &digest);
+    std::ostringstream digest_stream;
+    TextPrinter digest_printer(digest_stream);
+    digest_printer.PrintDigest(digest);
+    auto current_digest_string = digest_stream.str();
+    if (!current_digest_string.empty()) {
+      root.RecordString("current_digest", current_digest_string);
+    }
+    return fpromise::make_result_promise(fpromise::ok(inspector));
+  });
 
   return inspector;
 }
