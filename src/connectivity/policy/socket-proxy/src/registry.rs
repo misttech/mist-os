@@ -175,6 +175,7 @@ struct RegisteredNetworks {
 impl RegisteredNetworks {
     fn add_network(&mut self, network: Network) -> fnp_socketproxy::NetworkRegistryAddResult {
         let network = network.validate()?;
+        #[allow(clippy::map_entry, reason = "mass allow for https://fxbug.dev/381896734")]
         if self.networks.contains_key(&network.network_id) {
             self.adds.errors += 1;
             Err(fnp_socketproxy::NetworkRegistryAddError::DuplicateNetworkId)

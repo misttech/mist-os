@@ -101,6 +101,7 @@ impl Supplicant {
         Ok(Supplicant { auth_method, esssa, auth_cfg })
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn start(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error> {
         self.esssa.initiate(update_sink)
     }
@@ -111,6 +112,7 @@ impl Supplicant {
         self.esssa.reset_security_associations();
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_eapol_frame<B: SplitByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,
@@ -119,6 +121,7 @@ impl Supplicant {
         self.esssa.on_eapol_frame(update_sink, frame)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_eapol_conf(
         &mut self,
         update_sink: &mut UpdateSink,
@@ -127,6 +130,7 @@ impl Supplicant {
         self.esssa.on_eapol_conf(update_sink, result)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_rsna_retransmission_timeout(
         &mut self,
         update_sink: &mut UpdateSink,
@@ -142,6 +146,7 @@ impl Supplicant {
         self.esssa.incomplete_reason()
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     fn extract_sae_key(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error> {
         if let Some(pmk) = extract_sae_key_helper(&update_sink) {
             self.esssa.on_pmk_available(update_sink, pmk)?;
@@ -149,6 +154,7 @@ impl Supplicant {
         Ok(())
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_pmk_available(
         &mut self,
         update_sink: &mut UpdateSink,
@@ -160,10 +166,12 @@ impl Supplicant {
         self.extract_sae_key(update_sink)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_sae_handshake_ind(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error> {
         self.auth_method.on_sae_handshake_ind(update_sink).map_err(Error::AuthError)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_sae_frame_rx(
         &mut self,
         update_sink: &mut UpdateSink,
@@ -173,6 +181,7 @@ impl Supplicant {
         self.extract_sae_key(update_sink)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_sae_timeout(
         &mut self,
         update_sink: &mut UpdateSink,
@@ -282,6 +291,7 @@ impl Authenticator {
         }
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// `initiate(...)` must be called when the Authenticator should start establishing a
     /// security association with a client.
     /// The Authenticator must always initiate the security association in the current system as
@@ -293,6 +303,7 @@ impl Authenticator {
         self.esssa.initiate(update_sink)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Entry point for all incoming EAPOL frames. Incoming frames can be corrupted, invalid or of
     /// unsupported types; the Authenticator will filter and drop all unexpected frames.
     /// Outbound EAPOL frames, status and key updates will be pushed into the `update_sink`.
@@ -305,6 +316,7 @@ impl Authenticator {
         self.esssa.on_eapol_frame(update_sink, frame)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_eapol_conf(
         &mut self,
         update_sink: &mut UpdateSink,
@@ -313,6 +325,7 @@ impl Authenticator {
         self.esssa.on_eapol_conf(update_sink, result)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     fn extract_sae_key(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error> {
         if let Some(pmk) = extract_sae_key_helper(&update_sink) {
             self.esssa.on_pmk_available(update_sink, pmk)?;
@@ -320,10 +333,12 @@ impl Authenticator {
         Ok(())
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_sae_handshake_ind(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error> {
         self.auth_method.on_sae_handshake_ind(update_sink).map_err(Error::AuthError)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_sae_frame_rx(
         &mut self,
         update_sink: &mut UpdateSink,

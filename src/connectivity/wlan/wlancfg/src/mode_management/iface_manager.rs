@@ -388,6 +388,7 @@ impl IfaceManagerService {
         Ok(())
     }
 
+    #[allow(clippy::needless_return, reason = "mass allow for https://fxbug.dev/381896734")]
     fn disconnect(
         &mut self,
         network_id: ap_types::NetworkIdentifier,
@@ -853,6 +854,7 @@ impl IfaceManagerService {
         Ok(receiver)
     }
 
+    #[allow(clippy::needless_return, reason = "mass allow for https://fxbug.dev/381896734")]
     fn stop_ap(
         &mut self,
         ssid: ap_types::Ssid,
@@ -5285,6 +5287,7 @@ mod tests {
         let expected_wait_times =
             [2, 4, 8, MAX_AUTO_CONNECT_RETRY_SECONDS, MAX_AUTO_CONNECT_RETRY_SECONDS];
 
+        #[allow(clippy::needless_range_loop, reason = "mass allow for https://fxbug.dev/381896734")]
         for i in 0..5 {
             {
                 let fut = handle_automatic_connection_selection_results(

@@ -450,8 +450,12 @@ mod tests {
     ) -> Vec<DeviceWatcherEvent> {
         let events = Arc::new(Mutex::new(Some(Vec::new())));
         let events_two = events.clone();
-        let mut event_fut = stream
-            .try_for_each(move |e| future::ready(Ok(events_two.lock().as_mut().unwrap().push(e))));
+        let mut event_fut = stream.try_for_each(move |e| {
+            future::ready({
+                events_two.lock().as_mut().unwrap().push(e);
+                Ok(())
+            })
+        });
         if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut event_fut) {
             panic!("event stream future returned an error: {:?}", e);
         }

@@ -124,6 +124,10 @@ pub mod responder {
         }
 
         pub fn respond(self, result: T) {
+            #[allow(
+                clippy::unnecessary_lazy_evaluations,
+                reason = "mass allow for https://fxbug.dev/381896734"
+            )]
             self.0.send(result).unwrap_or_else(|_| ());
         }
     }

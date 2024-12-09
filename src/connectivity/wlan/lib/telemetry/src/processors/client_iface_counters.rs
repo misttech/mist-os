@@ -32,7 +32,7 @@ impl ClientIfaceCountersLogger {
         monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
         time_matrix_client: &TimeMatrixClient,
     ) -> Self {
-        Self::new_helper(monitor_svc_proxy, IfaceCountersTimeSeries::new(&time_matrix_client))
+        Self::new_helper(monitor_svc_proxy, IfaceCountersTimeSeries::new(time_matrix_client))
     }
 
     fn new_helper(
@@ -64,19 +64,13 @@ impl ClientIfaceCountersLogger {
     }
 
     pub async fn handle_iface_destroyed(&self, iface_id: u16) {
-        let destroyed = match *self.iface_state.lock() {
-            IfaceState::Created { iface_id: existing_iface_id, .. }
-                if iface_id == existing_iface_id =>
-            {
-                true
-            }
-            _ => false,
-        };
+        let destroyed = matches!(*self.iface_state.lock(), IfaceState::Created { iface_id: existing_iface_id, .. } if iface_id == existing_iface_id);
         if destroyed {
             *self.iface_state.lock() = IfaceState::NotAvailable;
         }
     }
 
+    #[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
     pub async fn handle_periodic_telemetry(&self, is_connected: bool) {
         match &*self.iface_state.lock() {
             IfaceState::NotAvailable => (),

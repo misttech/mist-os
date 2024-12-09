@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![cfg(test)]
-
 use super::*;
 use fidl::endpoints::create_proxy_and_stream;
 use fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload};
@@ -194,10 +192,7 @@ impl TestHelper {
             Poll::Pending => {
                 panic!("Unexpected pending state");
             }
-            Poll::Ready(result) => {
-                let hierarchy = result.expect("failed to get hierarchy");
-                return hierarchy;
-            }
+            Poll::Ready(result) => result.expect("failed to get hierarchy"),
         }
     }
 

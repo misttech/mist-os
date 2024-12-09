@@ -10,8 +10,7 @@ use tracing::error;
 use windowed_stats::experimental::serve::serve_time_matrix_inspection;
 use wlan_common::bss::BssDescription;
 use {
-    fidl_fuchsia_diagnostics_persist, fidl_fuchsia_metrics,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync, fuchsia_component,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync,
     fuchsia_inspect_auto_persist as auto_persist, wlan_legacy_metrics_registry as metrics,
 };
 
@@ -76,7 +75,7 @@ pub fn setup_persistence_req_sender(
     fuchsia_component::client::connect_to_protocol_at_path::<
         fidl_fuchsia_diagnostics_persist::DataPersistenceMarker,
     >(PERSISTENCE_SERVICE_PATH)
-    .map(|persistence_proxy| auto_persist::create_persistence_req_sender(persistence_proxy))
+    .map(auto_persist::create_persistence_req_sender)
 }
 
 /// Creates a disconnected channel with the same types as the persistence service. This allows for
@@ -105,7 +104,7 @@ pub fn serve_telemetry(
     let sender = TelemetrySender::new(sender);
 
     // Inspect nodes to hold time series and metadata for other nodes
-    const METADATA_NODE_NAME: &'static str = "metadata";
+    const METADATA_NODE_NAME: &str = "metadata";
     let inspect_metadata_node = inspect_node.create_child(METADATA_NODE_NAME);
     let inspect_time_series_node = inspect_node.create_child("time_series");
 

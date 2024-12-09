@@ -534,6 +534,7 @@ mod tests {
         TestValues { exec, iface_manager: IfaceManager { sender }, receiver }
     }
 
+    #[allow(clippy::enum_variant_names, reason = "mass allow for https://fxbug.dev/381896734")]
     #[derive(Clone)]
     enum NegativeTestFailureMode {
         RequestFailure,
@@ -1772,7 +1773,7 @@ mod tests {
         // Request a roam via the sme proxy
         let roam_request =
             fidl_sme::RoamRequest { bss_description: random_fidl_bss_description!() };
-        let _ = sme.roam(&roam_request).unwrap();
+        sme.roam(&roam_request).unwrap();
 
         // Verify SME gets the request
         let mut sme_fut = pin!(sme_fut.into_stream().into_future());

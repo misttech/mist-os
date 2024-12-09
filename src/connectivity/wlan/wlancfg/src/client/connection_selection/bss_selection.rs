@@ -148,6 +148,7 @@ mod test {
         }
     }
 
+    #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
     #[fuchsia::test]
     fn select_bss_sorts_by_score() {
         let mut exec = fasync::TestExecutor::new();
@@ -189,6 +190,7 @@ mod test {
         );
     }
 
+    #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
     #[fuchsia::test]
     fn select_bss_sorts_by_failure_count() {
         let mut exec = fasync::TestExecutor::new();
@@ -241,6 +243,7 @@ mod test {
         );
     }
 
+    #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
     #[fuchsia::test]
     fn select_bss_ignore_incompatible() {
         let mut exec = fasync::TestExecutor::new();
@@ -293,6 +296,7 @@ mod test {
         );
     }
 
+    #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
     #[fuchsia::test]
     fn select_bss_logs_to_inspect() {
         let mut exec = fasync::TestExecutor::new();

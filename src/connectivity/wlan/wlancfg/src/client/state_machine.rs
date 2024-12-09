@@ -342,6 +342,7 @@ fn notify_once_disconnected(
     // Notify the caller that disconnect was sent to the SME once the final disconnected update has
     // been sent.  This ensures that there will not be a race when the IfaceManager sends out a
     // ConnectionsDisabled update.
+    #[allow(clippy::single_match, reason = "mass allow for https://fxbug.dev/381896734")]
     match options.disconnect_responder.take() {
         Some(responder) => responder.send(()).unwrap_or(()),
         None => (),
@@ -395,10 +396,12 @@ async fn handle_connecting_error_and_retry(
     }
 }
 
+#[allow(clippy::needless_return, reason = "mass allow for https://fxbug.dev/381896734")]
 /// The CONNECTING state requests an SME connect. It handles the SME connect response:
 /// - for a successful connection, transition to CONNECTED state
 /// - for a failed connection, retry connection by passing a next_network to the
 ///       DISCONNECTING state, as long as there haven't been too many connection attempts
+#[allow(clippy::doc_lazy_continuation, reason = "mass allow for https://fxbug.dev/381896734")]
 /// During this time, incoming ManualRequests are also monitored for:
 /// - duplicate connect requests are deduped
 /// - different connect requests are serviced by passing a next_network to the DISCONNECTING state
@@ -622,6 +625,7 @@ impl ConnectedOptions {
 /// - if still connected to the correct network, no action
 /// - if disconnected, retry connection by passing a next_network to the
 ///       DISCONNECTING state
+#[allow(clippy::doc_lazy_continuation, reason = "mass allow for https://fxbug.dev/381896734")]
 /// During this time, incoming ManualRequests are also monitored for:
 /// - duplicate connect requests are deduped
 /// - different connect requests are serviced by passing a next_network to the DISCONNECTING state
@@ -1083,6 +1087,7 @@ fn update_internal_state_on_roam_success(
     Ok(())
 }
 
+#[allow(clippy::result_unit_err, reason = "mass allow for https://fxbug.dev/381896734")]
 /// Get the disconnect reason corresponding to the connect reason. Return an error if the connect
 /// reason does not correspond to a manual connect.
 pub fn convert_manual_connect_to_disconnect_reason(
@@ -1180,6 +1185,7 @@ mod tests {
         }
     }
 
+    #[allow(clippy::needless_return, reason = "mass allow for https://fxbug.dev/381896734")]
     async fn run_state_machine(fut: impl Future<Output = Result<State, ExitReason>> + 'static) {
         let state_machine = fut.into_state_machine();
         select! {

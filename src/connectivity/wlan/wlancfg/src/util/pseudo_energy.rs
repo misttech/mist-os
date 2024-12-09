@@ -53,6 +53,7 @@ impl EwmaSignalData {
         }
     }
 
+    #[allow(clippy::ptr_arg, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn new_from_list(
         signals: &Vec<client_types::Signal>,
         ewma_weight: usize,
@@ -127,6 +128,7 @@ impl RssiVelocity {
         Self { curr_velocity: 0.0, prev_rssi: initial_rssi.into() }
     }
 
+    #[allow(clippy::ptr_arg, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn new_from_list(rssi_samples: &Vec<f64>) -> Result<Self, anyhow::Error> {
         let last = rssi_samples.last().ok_or_else(|| format_err!("empty list"))?;
         match calculate_raw_velocity(rssi_samples.to_vec()) {

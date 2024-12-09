@@ -213,7 +213,7 @@ fn populate_update_sink(
         .unwrap()
         .as_mut()
         .map(|updates| {
-            update_sink.extend(updates.drain(..));
+            update_sink.append(updates);
         })
         .map_err(|e| format_rsn_err!("{:?}", e))
 }

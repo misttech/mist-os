@@ -13,6 +13,7 @@ use wlan_common::ie::rsn::cipher::Cipher;
 pub struct GtkProvider(Gtk);
 
 impl GtkProvider {
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn new(cipher: Cipher, key_id: u8, key_rsc: u64) -> Result<GtkProvider, Error> {
         Ok(GtkProvider(Gtk::generate_random(cipher, key_id, key_rsc)?))
     }
@@ -54,6 +55,7 @@ impl Hash for Gtk {
 }
 
 impl Gtk {
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn generate_random(cipher: Cipher, key_id: u8, key_rsc: u64) -> Result<Gtk, Error> {
         // IEEE 802.11-2016 12.7.4 EAPOL-Key frame notation
         rsn_ensure!(
@@ -69,6 +71,7 @@ impl Gtk {
         Ok(Gtk { bytes: gtk_bytes, cipher, tk_len, key_id, key_rsc })
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn from_bytes(
         gtk_bytes: Box<[u8]>,
         cipher: Cipher,

@@ -57,7 +57,7 @@ impl fmt::Display for Bssid {
 
 impl fmt::Debug for Bssid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Bssid({})", self.to_string())
+        write!(f, "Bssid({})", self)
     }
 }
 

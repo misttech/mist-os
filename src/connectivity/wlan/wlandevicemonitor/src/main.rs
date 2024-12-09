@@ -19,8 +19,9 @@ use futures::{StreamExt, TryFutureExt};
 use std::sync::Arc;
 use tracing::{error, info};
 
-const PHY_PATH: &'static str = "/dev/class/wlanphy";
+const PHY_PATH: &str = "/dev/class/wlanphy";
 
+#[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
 async fn serve_fidl(
     mut fs: ServiceFs<ServiceObjLocal<'_, ()>>,
     phys: Arc<device::PhyMap>,

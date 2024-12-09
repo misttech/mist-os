@@ -36,6 +36,7 @@ impl IfaceCounter {
     }
 }
 
+#[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
 pub(crate) async fn serve_monitor_requests(
     mut req_stream: fidl_svc::DeviceMonitorRequestStream,
     phys: Arc<PhyMap>,
@@ -465,7 +466,7 @@ async fn destroy_iface(
     let iface = ifaces.get(&id).ok_or(zx::Status::NOT_FOUND)?;
 
     let (telemetry_proxy, telemetry_server) = fidl::endpoints::create_proxy();
-    let result = get_sme_telemetry(&ifaces, id, telemetry_server).await;
+    let result = get_sme_telemetry(ifaces, id, telemetry_server).await;
     let destroyed_iface_vmo = match result {
         Ok(()) => match telemetry_proxy.clone_inspect_vmo().await {
             Ok(Ok(vmo)) => Some(vmo),
@@ -517,17 +518,12 @@ async fn destroy_iface(
             zx::Status::ok(zx::sys::ZX_OK)
         }
         Err(status) => {
-            match status {
-                zx::sys::ZX_ERR_NOT_FOUND => {
-                    if ifaces.get_snapshot().contains_key(&id) {
-                        info!(
-                            "Encountered NOT_FOUND while removing iface #{} potentially due to recovery.",
-                            id
-                        );
-                        ifaces.remove(&id);
-                    }
-                }
-                _ => {}
+            if status == zx::sys::ZX_ERR_NOT_FOUND && ifaces.get_snapshot().contains_key(&id) {
+                info!(
+                    "Encountered NOT_FOUND while removing iface #{} potentially due to recovery.",
+                    id
+                );
+                ifaces.remove(&id);
             }
             zx::Status::ok(status)
         }
@@ -545,7 +541,7 @@ async fn get_client_sme(
         error!("Failed to request client SME: {}", e);
         zx::Status::INTERNAL
     })?;
-    result.map_err(|e| zx::Status::from_raw(e))
+    result.map_err(zx::Status::from_raw)
 }
 
 async fn get_ap_sme(
@@ -559,7 +555,7 @@ async fn get_ap_sme(
         error!("Failed to request AP SME: {}", e);
         zx::Status::INTERNAL
     })?;
-    result.map_err(|e| zx::Status::from_raw(e))
+    result.map_err(zx::Status::from_raw)
 }
 
 async fn get_sme_telemetry(
@@ -573,7 +569,7 @@ async fn get_sme_telemetry(
         error!("Failed to request SME telemetry: {}", e);
         zx::Status::INTERNAL
     })?;
-    result.map_err(|e| zx::Status::from_raw(e))
+    result.map_err(zx::Status::from_raw)
 }
 
 async fn get_feature_support(
@@ -588,7 +584,7 @@ async fn get_feature_support(
             error!("Failed to request feature support: {}", e);
             zx::Status::INTERNAL
         })?;
-    result.map_err(|e| zx::Status::from_raw(e))
+    result.map_err(zx::Status::from_raw)
 }
 
 fn into_status_and_opt<T>(r: Result<T, zx::Status>) -> (zx::Status, Option<T>) {
@@ -653,7 +649,7 @@ mod tests {
             ifaces,
             watcher_service,
             watcher_fut: Box::pin(watcher_fut),
-            new_iface_stream: new_iface_stream,
+            new_iface_stream,
             new_iface_sink,
             iface_counter,
             inspector,
@@ -1193,7 +1189,11 @@ mod tests {
         // Initiate a QueryPhy request. The returned future should not be able
         // to produce a result immediately
         // Issue service.fidl::SetCountryRequest()
-        let req_msg = fidl_svc::SetCountryRequest { phy_id, alpha2: alpha2.clone() };
+        #[allow(
+            clippy::redundant_field_names,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
+        let req_msg = fidl_svc::SetCountryRequest { phy_id, alpha2: alpha2 };
         let req_fut = super::set_country(&test_values.phys, req_msg);
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
@@ -1224,7 +1224,11 @@ mod tests {
         // Initiate a QueryPhy request. The returned future should not be able
         // to produce a result immediately
         // Issue service.fidl::SetCountryRequest()
-        let req_msg = fidl_svc::SetCountryRequest { phy_id, alpha2: alpha2.clone() };
+        #[allow(
+            clippy::redundant_field_names,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
+        let req_msg = fidl_svc::SetCountryRequest { phy_id, alpha2: alpha2 };
         let req_fut = super::set_country(&test_values.phys, req_msg);
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));

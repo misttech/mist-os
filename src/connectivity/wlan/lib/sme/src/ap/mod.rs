@@ -149,7 +149,7 @@ impl ApSme {
                         Some(bc) => bc,
                     };
 
-                let op_radio_cfg = match validate_radio_cfg(&band_cap, &config.radio_cfg) {
+                let op_radio_cfg = match validate_radio_cfg(band_cap, &config.radio_cfg) {
                     Err(result) => {
                         responder.respond(result);
                         return State::Idle { ctx };
@@ -260,7 +260,7 @@ impl ApSme {
                 // IEEE Std 802.11-2016, 6.3.12.2.3: The SME should notify associated non-AP STAs of
                 // imminent infrastructure BSS termination before issuing the MLME-STOP.request
                 // primitive.
-                for (client_addr, _) in &bss.clients {
+                for client_addr in bss.clients.keys() {
                     bss.ctx.mlme_sink.send(MlmeRequest::Deauthenticate(
                         fidl_mlme::DeauthenticateRequest {
                             peer_sta_address: client_addr.to_array(),
@@ -462,8 +462,8 @@ impl super::Station for ApSme {
                 },
             },
             State::Stopping { ctx, stop_req, mut responders, mut stop_timeout } => {
-                match timed_event.event {
-                    Event::Sme { event } => match event {
+                if let Event::Sme { event } = timed_event.event {
+                    match event {
                         SmeEvent::StopTimeout if stop_timeout.is_some() => {
                             if stop_timeout == Some(timed_event.id) {
                                 for responder in responders.drain(..) {
@@ -473,8 +473,7 @@ impl super::Station for ApSme {
                             }
                         }
                         _ => (),
-                    },
-                    _ => (),
+                    }
                 }
                 // If timeout triggered, then the responders and the timeout are cleared, and
                 // we are left in an unclean stopping state
@@ -544,13 +543,13 @@ fn validate_radio_cfg(
                         StartResult::InternalError
                     })?;
                     let ht_cap_info = ht_cap.ht_cap_info;
-                    if ht_cap_info.chan_width_set() == ChanWidthSet::TWENTY_ONLY {
-                        if channel.cbw != Cbw::Cbw20 {
-                            return Err(StartResult::InvalidArguments(format!(
-                                "20 MHz band capabilities does not support channel {}",
-                                channel
-                            )));
-                        }
+                    if ht_cap_info.chan_width_set() == ChanWidthSet::TWENTY_ONLY
+                        && channel.cbw != Cbw::Cbw20
+                    {
+                        return Err(StartResult::InvalidArguments(format!(
+                            "20 MHz band capabilities does not support channel {}",
+                            channel
+                        )));
                     }
                 }
             }
@@ -596,6 +595,7 @@ fn validate_radio_cfg(
     Ok(OpRadioConfig { phy, channel })
 }
 
+#[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
 fn handle_start_conf(
     conf: fidl_mlme::StartConfirm,
     mut ctx: Context,
@@ -719,7 +719,7 @@ impl InfraBss {
             self.capabilities,
             ind.capability_info,
             &self.rates,
-            &ind.rates.into_iter().map(|r| SupportedRate(r)).collect::<Vec<_>>()[..],
+            &ind.rates.into_iter().map(SupportedRate).collect::<Vec<_>>()[..],
             &self.rsn_cfg,
             ind.rsne,
         );
@@ -834,7 +834,7 @@ fn create_start_request(
         if let Err(e) = rsne.write_into(&mut buf) {
             error!("error writing RSNE into MLME-START.request: {}", e);
         }
-        buf.into()
+        buf
     });
 
     let (channel_bandwidth, _secondary80) = op_radio_cfg.channel.cbw.to_fidl();
@@ -858,7 +858,7 @@ fn create_start_request(
         rates: basic_rates.to_vec(),
         country: fidl_mlme::Country {
             // TODO(https://fxbug.dev/42104247): Get config from wlancfg
-            alpha2: ['U' as u8, 'S' as u8],
+            alpha2: [b'U', b'S'],
             suffix: fidl_mlme::COUNTRY_ENVIRON_ALL,
         },
         rsne: rsne_bytes,
@@ -891,7 +891,7 @@ mod tests {
         static ref SSID: Ssid = Ssid::try_from([0x46, 0x55, 0x43, 0x48, 0x53, 0x49, 0x41]).unwrap();
     }
 
-    const RSNE: &'static [u8] = &[
+    const RSNE: &[u8] = &[
         0x30, // element id
         0x2A, // length
         0x01, 0x00, // version
@@ -975,8 +975,16 @@ mod tests {
         cbw: Cbw,
     ) {
         let channel = Channel::new(primary, cbw);
-        let radio_cfg = RadioConfig { phy: phy.clone(), channel: channel.clone() };
-        let expected_op_radio_cfg = OpRadioConfig { phy: phy.clone(), channel: channel.clone() };
+        #[allow(
+            clippy::redundant_field_names,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
+        let radio_cfg = RadioConfig { phy: phy, channel: channel };
+        #[allow(
+            clippy::redundant_field_names,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
+        let expected_op_radio_cfg = OpRadioConfig { phy: phy, channel: channel };
         let band_cap = match band_cap {
             Some(band_cap) => band_cap,
             None => fake_2ghz_band_capability_vht(),
@@ -1560,7 +1568,7 @@ mod tests {
             assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Eapol(eapol_req))) => {
                 assert_eq!(&eapol_req.src_addr, AP_ADDR.as_array());
                 assert_eq!(&eapol_req.dst_addr, self.addr.as_array());
-                assert!(eapol_req.data.len() > 0);
+                assert!(!eapol_req.data.is_empty());
             });
         }
 
@@ -1601,7 +1609,7 @@ mod tests {
         assert_eq!(Ok(None), receiver.try_recv());
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(..))));
         // drain time stream
-        while let Ok(..) = time_stream.try_next() {}
+        while time_stream.try_next().is_ok() {}
         sme.on_mlme_event(create_start_conf(fidl_mlme::StartResultCode::Success));
 
         assert_eq!(Ok(Some(StartResult::Success)), receiver.try_recv());

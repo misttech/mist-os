@@ -156,7 +156,7 @@ impl FromStr for MacAddr {
 
 impl fmt::Debug for MacAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "MacAddr({})", self.to_string())
+        write!(f, "MacAddr({})", self)
     }
 }
 

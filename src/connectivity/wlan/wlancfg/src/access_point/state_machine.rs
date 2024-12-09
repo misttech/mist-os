@@ -493,6 +493,7 @@ async fn starting_state(
         ExitReason(Err(e))
     })?;
 
+    #[allow(clippy::single_match, reason = "mass allow for https://fxbug.dev/381896734")]
     match responder {
         Some(responder) => responder.send(()).unwrap_or(()),
         None => {}
@@ -699,6 +700,7 @@ mod tests {
         })
     }
 
+    #[allow(clippy::needless_return, reason = "mass allow for https://fxbug.dev/381896734")]
     async fn run_state_machine(fut: impl Future<Output = Result<State, ExitReason>> + 'static) {
         let state_machine = fut.into_state_machine();
         select! {

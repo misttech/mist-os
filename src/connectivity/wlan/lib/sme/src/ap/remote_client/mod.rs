@@ -50,6 +50,7 @@ impl RemoteClient {
         self.state = Some(self.state.take().unwrap().handle_auth_ind(self, ctx, auth_type));
     }
 
+    #[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn handle_assoc_ind(
         &mut self,
         ctx: &mut Context,
@@ -142,7 +143,7 @@ impl RemoteClient {
     /// Sends MLME-EAPOL.request (IEEE Std 802.11-2016, 6.3.22.1) to the MLME.
     pub fn send_eapol_req(&mut self, ctx: &mut Context, frame: eapol::KeyFrameBuf) {
         ctx.mlme_sink.send(MlmeRequest::Eapol(fidl_mlme::EapolRequest {
-            src_addr: ctx.device_info.sta_addr.clone(),
+            src_addr: ctx.device_info.sta_addr,
             dst_addr: self.addr.to_array(),
             data: frame.into(),
         }));
@@ -200,7 +201,7 @@ impl RemoteClient {
         deadline: zx::MonotonicInstant,
         event: ClientEvent,
     ) -> EventId {
-        ctx.timer.schedule_at(deadline, Event::Client { addr: self.addr.clone(), event })
+        ctx.timer.schedule_at(deadline, Event::Client { addr: self.addr, event })
     }
 }
 
@@ -245,7 +246,7 @@ mod tests {
     #[test]
     fn authenticated_when_not_authenticated() {
         let r_sta = make_remote_client();
-        assert_eq!(r_sta.authenticated(), false);
+        assert!(!r_sta.authenticated());
     }
 
     #[test]
@@ -253,7 +254,7 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, _, _) = make_env();
         r_sta.handle_auth_ind(&mut ctx, fidl_mlme::AuthenticationTypes::OpenSystem);
-        assert_eq!(r_sta.authenticated(), true);
+        assert!(r_sta.authenticated());
     }
 
     #[test]
@@ -272,7 +273,7 @@ mod tests {
             &None,
             None,
         );
-        assert_eq!(r_sta.authenticated(), true);
+        assert!(r_sta.authenticated());
     }
 
     #[test]
@@ -299,7 +300,7 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, _, _) = make_env();
         r_sta.handle_auth_ind(&mut ctx, fidl_mlme::AuthenticationTypes::OpenSystem);
-        assert_eq!(r_sta.authenticated(), true);
+        assert!(r_sta.authenticated());
         let mut aid_map = aid::Map::default();
         r_sta.handle_assoc_ind(
             &mut ctx,
@@ -347,11 +348,11 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, _, _) = make_env();
         r_sta.handle_auth_ind(&mut ctx, fidl_mlme::AuthenticationTypes::OpenSystem);
-        assert_eq!(r_sta.authenticated(), true);
+        assert!(r_sta.authenticated());
         // TODO(tonyy): This is kind of fragile: EventId should be opaque, but we're just guessing
         // what it should be here since we can't see into the state machine's EventId.
         r_sta.handle_timeout(&mut ctx, 0, ClientEvent::AssociationTimeout);
-        assert_eq!(r_sta.authenticated(), false);
+        assert!(!r_sta.authenticated());
     }
 
     #[test]
@@ -421,7 +422,7 @@ mod tests {
         let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
         assert_variant!(mlme_event, MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest { keylist }) => {
             assert_eq!(keylist.len(), 1);
-            let k = keylist.get(0).expect("expect key descriptor");
+            let k = keylist.first().expect("expect key descriptor");
             assert_eq!(k.key, vec![0xCCu8; test_utils::cipher().tk_bytes().unwrap() as usize]);
             assert_eq!(k.key_id, 0);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Pairwise);
@@ -440,7 +441,7 @@ mod tests {
         let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
         assert_variant!(mlme_event, MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest { keylist }) => {
             assert_eq!(keylist.len(), 1);
-            let k = keylist.get(0).expect("expect key descriptor");
+            let k = keylist.first().expect("expect key descriptor");
             assert_eq!(&k.key[..], &test_utils::gtk_bytes()[..]);
             assert_eq!(k.key_id, 2);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Group);

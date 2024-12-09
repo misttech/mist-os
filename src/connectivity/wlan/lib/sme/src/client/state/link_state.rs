@@ -477,7 +477,7 @@ fn send_keys(mlme_sink: &MlmeSink, bssid: Bssid, key: Key) -> Option<u16> {
     let key_id = key_descriptor.key_id;
     mlme_sink
         .send(MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest { keylist: vec![key_descriptor] }));
-    return Some(key_id);
+    Some(key_id)
 }
 
 /// Sends an eapol frame, and optionally schedules a timeout for the response.
@@ -556,16 +556,13 @@ fn process_eapol_ind(
     };
 
     let mut update_sink = rsna::UpdateSink::default();
-    match rsna.supplicant.on_eapol_frame(&mut update_sink, eapol_frame) {
-        Err(e) => {
-            error!("error processing EAPOL key frame: {}", e);
-            inspect_log!(context.inspect.rsn_events.lock(), {
-                rx_eapol_frame: InspectBytes(&eapol_pdu),
-                status: format!("rejected (processing error): {}", e)
-            });
-            return RsnaStatus::Unchanged;
-        }
-        Ok(()) => {}
+    if let Err(e) = rsna.supplicant.on_eapol_frame(&mut update_sink, eapol_frame) {
+        error!("error processing EAPOL key frame: {}", e);
+        inspect_log!(context.inspect.rsn_events.lock(), {
+            rx_eapol_frame: InspectBytes(&eapol_pdu),
+            status: format!("rejected (processing error): {}", e)
+        });
+        return RsnaStatus::Unchanged;
     }
 
     inspect_log!(context.inspect.rsn_events.lock(), {
@@ -573,7 +570,7 @@ fn process_eapol_ind(
         status: "processed"
     });
     let ap_responsive =
-        (update_sink.len() > 0).then(|| context.timer.schedule(event::RsnaResponseTimeout {}));
+        (!update_sink.is_empty()).then(|| context.timer.schedule(event::RsnaResponseTimeout {}));
     process_rsna_updates(context, Some(Bssid::from(ind.src_addr)), update_sink, ap_responsive)
 }
 

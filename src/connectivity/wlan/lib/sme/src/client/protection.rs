@@ -100,7 +100,7 @@ impl<'a, C> SecurityContext<'a, C> {
     }
 }
 
-impl<'a> SecurityContext<'a, wpa::Wpa1Credentials> {
+impl SecurityContext<'_, wpa::Wpa1Credentials> {
     /// Gets the authenticator and supplicant IEs for WPA1 from the associated BSS.
     fn authenticator_supplicant_ie(&self) -> Result<(WpaIe, WpaIe), Error> {
         let a_wpa_ie = self.bss.wpa_ie()?;
@@ -117,7 +117,7 @@ impl<'a> SecurityContext<'a, wpa::Wpa1Credentials> {
     }
 }
 
-impl<'a> SecurityContext<'a, wpa::Wpa2PersonalCredentials> {
+impl SecurityContext<'_, wpa::Wpa2PersonalCredentials> {
     /// Gets the authenticator and supplicant RSNEs for WPA2 Personal from the associated BSS.
     fn authenticator_supplicant_rsne(&self) -> Result<(Rsne, Rsne), Error> {
         let a_rsne_ie = self
@@ -126,7 +126,7 @@ impl<'a> SecurityContext<'a, wpa::Wpa2PersonalCredentials> {
             .ok_or_else(|| format_err!("WPA2 requested but RSNE is not present in BSS."))?;
         let (_, a_rsne) = rsne::from_bytes(a_rsne_ie)
             .map_err(|error| format_err!("Invalid RSNE IE {:02x?}: {:?}", a_rsne_ie, error))?;
-        let s_rsne = a_rsne.derive_wpa2_s_rsne(&self.security_support)?;
+        let s_rsne = a_rsne.derive_wpa2_s_rsne(self.security_support)?;
         Ok((a_rsne, s_rsne))
     }
 
@@ -136,7 +136,7 @@ impl<'a> SecurityContext<'a, wpa::Wpa2PersonalCredentials> {
     }
 }
 
-impl<'a> SecurityContext<'a, wpa::Wpa3PersonalCredentials> {
+impl SecurityContext<'_, wpa::Wpa3PersonalCredentials> {
     /// Gets the authenticator and supplicant RSNEs for WPA3 Personal from the associated BSS.
     fn authenticator_supplicant_rsne(&self) -> Result<(Rsne, Rsne), Error> {
         let a_rsne_ie = self
@@ -145,7 +145,7 @@ impl<'a> SecurityContext<'a, wpa::Wpa3PersonalCredentials> {
             .ok_or_else(|| format_err!("WPA3 requested but RSNE is not present in BSS."))?;
         let (_, a_rsne) = rsne::from_bytes(a_rsne_ie)
             .map_err(|error| format_err!("Invalid RSNE IE {:02x?}: {:?}", a_rsne_ie, error))?;
-        let s_rsne = a_rsne.derive_wpa3_s_rsne(&self.security_support)?;
+        let s_rsne = a_rsne.derive_wpa3_s_rsne(self.security_support)?;
         Ok((a_rsne, s_rsne))
     }
 
@@ -330,7 +330,7 @@ pub(crate) fn build_protection_ie(protection: &Protection) -> Result<Option<Prot
             };
             let mut buf = vec![];
             ie::write_wpa1_ie(&mut buf, &s_wpa).unwrap(); // Writing to a Vec never fails
-            Ok(Some(ProtectionIe::VendorIes(buf.into())))
+            Ok(Some(ProtectionIe::VendorIes(buf)))
         }
         Protection::Rsna(rsna) => {
             let s_protection = rsna.negotiated_protection.to_full_protection();
@@ -345,7 +345,7 @@ pub(crate) fn build_protection_ie(protection: &Protection) -> Result<Option<Prot
             // space is required. If this panic ever triggers, something is clearly broken
             // somewhere else.
             let () = s_rsne.write_into(&mut buf).unwrap();
-            Ok(Some(ProtectionIe::Rsne(buf.into())))
+            Ok(Some(ProtectionIe::Rsne(buf)))
         }
     }
 }
@@ -370,7 +370,7 @@ mod tests {
         assert!(protection.rsn_auth_method().is_none());
 
         // Wep
-        let protection = Protection::Wep(WepKey::parse(&[1; 5]).expect("unable to parse WEP key"));
+        let protection = Protection::Wep(WepKey::parse([1; 5]).expect("unable to parse WEP key"));
         assert!(protection.rsn_auth_method().is_none());
 
         // WPA1

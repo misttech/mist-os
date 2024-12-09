@@ -53,9 +53,7 @@ impl ParseableParametrized<[u8], GenlHeader> for Nl80211 {
     fn parse_with_param(buf: &[u8], header: GenlHeader) -> Result<Self, DecodeError> {
         let cmd = header.cmd.try_into()?;
         let attrs = NlasIterator::new(buf)
-            .map(|nla| {
-                nla.map_err(|err| DecodeError::from(err)).and_then(|nla| Nl80211Attr::parse(&nla))
-            })
+            .map(|nla| nla.map_err(DecodeError::from).and_then(|nla| Nl80211Attr::parse(&nla)))
             .collect::<Result<Vec<_>, _>>()
             .context("Failed to parse NL80211 attributes")?;
         Ok(Self { cmd, attrs })

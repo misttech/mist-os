@@ -329,6 +329,7 @@ impl SmeClientIface {
     /// is no way to alter power levels via the wlanix FIDLs. However, this is insignificant, as
     /// empirical measurements show that the chips have virtually no power consumption when no
     /// interfaces exist.
+    #[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
     async fn update_power_level(&self, new_level: StaIfacePowerLevel) -> Result<(), Error> {
         // If the Power Broker is initialized, report the new state
         if let Some(pe) = &mut self.power_state.lock().power_element_context {
@@ -412,7 +413,7 @@ impl ClientIface for SmeClientIface {
             None => bail!("Requested network not found"),
         };
 
-        let credential = passphrase.map(|p| Credential::Password(p)).unwrap_or(Credential::None);
+        let credential = passphrase.map(Credential::Password).unwrap_or(Credential::None);
         let authenticator =
             match get_authenticator(bss_description.bssid, compatibility, &credential) {
                 Some(authenticator) => authenticator,
@@ -484,6 +485,7 @@ impl ClientIface for SmeClientIface {
         let _prev = self.connected_network_rssi.lock().replace(ind.rssi_dbm);
     }
 
+    #[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
     async fn set_power_save_mode(&self, enabled: bool) -> Result<(), Error> {
         // Update our cache
         let mut power_state = self.power_state.lock();
@@ -503,6 +505,7 @@ impl ClientIface for SmeClientIface {
         self.update_power_level(new_level).await
     }
 
+    #[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
     async fn set_suspend_mode(&self, enabled: bool) -> Result<(), Error> {
         let mut power_state = self.power_state.lock();
         power_state.suspend_mode_enabled = enabled;
@@ -510,16 +513,20 @@ impl ClientIface for SmeClientIface {
         let new_level = if enabled {
             // Assume that this overrides any SetPowerSave
             StaIfacePowerLevel::Suspended
+        } else if power_state.power_save_enabled {
+            info!(
+                "SetSuspendModeEnabled=false while SetPowerSave={:?}, reverting to power save mode",
+                power_state.power_save_enabled
+            );
+            // TODO(https://fxbug.dev/340921554): log a metric in this case, unclear if we
+            // should revert to power_save_enabled=true or not.
+            StaIfacePowerLevel::Normal
         } else {
-            if power_state.power_save_enabled {
-                info!("SetSuspendModeEnabled=false while SetPowerSave={:?}, reverting to power save mode", power_state.power_save_enabled );
-                // TODO(https://fxbug.dev/340921554): log a metric in this case, unclear if we
-                // should revert to power_save_enabled=true or not.
-                StaIfacePowerLevel::Normal
-            } else {
-                warn!("SetSuspendModeEnabled=false while SetPowerSave={:?}, moving to high performance", power_state.power_save_enabled );
-                StaIfacePowerLevel::NoPowerSavings
-            }
+            warn!(
+                "SetSuspendModeEnabled=false while SetPowerSave={:?}, moving to high performance",
+                power_state.power_save_enabled
+            );
+            StaIfacePowerLevel::NoPowerSavings
         };
         drop(power_state);
         self.update_power_level(new_level).await
@@ -698,7 +705,7 @@ pub mod test_utils {
         }
 
         fn on_disconnect(&self, info: &fidl_sme::DisconnectSource) {
-            self.calls.lock().push(ClientIfaceCall::OnDisconnect { info: info.clone() });
+            self.calls.lock().push(ClientIfaceCall::OnDisconnect { info: *info });
         }
 
         fn on_signal_report(&self, ind: fidl_internal::SignalReportIndication) {
@@ -850,6 +857,10 @@ mod tests {
     use wlan_common::test_utils::fake_stas::FakeProtectionCfg;
     use wlan_common::test_utils::ExpectWithin;
     use wlan_common::{assert_variant, fake_fidl_bss_description};
+    #[allow(
+        clippy::single_component_path_imports,
+        reason = "mass allow for https://fxbug.dev/381896734"
+    )]
     use {
         fidl_fuchsia_wlan_common_security as fidl_security,
         fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync, rand,
@@ -1258,7 +1269,7 @@ mod tests {
         }];
 
         let bssid = if bssid_specified { Some(Bssid::from([1, 2, 3, 4, 5, 6])) } else { None };
-        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], passphrase, bssid);
+        let mut connect_fut = iface.connect_to_network(b"foo", passphrase, bssid);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
         let (req, connect_txn) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
@@ -1338,7 +1349,7 @@ mod tests {
             }];
         }
 
-        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], passphrase, bssid);
+        let mut connect_fut = iface.connect_to_network(b"foo", passphrase, bssid);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_e)));
     }
 
@@ -1359,7 +1370,7 @@ mod tests {
             timestamp_nanos: 1,
         }];
 
-        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], None, None);
+        let mut connect_fut = iface.connect_to_network(b"foo", None, None);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
         let (req, connect_txn) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
@@ -1433,7 +1444,7 @@ mod tests {
             timestamp_nanos: 1,
         }];
 
-        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], None, None);
+        let mut connect_fut = iface.connect_to_network(b"foo", None, None);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
         let (_req, _connect_txn) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
@@ -1521,14 +1532,14 @@ mod tests {
             // Set up a connect failure so that later in the test, there'd be a score penalty
             // for the BSS described by `bss_description`
             *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
-                bss_description: bss_description,
+                bss_description,
                 compatibility: Some(Box::new(fidl_sme::Compatibility {
                     mutual_security_protocols: vec![fidl_security::Protocol::Open],
                 })),
                 timestamp_nanos: 1,
             }];
 
-            let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], None, None);
+            let mut connect_fut = iface.connect_to_network(b"foo", None, None);
             assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
             let (_req, connect_txn) = assert_variant!(
                 exec.run_until_stalled(&mut sme_stream.next()),
@@ -1549,7 +1560,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], None, None);
+        let mut connect_fut = iface.connect_to_network(b"foo", None, None);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
         let (req, _connect_txn) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),

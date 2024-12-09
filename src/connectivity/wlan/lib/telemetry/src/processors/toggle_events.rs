@@ -154,12 +154,12 @@ mod tests {
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         // Stop client connections and quickly start them again.
-        test_time = test_time + fasync::MonotonicDuration::from_minutes(40);
+        test_time += fasync::MonotonicDuration::from_minutes(40);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Disabled;
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
-        test_time = test_time + fasync::MonotonicDuration::from_seconds(1);
+        test_time += fasync::MonotonicDuration::from_seconds(1);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Enabled;
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
@@ -190,12 +190,12 @@ mod tests {
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         // Stop client connections and a while later start them again.
-        test_time = test_time + fasync::MonotonicDuration::from_minutes(20);
+        test_time += fasync::MonotonicDuration::from_minutes(20);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Disabled;
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
-        test_time = test_time + fasync::MonotonicDuration::from_minutes(30);
+        test_time += fasync::MonotonicDuration::from_minutes(30);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Enabled;
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
@@ -222,18 +222,18 @@ mod tests {
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         // Stop client connections and a while later stop them again.
-        test_time = test_time + fasync::MonotonicDuration::from_minutes(40);
+        test_time += fasync::MonotonicDuration::from_minutes(40);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Disabled;
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
-        test_time = test_time + fasync::MonotonicDuration::from_minutes(30);
+        test_time += fasync::MonotonicDuration::from_minutes(30);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Disabled;
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
         // Start client connections right after the last disable message.
-        test_time = test_time + fasync::MonotonicDuration::from_seconds(1);
+        test_time += fasync::MonotonicDuration::from_seconds(1);
         test_helper.exec.set_fake_time(test_time);
         let event = ClientConnectionsToggleEvent::Enabled;
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
