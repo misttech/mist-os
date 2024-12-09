@@ -14,8 +14,6 @@
 
 #include <memory>
 
-#include "lib/magma/magma_common_defs.h"
-
 namespace msd {
 
 class Connection;
@@ -178,7 +176,6 @@ class Context {
  public:
   virtual ~Context() = 0;
 
-  // Deprecated.
   // Executes a command buffer given associated set of resources and semaphores.
   // |command_buffer| is the command buffer to be executed
   // |exec_resources| describe the associated resources
@@ -191,13 +188,6 @@ class Context {
                                                            Buffer** buffers,
                                                            Semaphore** wait_semaphores,
                                                            Semaphore** signal_semaphores) {
-    return MAGMA_STATUS_UNIMPLEMENTED;
-  }
-
-  virtual magma_status_t ExecuteCommandBuffers(
-      std::vector<magma_exec_command_buffer>& command_buffers,
-      std::vector<magma_exec_resource>& resources, std::vector<Buffer*>& buffers,
-      std::vector<Semaphore*>& wait_semaphores, std::vector<Semaphore*>& signal_semaphores) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 

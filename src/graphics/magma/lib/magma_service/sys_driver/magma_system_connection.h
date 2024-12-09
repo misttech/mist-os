@@ -44,12 +44,9 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
                               fuchsia_gpu_magma::wire::ObjectType object_type) override;
   magma::Status CreateContext(uint32_t context_id) override;
   magma::Status DestroyContext(uint32_t context_id) override;
-  magma::Status ExecuteCommandBuffers(uint32_t context_id,
-                                      std::vector<magma_exec_command_buffer>& command_buffers,
-                                      std::vector<magma_exec_resource>& resources,
-                                      std::vector<uint64_t>& wait_semaphores,
-                                      std::vector<uint64_t>& signal_semaphores,
-                                      uint64_t flags) override;
+  magma::Status ExecuteCommandBufferWithResources(
+      uint32_t context_id, std::unique_ptr<magma_command_buffer> command_buffer,
+      std::vector<magma_exec_resource> resources, std::vector<uint64_t> semaphores) override;
   magma::Status MapBuffer(uint64_t buffer_id, uint64_t hw_va, uint64_t offset, uint64_t length,
                           uint64_t flags) override;
   magma::Status UnmapBuffer(uint64_t buffer_id, uint64_t hw_va) override;

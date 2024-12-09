@@ -12,11 +12,12 @@ TEST(MagmaSystemContext, ExecuteCommandBuffer_Normal) {
   auto cmd_buf = CommandBufferHelper::Create();
   EXPECT_TRUE(cmd_buf->Execute());
 
+  auto num_resources = cmd_buf->abi_cmd_buf()->resource_count;
   auto system_resources = cmd_buf->resources();
-  auto num_resources = system_resources.size();
   auto submitted_msd_resources =
       MsdMockContext::cast(cmd_buf->ctx())->last_submitted_exec_resources();
 
+  EXPECT_EQ(system_resources.size(), num_resources);
   EXPECT_EQ(submitted_msd_resources.size(), num_resources);
 
   for (uint32_t i = 0; i < num_resources; i++) {
@@ -26,14 +27,14 @@ TEST(MagmaSystemContext, ExecuteCommandBuffer_Normal) {
 
 TEST(MagmaSystemContext, ExecuteCommandBuffer_InvalidBatchBufferIndex) {
   auto cmd_buf = CommandBufferHelper::Create();
-  cmd_buf->abi_cmd_buf()->resource_index =
+  cmd_buf->abi_cmd_buf()->batch_buffer_resource_index =
       CommandBufferHelper::kNumResources;  // smallest invalid value
   EXPECT_FALSE(cmd_buf->Execute());
 }
 
 TEST(MagmaSystemContext, ExecuteCommandBuffer_InvalidBatchStartOffset) {
   auto cmd_buf = CommandBufferHelper::Create();
-  cmd_buf->abi_cmd_buf()->start_offset = UINT32_MAX;
+  cmd_buf->abi_cmd_buf()->batch_start_offset = UINT32_MAX;
   EXPECT_FALSE(cmd_buf->Execute());
 }
 

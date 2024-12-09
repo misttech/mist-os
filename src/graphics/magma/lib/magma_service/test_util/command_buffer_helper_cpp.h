@@ -61,7 +61,7 @@ class CommandBufferHelper final : public msd::NotificationHandler {
   msd::Semaphore** msd_wait_semaphores() { return msd_wait_semaphores_.data(); }
   msd::Semaphore** msd_signal_semaphores() { return msd_signal_semaphores_.data(); }
 
-  magma_exec_command_buffer* abi_cmd_buf() { return &command_buffer_; }
+  msd::magma_command_buffer* abi_cmd_buf() { return &command_buffer_; }
 
   uint64_t* abi_wait_semaphore_ids() { return abi_wait_semaphore_ids_.data(); }
 
@@ -69,17 +69,23 @@ class CommandBufferHelper final : public msd::NotificationHandler {
 
   magma_exec_resource* abi_resources() { return abi_exec_resources_.data(); }
 
-  void set_command_buffer_flags(uint64_t flags) { command_buffer_flags_ = flags; }
-  uint64_t get_command_buffer_flags() { return command_buffer_flags_; }
+  void set_command_buffer_flags(uint64_t flags) { abi_cmd_buf()->flags = flags; }
 
   bool Execute() {
-    std::vector<magma_exec_command_buffer> command_buffers = {command_buffer_};
+    auto command_buffer = std::make_unique<msd::magma_command_buffer>(command_buffer_);
     std::vector<magma_exec_resource> resources;
     for (uint32_t i = 0; i < kNumResources; i++) {
       resources.emplace_back(abi_resources()[i]);
     }
-    if (!ctx_->ExecuteCommandBuffers(command_buffers, resources, abi_wait_semaphore_ids_,
-                                     abi_signal_semaphore_ids_, /*flags=*/0))
+    std::vector<uint64_t> semaphores;
+    for (uint32_t i = 0; i < kWaitSemaphoreCount; i++) {
+      semaphores.emplace_back(abi_wait_semaphore_ids()[i]);
+    }
+    for (uint32_t i = 0; i < kSignalSemaphoreCount; i++) {
+      semaphores.emplace_back(abi_signal_semaphore_ids()[i]);
+    }
+    if (!ctx_->ExecuteCommandBufferWithResources(std::move(command_buffer), std::move(resources),
+                                                 std::move(semaphores)))
       return false;
     ProcessNotifications();
     return true;
@@ -114,8 +120,11 @@ class CommandBufferHelper final : public msd::NotificationHandler {
         ctx_(ctx) {
     connection_->SetNotificationCallback(this);
 
-    command_buffer_.resource_index = 0;
-    command_buffer_.start_offset = 0;
+    command_buffer_.resource_count = kNumResources;
+    command_buffer_.batch_buffer_resource_index = 0;
+    command_buffer_.batch_start_offset = 0;
+    command_buffer_.wait_semaphore_count = kWaitSemaphoreCount;
+    command_buffer_.signal_semaphore_count = kSignalSemaphoreCount;
     abi_wait_semaphore_ids_.resize(kWaitSemaphoreCount);
     abi_signal_semaphore_ids_.resize(kSignalSemaphoreCount);
     abi_exec_resources_.resize(kNumResources);
@@ -205,11 +214,10 @@ class CommandBufferHelper final : public msd::NotificationHandler {
   std::unique_ptr<msd::Driver> msd_drv_;
   std::shared_ptr<msd::MagmaSystemDevice> dev_;
   std::unique_ptr<msd::MagmaSystemConnection> connection_;
-  uint64_t command_buffer_flags_ = 0;
   msd::MagmaSystemContext* ctx_;  // owned by the connection
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 
-  magma_exec_command_buffer command_buffer_{};
+  msd::magma_command_buffer command_buffer_{};
   std::vector<uint64_t> abi_wait_semaphore_ids_;
   std::vector<uint64_t> abi_signal_semaphore_ids_;
   std::vector<magma_exec_resource> abi_exec_resources_;

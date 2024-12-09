@@ -14,7 +14,6 @@
 #include <optional>
 
 #include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
-#include "lib/magma_service/msd_defs.h"
 
 namespace {
 std::optional<fuchsia_gpu_magma::ObjectType> ValidateObjectType(
@@ -268,15 +267,22 @@ void PrimaryFidlServer::ExecuteCommand(ExecuteCommandRequestView request,
   TRACE_DURATION("magma", "PrimaryFidlServer::ExecuteCommand");
   FlowControl();
 
-  std::vector<magma_exec_command_buffer> command_buffers;
-  command_buffers.reserve(request->command_buffers.count());
-
-  for (auto& command_buffer : request->command_buffers) {
-    command_buffers.push_back(magma_exec_command_buffer{
-        .resource_index = command_buffer.resource_index,
-        .start_offset = command_buffer.start_offset,
-    });
+  // TODO(https://fxbug.dev/42174299) - support > 1 command buffer
+  if (request->command_buffers.count() > 1) {
+    SetError(&completer, MAGMA_STATUS_UNIMPLEMENTED);
+    return;
   }
+
+  auto command_buffer = std::make_unique<magma_command_buffer>();
+
+  *command_buffer = {
+      .resource_count = static_cast<uint32_t>(request->resources.count()),
+      .batch_buffer_resource_index = request->command_buffers[0].resource_index,
+      .batch_start_offset = request->command_buffers[0].start_offset,
+      .wait_semaphore_count = static_cast<uint32_t>(request->wait_semaphores.count()),
+      .signal_semaphore_count = static_cast<uint32_t>(request->signal_semaphores.count()),
+      .flags = static_cast<uint64_t>(request->flags),
+  };
 
   std::vector<magma_exec_resource> resources;
   resources.reserve(request->resources.count());
@@ -289,23 +295,19 @@ void PrimaryFidlServer::ExecuteCommand(ExecuteCommandRequestView request,
     });
   }
 
-  std::vector<uint64_t> wait_semaphores;
-  wait_semaphores.reserve(request->wait_semaphores.count());
+  // Merge semaphores into one vector
+  std::vector<uint64_t> semaphores;
+  semaphores.reserve(request->wait_semaphores.count() + request->signal_semaphores.count());
 
   for (uint64_t semaphore_id : request->wait_semaphores) {
-    wait_semaphores.push_back(semaphore_id);
+    semaphores.push_back(semaphore_id);
   }
-
-  std::vector<uint64_t> signal_semaphores;
-  signal_semaphores.reserve(request->signal_semaphores.count());
-
   for (uint64_t semaphore_id : request->signal_semaphores) {
-    signal_semaphores.push_back(semaphore_id);
+    semaphores.push_back(semaphore_id);
   }
 
-  magma::Status status = delegate_->ExecuteCommandBuffers(
-      request->context_id, command_buffers, resources, wait_semaphores, signal_semaphores,
-      static_cast<uint64_t>(request->flags));
+  magma::Status status = delegate_->ExecuteCommandBufferWithResources(
+      request->context_id, std::move(command_buffer), std::move(resources), std::move(semaphores));
 
   if (!status)
     SetError(&completer, status.get());
