@@ -11,13 +11,10 @@ group("target") {
 # Linking this source set into a target automatically connects to the engine.
 # See `:no_hooks` for a source set more suitable for testing.
 source_set("instrumented") {
+  public = [ "instrumented-process.h" ]
   sources = [ "instrumented-process.cc" ]
   public_deps = [ ":no_hooks" ]
-  deps = [
-    "//build/validate:non_production_tag",
-    "//sdk/lib/sys/cpp",
-    "//zircon/system/ulib/sync",
-  ]
+  deps = [ "//build/validate:non_production_tag" ]
 }
 
 # Version of the `target` library that does not install hooks, and can be used for testing.
@@ -31,14 +28,12 @@ source_set("no_hooks") {
     "weak-symbols.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_hlcpp",
     "//src/lib/fxl",
     "//src/sys/fuzzing/common",
     "//src/sys/fuzzing/fidl:fuchsia.fuzzer_hlcpp",
   ]
   deps = [
     "//build/validate:non_production_tag",
-    "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/debug:backtrace-request",
     "//third_party/modp_b64",
