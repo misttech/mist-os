@@ -100,8 +100,7 @@ where
         // fs_use_xattr-labelling defers to the security attribute on the file node, with fall-back
         // behaviours for missing and invalid labels.
         FileSystemLabelingScheme::FsUse { fs_use_type, def_sid, root_sid, .. } => {
-            let is_root_node = dir_entry.parent().is_none();
-            let maybe_sid = match fs_use_type {
+            match fs_use_type {
                 FsUseType::Xattr => {
                     // Determine the SID from the "security.selinux" attribute.
                     let attr = fs_node.ops().get_xattr(
@@ -111,7 +110,7 @@ where
                         XATTR_NAME_SELINUX.to_bytes().into(),
                         SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
                     );
-                    match attr {
+                    let maybe_sid = match attr {
                         Ok(ValueOrSize::Value(security_context)) => Some(
                             security_server
                                 .security_context_to_sid((&security_context).into())
@@ -119,7 +118,7 @@ where
                         ),
                         Ok(ValueOrSize::Size(_)) => None,
                         Err(err) => {
-                            if err.code == ENODATA && is_root_node {
+                            if err.code == ENODATA && dir_entry.parent().is_none() {
                                 // The root node of xattr-labeled filesystems should be labeled at
                                 // creation in principle. Distinguishing creation of the root of the
                                 // filesystem from re-instantiation of the `FsNode` representing an
@@ -142,29 +141,41 @@ where
                                 None
                             }
                         }
-                    }
+                    };
+                    maybe_sid.unwrap_or_else(||{
+                        // The node does not have a label, so apply the filesystem's default SID.
+                        if fs.name() == "remotefs" {
+                            track_stub!(TODO("https://fxbug.dev/378688761"), "RemoteFS node missing security label. Perhaps your device needs re-flashing?");
+                        } else {
+                            log_warn!(
+                                "Unlabeled node {:?} in {} ({:?}-labeled) filesystem",
+                                dir_entry,
+                                fs.name(),
+                                fs_use_type
+                            );
+                        };
+                        def_sid
+                    })
                 }
                 _ => {
-                    if is_root_node {
-                        Some(root_sid)
+                    if let Some(parent) = dir_entry.parent() {
+                        // Ephemeral nodes are then labeled by applying SID computation between their
+                        // SID of the task that created them, and their parent file node's label.
+                        // TODO: https://fxbug.dev/381275592 - Use the SID from the creating task, rather than current_task!
+                        return fs_node_init_on_create(
+                            security_server,
+                            current_task,
+                            fs_node,
+                            &parent.node,
+                        )
+                        .map(|_| ());
                     } else {
-                        None
+                        // Ephemeral filesystems' root nodes use the root SID, which will typically
+                        // be the same as that of the filesystem itself.
+                        root_sid
                     }
                 }
-            };
-            maybe_sid.unwrap_or_else(|| {
-                // The node does not have a label, so apply the filesystem's default SID.
-                    if fs.name() == "remotefs" {
-                        track_stub!(TODO("https://fxbug.dev/378688761"), "RemoteFS node missing security label. Perhaps your device needs re-flashing?");
-                    } else {
-                        log_warn!(
-                            "Unlabeled node in {} ({:?}-labeled) filesystem",
-                            fs.name(),
-                            fs_use_type
-                        );
-                    }
-                    def_sid
-            })
+            }
         }
         FileSystemLabelingScheme::GenFsCon => {
             let fs_type = fs_node.fs().name();
@@ -869,8 +880,7 @@ where
         let file_class = file_class_from_file_mode(fs_node.info().mode)?;
         let permission_check = security_server.as_permission_check();
         if old_sid == SecurityId::initial(InitialSid::File) {
-            todo_check_permission!(
-                TODO("https://fxbug.dev/381275592", "relabelfrom unlabeled file"),
+            check_permission(
                 &permission_check,
                 task_sid,
                 old_sid,
