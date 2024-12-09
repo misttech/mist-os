@@ -315,4 +315,28 @@ fit::result<Errno> sys_mkdirat(const CurrentTask& current_task, FdNumber dir_fd,
   return fit::ok();
 }
 
+fit::result<Errno, size_t> sys_getcwd(const CurrentTask& current_task,
+                                      starnix_uapi::UserAddress buf, size_t size) {
+  return fit::error(errno(ENOTSUP));
+}
+
+fit::result<Errno, FdNumber> sys_dup(const CurrentTask& current_task, FdNumber oldfd) {
+  return current_task->files_.duplicate(*current_task, oldfd, TargetFdNumber::Default(),
+                                        FdFlags::empty());
+}
+
+fit::result<Errno, FdNumber> sys_dup3(const CurrentTask& current_task, FdNumber oldfd,
+                                      FdNumber newfd, uint32_t flags) {
+  if (oldfd == newfd) {
+    return fit::error(errno(EINVAL));
+  }
+  if ((flags & ~O_CLOEXEC) != 0) {
+    return fit::error(errno(EINVAL));
+  }
+  auto fd_flags = get_fd_flags(flags);
+  _EP(current_task->files_.duplicate(*current_task, oldfd, TargetFdNumber::Specific(newfd),
+                                     fd_flags));
+  return fit::ok(newfd);
+}
+
 }  // namespace starnix

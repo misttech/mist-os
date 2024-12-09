@@ -18,6 +18,7 @@ source_set("linux_impl") {
     "arch/${current_cpu}/kernel/sys_x86_64.cc",
     "drivers/char/random.cc",
     "fs/exec.cc",
+    "fs/file.cc",
     "fs/namei.cc",
     "fs/open.cc",
     "fs/read_write.cc",

@@ -975,10 +975,13 @@ if (!is_efi_toolchain) {
       ]
       deps += invoker.deps
       if (is_mistos) {
-      # needed to run some starnix loader tests from bootfs
-      deps += [ "//vendor/misttech/zircon/kernel/lib/starnix/examples/hello_starnix:bin" ]
+        # needed to run some starnix loader tests from bootfs
+        deps += [
+          "//vendor/misttech/zircon/kernel/lib/starnix/examples/hello_starnix:bin",
+          "//vendor/misttech/zircon/kernel/lib/starnix/kernel:starnix-test-files",
+        ]
+      }
     }
-  }
   }
 
   kernel_unittests_boot_test("kernel-unittests-boot-test") {

@@ -13,9 +13,7 @@
 #include <lib/starnix_sync/locks.h>
 #include <zircon/compiler.h>
 
-#include <atomic>
 #include <functional>
-#include <utility>
 
 #include <fbl/ref_counted.h>
 #include <fbl/vector.h>
@@ -27,7 +25,7 @@
 
 namespace starnix {
 
-enum class FdFlagsEnum : uint32_t {
+enum class FdFlagsEnum : uint8_t {
   CLOEXEC = FD_CLOEXEC,
 };
 
@@ -82,12 +80,14 @@ class FdTableStore {
 
   ktl::optional<std::reference_wrapper<ktl::optional<FdTableEntry>>> get_mut(FdNumber fd);
 
+  // Returns the (possibly memoized) lowest available FD >= minfd in this map.
+  FdNumber get_lowest_available_fd(FdNumber minfd) const;
+
   // Recalculates the lowest available FD >= minfd based on the contents of the map.
-  FdNumber calculate_lowest_available_fd(FdNumber minfd) const;
+  FdNumber calculate_lowest_available_fd(const FdNumber& minfd) const;
 
   void retain(std::function<bool(const FdNumber&, FdTableEntry&)> func);
 
- public:
   FdTableStore();
   FdTableStore(const FdTableStore& other);
   FdTableStore& operator=(FdTableStore&& other);
@@ -123,14 +123,53 @@ class FdTableInner : public fbl::RefCounted<FdTableInner> {
   mutable starnix_sync::Mutex<FdTableStore> store_;
 };
 
+struct SpecificFd {
+  FdNumber fd;
+};
+
+struct MinimumFd {
+  FdNumber fd;
+};
+
+class TargetFdNumber {
+ public:
+  /// The duplicated FdNumber will be the smallest available FdNumber.
+  static TargetFdNumber Default() { return TargetFdNumber(); }
+
+  /// The duplicated FdNumber should be this specific FdNumber.
+  static TargetFdNumber Specific(FdNumber fd) { return TargetFdNumber(SpecificFd{fd}); }
+
+  /// The duplicated FdNumber should be greater than this FdNumber.
+  static TargetFdNumber Minimum(FdNumber fd) { return TargetFdNumber(MinimumFd{fd}); }
+
+ private:
+  using Value = ktl::variant<ktl::monostate, SpecificFd, MinimumFd>;
+
+  // Helper for variant visitors
+  template <typename... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  template <typename... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
+
+  friend class FdTable;
+
+  /// The duplicated FdNumber will be the smallest available FdNumber.
+  TargetFdNumber() : value_(ktl::monostate{}) {}
+
+  explicit TargetFdNumber(Value value) : value_(value) {}
+
+  Value value_;
+};
+
 class Task;
 class FdTable {
  private:
   mutable starnix_sync::Mutex<fbl::RefPtr<FdTableInner>> inner_;
 
  public:
-  // impl FdTable
-
+  /// impl FdTable
   FdTableId id() const { return inner_.Lock()->get()->id(); }
 
   FdTable fork() const {
@@ -150,6 +189,9 @@ class FdTable {
   fit::result<Errno, FdNumber> add_with_flags(const Task& task, FileHandle file,
                                               FdFlags flags) const;
 
+  fit::result<Errno, FdNumber> duplicate(const Task& task, FdNumber oldfd, TargetFdNumber target,
+                                         FdFlags flags) const;
+
   fit::result<Errno, FileHandle> get_allowing_opath(FdNumber fd) const;
 
   fit::result<Errno, ktl::pair<FileHandle, FdFlags>> get_allowing_opath_with_flags(
@@ -158,6 +200,8 @@ class FdTable {
   fit::result<Errno, FileHandle> get(FdNumber fd) const;
 
   fit::result<Errno> close(FdNumber fd) const;
+
+  fit::result<Errno, FdFlags> get_fd_flags_allowing_opath(FdNumber fd) const;
 
   fit::result<Errno, FdFlags> get_fd_flags(FdNumber fd) const;
 
@@ -171,7 +215,6 @@ class FdTable {
   void release() const { inner_.Lock()->reset(); }
 
   // C++
- public:
   static FdTable Create();
 
   FdTable(const FdTable& other) {
@@ -179,7 +222,7 @@ class FdTable {
   }
 
  private:
-  FdTable(fbl::RefPtr<FdTableInner> table);
+  explicit FdTable(fbl::RefPtr<FdTableInner> table);
 };
 
 }  // namespace starnix

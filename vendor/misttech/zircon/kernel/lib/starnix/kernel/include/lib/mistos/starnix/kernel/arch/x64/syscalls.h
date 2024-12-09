@@ -48,6 +48,9 @@ fit::result<Errno, FdNumber> sys_creat(const CurrentTask& current_task,
                                        starnix_uapi::UserCString user_path,
                                        starnix_uapi::FileMode mode);
 
+fit::result<Errno, FdNumber> sys_dup2(const CurrentTask& current_task, FdNumber oldfd,
+                                      FdNumber newfd);
+
 fit::result<Errno, pid_t> sys_getpgrp(const CurrentTask& current_task);
 
 fit::result<Errno, FdNumber> sys_open(const CurrentTask& current_task,
@@ -62,6 +65,8 @@ fit::result<Errno> sys_stat(const CurrentTask& current_task, starnix_uapi::UserC
                             starnix_uapi::UserRef<struct ::stat> buffer);
 
 fit::result<Errno, pid_t> sys_vfork(CurrentTask& current_task);
+
+
 
 }  // namespace starnix
 
