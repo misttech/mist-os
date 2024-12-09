@@ -36,6 +36,7 @@
 #include "src/lib/diagnostics/accessor2logger/log_message.h"
 #include "src/lib/fxl/memory/ref_counted.h"
 #include "src/lib/fxl/memory/ref_ptr.h"
+#include "src/lib/fxl/memory/weak_ptr.h"
 
 namespace debug_agent {
 
@@ -259,25 +260,42 @@ void ZirconComponentManager::OnComponentEvent(fuchsia_component::Event event) {
   const auto& url = *event.header()->component_url();
   switch (*event.header()->event_type()) {
     case fuchsia_component::EventType::kDebugStarted:
-      if (debug_agent_) {
-        debug_agent_->OnComponentStarted(moniker, url);
-      }
-      if (event.payload()->debug_started() && event.payload()->debug_started()->runtime_dir()) {
-        auto& runtime_dir = *event.payload()->debug_started()->runtime_dir();
-        auto& break_on_start = *event.payload()->debug_started()->break_on_start();
-        ReadElfJobId({std::move(runtime_dir), async_get_default_dispatcher()}, moniker,
-                     [weak_this = weak_factory_.GetWeakPtr(), moniker, url,
-                      break_on_start = std::move(break_on_start)](zx_koid_t job_id) mutable {
-                       if (weak_this && job_id != ZX_KOID_INVALID) {
-                         weak_this->running_component_info_.emplace(std::make_pair(
-                             job_id, debug_ipc::ComponentInfo{.moniker = moniker, .url = url}));
-                         DEBUG_LOG(Process) << "Component started job_id=" << job_id
-                                            << " moniker=" << moniker << " url=" << url;
-                       }
-                       // Explicitly reset break_on_start to indicate the component manager that
-                       // processes can be spawned.
-                       break_on_start.reset();
-                     });
+      if (event.payload()->debug_started()) {
+        fxl::WeakPtr<DebugAgent> weak_agent = nullptr;
+        if (debug_agent_) {
+          weak_agent = debug_agent_->GetWeakPtr();
+        }
+
+        if (event.payload()->debug_started()->runtime_dir()) {
+          auto& runtime_dir = *event.payload()->debug_started()->runtime_dir();
+          auto& break_on_start = *event.payload()->debug_started()->break_on_start();
+
+          ReadElfJobId({std::move(runtime_dir), async_get_default_dispatcher()}, moniker,
+                       [weak_this = weak_factory_.GetWeakPtr(), moniker, url, weak_agent,
+                        break_on_start = std::move(break_on_start)](zx_koid_t job_id) mutable {
+                         if (weak_this && job_id != ZX_KOID_INVALID) {
+                           weak_this->running_component_info_.emplace(std::make_pair(
+                               job_id, debug_ipc::ComponentInfo{.moniker = moniker, .url = url}));
+                           DEBUG_LOG(Process) << "Component started job_id=" << job_id
+                                              << " moniker=" << moniker << " url=" << url;
+                         }
+
+                         if (weak_agent) {
+                           weak_agent->OnComponentStarted(moniker, url, job_id);
+                         }
+
+                         // Explicitly reset break_on_start to indicate the component manager that
+                         // processes can be spawned.
+                         break_on_start.reset();
+                       });
+        } else {
+          // There is no runtime_dir for this component, so we can't read it's job_id and therefore
+          // won't have an entry for it in |running_component_info_|, but we can still do processing
+          // of filters based on this moniker and/or url.
+          if (weak_agent) {
+            weak_agent->OnComponentStarted(moniker, url, ZX_KOID_INVALID);
+          }
+        }
       }
       break;
     case fuchsia_component::EventType::kStopped: {

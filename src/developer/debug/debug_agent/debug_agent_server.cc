@@ -6,8 +6,6 @@
 
 #include <lib/fit/result.h>
 
-#include <utility>
-
 #include "fidl/fuchsia.debugger/cpp/natural_types.h"
 #include "src/developer/debug/debug_agent/backtrace_utils.h"
 #include "src/developer/debug/debug_agent/component_manager.h"
@@ -319,6 +317,20 @@ void DebugAgentServer::OnNotification(const debug_ipc::NotifyException& notify) 
           }
         }
       });
+}
+
+void DebugAgentServer::OnNotification(const debug_ipc::NotifyComponentStarting& notify) {
+  std::vector<debug_ipc::FilterMatch> filter_matches;
+  for (const auto& match : notify.matching_filters) {
+    // There will only ever be one koid per match.
+    FX_DCHECK(match.matched_pids.size() == 1);
+
+    if (match.matched_pids[0] != ZX_KOID_INVALID) {
+      filter_matches.emplace_back(match);
+    }
+  }
+
+  AttachToFilterMatches(filter_matches);
 }
 
 DebugAgentServer::GetMatchingProcessesResult DebugAgentServer::GetMatchingProcesses(

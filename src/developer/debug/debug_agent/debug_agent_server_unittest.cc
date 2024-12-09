@@ -5,14 +5,18 @@
 #include "src/developer/debug/debug_agent/debug_agent_server.h"
 
 #include <algorithm>
+#include <memory>
 
 #include <gtest/gtest.h>
 
+#include "lib/async/default.h"
+#include "src/developer/debug/debug_agent/mock_component_manager.h"
 #include "src/developer/debug/debug_agent/mock_debug_agent_harness.h"
 #include "src/developer/debug/debug_agent/mock_process.h"
 #include "src/developer/debug/debug_agent/mock_process_handle.h"
 #include "src/developer/debug/debug_agent/mock_thread.h"
 #include "src/developer/debug/ipc/protocol.h"
+#include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/shared/test_with_loop.h"
 
 namespace debug_agent {
@@ -41,10 +45,6 @@ class DebugAgentServerTest : public debug::TestWithLoop {
     debug_ipc::StatusReply reply;
     harness_.debug_agent()->OnStatus({}, &reply);
     return reply;
-  }
-
-  void Bind(fidl::ServerEnd<fuchsia_debugger::DebugAgent> server_end) {
-    server_.binding_ref_ = fidl::BindServer(server_.dispatcher_, std::move(server_end), &server_);
   }
 
   MockDebugAgentHarness* harness() { return &harness_; }
@@ -138,7 +138,7 @@ TEST_F(DebugAgentServerTest, AddNewFilter) {
   EXPECT_EQ(reply.matched_processes_for_filter[0].matched_pids.size(), 1u);
   EXPECT_EQ(reply.matched_processes_for_filter[0].matched_pids[0], kProcessKoid);
 
-  // Inject a component discovery event so the second filter attaches to the root component that
+  // Inject a component starting event so the second filter attaches to the root component that
   // doesn't have an ELF program running with it. This will install the subsequent moniker prefix
   // filter that will be used to match a child component with an ELF process.
   harness()->system_interface()->mock_component_manager().InjectComponentEvent(
@@ -306,11 +306,38 @@ TEST_F(DebugAgentServerTest, GetMatchingProcesses) {
   EXPECT_EQ(result.value()[0]->koid(), kProcessKoid);
 }
 
-class FakeClient : public fidl::AsyncEventHandler<fuchsia_debugger::DebugAgent> {
+TEST_F(DebugAgentServerTest, AttachToJobOnComponentStarting) {
+  constexpr zx_koid_t kJobKoid = 101;
+  constexpr std::string kComponentMoniker = "some/fake/moniker";
+  constexpr std::string kComponentUrl = "url";
+
+  fuchsia_debugger::Filter filter;
+  filter.pattern("moniker");
+  filter.type(fuchsia_debugger::FilterType::kMonikerSuffix);
+  filter.options().job_only(true);
+
+  AddFilter(filter);
+
+  harness()->system_interface()->mock_component_manager().InjectComponentEvent(
+      FakeEventType::kDebugStarted, kComponentMoniker, kComponentUrl, kJobKoid);
+
+  EXPECT_NE(GetDebugAgent()->GetDebuggedJob(kJobKoid), nullptr);
+}
+
+class FakeFidlClient : public fidl::AsyncEventHandler<fuchsia_debugger::DebugAgent> {
  public:
-  explicit FakeClient(fidl::ClientEnd<fuchsia_debugger::DebugAgent> client_end,
-                      async_dispatcher_t* dispatcher)
+  explicit FakeFidlClient(fidl::ClientEnd<fuchsia_debugger::DebugAgent> client_end,
+                          async_dispatcher_t* dispatcher)
       : client_(std::move(client_end), dispatcher, this) {}
+
+  void AttachTo(const fuchsia_debugger::Filter& filter,
+                fit::callback<void(fidl::Result<fuchsia_debugger::DebugAgent::AttachTo>&)> cb) {
+    client_->AttachTo(filter).Then(
+        [cb = std::move(cb)](fidl::Result<fuchsia_debugger::DebugAgent::AttachTo>& reply) mutable {
+          ASSERT_TRUE(cb);
+          cb(reply);
+        });
+  }
 
   void OnFatalException(
       fidl::Event<fuchsia_debugger::DebugAgent::OnFatalException>& event) override {
@@ -330,16 +357,34 @@ class FakeClient : public fidl::AsyncEventHandler<fuchsia_debugger::DebugAgent> 
   fidl::Client<fuchsia_debugger::DebugAgent> client_;
 };
 
-TEST_F(DebugAgentServerTest, OnFatalException) {
+class DebugAgentServerTestWithClient : public debug::TestWithLoop {
+ public:
+  void SetUp() override {
+    auto [client_end, server_end] = *fidl::CreateEndpoints<fuchsia_debugger::DebugAgent>();
+    client_ =
+        std::make_unique<FakeFidlClient>(std::move(client_end), async_get_default_dispatcher());
+
+    // The server is owned by the message loop.
+    DebugAgentServer::BindServer(async_get_default_dispatcher(), std::move(server_end),
+                                 harness()->debug_agent()->GetWeakPtr());
+  }
+
+  void TearDown() override { client_.reset(); }
+
+  FakeFidlClient& client() { return *client_; }
+  MockDebugAgentHarness* harness() { return &harness_; }
+  DebugAgent* agent() { return harness_.debug_agent(); }
+
+ private:
+  std::unique_ptr<FakeFidlClient> client_ = nullptr;
+  MockDebugAgentHarness harness_;
+};
+
+TEST_F(DebugAgentServerTestWithClient, OnFatalException) {
   constexpr zx_koid_t kProcessKoid = 0x1234;
   constexpr zx_koid_t kThreadKoid = 0x2345;
   auto mock_process = harness()->AddProcess(kProcessKoid);
   auto mock_thread = mock_process->AddThread(kThreadKoid);
-
-  auto [client_end, server_end] = *fidl::CreateEndpoints<fuchsia_debugger::DebugAgent>();
-
-  FakeClient fake(std::move(client_end), debug::MessageLoopFuchsia::Current()->dispatcher());
-  Bind(std::move(server_end));
 
   // Now that the server is bound to the message loop with a client, we can send the notification.
   // Note that there may be an error from inspector complaining about a process koid that doesn't
@@ -348,23 +393,18 @@ TEST_F(DebugAgentServerTest, OnFatalException) {
 
   loop().Run();
 
-  ASSERT_EQ(fake.GetExceptions().size(), 1u);
-  EXPECT_TRUE(fake.GetExceptions()[0].thread());
-  EXPECT_EQ(*fake.GetExceptions()[0].thread(), kThreadKoid);
+  ASSERT_EQ(client().GetExceptions().size(), 1u);
+  EXPECT_TRUE(client().GetExceptions()[0].thread());
+  EXPECT_EQ(*client().GetExceptions()[0].thread(), kThreadKoid);
 }
 
 // Debug exception types should not send notifications to clients, e.g. single step, software
 // breakpoints, etc.
-TEST_F(DebugAgentServerTest, DebugExceptionDoesNotSendEvent) {
+TEST_F(DebugAgentServerTestWithClient, DebugExceptionDoesNotSendEvent) {
   constexpr zx_koid_t kProcessKoid = 0x1234;
   constexpr zx_koid_t kThreadKoid = 0x2345;
   auto mock_process = harness()->AddProcess(kProcessKoid);
   auto mock_thread = mock_process->AddThread(kThreadKoid);
-
-  auto [client_end, server_end] = *fidl::CreateEndpoints<fuchsia_debugger::DebugAgent>();
-
-  FakeClient fake(std::move(client_end), debug::MessageLoopFuchsia::Current()->dispatcher());
-  Bind(std::move(server_end));
 
   // clang-format off
   constexpr std::array<debug_ipc::ExceptionType, 5> debug_exceptions = {
@@ -398,8 +438,44 @@ TEST_F(DebugAgentServerTest, DebugExceptionDoesNotSendEvent) {
     // This should return immediately.
     loop().RunUntilNoTasks();
 
-    ASSERT_TRUE(fake.GetExceptions().empty());
+    ASSERT_TRUE(client().GetExceptions().empty());
   }
+}
+
+TEST_F(DebugAgentServerTestWithClient, AttachToJobOnFilterInstalled) {
+  // The non-exhaustive job structure with matching component information will look like this from
+  // MockSystemInterface:
+  // ..
+  // root
+  // ├─j: 8 "/moniker"
+  // ├─j: 25 "/a/long/generated_to_here/fixed/moniker"
+  // └─j: 35 "/some/moniker"
+  //    └─j: 38 "/some/other/moniker"
+  // ..
+  // Since job 38 is a child of 35, DebugAgent shouldn't attach to it, but it will appear as a match
+  // to the filter. Therefore, there will be four matches for the filter, and three expected
+  // attaches.
+  constexpr std::array kExpectedJobKoids = {8, 25, 35};
+
+  // See the default pre-populated system in mock_system_interface.h to see which monikers will be
+  // matched.
+  fuchsia_debugger::Filter filter;
+  filter.pattern("moniker");
+  filter.type(fuchsia_debugger::FilterType::kMonikerSuffix);
+  filter.options().job_only(true);
+
+  client().AttachTo(filter,
+                    [=](fidl::Result<fuchsia_debugger::DebugAgent::AttachTo>& result) mutable {
+                      ASSERT_TRUE(result.is_ok());
+                      EXPECT_EQ(result->num_matches(), 4u);
+                      for (auto koid : kExpectedJobKoids) {
+                        EXPECT_NE(agent()->GetDebuggedJob(koid), nullptr);
+                      }
+
+                      loop().QuitNow();
+                    });
+
+  loop().Run();
 }
 
 }  // namespace debug_agent

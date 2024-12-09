@@ -9,6 +9,7 @@
 
 #include "src/developer/debug/debug_agent/component_manager.h"
 #include "src/developer/debug/debug_agent/debug_agent.h"
+#include "src/developer/debug/debug_agent/system_interface.h"
 
 namespace debug_agent {
 
@@ -18,10 +19,13 @@ enum class FakeEventType : uint32_t {
   kLast,
 };
 
+class MockSystemInterface;
+
 class MockComponentManager : public ComponentManager {
  public:
-  explicit MockComponentManager(SystemInterface* system_interface)
-      : ComponentManager(system_interface) {}
+  explicit MockComponentManager(MockSystemInterface* system_interface)
+      : ComponentManager(reinterpret_cast<SystemInterface*>(system_interface)),
+        mock_system_interface_(system_interface) {}
   ~MockComponentManager() override = default;
 
   auto& component_info() { return component_info_; }
@@ -29,38 +33,16 @@ class MockComponentManager : public ComponentManager {
   // ComponentManager implementation.
   void SetDebugAgent(DebugAgent* agent) override { debug_agent_ = agent; }
 
-  std::vector<debug_ipc::ComponentInfo> FindComponentInfo(zx_koid_t job_koid) const override {
-    auto [start, end] = component_info_.equal_range(job_koid);
-    if (start == component_info_.end()) {
-      // Not found.
-      return {};
-    }
+  std::vector<debug_ipc::ComponentInfo> FindComponentInfo(zx_koid_t job_koid) const override;
 
-    std::vector<debug_ipc::ComponentInfo> components;
-    components.reserve(std::distance(start, end));
-    for (auto& i = start; i != end; ++i) {
-      components.push_back(i->second);
-    }
-    return components;
-  }
+  // Updates |component_info_| and |moniker_to_job_| with the given information.
+  void AddComponentInfo(zx_koid_t job_koid, debug_ipc::ComponentInfo info);
 
-  void InjectComponentEvent(FakeEventType type, const std::string& moniker,
-                            const std::string& url) {
-    switch (type) {
-      case FakeEventType::kDebugStarted: {
-        debug_agent_->OnComponentStarted(moniker, url);
-        break;
-      }
-      case FakeEventType::kStopped: {
-        debug_agent_->OnComponentExited(moniker, url);
-        break;
-      }
-      default: {
-        FX_NOTREACHED();
-        break;
-      }
-    }
-  }
+  // Simulates the given event type coming from ComponentManager in a real system. |koid| is only
+  // used if the type is |kDebugStarted|, in which case it will be used to populate the known
+  // component information and add the koid as a child of the root job in MockSystemInterface.
+  void InjectComponentEvent(FakeEventType type, const std::string& moniker, const std::string& url,
+                            zx_koid_t koid = ZX_KOID_INVALID);
 
   debug::Status LaunchComponent(std::string url) override { return debug::Status("Not supported"); }
 
@@ -76,7 +58,9 @@ class MockComponentManager : public ComponentManager {
 
  private:
   DebugAgent* debug_agent_;
+  MockSystemInterface* mock_system_interface_;
   std::multimap<zx_koid_t, debug_ipc::ComponentInfo> component_info_;
+  std::multimap<std::string, zx_koid_t> moniker_to_job_;
 };
 
 }  // namespace debug_agent

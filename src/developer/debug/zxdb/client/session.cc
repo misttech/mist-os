@@ -809,6 +809,8 @@ void Session::DispatchNotifyComponentStarting(const debug_ipc::NotifyComponentSt
   for (auto& observer : component_observers_) {
     observer.OnComponentStarted(notify.component.moniker, notify.component.url);
   }
+
+  system().OnFilterMatches(notify.matching_filters);
 }
 
 void Session::DispatchNotifyComponentExiting(const debug_ipc::NotifyComponentExiting& notify) {
