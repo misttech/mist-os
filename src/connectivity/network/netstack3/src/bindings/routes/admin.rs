@@ -92,9 +92,9 @@ pub(crate) async fn serve_route_table_provider_v4(
                 options: fnet_routes_admin::RouteTableOptionsV4 { name, __source_breaking: _ },
                 control_handle,
             } => {
-                let route_table = match ctx.bindings_ctx().routes.add_table::<Ipv4>().await {
+                let route_table = match ctx.bindings_ctx().routes.add_table::<Ipv4>(name).await {
                     Ok((table_id, route_work_sink, token)) => {
-                        UserRouteTable::new(ctx.clone(), token, name, table_id, route_work_sink)
+                        UserRouteTable::new(ctx.clone(), token, table_id, route_work_sink)
                     }
                     Err(routes::TableIdOverflowsError) => {
                         control_handle.shutdown_with_epitaph(zx::Status::NO_SPACE);
@@ -127,9 +127,9 @@ pub(crate) async fn serve_route_table_provider_v6(
                 options: fnet_routes_admin::RouteTableOptionsV6 { name, __source_breaking: _ },
                 control_handle,
             } => {
-                let route_table = match ctx.bindings_ctx().routes.add_table::<Ipv6>().await {
+                let route_table = match ctx.bindings_ctx().routes.add_table::<Ipv6>(name).await {
                     Ok((table_id, route_work_sink, token)) => {
-                        UserRouteTable::new(ctx.clone(), token, name, table_id, route_work_sink)
+                        UserRouteTable::new(ctx.clone(), token, table_id, route_work_sink)
                     }
                     Err(routes::TableIdOverflowsError) => {
                         control_handle.shutdown_with_epitaph(zx::Status::NO_SPACE);
@@ -286,9 +286,6 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for MainRouteTable {
 pub(crate) struct UserRouteTable<I: Ip> {
     ctx: Ctx,
     token: Arc<zx::Event>,
-    // TODO(https://fxbug.dev/337868190): Use this method in the observational
-    // API.
-    _name: Option<String>,
     table_id: TableId<I>,
     route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
     cancel_event: Event,
@@ -299,19 +296,10 @@ impl<I: Ip> UserRouteTable<I> {
     fn new(
         ctx: Ctx,
         token: Arc<zx::Event>,
-        name: Option<String>,
         table_id: TableId<I>,
         route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
     ) -> Self {
-        Self {
-            ctx,
-            token,
-            _name: name,
-            table_id,
-            route_work_sink,
-            cancel_event: Event::new(),
-            detached: false,
-        }
+        Self { ctx, token, table_id, route_work_sink, cancel_event: Event::new(), detached: false }
     }
 }
 

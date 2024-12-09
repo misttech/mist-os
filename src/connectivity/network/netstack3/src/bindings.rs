@@ -60,7 +60,8 @@ use {
     fidl_fuchsia_hardware_network as fhardware_network,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
-    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fuchsia_async as fasync,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fuchsia_async as fasync,
 };
 
 use devices::{
@@ -919,6 +920,14 @@ impl BindingsCtx {
                 // We don't care whether there were any routes on the device or not.
             }
         }
+    }
+
+    pub(crate) fn get_route_table_name<I: Ip>(
+        &self,
+        table_id: routes::TableId<I>,
+        responder: fnet_routes::StateGetRouteTableNameResponder,
+    ) {
+        self.routes.get_route_table_name(table_id, responder)
     }
 }
 

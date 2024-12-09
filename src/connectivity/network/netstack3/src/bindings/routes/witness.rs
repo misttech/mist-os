@@ -57,3 +57,21 @@ pub(crate) const IPV6_MAIN_TABLE_ID: TableId<Ipv6> =
 pub(crate) fn main_table_id<I: Ip>() -> TableId<I> {
     I::map_ip((), |()| IPV4_MAIN_TABLE_ID, |()| IPV6_MAIN_TABLE_ID)
 }
+
+/// Either a [`TableId<Ipv4>`] or [`TableId<Ipv6>`].
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, GenericOverIp)]
+#[generic_over_ip()]
+pub(crate) enum TableIdEither {
+    V4(TableId<Ipv4>),
+    V6(TableId<Ipv6>),
+}
+
+impl TableIdEither {
+    pub(crate) const fn new(id: u32) -> Self {
+        match (TableId::<Ipv4>::new(id), TableId::<Ipv6>::new(id)) {
+            (None, None) | (Some(_), Some(_)) => unreachable!(),
+            (Some(id), _) => TableIdEither::V4(id),
+            (_, Some(id)) => TableIdEither::V6(id),
+        }
+    }
+}
