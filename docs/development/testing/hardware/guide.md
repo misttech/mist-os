@@ -241,10 +241,6 @@ details on what's supported and what's not. See
 [`//src/developer/adb/bin/README.md`](/src/developer/adb/bin/README.md)
 for more guidance on using `adb` with Fuchsia.
 
-Tip: If you have access to an {{ widgets.glossary_simple ('in-tree', 'in-tree')}}
-Fuchsia checkout there's a copy of `adb` that you can use at
-`//prebuilt/starnix/internal/android-image-amd64/adb`.
-
 ## List of hardware testing tools {: #tools }
 
 The following table points you to the specific tools that you
