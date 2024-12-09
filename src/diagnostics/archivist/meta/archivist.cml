@@ -23,7 +23,7 @@
         {
             directory: "netstack-diagnostics",
             from: "parent",
-            rights: [ "connect" ],
+            rights: [ "r*" ],
             path: "/netstack-diagnostics",
             availability: "optional",
         },
