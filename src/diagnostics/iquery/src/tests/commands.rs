@@ -4,7 +4,9 @@
 
 #![cfg(test)]
 
-use crate::tests::utils::{AssertionOption, AssertionParameters, IqueryCommand, TestBuilder};
+use crate::tests::utils::{
+    new_test, AssertionOption, AssertionParameters, IqueryCommand, TestComponent,
+};
 use assert_matches::assert_matches;
 use iquery::types::Error;
 
@@ -12,14 +14,7 @@ use iquery::types::Error;
 
 #[fuchsia::test]
 async fn test_list() {
-    let test = TestBuilder::new()
-        .await
-        .add_basic_component("basic-1")
-        .await
-        .add_basic_component("basic-2")
-        .await
-        .start()
-        .await;
+    let test = new_test(&[TestComponent::Basic("basic-1"), TestComponent::Basic("basic-2")]).await;
 
     test.assert(AssertionParameters {
         command: IqueryCommand::List,
@@ -32,7 +27,7 @@ async fn test_list() {
 
 #[fuchsia::test]
 async fn test_list_no_duplicates() {
-    let test = TestBuilder::new().await.add_test_component("test").await.start().await;
+    let test = new_test(&[TestComponent::Regular("test")]).await;
     test.assert(AssertionParameters {
         command: IqueryCommand::List,
         golden_basename: "list_no_dups",
@@ -44,14 +39,7 @@ async fn test_list_no_duplicates() {
 
 #[fuchsia::test]
 async fn test_list_filter_manifest() {
-    let test = TestBuilder::new()
-        .await
-        .add_basic_component("basic")
-        .await
-        .add_test_component("test")
-        .await
-        .start()
-        .await;
+    let test = new_test(&[TestComponent::Regular("test"), TestComponent::Basic("basic")]).await;
     test.assert(AssertionParameters {
         command: IqueryCommand::List,
         golden_basename: "list_filter_manifest",
@@ -68,14 +56,7 @@ async fn test_list_filter_manifest() {
 
 #[fuchsia::test]
 async fn test_list_filter_component() {
-    let test = TestBuilder::new()
-        .await
-        .add_basic_component("basic")
-        .await
-        .add_test_component("test")
-        .await
-        .start()
-        .await;
+    let test = new_test(&[TestComponent::Regular("test"), TestComponent::Basic("basic")]).await;
     test.assert(AssertionParameters {
         command: IqueryCommand::List,
         golden_basename: "list_filter_manifest",
@@ -92,14 +73,7 @@ async fn test_list_filter_component() {
 
 #[fuchsia::test]
 async fn test_list_with_urls() {
-    let test = TestBuilder::new()
-        .await
-        .add_basic_component("basic")
-        .await
-        .add_test_component("test")
-        .await
-        .start()
-        .await;
+    let test = new_test(&[TestComponent::Regular("test"), TestComponent::Basic("basic")]).await;
     test.assert(AssertionParameters {
         command: IqueryCommand::List,
         golden_basename: "list_with_url",
@@ -115,7 +89,7 @@ async fn test_list_with_urls() {
 
 #[fuchsia::test]
 async fn list_archive() {
-    let test = TestBuilder::new().await.add_basic_component("basic").await.start().await;
+    let test = new_test(&[TestComponent::Basic("basic")]).await;
     test.assert(AssertionParameters {
         command: IqueryCommand::List,
         golden_basename: "list_archive",
@@ -129,23 +103,19 @@ async fn list_archive() {
 
 #[fuchsia::test]
 async fn test_selectors_empty() {
-    let test = TestBuilder::new().await.start().await;
+    let test = new_test(&[]).await;
     let result = test.execute_command(&["selectors"]).await;
     assert_matches!(result, Err(Error::InvalidArguments(_)));
 }
 
 #[fuchsia::test]
 async fn test_selectors() {
-    let test = TestBuilder::new()
-        .await
-        .add_basic_component("basic-1")
-        .await
-        .add_basic_component("basic-2")
-        .await
-        .add_test_component("test")
-        .await
-        .start()
-        .await;
+    let test = new_test(&[
+        TestComponent::Basic("basic-1"),
+        TestComponent::Basic("basic-2"),
+        TestComponent::Regular("test"),
+    ])
+    .await;
     test.assert(AssertionParameters {
         command: IqueryCommand::Selectors,
         golden_basename: "selectors_test",
@@ -163,14 +133,7 @@ async fn test_selectors() {
 
 #[fuchsia::test]
 async fn test_selectors_filter_serve_fs() {
-    let test = TestBuilder::new()
-        .await
-        .add_basic_component("basic")
-        .await
-        .add_test_component("test")
-        .await
-        .start()
-        .await;
+    let test = new_test(&[TestComponent::Basic("basic"), TestComponent::Regular("test")]).await;
     test.assert(AssertionParameters {
         command: IqueryCommand::Selectors,
         golden_basename: "selectors_filter_test_serve_fs",
@@ -188,14 +151,7 @@ async fn test_selectors_filter_serve_fs() {
 
 #[fuchsia::test]
 async fn test_selectors_filter() {
-    let test = TestBuilder::new()
-        .await
-        .add_basic_component("basic")
-        .await
-        .add_test_component("test")
-        .await
-        .start()
-        .await;
+    let test = new_test(&[TestComponent::Basic("basic"), TestComponent::Regular("test")]).await;
     test.assert(AssertionParameters {
         command: IqueryCommand::Selectors,
         golden_basename: "selectors_filter_test",
@@ -215,16 +171,12 @@ async fn test_selectors_filter() {
 
 #[fuchsia::test]
 async fn show_test() {
-    let test = TestBuilder::new()
-        .await
-        .add_basic_component("basic-1")
-        .await
-        .add_basic_component("basic-2")
-        .await
-        .add_basic_component("basic-3")
-        .await
-        .start()
-        .await;
+    let test = new_test(&[
+        TestComponent::Basic("basic-1"),
+        TestComponent::Basic("basic-2"),
+        TestComponent::Basic("basic-3"),
+    ])
+    .await;
     test.assert(AssertionParameters {
         command: IqueryCommand::Show,
         golden_basename: "show_test",
@@ -242,14 +194,14 @@ async fn show_test() {
 
 #[fuchsia::test]
 async fn empty_result_on_null_payload() {
-    let test = TestBuilder::new().await.add_basic_component("basic").await.start().await;
+    let test = new_test(&[TestComponent::Basic("basic")]).await;
     let result = test.execute_command(&["show", "basic:root/nothing:here"]).await;
     assert_matches!(result, Err(_));
 }
 
 #[fuchsia::test]
 async fn show_component_does_not_exist() {
-    let test = TestBuilder::new().await.start().await;
+    let test = new_test(&[]).await;
     let result = test
         .execute_command(&[
             "show",
@@ -263,14 +215,7 @@ async fn show_component_does_not_exist() {
 
 #[fuchsia::test]
 async fn show_filter_manifest_serve_fs() {
-    let test = TestBuilder::new()
-        .await
-        .add_basic_component("basic")
-        .await
-        .add_test_component("test")
-        .await
-        .start()
-        .await;
+    let test = new_test(&[TestComponent::Basic("basic"), TestComponent::Regular("test")]).await;
     test.assert(AssertionParameters {
         command: IqueryCommand::Show,
         golden_basename: "show_filter_test_serve_fs",
@@ -288,14 +233,7 @@ async fn show_filter_manifest_serve_fs() {
 
 #[fuchsia::test]
 async fn show_filter_manifest() {
-    let test = TestBuilder::new()
-        .await
-        .add_basic_component("basic")
-        .await
-        .add_test_component("test")
-        .await
-        .start()
-        .await;
+    let test = new_test(&[TestComponent::Basic("basic"), TestComponent::Regular("test")]).await;
     test.assert(AssertionParameters {
         command: IqueryCommand::Show,
         golden_basename: "show_filter_test",
@@ -313,14 +251,7 @@ async fn show_filter_manifest() {
 
 #[fuchsia::test]
 async fn show_filter_manifest_no_selectors_serve_fs() {
-    let test = TestBuilder::new()
-        .await
-        .add_basic_component("basic")
-        .await
-        .add_test_component("test")
-        .await
-        .start()
-        .await;
+    let test = new_test(&[TestComponent::Basic("basic"), TestComponent::Regular("test")]).await;
     test.assert(AssertionParameters {
         command: IqueryCommand::Show,
         golden_basename: "show_filter_no_selectors_test_serve_fs",
@@ -337,14 +268,7 @@ async fn show_filter_manifest_no_selectors_serve_fs() {
 
 #[fuchsia::test]
 async fn show_filter_manifest_no_selectors() {
-    let test = TestBuilder::new()
-        .await
-        .add_basic_component("basic")
-        .await
-        .add_test_component("test")
-        .await
-        .start()
-        .await;
+    let test = new_test(&[TestComponent::Basic("basic"), TestComponent::Regular("test")]).await;
     test.assert(AssertionParameters {
         command: IqueryCommand::Show,
         golden_basename: "show_filter_no_selectors_test",
@@ -361,7 +285,7 @@ async fn show_filter_manifest_no_selectors() {
 
 #[fuchsia::test]
 async fn list_accessors() {
-    let test = TestBuilder::new().await.start().await;
+    let test = new_test(&[]).await;
     test.assert(AssertionParameters {
         command: IqueryCommand::ListAccessors,
         golden_basename: "list_accessors",
