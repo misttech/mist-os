@@ -1951,7 +1951,7 @@ pub struct RoutingTableId<I: Ip, D>(StrongRc<RwLock<RoutingTable<I, D>>>);
 impl<I: Ip, D> Debug for RoutingTableId<I, D> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        f.debug_tuple("RoutingTabeId").field(&StrongRc::debug_id(rc)).finish()
+        f.debug_tuple("RoutingTableId").field(&StrongRc::debug_id(rc)).finish()
     }
 }
 
@@ -1988,7 +1988,7 @@ pub struct WeakRoutingTableId<I: Ip, D>(WeakRc<RwLock<RoutingTable<I, D>>>);
 impl<I: Ip, D> Debug for WeakRoutingTableId<I, D> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        f.debug_tuple("WeakRoutingTabeId").field(&WeakRc::debug_id(rc)).finish()
+        f.debug_tuple("WeakRoutingTableId").field(&WeakRc::debug_id(rc)).finish()
     }
 }
 
