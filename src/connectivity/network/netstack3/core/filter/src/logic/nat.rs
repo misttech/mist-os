@@ -33,9 +33,9 @@ use crate::state::Hook;
 /// Each type of NAT (source and destination) is configured exactly once for a
 /// given connection, for the first packet encountered on that connection. This
 /// is not to say that all connections are NATed: the configuration can be
-/// either `true` (NAT the connection) or `false` (do not NAT), but the
-/// `OnceCell` containing the configuration should, in most cases, be
-/// initialized by the time a connection is inserted in the conntrack table.
+/// either `ShouldNat::Yes` or `ShouldNat::No`, but the `OnceCell` containing
+/// the configuration should, in most cases, be initialized by the time a
+/// connection is inserted in the conntrack table.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""), Debug(bound = "A: Debug"), PartialEq(bound = ""))]
 pub struct NatConfig<I: IpExt, A> {
