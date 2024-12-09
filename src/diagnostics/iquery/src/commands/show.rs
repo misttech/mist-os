@@ -95,7 +95,7 @@ impl Command for ShowCommand {
         if self.manifest.is_some() {
             panic!("ERROR: option `--manifest` is deprecated, please use `--component` instead");
         }
-        let selectors = if let Some(component) = self.component {
+        let mut selectors = if let Some(component) = self.component {
             utils::process_component_query_with_partial_selectors(
                 component,
                 self.selectors.into_iter(),
@@ -114,8 +114,7 @@ impl Command for ShowCommand {
             utils::process_fuzzy_inputs(self.selectors, provider).await?
         };
 
-        let selectors = utils::expand_selectors(selectors, self.name)?;
-
+        utils::ensure_tree_field_is_set(&mut selectors, self.name)?;
         let inspect_data_iter =
             provider.snapshot::<Inspect>(self.accessor.as_deref(), selectors).await?.into_iter();
 
