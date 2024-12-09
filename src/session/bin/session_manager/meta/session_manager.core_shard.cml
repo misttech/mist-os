@@ -313,6 +313,7 @@
             protocol: [
                 "fuchsia.fxfs.CryptManagement",
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.BootControl",
             ],
             from: "parent",
             to: "#session-manager",

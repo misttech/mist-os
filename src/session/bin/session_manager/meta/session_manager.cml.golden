@@ -63,6 +63,7 @@
             protocol: [
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.BootControl",
             ],
             from: "parent",
             availability: "optional",

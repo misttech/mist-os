@@ -119,6 +119,10 @@ impl PowerElement {
             .into_client_end()
             .expect("Proxy should be in a valid state to convert into client end");
 
+        let boot_control =
+            fuchsia_component::client::connect_to_protocol::<fsystem::BootControlMarker>()?;
+        let () = boot_control.set_boot_complete().await?;
+
         Ok(Self { power_element_context, lease: Some(lease) })
     }
 
