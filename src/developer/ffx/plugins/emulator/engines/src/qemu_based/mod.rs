@@ -403,6 +403,18 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         let mut zbi_command = Command::new(zbi_tool);
         zbi_command.arg("-o").arg(dest).arg("--replace").arg(src).arg("-e").arg(replace_str);
 
+        // Embed the authorized_keys as bootloader file. This ensures that the key file will be
+        // persisted in /data/ssh, and after an `fx ota` of a GPT image the ssh connection
+        // continues to work in subsequent boots.
+        let btfl = NamedTempFile::new().expect("temp file for the ssh key for the bootloader");
+        Self::authorized_keys_to_boot_loader_file(
+            &ssh_keys.authorized_keys,
+            &btfl.path().to_path_buf(),
+        )?;
+        zbi_command
+            .arg("--type=bootloader_file")
+            .arg(&btfl.path().to_str().expect("converting bootloader file to str"));
+
         let cmdline_file = NamedTempFile::new().map_err(|e| bug! {"{e}"})?;
         if let Some(c) = cmdline {
             fs::write(&cmdline_file, c).map_err(|e| bug!("{e}"))?;
@@ -421,6 +433,23 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             );
         }
         Ok(())
+    }
+
+    // prepare the SSH key as boot loader file
+    fn authorized_keys_to_boot_loader_file(src: &PathBuf, dst: &PathBuf) -> Result<()> {
+        let mut v = Vec::new();
+        let name = "ssh.authorized_keys";
+        let authorized_keys = fs::read(src).map_err(|e| bug!("{e}"))?;
+
+        // The format for the boot loader files is described in
+        // https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/zbi-format/include/lib/zbi-format/zbi.h;l=229-237;drc=64cdcbf06860ab1f19b85b3c221debcadcae3b5d
+        v.push(name.len().try_into().map_err(|_| {
+            bug!("Invalid length for boot file name: {} cannot be converted to u8", name.len())
+        })?);
+        v.extend(name.as_bytes());
+        v.extend(authorized_keys);
+
+        fs::write(&dst, v).map_err(|e| bug!("{e}"))
     }
 
     // generate_vbmeta creates a signed vbmeta file for a given key, metadata and ZBI file
@@ -1657,6 +1686,40 @@ mod tests {
 
         <TestEngine as QemuBasedEngine>::generate_vbmeta(&key_path, &metadata_path, &zbi, &dest)
             .await?;
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_authorized_keys_to_boot_loader_file() -> Result<()> {
+        let env = ffx_config::test_init().await?;
+        make_fake_sdk(&env).await;
+        let temp = tempdir().expect("cannot get tempdir");
+        let mut emu_config = EmulatorConfiguration::default();
+
+        let _root = setup(&env.context, &mut emu_config.guest, &temp, DiskImageFormat::Fvm).await?;
+
+        let tempdir = temp.into_path();
+        let testkey = "some test key";
+
+        let keyfile = tempdir.join("key");
+        fs::write(&keyfile, testkey).expect("write test key file");
+        let bootloaderfile = tempdir.join("btfl");
+
+        <TestEngine as QemuBasedEngine>::authorized_keys_to_boot_loader_file(
+            &keyfile,
+            &bootloaderfile,
+        )?;
+
+        let v = fs::read(&bootloaderfile).unwrap();
+        assert_eq!(
+            v,
+            vec![
+                // 19 + "ssh.authorized_keys" + "some test key"
+                19, 115, 115, 104, 46, 97, 117, 116, 104, 111, 114, 105, 122, 101, 100, 95, 107,
+                101, 121, 115, 115, 111, 109, 101, 32, 116, 101, 115, 116, 32, 107, 101, 121
+            ]
+        );
 
         Ok(())
     }
