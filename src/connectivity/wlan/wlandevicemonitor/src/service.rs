@@ -5,14 +5,14 @@
 use crate::device::{self, IfaceDevice, IfaceMap, NewIface, PhyDevice, PhyMap};
 use crate::inspect::IfacesTree;
 use crate::watcher_service;
-use anyhow::{Context, Error};
+use anyhow::{format_err, Context, Error};
 use core::sync::atomic::AtomicUsize;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_wlan_device_service::{self as fidl_svc, DeviceMonitorRequest};
 use futures::channel::mpsc;
 use futures::stream::FuturesUnordered;
 use futures::{select, StreamExt, TryStreamExt};
-use ieee80211::{MacAddr, MacAddrBytes};
+use ieee80211::{MacAddr, MacAddrBytes, NULL_ADDR};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -96,7 +96,7 @@ pub(crate) async fn serve_monitor_requests(
                 };
                 let sta_address = MacAddr::from(sta_address);
 
-                match create_iface(
+                let new_iface = match create_iface(
                     &new_iface_sink,
                     &phys,
                     phy_id,
@@ -108,27 +108,28 @@ pub(crate) async fn serve_monitor_requests(
                 )
                 .await
                 {
-                    Ok(new_iface) => {
-                        info!("iface #{} started ({:?})", new_iface.id, new_iface.phy_ownership);
-                        ifaces.insert(
-                            new_iface.id,
-                            IfaceDevice {
-                                phy_ownership: new_iface.phy_ownership,
-                                generic_sme: new_iface.generic_sme,
-                            },
-                        );
+                    Err(e) => {
+                        error!("{:?}", e.context("Failed to create iface"));
+                        responder.send(Err(fidl_svc::DeviceMonitorError::unknown()))?;
+                        continue;
+                    }
+                    Ok(new_iface) => new_iface,
+                };
 
-                        let resp = fidl_svc::DeviceMonitorCreateIfaceResponse {
-                            iface_id: Some(new_iface.id),
-                            ..Default::default()
-                        };
-                        responder.send(Ok(&resp))
-                    }
-                    Err(status) => {
-                        warn!("Failed to create iface: {}", status);
-                        responder.send(Err(fidl_svc::DeviceMonitorError::unknown()))
-                    }
-                }
+                info!("iface #{} started ({:?})", new_iface.id, new_iface.phy_ownership);
+                ifaces.insert(
+                    new_iface.id,
+                    IfaceDevice {
+                        phy_ownership: new_iface.phy_ownership,
+                        generic_sme: new_iface.generic_sme,
+                    },
+                );
+
+                let resp = fidl_svc::DeviceMonitorCreateIfaceResponse {
+                    iface_id: Some(new_iface.id),
+                    ..Default::default()
+                };
+                responder.send(Ok(&resp))
             }
             DeviceMonitorRequest::QueryIface { iface_id, responder } => {
                 let result = query_iface(&ifaces, iface_id).await;
@@ -357,8 +358,8 @@ async fn create_iface(
     iface_counter: &Arc<IfaceCounter>,
     cfg: &wlandevicemonitor_config::Config,
     ifaces_tree: Arc<IfacesTree>,
-) -> Result<NewIface, zx::Status> {
-    let phy = phys.get(&phy_id).ok_or(zx::Status::NOT_FOUND)?;
+) -> Result<NewIface, Error> {
+    let phy = phys.get(&phy_id).ok_or_else(|| format_err!("PHY not found: phy_id {}", phy_id))?;
 
     // Create the bootstrap channel. This channel is only used for initial communication
     // with the USME device.
@@ -393,19 +394,11 @@ async fn create_iface(
         .proxy
         .create_iface(phy_req)
         .await
-        .map_err(move |e| {
-            error!("CreateIface failed: phy {}, fidl error {}", phy_id, e);
-            zx::Status::INTERNAL
-        })?
-        .map_err(move |e| {
-            error!("CreateIface failed: phy {}, error {}", phy_id, e);
-            zx::Status::ok(e)
-        })?;
+        .map_err(move |e| format_err!("CreateIface request failed with FIDL error {}", e))?
+        .map_err(move |e| format_err!("CreateIface request failed with error {}", e))?;
 
-    let inspect_vmo = bootstrap_result.await.map_err(|e| {
-        error!("Failed to bootstrap USME: {}", e);
-        zx::Status::INTERNAL
-    })?;
+    let inspect_vmo =
+        bootstrap_result.await.map_err(|e| format_err!("Failed to bootstrap USME: {}", e))?;
 
     let iface_id = iface_counter.next_iface_id() as u16;
     ifaces_tree.add_iface(iface_id, inspect_vmo);
@@ -416,9 +409,28 @@ async fn create_iface(
         generic_sme: generic_sme_proxy,
     };
     new_iface_sink.unbounded_send(new_iface.clone()).map_err(|e| {
-        error!("Failed to register Generic SME event stream with internal handler: {}", e);
-        zx::Status::INTERNAL
+        format_err!("Failed to register Generic SME event stream with internal handler: {}", e)
     })?;
+
+    let fidl_sme::GenericSmeQuery { role: iface_role, sta_addr: iface_sta_address } = new_iface
+        .generic_sme
+        .query()
+        .await
+        .map_err(|e| format_err!("Failed to initially query iface: FIDL error {}", e))?;
+
+    // TODO(https://fxbug.dev/382075991): Log diagnostic information if the initial query contains
+    // incoherent results, compared to the request. However, don't fail iface creation because such
+    // incoherent results have been allowed for some time.
+    if iface_role != role {
+        warn!("Created iface has unexpected role: expected {:?}, actual {:?}", role, iface_role);
+    }
+    if sta_address != NULL_ADDR && iface_sta_address != sta_address.to_array() {
+        warn!(
+            "Created iface has unexpected sta_address: expected {:?}, actual {:?}",
+            sta_address.to_array(),
+            iface_sta_address
+        );
+    }
 
     Ok(new_iface)
 }
@@ -1516,7 +1528,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the ifaces should complete and no ifaces should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
+        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(ifaces)) => {
             assert!(ifaces.is_empty())
         });
 
@@ -1537,27 +1549,47 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut create_iface_fut), Poll::Pending);
 
         let bootstrap_channel = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
-        Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
-            assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
-            assert_eq!(req.init_sta_addr, sta_address);
-            responder.send(Ok(123)).expect("failed to send iface id");
-            req.mlme_channel.expect("no MLME channel")
-        });
+            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
+                assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
+                assert_eq!(req.init_sta_addr, sta_address);
+                responder.send(Ok(123)).expect("failed to send iface id");
+                req.mlme_channel.expect("no MLME channel")
+            }
+        );
 
         // Complete the USME bootstrap.
         let mut bootstrap_stream =
             fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(bootstrap_channel)
                 .into_stream();
-        assert_variant!(
-            exec.run_until_stalled(&mut bootstrap_stream.next()),
+        let mut generic_sme_stream = assert_variant!(
+        exec.run_until_stalled(&mut bootstrap_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
-                responder, ..
-            }))) => responder
+                responder, generic_sme_server, ..
+            }))) => {
+                responder
                 .send(test_values.inspector.duplicate_vmo().unwrap())
-                .expect("Failed to send bootstrap result"));
+                .expect("Failed to send bootstrap result");
+                generic_sme_server.into_stream()
+            }
+        );
 
         // The original future should resolve into a response.
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_variant!(
+        exec.run_until_stalled(&mut generic_sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::Query {
+                responder
+            }))) => {
+                responder
+                .send(&fidl_sme::GenericSmeQuery {
+                    role: fidl_common::WlanMacRole::Client,
+                    sta_addr: [0, 1, 2, 3, 4, 5],
+                })
+                .expect("Failed to send GenericSme.Query response");
+            }
+        );
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
         assert_variant!(exec.run_until_stalled(&mut create_iface_fut),
         Poll::Ready(Ok(Ok(response))) => {
             assert_eq!(Some(0), response.iface_id);
@@ -1780,16 +1812,32 @@ mod tests {
             let mut bootstrap_stream =
                 fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(bootstrap_channel)
                     .into_stream();
-            assert_variant!(
-                exec.run_until_stalled(&mut bootstrap_stream.next()),
-                Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
-                    responder, ..
-                }))) => responder
-                    .send(test_values.inspector.duplicate_vmo().unwrap())
-                    .expect("Failed to send bootstrap result"));
-
+            let mut generic_sme_stream = assert_variant!(
+            exec.run_until_stalled(&mut bootstrap_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
+                responder, generic_sme_server, ..
+            }))) => {
+                responder
+                .send(test_values.inspector.duplicate_vmo().unwrap())
+                .expect("Failed to send bootstrap result");
+                generic_sme_server.into_stream()
+            });
             // The original future should resolve into a response.
             assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+            assert_variant!(
+            exec.run_until_stalled(&mut generic_sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::Query {
+                responder
+            }))) => {
+                responder
+                .send(&fidl_sme::GenericSmeQuery {
+                    role: fidl_common::WlanMacRole::Client,
+                    sta_addr: sta_address,
+                })
+                .expect("Failed to send GenericSme.Query response");
+            });
+            assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
             assert_variant!(exec.run_until_stalled(&mut create_iface_fut),
             Poll::Ready(Ok(Ok(response))) => {
                 assert_eq!(Some(sme_assigned_iface_id), response.iface_id);
@@ -1846,7 +1894,7 @@ mod tests {
         let mut fut = pin!(fut);
         assert_variant!(
             exec.run_until_stalled(&mut fut),
-            Poll::Ready(Err(zx::Status::NOT_FOUND)),
+            Poll::Ready(Err(_)),
             "expected failure on invalid PHY"
         );
     }
