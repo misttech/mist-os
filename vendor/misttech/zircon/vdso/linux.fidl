@@ -190,11 +190,16 @@ closed protocol Linux {
     // STUB 31
     strict A0031Shmctl() -> () error int64;
 
-    // STUB 32
-    strict A0032Dup() -> () error int64;
+    // #32, SYSCALL_DEFINE1(dup, unsigned int, fildes)
+    strict A0032Dup(resource struct {
+        fildes uint32;
+    }) -> () error int64;
 
-    // STUB 33
-    strict A0033Dup2() -> () error int64;
+    // #33, SYSCALL_DEFINE2(dup2, unsigned int, oldfd, unsigned int, newfd)
+    strict A0033Dup2(resource struct {
+        oldfd uint32;
+        newfd uint32;
+    }) -> () error int64;
 
     // STUB 34
     strict A0034Pause() -> () error int64;
@@ -1044,8 +1049,12 @@ closed protocol Linux {
     // STUB 291
     strict A0291EpollCreate1() -> () error int64;
 
-    // STUB 292
-    strict A0292Dup3() -> () error int64;
+    // #292, SYSCALL_DEFINE3(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
+    strict A0292Dup3(resource struct {
+        oldfd uint32;
+        newfd uint32;
+        flags int32;
+    }) -> () error int64;
 
     // STUB 293
     strict A0293Pipe2() -> () error int64;
