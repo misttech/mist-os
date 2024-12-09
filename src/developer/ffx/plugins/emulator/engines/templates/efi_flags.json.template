@@ -258,7 +258,7 @@
         {{/if}}
     {{/if}}
     {{#if (eq runtime.log_level "verbose")}}
-        "verbose",
+        "kernel.phys.verbose=true",
     {{/if}}
     {{#if (eq device.cpu.architecture "riscv64")}}
     {{else}}
@@ -276,10 +276,11 @@
     {{#if (eq guest.is_gpt true)}}
         "bootloader.default=default",
         "bootloader.timeout=5",
+    {{else}}
+        "zircon.nodename={{runtime.name}}",
     {{/if}}
     "kernel.entropy-mixin=de330defe83c3d93556612a133f893892b6b49f96944c3c363197a679a6339b0",
-    "kernel.halt-on-panic=true",
-    "zircon.nodename={{runtime.name}}"
+    "kernel.halt-on-panic=true"
     {{#each runtime.addl_kernel_args}}
         ,"{{this}}"
     {{/each}}

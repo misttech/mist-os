@@ -137,7 +137,10 @@ pub struct StartCommand {
 
     /// name of this emulator instance. This is used to identify the instance in other commands and
     /// tools. Default is "fuchsia-emulator". This value can also be set via configuration using the
-    /// key `emu.name`.
+    /// key `emu.name`. Note that when using the `--uefi` flag, the visible target name in
+    /// `ffx target list` will be overwritten by a name "fuchsia-X-Y-Z" where X,Y,Z are derived from
+    /// the generated mac address for this emulator. This is currently required to support a
+    /// seamless OTA testing workflow.
     #[argh(option)]
     #[ffx_config_default(key = "emu.name", default = "fuchsia-emulator")]
     pub name: Option<String>,

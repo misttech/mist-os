@@ -252,7 +252,35 @@ async fn apply_command_line_options(
     }
 
     // Any generated values or values from ffx_config.
-    emu_config.runtime.mac_address = generate_mac_address(&cmd.name()?);
+    emu_config.runtime.mac_address = if cmd.uefi {
+        // TODO(https://fxbug.dev/382694675): Remove when we can persist `zircon.nodename`.
+        // When the emulator is started with `--uefi`, the name and its mac address must be in sync
+        // to avoid counter-intuitive behavior after an `fx ota`. The emulator name is set to
+        // "fuchsia-X-Y-Z" during startup, where X,Y,Z are derived from the generated mac address.
+        // Instead of generating yet another _different one_ here, we extract it from the name.
+        // Alternatively, this could also be removed if get_mac_address directly used mac addresses
+        // from suitable emulator names instead of generating it (https://fxbug.dev/383061309).
+        let name = cmd.name()?;
+        let s = name
+            .split("-")
+            .collect::<Vec<_>>()
+            .iter()
+            .filter_map(|&x| if x != "fuchsia" { Some(x) } else { None })
+            .collect::<Vec<_>>()
+            .join("");
+        let mac = format!(
+            "{}:{}:{}:{}:{}:{}",
+            &s[0..2],
+            &s[2..4],
+            &s[4..6],
+            &s[6..8],
+            &s[8..10],
+            &s[10..12]
+        );
+        mac
+    } else {
+        generate_mac_address(&cmd.name()?)
+    };
     let upscript: String =
         ctx.get(EMU_UPSCRIPT_FILE).context("Getting upscript path from ffx config")?;
     if !upscript.is_empty() {
@@ -342,7 +370,10 @@ fn parse_host_port_maps(
 
 /// Generate a unique MAC address based on the instance name. If using the default instance name
 /// of fuchsia-emulator, this will be 52:54:47:5e:82:ef.
-fn generate_mac_address(name: &str) -> String {
+/// TOOD(https://fxbug.dev/383061309): Consider not generating a name by hashing if the provided
+/// emulator name matches "fuchsia-5254-Y-Z" and the last three sections can be converted into a
+/// valid MAC address.
+pub(crate) fn generate_mac_address(name: &str) -> String {
     let mut hasher = DefaultHasher::new();
     hasher.write(name.as_bytes());
     let hashed = hasher.finish();

@@ -14,6 +14,7 @@ use fho::{
     bug, return_bug, return_user_error, Error, FfxContext, FfxMain, FfxTool, Result, ToolIO,
     TryFromEnv, VerifiedMachineWriter,
 };
+use pbm::generate_mac_address;
 use pbms::LoadedProductBundle;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -192,8 +193,9 @@ impl<T: EngineOperations> EmuStartTool<T> {
             &self.engine_operations.get_emu_instances(),
         )
         .await?;
+        // Plug through the flags needed during template processing and GPT image construction
+        emulator_configuration.guest.is_gpt = self.cmd.uefi;
         emulator_configuration.guest.product_bundle_path = product_bundle_path;
-
         let engine_type =
             EngineType::from_str(&self.cmd.engine().unwrap_or_else(|_| "femu".to_string()))
                 .context("Reading engine type from ffx config.")?;
@@ -378,6 +380,20 @@ impl<T: EngineOperations> EmuStartTool<T> {
             self.cmd.name = Some(name.into());
         }
 
+        // TODO(https://fxbug.dev/382694675): Remove when we can persist `zircon.nodename`.
+        // If the emulator starts GPT full disk images and performs it will not respect the
+        // runtime.name because we can't guarantee that `zircon.nodename` is persisted across
+        // running `fx ota` on such a configuration. Thus, we force the emulator name to be
+        // consistent with the nodename that the running instance will choose when booted up
+        // with an unset `zircon.nodename`.
+        if self.cmd.uefi {
+            let mac = generate_mac_address(&self.cmd.name.as_ref().unwrap());
+            let m: Vec<_> = mac.split(":").collect();
+            let name = format!("fuchsia-{}{}-{}{}-{}{}", m[0], m[1], m[2], m[3], m[4], m[5]);
+            tracing::info!("Setting emulator name to {} for --uefi", name);
+            self.cmd.name = Some(name);
+        }
+
         // if a custom config is used, skip the product bundle checks.
         if self.cmd.config.is_none() {
             let loaded_product_bundle =
@@ -453,7 +469,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
                 {
                     let name = self.cmd.engine.clone().unwrap_or_else(|| "qemu".into());
                     if name != "qemu" {
-                        let msg = "[emulator] engine {name} is not supported with the --uefi flag. Using `qemu`.";
+                        let msg = format!("[emulator] engine '{name}' is not supported with the --uefi flag. Using `qemu`.");
                         tracing::info!(msg);
                         writer.line(msg)?;
                         self.cmd.engine = Some("qemu".into());
@@ -1665,7 +1681,9 @@ mod tests {
 
         tool.finalize_start_command(&mut writer).await.unwrap();
 
-        assert_eq!(tool.cmd.name, Some("test-instance-name".into()));
+        // TODO(https://fxbug.dev/382694675): When zircon.nodename can be persisted across reboots
+        // from a running instance, rewriting the name won't be necessary anymore.
+        assert_eq!(tool.cmd.name, Some("fuchsia-5254-ea06-13fe".into()));
         assert_eq!(tool.cmd.engine, Some("qemu".into()));
     }
 
@@ -1699,7 +1717,9 @@ mod tests {
 
         tool.finalize_start_command(&mut writer).await.unwrap();
 
-        assert_eq!(tool.cmd.name, Some("test-instance-name".into()));
+        // TODO(https://fxbug.dev/382694675): When zircon.nodename can be persisted across reboots
+        // from a running instance, rewriting the name won't be necessary anymore.
+        assert_eq!(tool.cmd.name, Some("fuchsia-5254-ea06-13fe".into()));
         assert_eq!(tool.cmd.engine, Some("qemu".into()));
     }
 
@@ -1732,7 +1752,9 @@ mod tests {
 
         tool.finalize_start_command(&mut writer).await.unwrap();
 
-        assert_eq!(tool.cmd.name, Some("test-instance-name".into()));
+        // TODO(https://fxbug.dev/382694675): When zircon.nodename can be persisted across reboots
+        // from a running instance, rewriting the name won't be necessary anymore.
+        assert_eq!(tool.cmd.name, Some("fuchsia-5254-ea06-13fe".into()));
         assert_eq!(tool.cmd.engine, Some("qemu".into()));
     }
 

@@ -160,7 +160,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             } else {
                 // Add the authorized public keys to the zbi image to enable SSH access to
                 // the guest. Also, in the GPT case, bake in the kernel command line parameters.
-                let kernel_cmdline = if emu_config.guest.is_gpt() {
+                let kernel_cmdline = if emu_config.guest.is_gpt {
                     let c = emu_config.flags.kernel_args.join("\n");
                     tracing::debug!("Using kernel parameters in the ZBI: {}", c);
                     Some(c)
@@ -285,7 +285,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         }
 
         updated_guest.zbi_image = zbi_path;
-        if emu_config.guest.is_efi() || emu_config.guest.is_gpt() {
+        if emu_config.guest.is_efi() || emu_config.guest.is_gpt {
             let dest = instance_root.join("OVMF_VARS.fd");
             if !dest.exists() {
                 fs::copy(&emu_config.guest.ovmf_vars, &dest).map_err(|e| {
@@ -298,7 +298,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             updated_guest.ovmf_vars = dest;
         }
 
-        if emu_config.guest.is_gpt() {
+        if emu_config.guest.is_gpt {
             let zedboot_cmdline_path = instance_root.join("zedboot_cmdline");
             if zedboot_cmdline_path.exists() && reuse {
                 tracing::debug!(
@@ -519,8 +519,8 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
 
     async fn stage(&mut self) -> Result<()> {
         let emu_config = self.emu_config_mut();
-        let name = emu_config.runtime.name.clone();
         let reuse = emu_config.runtime.reuse;
+        let name = &emu_config.runtime.name;
 
         emu_config.guest = Self::stage_image_files(&name, emu_config, reuse).await?;
 
