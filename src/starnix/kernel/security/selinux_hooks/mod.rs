@@ -756,12 +756,11 @@ pub(super) fn check_file_ioctl_access(
     let file_sid = fs_node_effective_sid(file.node());
     let mode = file.node().info().mode;
     let file_class = file_class_from_file_mode(mode)?;
-    todo_check_permission!(
-        TODO("https://fxbug.dev/364569179", "ioctl fd use check"),
+    check_permission(
         &permission_check,
         current_sid,
-        file_sid,
-        FdPermission::Use
+        file.security_state.state.sid,
+        FdPermission::Use,
     )?;
 
     todo_check_permission!(
