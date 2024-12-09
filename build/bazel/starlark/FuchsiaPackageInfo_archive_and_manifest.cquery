@@ -13,7 +13,7 @@
 #         //path/to/fuchsia:package
 #
 def format(target):
-    package_info = providers(target)["@@fuchsia_sdk//fuchsia/private:providers.bzl%FuchsiaPackageInfo"]
+    package_info = providers(target)["@@rules_fuchsia//fuchsia/private:providers.bzl%FuchsiaPackageInfo"]
     lines = [
         package_info.far_file.path,
         package_info.package_manifest.path,

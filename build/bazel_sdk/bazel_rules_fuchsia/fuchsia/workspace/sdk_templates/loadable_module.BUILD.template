@@ -1,10 +1,10 @@
 load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "@{{rules_fuchsia}}//fuchsia:defs.bzl",
     "fuchsia_cpu_select",
     "fuchsia_package_resource_collection",
     "fuchsia_package_resource_group",
 )
-load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("@{{rules_fuchsia}}//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//:generated_constants.bzl", "constants")
 
 fuchsia_package_resource_group(
@@ -22,13 +22,13 @@ fuchsia_package_resource_collection(
     resources = fuchsia_cpu_select(
         {
             "arm64": {
-                "@fuchsia_sdk//fuchsia/constraints:is_fuchsia_arm64": ["//{{relative_dir}}/arm64:{{name}}"],
+                "@{{rules_fuchsia}}//fuchsia/constraints:is_fuchsia_arm64": ["//{{relative_dir}}/arm64:{{name}}"],
             },
             "x64": {
-                "@fuchsia_sdk//fuchsia/constraints:is_fuchsia_x64": ["//{{relative_dir}}/x64:{{name}}"],
+                "@{{rules_fuchsia}}//fuchsia/constraints:is_fuchsia_x64": ["//{{relative_dir}}/x64:{{name}}"],
             },
             "riscv64": {
-                "@fuchsia_sdk//fuchsia/constraints:is_fuchsia_riscv64": ["//{{relative_dir}}/riscv64:{{name}}"],
+                "@{{rules_fuchsia}}//fuchsia/constraints:is_fuchsia_riscv64": ["//{{relative_dir}}/riscv64:{{name}}"],
             },
         },
         constants.target_cpus,

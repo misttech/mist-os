@@ -60,6 +60,7 @@ alias(
 generate_bazel_sdk(
     name = "bazel_in_tree_sdk",
     idk_export_dir = "@gn_targets//sdk:bazel_in_tree_idk",
+    use_rules_fuchsia = False,
 )
 
 # Compare the content of the @fuchsia_sdk with the SDK generated

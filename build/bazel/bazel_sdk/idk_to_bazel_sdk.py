@@ -451,6 +451,11 @@ def main() -> int:
         help="Output Bazel SDK directory path.",
     )
     parser.add_argument(
+        "--use-rules_fuchsia",
+        action="store_true",
+        help="Generate an SDK that depends on @rules_fuchsia to load rules.",
+    )
+    parser.add_argument(
         "--copy-files",
         action="store_true",
         help="Copy/hard-link files instead of symlinking them.",
@@ -507,6 +512,7 @@ def main() -> int:
         generate_sdk_repository(
             runtime,
             manifests,
+            bool(args.use_rules_fuchsia),
         )
 
         if args.depfile:

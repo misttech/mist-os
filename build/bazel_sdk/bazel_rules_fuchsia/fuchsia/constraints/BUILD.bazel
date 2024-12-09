@@ -5,6 +5,11 @@
 # Constraints and platforms for Fuchsia.
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
+
+# NOTE: api_version.bzl is a generated file that only exists in @fuchsia_sdk.
+# This means that , at the moment, targets in this file cannot be used by a
+# workspace that only wants to use @rules_fuchsia without @fuchsia_sdk
+# (e.g. a Pigweed workspace).
 load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
 load(":target_compatibility.bzl", "COMPATIBILITY", "define_host_can_build_fuchsia_flag")
 
@@ -44,7 +49,7 @@ constraint_setting(
     config_setting(
         name = "api_level_%s" % api_level.api_level,
         flag_values = {
-            "//fuchsia:fuchsia_api_level": api_level.api_level,
+            "@fuchsia_sdk//fuchsia:fuchsia_api_level": api_level.api_level,
         },
     )
     for api_level in INTERNAL_ONLY_VALID_TARGET_APIS

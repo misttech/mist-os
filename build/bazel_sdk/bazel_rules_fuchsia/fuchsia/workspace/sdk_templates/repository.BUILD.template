@@ -6,8 +6,8 @@
 #
 # This is referenced by //fuchsia/private/fuchsia_sdk_repository.bzl, see
 # the `fuchsia_sdk_repository` rule for more information.
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_toolchain_info")
-load("@fuchsia_sdk//fuchsia/workspace:sdk_host_tool.bzl", "sdk_host_tool")
+load("@{{rules_fuchsia}}//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_toolchain_info")
+load("@{{rules_fuchsia}}//fuchsia/workspace:sdk_host_tool.bzl", "sdk_host_tool")
 
 load("//:generated_constants.bzl", sdk_constants = "constants")
 
@@ -126,12 +126,12 @@ fuchsia_toolchain_info(
 toolchain(
     name = "fuchsia_toolchain_sdk",
     toolchain = ":fuchsia_toolchain_info",
-    toolchain_type = "@fuchsia_sdk//fuchsia:toolchain",
+    toolchain_type = "@{{rules_fuchsia}}//fuchsia:toolchain",
 )
 
 # The following rules expose the sdk tools that are put in the fuchsia_toolchain
 # so uses can run them directly. These targets can be invoked by calling
-# `bazel run @fuchsia_sdk//:<tool_name> -- args`
+# `bazel run @{{rules_fuchsia}}//:<tool_name> -- args`
 # Additionally, the run_sdk_tool.sh script knows how to invoke these tools
 # and can be used as a drop in replacement for the tool.
 sdk_host_tool(name = "ffx")

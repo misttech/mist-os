@@ -21,7 +21,7 @@
 #         //path/to/fuchsia:package
 #
 def format(target):
-    debug_info = providers(target)["@@fuchsia_sdk//fuchsia/private:providers.bzl%FuchsiaDebugSymbolInfo"]
+    debug_info = providers(target)["@@rules_fuchsia//fuchsia/private:providers.bzl%FuchsiaDebugSymbolInfo"]
     lines = []
     for source_dir, dirs in debug_info.build_id_dirs.items():
         lines += [dir.path for dir in dirs.to_list()]

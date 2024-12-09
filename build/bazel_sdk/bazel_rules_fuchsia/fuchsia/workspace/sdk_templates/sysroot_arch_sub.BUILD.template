@@ -1,8 +1,8 @@
 load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "@{{rules_fuchsia}}//fuchsia:defs.bzl",
     "fuchsia_package_resource_group",
 )
-load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("@{{rules_fuchsia}}//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 fuchsia_package_resource_group(
     name = "dist",

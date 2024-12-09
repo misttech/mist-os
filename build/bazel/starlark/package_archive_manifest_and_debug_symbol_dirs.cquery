@@ -24,12 +24,12 @@
 #         //path/to/fuchsia:package
 #
 def format(target):
-    package_info = providers(target)["@@fuchsia_sdk//fuchsia/private:providers.bzl%FuchsiaPackageInfo"]
+    package_info = providers(target)["@@rules_fuchsia//fuchsia/private:providers.bzl%FuchsiaPackageInfo"]
     lines = [
         package_info.far_file.path,
         package_info.package_manifest.path,
     ]
-    debug_info = providers(target)["@@fuchsia_sdk//fuchsia/private:providers.bzl%FuchsiaDebugSymbolInfo"]
+    debug_info = providers(target)["@@rules_fuchsia//fuchsia/private:providers.bzl%FuchsiaDebugSymbolInfo"]
     for source_dir, dirs in debug_info.build_id_dirs.items():
         lines += [dir.path for dir in dirs.to_list()]
     return "\n".join(lines)

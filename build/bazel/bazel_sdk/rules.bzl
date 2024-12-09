@@ -52,7 +52,7 @@ def _generate_bazel_sdk(ctx):
             output_dir.path,
             "--buildifier",
             ctx.file._buildifier_tool.path,
-        ],
+        ] + (["--use-rules_fuchsia"] if ctx.attr.use_rules_fuchsia else []),
         inputs = inputs,
         outputs = [output_dir],
         execution_requirements = {
@@ -80,6 +80,11 @@ generate_bazel_sdk = rule(
         ),
         "idk_export_label": attr.label(
             doc = "Label to a target generatinf an IDK export directory as a TreeArtifact",
+        ),
+        "use_rules_fuchsia": attr.bool(
+            doc = "Set to True to generate an SDK repository that uses @rules_fuchsia to load rules. " +
+                  "By default, this creates a standalone repository instead.",
+            default = False,
         ),
         "_idk_to_bazel_script": attr.label(
             default = "//build/bazel/bazel_sdk:idk_to_bazel_sdk",

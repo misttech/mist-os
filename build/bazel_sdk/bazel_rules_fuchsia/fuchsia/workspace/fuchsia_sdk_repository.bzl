@@ -162,7 +162,7 @@ def _fuchsia_sdk_repository_impl(ctx):
     # Resolve labels early to avoid repository rule restarts.
     resolve_repository_labels(runtime)
 
-    generate_sdk_repository(runtime, manifests)
+    generate_sdk_repository(runtime, manifests, ctx.attr.use_rules_fuchsia)
 
 fuchsia_sdk_repository = repository_rule(
     doc = """
@@ -198,6 +198,15 @@ Loads a particular version of the Fuchsia IDK.
         "local_sdk_version_file": attr.label(
             doc = "An optional file used to mark the version of the SDK pointed to by local_paths.",
             allow_single_file = True,
+        ),
+        "use_rules_fuchsia": attr.bool(
+            doc =
+                """
+                Use the @rules_fuchsia repository name to load all Fuchsia Bazel SDK rules in the generated
+                repository files. Defaults to @fuchsia_sdk otherwise for compatibility reasons. For details
+                see https://fxbug.dev/381126633.
+                """,
+            default = False,
         ),
         "buildifier": attr.label(
             doc = "An optional label to the buildifier tool, used to reformat all generated Bazel files.",
