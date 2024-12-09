@@ -44,6 +44,7 @@ pub async fn get_selectors_for_manifest<P: DiagnosticsProvider>(
 ) -> Result<Vec<Selector>, Error> {
     let list_command = ListCommand {
         manifest: Some(manifest.clone()),
+        component: None,
         with_url: false,
         accessor: accessor.clone(),
     };

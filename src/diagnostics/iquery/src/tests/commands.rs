@@ -67,6 +67,30 @@ async fn test_list_filter_manifest() {
 }
 
 #[fuchsia::test]
+async fn test_list_filter_component() {
+    let test = TestBuilder::new()
+        .await
+        .add_basic_component("basic")
+        .await
+        .add_test_component("test")
+        .await
+        .start()
+        .await;
+    test.assert(AssertionParameters {
+        command: IqueryCommand::List,
+        golden_basename: "list_filter_manifest",
+        iquery_args: vec![
+            "--component",
+            "test_component.cm",
+            "--accessor",
+            "archivist:fuchsia.diagnostics.ArchiveAccessor",
+        ],
+        opts: vec![AssertionOption::Retry],
+    })
+    .await;
+}
+
+#[fuchsia::test]
 async fn test_list_with_urls() {
     let test = TestBuilder::new()
         .await

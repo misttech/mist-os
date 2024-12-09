@@ -3,9 +3,13 @@
 // found in the LICENSE file.
 
 use crate::commands::types::*;
+use crate::commands::utils;
 use crate::types::Error;
 use argh::{ArgsInfo, FromArgs};
+use component_debug::realm::Instance;
 use diagnostics_data::{Inspect, InspectData};
+use fidl_fuchsia_diagnostics::Selector;
+use fidl_fuchsia_sys2 as fsys;
 use serde::{Serialize, Serializer};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
@@ -88,24 +92,23 @@ impl fmt::Display for ListResult {
     }
 }
 
-fn components_from_inspect_data(inspect_data: Vec<InspectData>) -> Vec<ListResultItem> {
-    let mut result = vec![];
-    for value in inspect_data {
-        result.push(ListResultItem::MonikerWithUrl(MonikerWithUrl {
+fn components_from_inspect_data(
+    inspect_data: Vec<InspectData>,
+) -> impl Iterator<Item = ListResultItem> {
+    inspect_data.into_iter().map(|value| {
+        ListResultItem::MonikerWithUrl(MonikerWithUrl {
             moniker: value.moniker.to_string(),
             component_url: value.metadata.component_url.into(),
-        }));
-    }
-    result
+        })
+    })
 }
 
-pub fn list_response_items_from_components(
+pub fn list_response_items(
     manifest: Option<&str>,
     with_url: bool,
-    components: Vec<ListResultItem>,
+    components: impl Iterator<Item = ListResultItem>,
 ) -> Vec<ListResultItem> {
     components
-        .into_iter()
         .filter(|result| match manifest {
             None => true,
             Some(manifest) => match result {
@@ -135,9 +138,15 @@ pub fn list_response_items_from_components(
 #[argh(subcommand, name = "list")]
 pub struct ListCommand {
     #[argh(option)]
-    /// the name of the manifest file that we are interested in. If this is provided, the output
-    /// will only contain monikers for components whose url contains the provided name.
+    /// DEPRECATED: use `--component` instead.
     pub manifest: Option<String>,
+
+    #[argh(option)]
+    /// a fuzzy-search query. May include URL, moniker, or manifest fragments.
+    /// a fauzzy-search query for the component we are interested in. May include URL, moniker, or
+    /// manifest fragments. If this is provided, the output will only contain monikers for
+    /// components that matched the query.
+    pub component: Option<String>,
 
     #[argh(switch)]
     /// also print the URL of the component.
@@ -160,16 +169,54 @@ impl Command for ListCommand {
     type Result = ListResult;
 
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
-        let inspect =
-            provider.snapshot::<Inspect>(self.accessor.as_deref(), std::iter::empty()).await?;
+        let (inspect, manifest) = if self.manifest.is_some() {
+            eprintln!(
+                "WARNING: --manifest is DEPRECATED and will be removed soon. Please use --component only."
+            );
+            if self.component.is_some() {
+                eprintln!("WARNING: --component ignored due to usage of deprecated --manifest. Please use --component only.")
+            }
+            let inspect =
+                provider.snapshot::<Inspect>(self.accessor.as_deref(), std::iter::empty()).await?;
+            (inspect, self.manifest)
+        } else {
+            let mut selectors = if let Some(query) = self.component {
+                let instances = find_components(provider.realm_query(), &query).await?;
+                instances_to_root_selectors(instances)?
+            } else {
+                vec![]
+            };
+            utils::ensure_tree_field_is_set(&mut selectors, None)?;
+            let inspect = provider
+                .snapshot::<Inspect>(self.accessor.as_deref(), selectors.into_iter())
+                .await?;
+            (inspect, None)
+        };
+
         let components = components_from_inspect_data(inspect);
-        let results = list_response_items_from_components(
-            self.manifest.as_deref(),
-            self.with_url,
-            components,
-        );
+        let results = list_response_items(manifest.as_deref(), self.with_url, components);
         Ok(ListResult(results))
     }
+}
+
+async fn find_components(
+    realm_proxy: &fsys::RealmQueryProxy,
+    query: &str,
+) -> Result<Vec<Instance>, Error> {
+    component_debug::query::get_instances_from_query(query, realm_proxy)
+        .await
+        .map_err(Error::FuzzyMatchRealmQuery)
+}
+
+fn instances_to_root_selectors(instances: Vec<Instance>) -> Result<Vec<Selector>, Error> {
+    instances
+        .into_iter()
+        .map(|instance| instance.moniker)
+        .map(|moniker| {
+            let selector_str = format!("{moniker}:root");
+            selectors::parse_verbose(&selector_str).map_err(Error::PartialSelectorHint)
+        })
+        .collect::<Result<Vec<Selector>, Error>>()
 }
 
 #[cfg(test)]
@@ -210,7 +257,7 @@ mod tests {
             .build(),
         ];
 
-        let components = components_from_inspect_data(inspect_data);
+        let components = components_from_inspect_data(inspect_data).collect::<Vec<_>>();
 
         assert_eq!(components.len(), 4);
     }
