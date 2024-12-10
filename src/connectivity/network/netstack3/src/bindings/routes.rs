@@ -216,7 +216,7 @@ impl<I: Ip> Table<I> {
         netstack3_core::routes::AddableEntry<I::Addr, DeviceId>,
         netstack3_core::routes::Generation,
     )> {
-        let Self { inner, next_generation, token: _, core_id: _, name: _ } = self;
+        let Self { inner, next_generation, token: _, core_id, name: _ } = self;
         let (entry, new_to_table) = match inner.entry(route.clone()) {
             std::collections::hash_map::Entry::Occupied(occupied_entry) => {
                 (occupied_entry.into_mut(), false)
@@ -238,9 +238,7 @@ impl<I: Ip> Table<I> {
         } else {
             TableModifyResult::NoChange
         };
-        info!(
-            "insert operation of route {route:?} into table with set {set:?} had result {result:?}",
-        );
+        info!("insert route {route:?} (table={core_id:?}) (set={set:?}) had result {result:?}");
         result
     }
 
@@ -262,7 +260,7 @@ impl<I: Ip> Table<I> {
             netstack3_core::routes::Generation,
         )>,
     > {
-        let Self { inner, next_generation: _, token: _, core_id: _, name: _ } = self;
+        let Self { inner, next_generation: _, token: _, core_id, name: _ } = self;
 
         let mut removed_any_from_set = false;
         let mut removed_from_table = Vec::new();
@@ -306,23 +304,23 @@ impl<I: Ip> Table<I> {
         let result = {
             if !removed_from_table.is_empty() {
                 info!(
-                    "remove operation on routing table resulted in removal of \
+                    "remove operation on routing table (table={core_id:?}) resulted in removal of \
                      {} routes from the table:",
                     removed_from_table.len()
                 );
                 for (route, generation) in &removed_from_table {
-                    info!("  removed route {route:?} (generation {generation:?})");
+                    info!("-- removed route {route:?} (generation={generation:?})");
                 }
                 TableModifyResult::TableChanged(removed_from_table)
             } else if removed_any_from_set {
                 info!(
-                    "remove operation on routing table removed routes from set \
+                    "remove operation on routing table (table={core_id:?}) removed routes from set \
                     {set:?}, but not the overall table"
                 );
                 TableModifyResult::SetChanged
             } else {
                 info!(
-                    "remove operation on routing table from set {set:?} \
+                    "remove operation on routing table (table={core_id:?}) from set {set:?} \
                      resulted in no change"
                 );
                 TableModifyResult::NoChange
@@ -338,7 +336,7 @@ impl<I: Ip> Table<I> {
         netstack3_core::routes::AddableEntry<I::Addr, DeviceId>,
         netstack3_core::routes::Generation,
     )> {
-        let Self { inner, next_generation: _, token: _, core_id: _, name: _ } = self;
+        let Self { inner, next_generation: _, token: _, core_id, name: _ } = self;
         let set = SetMembership::User(set);
         let mut removed_from_table = Vec::new();
         inner.retain(|route, data| {
@@ -350,10 +348,13 @@ impl<I: Ip> Table<I> {
             }
         });
 
-        info!("route set removal ({set:?}) removed {} routes:", removed_from_table.len());
+        info!(
+            "route set removal ({set:?}) removed {} routes from table ({core_id:?}):",
+            removed_from_table.len()
+        );
 
         for (route, generation) in &removed_from_table {
-            info!("  removed route {route:?} (generation {generation:?})");
+            info!("-- removed route {route:?} (generation={generation:?})");
         }
 
         removed_from_table
@@ -519,6 +520,7 @@ where
                             .expect("invalid table ID");
                         let core_id = assert_matches!(core_id,
                             CoreId::User(core_id) => core_id, "cannot remove main table");
+                        info!("Removing Route Table: {core_id:?}");
                         let weak = core_id.downgrade();
                         ctx.api().routes()
                             .remove_table(core_id)
@@ -661,9 +663,11 @@ where
                         None => Err(TableIdOverflowsError),
                         Some(table_id) => {
                             let core_id = ctx.api().routes().new_table();
+                            let core_id = CoreId::User(core_id);
+                            info!("Adding Route Table: name={name:?} ({core_id:?})");
                             let new_table = Table::new(
                                 netstack3_core::routes::Generation::initial(),
-                                CoreId::User(core_id),
+                                core_id,
                                 name,
                             );
                             let token = new_table.token.clone();
@@ -713,12 +717,15 @@ where
                 }
                 RuleOp::Add { priority, index, matcher, action } => {
                     rule_table.add_rule(priority, index, matcher.clone(), action)?;
+                    info!("Added PBR rule: {priority:?}, {index:?}, {matcher:?}, {action:?}");
                     itertools::Either::Right(std::iter::once(watcher::Update::Added(
                         InstalledRule { priority, index, matcher: matcher.into(), action },
                     )))
                 }
                 RuleOp::Remove { priority, index } => {
                     let removed = rule_table.remove_rule(priority, index)?;
+                    let InstalledRule { priority, index, matcher, action } = &removed;
+                    info!("Removed PBR rule: {priority:?}, {index:?}, {matcher:?}, {action:?}");
                     itertools::Either::Right(std::iter::once(watcher::Update::Removed(removed)))
                 }
             };
