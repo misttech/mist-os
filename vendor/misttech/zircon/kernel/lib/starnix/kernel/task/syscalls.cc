@@ -296,7 +296,7 @@ fit::result<Errno> sys_execveat(CurrentTask& current_task, FdNumber dir_fd, User
     // See https://man7.org/linux/man-pages/man2/execveat.2.html#NOTES
     if (path->empty()) {
       // User-provided path is empty
-      // None => format!("/dev/fd/{}", dir_fd.raw()).into_bytes(),
+      return mtl::format("/dev/fd/%d", dir_fd.raw());
     }
     switch (path.value()[0]) {
       case '/': {
@@ -305,12 +305,11 @@ fit::result<Errno> sys_execveat(CurrentTask& current_task, FdNumber dir_fd, User
       }
       default: {
         // User-provided path is relative, append it.
-        // let mut new_path = format!("/dev/fd/{}/", dir_fd.raw()).into_bytes();
-        // new_path.append(&mut path.to_vec());
-        // new_path
+        auto str = path.value();
+        return mtl::format("/dev/fd/%d/%.*s", dir_fd.raw(), static_cast<int>(str.size()),
+                           str.data());
       }
     }
-    return BString();
   }();
 
   _EP(current_task.exec(*executable, npath, argv, environ));
