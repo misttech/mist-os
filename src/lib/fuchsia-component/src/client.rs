@@ -455,8 +455,8 @@ pub fn connect_to_service_instance_at_dir_svc<S: ServiceMarker>(
 /// Opens a FIDL service as a directory, which holds instances of the service.
 pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
     let service_path = format!("{}/{}", SVC_DIR, S::SERVICE_NAME);
-    fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())
-        .context("namespace open failed")
+    let flags = fio::PERM_READABLE;
+    fuchsia_fs::directory::open_in_namespace(&service_path, flags).context("namespace open failed")
 }
 
 /// Opens a FIDL service hosted in `directory` as a directory, which holds
@@ -464,7 +464,8 @@ pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
 pub fn open_service_at_dir<S: ServiceMarker>(
     directory: &fio::DirectoryProxy,
 ) -> Result<fio::DirectoryProxy, Error> {
-    fuchsia_fs::directory::open_directory_async(directory, S::SERVICE_NAME, fio::Flags::empty())
+    let flags = fio::PERM_READABLE;
+    fuchsia_fs::directory::open_directory_async(directory, S::SERVICE_NAME, flags)
         .map_err(Into::into)
 }
 

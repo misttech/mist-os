@@ -116,6 +116,7 @@ _component_manager_bin = {
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:scopeguard",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]

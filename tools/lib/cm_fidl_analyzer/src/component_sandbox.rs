@@ -275,6 +275,18 @@ impl program_output_dict::ProgramOutputGenerator<ComponentInstanceForAnalyzer>
             moniker: component.moniker().clone(),
         }))
     }
+
+    fn new_outgoing_dir_dictionary_router(
+        &self,
+        component: &Arc<ComponentInstanceForAnalyzer>,
+        _decl: &cm_rust::ComponentDecl,
+        capability: &cm_rust::CapabilityDecl,
+    ) -> Router<Dict> {
+        new_debug_only_specific_router::<Dict>(CapabilitySource::Component(ComponentSource {
+            capability: ComponentCapability::from(capability.clone()),
+            moniker: component.moniker().clone(),
+        }))
+    }
 }
 
 pub(crate) fn static_children_component_output_dictionary_routers(
