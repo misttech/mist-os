@@ -1300,9 +1300,13 @@ pub(super) fn fs_node_set_label_with_task(fs_node: &FsNode, task: WeakRef<Task>)
 pub(super) fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
     match fs_node.security_state.lock().label.clone() {
         FsNodeLabel::SecurityId { sid } => Some(sid),
-        FsNodeLabel::FromTask { weak_task } => {
-            weak_task.upgrade().map(|t| t.security_state.lock().current_sid)
-        }
+        FsNodeLabel::FromTask { weak_task } => Some(
+            weak_task
+                .upgrade()
+                .map(|t| t.security_state.lock().current_sid)
+                // If `upgrade()` fails then the `Task` has exited, so return a placeholder SID.
+                .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled)),
+        ),
         FsNodeLabel::Uninitialized => None,
     }
 }
