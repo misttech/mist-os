@@ -7,6 +7,7 @@
 #include <time.h>
 
 #include <array>
+#include <cstdint>
 #include <limits>
 #include <thread>
 #include <unordered_set>
@@ -69,6 +70,10 @@ static uint64_t clock_gettime_monotonic_raw() {
 
   return 1000000000ull * ts.tv_sec + ts.tv_nsec;
 }
+
+constexpr uint32_t kVendorIdIntel = 0x8086;
+constexpr uint32_t kVendorIdArm = 0x13B5;
+constexpr uint32_t kVendorIdVsi = 0x10001;
 
 }  // namespace
 
@@ -1207,9 +1212,6 @@ class TestConnection {
     ASSERT_TRUE(device_);
     ASSERT_TRUE(connection_);
 
-    constexpr uint32_t kVendorIdIntel = 0x8086;
-    constexpr uint32_t kVendorIdArm = 0x13B5;
-
     uint64_t query_id = 0;
     uint64_t vendor_id;
     ASSERT_EQ(MAGMA_STATUS_OK,
@@ -1408,7 +1410,7 @@ class TestConnection {
 #endif
   }
 
- private:
+ protected:
   std::string device_name_;
   bool is_virtmagma_ = false;
   int fd_ = -1;
@@ -1469,6 +1471,10 @@ class TestConnectionWithContext : public TestConnection {
   }
 
   void ExecuteCommandNoResources() {
+    uint64_t vendor_id = 0;
+    ASSERT_EQ(MAGMA_STATUS_OK,
+              magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
+
     ASSERT_TRUE(connection());
 
     magma_command_descriptor descriptor = {.resource_count = 0, .command_buffer_count = 0};
@@ -1478,9 +1484,14 @@ class TestConnectionWithContext : public TestConnection {
 
     // Empty command buffers may or may not be valid.
     magma_status_t status = magma_connection_flush(connection());
-    EXPECT_TRUE(status == MAGMA_STATUS_OK || status == MAGMA_STATUS_INVALID_ARGS ||
-                status == MAGMA_STATUS_UNIMPLEMENTED)
-        << "status: " << status;
+
+    if (vendor_id == kVendorIdVsi) {
+      EXPECT_TRUE(status == MAGMA_STATUS_OK) << "status: " << status;
+    } else if (vendor_id == kVendorIdArm) {
+      EXPECT_TRUE(status == MAGMA_STATUS_UNIMPLEMENTED) << "status: " << status;
+    } else {
+      EXPECT_TRUE(status == MAGMA_STATUS_INVALID_ARGS) << "status: " << status;
+    }
   }
 
   void ExecuteCommandTwoCommandBuffers() {
@@ -1499,7 +1510,8 @@ class TestConnectionWithContext : public TestConnection {
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_execute_command(connection(), context_id(), &descriptor));
 
-    EXPECT_EQ(magma_connection_flush(connection()), MAGMA_STATUS_UNIMPLEMENTED);
+    magma_status_t status = magma_connection_flush(connection());
+    EXPECT_TRUE(status == MAGMA_STATUS_UNIMPLEMENTED || status == MAGMA_STATUS_INVALID_ARGS);
   }
 
  private:
@@ -1862,7 +1874,7 @@ TEST_F(Magma, MaxBufferHandle2) {
 
   constexpr size_t kMaxBufferHandles = 10000;
 #if defined(__linux__)
-  struct rlimit rlimit {};
+  struct rlimit rlimit{};
   rlimit.rlim_cur = kMaxBufferHandles * 2;
   rlimit.rlim_max = rlimit.rlim_cur;
   EXPECT_EQ(0, setrlimit(RLIMIT_NOFILE, &rlimit));

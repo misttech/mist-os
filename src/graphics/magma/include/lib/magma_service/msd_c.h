@@ -22,13 +22,18 @@ struct MsdConnection;
 struct MsdContext;
 struct MsdSemaphore;
 
-struct magma_command_buffer {
+struct MsdCommandDescriptor {
+  uint32_t command_buffer_count;
   uint32_t resource_count;
-  uint32_t batch_buffer_resource_index;  // resource index of the batch buffer to execute
-  uint64_t batch_start_offset;           // relative to the starting offset of the buffer
   uint32_t wait_semaphore_count;
   uint32_t signal_semaphore_count;
   uint64_t flags;
+
+  struct magma_exec_command_buffer* command_buffers;
+  struct magma_exec_resource* exec_resources;
+  struct MsdBuffer** buffers;
+  struct MsdSemaphore** wait_semaphores;
+  struct MsdSemaphore** signal_semaphores;
 };
 
 struct MsdDriverCallbacks {
@@ -59,10 +64,8 @@ struct MsdContext* msd_connection_create_context(struct MsdConnection* msd_conne
 
 struct MsdContext* msd_context_release(struct MsdContext* msd_context);
 
-magma_status_t msd_context_execute_command_buffer_with_resources(
-    struct MsdContext* msd_context, struct magma_command_buffer* command_buffer,
-    struct magma_exec_resource* exec_resources, struct MsdBuffer** buffers,
-    struct MsdSemaphore** wait_semaphores, struct MsdSemaphore** signal_semaphores);
+magma_status_t msd_context_execute_command_buffers(struct MsdContext* msd_context,
+                                                   struct MsdCommandDescriptor* descriptor);
 
 struct MsdBuffer* msd_driver_import_buffer(magma_handle_t buffer_handle, uint64_t client_id);
 

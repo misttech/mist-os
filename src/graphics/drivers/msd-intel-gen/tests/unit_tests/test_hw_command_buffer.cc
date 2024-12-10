@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 
 #include "command_buffer.h"
+#include "lib/magma_service/sys_driver/magma_system_context.h"
 #include "msd_intel_context.h"
 #include "msd_intel_device.h"
 #include "ppgtt.h"
@@ -83,7 +84,7 @@ class TestHwCommandBuffer : public ::testing::Test {
 
   void TestPrepareForExecution(EngineCommandStreamerId id) {
     uint32_t batch_start_offset = 0x10;
-    helper_->abi_cmd_buf()->batch_start_offset = batch_start_offset;
+    helper_->abi_cmd_buf()->start_offset = batch_start_offset;
 
     CreateCommandBuffer();
 
@@ -203,8 +204,16 @@ class TestHwCommandBuffer : public ::testing::Test {
 
  private:
   void CreateCommandBuffer() {
+    msd::magma_command_buffer command_buffer = {
+        .resource_count = static_cast<uint32_t>(helper_->resources().size()),
+        .batch_buffer_resource_index = helper_->abi_cmd_buf()->resource_index,
+        .batch_start_offset = helper_->abi_cmd_buf()->start_offset,
+        .wait_semaphore_count = CommandBufferHelper::kWaitSemaphoreCount,
+        .signal_semaphore_count = CommandBufferHelper::kSignalSemaphoreCount,
+    };
+
     cmd_buf_ = CommandBuffer::Create(
-        static_cast<MsdIntelAbiContext*>(helper_->ctx())->ptr(), helper_->abi_cmd_buf(),
+        static_cast<MsdIntelAbiContext*>(helper_->ctx())->ptr(), &command_buffer,
         helper_->abi_resources(), helper_->msd_resources().data(), helper_->msd_wait_semaphores(),
         helper_->msd_signal_semaphores());
   }
