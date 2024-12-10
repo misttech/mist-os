@@ -18,7 +18,7 @@ use rand::Rng;
 
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpContext, GmpContextInner, GmpGroupState, GmpMode, GmpStateRef,
-    GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt, NotAMemberErr, QueryTarget,
+    GroupJoinResult, GroupLeaveResult, IpExt, NotAMemberErr, QueryTarget,
 };
 
 /// Timers installed by GMP v1.
@@ -490,17 +490,16 @@ impl<I: Instant> GmpStateMachine<I> {
     }
 }
 
-pub(super) fn handle_timer<I, CC, BC, T>(
-    core_ctx: &mut CC,
+pub(super) fn handle_timer<I, CC, BC>(
+    core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, T, BC>,
+    state: GmpStateRef<'_, I, CC, BC>,
     timer: DelayedReportTimerId<I>,
 ) where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
-    T: GmpTypeLayout<I, BC>,
 {
     let GmpStateRef { enabled: _, groups, gmp, config: _ } = state;
     debug_assert!(gmp.mode.is_v1());
@@ -609,17 +608,16 @@ where
     })
 }
 
-pub(super) fn handle_query_message_inner<I, CC, BC, T, Q>(
-    core_ctx: &mut CC,
+pub(super) fn handle_query_message_inner<I, CC, BC, Q>(
+    core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, T, BC>,
+    state: GmpStateRef<'_, I, CC, BC>,
     query: &Q,
 ) -> Result<(), NotAMemberErr<I>>
 where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC, Actions = T::Actions>,
-    T: GmpTypeLayout<I, BC>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
     Q: QueryMessage<I>,
 {
@@ -676,16 +674,15 @@ where
     Ok(())
 }
 
-pub(super) fn handle_enabled<I, CC, BC, T>(
-    core_ctx: &mut CC,
+pub(super) fn handle_enabled<I, CC, BC>(
+    core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, T, BC>,
+    state: GmpStateRef<'_, I, CC, BC>,
 ) where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
-    T: GmpTypeLayout<I, BC>,
 {
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
     debug_assert!(gmp.mode.is_v1());
@@ -716,16 +713,15 @@ pub(super) fn handle_enabled<I, CC, BC, T>(
     }
 }
 
-pub(super) fn handle_disabled<I, CC, BC, T>(
-    core_ctx: &mut CC,
+pub(super) fn handle_disabled<I, CC, BC>(
+    core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, T, BC>,
+    state: GmpStateRef<'_, I, CC, BC>,
 ) where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
-    T: GmpTypeLayout<I, BC>,
 {
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
     debug_assert!(gmp.mode.is_v1());
@@ -744,18 +740,17 @@ pub(super) fn handle_disabled<I, CC, BC, T>(
     }
 }
 
-pub(super) fn join_group<I, CC, BC, T>(
-    core_ctx: &mut CC,
+pub(super) fn join_group<I, CC, BC>(
+    core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     group_addr: MulticastAddr<I::Addr>,
-    state: GmpStateRef<'_, I, T, BC>,
+    state: GmpStateRef<'_, I, CC, BC>,
 ) -> GroupJoinResult
 where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
-    T: GmpTypeLayout<I, BC>,
 {
     let GmpStateRef { enabled, groups, gmp, config } = state;
     debug_assert!(gmp.mode.is_v1());
@@ -784,18 +779,17 @@ where
     })
 }
 
-pub(super) fn leave_group<I, CC, BC, T>(
-    core_ctx: &mut CC,
+pub(super) fn leave_group<I, CC, BC>(
+    core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     group_addr: MulticastAddr<I::Addr>,
-    state: GmpStateRef<'_, I, T, BC>,
+    state: GmpStateRef<'_, I, CC, BC>,
 ) -> GroupLeaveResult
 where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
-    T: GmpTypeLayout<I, BC>,
 {
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
     debug_assert!(gmp.mode.is_v1());

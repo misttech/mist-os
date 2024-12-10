@@ -725,16 +725,11 @@ fn handle_timer<I, BC, CC>(
 /// updated to the appropriate GMP version.
 ///
 /// No-op if `new_mode` is current.
-fn enter_mode<
-    I: IpExt,
-    CC: GmpContextInner<I, BC>,
-    BC: GmpBindingsContext,
-    T: GmpTypeLayout<I, BC>,
->(
-    core_ctx: &mut CC,
+fn enter_mode<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
+    core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, T, BC>,
+    state: GmpStateRef<'_, I, CC, BC>,
     new_mode: GmpMode,
 ) {
     match (&mut state.gmp.mode, &new_mode) {
