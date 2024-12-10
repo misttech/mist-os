@@ -446,20 +446,15 @@ mod tests {
 
     fn fetch_events(
         exec: &mut fasync::TestExecutor,
-        stream: fidl_svc::DeviceWatcherEventStream,
+        mut stream: fidl_svc::DeviceWatcherEventStream,
     ) -> Vec<DeviceWatcherEvent> {
-        let events = Arc::new(Mutex::new(Some(Vec::new())));
-        let events_two = events.clone();
-        let mut event_fut = stream.try_for_each(move |e| {
-            future::ready({
-                events_two.lock().as_mut().unwrap().push(e);
-                Ok(())
-            })
-        });
-        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut event_fut) {
-            panic!("event stream future returned an error: {:?}", e);
+        let mut events = vec![];
+        loop {
+            match exec.run_until_stalled(&mut stream.try_next()) {
+                Poll::Ready(Err(e)) => panic!("event stream future returned an error: {:?}", e),
+                Poll::Pending | Poll::Ready(Ok(None)) => break events,
+                Poll::Ready(Ok(Some(event))) => events.push(event),
+            }
         }
-        let events = events.lock().take().unwrap();
-        events
     }
 }
