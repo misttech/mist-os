@@ -915,12 +915,34 @@ impl HierarchyMatcher {
     }
 }
 
-/// Applies a single selector to a `DiagnosticsHierarchy`, returning a vector of tuples for every
-/// property in the hierarchy matched by the selector.
+#[derive(Debug, PartialEq)]
+pub enum SelectResult<'a, Key> {
+    Properties(Vec<&'a Property<Key>>),
+    Nodes(Vec<&'a DiagnosticsHierarchy<Key>>),
+}
+
+impl<'a, Key> SelectResult<'a, Key> {
+    /// Returns Err(()) if `self` is `Self::Nodes`. Otherwise, adds to property list.
+    fn add_property(&mut self, prop: &'a Property<Key>) {
+        let Self::Properties(v) = self else {
+            panic!("must be Self::Properties to call add_property");
+        };
+        v.push(prop);
+    }
+
+    /// Returns Err(()) if `self` is `Self::Properties`. Otherwise, adds to property list.
+    fn add_node(&mut self, node: &'a DiagnosticsHierarchy<Key>) {
+        let Self::Nodes(v) = self else {
+            panic!("must be Self::Nodes to call add_node");
+        };
+        v.push(node);
+    }
+}
+
 pub fn select_from_hierarchy<'a, 'b, Key>(
     root_node: &'a DiagnosticsHierarchy<Key>,
     selector: &'b Selector,
-) -> Result<Vec<&'a Property<Key>>, Error>
+) -> Result<SelectResult<'a, Key>, Error>
 where
     Key: AsRef<str>,
     'a: 'b,
@@ -950,7 +972,11 @@ where
     };
 
     let mut stack = vec![stack_entry];
-    let mut result = vec![];
+    let mut result = if property_selector.is_some() {
+        SelectResult::Properties(vec![])
+    } else {
+        SelectResult::Nodes(vec![])
+    };
 
     while let Some(StackEntry { node, node_path_index, mut explored_path }) = stack.pop() {
         // Unwrap is safe since we validate is_empty right above.
@@ -974,19 +1000,16 @@ where
             // If we have a property selector, then add any properties matching it to our result.
             for property in &node.properties {
                 if selectors::match_string(s, property.key()) {
-                    result.push(property);
+                    result.add_property(property);
                 }
             }
         } else {
             // If we don't have a property selector and we reached the end of the node path, then
-            // we should add everything under the current node to the result.
-            for (_path, property) in node.property_iter() {
-                if let Some(property) = property {
-                    result.push(property);
-                }
-            }
+            // we should add the current node to the result.
+            result.add_node(node);
         }
     }
+
     Ok(result)
 }
 
@@ -1130,6 +1153,7 @@ impl<K: Clone> DiagnosticsHierarchyGetter<K> for DiagnosticsHierarchy<K> {
 mod tests {
     use super::*;
     use crate::testing::CondensableOnDemand;
+    use test_case::test_case;
 
     use assert_matches::assert_matches;
     use selectors::VerboseError;
@@ -1759,19 +1783,7 @@ mod tests {
                 Property::Int("z".to_string(), -4),
             ],
             vec![
-                DiagnosticsHierarchy::new(
-                    "foo",
-                    vec![
-                        Property::Int("11".to_string(), -4),
-                        Property::Bytes("123".to_string(), "foo".bytes().collect()),
-                        Property::Double("0".to_string(), 8.1),
-                    ],
-                    vec![DiagnosticsHierarchy::new(
-                        "zed",
-                        vec![Property::Int("13".to_string(), -4)],
-                        vec![],
-                    )],
-                ),
+                make_foo(),
                 DiagnosticsHierarchy::new(
                     "bar",
                     vec![Property::Int("12".to_string(), -4)],
@@ -1783,6 +1795,22 @@ mod tests {
                 ),
             ],
         )
+    }
+
+    fn make_all_foo_props() -> Vec<Property> {
+        vec![
+            Property::Int("11".to_string(), -4),
+            Property::Bytes("123".to_string(), b"foo".to_vec()),
+            Property::Double("0".to_string(), 8.1),
+        ]
+    }
+
+    fn make_zed() -> Vec<DiagnosticsHierarchy> {
+        vec![DiagnosticsHierarchy::new("zed", vec![Property::Int("13".to_string(), -4)], vec![])]
+    }
+
+    fn make_foo() -> DiagnosticsHierarchy {
+        DiagnosticsHierarchy::new("foo", make_all_foo_props(), make_zed())
     }
 
     #[fuchsia::test]
@@ -1918,33 +1946,49 @@ mod tests {
         );
     }
 
+    #[test_case(vec![Property::Int("11".to_string(), -4)], "root/foo:11" ; "specific_property")]
+    #[test_case(make_all_foo_props(), "root/foo:*" ; "many_properties")]
+    #[test_case(vec![], "root/foo:none" ; "property_not_there")]
     #[fuchsia::test]
-    fn test_select_from_hierarchy() {
-        let int_11 = Property::Int("11".to_string(), -4);
-        let double_0 = Property::Double("0".to_string(), 8.1);
-        let bytes_123 = Property::Bytes("123".to_string(), "foo".bytes().collect());
-        let int_13 = Property::Int("13".to_string(), -4);
-        let test_cases = vec![
-            ("*:root/foo:11", vec![&int_11]),
-            ("*:root/foo:*", vec![&double_0, &int_11, &bytes_123]),
-            ("*:root/foo:nonexistant", vec![]),
-            ("*:root/foo", vec![&double_0, &int_11, &bytes_123, &int_13]),
-        ];
-
-        for (test_selector, expected_vector) in test_cases {
-            let hierarchy = get_test_hierarchy();
-            let parsed_selector = selectors::parse_selector::<VerboseError>(test_selector)
+    fn test_select_from_hierarchy_property_selectors(expected: Vec<Property>, tree_selector: &str) {
+        let hierarchy = get_test_hierarchy();
+        let parsed_selector =
+            selectors::parse_selector::<VerboseError>(&format!("*:{tree_selector}"))
                 .expect("All test selectors are valid and parsable.");
-            let mut property_entry_vec = select_from_hierarchy(&hierarchy, &parsed_selector)
-                .expect("Selecting from hierarchy should succeed.");
+        let Ok(SelectResult::Properties(mut property_entry_vec)) =
+            select_from_hierarchy(&hierarchy, &parsed_selector)
+        else {
+            panic!("must be properties");
+        };
 
-            property_entry_vec.sort_by(|p1, p2| {
-                let p1_string = p1.name().to_string();
-                let p2_string = p2.name().to_string();
-                p1_string.cmp(&p2_string)
-            });
-            assert_eq!(property_entry_vec, expected_vector);
-        }
+        property_entry_vec.sort_by(|p1, p2| p1.name().cmp(&p2.name()));
+        let mut expected = expected.iter().map(Borrow::borrow).collect::<Vec<_>>();
+        expected.sort_by(|p1, p2| p1.name().cmp(&p2.name()));
+
+        assert_eq!(property_entry_vec, expected);
+    }
+
+    #[test_case(vec![], "root/none" ; "node_not_there")]
+    #[test_case(make_zed(), "root/foo/zed" ; "properties_only")]
+    #[test_case(vec![make_foo()], "root/foo" ; "nodes_and_properties")]
+    #[test_case(vec![get_test_hierarchy()], "root" ; "select_root")]
+    #[fuchsia::test]
+    fn test_select_from_hierarchy_tree_selectors(
+        expected: Vec<DiagnosticsHierarchy>,
+        tree_selector: &str,
+    ) {
+        let hierarchy = get_test_hierarchy();
+        let parsed_selector =
+            selectors::parse_selector::<VerboseError>(&format!("*:{tree_selector}"))
+                .expect("All test selectors are valid and parsable.");
+        let Ok(SelectResult::Nodes(node_vec)) = select_from_hierarchy(&hierarchy, &parsed_selector)
+        else {
+            panic!("must be nodes");
+        };
+
+        let expected = expected.iter().map(Borrow::borrow).collect::<Vec<_>>();
+
+        assert_eq!(node_vec, expected);
     }
 
     #[fuchsia::test]

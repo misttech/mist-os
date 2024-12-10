@@ -91,6 +91,7 @@ use anyhow::{format_err, Context, Error};
 use diagnostics_data::{Data, InspectHandleName};
 use diagnostics_hierarchy::{
     ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property,
+    SelectResult,
 };
 use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
 use fidl_fuchsia_metrics::{
@@ -668,11 +669,11 @@ impl ProjectSampler {
                     payload,
                     &parsed_selector.selector,
                 )?;
-                match found_properties.len() {
+                match found_properties {
                     // Maybe the data hasn't been published yet. Maybe another selector in this
                     // metric is the correct one to find the data. Either way, not-found is fine.
-                    0 => {}
-                    1 => {
+                    SelectResult::Properties(p) if p.is_empty() => {}
+                    SelectResult::Properties(p) if p.len() == 1 => {
                         let metric_cache_key = MetricCacheKey {
                             handle_name: inspect_handle_name.clone(),
                             selector: parsed_selector.selector_string.to_string(),
@@ -681,7 +682,7 @@ impl ProjectSampler {
                             metric.borrow(),
                             self.metric_cache.borrow_mut(),
                             metric_cache_key,
-                            found_properties[0],
+                            p[0],
                         )? {
                             parsed_selector.increment_upload_count();
                             events_to_log.push((project_id, event));
@@ -690,7 +691,7 @@ impl ProjectSampler {
                         break;
                     }
                     too_many => {
-                        warn!(%too_many, %parsed_selector.selector_string, "Too many matches for selector")
+                        warn!(?too_many, %parsed_selector.selector_string, "Too many matches for selector")
                     }
                 }
             }

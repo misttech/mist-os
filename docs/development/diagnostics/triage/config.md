@@ -107,7 +107,8 @@ Provided functions include:
     *   `Fold(function, vector, optional_start_value)`
     *   `Filter(function, vector)`
     *   `Apply(function, [arg1, arg2, ...])`
-    *   `Count(vector)`
+    *   `CountProperties(vector)` counts the number of properties in a vector.
+    *   `CountChildren(vector)` counts the number of children (nodes) in a vector.
 *   Time
     *   `Days()`, `Hours()`, `Minutes()`, `Seconds()`, `Millis()`, `Micros()`,
         and `Nanos()` calculate values for comparison with monotonic timestamps.
