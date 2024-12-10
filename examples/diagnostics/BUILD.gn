@@ -7,7 +7,6 @@ group("diagnostics") {
   deps = [
     "inspect",
     "logs",
-    "workshop",
   ]
 }
 
@@ -16,6 +15,5 @@ group("hermetic_tests") {
   deps = [
     "inspect:hermetic_tests",
     "logs:hermetic_tests",
-    "workshop:hermetic_tests",
   ]
 }
