@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 load(
-    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "@rules_fuchsia//fuchsia:assembly.bzl",
     "PARTITION_TYPE",
     "SLOT",
     "fuchsia_bootloader_partition",
