@@ -38,8 +38,12 @@ const CONNECTION_EXPIRY_TIME_UDP: Duration = Duration::from_secs(120);
 /// considered expired and is eligible for garbage collection.
 const CONNECTION_EXPIRY_OTHER: Duration = Duration::from_secs(30);
 
-/// The maximum number of connections in the conntrack table.
-pub(crate) const MAXIMUM_CONNECTIONS: usize = 50_000;
+/// The maximum number of entries in the conntrack table.
+///
+/// NOTE: This is subtly different from the number of connections in the table
+/// because self-connected sockets only have a single entry instead of the
+/// normal two.
+pub(crate) const MAXIMUM_ENTRIES: usize = 100_000;
 
 /// Implements a connection tracking subsystem.
 ///
@@ -54,12 +58,6 @@ struct TableInner<I: IpExt, E, BT: FilterBindingsTypes> {
     /// A connection is inserted into the map twice: once for the original
     /// tuple, and once for the reply tuple.
     table: HashMap<Tuple<I>, Arc<ConnectionShared<I, E, BT>>>,
-    /// The number of connections in the table.
-    ///
-    /// We can't use the size of the HashMap because connections that have
-    /// identical original and reply tuples (e.g. self-connected sockets) can
-    /// only be inserted into the table once.
-    num_connections: usize,
     /// A timer for triggering garbage collection events.
     gc_timer: BT::Timer,
     /// The number of times the table size limit was hit.
@@ -97,10 +95,13 @@ impl<I: IpExt, E, BT: FilterBindingsTypes> Table<I, E, BT> {
         Some(Connection::Shared(conn.clone()))
     }
 
-    /// Returns the number of connections in the table.
+    /// Returns the number of entries in the table.
+    ///
+    /// NOTE: This is usually twice the number of connections, but self-connected sockets will only
+    /// have a single entry.
     #[cfg(feature = "testutils")]
-    pub fn num_connections(&self) -> usize {
-        self.inner.lock().num_connections
+    pub fn num_entries(&self) -> usize {
+        self.inner.lock().table.len()
     }
 
     /// Removes the [`Connection`] for the flow indexed by `tuple`, if one exists,
@@ -123,8 +124,6 @@ impl<I: IpExt, E, BT: FilterBindingsTypes> Table<I, E, BT> {
             }
         }
 
-        guard.num_connections -= 1;
-
         Some(Connection::Shared(conn))
     }
 }
@@ -145,7 +144,6 @@ impl<I: IpExt, E, BC: FilterBindingsContext> Table<I, E, BC> {
                     bindings_ctx,
                     FilterTimerId::ConntrackGc(IpVersionMarker::<I>::new()),
                 ),
-                num_connections: 0,
                 table_limit_hits: 0,
                 table_limit_drops: 0,
             }),
@@ -186,7 +184,7 @@ impl<
 
         let mut guard = self.inner.lock();
 
-        if guard.num_connections >= MAXIMUM_CONNECTIONS {
+        if guard.table.len() >= MAXIMUM_ENTRIES {
             guard.table_limit_hits = guard.table_limit_hits.saturating_add(1);
             if let Some((original_tuple, reply_tuple)) = guard
                 .table
@@ -203,8 +201,6 @@ impl<
                 if original_tuple != reply_tuple {
                     assert!(guard.table.remove(&reply_tuple).is_some());
                 }
-
-                guard.num_connections -= 1;
             } else {
                 guard.table_limit_drops = guard.table_limit_drops.saturating_add(1);
                 return Err(FinalizeConnectionError::TableFull);
@@ -258,8 +254,6 @@ impl<
                 let res = guard.table.insert(shared.inner.reply_tuple.clone(), shared);
                 debug_assert!(res.is_none());
             }
-
-            guard.num_connections += 1;
 
             // For the most part, this will only schedule the timer once, when
             // the first packet hits the netstack. However, since the GC timer
@@ -319,12 +313,8 @@ impl<I: IpExt, E: Default, BC: FilterBindingsContext> Table<I, E, BC> {
                     // connection from the table, since we released the table
                     // lock while updating the connection.
                     let mut guard = self.inner.lock();
-                    let original = guard.table.remove(&conn.inner.original_tuple);
-                    let reply = guard.table.remove(&conn.inner.reply_tuple);
-
-                    if original.is_some() || reply.is_some() {
-                        guard.num_connections -= 1;
-                    }
+                    let _ = guard.table.remove(&conn.inner.original_tuple);
+                    let _ = guard.table.remove(&conn.inner.reply_tuple);
 
                     Ok(Some((Connection::Shared(conn), direction)))
                 }
@@ -359,7 +349,6 @@ impl<I: IpExt, E: Default, BC: FilterBindingsContext> Table<I, E, BC> {
             })
             .collect();
 
-        guard.num_connections -= to_remove.len();
         for (original_tuple, reply_tuple) in to_remove {
             assert!(guard.table.remove(&original_tuple).is_some());
             if reply_tuple != original_tuple {
@@ -372,7 +361,7 @@ impl<I: IpExt, E: Default, BC: FilterBindingsContext> Table<I, E, BC> {
         // will wait for core to quiesce by waiting for timers to stop firing.
         // By only rescheduling when there are still entries in the table, we
         // ensure that we won't enter an infinite timer firing/scheduling loop.
-        if guard.num_connections > 0 {
+        if !guard.table.is_empty() {
             schedule_gc(bindings_ctx, &mut guard.gc_timer);
         }
     }
@@ -382,7 +371,7 @@ impl<I: IpExt, E: Inspectable, BT: FilterBindingsTypes> Inspectable for Table<I,
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         let guard = self.inner.lock();
 
-        inspector.record_usize("num_connections", guard.num_connections);
+        inspector.record_usize("num_entries", guard.table.len());
         inspector.record_uint("table_limit_hits", guard.table_limit_hits);
         inspector.record_uint("table_limit_drops", guard.table_limit_drops);
 
@@ -1621,7 +1610,7 @@ mod tests {
         );
         assert!(core_ctx.conntrack().contains_tuple(&first_tuple));
         assert!(core_ctx.conntrack().contains_tuple(&second_tuple));
-        assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
+        assert_eq!(core_ctx.conntrack().inner.lock().table.len(), 4);
 
         // T=GC_INTERVAL: Triggering a GC does not clean up any connections,
         // because no connections are stale yet.
@@ -1631,7 +1620,7 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), true);
-        assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
+        assert_eq!(core_ctx.conntrack().inner.lock().table.len(), 4);
 
         // T=GC_INTERVAL a packet for just the second connection comes in.
         let (conn, _dir) = core_ctx
@@ -1651,7 +1640,7 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), true);
-        assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
+        assert_eq!(core_ctx.conntrack().inner.lock().table.len(), 4);
 
         // The state in the table at this point is:
         // Connection 1:
@@ -1668,7 +1657,7 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), true);
-        assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
+        assert_eq!(core_ctx.conntrack().inner.lock().table.len(), 4);
 
         // Time advances to expiry for the first packet
         // (T=CONNECTION_EXPIRY_TIME_UDP) trigger gc and note that the first
@@ -1679,7 +1668,7 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), false);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), true);
-        assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 1);
+        assert_eq!(core_ctx.conntrack().inner.lock().table.len(), 2);
 
         // Advance time past the expiry time for the second connection
         // (T=CONNECTION_EXPIRY_TIME_UDP + GC_INTERVAL) and see that it is
@@ -1690,15 +1679,15 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), false);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), false);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), false);
-        assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 0);
+        assert!(core_ctx.conntrack().inner.lock().table.is_empty());
     }
 
     fn make_packets<I: IpExt + TestIpExt>(
         index: usize,
     ) -> (FakeIpPacket<I, FakeUdpPacket>, FakeIpPacket<I, FakeUdpPacket>) {
-        // This ensures that, no matter what size MAXIMUM_CONNECTIONS is
-        // (under 2^32, at least), we'll always have unique src and dst
-        // ports, and thus unique connections.
+        // This ensures that, no matter how big index is (under 2^32, at least),
+        // we'll always have unique src and dst ports, and thus unique
+        // connections.
         assert!(index < u32::MAX as usize);
         let src = (index % (u16::MAX as usize)) as u16;
         let dst = (index / (u16::MAX as usize)) as u16;
@@ -1726,7 +1715,7 @@ mod tests {
         let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
 
         // Fill up the table so that the next insertion will fail.
-        for i in 0..MAXIMUM_CONNECTIONS {
+        for i in 0..MAXIMUM_ENTRIES / 2 {
             let (packet, reply_packet) = make_packets(i);
             let (conn, _dir) = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
@@ -1758,9 +1747,9 @@ mod tests {
         // The table should be full whether or not the connections are
         // established since finalize_connection always inserts the connection
         // under the original and reply tuples.
-        assert_eq!(table.inner.lock().num_connections, MAXIMUM_CONNECTIONS);
+        assert_eq!(table.inner.lock().table.len(), MAXIMUM_ENTRIES);
 
-        let (packet, _) = make_packets(MAXIMUM_CONNECTIONS);
+        let (packet, _) = make_packets(MAXIMUM_ENTRIES / 2);
         let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
@@ -1775,7 +1764,7 @@ mod tests {
 
             // Inserting an existing connection again should succeed because
             // it's not growing the table.
-            let (packet, _) = make_packets(MAXIMUM_CONNECTIONS - 1);
+            let (packet, _) = make_packets(MAXIMUM_ENTRIES / 2 - 1);
             let (conn, _dir) = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
                 .expect("packet should be valid")
@@ -1816,7 +1805,7 @@ mod tests {
             assert_data_tree!(inspector, "root": {
                 "table_limit_drops": 0u64,
                 "table_limit_hits": 0u64,
-                "num_connections": 0u64,
+                "num_entries": 0u64,
                 "connections": {},
             });
         }
@@ -1844,7 +1833,7 @@ mod tests {
             assert_data_tree!(inspector, "root": {
                 "table_limit_drops": 0u64,
                 "table_limit_hits": 0u64,
-                "num_connections": 1u64,
+                "num_entries": 2u64,
                 "connections": {
                     "0": {
                         "original_tuple": {
@@ -1870,7 +1859,7 @@ mod tests {
         }
 
         // Fill the table up the rest of the way.
-        for i in 1..MAXIMUM_CONNECTIONS {
+        for i in 1..MAXIMUM_ENTRIES / 2 {
             let (packet, reply_packet) = make_packets(i);
             let (conn, _dir) = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
@@ -1895,11 +1884,11 @@ mod tests {
             );
         }
 
-        assert_eq!(table.inner.lock().num_connections, MAXIMUM_CONNECTIONS);
+        assert_eq!(table.inner.lock().table.len(), MAXIMUM_ENTRIES);
 
         // This first one should succeed because it can evict the
         // non-established connection.
-        let (packet, reply_packet) = make_packets(MAXIMUM_CONNECTIONS);
+        let (packet, reply_packet) = make_packets(MAXIMUM_ENTRIES / 2);
         let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
@@ -1923,7 +1912,7 @@ mod tests {
 
         // This next one should fail because there are no connections left to
         // evict.
-        let (packet, _) = make_packets(MAXIMUM_CONNECTIONS + 1);
+        let (packet, _) = make_packets(MAXIMUM_ENTRIES / 2 + 1);
         let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
@@ -1941,7 +1930,7 @@ mod tests {
             assert_data_tree!(inspector, "root": contains {
                 "table_limit_drops": 1u64,
                 "table_limit_hits": 2u64,
-                "num_connections": MAXIMUM_CONNECTIONS as u64,
+                "num_entries": MAXIMUM_ENTRIES as u64,
             });
         }
     }
@@ -1981,13 +1970,11 @@ mod tests {
         // There should be a single connection in the table, despite there only
         // being a single tuple.
         assert_eq!(table.inner.lock().table.len(), 1);
-        assert_eq!(table.inner.lock().num_connections, 1);
 
         bindings_ctx.sleep(CONNECTION_EXPIRY_TIME_UDP);
         table.perform_gc(&mut bindings_ctx);
 
-        assert_eq!(table.inner.lock().table.len(), 0);
-        assert_eq!(table.inner.lock().num_connections, 0);
+        assert!(table.inner.lock().table.is_empty());
     }
 
     #[ip_test(I)]
@@ -2050,14 +2037,14 @@ mod tests {
 
         assert!(!table.contains_tuple(&tuple));
         assert!(!table.contains_tuple(&reply_tuple));
-        assert_eq!(table.inner.lock().num_connections, 0);
+        assert!(table.inner.lock().table.is_empty());
 
         // The connection should not added back on finalization.
         assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok((false, Some(_))));
 
         assert!(!table.contains_tuple(&tuple));
         assert!(!table.contains_tuple(&reply_tuple));
-        assert_eq!(table.inner.lock().num_connections, 0);
+        assert!(table.inner.lock().table.is_empty());
 
         // GC should complete successfully.
         bindings_ctx.sleep(Duration::from_secs(60 * 60 * 24 * 6));

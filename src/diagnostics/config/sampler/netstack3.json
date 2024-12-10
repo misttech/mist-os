@@ -22,7 +22,7 @@
             ],
             "metric_id": 40,
             "metric_type": "Integer",
-            "selector": "core/network/netstack:root/Filtering\\ State/IPv4/conntrack:num_connections"
+            "selector": "core/network/netstack:root/Filtering\\ State/IPv4/conntrack:num_entries"
         },
         {
             "event_codes": [
@@ -30,7 +30,7 @@
             ],
             "metric_id": 40,
             "metric_type": "Integer",
-            "selector": "core/network/netstack:root/Filtering\\ State/IPv6/conntrack:num_connections"
+            "selector": "core/network/netstack:root/Filtering\\ State/IPv6/conntrack:num_entries"
         },
         {
             "event_codes": [

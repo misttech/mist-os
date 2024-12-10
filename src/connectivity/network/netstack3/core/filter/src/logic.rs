@@ -803,7 +803,7 @@ mod tests {
     use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
     use ip_test_macro::ip_test;
-    use net_types::ip::{AddrSubnet, Ipv4};
+    use net_types::ip::{AddrSubnet, Ipv4, Ipv4Addr, Ipv6Addr};
     use netstack3_base::{AssignedAddrIpExt, SegmentHeader};
     use test_case::test_case;
 
@@ -1465,13 +1465,34 @@ mod tests {
         let mut bindings_ctx = FakeBindingsCtx::new();
         let mut ctx = FakeCtx::new(&mut bindings_ctx);
 
-        for i in 0..u16::try_from(conntrack::MAXIMUM_CONNECTIONS).unwrap() {
+        for i in 0..conntrack::MAXIMUM_ENTRIES {
+            // This ensures that, no matter how big index is (under 2^32, at least),
+            // we'll always have unique src and dst ports, and thus unique
+            // connections.
+            assert!(i < u32::MAX as usize);
+            let port = (i % (u16::MAX as usize)) as u16;
+            let ip_index = (i / (u16::MAX as usize)) as u16;
+
+            let ip: I::Addr = I::map_ip(
+                (I::SRC_IP, ip_index),
+                |(base_ip, i)| {
+                    let start = u32::from_be_bytes(base_ip.ipv4_bytes());
+                    let bytes = (start + u32::try_from(i).unwrap()).to_be_bytes();
+                    Ipv4Addr::new(bytes)
+                },
+                |(base_ip, i)| {
+                    let start = u128::from_be_bytes(base_ip.ipv6_bytes());
+                    let bytes = (start + u128::try_from(i).unwrap()).to_be_bytes();
+                    Ipv6Addr::from_bytes(bytes)
+                },
+            );
+
             // Create a self-connected flow so it's automatically considered established
             // after the first packet.
             let mut packet = FakeIpPacket {
-                src_ip: I::SRC_IP,
-                dst_ip: I::SRC_IP,
-                body: FakeUdpPacket { src_port: i, dst_port: i },
+                src_ip: ip,
+                dst_ip: ip,
+                body: FakeUdpPacket { src_port: port, dst_port: port },
             };
             let (verdict, _proof) = FilterImpl(&mut ctx).egress_hook(
                 &mut bindings_ctx,
