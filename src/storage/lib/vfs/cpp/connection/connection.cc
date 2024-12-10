@@ -48,15 +48,16 @@ Connection::~Connection() {
   }
 }
 
-void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
-                           fidl::ServerEnd<fio::Node> server_end) {
+void Connection::NodeCloneDeprecated(fio::OpenFlags flags, VnodeProtocol protocol,
+                                     fidl::ServerEnd<fio::Node> server_end) {
   zx_status_t status = [&]() -> zx_status_t {
     zx::result clone_options = VnodeConnectionOptions::FromCloneFlags(flags, protocol);
     if (clone_options.is_error()) {
-      FS_PRETTY_TRACE_DEBUG("[NodeClone] invalid clone flags: ", flags);
+      FS_PRETTY_TRACE_DEBUG("[NodeCloneDeprecated] invalid clone flags: ", flags);
       return clone_options.error_value();
     }
-    FS_PRETTY_TRACE_DEBUG("[NodeClone] our rights: ", rights(), ", options: ", *clone_options);
+    FS_PRETTY_TRACE_DEBUG("[NodeCloneDeprecated] our rights: ", rights(),
+                          ", options: ", *clone_options);
 
     // If CLONE_SAME_RIGHTS is requested, cloned connection will inherit the same rights as those
     // from the originating connection.
@@ -88,7 +89,7 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
   }();
 
   if (status != ZX_OK) {
-    FS_PRETTY_TRACE_DEBUG("[NodeClone] error: ", zx_status_get_string(status));
+    FS_PRETTY_TRACE_DEBUG("[NodeCloneDeprecated] error: ", zx_status_get_string(status));
     if (flags & fio::wire::OpenFlags::kDescribe) {
       // Ignore errors since there is nothing we can do if this fails.
       [[maybe_unused]] auto result = fidl::WireSendEvent(server_end)->OnOpen(status, {});
@@ -97,8 +98,8 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
   }
 }
 
-void Connection::NodeClone2(fio::Flags flags, zx::channel object) const {
-  FS_PRETTY_TRACE_DEBUG("[NodeClone2] reopening with flags: ", flags);
+void Connection::NodeClone(fio::Flags flags, zx::channel object) const {
+  FS_PRETTY_TRACE_DEBUG("[NodeClone] reopening with flags: ", flags);
   auto vfs = this->vfs();
   if (!vfs) {
     fidl::ServerEnd<fio::Node>{std::move(object)}.Close(ZX_ERR_CANCELED);
@@ -108,7 +109,7 @@ void Connection::NodeClone2(fio::Flags flags, zx::channel object) const {
   [[maybe_unused]] zx_status_t status = vfs->Serve(vnode(), std::move(object), flags);
 #if FS_TRACE_DEBUG_ENABLED
   if (status != ZX_OK) {
-    FS_PRETTY_TRACE_DEBUG("[NodeClone2] serve failed: ", zx_status_get_string(status));
+    FS_PRETTY_TRACE_DEBUG("[NodeClone] serve failed: ", zx_status_get_string(status));
   }
 #endif  // FS_TRACE_DEBUG_ENABLED
 }

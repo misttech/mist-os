@@ -81,6 +81,12 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         request: fio::DirectoryRequest,
     ) -> Result<ConnectionState, Error> {
         match request {
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::DeprecatedClone { flags, object, control_handle: _ } => {
+                trace::duration!(c"storage", c"Directory::DeprecatedClone");
+                self.handle_clone(flags, object);
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::Clone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"Directory::Clone");
                 self.handle_clone(flags, object);

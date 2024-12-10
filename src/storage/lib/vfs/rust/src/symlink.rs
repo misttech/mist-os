@@ -91,11 +91,16 @@ impl<T: Symlink> Connection<T> {
     // Returns true if the connection should terminate.
     async fn handle_request(&mut self, req: fio::SymlinkRequest) -> Result<bool, fidl::Error> {
         match req {
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::DeprecatedClone { flags, object, control_handle: _ } => {
+                self.handle_clone_deprecated(flags, object);
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::SymlinkRequest::Clone { flags, object, control_handle: _ } => {
-                self.handle_clone(flags, object);
+                self.handle_clone_deprecated(flags, object);
             }
             fio::SymlinkRequest::Clone2 { request, control_handle: _ } => {
-                self.handle_clone2(ServerEnd::new(request.into_channel()));
+                self.handle_clone(ServerEnd::new(request.into_channel()));
             }
             fio::SymlinkRequest::Close { responder } => {
                 responder.send(Ok(()))?;
@@ -197,7 +202,11 @@ impl<T: Symlink> Connection<T> {
         Ok(false)
     }
 
-    fn handle_clone(&mut self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {
+    fn handle_clone_deprecated(
+        &mut self,
+        flags: fio::OpenFlags,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
         let flags = match inherit_rights_for_clone(fio::OpenFlags::RIGHT_READABLE, flags) {
             Ok(updated) => updated,
             Err(status) => {
@@ -220,7 +229,7 @@ impl<T: Symlink> Connection<T> {
         });
     }
 
-    fn handle_clone2(&mut self, server_end: ServerEnd<fio::SymlinkMarker>) {
+    fn handle_clone(&mut self, server_end: ServerEnd<fio::SymlinkMarker>) {
         let flags = fio::Flags::PROTOCOL_SYMLINK | fio::Flags::PERM_GET_ATTRIBUTES;
         flags.to_object_request(server_end).handle(|object_request| {
             self.scope.spawn(Self::create(

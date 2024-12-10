@@ -189,7 +189,7 @@ void CloneFdAsReadOnlyHelper(fbl::unique_fd in_fd, fbl::unique_fd* out_fd) {
 
   auto clone_result =
       fidl::WireCall(fdio_caller.borrow_as<fio::Node>())
-          ->Clone(fio::wire::OpenFlags::kRightReadable, std::move(endpoints.server));
+          ->DeprecatedClone(fio::wire::OpenFlags::kRightReadable, std::move(endpoints.server));
   ASSERT_EQ(clone_result.status(), ZX_OK);
 
   // Turn the handle back to an fd to test posix functions
@@ -220,9 +220,9 @@ TEST_P(DirectoryPermissionTest, TestCloneWithBadFlags) {
 
     auto endpoints = fidl::Endpoints<fio::Node>::Create();
 
-    auto clone_result =
-        fidl::WireCall(fdio_caller.borrow_as<fio::Node>())
-            ->Clone(fio::wire::OpenFlags::kCloneSameRights | right, std::move(endpoints.server));
+    auto clone_result = fidl::WireCall(fdio_caller.borrow_as<fio::Node>())
+                            ->DeprecatedClone(fio::wire::OpenFlags::kCloneSameRights | right,
+                                              std::move(endpoints.server));
     ASSERT_EQ(clone_result.status(), ZX_OK);
     auto describe_result = fidl::WireCall(endpoints.client)->Query();
     ASSERT_EQ(describe_result.status(), ZX_ERR_PEER_CLOSED);
@@ -241,10 +241,10 @@ TEST_P(DirectoryPermissionTest, TestCloneCannotIncreaseRights) {
 
   auto endpoints = fidl::Endpoints<fio::Node>::Create();
 
-  auto clone_result =
-      fidl::WireCall(fdio_caller.borrow_as<fio::Node>())
-          ->Clone(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable,
-                  std::move(endpoints.server));
+  auto clone_result = fidl::WireCall(fdio_caller.borrow_as<fio::Node>())
+                          ->DeprecatedClone(fio::wire::OpenFlags::kRightReadable |
+                                                fio::wire::OpenFlags::kRightWritable,
+                                            std::move(endpoints.server));
   ASSERT_EQ(clone_result.status(), ZX_OK);
   auto describe_result = fidl::WireCall(endpoints.client)->Query();
   ASSERT_EQ(describe_result.status(), ZX_ERR_PEER_CLOSED);

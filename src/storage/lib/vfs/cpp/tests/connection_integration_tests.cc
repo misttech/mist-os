@@ -436,8 +436,8 @@ TEST_F(ConnectionTest, NegotiateProtocol) {
     // Check that if we clone the connection, we still get the directory protocol.
     auto [clone_client, clone_server] = fidl::Endpoints<fio::Node>::Create();
     ASSERT_EQ(fidl::WireCall(dir_client)
-                  ->Clone(fio::OpenFlags::kDescribe | fio::OpenFlags::kCloneSameRights,
-                          std::move(clone_server))
+                  ->DeprecatedClone(fio::OpenFlags::kDescribe | fio::OpenFlags::kCloneSameRights,
+                                    std::move(clone_server))
                   .status(),
               ZX_OK);
     zx::result<fio::wire::NodeInfoDeprecated> cloned_info = GetOnOpenResponse(clone_client);
@@ -459,8 +459,8 @@ TEST_F(ConnectionTest, NegotiateProtocol) {
     // Check that if we clone the connection, we still get the file protocol.
     auto [clone_client, clone_server] = fidl::Endpoints<fio::Node>::Create();
     ASSERT_EQ(fidl::WireCall(file_client)
-                  ->Clone(fio::OpenFlags::kDescribe | fio::OpenFlags::kCloneSameRights,
-                          std::move(clone_server))
+                  ->DeprecatedClone(fio::OpenFlags::kDescribe | fio::OpenFlags::kCloneSameRights,
+                                    std::move(clone_server))
                   .status(),
               ZX_OK);
     zx::result<fio::wire::NodeInfoDeprecated> cloned_info = GetOnOpenResponse(clone_client);
@@ -482,8 +482,8 @@ TEST_F(ConnectionTest, NegotiateProtocol) {
     // Check that if we clone the connection, we still get the node protocol.
     auto [clone_client, clone_server] = fidl::Endpoints<fio::Node>::Create();
     ASSERT_EQ(fidl::WireCall(node_client)
-                  ->Clone(fio::OpenFlags::kDescribe | fio::OpenFlags::kCloneSameRights,
-                          std::move(clone_server))
+                  ->DeprecatedClone(fio::OpenFlags::kDescribe | fio::OpenFlags::kCloneSameRights,
+                                    std::move(clone_server))
                   .status(),
               ZX_OK);
     zx::result<fio::wire::NodeInfoDeprecated> cloned_info = GetOnOpenResponse(clone_client);

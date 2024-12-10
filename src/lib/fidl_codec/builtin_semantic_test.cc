@@ -104,16 +104,16 @@ void BuiltinSemanticTest::ShortDisplay(std::ostream& os, const MethodDisplay* di
   }
 }
 
-// Check Node::Clone: request.object = handle
-TEST_F(BuiltinSemanticTest, CloneWrite) {
-  // Checks that Node::Clone exists in fuchsia.io.
+// Check Node::DeprecatedClone: request.object = handle
+TEST_F(BuiltinSemanticTest, DeprecatedCloneWrite) {
+  // Checks that Node::DeprecatedClone exists in fuchsia.io.
   Library* library = library_loader_.GetLibraryFromName("fuchsia.io");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
   library->GetProtocolByName("fuchsia.io/Node", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("Clone");
+  ProtocolMethod* method = protocol->GetMethodByName("DeprecatedClone");
   ASSERT_NE(method, nullptr);
   // Checks that the builtin semantic is defined for Clone.
   ASSERT_NE(method->semantic(), nullptr);
@@ -136,16 +136,16 @@ TEST_F(BuiltinSemanticTest, CloneWrite) {
   ASSERT_EQ(inferred_handle_info->attributes(), "cloned");
 }
 
-// Check Node::Clone: request.object = handle
-TEST_F(BuiltinSemanticTest, CloneRead) {
-  // Checks that Node::Clone exists in fuchsia.io.
+// Check Node::DeprecatedClone: request.object = handle
+TEST_F(BuiltinSemanticTest, DeprecatedCloneRead) {
+  // Checks that Node::DeprecatedClone exists in fuchsia.io.
   Library* library = library_loader_.GetLibraryFromName("fuchsia.io");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
   library->GetProtocolByName("fuchsia.io/Node", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("Clone");
+  ProtocolMethod* method = protocol->GetMethodByName("DeprecatedClone");
   ASSERT_NE(method, nullptr);
   // Checks that the builtin semantic is defined for Clone.
   ASSERT_NE(method->semantic(), nullptr);
@@ -168,16 +168,16 @@ TEST_F(BuiltinSemanticTest, CloneRead) {
   ASSERT_EQ(inferred_handle_info->attributes(), "cloned");
 }
 
-// Check Node::Clone: request.object = handle
-TEST_F(BuiltinSemanticTest, CloneFd) {
-  // Checks that Node::Clone exists in fuchsia.io.
+// Check Node::DeprecatedClone: request.object = handle
+TEST_F(BuiltinSemanticTest, DeprecatedCloneFd) {
+  // Checks that Node::DeprecatedClone exists in fuchsia.io.
   Library* library = library_loader_.GetLibraryFromName("fuchsia.io");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
   library->GetProtocolByName("fuchsia.io/Node", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("Clone");
+  ProtocolMethod* method = protocol->GetMethodByName("DeprecatedClone");
   ASSERT_NE(method, nullptr);
   // Checks that the builtin semantic is defined for Clone.
   ASSERT_NE(method->semantic(), nullptr);

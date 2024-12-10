@@ -408,7 +408,7 @@ class FidlcatE2eTests(unittest.TestCase):
   startup Channel:8db3d62f(dir:/pkg)
 
   startup Channel:2f53d2bb(directory-request:/)
-      21320.389674 read  request  fuchsia.io/Node.Clone
+      21320.389674 read  request  fuchsia.io/Node.DeprecatedClone
     closed by zx_handle_close
 
   startup Clock:7343d0fb()
@@ -459,7 +459,7 @@ class FidlcatE2eTests(unittest.TestCase):
     closed by Channel:fdd3d09f(channel:1) sending fuchsia.io/Directory.Open
 
   Channel:31c3d79b()
-    created by Channel:2f53d2bb(directory-request:/) receiving fuchsia.io/Node.Clone
+    created by Channel:2f53d2bb(directory-request:/) receiving fuchsia.io/Node.DeprecatedClone
     closed by zx_handle_close
 
 --------------------------------------------------------------------------------echo_server.cm 1934409: 18 handles
@@ -477,7 +477,7 @@ class FidlcatE2eTests(unittest.TestCase):
   startup Channel:c75c3537(dir:/pkg)
 
   startup Channel:dedc3503(directory-request:/)
-      21320.679108 read  request  fuchsia.io/Node.Clone
+      21320.679108 read  request  fuchsia.io/Node.DeprecatedClone
       21320.814595 read  request  fuchsia.io/Directory.Open("svc/test.placeholders.Echo")
         -> Channel:60dc2bb3()
 
@@ -509,7 +509,7 @@ class FidlcatE2eTests(unittest.TestCase):
     created by zx_channel_create
 
   Channel:aa3c2a07()
-    created by Channel:dedc3503(directory-request:/) receiving fuchsia.io/Node.Clone
+    created by Channel:dedc3503(directory-request:/) receiving fuchsia.io/Node.DeprecatedClone
     closed by zx_handle_close
 
   Channel:60dc2bb3()
@@ -542,8 +542,8 @@ class FidlcatE2eTests(unittest.TestCase):
       21321.018177 read  response test.placeholders/Echo.EchoString(Channel:7663d53b(channel:2))
 
   fuchsia.io/Node: 1 event
-    Clone: 1 event
-      21320.389674 read  request  fuchsia.io/Node.Clone(Channel:2f53d2bb(directory-request:/))
+    DeprecatedClone: 1 event
+      21320.389674 read  request  fuchsia.io/Node.DeprecatedClone(Channel:2f53d2bb(directory-request:/))
 
 --------------------------------------------------------------------------------echo_server.cm 1934409: 5 events
   fuchsia.io/Directory: 2 events
@@ -559,8 +559,8 @@ class FidlcatE2eTests(unittest.TestCase):
       21320.992007 write response test.placeholders/Echo.EchoString(Channel:60dc2bb3())
 
   fuchsia.io/Node: 1 event
-    Clone: 1 event
-      21320.679108 read  request  fuchsia.io/Node.Clone(Channel:dedc3503(directory-request:/))
+    DeprecatedClone: 1 event
+      21320.679108 read  request  fuchsia.io/Node.DeprecatedClone(Channel:dedc3503(directory-request:/))
 """,
         )
 

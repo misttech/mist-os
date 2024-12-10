@@ -308,11 +308,20 @@ open protocol Node {
     /// Alternatively, pass `OpenFlags.CLONE_SAME_RIGHTS` to inherit the rights on the source connection.
     /// It is invalid to pass any of the `OpenFlags.RIGHT_*` flags together with
     /// `OpenFlags.CLONE_SAME_RIGHTS`.
+    @available(replaced=NEXT, renamed="DeprecatedClone")
     @selector("fuchsia.io1/Node.Clone")
     strict Clone(resource struct {
         flags OpenFlags;
         object server_end:Node;
     });
+
+    @available(added=NEXT, deprecated=HEAD, note="Use fuchsia.unknown/Cloneable.Clone2 instead.")
+    @selector("fuchsia.io1/Node.Clone")
+    flexible DeprecatedClone(resource struct {
+        flags OpenFlags;
+        object server_end:Node;
+    });
+
 
     /// An event produced eagerly by a FIDL server if requested by `OpenFlags.DESCRIBE`.
     ///

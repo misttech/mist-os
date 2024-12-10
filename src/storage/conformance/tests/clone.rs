@@ -22,7 +22,8 @@ async fn clone_file_with_same_or_fewer_rights() {
         // Clone using every subset of flags.
         for clone_flags in file_rights.combinations_deprecated() {
             let (proxy, server) = create_proxy::<fio::NodeMarker>();
-            file.clone(clone_flags | fio::OpenFlags::DESCRIBE, server).expect("clone failed");
+            file.deprecated_clone(clone_flags | fio::OpenFlags::DESCRIBE, server)
+                .expect("clone failed");
             let status = get_open_status(&proxy).await;
             assert_eq!(status, zx::Status::OK);
 
@@ -46,7 +47,7 @@ async fn clone_file_with_same_rights_flag() {
 
         // Clone using CLONE_FLAG_SAME_RIGHTS.
         let (proxy, server) = create_proxy::<fio::NodeMarker>();
-        file.clone(fio::OpenFlags::CLONE_SAME_RIGHTS | fio::OpenFlags::DESCRIBE, server)
+        file.deprecated_clone(fio::OpenFlags::CLONE_SAME_RIGHTS | fio::OpenFlags::DESCRIBE, server)
             .expect("clone failed");
         let status = get_open_status(&proxy).await;
         assert_eq!(status, zx::Status::OK);
@@ -77,7 +78,8 @@ async fn clone_file_with_additional_rights() {
                 continue;
             }
             let (proxy, server) = create_proxy::<fio::NodeMarker>();
-            file.clone(clone_flags | fio::OpenFlags::DESCRIBE, server).expect("clone failed");
+            file.deprecated_clone(clone_flags | fio::OpenFlags::DESCRIBE, server)
+                .expect("clone failed");
             let status = get_open_status(&proxy).await;
             assert_eq!(status, zx::Status::ACCESS_DENIED);
         }
@@ -97,7 +99,8 @@ async fn clone_directory_with_same_or_fewer_rights() {
         // Clone using every subset of flags.
         for clone_flags in Rights::new(dir_rights.all_rights()).combinations_deprecated() {
             let (proxy, server) = create_proxy::<fio::NodeMarker>();
-            dir.clone(clone_flags | fio::OpenFlags::DESCRIBE, server).expect("clone failed");
+            dir.deprecated_clone(clone_flags | fio::OpenFlags::DESCRIBE, server)
+                .expect("clone failed");
             let status = get_open_status(&proxy).await;
             assert_eq!(status, zx::Status::OK);
 
@@ -120,7 +123,7 @@ async fn clone_directory_with_same_rights_flag() {
 
         // Clone using CLONE_FLAG_SAME_RIGHTS.
         let (proxy, server) = create_proxy::<fio::NodeMarker>();
-        dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS | fio::OpenFlags::DESCRIBE, server)
+        dir.deprecated_clone(fio::OpenFlags::CLONE_SAME_RIGHTS | fio::OpenFlags::DESCRIBE, server)
             .expect("clone failed");
         let status = get_open_status(&proxy).await;
         assert_eq!(status, zx::Status::OK);
@@ -151,7 +154,8 @@ async fn clone_directory_with_additional_rights() {
                 continue;
             }
             let (proxy, server) = create_proxy::<fio::NodeMarker>();
-            dir.clone(clone_flags | fio::OpenFlags::DESCRIBE, server).expect("clone failed");
+            dir.deprecated_clone(clone_flags | fio::OpenFlags::DESCRIBE, server)
+                .expect("clone failed");
             let status = get_open_status(&proxy).await;
             assert_eq!(status, zx::Status::ACCESS_DENIED);
         }

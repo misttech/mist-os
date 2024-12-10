@@ -109,7 +109,7 @@ func (s *Service) addConnectionDeprecated(flags io.OpenFlags, mode io.ModeType, 
 	return respondDeprecated(flags, req, s.AddFn(context.Background(), req.Channel), s)
 }
 
-func (s *Service) Clone(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtxInterfaceRequest) error {
+func (s *Service) DeprecatedClone(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtxInterfaceRequest) error {
 	return s.addConnectionDeprecated(flags, 0, req)
 }
 
@@ -302,7 +302,7 @@ type directoryState struct {
 	dirents bytes.Buffer
 }
 
-func (dirState *directoryState) Clone(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtxInterfaceRequest) error {
+func (dirState *directoryState) DeprecatedClone(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtxInterfaceRequest) error {
 	return dirState.addConnectionDeprecated(flags, 0, req)
 }
 
@@ -705,7 +705,7 @@ type fileState struct {
 	size   uint64
 }
 
-func (fState *fileState) Clone(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtxInterfaceRequest) error {
+func (fState *fileState) DeprecatedClone(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtxInterfaceRequest) error {
 	return fState.addConnectionDeprecated(flags, 0, req)
 }
 

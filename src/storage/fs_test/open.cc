@@ -133,7 +133,7 @@ TEST_P(OpenTest, OpenFileWithCreateFailsInReadWriteDirPosixClone) {
                                           fio::wire::OpenFlags::kDirectory;
   auto clone_endpoints = fidl::Endpoints<fio::Node>::Create();
   auto clone_res =
-      fidl::WireCall(parent)->Clone(flags_deprecated, std::move(clone_endpoints.server));
+      fidl::WireCall(parent)->DeprecatedClone(flags_deprecated, std::move(clone_endpoints.server));
   ASSERT_EQ(clone_res.status(), ZX_OK);
   fidl::ClientEnd<fio::Directory> clone_dir(clone_endpoints.client.TakeChannel());
 
@@ -149,7 +149,7 @@ TEST_P(OpenTest, OpenFileWithCreateFailsInReadOnlyDirPosixClone) {
                                           fio::wire::OpenFlags::kDirectory;
   auto clone_endpoints = fidl::Endpoints<fio::Node>::Create();
   auto clone_res =
-      fidl::WireCall(parent)->Clone(flags_deprecated, std::move(clone_endpoints.server));
+      fidl::WireCall(parent)->DeprecatedClone(flags_deprecated, std::move(clone_endpoints.server));
   ASSERT_EQ(clone_res.status(), ZX_OK);
   fidl::ClientEnd<fio::Directory> clone_dir(clone_endpoints.client.TakeChannel());
 

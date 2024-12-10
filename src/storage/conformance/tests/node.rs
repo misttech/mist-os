@@ -143,7 +143,7 @@ async fn test_node_clone() {
         .unwrap();
 
     let (cloned, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-    proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server).expect("clone failed");
+    proxy.deprecated_clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server).expect("clone failed");
 
     assert_matches!(
         cloned.get_connection_info().await.expect("get_connection_info failed"),

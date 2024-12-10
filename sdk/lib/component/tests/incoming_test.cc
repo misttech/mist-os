@@ -167,7 +167,12 @@ class EmptyCloneableNodeImpl : public fidl::testing::WireTestBase<EmptyCloneable
     completer.Close(ZX_ERR_BAD_STATE);
   }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  void DeprecatedClone(DeprecatedCloneRequestView request,
+                       DeprecatedCloneCompleter::Sync& completer) override {
+#else
   void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override {
+#endif
     fidl::BindServer(dispatcher_,
                      fidl::ServerEnd<EmptyCloneableNode>(request->object.TakeChannel()), this);
   }
