@@ -1,35 +1,51 @@
 # Recording a kernel trace
 
-The kernel traces various actions by writing records to an internal buffer,
-which can later be retrieved, printed, and viewed.
+Caution: In most cases you should use `ffx trace` to record traces, see
+[Record traces for performance analysis][ffx-trace-guide]. However, this guide
+is useful if you don't have access to the `ffx` tool such as when you
+want to do a kernel trace in bringup builds.
+
+The kernel writes records to an internal buffer to capture traces of various
+actions. These traces can then be retrieved, printed, and viewed in a tool such
+as [Perfetto][`ui.perfetto.dev`].
 
 ## Kernel trace format
 
-The kernel trace format uses [FXT](/docs/reference/tracing/trace-format.md)
-
-## Controlling what to trace
-
-Control of what to trace is provided by a kernel command-line parameter
-`ktrace.grpmask`. The value is specified as 0xNNN and is a bitmask
-of tracing groups to enable. See the **KTRACE\_GRP\_\** values in
-`system/ulib/zircon-internal/include/lib/zircon-internal/ktrace.h`.
-The default is 0xfff, which traces everything.
-
-What to trace can also be controlled by the `ktrace` command-line utility,
-described below.
+The kernel trace format uses [FXT](/docs/reference/tracing/trace-format.md).
 
 ## Trace buffer size
 
 The size of the trace buffer is fixed at boot time and is controlled by
-the `ktrace.bufsize` kernel command-line parameter. Its value is the
+the [`ktrace.bufsize`] kernel command-line parameter. Its value is the
 buffer size in megabytes. The default is 32MB.
 
-## ktrace command-line utility
+## Control what to trace
 
-Kernel tracing may be controlled with the `ktrace` command-line utility.
+You can control what to trace through the kernel command-line parameter
+`ktrace.grpmask`. The value is specified as `0xNNN` and is a bitmask of tracing
+groups to enable. See the **KTRACE_GRP_** values in
+`system/ulib/zircon-internal/include/lib/zircon-internal/ktrace.h`. By default,
+the value is `0xfff` which traces everything.
 
+You can also dynamically control what to trace with the `ktrace` command-line
+utility.
+
+## `ktrace` command-line utility
+
+You can control kernel tracing with the `ktrace` command-line utility.
+
+Note: For more information about `ktrace`, see
+[Zircon Kernel Command Line Options][kernel-cmd-ref].
+
+Use `ktrace --help` to see all of the available commands:
+
+```posix-terminal
+ktrace --help
 ```
-$ ktrace --help
+
+You should see an output like:
+
+```none {:.devsite-disable-click-to-copy}
 Usage: ktrace [options] <control>
 Where <control> is one of:
   start <group_mask>  - start tracing
@@ -44,40 +60,46 @@ Options:
   --help  - Duh.
 ```
 
-## Viewing kernel trace
+## View a  kernel trace
 
-Traces can be uploaded to ui.perfetto.dev to be viewed. Alternatively, the host tool `trace2json`
-can be used to export a trace to a more readable json output.
+You can view a trace with [`ui.perfetto.dev`]. Before you can view a trace, you
+need to capture a trace.
 
-Example:
+1. Start the trace on the target:
 
-First collect the trace on the target:
+  ```posix-terminal
+  ktrace start {{ '<var>0xfff</var>' }}
+  ... do something ...
 
-```
-$ ktrace start 0xfff
-... do something ...
-$ ktrace stop
-$ ktrace save /tmp/save.ktrace
-```
+1. Stop the trace:
 
-Then copy the file to the development host, and export it:
+  ```posix-terminal
+  ktrace stop
+  ```
 
-```
-host$ fx cp --to-host /tmp/save.ktrace save.fxt
-host$ fx trace2json < save.fxt > save.json
-```
+1. Save the trace to `/tmp/save.ktrace`:
 
-The output can be quite voluminous, thus it's recommended to send it to a
-file and then view it in your editor or whatever.
+  ```posix-terminal
+  ktrace save /tmp/save.ktrace
+  ```
+
+1. Use `fx cp` to copy the file to your development host:
+
+  ```none{: .devsite-terminal data-terminal-prefix="host$" }
+  fx cp --to-host /tmp/save.ktrace save.fxt
+  ```
+
+1. View the trace file in [`ui.perfetto.dev`].
 
 ## Use with Fuchsia Tracing
 
-Fuchsia's tracing system supports collecting kernel trace records through
-the `ktrace_provider` trace provider.
-For documentation of Fuchsia's tracing system see the documentation in
-[Fuchsia tracing system](/docs/concepts/kernel/tracing-system.md).
+Fuchsia's tracing system supports collecting kernel trace records through the
+`ktrace_provider` trace provider. For more information about Fuchsia's tracing
+system, see [Fuchsia tracing system][tracing-concepts].
 
-## More information
-
-More information on `ktrace` can be found in the
-[full list of kernel command line parameters](/docs/reference/kernel/kernel_cmdline.md).
+[`/zircon/system/ulib/zircon-internal/include/lib/zircon-internal/ktrace.h`]: /zircon/system/ulib/zircon-internal/include/lib/zircon-internal/ktrace.h
+[kernel-cmd-ref]: /docs/reference/kernel/kernel_cmdline.md
+[tracing-concepts]: /docs/concepts/kernel/tracing-system.md
+[ffx-trace-guide]: /docs/development/tools/ffx/workflows/record-traces.md
+[`ktrace.bufsize`]: /docs/gen/boot-options.md#ktracebufsizeuint32_t
+[`ui.perfetto.dev`]: https://ui.perfetto.dev/
