@@ -399,7 +399,7 @@ int main(int argv, char** argc) {
       });
 
       if (fidl::Status status = handler.HandleOneEvent(client_end); !status.ok()) {
-        FX_PLOGS(ERROR, status.status()) << "failed to handle event for '" << path << "'";
+        FX_PLOGS(DEBUG, status.status()) << "failed to handle event for '" << path << "'";
       }
     });
     if (!inserted) {
