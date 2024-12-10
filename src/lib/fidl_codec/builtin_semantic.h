@@ -5,14 +5,29 @@
 #ifndef SRC_LIB_FIDL_CODEC_BUILTIN_SEMANTIC_H_
 #define SRC_LIB_FIDL_CODEC_BUILTIN_SEMANTIC_H_
 
-#include <string>
+#include <string_view>
 
-namespace fidl_codec {
-namespace semantic {
+namespace fidl_codec::semantic {
 
-extern std::string builtin_semantic_fuchsia_io;
+constexpr std::string_view kBuiltinSemanticFuchsiaIo =
+    "library fuchsia.io {\n"
+    "  Node::DeprecatedClone {\n"
+    "    request.object = handle : 'cloned';\n"
+    "  }\n"
+    "  Directory::Open {\n"
+    "    request.object = handle / request.path;\n"
+    "    input_field: request.path;\n"
+    "    result: request.object;\n"
+    "  }\n"
+    "  File::Seek {\n"
+    "    input_field: request.origin;\n"
+    "    input_field: request.offset;\n"
+    "  }\n"
+    "  File::Write {\n"
+    "    input_field: request.data.size ' bytes';\n"
+    "  }\n"
+    "}\n";
 
-}  // namespace semantic
-}  // namespace fidl_codec
+}  // namespace fidl_codec::semantic
 
 #endif  // SRC_LIB_FIDL_CODEC_BUILTIN_SEMANTIC_H_

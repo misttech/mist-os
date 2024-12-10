@@ -53,7 +53,7 @@ class BuiltinSemanticTest : public SemanticParserTest {
 BuiltinSemanticTest::BuiltinSemanticTest()
     : channel0_({fidl_codec::kNoHandleDisposition, kChannel0, 0, 0, ZX_OK}),
       channel2_({fidl_codec::kNoHandleDisposition, kChannel2, 0, 0, ZX_OK}) {
-  library_loader_.ParseBuiltinSemantic();
+  library_loader_.ParseBuiltinSemantics();
   handle_semantic_.AddLinkedHandles(kPid, kChannel0, kChannel1);
   handle_semantic_.AddLinkedHandles(kPid, kChannel2, kChannel3);
 }

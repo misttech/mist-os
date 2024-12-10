@@ -691,10 +691,10 @@ void LibraryLoader::AddMethod(ProtocolMethod* method) {
   }
 }
 
-void LibraryLoader::ParseBuiltinSemantic() {
+void LibraryLoader::ParseBuiltinSemantics() {
   semantic::ParserErrors parser_errors;
   {
-    semantic::SemanticParser parser(this, semantic::builtin_semantic_fuchsia_io, &parser_errors);
+    semantic::SemanticParser parser(this, semantic::kBuiltinSemanticFuchsiaIo, &parser_errors);
     parser.ParseSemantic();
   }
 }

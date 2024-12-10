@@ -22,17 +22,17 @@ namespace semantic {
 // Defines a location within a buffer.
 class Location {
  public:
-  Location(const std::string& buffer, std::string::const_iterator location)
+  Location(std::string_view buffer, std::string_view::const_iterator location)
       : buffer_(buffer), location_(location) {}
 
-  const std::string& buffer() const { return buffer_; }
-  std::string::const_iterator location() const { return location_; }
+  std::string_view buffer() const { return buffer_; }
+  std::string_view::const_iterator location() const { return location_; }
 
  private:
   // Reference to the buffer which contains the text we are parsing.
-  const std::string& buffer_;
+  const std::string_view buffer_;
   // Location within this buffer.
-  const std::string::const_iterator location_;
+  const std::string_view::const_iterator location_;
 };
 
 // Handles the parser errors.
@@ -91,7 +91,7 @@ enum class LexicalToken {
 // Parser for the language which defines semantic rules for FIDL methods.
 class SemanticParser {
  public:
-  SemanticParser(LibraryLoader* library_loader, const std::string& buffer, ParserErrors* errors)
+  SemanticParser(LibraryLoader* library_loader, std::string_view buffer, ParserErrors* errors)
       : library_loader_(library_loader), buffer_(buffer), errors_(errors) {
     next_ = buffer_.begin();
     NextLexicalToken();
@@ -234,13 +234,13 @@ class SemanticParser {
   // protocol methods is assigned when a rule is parsed.
   LibraryLoader* const library_loader_;
   // The text buffer we are currently parsing.
-  const std::string& buffer_;
+  const std::string_view buffer_;
   // The error handling object.
   ParserErrors* errors_;
   // Location in the buffer of the last lexical token reduced by NextLexicalToken.
-  std::string::const_iterator current_location_;
+  std::string_view::const_iterator current_location_;
   // Next location in the buffer which will be analyzed by NextLexicalToken.
-  std::string::const_iterator next_;
+  std::string_view::const_iterator next_;
   // Last lexical token reduced by NextLexicalToken.
   LexicalToken current_lexical_token_ = LexicalToken::kEof;
   // For LexicalToken::kIdentifier, the value of the identifier.
