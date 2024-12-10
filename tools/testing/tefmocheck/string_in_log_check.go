@@ -410,6 +410,12 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			String: "critical to root job killed with",
 			Type:   swarmingOutputType,
 			ExceptBlocks: []*logBlock{
+				// Mobly tests tend to be e2e tests that sometimes reboot the
+				// target, leading to expected job failures.
+				{
+					startString: "======== Mobly config content ========",
+					endString:   "[=====MOBLY RESULTS=====]",
+				},
 				{
 					startString: "=== RUN   TestKillCriticalProcess",
 					endString:   "--- PASS: TestKillCriticalProcess",

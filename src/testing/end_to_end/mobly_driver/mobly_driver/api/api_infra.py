@@ -16,4 +16,4 @@ ACCESS_POINT = "AccessPoint"
 TESTPARSER_PREAMBLE = "======== Mobly config content ========"
 
 TESTPARSER_RESULT_HEADER = "[=====MOBLY RESULTS=====]"
-# LINT.ThenChange(//tools/testing/testparser/moblytest.go)
+# LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go,//tools/testing/testparser/moblytest.go)
