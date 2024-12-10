@@ -351,19 +351,19 @@ fit::result<Errno, pid_t> sys_getpgid(const CurrentTask& current_task, pid_t pid
 }
 
 fit::result<Errno, uid_t> sys_getuid(const CurrentTask& current_task) {
-  return fit::ok(current_task->creds().uid);
+  return fit::ok(current_task->creds().uid_);
 }
 
 fit::result<Errno, uid_t> sys_getgid(const CurrentTask& current_task) {
-  return fit::ok(current_task->creds().gid);
+  return fit::ok(current_task->creds().gid_);
 }
 
 fit::result<Errno, uid_t> sys_geteuid(const CurrentTask& current_task) {
-  return fit::ok(current_task->creds().euid);
+  return fit::ok(current_task->creds().euid_);
 }
 
 fit::result<Errno, uid_t> sys_getegid(const CurrentTask& current_task) {
-  return fit::ok(current_task->creds().egid);
+  return fit::ok(current_task->creds().egid_);
 }
 
 fit::result<Errno> sys_exit(const CurrentTask& current_task, uint32_t code) {

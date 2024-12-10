@@ -490,7 +490,7 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
 
   auto creds = current_task->creds();
   auto secure = [&creds]() {
-    if (creds.uid != creds.euid || creds.gid != creds.egid) {
+    if (creds.uid_ != creds.euid_ || creds.gid_ != creds.egid_) {
       return 1;
     }
     return 0;
@@ -498,13 +498,13 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
 
   fbl::AllocChecker ac;
   fbl::Vector<ktl::pair<uint32_t, uint64_t>> auxv;
-  auxv.push_back(ktl::pair(AT_UID, creds.uid), &ac);
+  auxv.push_back(ktl::pair(AT_UID, creds.uid_), &ac);
   ZX_ASSERT(ac.check());
-  auxv.push_back(ktl::pair(AT_EUID, creds.euid), &ac);
+  auxv.push_back(ktl::pair(AT_EUID, creds.euid_), &ac);
   ZX_ASSERT(ac.check());
-  auxv.push_back(ktl::pair(AT_GID, creds.gid), &ac);
+  auxv.push_back(ktl::pair(AT_GID, creds.gid_), &ac);
   ZX_ASSERT(ac.check());
-  auxv.push_back(ktl::pair(AT_EGID, creds.egid), &ac);
+  auxv.push_back(ktl::pair(AT_EGID, creds.egid_), &ac);
   ZX_ASSERT(ac.check());
   auxv.push_back(ktl::pair(AT_BASE, interp_elf.value_or(LoadedElf{.file_base = 0}).file_base), &ac);
   ZX_ASSERT(ac.check());

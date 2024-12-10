@@ -4,6 +4,7 @@
 
 source_set("tests") {
   sources = [
+    "auth-tests.cc",
     "device_types-tests.cc",
     "errors-tests.cc",
 
