@@ -5,6 +5,8 @@
 #ifndef SRC_DEVICES_USB_LIB_USB_INCLUDE_USB_DESCRIPTORS_H_
 #define SRC_DEVICES_USB_LIB_USB_INCLUDE_USB_DESCRIPTORS_H_
 
+#include <endian.h>
+
 // maximum number of endpoints per device
 #define USB_MAX_EPS 32
 
