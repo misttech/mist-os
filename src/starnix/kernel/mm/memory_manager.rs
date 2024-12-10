@@ -1145,10 +1145,10 @@ impl MemoryManagerState {
             return error!(EINVAL);
         }
 
-        // MREMAP_DONTUNMAP is always a move to a specific address,
-        // which requires MREMAP_FIXED. There is no resizing allowed either.
+        // MREMAP_DONTUNMAP is always a move, so it requires MREMAP_MAYMOVE.
+        // There is no resizing allowed either.
         if flags.contains(MremapFlags::DONTUNMAP)
-            && (!flags.contains(MremapFlags::FIXED) || old_length != new_length)
+            && (!flags.contains(MremapFlags::MAYMOVE) || old_length != new_length)
         {
             return error!(EINVAL);
         }
@@ -1156,11 +1156,6 @@ impl MemoryManagerState {
         // In-place copies are invalid.
         if !flags.contains(MremapFlags::MAYMOVE) && old_length == 0 {
             return error!(ENOMEM);
-        }
-
-        if flags.contains(MremapFlags::DONTUNMAP) {
-            track_stub!(TODO("https://fxbug.dev/297372077"), "MREMAP_DONTUNMAP");
-            return error!(EOPNOTSUPP);
         }
 
         if new_length == 0 {
@@ -1183,7 +1178,10 @@ impl MemoryManagerState {
             return error!(EINVAL);
         }
 
-        if !flags.contains(MremapFlags::FIXED) && old_length != 0 {
+        if !flags.contains(MremapFlags::DONTUNMAP)
+            && !flags.contains(MremapFlags::FIXED)
+            && old_length != 0
+        {
             // We are not requested to remap to a specific address, so first we see if we can remap
             // in-place. In-place copies (old_length == 0) are not allowed.
             if let Some(new_addr) =
@@ -1197,7 +1195,15 @@ impl MemoryManagerState {
         if flags.contains(MremapFlags::MAYMOVE) {
             let dst_address =
                 if flags.contains(MremapFlags::FIXED) { Some(new_addr) } else { None };
-            self.remap_move(mm, old_addr, old_length, dst_address, new_length, released_mappings)
+            self.remap_move(
+                mm,
+                old_addr,
+                old_length,
+                dst_address,
+                new_length,
+                flags.contains(MremapFlags::DONTUNMAP),
+                released_mappings,
+            )
         } else {
             error!(ENOMEM)
         }
@@ -1315,6 +1321,7 @@ impl MemoryManagerState {
         src_length: usize,
         dst_addr: Option<UserAddress>,
         dst_length: usize,
+        keep_source: bool,
         released_mappings: &mut Vec<Mapping>,
     ) -> Result<UserAddress, Errno> {
         let src_range = src_addr..src_addr.checked_add(src_length).ok_or_else(|| errno!(EINVAL))?;
@@ -1461,15 +1468,31 @@ impl MemoryManagerState {
             src_mapping.flags,
             src_mapping.max_access,
             false,
-            src_mapping.name,
+            src_mapping.name.clone(),
             src_mapping.file_write_guard,
             released_mappings,
         )?;
 
-        if src_length != 0 {
-            // Only unmap the source range if this is not a copy. It was checked earlier that
+        if src_length != 0 && !keep_source {
+            // Only unmap the source range if this is not a copy and if there was not a specific
+            // request to not unmap. It was checked earlier that in case of src_length == 0
             // this mapping is MAP_SHARED.
             self.unmap(mm, src_addr, src_length, released_mappings)?;
+        }
+        if keep_source && private_anonymous {
+            // For MREMAP_DONTUNMAP case, replace the old range with a new one with the same flags
+            // This is done so that any new access would be a pagefault and would be
+            // zero-initialized.
+            // TODO(https://fxbug.dev/381098290): Handle the case of private file-backed memory.
+            self.map_anonymous(
+                mm,
+                DesiredAddress::FixedOverwrite(src_addr),
+                src_length,
+                src_mapping.flags.access_flags(),
+                MappingOptions::ANONYMOUS,
+                src_mapping.name.clone(),
+                released_mappings,
+            )?;
         }
 
         Ok(new_address)

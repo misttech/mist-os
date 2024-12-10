@@ -369,6 +369,9 @@ bool HasCapability(uint32_t cap);
 // Returns true if running on Starnix.  This is likely only necessary when there are known bugs.
 bool IsStarnix();
 
+// Returns true if reported kernel version is equal or greater than a given one.
+bool IsKernelVersionAtLeast(int min_major, int min_minor);
+
 /// Unmount anything mounted at or under `path` and remove it.
 void RecursiveUnmountAndRemove(const std::string &path);
 

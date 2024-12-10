@@ -310,6 +310,18 @@ bool IsStarnix() {
   return uname(&buf) == 0 && strstr(buf.release, "starnix") != nullptr;
 }
 
+bool IsKernelVersionAtLeast(int min_major, int min_minor) {
+  struct utsname buf;
+  int major, minor;
+  if (uname(&buf) != 0) {
+    return false;
+  }
+  if (sscanf(buf.release, "%d.%d:", &major, &minor), 2) {
+    return false;
+  }
+  return major > min_major || (major == min_major && minor >= min_minor);
+}
+
 void RecursiveUnmountAndRemove(const std::string &path) {
   if (HasSysAdmin()) {
     // Repeatedly call umount to handle shadowed mounts properly.

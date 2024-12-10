@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/string_view.h>
+#include <string.h>
 #include <sys/auxv.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
@@ -14,6 +15,7 @@
 
 #include <atomic>
 #include <charconv>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <thread>
@@ -32,6 +34,10 @@ constexpr size_t PAGE_SIZE = 0x1000;
 
 #ifndef MAP_FIXED_NOREPLACE
 #define MAP_FIXED_NOREPLACE 0x100000
+#endif
+
+#ifndef MREMAP_DONTUNMAP
+#define MREMAP_DONTUNMAP 4
 #endif
 
 namespace {
@@ -1100,6 +1106,127 @@ TEST(Mremap, RemapPartOfMapping) {
   EXPECT_EQ('x', reinterpret_cast<volatile char*>(target)[0]);
   EXPECT_EQ('b', reinterpret_cast<volatile char*>(target)[page_size]);
   EXPECT_EQ('z', reinterpret_cast<volatile char*>(target)[2 * page_size]);
+}
+
+TEST(Mremap, MremapSharedCopy) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* source =
+      mmap(nullptr, page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(source, MAP_FAILED);
+  reinterpret_cast<volatile char*>(source)[0] = 'a';
+
+  void* remapped = mremap(source, 0, page_size, MREMAP_MAYMOVE);
+  ASSERT_NE(remapped, MAP_FAILED);
+  ASSERT_NE(remapped, source);
+  EXPECT_EQ('a', reinterpret_cast<volatile char*>(remapped)[0]);
+  EXPECT_EQ('a', reinterpret_cast<volatile char*>(source)[0]);
+
+  // Changes are shared
+  reinterpret_cast<volatile char*>(remapped)[0] = 'b';
+  EXPECT_EQ('b', reinterpret_cast<volatile char*>(source)[0]);
+
+  SAFE_SYSCALL(munmap(source, page_size));
+  SAFE_SYSCALL(munmap(remapped, page_size));
+}
+
+TEST(Mremap, MremapDontUnmap) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* source =
+      mmap(nullptr, page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(source, MAP_FAILED);
+  reinterpret_cast<volatile char*>(source)[1] = 'a';
+
+  void* remapped = mremap(source, page_size, page_size, MREMAP_MAYMOVE | MREMAP_DONTUNMAP, 0);
+  ASSERT_NE(remapped, MAP_FAILED);
+  ASSERT_NE(remapped, source);
+  EXPECT_EQ('a', reinterpret_cast<volatile char*>(remapped)[1]);
+  // MREMAP_DONTUNMAP leaves the source mapped but makes any new access to the unmapped range a
+  // pagefault that will be zero-filled in the absence of userfaultfd.
+  EXPECT_EQ('\0', reinterpret_cast<volatile char*>(source)[1]);
+
+  SAFE_SYSCALL(munmap(source, page_size));
+  SAFE_SYSCALL(munmap(remapped, page_size));
+}
+
+TEST(Mremap, MremapDontUnmapFixed) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* source =
+      mmap(nullptr, page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(source, MAP_FAILED);
+
+  void* available =
+      mmap(nullptr, 2 * page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(available, MAP_FAILED);
+  SAFE_SYSCALL(munmap(available, 2 * page_size));
+
+  // Check that the specified address wasn't ignored: if it was, remap would land on
+  // available + page_size instead as this is the next unused range.
+  void* remapped = mremap(source, page_size, page_size,
+                          MREMAP_MAYMOVE | MREMAP_DONTUNMAP | MREMAP_FIXED, available);
+  ASSERT_EQ(remapped, available);
+
+  SAFE_SYSCALL(munmap(source, page_size));
+  SAFE_SYSCALL(munmap(remapped, page_size));
+}
+
+TEST(Mremap, MremapDontUnmapSharedAnon) {
+  if (!test_helper::IsStarnix() && !test_helper::IsKernelVersionAtLeast(5, 13)) {
+    GTEST_SKIP()
+        << "MREMAP_DONTUNMAP on shared memory isn't supported on Linux with kernel version older"
+        << " than 5.13, skipping.";
+  }
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* source =
+      mmap(nullptr, page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(source, MAP_FAILED);
+  reinterpret_cast<volatile char*>(source)[0] = 'a';
+
+  void* remapped = mremap(source, page_size, page_size, MREMAP_MAYMOVE | MREMAP_DONTUNMAP, 0);
+  ASSERT_NE(remapped, MAP_FAILED);
+  ASSERT_NE(remapped, source);
+  EXPECT_EQ('a', reinterpret_cast<volatile char*>(remapped)[0]);
+  // MREMAP_DONTUNMAP on shared anonymous memory creates a new mapping of the same memory.
+  EXPECT_EQ('a', reinterpret_cast<volatile char*>(source)[0]);
+
+  SAFE_SYSCALL(munmap(source, page_size));
+  SAFE_SYSCALL(munmap(remapped, page_size));
+}
+
+TEST(Mremap, MremapDontUnmapGap) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* source =
+      mmap(nullptr, 3 * page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(source, MAP_FAILED);
+  SAFE_SYSCALL(
+      munmap(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(source) + page_size), page_size));
+
+  void* remapped =
+      mremap(source, 3 * page_size, 3 * page_size, MREMAP_MAYMOVE | MREMAP_DONTUNMAP, 0);
+  ASSERT_EQ(remapped, MAP_FAILED);
+  SAFE_SYSCALL(munmap(source, 3 * page_size));
+}
+
+TEST(Mremap, MremapDontUnmapTwoSharedAnon) {
+  if (!test_helper::IsStarnix() && !test_helper::IsKernelVersionAtLeast(5, 13)) {
+    GTEST_SKIP()
+        << "MREMAP_DONTUNMAP on shared memory isn't supported on Linux with kernel version older"
+        << " than 5.13, skipping.";
+  }
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* source =
+      mmap(nullptr, 2 * page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(source, MAP_FAILED);
+  SAFE_SYSCALL(munmap(source, 2 * page_size));
+  void* page1 = mmap(source, page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(page1, MAP_FAILED);
+  void* page2 = mmap(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(source) + page_size),
+                     page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(page2, MAP_FAILED);
+
+  void* remapped =
+      mremap(source, 2 * page_size, 2 * page_size, MREMAP_MAYMOVE | MREMAP_DONTUNMAP, 0);
+  ASSERT_EQ(remapped, MAP_FAILED);
+  SAFE_SYSCALL(munmap(source, 2 * page_size));
 }
 
 TEST(Mremap, GrowThenGrow) {
