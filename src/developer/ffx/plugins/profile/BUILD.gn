@@ -55,7 +55,7 @@ if (is_host) {
     testonly = true
     deps = [
       ":ffx_profile_tests($host_toolchain)",
-      "memory:host_tests",
+      "memory:tests",
     ]
   }
 }
