@@ -219,10 +219,19 @@ class LocalComponentImpl {
   sys::ServiceDirectory svc();
 
  private:
+// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
   friend internal::LocalComponentRunner;
   // The |LocalComponentHandles| are set by the |LocalComponentRunner| after
   // construction by the factory, and before calling |OnStart()|
   std::unique_ptr<LocalComponentHandles> handles_;
+#else
+  friend internal::LocalComponentInstance;
+  fit::function<void(zx_status_t)> on_exit_;
+  fdio_ns_t* namespace_ = nullptr;
+  sys::OutgoingDirectory outgoing_dir_;
+  bool initialized_ = false;
+#endif
 };
 // [END mock_interface_cpp]
 
