@@ -21,6 +21,7 @@
 #define X86_CR0_CD 0x40000000               /* cache disable */
 #define X86_CR0_PG 0x80000000               /* enable paging */
 #define X86_CR4_PAE 0x00000020              /* PAE paging */
+#define X86_CR3_BASE_MASK (((1ull << 39) - 1) << 12)
 #define X86_CR4_PGE 0x00000080              /* page global enable */
 #define X86_CR4_OSFXSR 0x00000200           /* os supports fxsave */
 #define X86_CR4_OSXMMEXPT 0x00000400        /* os supports xmm exception */

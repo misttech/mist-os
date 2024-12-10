@@ -62,13 +62,15 @@
 #define X86_MMU_LARGE_PAT_WRITE_COMBINING X86_PAT_LARGE_SELECTOR(7)
 
 /* default flags for inner page directory entries */
-#define X86_KERNEL_PD_FLAGS (X86_MMU_PG_A | X86_MMU_PG_RW | X86_MMU_PG_P)
+#define X86_KERNEL_PD_FLAGS (X86_MMU_PG_A | X86_MMU_PG_D | X86_MMU_PG_RW | X86_MMU_PG_P)
 
 /* default flags for 2MB/4MB/1GB page directory entries */
 #define X86_KERNEL_PD_LP_FLAGS \
   (X86_MMU_PG_A | X86_MMU_PG_D | X86_MMU_PG_G | X86_MMU_PG_PS | X86_MMU_PG_RW | X86_MMU_PG_P)
 
 #define X86_MMU_PG_NX (1UL << 63)
+
+#define X86_PT_BASE_ADDRESS_MASK (((1ull << 39) - 1) << 12)
 
 // ASAN shadow memory mapping flags; the shadow is always present, but only non-zero pages are
 // writable.
@@ -120,8 +122,6 @@ void x86_mmu_early_init();
 void x86_mmu_init();
 // Called once on the BSP after CPU init has been completed.
 void x86_mmu_prevm_init();
-
-paddr_t x86_kernel_cr3();
 
 #endif  // !__ASSEMBLER__
 
