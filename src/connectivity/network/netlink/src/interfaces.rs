@@ -53,7 +53,7 @@ use packet_formats::icmp::ndp;
 
 use crate::client::{ClientTable, InternalClient};
 use crate::errors::WorkerInitializationError;
-use crate::logging::{log_debug, log_info, log_error, log_warn};
+use crate::logging::{log_debug, log_error, log_info, log_warn};
 use crate::messaging::Sender;
 use crate::multicast_groups::ModernGroup;
 use crate::netlink_packet::errno::Errno;
