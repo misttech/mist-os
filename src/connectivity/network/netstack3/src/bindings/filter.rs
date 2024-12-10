@@ -11,7 +11,6 @@ use std::num::NonZeroUsize;
 use std::pin::pin;
 use std::sync::Arc;
 
-use assert_matches::assert_matches;
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
 use futures::channel::mpsc;
 use futures::future::FusedFuture as _;
@@ -81,10 +80,7 @@ impl UpdateDispatcherInner {
     }
 
     fn connect_or_create_new_controller(&mut self, id: fnet_filter_ext::ControllerId) {
-        #[allow(clippy::map_entry)]
-        if !self.resources.contains_key(&id) {
-            assert_matches!(self.resources.insert(id, Controller::default()), None);
-        }
+        let _: &mut _ = self.resources.entry(id).or_default();
     }
 
     fn remove_controller(
