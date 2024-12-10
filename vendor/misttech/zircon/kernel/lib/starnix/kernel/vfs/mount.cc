@@ -138,7 +138,7 @@ MountInfo::~MountInfo() = default;
 
 MountInfo MountInfo::detached() { return {ktl::nullopt}; }
 
-MountFlags MountInfo::flags() {
+MountFlags MountInfo::flags() const {
   if (handle_.has_value()) {
     return handle_.value()->flags();
   }
@@ -146,9 +146,16 @@ MountFlags MountInfo::flags() {
   return MountFlags(MountFlagsEnum::NOATIME);
 }
 
-fit::result<Errno> MountInfo::check_readonly_filesystem() {
+fit::result<Errno> MountInfo::check_readonly_filesystem() const {
   if (flags().contains(MountFlagsEnum::RDONLY)) {
     return fit::error(errno(EROFS));
+  }
+  return fit::ok();
+}
+
+fit::result<Errno> MountInfo::check_noexec_filesystem() const {
+  if (flags().contains(MountFlagsEnum::NOEXEC)) {
+    return fit::error(errno(EACCES));
   }
   return fit::ok();
 }

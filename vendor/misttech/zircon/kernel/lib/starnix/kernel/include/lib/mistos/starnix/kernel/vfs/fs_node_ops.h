@@ -80,9 +80,9 @@ class FsNodeOps {
  public:
   /// Delegate the access check to the node.
   virtual fit::result<Errno> check_access(const FsNode& node, const CurrentTask& current_task,
-                                          int access) const {
-    return fit::error(errno(ENOSYS));
-  }
+                                          starnix_uapi::Access access,
+                                          starnix_sync::RwLock<FsNodeInfo>& info,
+                                          CheckAccessReason _reason) const;
 
   /// Build the [`DirEntryOps`] for a new [`DirEntry`] that will be associated
   /// to this node.

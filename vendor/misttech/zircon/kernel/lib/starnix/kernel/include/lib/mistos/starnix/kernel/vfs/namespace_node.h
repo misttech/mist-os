@@ -53,6 +53,8 @@ struct Unreachable {
   FsString path;
 };
 
+enum class CheckAccessReason : uint8_t { Access, Chdir, Chroot, InternalPermissionChecks };
+
 class PathWithReachability {
  public:
   using Variant = ktl::variant<Reachable, Unreachable>;
@@ -217,7 +219,8 @@ class NamespaceNode {
   /// Check whether the node can be accessed in the current context with the specified access
   /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
   /// owner or is in the file's group.
-  fit::result<Errno> check_access(const CurrentTask& current_task, Access access) const;
+  fit::result<Errno> check_access(const CurrentTask& current_task, Access access,
+                                  CheckAccessReason reason) const;
 
   fit::result<Errno> truncate(const CurrentTask& current_task, uint64_t length) const;
 

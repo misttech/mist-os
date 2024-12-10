@@ -28,6 +28,13 @@
 
 #include "../kernel_priv.h"
 
+namespace ktl {
+
+using std::addressof;
+using std::destroy_at;
+
+}  // namespace ktl
+
 #include <ktl/enforce.h>
 
 #include <linux/errno.h>
@@ -35,6 +42,9 @@
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
+
+using starnix_uapi::Access;
+using starnix_uapi::AccessEnum;
 
 FsNode* FsNode::new_root(FsNodeOps* ops) {
   return FsNode::new_root_with_properties(ops, [](FsNodeInfo& info) {});
@@ -192,6 +202,30 @@ fit::result<Errno, FsNodeHandle> FsNode::mknod(const CurrentTask& current_task,
 fit::result<Errno, SymlinkTarget> FsNode::readlink(const CurrentTask& current_task) const {
   // TODO(qsr): Is there a permission check here?
   return ops_->readlink(*this, current_task);
+}
+
+fit::result<Errno> FsNode::default_check_access_impl(
+    const CurrentTask& current_task, Access access,
+    starnix_sync::RwLockGuard<FsNodeInfo, BrwLockPi::Reader> info) {
+  auto [node_uid, node_gid, mode] = ktl::tuple(info->uid_, info->gid_, info->mode_);
+  ktl::destroy_at(ktl::addressof(info));
+  return current_task->creds().check_access(access, node_uid, node_gid, mode);
+}
+
+/// Check whether the node can be accessed in the current context with the specified access
+/// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
+/// owner or is in the file's group.
+fit::result<Errno> FsNode::check_access(const CurrentTask& current_task, const MountInfo& mount,
+                                        Access access, CheckAccessReason reason) const {
+  if (access.contains(AccessEnum::WRITE)) {
+    _EP(mount.check_readonly_filesystem());
+  }
+
+  if (access.contains(AccessEnum::EXEC) && !is_dir()) {
+    _EP(mount.check_noexec_filesystem());
+  }
+
+  return ops_->check_access(*this, current_task, access, info_, reason);
 }
 
 fit::result<Errno, struct stat> FsNode::stat(const CurrentTask& current_task) const {

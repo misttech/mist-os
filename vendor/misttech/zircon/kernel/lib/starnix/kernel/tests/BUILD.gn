@@ -14,7 +14,6 @@ source_set("tests") {
     "fs/sysfs/kobject_symlink_directory-test.cc",
     "fs/tmpfs-test.cc",
     "fs_args-test.cc",
-    "fs_node-test.cc",
     "io_buffers-test.cc",
     "loader-test.cc",
     "memory_manager-test.cc",
@@ -27,6 +26,7 @@ source_set("tests") {
     "thread_group-test.cc",
     "vfs/fd_table-test.cc",
     "vfs/fs_context-test.cc",
+    "vfs/fs_node-test.cc",
     "vfs/namespace-test.cc",
     "vfs/syscalls-test.cc",
   ]

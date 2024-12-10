@@ -686,7 +686,13 @@ mtl::WeakPtr<Task> CurrentTask::weak_task() const {
   return task_->weak_factory_.GetWeakPtr();
 }
 
-void CurrentTask::set_creds(Credentials creds) const {}
+void CurrentTask::set_creds(Credentials creds) const {
+  task_->persistent_info_->Lock()->creds_mut() = creds;
+  // The /proc/pid directory's ownership is updated when the task's euid
+  // or egid changes. See proc(5).
+  // auto state = task_->proc_pid_directory_cache_.Lock();
+  // TaskDirectory::maybe_force_chown(this, &state, &task_->persistent_info_->Lock()->creds());
+}
 
 void CurrentTask::release() {
   LTRACE_ENTRY_OBJ;
@@ -767,7 +773,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
     if (!dir.entry_->node_->is_dir()) {
       return fit::error(errno(ENOTDIR));
     }
-    _EP(dir.check_access(*this, Access(Access::EnumType::EXEC)));
+    _EP(dir.check_access(*this, Access(AccessEnum::EXEC), CheckAccessReason::InternalPermissionChecks));
   }
 
   return fit::ok(ktl::pair(dir, path));

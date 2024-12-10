@@ -356,8 +356,8 @@ fit::result<Errno, SymlinkTarget> NamespaceNode::readlink(const CurrentTask& cur
   return entry_->node_->readlink(current_task);
 }
 
-fit::result<Errno> NamespaceNode::check_access(const CurrentTask& current_task,
-                                               Access access) const {
+fit::result<Errno> NamespaceNode::check_access(const CurrentTask& current_task, Access access,
+                                               CheckAccessReason reason) const {
   return fit::ok();
 }
 
