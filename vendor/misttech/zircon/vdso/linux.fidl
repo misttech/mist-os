@@ -375,8 +375,11 @@ closed protocol Linux {
     // STUB 79
     strict A0079Getcwd() -> () error int64;
 
-    // STUB 80
-    strict A0080Chdir() -> () error int64;
+    // #80, SYSCALL_DEFINE1(chdir, const char __user *, filename)
+    strict A0080Chdir(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+    }) -> () error int64;
 
     // STUB 81
     strict A0081Fchdir() -> () error int64;
@@ -635,8 +638,11 @@ closed protocol Linux {
     // STUB 160
     strict A0160Setrlimit() -> () error int64;
 
-    // STUB 161
-    strict A0161Chroot() -> () error int64;
+    // #161, SYSCALL_DEFINE1(chroot, const char __user *, filename)
+    strict A0161Chroot(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+    }) -> () error int64;
 
     // STUB 162
     strict A0162Sync() -> () error int64;
