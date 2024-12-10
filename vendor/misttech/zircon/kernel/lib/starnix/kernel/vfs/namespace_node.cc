@@ -20,6 +20,8 @@
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <trace.h>
 
+#include <utility>
+
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
 
@@ -81,6 +83,8 @@ fit::result<Errno, NamespaceNode> NamespaceNode::open_create_node(const CurrentT
 
   return fit::ok(NamespaceNode::with_new_entry(entry_result.value()));
 }
+
+ActiveNamespaceNode NamespaceNode::into_active() const { return ActiveNamespaceNode::New(*this); }
 
 fit::result<Errno, NamespaceNode> NamespaceNode::create_node(const CurrentTask& current_task,
                                                              const FsStr& name, FileMode mode,
@@ -375,6 +379,34 @@ mtl::BString NamespaceNode::debug() const {
 NamespaceNode& NamespaceNode::operator=(const NamespaceNode& other) = default;
 
 NamespaceNode::~NamespaceNode() { LTRACE_ENTRY_OBJ; }
+
+ActiveNamespaceNode ActiveNamespaceNode::New(NamespaceNode name) {
+  ktl::optional<MountClientMarker> marker =
+      name.mount_.handle_.has_value()
+          ? ktl::optional<MountClientMarker>{(*name.mount_.handle_)->active_client_counter_}
+          : ktl::nullopt;
+  return ActiveNamespaceNode(ktl::move(name), ktl::move(marker));
+}
+
+NamespaceNode ActiveNamespaceNode::to_passive() const {
+  auto clone = name_;
+  return clone;
+}
+
+ActiveNamespaceNode::ActiveNamespaceNode(NamespaceNode name,
+                                         ktl::optional<MountClientMarker> marker)
+    : name_(name), marker_(ktl::move(marker)) {}
+
+ActiveNamespaceNode::~ActiveNamespaceNode() = default;
+
+const NamespaceNode& ActiveNamespaceNode::operator*() const { return name_; }
+const NamespaceNode* ActiveNamespaceNode::operator->() const { return &name_; }
+NamespaceNode& ActiveNamespaceNode::operator*() { return name_; }
+NamespaceNode* ActiveNamespaceNode::operator->() { return &name_; }
+
+bool ActiveNamespaceNode::operator==(const ActiveNamespaceNode& other) const {
+  return name_ == other.name_;
+}
 
 SymlinkTarget::SymlinkTarget(Variant variant) : variant_(ktl::move(variant)) {}
 

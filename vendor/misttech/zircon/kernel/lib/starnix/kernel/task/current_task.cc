@@ -604,7 +604,7 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
     self.notify_robust_list();
   */
 
-  auto exec_result = (*this)->mm()->exec(resolved_elf.file->name_);
+  auto exec_result = (*this)->mm()->exec(resolved_elf.file->name_.to_passive());
   if (exec_result.is_error()) {
     fit::error(errno(from_status_like_fdio(exec_result.error_value())));
   }
@@ -759,7 +759,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
     //
     // See https://man7.org/linux/man-pages/man2/open.2.html
     auto result = task_->files_.get_allowing_opath(dir_fd) _EP(result);
-    return fit::ok(result.value()->name_);
+    return fit::ok(result.value()->name_.to_passive());
   }() _EP(dir_result);
   auto dir = dir_result.value();
 

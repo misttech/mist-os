@@ -146,7 +146,7 @@ fit::result<Errno, UserAddress> do_mmap(const CurrentTask& current_task, UserAdd
   // TODO(tbodt): maximize protection flags so that mprotect works
   auto file = current_task->files_.get(fd) _EP(file);
   return file->mmap(current_task, daddr.value(), memory_offset, length, prot_flags.value(), options,
-                    file->name_);
+                    file->name_.to_passive());
 }
 
 fit::result<Errno> sys_munmap(const CurrentTask& current_task, UserAddress addr, size_t length) {

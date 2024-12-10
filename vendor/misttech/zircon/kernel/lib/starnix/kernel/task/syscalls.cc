@@ -7,6 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/arch/x86_64.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/arch/x64/registers.h>
 #include <lib/mistos/starnix/kernel/execution/executor.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
@@ -23,7 +24,6 @@
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/num.h>
-#include <lib/mistos/memory/weak_ptr.h>
 #include <trace.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -52,7 +52,7 @@ using starnix_uapi::UserCString;
 using starnix_uapi::UserRef;
 
 mtl::WeakPtr<starnix::Task> get_task_or_current(const starnix::CurrentTask& current_task,
-                                                 pid_t pid) {
+                                                pid_t pid) {
   if (pid == 0) {
     return current_task.weak_task();
   }
@@ -279,13 +279,11 @@ fit::result<Errno> sys_execveat(CurrentTask& current_task, FdNumber dir_fd, User
       //
       // See https://man7.org/linux/man-pages/man3/fexecve.3.html#DESCRIPTION
       // file->name()
-      return file->name_.open(current_task,
-                              starnix_uapi::OpenFlags(starnix_uapi::OpenFlagsEnum::RDONLY),
-                              /* AccessCheck::check_for(Access::EXEC)*/ true);
+      return file->name_->open(current_task,
+                               starnix_uapi::OpenFlags(starnix_uapi::OpenFlagsEnum::RDONLY), true);
     } else {
-      return current_task.open_file_at(
-          dir_fd, *path, open_flags, FileMode(),
-          ResolveFlags::empty() /*, AccessCheck::check_for(Access::EXEC)*/);
+      return current_task.open_file_at(dir_fd, *path, open_flags, FileMode(),
+                                       ResolveFlags::empty());
     }
   }() _EP(executable);
 
@@ -419,9 +417,7 @@ fit::result<Errno, SyscallResult> sys_prctl(const CurrentTask& current_task, int
         }
         name = fname;
       }
-      auto result = current_task->mm()->set_mapping_name(addr, length, name);
-      if (result.is_error())
-        return result.take_error();
+      _EP(current_task->mm()->set_mapping_name(addr, length, name));
       return fit::ok(starnix_syscalls::SUCCESS);
     }
     // case PR_SET_NAME:

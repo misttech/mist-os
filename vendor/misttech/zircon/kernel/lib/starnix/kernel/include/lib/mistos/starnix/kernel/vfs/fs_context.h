@@ -33,13 +33,13 @@ struct FsContextState {
   ///
   /// Operations on the file system are typically either relative to this
   /// root or to the cwd().
-  NamespaceNode root;
+  ActiveNamespaceNode root_;
 
   /// The current working directory.
-  NamespaceNode cwd;
+  ActiveNamespaceNode cwd_;
 
   // See <https://man7.org/linux/man-pages/man2/umask.2.html>
-  FileMode umask;
+  FileMode umask_;
 };
 
 class FsContext : public fbl::RefCounted<FsContext> {

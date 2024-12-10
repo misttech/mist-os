@@ -12,7 +12,7 @@ fit::result<Errno> emit_dotdot(const FileObject& file, DirentSink* sink) {
     _EP(sink->add(file.node()->node_id_, 1, DirectoryEntryType::DIR, "."));
   }
   if (sink->offset() == 1) {
-    _EP(sink->add(file.name_.entry_->parent_or_self()->node_->node_id_, 2, DirectoryEntryType::DIR,
+    _EP(sink->add(file.name_->entry_->parent_or_self()->node_->node_id_, 2, DirectoryEntryType::DIR,
                   ".."));
   }
   return fit::ok();

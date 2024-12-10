@@ -76,17 +76,17 @@ class FileObject : public fbl::RefCounted<FileObject> {
   /// `FileHandle` from a `FileObject`.
   WeakFileHandle weak_handle_;
 
-  // A unique identifier for this file object.
+  /// A unique identifier for this file object.
   FileObjectId id_;
 
  private:
   ktl::unique_ptr<FileOps> ops_;
 
  public:
-  // The NamespaceNode associated with this FileObject.
-  //
-  // Represents the name the process used to open this file.
-  NamespaceNode name_;
+  /// The NamespaceNode associated with this FileObject.
+  ///
+  /// Represents the name the process used to open this file.
+  ActiveNamespaceNode name_;
 
   FileSystemHandle fs_;
 
@@ -206,7 +206,7 @@ class FileObject : public fbl::RefCounted<FileObject> {
   ~FileObject();
 
  private:
-  FileObject(WeakFileHandle weak_handle, FileObjectId id, NamespaceNode name, FileSystemHandle fs,
+  FileObject(WeakFileHandle weak_handle, FileObjectId id, ActiveNamespaceNode name, FileSystemHandle fs,
              ktl::unique_ptr<FileOps> ops, OpenFlags flags);
 
  public:
