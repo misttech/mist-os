@@ -57,6 +57,7 @@ fuchsia_driver_component("aml-meson-power") {
 
 fuchsia_driver_package("package") {
   package_name = "aml-meson-power"
+  export_to_bazel = true
   driver_components = [ ":aml-meson-power" ]
 }
 

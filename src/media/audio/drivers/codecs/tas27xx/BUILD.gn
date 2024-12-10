@@ -56,6 +56,7 @@ fuchsia_driver_component("tas27xx") {
 
 fuchsia_driver_package("package") {
   package_name = "tas27xx"
+  export_to_bazel = true
   driver_components = [ ":tas27xx" ]
 }
 

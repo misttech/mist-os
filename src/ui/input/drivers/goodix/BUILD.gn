@@ -72,6 +72,7 @@ if (internal_access) {
 }
 
 fuchsia_driver_package("goodix") {
+  export_to_bazel = true
   driver_components = [ ":goodix-module" ]
 
   deps = []

@@ -61,6 +61,7 @@ fuchsia_driver_component("bt-transport-uart") {
 }
 
 fuchsia_driver_package("uart") {
+  export_to_bazel = true
   driver_components = [ ":bt-transport-uart" ]
 }
 

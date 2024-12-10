@@ -24,6 +24,7 @@ fuchsia_driver_component("skip-block") {
 
 fuchsia_driver_package("package") {
   package_name = "skip-block"
+  export_to_bazel = true
   driver_components = [ ":skip-block" ]
 }
 

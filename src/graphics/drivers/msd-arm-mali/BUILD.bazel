@@ -10,4 +10,7 @@ fuchsia_prebuilt_package(
     name = "msd-arm-mali",
     applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
     archive = "@gn_targets//src/graphics/drivers/msd-arm-mali:msd-arm-mali",
+    drivers = [
+        "meta/msd_arm.cm",
+    ],
 )

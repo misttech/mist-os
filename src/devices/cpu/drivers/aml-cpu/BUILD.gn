@@ -55,6 +55,7 @@ fuchsia_driver_component("aml-cpu") {
 
 fuchsia_driver_package("package") {
   package_name = "aml-cpu"
+  export_to_bazel = true
   driver_components = [ ":aml-cpu" ]
 }
 

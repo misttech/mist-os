@@ -66,6 +66,7 @@ fuchsia_driver_component("ti-lp8556") {
 
 fuchsia_driver_package("package") {
   package_name = "ti-lp8556"
+  export_to_bazel = true
   driver_components = [ ":ti-lp8556" ]
 }
 

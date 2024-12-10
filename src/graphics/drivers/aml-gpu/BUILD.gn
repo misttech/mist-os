@@ -78,6 +78,7 @@ fuchsia_driver_component("aml-gpu") {
 }
 
 fuchsia_driver_package("aml-gpu-package") {
+  export_to_bazel = true
   driver_components = [ ":aml-gpu" ]
 }
 

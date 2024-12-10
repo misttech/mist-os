@@ -61,6 +61,7 @@ fuchsia_driver_component("aml-light") {
 
 fuchsia_driver_package("package") {
   package_name = "aml-light"
+  export_to_bazel = true
   driver_components = [ ":aml-light" ]
 }
 
