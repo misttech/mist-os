@@ -120,7 +120,6 @@ enum class AccessEnum : uint32_t {
   EXEC = 1,
   WRITE = 2,
   READ = 4,
-  NOATIME = 8,
 
   // Access mask is the part of access related to the file access mode. It is
   // exec/write/read.
@@ -162,6 +161,7 @@ class Access : public AccessFlags {
 }  // namespace inner_access
 
 using Access = inner_access::Access;
+using AccessEnum = inner_access::AccessEnum;
 
 }  // namespace starnix_uapi
 
@@ -172,7 +172,6 @@ constexpr Flag<starnix_uapi::inner_access::AccessEnum>
         {starnix_uapi::inner_access::AccessEnum::EXEC},
         {starnix_uapi::inner_access::AccessEnum::WRITE},
         {starnix_uapi::inner_access::AccessEnum::READ},
-        {starnix_uapi::inner_access::AccessEnum::NOATIME},
 };
 
 #endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_FILE_MODE_H_

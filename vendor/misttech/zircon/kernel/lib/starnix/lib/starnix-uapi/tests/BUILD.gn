@@ -7,8 +7,7 @@ source_set("tests") {
     "auth-tests.cc",
     "device_types-tests.cc",
     "errors-tests.cc",
-
-    #"file_mode-tests.cc",
+    "file_mode-tests.cc",
     "open_flags-test.cc",
     "user_address-test.cc",
     "user_buffer-tests.cc",
