@@ -6,7 +6,7 @@ use anyhow::Error;
 use fuchsia_async as fasync;
 use fuchsia_component::server::MissingStartupHandle;
 use fuchsia_runtime::HandleType;
-use storage_host::service::StorageHostService;
+use gpt_component::service::StorageHostService;
 
 #[fasync::run(6)]
 async fn main() -> Result<(), Error> {

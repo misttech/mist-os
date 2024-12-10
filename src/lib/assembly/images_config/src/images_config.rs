@@ -392,23 +392,18 @@ impl ImagesConfig {
                     // Construct the list of FVM filesystems.
                     let mut filesystems = vec![];
                     let mut filesystem_names = vec![];
-                    if let Some(_) = fvm.data {
-                        filesystems.push(FvmFilesystem::EmptyData(EmptyData {
-                            name: "empty-data".into(),
-                        }));
-                        filesystem_names.push("empty-data".to_string());
-                    }
-                    if let Some(pfc::BlobFvmVolumeConfig { blob_layout }) = &fvm.blob {
-                        filesystems.push(FvmFilesystem::BlobFS(BlobFS {
-                            name: "blob".into(),
-                            layout: blob_layout.clone(),
-                            maximum_bytes: board.fvm.blobfs.build_time_maximum_bytes,
-                            minimum_data_bytes: board.fvm.blobfs.minimum_data_bytes,
-                            minimum_inodes: board.fvm.blobfs.minimum_inodes,
-                            maximum_contents_size: board.fvm.blobfs.size_checker_maximum_bytes,
-                        }));
-                        filesystem_names.push("blob".to_string());
-                    }
+                    filesystems
+                        .push(FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }));
+                    filesystem_names.push("empty-data".to_string());
+                    filesystems.push(FvmFilesystem::BlobFS(BlobFS {
+                        name: "blob".into(),
+                        layout: fvm.blob.blob_layout.clone(),
+                        maximum_bytes: board.fvm.blobfs.build_time_maximum_bytes,
+                        minimum_data_bytes: board.fvm.blobfs.minimum_data_bytes,
+                        minimum_inodes: board.fvm.blobfs.minimum_inodes,
+                        maximum_contents_size: board.fvm.blobfs.size_checker_maximum_bytes,
+                    }));
+                    filesystem_names.push("blob".to_string());
                     if let Some(pfc::ReservedFvmVolumeConfig { reserved_slices }) = fvm.reserved {
                         filesystems.push(FvmFilesystem::Reserved(Reserved {
                             name: "internal".into(),
@@ -519,6 +514,7 @@ mod tests {
                     truncate_to_length: Some(3456),
                 }),
             },
+            gpt: bfc::GptMode::Enabled,
             gpt_all: false,
         }
     }
@@ -561,6 +557,7 @@ mod tests {
                 }),
                 fastboot_output: None,
             },
+            gpt: bfc::GptMode::Disabled,
             gpt_all: false,
         }
     }
@@ -652,11 +649,11 @@ mod tests {
             no_zxcrypt: false,
             image_mode: pfc::FilesystemImageMode::Partition,
             volume: pfc::VolumeConfig::Fvm(pfc::FvmVolumeConfig {
-                data: Some(pfc::DataFvmVolumeConfig {
+                data: pfc::DataFvmVolumeConfig {
                     use_disk_based_minfs_migration: true,
                     data_filesystem_format: pfc::DataFilesystemFormat::Minfs,
-                }),
-                blob: Some(pfc::BlobFvmVolumeConfig { blob_layout: BlobfsLayout::Compact }),
+                },
+                blob: pfc::BlobFvmVolumeConfig { blob_layout: BlobfsLayout::Compact },
                 reserved: Some(pfc::ReservedFvmVolumeConfig { reserved_slices: 7 }),
             }),
             ..Default::default()
@@ -748,11 +745,11 @@ mod tests {
             no_zxcrypt: false,
             image_mode: pfc::FilesystemImageMode::Partition,
             volume: pfc::VolumeConfig::Fvm(pfc::FvmVolumeConfig {
-                data: Some(pfc::DataFvmVolumeConfig {
+                data: pfc::DataFvmVolumeConfig {
                     use_disk_based_minfs_migration: true,
                     data_filesystem_format: pfc::DataFilesystemFormat::Minfs,
-                }),
-                blob: Some(pfc::BlobFvmVolumeConfig { blob_layout: BlobfsLayout::Compact }),
+                },
+                blob: pfc::BlobFvmVolumeConfig { blob_layout: BlobfsLayout::Compact },
                 reserved: Some(pfc::ReservedFvmVolumeConfig { reserved_slices: 7 }),
             }),
             ..Default::default()

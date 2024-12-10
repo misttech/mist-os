@@ -54,6 +54,7 @@ resource("golden_images") {
 group("tests") {
   testonly = true
   deps = [
+    "component:tests",
     "rust:tests",
     "test",
   ]

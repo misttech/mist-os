@@ -2793,9 +2793,30 @@ assembly_input_bundle("fshost_common") {
           destination = "src/storage/lib/fs_management/client.shard.cml"
         },
         {
-          source = "//src/storage/fshost/meta/storage_host_minfs_base.shard.cml"
+          source = "//src/storage/fshost/meta/fxfs_blob_fshost_base.shard.cml"
           destination =
-              "src/storage/fshost/meta/storage_host_minfs_base.shard.cml"
+              "src/storage/fshost/meta/fxfs_blob_fshost_base.shard.cml"
+        },
+        {
+          source = "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml"
+          destination = "src/storage/fshost/meta/non_storage_host_gpt.shard.cml"
+        },
+        {
+          source = "//src/storage/fshost/meta/storage_host_base.shard.cml"
+          destination = "src/storage/fshost/meta/storage_host_base.shard.cml"
+        },
+        {
+          source = "//src/storage/fshost/meta/storage_host_gpt.shard.cml"
+          destination = "src/storage/fshost/meta/storage_host_gpt.shard.cml"
+        },
+        {
+          source = "//src/storage/fshost/meta/storage_host_fvm.cml"
+          destination = "src/storage/fshost/meta/storage_host_fvm.cml"
+        },
+        {
+          source = "//src/storage/fshost/meta/storage_host_fvm_base.shard.cml"
+          destination =
+              "src/storage/fshost/meta/storage_host_fvm_base.shard.cml"
         },
         {
           source = "//sdk/lib/trace/client.shard.cml"
@@ -2836,6 +2857,104 @@ assembly_input_bundle("fshost_storage") {
   bootfs_packages = [ "//src/storage/memfs:package" ]
 }
 
+# AIB for fshost's storage-host configuration with GPT+Fxfs.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_storage_host_fxfs") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = [
+            "//src/storage/fshost/meta/fxfs_blob_fshost.cml",
+            "//src/storage/fshost/meta/fxfs_blob_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/storage_host_base.shard.cml",
+            "//src/storage/fshost/meta/storage_host_gpt.shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+  bootfs_packages = [
+    "//src/storage/gpt/component:package",
+    "//src/storage/fxfs:package",
+    "//src/storage/fxfs-crypt:package",
+  ]
+}
+
+# AIB for fshost's storage-host configuration with GPT+FVM+Minfs.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_storage_host_gpt_fvm_minfs") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = [
+            "//src/storage/fshost/meta/minfs_fshost.cml",
+            "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/storage_host_base.shard.cml",
+            "//src/storage/fshost/meta/storage_host_fvm.cml",
+            "//src/storage/fshost/meta/storage_host_fvm_base.shard.cml",
+            "//src/storage/fshost/meta/storage_host_gpt.shard.cml",
+          ]
+        },
+      ]
+      bootfs_packages = [
+        "//src/storage/gpt/component:package",
+        "//src/storage/blobfs/bin:package",
+        "//src/storage/minfs/bin:package",
+        "//src/storage/fvm:package",
+      ]
+    },
+  ]
+}
+
+# AIB for fshost's storage-host configuration with FVM+Minfs.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_storage_host_fvm_minfs") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = [
+            "//src/storage/fshost/meta/minfs_fshost.cml",
+            "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
+            "//src/storage/fshost/meta/storage_host_base.shard.cml",
+            "//src/storage/fshost/meta/storage_host_fvm.cml",
+            "//src/storage/fshost/meta/storage_host_fvm_base.shard.cml",
+          ]
+        },
+      ]
+      bootfs_packages = [
+        "//src/storage/blobfs/bin:package",
+        "//src/storage/minfs/bin:package",
+        "//src/storage/fvm:package",
+      ]
+    },
+  ]
+}
+
 # AIB containing the fshost with fxfs.
 #
 # optional: product must specify its inclusion
@@ -2853,6 +2972,7 @@ assembly_input_bundle("fshost_fxfs") {
           shards = [
             "//src/storage/fshost/meta/fxfs_blob_fshost.cml",
             "//src/storage/fshost/meta/fxfs_blob_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -2862,66 +2982,6 @@ assembly_input_bundle("fshost_fxfs") {
   bootfs_packages = [
     "//src/storage/fxfs:package",
     "//src/storage/fxfs-crypt:package",
-  ]
-}
-
-# AIB containing the fshost with storage_host.
-#
-# optional: product must specify its inclusion
-# valid feature_set_levels: all
-# valid build-types: all
-#
-assembly_input_bundle("fshost_storage_host") {
-  compiled_packages = [
-    {
-      bootfs_package = true
-      name = "fshost"
-      components = [
-        {
-          component_name = "fshost"
-          shards = [
-            "//src/storage/fshost/meta/fxfs_gpt_fshost.cml",
-            "//src/storage/fshost/meta/fxfs_gpt_fshost_base.shard.cml",
-          ]
-        },
-      ]
-    },
-  ]
-  bootfs_packages = [
-    "//src/storage/storage-host:package",
-    "//src/storage/fxfs:package",
-    "//src/storage/fxfs-crypt:package",
-  ]
-}
-
-# AIB containing the fshost with storage_host with fvm and minfs.
-#
-# optional: product must specify its inclusion
-# valid feature_set_levels: all
-# valid build-types: all
-#
-assembly_input_bundle("fshost_storage_host_fvm_minfs") {
-  compiled_packages = [
-    {
-      bootfs_package = true
-      name = "fshost"
-      components = [
-        {
-          component_name = "fshost"
-          shards = [ "//src/storage/fshost/meta/storage_host_minfs.cml" ]
-        },
-      ]
-    },
-  ]
-  memory_buckets = [
-    "//src/developer/memory/buckets/blobfs_buckets.json5",
-    "//src/developer/memory/buckets/minfs_buckets.json5",
-  ]
-  bootfs_packages = [
-    "//src/storage/storage-host:package",
-    "//src/storage/blobfs/bin:package",
-    "//src/storage/minfs/bin:package",
-    "//src/storage/fvm:package",
   ]
 }
 
@@ -2968,6 +3028,7 @@ assembly_input_bundle("fshost_fvm_fxfs") {
           shards = [
             "//src/storage/fshost/meta/fxfs_fshost.cml",
             "//src/storage/fshost/meta/fxfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -2998,6 +3059,7 @@ assembly_input_bundle("fshost_fvm_minfs") {
             "//src/storage/fshost/meta/minfs_fshost.cml",
             "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
             "//src/storage/fshost/meta/non_fxfs_fshost.cml",
+            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -3029,6 +3091,7 @@ assembly_input_bundle("fshost_fvm_minfs_migration") {
             "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
             "//src/storage/fshost/meta/fxfs_fshost.cml",
             "//src/storage/fshost/meta/fxfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -3063,6 +3126,7 @@ assembly_input_bundle("fshost_fvm_f2fs") {
             "//src/storage/fshost/meta/f2fs_fshost.cml",
             "//src/storage/fshost/meta/f2fs_fshost_base.shard.cml",
             "//src/storage/fshost/meta/non_fxfs_fshost.cml",
+            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]

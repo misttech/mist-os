@@ -127,7 +127,8 @@ bootstrap_eng_platform_aib_names = [
   "power_framework_testing_sag",
 
   # Storage
-  "fshost_storage_host",
+  "fshost_storage_host_fxfs",
+  "fshost_storage_host_gpt_fvm_minfs",
   "fshost_storage_host_fvm_minfs",
   "partitioning_tools",
 
@@ -430,8 +431,9 @@ required_userdebug_aib_names = required_user_aib_names + [
 experimental_aib_names = [
   "adb_support",
   "bootstrap_realm_vsock_development_access",
-  "fshost_storage_host",
-  "fshost_storage_host_fshost_minfs",
+  "fshost_storage_host_fxfs",
+  "fshost_storage_host_gpt_fvm_minfs",
+  "fshost_storage_host_fvm_minfs",
   "nanohub_support",
   "paravirtualization_support_bootstrap",
   "power_framework",

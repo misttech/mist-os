@@ -452,7 +452,7 @@ impl Matcher for SystemGptMatcher {
     ) -> Result<Option<DeviceTag>, Error> {
         match self.gpt_type {
             GptType::Driver(driver_path) => env.attach_driver(device, driver_path).await?,
-            GptType::StorageHost => env.launch_storage_host(device).await?,
+            GptType::StorageHost => env.launch_gpt_component(device).await?,
         };
         self.device_path = Some(device.topological_path().to_string());
         Ok(Some(DeviceTag::SystemPartitionTable))
@@ -778,7 +778,7 @@ mod tests {
             Ok(())
         }
 
-        async fn launch_storage_host(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
+        async fn launch_gpt_component(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
             assert_eq!(
                 std::mem::take(&mut *self.expect_launch_storage_host.lock().unwrap()),
                 true,

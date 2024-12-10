@@ -1,0 +1,24 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// TODO(https://fxbug.dev/339491886): Remove when all products use storage-host.
+{
+    expose: [
+        {
+            service: "fuchsia.storage.partitions.PartitionService",
+            from: "void",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.storage.partitions.PartitionsAdmin",
+            from: "void",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.storage.partitions.PartitionsManager",
+            from: "void",
+            availability: "optional",
+        },
+    ],
+}

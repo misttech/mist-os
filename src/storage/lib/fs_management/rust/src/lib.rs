@@ -487,7 +487,7 @@ impl Gpt {
 impl FSConfig for Gpt {
     fn options(&self) -> Options<'_> {
         Options {
-            component_name: "storage-host",
+            component_name: "gpt2",
             reuse_component_after_serving: true,
             format_options: FormatOptions::default(),
             start_options: StartOptions {

@@ -36,9 +36,82 @@ pub struct BoardFilesystemConfig {
     #[serde(default)]
     pub fvm: Fvm,
 
-    /// Permit multiple GPT devices to be matched.
+    /// Configures how GPT-formatted block devices are handled.
+    #[serde(default)]
+    pub gpt: GptMode,
+
+    /// DEPRECATED.  Use GptMode::AllowMultiple.
     #[serde(default)]
     pub gpt_all: bool,
+}
+
+/// How GPT-formatted block devices ought to be handled.
+#[derive(Serialize, Deserialize, Debug, Default, Clone, Copy, PartialEq)]
+#[serde(try_from = "String", into = "String")]
+pub enum GptMode {
+    /// Don't permit binding to GPT-formatted block devices.
+    Disabled,
+    /// Only permit binding to a single GPT-formatted block device.  This is the most common
+    /// configuration, as typically there would be a single storage device which is GPT-formatted.
+    #[default]
+    Enabled,
+    /// Permit binding to multiple GPT-formatted block devices.  This exists to support boards with
+    /// multiple storage devices, or for removable media support.
+    AllowMultiple,
+}
+
+impl GptMode {
+    /// Whether GPT-formatted block devices are supported.
+    pub fn enabled(&self) -> bool {
+        if let Self::Disabled = self {
+            false
+        } else {
+            true
+        }
+    }
+}
+
+impl TryFrom<String> for GptMode {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+impl TryFrom<&str> for GptMode {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let mode = match value {
+            "disabled" => Some(Self::Disabled),
+            "enabled" => Some(Self::Enabled),
+            "allow_multiple" => Some(Self::AllowMultiple),
+            _ => None,
+        };
+        mode.ok_or_else(|| {
+            anyhow!(
+                "Not a valid gpt mode, must be 'disabled', 'enabled', or 'allow_multiple': {}",
+                value
+            )
+        })
+    }
+}
+
+impl std::fmt::Display for GptMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GptMode::Disabled => f.write_str("disabled"),
+            GptMode::Enabled => f.write_str("enabled"),
+            GptMode::AllowMultiple => f.write_str("allow_multiple"),
+        }
+    }
+}
+
+impl From<GptMode> for String {
+    fn from(value: GptMode) -> Self {
+        value.to_string()
+    }
 }
 
 /// Parameters describing how to generate the ZBI.
