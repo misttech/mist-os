@@ -20,7 +20,7 @@ pub fn filter_and_order_vmo_groups_names_for_printing(
 ) -> Vec<&String> {
     let mut names: Vec<&String> = name_to_vmo_memory.keys().collect();
     // Filter out names of VMOs that don't use any memory.
-    names.retain(|&name| name_to_vmo_memory.get(name).unwrap().total > 0);
+    names.retain(|&name| name_to_vmo_memory.get(name).unwrap().total_populated > 0);
     // Sort the VMO names along the tuple (private, scaled, name of VMO).
     names.sort_by(|&a, &b| {
         let sa = name_to_vmo_memory.get(a).unwrap();
@@ -350,6 +350,30 @@ mod tests {
                 name_to_vmo_memory: {
                     let mut result = HashMap::new();
                     result.insert(
+                        "shown".to_string(),
+                        processed::RetainedMemory {
+                            private: 4444,
+                            scaled: 55555,
+                            total: 0,
+                            private_populated: 44440,
+                            scaled_populated: 555550,
+                            total_populated: 6666660,
+                            vmos: vec![],
+                        },
+                    );
+                    result.insert(
+                        "hidden".to_string(),
+                        processed::RetainedMemory {
+                            private: 4444,
+                            scaled: 55555,
+                            total: 666666,
+                            private_populated: 44440,
+                            scaled_populated: 555550,
+                            total_populated: 0,
+                            vmos: vec![],
+                        },
+                    );
+                    result.insert(
                         "vmoC".to_string(),
                         processed::RetainedMemory {
                             private: 4444,
@@ -503,13 +527,14 @@ Process koid:         4|
         let actual_output = std::str::from_utf8(&writer).unwrap();
         let expected_output = r#"Process name:         P|
 Process koid:         4|
-                  Private                   Scaled                     Total          |
-            Committed    Populated    Committed    Populated    Committed    Populated|
+                   Private                   Scaled                     Total          |
+             Committed    Populated    Committed    Populated    Committed    Populated|
     Total         11 B     1.07 KiB         22 B     2.15 KiB         33 B     3.22 KiB|
 |
-    vmoA    43.40 KiB    43.40 KiB   542.53 KiB   542.53 KiB     6.36 MiB     6.36 MiB     (shared)|
-    vmoB     4.34 KiB    43.40 KiB    54.25 KiB   542.53 KiB   651.04 KiB     6.36 MiB     (shared)|
-    vmoC     4.34 KiB    43.40 KiB    54.25 KiB   542.53 KiB   651.04 KiB     6.36 MiB     (shared)|
+    vmoA     43.40 KiB    43.40 KiB   542.53 KiB   542.53 KiB     6.36 MiB     6.36 MiB     (shared)|
+    shown     4.34 KiB    43.40 KiB    54.25 KiB   542.53 KiB          0 B     6.36 MiB     (shared)|
+    vmoB      4.34 KiB    43.40 KiB    54.25 KiB   542.53 KiB   651.04 KiB     6.36 MiB     (shared)|
+    vmoC      4.34 KiB    43.40 KiB    54.25 KiB   542.53 KiB   651.04 KiB     6.36 MiB     (shared)|
 |
 "#;
         pretty_assertions::assert_eq!(actual_output, expected_output.replace("|", ""));
