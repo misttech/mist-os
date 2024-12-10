@@ -6,8 +6,10 @@
 //! utilities here allow testing GMP without regard for MLD/IGMP differences.
 
 use alloc::vec::Vec;
+use core::borrow::Borrow;
 use core::convert::Infallible as Never;
 use core::time::Duration;
+use packet_formats::gmp::{GmpReportGroupRecord, GroupRecordType};
 use rand::SeedableRng as _;
 
 use net_declare::{net_ip_v4, net_ip_v6};
@@ -79,6 +81,7 @@ impl<I: IpExt> HandleableTimer<FakeGmpContext<I>, FakeGmpBindingsContext<I>>
 #[derive(Default)]
 pub(super) struct FakeGmpContextInner<I: IpExt> {
     pub v1_messages: Vec<(MulticastAddr<I::Addr>, gmp::v1::GmpMessageType)>,
+    pub v2_messages: Vec<Vec<(MulticastAddr<I::Addr>, GroupRecordType, Vec<I::Addr>)>>,
 }
 
 impl<I: IpExt> DeviceIdContext<AnyDevice> for &'_ mut FakeGmpContextInner<I> {
@@ -100,6 +103,25 @@ impl<I: IpExt> GmpContextInner<I, FakeGmpBindingsContext<I>> for &'_ mut FakeGmp
         msg_type: gmp::v1::GmpMessageType,
     ) {
         self.v1_messages.push((group_addr, msg_type));
+    }
+
+    fn send_report_v2(
+        &mut self,
+        _bindings_ctx: &mut FakeGmpBindingsContext<I>,
+        _device: &Self::DeviceId,
+        groups: impl Iterator<Item: GmpReportGroupRecord<I::Addr> + Clone> + Clone,
+    ) {
+        // NB: We sort the message so we can perform stable equality operations
+        // in tests.
+        let mut groups = groups
+            .map(|g| {
+                let mut sources = g.sources().map(|i| i.borrow().clone()).collect::<Vec<_>>();
+                sources.sort();
+                (g.group(), g.record_type(), sources)
+            })
+            .collect::<Vec<_>>();
+        groups.sort();
+        self.v2_messages.push(groups)
     }
 
     fn run_actions(

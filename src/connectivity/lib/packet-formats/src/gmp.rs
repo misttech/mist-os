@@ -166,7 +166,7 @@ create_protocol_enum!(
     /// [RFC 3810 section 5.2.12]:
     ///     https://www.rfc-editor.org/rfc/rfc3810#section-5.2.12
     #[allow(missing_docs)]
-    #[derive(PartialEq, Copy, Clone)]
+    #[derive(PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
     pub enum GroupRecordType: u8 {
         ModeIsInclude, 0x01, "Mode Is Include";
         ModeIsExclude, 0x02, "Mode Is Exclude";

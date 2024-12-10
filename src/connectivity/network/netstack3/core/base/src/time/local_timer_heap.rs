@@ -132,6 +132,11 @@ where
         heap.clear();
         let _: Option<BC::Instant> = bindings_ctx.cancel_timer(next_wakeup);
     }
+
+    /// Returns true if there are no timers installed.
+    pub fn is_empty(&self) -> bool {
+        self.heap.map.is_empty()
+    }
 }
 
 /// A timer heap that is keyed on `K`.

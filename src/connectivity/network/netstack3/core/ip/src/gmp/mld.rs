@@ -12,17 +12,22 @@ use core::convert::Infallible as Never;
 use core::time::Duration;
 
 use log::{debug, error};
+use net_declare::net_ip_v6;
 use net_types::ip::{Ip, Ipv6, Ipv6Addr, Ipv6ReservedScope, Ipv6Scope, Ipv6SourceAddr};
 use net_types::{LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr, Witness};
-use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer, WeakDeviceIdentifier};
+use netstack3_base::{
+    AnyDevice, DeviceIdContext, ErrorAndSerializer, HandleableTimer, WeakDeviceIdentifier,
+};
 use netstack3_filter as filter;
-use packet::serialize::Serializer;
+use packet::serialize::{PacketBuilder, Serializer};
 use packet::InnerPacketBuilder;
+use packet_formats::gmp::GmpReportGroupRecord;
 use packet_formats::icmp::mld::{
     IcmpMldv1MessageType, MldPacket, Mldv1Body, Mldv1MessageBuilder, Mldv2QueryBody,
-    MulticastListenerDone, MulticastListenerReport,
+    Mldv2ReportMessageBuilder, MulticastListenerDone, MulticastListenerReport,
+    MulticastListenerReportV2,
 };
-use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::icmp::{IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode};
 use packet_formats::ip::Ipv6Proto;
 use packet_formats::ipv6::ext_hdrs::{
     ExtensionHeaderOptionAction, HopByHopOption, HopByHopOptionData,
@@ -32,12 +37,21 @@ use packet_formats::utils::NonZeroDuration;
 use thiserror::Error;
 use zerocopy::SplitByteSlice;
 
-use crate::internal::base::{IpLayerHandler, IpPacketDestination};
+use crate::internal::base::{IpDeviceMtuContext, IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpGroupState,
     GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
     NotAMemberErr,
 };
+
+/// The destination address for all MLDv2 reports.
+///
+/// Defined in [RFC 3376 section 5.2.14].
+///
+/// [RFC 3376 section 5.2.14]:
+///     https://datatracker.ietf.org/doc/html/rfc3810#section-5.2.14
+const ALL_MLDV2_CAPABLE_ROUTERS: MulticastAddr<Ipv6Addr> =
+    unsafe { MulticastAddr::new_unchecked(net_ip_v6!("FF02::16")) };
 
 /// The bindings types for MLD.
 pub trait MldBindingsTypes: GmpBindingsTypes {}
@@ -62,7 +76,7 @@ pub trait MldStateContext<BT: MldBindingsTypes>:
 
 /// The execution context capable of sending frames for MLD.
 pub trait MldSendContext<BT: MldBindingsTypes>:
-    DeviceIdContext<AnyDevice> + IpLayerHandler<Ipv6, BT> + MldContextMarker
+    DeviceIdContext<AnyDevice> + IpLayerHandler<Ipv6, BT> + IpDeviceMtuContext<Ipv6> + MldContextMarker
 {
     /// Gets the IPv6 link local address on `device`.
     fn get_ipv6_link_local_addr(
@@ -244,7 +258,7 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         msg_type: gmp::v1::GmpMessageType,
     ) {
         let result = match msg_type {
-            gmp::v1::GmpMessageType::Report => send_mld_packet::<_, _, _>(
+            gmp::v1::GmpMessageType::Report => send_mld_v1_packet::<_, _, _>(
                 self,
                 bindings_ctx,
                 device,
@@ -253,7 +267,7 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
                 group_addr,
                 (),
             ),
-            gmp::v1::GmpMessageType::Leave => send_mld_packet::<_, _, _>(
+            gmp::v1::GmpMessageType::Leave => send_mld_v1_packet::<_, _, _>(
                 self,
                 bindings_ctx,
                 device,
@@ -266,10 +280,45 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
 
         match result {
             Ok(()) => {}
-            Err(err) => error!(
+            Err(err) => debug!(
                 "error sending MLD message ({msg_type:?}) on device {device:?} for group \
                 {group_addr}: {err}",
             ),
+        }
+    }
+
+    fn send_report_v2(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device: &Self::DeviceId,
+        groups: impl Iterator<Item: GmpReportGroupRecord<Ipv6Addr> + Clone> + Clone,
+    ) {
+        let dst_ip = ALL_MLDV2_CAPABLE_ROUTERS;
+        let (ipv6, icmp) =
+            new_ip_and_icmp_builders(self, device, dst_ip, MulticastListenerReportV2);
+        let header = ipv6.constraints().header_len() + icmp.constraints().header_len();
+        let avail_len = usize::from(self.get_mtu(device)).saturating_sub(header);
+        let reports = match Mldv2ReportMessageBuilder::new(groups).with_len_limits(avail_len) {
+            Ok(msg) => msg,
+            Err(e) => {
+                // Warn here, we don't quite have a good global guarantee of
+                // minimal acceptable MTUs across both IPv4 and IPv6. This
+                // should effectively not happen though.
+                //
+                // TODO(https://fxbug.dev/383355972): Consider an assertion here
+                // instead.
+                error!("MTU too small to send MLD reports: {e:?}");
+                return;
+            }
+        };
+        for report in reports {
+            let destination = IpPacketDestination::Multicast(dst_ip);
+            let ip_frame =
+                report.into_serializer().encapsulate(icmp.clone()).encapsulate(ipv6.clone());
+            IpLayerHandler::send_ip_frame(self, bindings_ctx, device, destination, ip_frame)
+                .unwrap_or_else(|ErrorAndSerializer { error, .. }| {
+                    debug!("failed to send MLDv2 report over {device:?}: {error:?}")
+                });
         }
     }
 
@@ -382,11 +431,82 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> HandleableTimer<CC, BC>
     }
 }
 
+/// An iterator that generates the IP options for MLD packets.
+///
+/// This allows us to write `new_ip_and_icmp_builders` easily without a big mess
+/// of static lifetimes.
+///
+/// MLD messages require the Router Alert hop-by-hop extension. See [RFC 2710
+/// section 3] , [RFC 3810 section 5].
+///
+/// [RFC 2710 section 2]:
+///     https://datatracker.ietf.org/doc/html/rfc2710#section-3
+/// [RFC 3810 section 5]:
+///     https://datatracker.ietf.org/doc/html/rfc3810#section-5
+#[derive(Debug, Clone, Default)]
+struct MldIpOptions(bool);
+
+impl Iterator for MldIpOptions {
+    type Item = HopByHopOption<'static>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self(yielded) = self;
+        if core::mem::replace(yielded, true) {
+            None
+        } else {
+            Some(HopByHopOption {
+                action: ExtensionHeaderOptionAction::SkipAndContinue,
+                mutable: false,
+                data: HopByHopOptionData::RouterAlert { data: 0 },
+            })
+        }
+    }
+}
+
+/// The required IP TTL for MLD messages.
+///
+/// See [RFC 2710 section 3] , [RFC 3810 section 5].
+///
+/// [RFC 2710 section 2]:
+///     https://datatracker.ietf.org/doc/html/rfc2710#section-3
+/// [RFC 3810 section 5]:
+///     https://datatracker.ietf.org/doc/html/rfc3810#section-5
+const MLD_IP_HOP_LIMIT: u8 = 1;
+
+fn new_ip_and_icmp_builders<
+    BC: MldBindingsContext,
+    CC: MldSendContext<BC>,
+    M: IcmpMessage<Ipv6, Code = IcmpUnusedCode> + filter::IcmpMessage<Ipv6>,
+>(
+    core_ctx: &mut CC,
+    device: &CC::DeviceId,
+    dst_ip: MulticastAddr<Ipv6Addr>,
+    msg: M,
+) -> (Ipv6PacketBuilderWithHbhOptions<'static, MldIpOptions>, IcmpPacketBuilder<Ipv6, M>) {
+    // According to https://tools.ietf.org/html/rfc3590#section-4, if a valid
+    // link-local address is not available for the device (e.g., one has not
+    // been configured), the message is sent with the unspecified address (::)
+    // as the IPv6 source address.
+    //
+    // TODO(https://fxbug.dev/42180878): Handle an IPv6 link-local address being
+    // assigned when reports were sent with the unspecified source address.
+    let src_ip =
+        core_ctx.get_ipv6_link_local_addr(device).map_or(Ipv6::UNSPECIFIED_ADDRESS, |x| x.get());
+
+    let ipv6 = Ipv6PacketBuilderWithHbhOptions::new(
+        Ipv6PacketBuilder::new(src_ip, dst_ip.get(), MLD_IP_HOP_LIMIT, Ipv6Proto::Icmpv6),
+        MldIpOptions::default(),
+    )
+    .unwrap();
+    let icmp = IcmpPacketBuilder::new(src_ip, dst_ip.get(), IcmpUnusedCode, msg);
+    (ipv6, icmp)
+}
+
 /// Send an MLD packet.
 ///
 /// The MLD packet being sent should have its `hop_limit` to be 1 and a
 /// `RouterAlert` option in its Hop-by-Hop Options extensions header.
-fn send_mld_packet<
+fn send_mld_v1_packet<
     BC: MldBindingsContext,
     CC: MldSendContext<BC>,
     M: IcmpMldv1MessageType + filter::IcmpMessage<Ipv6>,
@@ -399,30 +519,11 @@ fn send_mld_packet<
     group_addr: M::GroupAddr,
     max_resp_delay: M::MaxRespDelay,
 ) -> MldResult<()> {
-    // According to https://tools.ietf.org/html/rfc3590#section-4, if a valid
-    // link-local address is not available for the device (e.g., one has not
-    // been configured), the message is sent with the unspecified address (::)
-    // as the IPv6 source address.
-    //
-    // TODO(https://fxbug.dev/42180878): Handle an IPv6 link-local address being
-    // assigned when reports were sent with the unspecified source address.
-    let src_ip =
-        core_ctx.get_ipv6_link_local_addr(device).map_or(Ipv6::UNSPECIFIED_ADDRESS, |x| x.get());
-
+    let (ipv6, icmp) = new_ip_and_icmp_builders(core_ctx, device, dst_ip, msg);
     let body = Mldv1MessageBuilder::<M>::new_with_max_resp_delay(group_addr, max_resp_delay)
         .into_serializer()
-        .encapsulate(IcmpPacketBuilder::new(src_ip, dst_ip.get(), IcmpUnusedCode, msg))
-        .encapsulate(
-            Ipv6PacketBuilderWithHbhOptions::new(
-                Ipv6PacketBuilder::new(src_ip, dst_ip.get(), 1, Ipv6Proto::Icmpv6),
-                &[HopByHopOption {
-                    action: ExtensionHeaderOptionAction::SkipAndContinue,
-                    mutable: false,
-                    data: HopByHopOptionData::RouterAlert { data: 0 },
-                }],
-            )
-            .unwrap(),
-        );
+        .encapsulate(icmp)
+        .encapsulate(ipv6);
 
     let destination = IpPacketDestination::Multicast(dst_ip);
     IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, body)
@@ -431,21 +532,26 @@ fn send_mld_packet<
 
 #[cfg(test)]
 mod tests {
-
+    use alloc::rc::Rc;
+    use alloc::vec;
+    use alloc::vec::Vec;
     use core::cell::RefCell;
 
-    use alloc::rc::Rc;
     use assert_matches::assert_matches;
     use net_types::ethernet::Mac;
-    use net_types::ip::{Ip as _, IpVersionMarker};
+    use net_types::ip::{Ip as _, IpVersionMarker, Mtu};
     use netstack3_base::testutil::{
         assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
-        FakeWeakDeviceId,
+        FakeWeakDeviceId, TestIpExt,
     };
     use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext};
     use packet::{BufferMut, ParseBuffer};
+    use packet_formats::gmp::GroupRecordType;
     use packet_formats::icmp::mld::MulticastListenerQuery;
     use packet_formats::icmp::{IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet};
+    use packet_formats::ip::IpPacket;
+    use packet_formats::ipv6::ext_hdrs::Ipv6ExtensionHeaderData;
+    use packet_formats::ipv6::Ipv6Packet;
 
     use super::*;
     use crate::internal::base::{IpPacketDestination, IpSendFrameError, SendIpPacketMeta};
@@ -555,6 +661,12 @@ mod tests {
             let mut shared = shared.borrow_mut();
             let Shared { gmp_state, groups, config } = &mut *shared;
             cb(self, GmpStateRef { enabled, groups, gmp: gmp_state, config })
+        }
+    }
+
+    impl IpDeviceMtuContext<Ipv6> for &mut FakeCoreCtxImpl {
+        fn get_mtu(&mut self, _device: &FakeDeviceId) -> Mtu {
+            Ipv6::MINIMUM_LINK_MTU
         }
     }
 
@@ -710,7 +822,7 @@ mod tests {
 
     // Ensure the ttl is 1.
     fn ensure_ttl(frame: &[u8]) {
-        assert_eq!(frame[7], 1);
+        assert_eq!(frame[7], MLD_IP_HOP_LIMIT);
     }
 
     fn ensure_slice_addr(frame: &[u8], start: usize, end: usize, ip: Ipv6Addr) {
@@ -1265,5 +1377,70 @@ mod tests {
             );
             ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
         });
+    }
+
+    /// Test the basics of MLDv2 report sending.
+    #[test]
+    fn send_gmpv2_report() {
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+        let sent_report_addr = Ipv6::get_multicast_addr(130);
+        let sent_report_mode = GroupRecordType::ModeIsExclude;
+        let sent_report_sources = Vec::<Ipv6Addr>::new();
+        (&mut core_ctx).send_report_v2(
+            &mut bindings_ctx,
+            &FakeDeviceId,
+            [(sent_report_addr, sent_report_mode, sent_report_sources.iter())].into_iter(),
+        );
+        let frames = core_ctx.take_frames();
+        let (MldFrameMetadata { device: FakeDeviceId, dst_ip }, frame) =
+            assert_matches!(&frames[..], [x] => x);
+        assert_eq!(dst_ip, &ALL_MLDV2_CAPABLE_ROUTERS);
+        let mut buff = &frame[..];
+        let ipv6 = buff.parse::<Ipv6Packet<_>>().expect("parse IPv6");
+        assert_eq!(ipv6.ttl(), MLD_IP_HOP_LIMIT);
+        assert_eq!(ipv6.src_ip(), Ipv6::UNSPECIFIED_ADDRESS);
+        assert_eq!(ipv6.dst_ip(), ALL_MLDV2_CAPABLE_ROUTERS.get());
+        assert_eq!(ipv6.proto(), Ipv6Proto::Icmpv6);
+        assert_eq!(
+            ipv6.iter_extension_hdrs()
+                .map(|h| {
+                    let options = assert_matches!(
+                        h.data(),
+                        Ipv6ExtensionHeaderData::HopByHopOptions { options } => options
+                    );
+                    assert_eq!(
+                        options
+                            .iter()
+                            .map(|o| {
+                                assert_matches!(
+                                    o.data,
+                                    HopByHopOptionData::RouterAlert { data: 0 }
+                                );
+                            })
+                            .count(),
+                        1
+                    );
+                })
+                .count(),
+            1
+        );
+        let args = IcmpParseArgs::new(ipv6.src_ip(), ipv6.dst_ip());
+        let icmp = buff.parse_with::<_, Icmpv6Packet<_>>(args).expect("parse ICMPv6");
+        let report = assert_matches!(
+            icmp,
+            Icmpv6Packet::Mld(MldPacket::MulticastListenerReportV2(report)) => report
+        );
+        let report = report
+            .body()
+            .iter_multicast_records()
+            .map(|r| {
+                (
+                    r.header().multicast_addr().clone(),
+                    r.header().record_type().unwrap(),
+                    r.sources().to_vec(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(report, vec![(sent_report_addr.get(), sent_report_mode, sent_report_sources)]);
     }
 }

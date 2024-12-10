@@ -18,11 +18,12 @@ use core::time::Duration;
 use net_types::ip::Ip;
 use net_types::{MulticastAddr, Witness as _};
 use netstack3_base::Instant as _;
+use packet_formats::gmp::GroupRecordType;
 use packet_formats::utils::NonZeroDuration;
 
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpContext, GmpContextInner, GmpGroupState, GmpMode, GmpStateRef,
-    GmpTypeLayout, GroupJoinResult, IpExt, NotAMemberErr, QueryTarget,
+    GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt, NotAMemberErr, QueryTarget,
 };
 
 /// The default value for Query Response Interval defined in [RFC 3810
@@ -385,8 +386,176 @@ pub(super) fn join_group<
     })
 }
 
+pub(super) fn leave_group<
+    I: IpExt,
+    CC: GmpContextInner<I, BC>,
+    BC: GmpBindingsContext,
+    T: GmpTypeLayout<I, BC>,
+>(
+    _core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    _device: &CC::DeviceId,
+    group_addr: MulticastAddr<I::Addr>,
+    state: GmpStateRef<'_, I, T, BC>,
+) -> GroupLeaveResult {
+    let GmpStateRef { enabled, groups, gmp, config: _ } = state;
+    debug_assert!(gmp.mode.is_v2());
+    let gmp_enabled = enabled && I::should_perform_gmp(group_addr);
+    groups.leave_group(group_addr).map(|_state| {
+        // Cancel existing query timers since we've left the group.
+        let _: Option<_> =
+            gmp.timers.cancel(bindings_ctx, &TimerId::MulticastAddress(group_addr).into());
+        if gmp_enabled {
+            // TODO(https://fxbug.dev/42071006): Operate unsolicited reports.
+        }
+    })
+}
+
+/// Handles an expire timer.
+///
+/// The timer expiration algorithm is described in [RFC 3376 section 5.1] and
+/// [RFC 3376 section 5.2] for IGMP and [RFC 3810 section 6.3] for MLD.
+///
+/// [RFC 3376 section 5.1]:
+///     https://datatracker.ietf.org/doc/html/rfc3376#section-5.1
+/// [RFC 3376 section 5.2]:
+///     https://datatracker.ietf.org/doc/html/rfc3376#section-5.2
+/// [RFC 3810 section 6.3]:
+///     https://datatracker.ietf.org/doc/html/rfc3810#section-6.3
+pub(super) fn handle_timer<
+    I: IpExt,
+    CC: GmpContextInner<I, BC>,
+    BC: GmpBindingsContext,
+    T: GmpTypeLayout<I, BC>,
+>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    timer: TimerId<I>,
+    state: GmpStateRef<'_, I, T, BC>,
+) {
+    match timer {
+        TimerId::GeneralQuery => handle_general_query_timer(core_ctx, bindings_ctx, device, state),
+        TimerId::MulticastAddress(multicast_addr) => {
+            handle_multicast_address_timer(core_ctx, bindings_ctx, device, multicast_addr, state)
+        }
+    }
+}
+
+/// Handles general query timers.
+///
+/// Quote from RFC 3810:
+///
+/// > If the expired timer is the Interface Timer (i.e., there is a pending
+/// > response to a General Query), then one Current State Record is sent for
+/// > each multicast address for which the specified interface has listening
+/// > state [...]. The Current State Record carries the multicast address and
+/// > its associated filter mode (MODE_IS_INCLUDE or MODE_IS_EXCLUDE) and Source
+/// > list. Multiple Current State Records are packed into individual Report
+/// > messages, to the extent possible.
+fn handle_general_query_timer<
+    I: IpExt,
+    CC: GmpContextInner<I, BC>,
+    BC: GmpBindingsContext,
+    T: GmpTypeLayout<I, BC>,
+>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    state: GmpStateRef<'_, I, T, BC>,
+) {
+    let GmpStateRef { enabled: _, groups, gmp: _, config: _ } = state;
+    let report = groups.iter().map(|(addr, state)| {
+        // TODO(https://fxbug.dev/381241191): Update to include SSM in group
+        // records.
+        let _ = state;
+
+        // Given we don't support SSM, all the groups we're currently joined
+        // should be reported in exclude mode with an empty source list.
+        //
+        // See https://datatracker.ietf.org/doc/html/rfc3810#section-5.2.12 and
+        // https://datatracker.ietf.org/doc/html/rfc3376#section-4.2.12 for
+        // group record type descriptions.
+        (*addr, GroupRecordType::ModeIsExclude, core::iter::empty::<I::Addr>())
+    });
+    core_ctx.send_report_v2(bindings_ctx, device, report)
+}
+
+/// Handles a multicast address timer for `multicast_addr`.
+///
+/// RFC 3810 quote:
+///
+/// > If the expired timer is a Multicast Address Timer and the list of recorded
+/// > sources for that multicast address is empty (i.e., there is a pending
+/// > response to a Multicast Address Specific Query), then if, and only if, the
+/// > interface has listening state for that multicast address, a single Current
+/// > State Record is sent for that address. The Current State Record carries
+/// > the multicast address and its associated filter mode (MODE_IS_INCLUDE or
+/// > MODE_IS_EXCLUDE) and source list, if any.
+/// >
+/// > If the expired timer is a Multicast Address Timer and the list of recorded
+/// > sources for that multicast address is non-empty (i.e., there is a pending
+/// > response to a Multicast Address and Source Specific Query), then if, and
+/// > only if, the interface has listening state for that multicast address, the
+/// > contents of the corresponding Current State Record are determined from the
+/// > per- interface state and the pending response record, as specified in the
+/// > following table:
+/// >
+/// >                        set of sources in the
+/// > per-interface state  pending response record  Current State Record
+/// > -------------------  -----------------------  --------------------
+/// >  INCLUDE (A)                   B                IS_IN (A*B)
+/// >
+/// >  EXCLUDE (A)                   B                IS_IN (B-A)
+fn handle_multicast_address_timer<
+    I: IpExt,
+    CC: GmpContextInner<I, BC>,
+    BC: GmpBindingsContext,
+    T: GmpTypeLayout<I, BC>,
+>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    multicast_addr: MulticastAddr<I::Addr>,
+    state: GmpStateRef<'_, I, T, BC>,
+) {
+    let GmpStateRef { enabled: _, groups, gmp: _, config: _ } = state;
+    // Invariant: multicast address timers are removed when we remove interest
+    // from the group.
+    let state = groups
+        .get_mut(&multicast_addr)
+        .expect("multicast timer fired for removed address")
+        .v2_mut();
+    let recorded_sources = core::mem::take(&mut state.recorded_sources);
+
+    let (mode, sources) = if recorded_sources.is_empty() {
+        // Multicast Address Specific Query.
+
+        // TODO(https://fxbug.dev/381241191): Update to include SSM-enabled
+        // filter mode. For now, ModeIsExclude is all that needs to be reported
+        // for any group we're a member of.
+
+        (GroupRecordType::ModeIsExclude, either::Either::Left(core::iter::empty::<&I::Addr>()))
+    } else {
+        // Multicast Address And Source Specific Query. The mode is always
+        // include.
+
+        // TODO(https://fxbug.dev/381241191): Actually calculate set
+        // intersection or union when SSM is available.
+
+        (GroupRecordType::ModeIsInclude, either::Either::Right(recorded_sources.iter()))
+    };
+    core_ctx.send_report_v2(
+        bindings_ctx,
+        device,
+        core::iter::once((multicast_addr, mode, sources)),
+    );
+}
+
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_types::Witness as _;
@@ -403,6 +572,26 @@ mod tests {
     enum SpecificQuery {
         Multicast,
         MulticastAndSource,
+    }
+
+    fn join_and_ignore_unsolicited<I: IpExt>(
+        ctx: &mut FakeCtx<I>,
+        groups: impl IntoIterator<Item = MulticastAddr<I::Addr>>,
+    ) {
+        let FakeCtx { core_ctx, bindings_ctx } = ctx;
+        for group in groups {
+            assert_eq!(
+                core_ctx.gmp_join_group(bindings_ctx, &FakeDeviceId, group),
+                GroupJoinResult::Joined(())
+            );
+        }
+        while !core_ctx.gmp.timers.is_empty() {
+            assert_eq!(
+                bindings_ctx.trigger_next_timer(core_ctx),
+                Some(GmpTimerId::new(FakeWeakDeviceId(FakeDeviceId)))
+            );
+        }
+        core_ctx.inner.v2_messages.clear();
     }
 
     #[ip_test(I)]
@@ -517,6 +706,31 @@ mod tests {
     }
 
     #[ip_test(I)]
+    fn leave_group_cancels_multicast_address_timer<I: TestIpExt>() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            testutil::new_context_with_mode::<I>(GmpMode::V2);
+        assert_eq!(
+            core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
+            GroupJoinResult::Joined(())
+        );
+        let query = FakeV2Query { group_addr: I::GROUP_ADDR1.get(), ..Default::default() };
+        handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query)
+            .expect("handle query");
+        assert_matches!(
+            core_ctx.gmp.timers.get(&TimerId::MulticastAddress(I::GROUP_ADDR1).into()),
+            Some(_)
+        );
+        assert_eq!(
+            core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
+            GroupLeaveResult::Left(())
+        );
+        assert_matches!(
+            core_ctx.gmp.timers.get(&TimerId::MulticastAddress(I::GROUP_ADDR1).into()),
+            None
+        );
+    }
+
+    #[ip_test(I)]
     #[test_matrix(
         [SpecificQuery::Multicast, SpecificQuery::MulticastAndSource],
         [SpecificQuery::Multicast, SpecificQuery::MulticastAndSource]
@@ -593,5 +807,68 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[ip_test(I)]
+    fn send_general_query_response<I: TestIpExt>() {
+        let mut ctx = testutil::new_context_with_mode::<I>(GmpMode::V2);
+        join_and_ignore_unsolicited(&mut ctx, [I::GROUP_ADDR1, I::GROUP_ADDR2]);
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        handle_query_message(core_ctx, bindings_ctx, &FakeDeviceId, &FakeV2Query::default())
+            .expect("handle query");
+        assert_eq!(
+            bindings_ctx.trigger_next_timer(core_ctx),
+            Some(GmpTimerId::new(FakeWeakDeviceId(FakeDeviceId)))
+        );
+        assert_eq!(
+            core_ctx.inner.v2_messages,
+            vec![vec![
+                (I::GROUP_ADDR1, GroupRecordType::ModeIsExclude, vec![]),
+                (I::GROUP_ADDR2, GroupRecordType::ModeIsExclude, vec![]),
+            ]]
+        );
+    }
+
+    #[ip_test(I)]
+    fn send_multicast_address_specific_query_response<I: TestIpExt>() {
+        let mut ctx = testutil::new_context_with_mode::<I>(GmpMode::V2);
+        join_and_ignore_unsolicited(&mut ctx, [I::GROUP_ADDR1]);
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        handle_query_message(
+            core_ctx,
+            bindings_ctx,
+            &FakeDeviceId,
+            &FakeV2Query { group_addr: I::GROUP_ADDR1.get(), ..Default::default() },
+        )
+        .expect("handle query");
+        assert_eq!(
+            bindings_ctx.trigger_next_timer(core_ctx),
+            Some(GmpTimerId::new(FakeWeakDeviceId(FakeDeviceId)))
+        );
+        assert_eq!(
+            core_ctx.inner.v2_messages,
+            vec![vec![(I::GROUP_ADDR1, GroupRecordType::ModeIsExclude, vec![])]]
+        );
+    }
+
+    #[ip_test(I)]
+    fn send_multicast_address_and_source_specific_query_response<I: TestIpExt>() {
+        let mut ctx = testutil::new_context_with_mode::<I>(GmpMode::V2);
+        join_and_ignore_unsolicited(&mut ctx, [I::GROUP_ADDR1]);
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let query = FakeV2Query {
+            group_addr: I::GROUP_ADDR1.get(),
+            sources: vec![I::get_other_ip_address(1).get(), I::get_other_ip_address(2).get()],
+            ..Default::default()
+        };
+        handle_query_message(core_ctx, bindings_ctx, &FakeDeviceId, &query).expect("handle query");
+        assert_eq!(
+            bindings_ctx.trigger_next_timer(core_ctx),
+            Some(GmpTimerId::new(FakeWeakDeviceId(FakeDeviceId)))
+        );
+        assert_eq!(
+            core_ctx.inner.v2_messages,
+            vec![vec![(I::GROUP_ADDR1, GroupRecordType::ModeIsInclude, query.sources)]]
+        );
     }
 }

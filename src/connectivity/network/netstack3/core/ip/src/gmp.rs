@@ -53,6 +53,7 @@ use netstack3_base::{
     AnyDevice, CoreTimerContext, DeviceIdContext, InstantBindingsTypes, LocalTimerHeap, RngContext,
     TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
+use packet_formats::gmp::GmpReportGroupRecord;
 use rand::Rng;
 
 /// The result of joining a multicast group.
@@ -178,6 +179,10 @@ impl<A: IpAddress, T> MulticastGroupSet<A, T> {
 
     fn iter_mut<'a>(&'a mut self) -> impl 'a + Iterator<Item = (&'a MulticastAddr<A>, &'a mut T)> {
         self.inner.iter_mut()
+    }
+
+    fn iter<'a>(&'a self) -> impl 'a + Iterator<Item = (&'a MulticastAddr<A>, &'a T)> + Clone {
+        self.inner.iter()
     }
 
     fn is_empty(&self) -> bool {
@@ -306,9 +311,7 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
             GmpMode::V1 { compat: _ } => {
                 v1::leave_group(&mut core_ctx, bindings_ctx, device, group_addr, state)
             }
-            GmpMode::V2 => {
-                todo!("https://fxbug.dev/42071006 handle GMPv2 leave group")
-            }
+            GmpMode::V2 => v2::leave_group(&mut core_ctx, bindings_ctx, device, group_addr, state),
         })
     }
 }
@@ -625,13 +628,21 @@ trait GmpContext<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> + Sized
 ///
 /// Provides access to external actions while holding the GMP state lock.
 trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
-    /// Sends a GMP message.
+    /// Sends a GMPv1 message.
     fn send_message_v1(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
         msg_type: v1::GmpMessageType,
+    );
+
+    /// Sends a GMPv2 report message.
+    fn send_report_v2(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device: &Self::DeviceId,
+        groups: impl Iterator<Item: GmpReportGroupRecord<I::Addr> + Clone> + Clone,
     );
 
     /// Runs protocol-specific actions.
@@ -682,8 +693,8 @@ fn handle_timer<I, BC, CC>(
             (TimerIdInner::V1Compat, GmpMode::V1 { compat: true }) => {
                 enter_mode(&mut core_ctx, bindings_ctx, &device, state, GmpMode::V2);
             }
-            (TimerIdInner::V2(_), GmpMode::V2) => {
-                todo!("https://fxbug.dev/42071006 handle GMPv2 timers");
+            (TimerIdInner::V2(timer), GmpMode::V2) => {
+                v2::handle_timer(&mut core_ctx, bindings_ctx, &device, timer, state);
             }
             (TimerIdInner::V1Compat, bad) => {
                 panic!("v1 compat timer fired in non v1 compat mode: {bad:?}")
@@ -794,7 +805,7 @@ impl<A: IpAddress> QueryTarget<A> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec;
+    use alloc::vec::Vec;
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
@@ -860,8 +871,9 @@ mod tests {
         );
 
         // Throughout we should've generated no traffic.
-        let FakeGmpContextInner { v1_messages } = &core_ctx.inner;
-        assert_eq!(v1_messages, &vec![]);
+        let FakeGmpContextInner { v1_messages, v2_messages } = &core_ctx.inner;
+        assert_eq!(v1_messages, &Vec::new());
+        assert_eq!(v2_messages, &Vec::<Vec<_>>::new());
     }
 
     #[ip_test(I)]
@@ -985,7 +997,8 @@ mod tests {
         assert_eq!(core_ctx.gmp.mode, GmpMode::V2);
         // No more timers should exist, no frames are sent out.
         core_ctx.gmp.timers.assert_timers([]);
-        let testutil::FakeGmpContextInner { v1_messages } = &core_ctx.inner;
-        assert_eq!(v1_messages, &vec![]);
+        let testutil::FakeGmpContextInner { v1_messages, v2_messages } = &core_ctx.inner;
+        assert_eq!(v1_messages, &Vec::new());
+        assert_eq!(v2_messages, &Vec::<Vec<_>>::new());
     }
 }

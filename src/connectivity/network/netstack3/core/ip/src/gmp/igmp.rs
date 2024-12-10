@@ -11,16 +11,18 @@ use core::fmt::Debug;
 use core::time::Duration;
 
 use log::{debug, error};
+use net_declare::net_ip_v4;
 use net_types::ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr};
 use net_types::{MulticastAddr, SpecifiedAddr, Witness};
 use netstack3_base::{
-    AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, Ipv4DeviceAddr, TimerContext,
-    WeakDeviceIdentifier,
+    AnyDevice, CoreTimerContext, DeviceIdContext, ErrorAndSerializer, HandleableTimer,
+    Ipv4DeviceAddr, TimerContext, WeakDeviceIdentifier,
 };
-use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, Serializer};
+use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, PacketBuilder, Serializer};
+use packet_formats::gmp::GmpReportGroupRecord;
 use packet_formats::igmp::messages::{
     IgmpLeaveGroup, IgmpMembershipQueryV2, IgmpMembershipQueryV3, IgmpMembershipReportV1,
-    IgmpMembershipReportV2, IgmpPacket,
+    IgmpMembershipReportV2, IgmpMembershipReportV3Builder, IgmpPacket,
 };
 use packet_formats::igmp::{IgmpMessage, IgmpPacketBuilder, MessageType};
 use packet_formats::ip::Ipv4Proto;
@@ -32,12 +34,21 @@ use packet_formats::utils::NonZeroDuration;
 use thiserror::Error;
 use zerocopy::SplitByteSlice;
 
-use crate::internal::base::{IpLayerHandler, IpPacketDestination};
+use crate::internal::base::{IpDeviceMtuContext, IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpGroupState,
     GmpMode, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
     NotAMemberErr,
 };
+
+/// The destination address for all IGMPv3 reports.
+///
+/// Defined in [RFC 3376 section 4.2.14].
+///
+/// [RFC 3376 section 4.2.14]:
+///     https://datatracker.ietf.org/doc/html/rfc3376#section-4.2.14
+const ALL_IGMPV3_CAPABLE_ROUTERS: MulticastAddr<Ipv4Addr> =
+    unsafe { MulticastAddr::new_unchecked(net_ip_v4!("224.0.0.22")) };
 
 /// The bindings types for IGMP.
 pub trait IgmpBindingsTypes: GmpBindingsTypes {}
@@ -87,7 +98,7 @@ pub trait IgmpStateContext<BT: IgmpBindingsTypes>:
 
 /// The inner execution context for IGMP capable of sending packets.
 pub trait IgmpSendContext<BT: IgmpBindingsTypes>:
-    DeviceIdContext<AnyDevice> + IpLayerHandler<Ipv4, BT>
+    DeviceIdContext<AnyDevice> + IpLayerHandler<Ipv4, BT> + IpDeviceMtuContext<Ipv4>
 {
     /// Gets an IP address and subnet associated with this device.
     fn get_ip_addr_subnet(
@@ -315,7 +326,7 @@ where
         let result = match msg_type {
             gmp::v1::GmpMessageType::Report => {
                 if *v1_router_present {
-                    send_igmp_message::<_, _, IgmpMembershipReportV1>(
+                    send_igmp_v2_message::<_, _, IgmpMembershipReportV1>(
                         core_ctx,
                         bindings_ctx,
                         device,
@@ -324,7 +335,7 @@ where
                         (),
                     )
                 } else {
-                    send_igmp_message::<_, _, IgmpMembershipReportV2>(
+                    send_igmp_v2_message::<_, _, IgmpMembershipReportV2>(
                         core_ctx,
                         bindings_ctx,
                         device,
@@ -334,7 +345,7 @@ where
                     )
                 }
             }
-            gmp::v1::GmpMessageType::Leave => send_igmp_message::<_, _, IgmpLeaveGroup>(
+            gmp::v1::GmpMessageType::Leave => send_igmp_v2_message::<_, _, IgmpLeaveGroup>(
                 core_ctx,
                 bindings_ctx,
                 device,
@@ -346,10 +357,44 @@ where
 
         match result {
             Ok(()) => {}
-            Err(err) => error!(
+            Err(err) => debug!(
                 "error sending IGMP message ({msg_type:?}) on device {device:?} for group \
                 {group_addr}: {err}",
             ),
+        }
+    }
+
+    fn send_report_v2(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device: &Self::DeviceId,
+        groups: impl Iterator<Item: GmpReportGroupRecord<Ipv4Addr> + Clone> + Clone,
+    ) {
+        let Self { core_ctx, igmp_state: _ } = self;
+        let dst_ip = ALL_IGMPV3_CAPABLE_ROUTERS;
+        let header = new_ip_header_builder(core_ctx, device, dst_ip);
+        let avail_len =
+            usize::from(core_ctx.get_mtu(device)).saturating_sub(header.constraints().header_len());
+        let reports = match IgmpMembershipReportV3Builder::new(groups).with_len_limits(avail_len) {
+            Ok(msg) => msg,
+            Err(e) => {
+                // Warn here, we don't quite have a good global guarantee of
+                // minimal acceptable MTUs across both IPv4 and IPv6. This
+                // should effectively not happen though.
+                //
+                // TODO(https://fxbug.dev/383355972): Consider an assertion here
+                // instead.
+                error!("MTU too small to send IGMP reports: {e:?}");
+                return;
+            }
+        };
+        for report in reports {
+            let destination = IpPacketDestination::Multicast(dst_ip);
+            let ip_frame = report.into_serializer().encapsulate(header.clone());
+            IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, device, destination, ip_frame)
+                .unwrap_or_else(|ErrorAndSerializer { error, .. }| {
+                    debug!("failed to send IGMPv3 report over {device:?}: {error:?}")
+                });
         }
     }
 
@@ -467,7 +512,71 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> HandleableTimer<CC, BC>
     }
 }
 
-fn send_igmp_message<BC: IgmpBindingsContext, CC: IgmpSendContext<BC>, M>(
+/// An iterator that generates the IP options for IGMP packets.
+///
+/// This allows us to write `new_ip_header_builder` easily without a big mess of
+/// static lifetimes.
+///
+/// IGMP messages require the Router Alert options. See [RFC 2236 section 2] ,
+/// [RFC 3376 section 4].
+///
+/// [RFC 2236 section 2]:
+///     https://datatracker.ietf.org/doc/html/rfc2236#section-2
+/// [RFC 3376 section 4]:
+///     https://datatracker.ietf.org/doc/html/rfc3376#section-4
+#[derive(Debug, Clone, Default)]
+struct IgmpIpOptions(bool);
+
+impl Iterator for IgmpIpOptions {
+    type Item = Ipv4Option<'static>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self(yielded) = self;
+        if core::mem::replace(yielded, true) {
+            None
+        } else {
+            Some(Ipv4Option::RouterAlert { data: 0 })
+        }
+    }
+}
+
+/// The required IP TTL for IGMP messages.
+///
+/// See [RFC 2236 section 2] , [RFC 3376 section 4].
+///
+/// [RFC 2236 section 2]:
+///     https://datatracker.ietf.org/doc/html/rfc2236#section-2
+/// [RFC 3376 section 4]:
+///     https://datatracker.ietf.org/doc/html/rfc3376#section-4
+const IGMP_IP_TTL: u8 = 1;
+
+fn new_ip_header_builder<BC: IgmpBindingsContext, CC: IgmpSendContext<BC>>(
+    core_ctx: &mut CC,
+    device: &CC::DeviceId,
+    dst_ip: MulticastAddr<Ipv4Addr>,
+) -> Ipv4PacketBuilderWithOptions<'static, IgmpIpOptions> {
+    // As per RFC 3376 section 4.2.13,
+    //
+    //   An IGMP report is sent with a valid IP source address for the
+    //   destination subnet. The 0.0.0.0 source address may be used by a system
+    //   that has not yet acquired an IP address.
+    //
+    // Note that RFC 3376 targets IGMPv3 but we could be running IGMPv2.
+    // However, we still allow sending IGMP packets with the unspecified source
+    // when no address is available so that IGMP snooping switches know to
+    // forward multicast packets to us before an address is available. See RFC
+    // 4541 for some details regarding considerations for IGMP/MLD snooping
+    // switches.
+    let src_ip =
+        core_ctx.get_ip_addr_subnet(device).map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.addr().get());
+    Ipv4PacketBuilderWithOptions::new(
+        Ipv4PacketBuilder::new(src_ip, dst_ip, IGMP_IP_TTL, Ipv4Proto::Igmp),
+        IgmpIpOptions::default(),
+    )
+    .unwrap_or_else(|Ipv4OptionsTooLongError| unreachable!("router alert always fits"))
+}
+
+fn send_igmp_v2_message<BC: IgmpBindingsContext, CC: IgmpSendContext<BC>, M>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
@@ -478,32 +587,11 @@ fn send_igmp_message<BC: IgmpBindingsContext, CC: IgmpSendContext<BC>, M>(
 where
     M: MessageType<EmptyBuf, FixedHeader = Ipv4Addr, VariableBody = ()>,
 {
-    // As per RFC 3376 section 4.2.13,
-    //
-    //   An IGMP report is sent with a valid IP source address for the
-    //   destination subnet. The 0.0.0.0 source address may be used by a
-    //   system that has not yet acquired an IP address.
-    //
-    // Note that RFC 3376 targets IGMPv3 but we implement IGMPv2. However,
-    // we still allow sending IGMP packets with the unspecified source when no
-    // address is available so that IGMP snooping switches know to forward
-    // multicast packets to us before an address is available. See RFC 4541 for
-    // some details regarding considerations for IGMP/MLD snooping switches.
-    let src_ip =
-        core_ctx.get_ip_addr_subnet(device).map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.addr().get());
-    let destination = IpPacketDestination::from_addr(dst_ip.into_specified());
-
+    let header = new_ip_header_builder(core_ctx, device, dst_ip);
     let body =
         IgmpPacketBuilder::<EmptyBuf, M>::new_with_resp_time(group_addr.get(), max_resp_time);
-    let builder = match Ipv4PacketBuilderWithOptions::new(
-        Ipv4PacketBuilder::new(src_ip, dst_ip, 1, Ipv4Proto::Igmp),
-        &[Ipv4Option::RouterAlert { data: 0 }],
-    ) {
-        Err(Ipv4OptionsTooLongError) => return Err(IgmpError::SendFailure { addr: *group_addr }),
-        Ok(builder) => builder,
-    };
-    let body = body.into_serializer().encapsulate(builder);
-
+    let body = body.into_serializer().encapsulate(header);
+    let destination = IpPacketDestination::Multicast(dst_ip);
     IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, body)
         .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
 }
@@ -600,18 +688,21 @@ mod tests {
     use core::cell::RefCell;
 
     use alloc::rc::Rc;
+    use alloc::vec;
     use alloc::vec::Vec;
     use assert_matches::assert_matches;
 
-    use net_types::ip::{Ip, IpVersionMarker};
+    use net_types::ip::{Ip, IpVersionMarker, Mtu};
     use netstack3_base::testutil::{
         assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
-        FakeWeakDeviceId,
+        FakeWeakDeviceId, TestIpExt as _,
     };
     use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _};
     use packet::serialize::Buf;
-    use packet::ParsablePacket as _;
+    use packet::{ParsablePacket as _, ParseBuffer};
+    use packet_formats::gmp::GroupRecordType;
     use packet_formats::igmp::messages::IgmpMembershipQueryV2;
+    use packet_formats::ipv4::{Ipv4Header, Ipv4Packet};
     use packet_formats::testutil::parse_ip_packet;
     use test_case::test_case;
 
@@ -725,6 +816,12 @@ mod tests {
             _device: &FakeDeviceId,
         ) -> Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>> {
             self.state.addr_subnet
+        }
+    }
+
+    impl IpDeviceMtuContext<Ipv4> for &mut FakeCoreCtx {
+        fn get_mtu(&mut self, _device: &FakeDeviceId) -> Mtu {
+            Mtu::new(1500)
         }
     }
 
@@ -898,7 +995,7 @@ mod tests {
 
     fn ensure_ttl_ihl_rtr(core_ctx: &FakeCoreCtx) {
         for (_, frame) in core_ctx.frames() {
-            assert_eq!(frame[8], 1); // TTL,
+            assert_eq!(frame[8], IGMP_IP_TTL); // TTL,
             assert_eq!(&frame[20..24], &[148, 4, 0, 0]); // RTR
             assert_eq!(frame[0], 0x46); // IHL
         }
@@ -918,7 +1015,7 @@ mod tests {
             assert_eq!(src_ip, expected_src_ip);
             assert_eq!(dst_ip, GROUP_ADDR.get());
             assert_eq!(proto, Ipv4Proto::Igmp);
-            assert_eq!(ttl, 1);
+            assert_eq!(ttl, IGMP_IP_TTL);
             let mut bv = &body[..];
             assert_matches!(
                 IgmpPacket::parse(&mut bv, ()).unwrap(),
@@ -1355,7 +1452,7 @@ mod tests {
                 assert_eq!(src_ip, MY_ADDR.get());
                 assert_eq!(dst_ip, GROUP_ADDR.get());
                 assert_eq!(proto, Ipv4Proto::Igmp);
-                assert_eq!(ttl, 1);
+                assert_eq!(ttl, IGMP_IP_TTL);
                 let mut bv = &body[..];
                 assert_matches!(
                     IgmpPacket::parse(&mut bv, ()).unwrap(),
@@ -1382,7 +1479,7 @@ mod tests {
                 assert_eq!(src_ip, MY_ADDR.get());
                 assert_eq!(dst_ip, Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS.get());
                 assert_eq!(proto, Ipv4Proto::Igmp);
-                assert_eq!(ttl, 1);
+                assert_eq!(ttl, IGMP_IP_TTL);
                 let mut bv = &body[..];
                 assert_matches!(
                     IgmpPacket::parse(&mut bv, ()).unwrap(),
@@ -1409,7 +1506,7 @@ mod tests {
                 assert_eq!(src_ip, MY_ADDR.get());
                 assert_eq!(dst_ip, GROUP_ADDR.get());
                 assert_eq!(proto, Ipv4Proto::Igmp);
-                assert_eq!(ttl, 1);
+                assert_eq!(ttl, IGMP_IP_TTL);
                 let mut bv = &body[..];
                 assert_matches!(
                     IgmpPacket::parse(&mut bv, ()).unwrap(),
@@ -1419,5 +1516,57 @@ mod tests {
                 );
             }
         });
+    }
+
+    /// Test the basics of IGMPv3 report sending.
+    #[test]
+    fn send_igmpv3_report() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(0);
+        let sent_report_addr = Ipv4::get_multicast_addr(130);
+        let sent_report_mode = GroupRecordType::ModeIsExclude;
+        let sent_report_sources = Vec::<Ipv4Addr>::new();
+        core_ctx.with_gmp_state_mut_and_ctx(&FakeDeviceId, |mut core_ctx, _| {
+            core_ctx.send_report_v2(
+                &mut bindings_ctx,
+                &FakeDeviceId,
+                [(sent_report_addr, sent_report_mode, sent_report_sources.iter())].into_iter(),
+            );
+        });
+
+        let frames = core_ctx.take_frames();
+        let (IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame) =
+            assert_matches!(&frames[..], [x] => x);
+        assert_eq!(dst_ip, &ALL_IGMPV3_CAPABLE_ROUTERS);
+        let mut buff = &frame[..];
+        let ipv4 = buff.parse::<Ipv4Packet<_>>().expect("parse IPv4");
+        assert_eq!(ipv4.ttl(), IGMP_IP_TTL);
+        assert_eq!(ipv4.src_ip(), MY_ADDR.get());
+        assert_eq!(ipv4.dst_ip(), ALL_IGMPV3_CAPABLE_ROUTERS.get());
+        assert_eq!(ipv4.proto(), Ipv4Proto::Igmp);
+        assert_eq!(
+            ipv4.iter_options()
+                .map(|o| {
+                    assert_matches!(o, Ipv4Option::RouterAlert { data: 0 });
+                })
+                .count(),
+            1
+        );
+        let igmp = buff.parse::<IgmpPacket<_>>().expect("parse IGMP");
+        let report = assert_matches!(
+            igmp,
+            IgmpPacket::MembershipReportV3(report) => report
+        );
+        let report = report
+            .body()
+            .iter()
+            .map(|r| {
+                (
+                    r.header().multicast_addr().clone(),
+                    r.header().record_type().unwrap(),
+                    r.sources().to_vec(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(report, vec![(sent_report_addr.get(), sent_report_mode, sent_report_sources)]);
     }
 }

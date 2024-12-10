@@ -57,6 +57,7 @@ rustc_library_with_features("netstack3-ip") {
     "src/uninstantiable.rs",
   ]
   deps = [
+    "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/lib/explicit",
@@ -124,7 +125,6 @@ rustc_library_with_features("netstack3-ip") {
       ]
       test_deps = [
         "//src/connectivity/lib/ip-test-macro",
-        "//src/connectivity/lib/net-declare",
         "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
         "//src/connectivity/network/netstack3/core/filter:netstack3-filter-testutils",
         "//src/lib/test_util",
