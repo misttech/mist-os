@@ -232,7 +232,7 @@ And here is what's included when selecting multiple versions:
 | `foo:1,2,3`               |    | ✔︎  | ✔︎ | ✔︎  |    |
 | `foo:3,6`                 |    | ✔︎  | ✔︎ | ✔︎  |    |
 | `foo:3,HEAD`              |    | ✔︎  | ✔︎ | ✔︎  |    |
-| `foo:2,4,6`               |    | ✔︎  | ✔︎ | ✔︎  |    |
+| `foo:2,4,6`               |    | ✔︎  | ✔︎ |    |    |
 | `foo:1,3,5`               |    | ✔︎  | ✔︎ |    | ✔︎  |
 | `foo:1,2,3,4,5,6,HEAD`    |    | ✔︎  | ✔︎ |    | ✔︎  |
 
