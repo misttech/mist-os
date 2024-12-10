@@ -15,11 +15,12 @@ BT_FILE_DEPS=(
   "tools/devshell/lib/platform.sh"
 )
 
-# Replace fx-gen with stub.
-unset -f fx-gen
+# Replace fx-regenerator with stub.
+unset -f fx-regenerator
 
-fx-gen() {
-  return 0
+function fx-regenerator {
+    ln -sf "${BT_TEMP_DIR}/${BUILD_DIR}"/rust-project.json "${FUCHSIA_DIR}"/rust-project.json
+    ln -sf "${BT_TEMP_DIR}/${BUILD_DIR}"/compile_commands.json "${FUCHSIA_DIR}"/compile_commands.json
 }
 
 BT_SET_UP() {
