@@ -216,8 +216,8 @@ fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(const fbl::RefP
   auto root_node =
       FsNode::new_root_with_properties(root, [&mode /*, &uid, &gid*/](FsNodeInfo& info) -> void {
         info.chmod(mode);
-        info.uid = 0;
-        info.gid = 0;
+        info.uid_ = 0;
+        info.gid_ = 0;
       });
   fs->set_root_node(root_node);
 

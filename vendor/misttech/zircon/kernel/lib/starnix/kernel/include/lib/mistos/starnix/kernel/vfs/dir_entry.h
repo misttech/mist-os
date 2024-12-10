@@ -217,7 +217,7 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
         }() _EP(node_and_create_result);
         auto [node, create_result] = node_and_create_result.value();
 
-        ASSERT_MSG((node->info()->mode & FileMode::IFMT) != FileMode::EMPTY,
+        ASSERT_MSG((node->info()->mode_ & FileMode::IFMT) != FileMode::EMPTY,
                    "FsNode initialization did not populate the FileMode in FsNodeInfo.");
 
         auto entry = DirEntry::New(node, {entry_}, name);

@@ -203,13 +203,13 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   fit::result<Errno, SymlinkTarget> readlink(const CurrentTask& current_task) const;
 
   /// Whether this node is a regular file.
-  bool is_reg() const { return info()->mode.is_reg(); }
+  bool is_reg() const { return info()->mode_.is_reg(); }
 
   /// Whether this node is a directory.
-  bool is_dir() const { return info()->mode.is_dir(); }
+  bool is_dir() const { return info()->mode_.is_dir(); }
 
   /// Whether this node is a symbolic link.
-  bool is_lnk() const { return info()->mode.is_lnk(); }
+  bool is_lnk() const { return info()->mode_.is_lnk(); }
 
   fit::result<Errno, struct ::stat> stat(const CurrentTask& current_task) const;
 

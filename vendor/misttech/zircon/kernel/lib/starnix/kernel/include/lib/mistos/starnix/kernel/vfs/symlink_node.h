@@ -29,7 +29,7 @@ class SymlinkNode : public FsNodeOps {
     auto size = target.size();
     auto info = [size, owner](ino_t ino) {
       auto info = FsNodeInfo::New(ino, FILE_MODE(IFLNK, 0777), owner);
-      info.size = size;
+      info.size_ = size;
       return info;
     };
     fbl::AllocChecker ac;

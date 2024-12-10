@@ -15,6 +15,22 @@ const FileMode FileMode::IFBLK = FileMode(S_IFBLK);
 const FileMode FileMode::IFIFO = FileMode(S_IFIFO);
 const FileMode FileMode::IFSOCK = FileMode(S_IFSOCK);
 
+const FileMode FileMode::ISUID = FileMode(S_ISUID);
+const FileMode FileMode::ISGID = FileMode(S_ISGID);
+const FileMode FileMode::ISVTX = FileMode(S_ISVTX);
+const FileMode FileMode::IRWXU = FileMode(S_IRWXU);
+const FileMode FileMode::IRUSR = FileMode(S_IRUSR);
+const FileMode FileMode::IWUSR = FileMode(S_IWUSR);
+const FileMode FileMode::IXUSR = FileMode(S_IXUSR);
+const FileMode FileMode::IRWXG = FileMode(S_IRWXG);
+const FileMode FileMode::IRGRP = FileMode(S_IRGRP);
+const FileMode FileMode::IWGRP = FileMode(S_IWGRP);
+const FileMode FileMode::IXGRP = FileMode(S_IXGRP);
+const FileMode FileMode::IRWXO = FileMode(S_IRWXO);
+const FileMode FileMode::IROTH = FileMode(S_IROTH);
+const FileMode FileMode::IWOTH = FileMode(S_IWOTH);
+const FileMode FileMode::IXOTH = FileMode(S_IXOTH);
+
 const FileMode FileMode::IFMT = FileMode(S_IFMT);
 
 const FileMode FileMode::DEFAULT_UMASK = FileMode(022);  // 0o022 in octal

@@ -135,7 +135,7 @@ fit::result<Errno, ktl::unique_ptr<FileOps>> FsNode::open(const CurrentTask& cur
 
   auto [mode, rdev] = [&]() -> auto {
     auto info = this->info();
-    return ktl::pair(info->mode, info->rdev);
+    return ktl::pair(info->mode_, info->rdev_);
   }();
 
   auto fmt_mode = (mode & FileMode::IFMT);
@@ -213,15 +213,15 @@ fit::result<Errno, struct stat> FsNode::stat(const CurrentTask& current_task) co
 
   return fit::ok<struct stat>({
       //.st_dev =
-      .st_ino = info.ino,
-      .st_nlink = static_cast<__kernel_ulong_t>(info.link_count),
-      .st_mode = info.mode.bits(),
-      .st_uid = info.uid,
-      .st_gid = info.gid,
-      .st_rdev = info.rdev.bits(),
-      .st_size = static_cast<__kernel_long_t>(info.size),
-      .st_blksize = static_cast<__kernel_long_t>(info.blksize),
-      .st_blocks = static_cast<__kernel_long_t>(info.blocks),
+      .st_ino = info.ino_,
+      .st_nlink = static_cast<__kernel_ulong_t>(info.link_count_),
+      .st_mode = info.mode_.bits(),
+      .st_uid = info.uid_,
+      .st_gid = info.gid_,
+      .st_rdev = info.rdev_.bits(),
+      .st_size = static_cast<__kernel_long_t>(info.size_),
+      .st_blksize = static_cast<__kernel_long_t>(info.blksize_),
+      .st_blocks = static_cast<__kernel_long_t>(info.blocks_),
   });
 }
 

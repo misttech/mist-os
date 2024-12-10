@@ -61,17 +61,17 @@ bool node_info_is_reflected_in_stat() {
   ASSERT_TRUE(result.is_ok(), "create_node");
   auto& node = result.value().entry_->node_;
   node->update_info<void>([](starnix::FsNodeInfo& info) {
-    info.mode = FileMode::IFSOCK;
-    info.size = 1;
-    info.blocks = 2;
-    info.blksize = 4;
-    info.uid = 9;
-    info.gid = 10;
-    info.link_count = 11;
+    info.mode_ = FileMode::IFSOCK;
+    info.size_ = 1;
+    info.blocks_ = 2;
+    info.blksize_ = 4;
+    info.uid_ = 9;
+    info.gid_ = 10;
+    info.link_count_ = 11;
     // info.time_status_change = UtcInstant::from_nanos(1);
     // info.time_access = UtcInstant::from_nanos(2);
     // info.time_modify = UtcInstant::from_nanos(3);
-    info.rdev = DeviceType::New(13, 13);
+    info.rdev_ = DeviceType::New(13, 13);
   });
 
   auto stat_result = node->stat(*current_task);

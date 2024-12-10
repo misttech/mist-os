@@ -33,7 +33,7 @@ FileMode FsContext::umask() const { return state_.Read()->umask_; }
 
 FileMode FsContext::apply_umask(FileMode mode) const {
   auto umask = state_.Read()->umask_;
-  return mode & !umask;
+  return mode & ~umask;
 }
 
 FileMode FsContext::set_umask(FileMode umask) const {

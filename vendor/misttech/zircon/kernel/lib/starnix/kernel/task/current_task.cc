@@ -970,7 +970,7 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
       return name.create_tmpfile(*this, mode.with_type(FileMode::IFREG), local_flags);
     }
 
-    auto local_mode = name.entry_->node_->info()->mode;
+    auto local_mode = name.entry_->node_->info()->mode_;
 
     // These checks are not needed in the `O_TMPFILE` case because `mode` refers to the
     // file we are opening. With `O_TMPFILE`, that file is the regular file we just

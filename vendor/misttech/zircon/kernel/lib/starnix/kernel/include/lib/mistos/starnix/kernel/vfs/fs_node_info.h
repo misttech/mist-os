@@ -15,15 +15,15 @@ namespace starnix {
 const size_t DEFAULT_BYTES_PER_BLOCK = 512;
 
 struct FsNodeInfo {
-  ino_t ino;
-  starnix_uapi::FileMode mode;
-  size_t link_count;
-  uid_t uid;
-  gid_t gid;
-  starnix_uapi::DeviceType rdev;
-  size_t size;
-  size_t blksize;
-  size_t blocks;
+  ino_t ino_;
+  starnix_uapi::FileMode mode_;
+  size_t link_count_;
+  uid_t uid_;
+  gid_t gid_;
+  starnix_uapi::DeviceType rdev_;
+  size_t size_;
+  size_t blksize_;
+  size_t blocks_;
   // pub time_status_change: zx::Time,
   // pub time_access: zx::Time,
   // pub time_modify: zx::Time,
@@ -32,20 +32,20 @@ struct FsNodeInfo {
   /// impl FsNodeInfo
   static FsNodeInfo New(ino_t ino, starnix_uapi::FileMode mode, starnix_uapi::FsCred owner) {
     return {
-        .ino = ino,
-        .mode = mode,
-        .uid = owner.uid,
-        .gid = owner.gid,
-        .rdev = starnix_uapi::DeviceType(0),
-        .size = 0,
-        .blksize = DEFAULT_BYTES_PER_BLOCK,
-        .blocks = 0,
+        .ino_ = ino,
+        .mode_ = mode,
+        .uid_ = owner.uid_,
+        .gid_ = owner.gid_,
+        .rdev_ = starnix_uapi::DeviceType(0),
+        .size_ = 0,
+        .blksize_ = DEFAULT_BYTES_PER_BLOCK,
+        .blocks_ = 0,
     };
   }
 
   size_t storage_size() const {
     // TODO (Herrera) : saturating_mul
-    return blksize * blocks;
+    return blksize_ * blocks_;
   }
 
   static std::function<FsNodeInfo(ino_t)> new_factory(starnix_uapi::FileMode mode,
@@ -53,9 +53,9 @@ struct FsNodeInfo {
     return [mode, owner](ino_t ino) -> FsNodeInfo { return FsNodeInfo::New(ino, mode, owner); };
   }
 
-  void chmod(const starnix_uapi::FileMode& m) {
-    mode =
-        (mode & !starnix_uapi::FileMode::PERMISSIONS) | (m & starnix_uapi::FileMode::PERMISSIONS);
+  void chmod(const starnix_uapi::FileMode& mode) {
+    mode_ = (mode_ & ~starnix_uapi::FileMode::PERMISSIONS) |
+            (mode & starnix_uapi::FileMode::PERMISSIONS);
     // self.time_status_change = utc::utc_now();
   }
 };
