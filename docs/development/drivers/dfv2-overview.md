@@ -9,11 +9,11 @@ new drivers using Fuchsia's [driver framework version 2][dfv2] (DFv2).
   create a minimal DFv2 driver from scratch.
 - [**Driver examples**][driver-examples]: Explore sample drivers intended to
   demonstrate various Fuchsia driver concepts.
-- [**Composite nodes**][composite-node]: Learn how to create composite nodes in
-  DFv2 using composite node specifications.
 
 ## Tutorials {:#tutorials}
 
+- [**Create a composite node**][composite-node]: Learn how to create a
+  composite node using composite node specifications.
 - [**Bind rules tutorial**][bind-rules-tutorial]: Learn how to write bind rules
   for DFv2 drivers to discover and match devices.
 - [**Bind library code generation tutorial**][bind-libraries-codegen]: Learn
@@ -76,7 +76,7 @@ See the following tutorials under the **SDK** section:
 [dfv2]: /docs/concepts/drivers/README.md
 [write-a-minimal-dfv2-driver]: /docs/development/drivers/developer_guide/write-a-minimal-dfv2-driver.md
 [driver-examples]: /docs/development/drivers/developer_guide/driver-examples.md
-[composite-node]: /docs/development/drivers/developer_guide/composite-node.md
+[composite-node]: /docs/development/drivers/developer_guide/create-a-composite-node.md
 [fidl-tutorial]: /docs/development/drivers/tutorials/fidl-tutorial.md
 [bind-rules-tutorial]: /docs/development/drivers/tutorials/bind-rules-tutorial.md
 [bind-libraries-codegen]: /docs/development/drivers/tutorials/bind-libraries-codegen.md

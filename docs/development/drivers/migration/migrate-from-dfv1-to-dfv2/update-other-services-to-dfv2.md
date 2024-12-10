@@ -535,7 +535,7 @@ All the **documentation pages** mentioned in this section:
 - [Drivers and nodes][driver-node]
 - [Driver dispatcher and threads][driver-dispatcher]
 - [Drivers][driver-concepts]
-- [Composite nodes][composite-node]
+- [Create a composite node][composite-node]
 - [Expose the driver capabilities][codelab-driver-service]
 - [Fuchsia component inspection overview][driver-inspect]
 - [Mock DDK Migration][mock-ddk]
@@ -599,7 +599,7 @@ All the **documentation pages** mentioned in this section:
 [root-driver-cc]: https://source.corp.google.com/fuchsia/src/devices/tests/v2/compat-runtime/root-driver.cc
 [device-server-h-23]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/device_server.h;l=23?q=deviceserver&sq=&ss=fuchsia%2Ffuchsia
 [driver-concepts]: /docs/concepts/drivers/README.md
-[composite-node]: /docs/development/drivers/developer_guide/composite-node.md
+[composite-node]: /docs/development/drivers/developer_guide/create-a-composite-node.md
 [composite-node-spec]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl;l=68
 [nodecontroller-remove]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.driver.framework/topology.fidl;drc=53130c6bb8b33ae921bb49a561966cbdbc2d6595;l=103
 [gc-iwlwifi-driver]: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/692243

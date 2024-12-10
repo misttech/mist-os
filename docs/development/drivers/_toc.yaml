@@ -19,10 +19,10 @@ toc:
     path: /docs/development/drivers/developer_guide/write-a-minimal-dfv2-driver.md
   - title: "Driver examples"
     path: /docs/development/drivers/developer_guide/driver-examples.md
-  - title: "Composite nodes"
-    path: /docs/development/drivers/developer_guide/composite-node.md
   - title: "Tutorials"
     section:
+    - title: "Create a composite node"
+      path: /docs/development/drivers/developer_guide/create-a-composite-node.md
     - title: "Bind rules tutorial"
       path: /docs/development/drivers/tutorials/bind-rules-tutorial.md
     - title: "Bind library code generation tutorial"

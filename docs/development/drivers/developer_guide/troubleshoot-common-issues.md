@@ -646,8 +646,8 @@ void handle_unknown_method(
 
 <!-- Reference links -->
 
-[composite-drivers]: /docs/development/drivers/developer_guide/composite-node.md
-[composite-node-spec]: /docs/development/drivers/developer_guide/composite-node.md#defining_a_composite_node_specification
+[composite-drivers]: /docs/development/drivers/developer_guide/create-a-composite-node.md
+[composite-node-spec]: /docs/development/drivers/developer_guide/create-a-composite-node.md#what-is-a-composite-node-specification
 [dfv2-driver-transport]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/transport/driver/v2/
 [dfv2-zircon-transport]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/transport/zircon/v2/
 [transport-examples]: /docs/development/drivers/developer_guide/driver-examples.md#transport_examples
