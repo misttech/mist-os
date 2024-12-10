@@ -18,7 +18,7 @@ source_set("surface_header") {
   public_deps = [ "//src/lib/vulkan:headers" ]
 }
 
-validation_layer_dir = "//third_party/Vulkan-ValidationLayers"
+validation_layer_dir = "//third_party/Vulkan-ValidationLayers/src"
 
 config("vulkan_layer_config") {
   include_dirs = [

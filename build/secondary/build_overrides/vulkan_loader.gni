@@ -4,4 +4,4 @@
 
 vulkan_loader_extra_defines = []
 vulkan_loader_shared = true
-vulkan_headers_dir = "//third_party/Vulkan-Headers"
+vulkan_headers_dir = "//third_party/Vulkan-Headers/src"
