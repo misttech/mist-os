@@ -1,6 +1,4 @@
-# Triage codelab
-
-Contributors: cphoenix@
+# Codelab: Using Triage
 
 This codelab explains the Triage utility:
 

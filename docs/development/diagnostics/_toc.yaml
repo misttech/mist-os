@@ -61,9 +61,9 @@ toc:
     path: /docs/development/diagnostics/triage/README.md
   - title: "Configuring Triage"
     path: /docs/development/diagnostics/triage/config.md
-  - title: "Codelab"
-    path: /docs/development/diagnostics/triage/codelab.md
   - title: "Triage (fx triage)"
     path: /docs/development/diagnostics/triage/fx_triage.md
+  - title: "Codelab: Using Triage"
+    path: /docs/development/diagnostics/triage/codelab.md
 
 
