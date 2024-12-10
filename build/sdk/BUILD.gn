@@ -143,6 +143,7 @@ _internal_source_sets_list_testonly = [
   # TODO(https://fxbug.dev/343059325): Promote devicetree to "partner".
   "//sdk/lib/device-watcher/cpp:cpp",
   "//sdk/lib/driver/devicetree/manager:headers",
+  "//sdk/lib/driver/mock-mmio-reg/cpp",
   "//sdk/lib/driver/devicetree/manager:manager",
   "//sdk/lib/driver/devicetree/testing:board-test-helper",
   "//sdk/lib/driver/devicetree/visitors:common-types",
