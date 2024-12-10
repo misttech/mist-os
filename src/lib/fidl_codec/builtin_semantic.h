@@ -9,12 +9,17 @@
 
 namespace fidl_codec::semantic {
 
-constexpr std::string_view kBuiltinSemanticFuchsiaIo =
+constexpr std::string_view kBuiltinSemantics =
     "library fuchsia.io {\n"
     "  Node::DeprecatedClone {\n"
     "    request.object = handle : 'cloned';\n"
     "  }\n"
     "  Directory::Open {\n"
+    "    request.object = handle / request.path;\n"
+    "    input_field: request.path;\n"
+    "    result: request.object;\n"
+    "  }\n"
+    "  Directory::Open3 {\n"
     "    request.object = handle / request.path;\n"
     "    input_field: request.path;\n"
     "    result: request.object;\n"
@@ -25,6 +30,11 @@ constexpr std::string_view kBuiltinSemanticFuchsiaIo =
     "  }\n"
     "  File::Write {\n"
     "    input_field: request.data.size ' bytes';\n"
+    "  }\n"
+    "}\n"
+    "library fuchsia.unknown {\n"
+    "  Cloneable::Clone2 {\n"
+    "    request.request = handle : 'cloned';\n"
     "  }\n"
     "}\n";
 

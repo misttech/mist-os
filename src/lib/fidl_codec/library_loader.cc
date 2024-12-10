@@ -694,7 +694,7 @@ void LibraryLoader::AddMethod(ProtocolMethod* method) {
 void LibraryLoader::ParseBuiltinSemantics() {
   semantic::ParserErrors parser_errors;
   {
-    semantic::SemanticParser parser(this, semantic::kBuiltinSemanticFuchsiaIo, &parser_errors);
+    semantic::SemanticParser parser(this, semantic::kBuiltinSemantics, &parser_errors);
     parser.ParseSemantic();
   }
 }

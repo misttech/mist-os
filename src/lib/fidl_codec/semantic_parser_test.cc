@@ -49,14 +49,14 @@ TEST_F(SemanticParserTest, GlobalExample) {
   Protocol* protocol = nullptr;
   library->GetProtocolByName("fuchsia.io/Directory", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("Open");
+  ProtocolMethod* method = protocol->GetMethodByName("Open3");
   ASSERT_NE(method, nullptr);
-  // Checks that we currently don't have any semantic for Open.
+  // Checks that we currently don't have any semantic for Open3.
   ASSERT_EQ(method->semantic(), nullptr);
 
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
-      "  Directory::Open {\n"
+      "  Directory::Open3 {\n"
       "    request.object = handle / request.path;\n"
       "  }\n"
       "}\n"
@@ -78,7 +78,7 @@ TEST_F(SemanticParserTest, GlobalExample) {
 }
 
 TEST_F(SemanticParserTest, CheckAssignments) {
-  std::string text =
+  std::string_view text =
       "request.object = handle / request.path;\n"
       "request.foo = handle;\n"
       "request.bar = handle / request.other_path;\n"
@@ -101,7 +101,7 @@ TEST_F(SemanticParserTest, CheckAssignments) {
 }
 
 TEST_F(SemanticParserTest, CheckDisplay) {
-  std::string text =
+  std::string_view text =
       "  input_field: request.path;\n"
       "  result: request.object;\n"
       "  input_field: request.data.size ' bytes';\n"
@@ -129,7 +129,7 @@ TEST_F(SemanticParserTest, CheckDisplay) {
 }
 
 TEST_F(SemanticParserTest, EmptyText) {
-  std::string text = "";
+  std::string_view text = "";
   std::stringstream error_stream;
   ParserErrors parser_errors(error_stream);
   SemanticParser parser(&library_loader_, text, &parser_errors);
@@ -141,7 +141,7 @@ TEST_F(SemanticParserTest, EmptyText) {
 }
 
 TEST_F(SemanticParserTest, LibraryExpected) {
-  std::string text =
+  std::string_view text =
       "xxx fuchsia.io {\n"
       "  Directory::Open {\n"
       "    request.object = handle / request.path;\n"
@@ -160,7 +160,7 @@ TEST_F(SemanticParserTest, LibraryExpected) {
 }
 
 TEST_F(SemanticParserTest, LibraryNameExpected) {
-  std::string text =
+  std::string_view text =
       "library {\n"
       "  Directory::Open {\n"
       "    request.object = handle / request.path;\n"
@@ -179,7 +179,7 @@ TEST_F(SemanticParserTest, LibraryNameExpected) {
 }
 
 TEST_F(SemanticParserTest, LibraryNotFound) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.xxx {\n"
       "  Directory::Open {\n"
       "    request.object = handle / request.path;\n"
@@ -198,7 +198,7 @@ TEST_F(SemanticParserTest, LibraryNotFound) {
 }
 
 TEST_F(SemanticParserTest, MissingLeftBrace1) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io\n"
       "  Directory::Open {\n"
       "    request.object = handle / request.path;\n"
@@ -217,7 +217,7 @@ TEST_F(SemanticParserTest, MissingLeftBrace1) {
 }
 
 TEST_F(SemanticParserTest, ProtocolNameExpected) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  ::Open {\n"
       "    request.object = handle / request.path;\n"
@@ -236,7 +236,7 @@ TEST_F(SemanticParserTest, ProtocolNameExpected) {
 }
 
 TEST_F(SemanticParserTest, ProtocolNotFound) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Xxx::Open {\n"
       "    request.object = handle / request.path;\n"
@@ -255,7 +255,7 @@ TEST_F(SemanticParserTest, ProtocolNotFound) {
 }
 
 TEST_F(SemanticParserTest, DoubleColonExpected) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory Open {\n"
       "    request.object = handle / request.path;\n"
@@ -274,7 +274,7 @@ TEST_F(SemanticParserTest, DoubleColonExpected) {
 }
 
 TEST_F(SemanticParserTest, MethodNameExpected) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory:: {\n"
       "    request.object = handle / request.path;\n"
@@ -293,7 +293,7 @@ TEST_F(SemanticParserTest, MethodNameExpected) {
 }
 
 TEST_F(SemanticParserTest, MethodNotFound) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Xxx {\n"
       "    request.object = handle / request.path;\n"
@@ -312,7 +312,7 @@ TEST_F(SemanticParserTest, MethodNotFound) {
 }
 
 TEST_F(SemanticParserTest, MissingLeftBrace2) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Open\n"
       "    request.object = handle / request.path;\n"
@@ -334,7 +334,7 @@ TEST_F(SemanticParserTest, MissingLeftBrace2) {
 }
 
 TEST_F(SemanticParserTest, InputFieldColonExpected) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Open {\n"
       "    input_field request.path;\n"
@@ -354,7 +354,7 @@ TEST_F(SemanticParserTest, InputFieldColonExpected) {
 }
 
 TEST_F(SemanticParserTest, ResultColonExpected) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Open {\n"
       "    input_field: request.path;\n"
@@ -374,7 +374,7 @@ TEST_F(SemanticParserTest, ResultColonExpected) {
 }
 
 TEST_F(SemanticParserTest, InputFieldSemiColonExpected) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Open {\n"
       "    input_field: request.path\n"
@@ -394,7 +394,7 @@ TEST_F(SemanticParserTest, InputFieldSemiColonExpected) {
 }
 
 TEST_F(SemanticParserTest, ResultSemiColonExpected) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Open {\n"
       "    input_field: request.path;\n"
@@ -414,7 +414,7 @@ TEST_F(SemanticParserTest, ResultSemiColonExpected) {
 }
 
 TEST_F(SemanticParserTest, AssignmentExpected) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Open {\n"
       "    = handle / request.path;\n"
@@ -433,7 +433,7 @@ TEST_F(SemanticParserTest, AssignmentExpected) {
 }
 
 TEST_F(SemanticParserTest, FieldNameExpected) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Open {\n"
       "    request. = handle / request.path;\n"
@@ -452,7 +452,7 @@ TEST_F(SemanticParserTest, FieldNameExpected) {
 }
 
 TEST_F(SemanticParserTest, EqualExpected) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Open {\n"
       "    request.object handle / request.path;\n"
@@ -471,7 +471,7 @@ TEST_F(SemanticParserTest, EqualExpected) {
 }
 
 TEST_F(SemanticParserTest, ExpressionExpected1) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Open {\n"
       "    request.object =;\n"
@@ -490,7 +490,7 @@ TEST_F(SemanticParserTest, ExpressionExpected1) {
 }
 
 TEST_F(SemanticParserTest, ExpressionExpected2) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Open {\n"
       "    request.object = handle /;\n"
@@ -509,7 +509,7 @@ TEST_F(SemanticParserTest, ExpressionExpected2) {
 }
 
 TEST_F(SemanticParserTest, ExpressionExpected3) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Open {\n"
       "    request.object = xxx;\n"
@@ -528,7 +528,7 @@ TEST_F(SemanticParserTest, ExpressionExpected3) {
 }
 
 TEST_F(SemanticParserTest, SemicolonExpected) {
-  std::string text =
+  std::string_view text =
       "library fuchsia.io {\n"
       "  Directory::Open {\n"
       "    request.object = handle / request.path\n"
@@ -547,7 +547,7 @@ TEST_F(SemanticParserTest, SemicolonExpected) {
 }
 
 TEST_F(SemanticParserTest, HandleDescriptionTypo) {
-  std::string text =
+  std::string_view text =
       "library test.fidlcodec.sys {\n"
       "  Launcher::CreateComponent {\n"
       "   request.controller = HandleDescriptions('server-control', request.launch_info.url);\n"
@@ -567,7 +567,7 @@ TEST_F(SemanticParserTest, HandleDescriptionTypo) {
 }
 
 TEST_F(SemanticParserTest, UnterminatedString) {
-  std::string text =
+  std::string_view text =
       "library test.fidlcodec.sys {\n"
       "  Launcher::CreateComponent {\n"
       "   request.controller = HandleDescription('server-control, request.launch_info.url);\n"
@@ -587,7 +587,7 @@ TEST_F(SemanticParserTest, UnterminatedString) {
 }
 
 TEST_F(SemanticParserTest, LeftParenthesisExpected) {
-  std::string text =
+  std::string_view text =
       "library test.fidlcodec.sys {\n"
       "  Launcher::CreateComponent {\n"
       "   request.controller = HandleDescription 'server-control', request.launch_info.url);\n"
@@ -607,7 +607,7 @@ TEST_F(SemanticParserTest, LeftParenthesisExpected) {
 }
 
 TEST_F(SemanticParserTest, CommaExpected) {
-  std::string text =
+  std::string_view text =
       "library test.fidlcodec.sys {\n"
       "  Launcher::CreateComponent {\n"
       "   request.controller = HandleDescription('server-control' request.launch_info.url);\n"
@@ -626,7 +626,7 @@ TEST_F(SemanticParserTest, CommaExpected) {
 }
 
 TEST_F(SemanticParserTest, RightParenthesisExpected) {
-  std::string text =
+  std::string_view text =
       "library test.fidlcodec.sys {\n"
       "  Launcher::CreateComponent {\n"
       "   request.controller = HandleDescription('server-control', request.launch_info.url;\n"

@@ -104,16 +104,16 @@ void BuiltinSemanticTest::ShortDisplay(std::ostream& os, const MethodDisplay* di
   }
 }
 
-// Check Node::DeprecatedClone: request.object = handle
-TEST_F(BuiltinSemanticTest, DeprecatedCloneWrite) {
-  // Checks that Node::DeprecatedClone exists in fuchsia.io.
-  Library* library = library_loader_.GetLibraryFromName("fuchsia.io");
+// Check Cloneable::Clone2: request.request = handle
+TEST_F(BuiltinSemanticTest, CloneWrite) {
+  // Checks that Cloneable::Clone2 exists in fuchsia.unknown.
+  Library* library = library_loader_.GetLibraryFromName("fuchsia.unknown");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
-  library->GetProtocolByName("fuchsia.io/Node", &protocol);
+  library->GetProtocolByName("fuchsia.unknown/Cloneable", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("DeprecatedClone");
+  ProtocolMethod* method = protocol->GetMethodByName("Clone2");
   ASSERT_NE(method, nullptr);
   // Checks that the builtin semantic is defined for Clone.
   ASSERT_NE(method->semantic(), nullptr);
@@ -123,7 +123,7 @@ TEST_F(BuiltinSemanticTest, DeprecatedCloneWrite) {
 
   // This message (we only define the fields used by the semantic):
   StructValue request(method->request()->AsStructType()->struct_definition());
-  request.AddField("object", std::make_unique<HandleValue>(channel0_));
+  request.AddField("request", std::make_unique<HandleValue>(channel0_));
 
   ExecuteWrite(method->semantic(), &request, nullptr);
 
@@ -136,16 +136,16 @@ TEST_F(BuiltinSemanticTest, DeprecatedCloneWrite) {
   ASSERT_EQ(inferred_handle_info->attributes(), "cloned");
 }
 
-// Check Node::DeprecatedClone: request.object = handle
-TEST_F(BuiltinSemanticTest, DeprecatedCloneRead) {
-  // Checks that Node::DeprecatedClone exists in fuchsia.io.
-  Library* library = library_loader_.GetLibraryFromName("fuchsia.io");
+// Check Cloneable::Clone2: request.request = handle
+TEST_F(BuiltinSemanticTest, CloneRead) {
+  // Checks that Cloneable::Clone2 exists in fuchsia.unknown.
+  Library* library = library_loader_.GetLibraryFromName("fuchsia.unknown");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
-  library->GetProtocolByName("fuchsia.io/Node", &protocol);
+  library->GetProtocolByName("fuchsia.unknown/Cloneable", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("DeprecatedClone");
+  ProtocolMethod* method = protocol->GetMethodByName("Clone2");
   ASSERT_NE(method, nullptr);
   // Checks that the builtin semantic is defined for Clone.
   ASSERT_NE(method->semantic(), nullptr);
@@ -155,7 +155,7 @@ TEST_F(BuiltinSemanticTest, DeprecatedCloneRead) {
 
   // This message (we only define the fields used by the semantic):
   StructValue request(method->request()->AsStructType()->struct_definition());
-  request.AddField("object", std::make_unique<HandleValue>(channel0_));
+  request.AddField("request", std::make_unique<HandleValue>(channel0_));
 
   ExecuteRead(method->semantic(), &request, nullptr);
 
@@ -168,16 +168,16 @@ TEST_F(BuiltinSemanticTest, DeprecatedCloneRead) {
   ASSERT_EQ(inferred_handle_info->attributes(), "cloned");
 }
 
-// Check Node::DeprecatedClone: request.object = handle
-TEST_F(BuiltinSemanticTest, DeprecatedCloneFd) {
-  // Checks that Node::DeprecatedClone exists in fuchsia.io.
-  Library* library = library_loader_.GetLibraryFromName("fuchsia.io");
+// Check Cloneable::Clone2: request.request = handle
+TEST_F(BuiltinSemanticTest, CloneFd) {
+  // Checks that Cloneable::Clone2 exists in fuchsia.unknown.
+  Library* library = library_loader_.GetLibraryFromName("fuchsia.unknown");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
-  library->GetProtocolByName("fuchsia.io/Node", &protocol);
+  library->GetProtocolByName("fuchsia.unknown/Cloneable", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("DeprecatedClone");
+  ProtocolMethod* method = protocol->GetMethodByName("Clone2");
   ASSERT_NE(method, nullptr);
   // Checks that the builtin semantic is defined for Clone.
   ASSERT_NE(method->semantic(), nullptr);
@@ -187,7 +187,7 @@ TEST_F(BuiltinSemanticTest, DeprecatedCloneFd) {
 
   // This message (we only define the fields used by the semantic):
   StructValue request(method->request()->AsStructType()->struct_definition());
-  request.AddField("object", std::make_unique<HandleValue>(channel0_));
+  request.AddField("request", std::make_unique<HandleValue>(channel0_));
 
   ExecuteRead(method->semantic(), &request, nullptr);
 
@@ -200,16 +200,16 @@ TEST_F(BuiltinSemanticTest, DeprecatedCloneFd) {
   ASSERT_EQ(inferred_handle_info->fd(), 2);
 }
 
-// Check Directory::Open: request.object = handle / request.path
+// Check Directory::Open3: request.object = handle / request.path
 TEST_F(BuiltinSemanticTest, Open) {
-  // Checks that Directory::Open exists in fuchsia.io.
+  // Checks that Directory::Open3 exists in fuchsia.io.
   Library* library = library_loader_.GetLibraryFromName("fuchsia.io");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
   library->GetProtocolByName("fuchsia.io/Directory", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("Open");
+  ProtocolMethod* method = protocol->GetMethodByName("Open3");
   ASSERT_NE(method, nullptr);
   // Checks that the builtin semantic is defined for Open.
   ASSERT_NE(method->semantic(), nullptr);
@@ -232,16 +232,16 @@ TEST_F(BuiltinSemanticTest, Open) {
   ASSERT_EQ(inferred_handle_info->path(), "/svc/fuchsia.io.Directory");
 }
 
-// Check short display of Directory::Open.
+// Check short display of Directory::Open3.
 TEST_F(BuiltinSemanticTest, OpenShortDisplay) {
-  // Checks that Directory::Open exists in fuchsia.io.
+  // Checks that Directory::Open3 exists in fuchsia.io.
   Library* library = library_loader_.GetLibraryFromName("fuchsia.io");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
   library->GetProtocolByName("fuchsia.io/Directory", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("Open");
+  ProtocolMethod* method = protocol->GetMethodByName("Open3");
   ASSERT_NE(method, nullptr);
   // Checks that the short display is defined for Open.
   ASSERT_NE(method->short_display(), nullptr);
