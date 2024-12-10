@@ -134,6 +134,13 @@ def main(argv: Sequence[str]) -> int:
     # We only need a small subset of subdirs under //build.
     force_symlink(workspace_dir / "build", fuchsia_dir / "build")
 
+    # symlink to vendored //third_party/bazel_skylib
+    (workspace_dir / "third_party").mkdir(parents=True, exist_ok=True)
+    force_symlink(
+        workspace_dir / "third_party" / "bazel_skylib",
+        fuchsia_dir / "third_party" / "bazel_skylib",
+    )
+
     # copy/link over build files (no template expansion needed)
     force_symlink(
         workspace_dir / "BUILD.bazel",
