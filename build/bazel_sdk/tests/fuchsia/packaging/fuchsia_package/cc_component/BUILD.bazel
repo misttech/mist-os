@@ -156,6 +156,23 @@ fuchsia_package(
     visibility = ["//visibility:public"],
 )
 
+# Same as `pkg_at_lowercase_next_api_level` but without `cc_component`.
+# TODO(https://fxbug.dev/382773036): Remove once the test can use `pkg_at_lowercase_next_api_level`.
+fuchsia_package(
+    name = "pkg_at_lowercase_next_api_level_without_cc_component",
+    package_name = "pkg_at_lowercase_next_api_level_without_cc_component_for_test",
+    components = [
+        ":empty_component",
+    ],
+    fuchsia_api_level = "next",
+    resources = [
+        ":sc-values",
+        ":simple_file_resource",
+    ],
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
 # Package with an API level that is known in version_history.json but "unsupported".
 fuchsia_package(
     name = "pkg_at_retired_api_level",

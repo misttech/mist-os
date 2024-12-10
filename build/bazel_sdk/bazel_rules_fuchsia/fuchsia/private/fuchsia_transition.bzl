@@ -6,7 +6,7 @@
 
 load("//common:transition_utils.bzl", "set_command_line_option_value")
 load("//fuchsia/constraints/platforms:supported_platforms.bzl", "ALL_SUPPORTED_PLATFORMS", "fuchsia_platforms")
-load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME", "fail_missing_api_level", "get_fuchsia_api_levels")
+load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME", "fail_missing_api_level", "u32_for_fuchsia_api_level_or_none")
 
 NATIVE_CPU_ALIASES = {
     "darwin": "x86_64",
@@ -39,9 +39,11 @@ def _name_for_error(attr):
         getattr(attr, "name", None)
     ) or "NAME NOT FOUND"
 
-def _update_fuchsia_api_level(settings, attr):
+def _fuchsia_api_level_in_effect(settings, attr):
     # The logic for determining what API level to use.
-    # The effective precedence is specified below:
+    # The effective precedence is specified below.
+    # None of the values have been validated at this point.
+    # If the transition is executed multiple times, the previous result will be in (1).
 
     # 1. Check the value that is manually specified via command-line
     manually_specified_api_level = settings[FUCHSIA_API_LEVEL_TARGET_NAME]
@@ -97,21 +99,11 @@ def _fuchsia_transition_impl(settings, attr):
         [] if "--debug" in settings["//command_line_option:copt"] else ["--debug"]
     )
 
-    # Note: we do not need to validate here since the validation logic will
-    # run in the config setting rule
-    fuchsia_api_level = _update_fuchsia_api_level(settings, attr)
-    fuchsia_api_level_infos = [
-        info
-        for info in get_fuchsia_api_levels()
-        if info.api_level == fuchsia_api_level
-    ]
-    if len(fuchsia_api_level_infos) == 0:
-        fail("No metadata found for API level: ", fuchsia_api_level)
-    if 1 < len(fuchsia_api_level_infos):
-        fail("Assertion failure: more than one API level matched: ", fuchsia_api_level_infos)
-    fuchsia_api_level_info = fuchsia_api_level_infos[0]
-
-    copt = set_command_line_option_value(copt, "-ffuchsia-api-level=", str(fuchsia_api_level_info.as_u32))
+    # Add the Fuchsia API level to the Clang command line.
+    # If the API level is not supported, the command line will be broken, but the invalid level
+    # should be caught before it is used.
+    fuchsia_api_level = _fuchsia_api_level_in_effect(settings, attr)
+    copt = set_command_line_option_value(copt, "-ffuchsia-api-level=", str(u32_for_fuchsia_api_level_or_none(fuchsia_api_level)))
 
     return {
         "//command_line_option:cpu": output_cpu,

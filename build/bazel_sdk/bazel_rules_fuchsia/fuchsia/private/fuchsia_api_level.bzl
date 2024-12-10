@@ -68,6 +68,56 @@ def _valid_api_level_names():
     # The returned list is sorted alphabetically, which is not reader-friendly.
     return [entry.api_level for entry in get_fuchsia_api_levels()]
 
+def _info_for_fuchsia_api_level_or_none(api_level):
+    """ Get a struct containg infor about `api_level` if known.
+
+    Args:
+        api_level: A string containing the API level name.
+
+    Returns:
+        A struct containg infor about `api_level` or `None` if `api_level` is
+        not known to this SDK version.
+    """
+    fuchsia_api_level_infos = [
+        info
+        for info in get_fuchsia_api_levels()
+        if info.api_level == api_level
+    ]
+    if len(fuchsia_api_level_infos) > 1:
+        fail("Assertion failure: There should be exactly one info for a supported level. Found: ", fuchsia_api_level_infos)
+    return fuchsia_api_level_infos[0] if fuchsia_api_level_infos else None
+
+def u32_for_fuchsia_api_level(api_level):
+    """ Get the integer representation of `api_level`.
+
+    Args:
+        api_level: A string containing the API level name. It must be known to
+        this SDK version.
+
+    Returns:
+         The integer representation of `api_level`.
+    """
+    info = _info_for_fuchsia_api_level_or_none(api_level)
+    if not info:
+        fail('API level "%s" is unrecognized.' % api_level)
+    return info.as_u32
+
+def u32_for_fuchsia_api_level_or_none(api_level):
+    """ Get the integer representation of `api_level` if known.
+
+    For use during transition when errors are not desirable.
+
+    Args:
+        api_level: A string containing the API level name.
+
+    Returns:
+        The integer representation of `api_level` or `None` if
+        `api_level` is not known to this SDK version.
+
+    """
+    info = _info_for_fuchsia_api_level_or_none(api_level)
+    return info.as_u32 if info else None
+
 def _fuchsia_api_level_impl(ctx):
     raw_level = ctx.build_setting_value
 

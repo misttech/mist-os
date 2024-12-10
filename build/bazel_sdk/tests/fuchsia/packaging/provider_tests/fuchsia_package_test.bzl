@@ -277,14 +277,7 @@ def _test_api_levels():
 
     failure_test(
         name = "failure_test_unknown_numerical_api_level",
-        # This test currently fails because the following error occurs in `fuchsia_transition`:
-        # Error in fail: No metadata found for API level:  90000
-        # ERROR: .../build/bazel_sdk/tests/fuchsia/packaging/provider_tests/BUILD.bazel:24:27: Errors encountered while applying Starlark transition
-        # ERROR: Analysis of target '//fuchsia/packaging/provider_tests:failure_test_unknown_numerical_api_level' failed; build aborted: Analysis failed
-        # TODO(https://fxbug.dev/354047162): Make it fail outside the
-        # transition with the following error:
-        # expected_failure_message = 'ERROR: "90000" is not an API level supported by this SDK. API level should be one of ["',
-        expected_failure_message = "No metadata found for API level:  90000",
+        expected_failure_message = 'ERROR: "90000" is not an API level supported by this SDK. API level should be one of ["',
         target_under_test = ":pkg_at_unknown_numerical_api_level",
         tags = ["manual"],
     )
@@ -299,14 +292,7 @@ def _test_api_levels():
 
     failure_test(
         name = "failure_test_lowercase_next_api_level",
-        # This test currently fails because the following error occurs in `fuchsia_transition`:
-        # Error in fail: No metadata found for API level:  next
-        # ERROR: .../build/bazel_sdk/tests/fuchsia/packaging/provider_tests/BUILD.bazel:24:27: Errors encountered while applying Starlark transition
-        # ERROR: Analysis of target '//fuchsia/packaging/provider_tests:failure_test_lowercase_next_api_level' failed; build aborted: Analysis failed
-        # TODO(https://fxbug.dev/354047162): Make it fail outside the
-        # transition with the following error:
-        # expected_failure_message = 'ERROR: "next" is not an API level supported by this SDK. API level should be one of ["',
-        expected_failure_message = "No metadata found for API level:  next",
+        expected_failure_message = 'ERROR: "next" is not an API level supported by this SDK. API level should be one of ["',
         target_under_test = ":pkg_at_lowercase_next_api_level",
         tags = ["manual"],
     )
@@ -366,20 +352,14 @@ def _test_api_levels():
 
     unknown_repo_default_api_level_failure_test(
         name = "failure_test_pkg_without_api_level_and_unknown_repo_default",
-        expected_failure_message = "No metadata found for API level:  98765",
-
-        # TODO(https://fxbug.dev/354047162): Make the error as follows:
-        # expected_failure_message = 'ERROR: "98765" is not an API level supported by this SDK. API level should be one of ["',
+        expected_failure_message = 'ERROR: "98765" is not an API level supported by this SDK. API level should be one of ["',
         target_under_test = ":pkg_without_api_level",
         tags = ["manual"],
     )
 
     unknown_override_api_level_failure_test(
         name = "failure_test_pkg_at_next_api_level_with_unknown_override_api_level",
-        expected_failure_message = "No metadata found for API level:  123456",
-
-        # TODO(https://fxbug.dev/354047162): Make the error as follows:
-        # expected_failure_message = 'ERROR: "123456" is not an API level supported by this SDK. API level should be one of ["',
+        expected_failure_message = 'ERROR: "123456" is not an API level supported by this SDK. API level should be one of ["',
         target_under_test = ":pkg_at_next_api_level",
         tags = ["manual"],
     )
@@ -405,13 +385,8 @@ def fuchsia_package_test_suite(name, **kwargs):
             # The scenario in this test currently succeeds because the SDK ignores API level status.
             # TODO(https://fxbug.dev/354047162): Enable once the SDK respects API level status.
             # ":failure_test_retired_api_level",
-
-            # The scenarios in these tests fail as expected but during the
-            # transition, which avoids `expect_failure`, causing the tests to fail.
-            # TODO(https://fxbug.dev/354047162): Enable these two tests once the
-            # error does not occur during the transition.
-            # ":failure_test_unknown_numerical_api_level",
-            # ":failure_test_lowercase_next_api_level",
+            ":failure_test_unknown_numerical_api_level",
+            ":failure_test_lowercase_next_api_level",
 
             # This test fails as expected but during the transition, which avoids expect_failure.
             # TODO(https://fxbug.dev/354047162): Enable once the error is not during the transition.
@@ -422,11 +397,8 @@ def fuchsia_package_test_suite(name, **kwargs):
             ":override_api_level_overrides_unknown_package_and_repo_default",
             ":pkg_without_api_level_and_some_supported_repo_default",
             ":pkg_without_api_level_and_repo_default_next",
-
-            # These tests fails as expected but during the transition, which avoids expect_failure.
-            # TODO(https://fxbug.dev/354047162): Enable once the error is not during the transition.
-            # ":failure_test_pkg_without_api_level_and_unknown_repo_default",
-            # ":failure_test_pkg_at_next_api_level_with_unknown_override_api_level",
+            ":failure_test_pkg_without_api_level_and_unknown_repo_default",
+            ":failure_test_pkg_at_next_api_level_with_unknown_override_api_level",
         ],
         **kwargs
     )
