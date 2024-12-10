@@ -53,7 +53,7 @@ use packet_formats::icmp::ndp;
 
 use crate::client::{ClientTable, InternalClient};
 use crate::errors::WorkerInitializationError;
-use crate::logging::{log_debug, log_error, log_warn};
+use crate::logging::{log_debug, log_info, log_error, log_warn};
 use crate::messaging::Sender;
 use crate::multicast_groups::ModernGroup;
 use crate::netlink_packet::errno::Errno;
@@ -559,7 +559,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         u32::try_from(id.get()).expect("should fit in u32"),
                     );
 
-                    log_debug!(
+                    log_info!(
                         "detected newly-acquired default route for interface {id}, \
                          sending stub NDUSEROPT message"
                     );
