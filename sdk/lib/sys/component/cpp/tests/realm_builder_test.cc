@@ -1117,7 +1117,7 @@ TEST_F(RealmBuilderTest, PanicsWhenUsingHandlesFromConstructor) {
         auto realm = realm_builder.Build(dispatcher());
         RunLoop();
       },
-      "LocalComponentImpl::ns\\(\\) cannot be called until RealmBuilder calls OnStart\\(\\)");
+      "LocalComponentImplBase::ns\\(\\) cannot be called until RealmBuilder calls Initialize\\(\\)");
 
   class UseSvcTooEarly : public LocalComponentImpl {
    public:
@@ -1135,7 +1135,7 @@ TEST_F(RealmBuilderTest, PanicsWhenUsingHandlesFromConstructor) {
         auto realm = realm_builder.Build(dispatcher());
         RunLoop();
       },
-      "LocalComponentImpl::svc\\(\\) cannot be called until RealmBuilder calls OnStart\\(\\)");
+      "LocalHlcppComponent::svc\\(\\) cannot be called until RealmBuilder calls Initialize\\(\\)");
 
   class UseOutgoingTooEarly : public LocalComponentImpl {
    public:
@@ -1153,7 +1153,7 @@ TEST_F(RealmBuilderTest, PanicsWhenUsingHandlesFromConstructor) {
         auto realm = realm_builder.Build(dispatcher());
         RunLoop();
       },
-      "LocalComponentImpl::outgoing\\(\\) cannot be called until RealmBuilder calls OnStart\\(\\)");
+      "LocalHlcppComponent::outgoing\\(\\) cannot be called until RealmBuilder calls Initialize\\(\\)");
 
   class CallExitTooEarly : public LocalComponentImpl {
    public:
@@ -1171,7 +1171,7 @@ TEST_F(RealmBuilderTest, PanicsWhenUsingHandlesFromConstructor) {
         auto realm = realm_builder.Build(dispatcher());
         RunLoop();
       },
-      "LocalComponentImpl::Exit\\(\\) cannot be called until RealmBuilder calls OnStart\\(\\)");
+      "LocalComponentImplBase::Exit\\(\\) cannot be called until RealmBuilder calls Initialize\\(\\)");
 }
 
 TEST_F(RealmBuilderTest, PanicsWhenBuildCalledMultipleTimes) {

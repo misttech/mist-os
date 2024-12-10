@@ -10,6 +10,7 @@
 #include <fuchsia/io/cpp/fidl.h>
 #include <fuchsia/mem/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fit/function.h>
 #include <lib/sys/cpp/outgoing_directory.h>
@@ -27,7 +28,7 @@
 
 namespace component_testing {
 
-class LocalComponentImpl;
+class LocalComponentImplBase;
 
 namespace internal {
 class LocalComponentInstance;
@@ -159,11 +160,11 @@ class LocalComponentHandles final {
 
   // [START_EXCLUDE]
  private:
-  friend LocalComponentImpl;
+  friend LocalComponentImplBase;
   friend internal::LocalComponentInstance;
   friend internal::LocalComponentRunner;
 
-  // Called by LocalComponentImpl::Exit().
+  // Called by LocalComponentImplBase::Exit().
   void Exit(zx_status_t return_code = ZX_OK);
 
   fit::function<void(zx_status_t)> on_exit_;
@@ -175,27 +176,27 @@ class LocalComponentHandles final {
 
 // [START mock_interface_cpp]
 // The interface for backing implementations of components with a Source of Mock.
-class LocalComponentImpl {
+class LocalComponentImplBase {
  public:
-  virtual ~LocalComponentImpl();
+  virtual ~LocalComponentImplBase();
 
   // Invoked when the Component Manager issues a Start request to the component.
   // |mock_handles| contains the outgoing directory and namespace of
   // the component.
   virtual void OnStart() = 0;
 
-  // The LocalComponentImpl derived class may override this method to be informed if
+  // The LocalComponentImplBase derived class may override this method to be informed if
   // ComponentController::Stop() was called on the controller associated with
   // the component instance. The ComponentController binding will be dropped
-  // automatically, immediately after LocalComponentImpl::OnStop() returns.
+  // automatically, immediately after LocalComponentImplBase::OnStop() returns.
   virtual void OnStop() {}
 
   // The component can call this method to terminate its instance. This will
   // release the handles, and drop the |ComponentController|, informing
   // component manager that the component has stopped. Calling |Exit()| will
-  // also cause the Realm to drop the |LocalComponentImpl|, which should
+  // also cause the Realm to drop the |LocalComponentImplBase|, which should
   // destruct the component, and the handles and bindings held by the component.
-  // Therefore the |LocalComponentImpl| should not do anything else after
+  // Therefore the |LocalComponentImplBase| should not do anything else after
   // calling |Exit()|.
   //
   // This method is not valid until |OnStart()| is invoked.
@@ -206,6 +207,8 @@ class LocalComponentImpl {
   // This method is not valid until |OnStart()| is invoked.
   fdio_ns_t* ns();
 
+// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
   // Returns a wrapper around the component's outgoing directory. The mock
   // component may publish capabilities using the returned object.
   //
@@ -219,20 +222,79 @@ class LocalComponentImpl {
   sys::ServiceDirectory svc();
 
  private:
-// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
-#if FUCHSIA_API_LEVEL_LESS_THAN(17)
   friend internal::LocalComponentRunner;
   // The |LocalComponentHandles| are set by the |LocalComponentRunner| after
   // construction by the factory, and before calling |OnStart()|
   std::unique_ptr<LocalComponentHandles> handles_;
 #else
+ protected:
+  // Called by internal::LocalComponentInstance
+  zx_status_t Initialize(fdio_ns_t* ns, zx::channel outgoing_dir, async_dispatcher_t* dispatcher,
+                         fit::function<void(zx_status_t)> on_exit);
+
+  // The different bindings override this function and provide their own
+  // Outgoing_directory calls.
+  virtual zx_status_t SetOutgoingDirectory(zx::channel outgoing_dir,
+                                           async_dispatcher_t* dispatcher) = 0;
+
+  fdio_ns_t* namespace_ = nullptr;
+  bool initialized_ = false;
+
+ private:
   friend internal::LocalComponentInstance;
   fit::function<void(zx_status_t)> on_exit_;
-  fdio_ns_t* namespace_ = nullptr;
-  sys::OutgoingDirectory outgoing_dir_;
-  bool initialized_ = false;
 #endif
 };
+
+// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
+using LocalComponentImpl = LocalComponentImplBase;
+#else
+class LocalHlcppComponent : public LocalComponentImplBase {
+ public:
+  // Returns a wrapper around the component's outgoing directory. The mock
+  // component may publish capabilities using the returned object.
+  //
+  // This method is not valid until |OnStart()| is invoked.
+  sys::OutgoingDirectory* outgoing();
+
+  // Convenience method to construct a ServiceDirectory by opening a handle to
+  // "/svc" in the namespace object returned by `ns()`.
+  //
+  // This method is not valid until |OnStart()| is invoked.
+  sys::ServiceDirectory svc();
+
+ private:
+  zx_status_t SetOutgoingDirectory(zx::channel outgoing_dir,
+                                   async_dispatcher_t* dispatcher) override {
+    return outgoing_dir_.Serve(
+        fidl::InterfaceRequest<fuchsia::io::Directory>(std::move(outgoing_dir)), dispatcher);
+  }
+  sys::OutgoingDirectory outgoing_dir_;
+};
+
+// TODO(https://fxbug.dev/383349947): Remove alias from LocalComponentImpl to LocalHlcppComponent
+// when all instances in the codebase have been changed.
+using LocalComponentImpl = LocalHlcppComponent;
+
+class LocalCppComponent : public LocalComponentImplBase {
+ public:
+  // Returns a wrapper around the component's outgoing directory. The mock
+  // component may publish capabilities using the returned object.
+  //
+  // This method is not valid until |OnStart()| is invoked.
+  component::OutgoingDirectory* outgoing();
+
+ private:
+  zx_status_t SetOutgoingDirectory(zx::channel outgoing_dir,
+                                   async_dispatcher_t* dispatcher) override {
+    outgoing_dir_ = std::make_unique<component::OutgoingDirectory>(dispatcher);
+    return outgoing_dir_->Serve(fidl::ServerEnd<fuchsia_io::Directory>(std::move(outgoing_dir)))
+        .status_value();
+  }
+  std::unique_ptr<component::OutgoingDirectory> outgoing_dir_;
+};
+#endif
 // [END mock_interface_cpp]
 
 // The use of this class is DEPRECATED.
@@ -251,11 +313,11 @@ class LocalComponent {
   virtual void Start(std::unique_ptr<LocalComponentHandles> mock_handles) = 0;
 } ZX_REMOVED_SINCE(1, 9, 17, "Use LocalComponentFactory instead.");
 
-// Type for a function that returns a new |LocalComponentImpl| when component
+// Type for a function that returns a new |LocalComponentImplBase| when component
 // manager requests a new component instance.
 //
 // See |Realm.AddLocalChild| for more details.
-using LocalComponentFactory = fit::function<std::unique_ptr<LocalComponentImpl>()>;
+using LocalComponentFactory = fit::function<std::unique_ptr<LocalComponentImplBase>()>;
 
 // Type for either variation of implementation passed to AddLocalChild(): the
 // deprecated raw pointer, or one of the valid callback functions.

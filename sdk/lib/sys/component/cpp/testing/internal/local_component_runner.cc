@@ -173,13 +173,13 @@ LocalComponentInstance::LocalComponentInstance(
         "CreateHandlesFromStartInfo",
         fdio_ns_bind(ns, entry.path().c_str(), entry.mutable_directory()->TakeChannel().release()));
   }
-  local_component_->namespace_ = ns;
-  local_component_->outgoing_dir_.Serve(std::move(*start_info.mutable_outgoing_dir()), dispatcher);
-  local_component_->on_exit_ = [this](zx_status_t status) { Exit(status); };
+  ZX_COMPONENT_ASSERT_STATUS_OK(
+      "Initialize namespace and outgoing directory",
+      local_component_->Initialize(ns, start_info.mutable_outgoing_dir()->TakeChannel(), dispatcher,
+                                   [this](zx_status_t status) { Exit(status); }));
 }
 
 void LocalComponentInstance::Start() {
-  local_component_->initialized_ = true;
   starting_ = true;
   local_component_->OnStart();
   started_ = true;
@@ -189,8 +189,8 @@ void LocalComponentInstance::Start() {
     // `ComponentInstance::on_exit_` callback) must not be called before the
     // `on_start_` callback completes.
     //
-    // A LocalComponentImpl may call `Exit()` during the
-    // `LocalComponentImpl::OnStart()` method. This is a legitimate use case, if
+    // A LocalComponentImplBase may call `Exit()` during the
+    // `LocalComponentImplBase::OnStart()` method. This is a legitimate use case, if
     // the component can complete its work via synchronous calls. See the
     // `RoutesProtocolToLocalComponentSync` test in `realm_builder_test.cc`, for
     // example. This test's component uses an `EchoSyncPtr` to invoke a client
@@ -338,7 +338,8 @@ void LocalComponentRunner::Start(
 }
 #endif
 
-std::unique_ptr<LocalComponentImpl> LocalComponentRunner::SetComponentToRunning(std::string name) {
+std::unique_ptr<LocalComponentImplBase> LocalComponentRunner::SetComponentToRunning(
+    std::string name) {
   ZX_ASSERT_MSG(ready_components_.find(name) != ready_components_.cend(),
                 "Component manager requested a named LocalComponent that is unregistered, already "
                 "running, or not restartable. Component name: %s",
@@ -357,9 +358,9 @@ void LocalComponentRunner::SetComponentToReady(std::string name) {
   ready_components_[name] = std::move(running_components_[name]);
   ZX_ASSERT_MSG(running_components_.erase(name) == 1, "running component not erased");
   // Drop the ComponentInstance. This also causes the ComponentController
-  // and LocalComponentImpl to be dropped. Dropping the LocalComponentImpl
-  // drops the handles.
-  ZX_ASSERT_MSG(running_component_instances_.erase(name) == 1, "running component not erased");
+  // and LocalComponentImplBase to be dropped.
+  ZX_ASSERT_MSG(running_component_instances_.erase(name) == 1,
+                "running component instance not erased");
 }
 
 bool LocalComponentRunner::ContainsReadyComponent(std::string name) const {

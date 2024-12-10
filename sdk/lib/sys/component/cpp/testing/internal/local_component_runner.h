@@ -139,8 +139,8 @@ class LocalComponentInstance final : public fuchsia::component::runner::Componen
 
   fidl::Binding<fuchsia::component::runner::ComponentController> binding_;
 
-  // If a |LocalComponentImpl| calls `Exit()` during
-  // `LocalComponentImpl::OnStart()`, the LocalComponentInstance will _not_
+  // If a |LocalComponentImplBase| calls `Exit()` during
+  // `LocalComponentImplBase::OnStart()`, the LocalComponentInstance will _not_
   // immediately call `LocalComponentInstance::Exit()`. It will save the
   // provided status, and call `LocalComponentInstance::Exit()` after the
   // component has `started_`.
@@ -157,7 +157,7 @@ class LocalComponentInstance final : public fuchsia::component::runner::Componen
   // ComponentController::Kill().
   fit::closure on_exit_;
 
-  std::unique_ptr<LocalComponentImpl> local_component_;
+  std::unique_ptr<LocalComponentImplBase> local_component_;
 };
 
 #endif  // #if FUCHSIA_API_LEVEL_LESS_THAN(17)
@@ -193,7 +193,7 @@ class LocalComponentRunner final : fuchsia::component::runner::ComponentRunner {
   // can be started again).
   bool ContainsReadyComponent(std::string name) const;
 
-  std::unique_ptr<LocalComponentImpl> SetComponentToRunning(std::string name);
+  std::unique_ptr<LocalComponentImplBase> SetComponentToRunning(std::string name);
   void SetComponentToReady(std::string name);
 
   // The list of components that are not running but can be started.

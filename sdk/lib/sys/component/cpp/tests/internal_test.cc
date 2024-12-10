@@ -129,7 +129,10 @@ class LocalComponentRunnerTest : public gtest::RealLoopFixture {
 };
 
 TEST_F(LocalComponentRunnerTest, RunnerStartsOnStartRequest) {
-  CallStart(CreateValidStartInfo());
+  auto start_info = CreateValidStartInfo();
+  fuchsia::io::DirectoryPtr outgoing_directory_proxy;
+  start_info.set_outgoing_dir(outgoing_directory_proxy.NewRequest(dispatcher()));
+  CallStart(std::move(start_info));
 
   RunLoop();
 
@@ -171,6 +174,8 @@ TEST_F(LocalComponentRunnerTest, RunnerGivesComponentItsNamespace) {
   static constexpr char kNamespacePath[] = "/test/path";
 
   auto start_info = CreateValidStartInfo();
+  fuchsia::io::DirectoryPtr outgoing_directory_proxy;
+  start_info.set_outgoing_dir(outgoing_directory_proxy.NewRequest(dispatcher()));
   fuchsia::component::runner::ComponentNamespaceEntry ns_entry;
   ns_entry.set_path(kNamespacePath);
   zx::channel e1, e2;
