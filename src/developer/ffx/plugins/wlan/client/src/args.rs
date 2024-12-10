@@ -211,8 +211,8 @@ fn donut_security_from_security(security_type: SecurityType) -> donut_lib::opts:
         SecurityType::None => donut_lib::opts::SecurityTypeArg::None,
         SecurityType::Wep => donut_lib::opts::SecurityTypeArg::Wep,
         SecurityType::Wpa => donut_lib::opts::SecurityTypeArg::Wpa,
-        SecurityType::Wpa3 => donut_lib::opts::SecurityTypeArg::Wpa2,
-        SecurityType::Wpa2 => donut_lib::opts::SecurityTypeArg::Wpa3,
+        SecurityType::Wpa2 => donut_lib::opts::SecurityTypeArg::Wpa2,
+        SecurityType::Wpa3 => donut_lib::opts::SecurityTypeArg::Wpa3,
     }
 }
 
