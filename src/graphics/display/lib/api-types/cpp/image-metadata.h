@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_IMAGE_METADATA_H_
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fidl/fuchsia.math/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <zircon/assert.h>
 
@@ -73,14 +74,14 @@ class ImageMetadata {
 // static
 constexpr bool ImageMetadata::IsValid(
     const fuchsia_hardware_display_types::wire::ImageMetadata& fidl_image_metadata) {
-  return Dimensions::IsValid(
-      {.unsigned_width = fidl_image_metadata.width, .unsigned_height = fidl_image_metadata.height});
+  return Dimensions::IsValid(fuchsia_math::wire::SizeU(
+      {.width = fidl_image_metadata.width, .height = fidl_image_metadata.height}));
 }
 
 // static
 constexpr bool ImageMetadata::IsValid(const image_metadata_t& banjo_image_metadata) {
-  return Dimensions::IsValid({.unsigned_width = banjo_image_metadata.width,
-                              .unsigned_height = banjo_image_metadata.height});
+  return Dimensions::IsValid(fuchsia_math::wire::SizeU(
+      {.width = banjo_image_metadata.width, .height = banjo_image_metadata.height}));
 }
 
 constexpr ImageMetadata::ImageMetadata(const ImageMetadata::ConstructorArgs& args)
@@ -88,13 +89,13 @@ constexpr ImageMetadata::ImageMetadata(const ImageMetadata::ConstructorArgs& arg
 
 constexpr ImageMetadata::ImageMetadata(
     const fuchsia_hardware_display_types::wire::ImageMetadata& fidl_image_metadata)
-    : dimensions_({.unsigned_width = fidl_image_metadata.width,
-                   .unsigned_height = fidl_image_metadata.height}),
+    : dimensions_(Dimensions::From(fuchsia_math::wire::SizeU(
+          {.width = fidl_image_metadata.width, .height = fidl_image_metadata.height}))),
       tiling_type_(fidl_image_metadata.tiling_type) {}
 
 constexpr ImageMetadata::ImageMetadata(const image_metadata_t& banjo_image_metadata)
-    : dimensions_({.unsigned_width = banjo_image_metadata.width,
-                   .unsigned_height = banjo_image_metadata.height}),
+    : dimensions_(Dimensions::From(fuchsia_math::wire::SizeU(
+          {.width = banjo_image_metadata.width, .height = banjo_image_metadata.height}))),
       tiling_type_(banjo_image_metadata.tiling_type) {}
 
 constexpr bool operator==(const ImageMetadata& lhs, const ImageMetadata& rhs) {

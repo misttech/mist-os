@@ -66,53 +66,39 @@ TEST(DimensionsTest, FromDesignatedInitializer) {
   EXPECT_EQ(500, dimensions.height());
 }
 
-TEST(DimensionsTest, FromUnsignedDesignatedInitializer) {
-  static constexpr Dimensions dimensions({
-      .unsigned_width = 400,
-      .unsigned_height = 500,
-  });
+TEST(DimensionsTest, FromFidlSizeU) {
+  static constexpr fuchsia_math::wire::SizeU fidl_size = {
+      .width = 400,
+      .height = 500,
+  };
+
+  static constexpr Dimensions dimensions = Dimensions::From(fidl_size);
   EXPECT_EQ(400, dimensions.width());
   EXPECT_EQ(500, dimensions.height());
 }
 
-TEST(DimensionsTest, IsValidSmall) {
-  EXPECT_TRUE(Dimensions::IsValid({.width = 10, .height = 20}));
-  EXPECT_TRUE(Dimensions::IsValid({.unsigned_width = 10, .unsigned_height = 20}));
+TEST(DimensionsTest, IsValidFidlSmall) {
+  EXPECT_TRUE(Dimensions::IsValid(fuchsia_math::wire::SizeU({.width = 10, .height = 20})));
 }
 
-TEST(DimensionsTest, IsValidNegativeWidth) {
-  EXPECT_FALSE(Dimensions::IsValid({.width = -10, .height = 20}));
-  // The uint32_t overload doesn't need to handle negative inputs.
+TEST(DimensionsTest, IsValidFidlLargeWidth) {
+  EXPECT_FALSE(Dimensions::IsValid(fuchsia_math::wire::SizeU({.width = 1'000'000, .height = 20})));
 }
 
-TEST(DimensionsTest, IsValidNegativeHeight) {
-  EXPECT_FALSE(Dimensions::IsValid({.width = 10, .height = -20}));
-  // The uint32_t overload doesn't need to handle negative inputs.
+TEST(DimensionsTest, IsValidFidlLargeHeight) {
+  EXPECT_FALSE(Dimensions::IsValid(fuchsia_math::wire::SizeU({.width = 10, .height = 1'000'000})));
 }
 
-TEST(DimensionsTest, IsValidLargeWidth) {
-  EXPECT_FALSE(Dimensions::IsValid({.width = 1'000'000, .height = 20}));
-  EXPECT_FALSE(Dimensions::IsValid({.unsigned_width = 1'000'000, .unsigned_height = 20}));
+TEST(DimensionsTest, IsValidFidlCanonicalEmpty) {
+  EXPECT_TRUE(Dimensions::IsValid(fuchsia_math::wire::SizeU({.width = 0, .height = 0})));
 }
 
-TEST(DimensionsTest, IsValidLargeHeight) {
-  EXPECT_FALSE(Dimensions::IsValid({.width = 10, .height = 1'000'000}));
-  EXPECT_FALSE(Dimensions::IsValid({.unsigned_width = 10, .unsigned_height = 1'000'000}));
+TEST(DimensionsTest, IsValidFidlEmptyHorizontalLine) {
+  EXPECT_FALSE(Dimensions::IsValid(fuchsia_math::wire::SizeU({.width = 10, .height = 0})));
 }
 
-TEST(DimensionsTest, IsValidCanonicalEmpty) {
-  EXPECT_TRUE(Dimensions::IsValid({.width = 0, .height = 0}));
-  EXPECT_TRUE(Dimensions::IsValid({.unsigned_width = 0, .unsigned_height = 0}));
-}
-
-TEST(DimensionsTest, IsValidEmptyHorizontalLine) {
-  EXPECT_FALSE(Dimensions::IsValid({.width = 10, .height = 0}));
-  EXPECT_FALSE(Dimensions::IsValid({.unsigned_width = 10, .unsigned_height = 0}));
-}
-
-TEST(DimensionsTest, IsValidEmptyVerticalLine) {
-  EXPECT_FALSE(Dimensions::IsValid({.width = 0, .height = 10}));
-  EXPECT_FALSE(Dimensions::IsValid({.unsigned_width = 0, .unsigned_height = 10}));
+TEST(DimensionsTest, IsValidFidlEmptyVerticalLine) {
+  EXPECT_FALSE(Dimensions::IsValid(fuchsia_math::wire::SizeU({.width = 0, .height = 10})));
 }
 
 TEST(DimensionsTest, IsEmpty) {
