@@ -324,3 +324,20 @@ pub fn create_proxy_for_wake_events(
 
     (local_proxy, local_resume_event)
 }
+
+/// Creates a watcher between clients and the Starnix runner.
+///
+/// Changes in the power state of the container are relayed by the event pair.
+pub fn create_watcher_for_wake_events(watcher: zx::EventPair) {
+    let manager = fuchsia_component::client::connect_to_protocol_sync::<frunner::ManagerMarker>()
+        .expect("failed");
+    manager
+        .register_wake_watcher(
+            frunner::ManagerRegisterWakeWatcherRequest {
+                watcher: Some(watcher),
+                ..Default::default()
+            },
+            zx::Instant::INFINITE,
+        )
+        .expect("Failed to register wake watcher");
+}

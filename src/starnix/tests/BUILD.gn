@@ -21,6 +21,7 @@ group("tests") {
     "memory_attribution:tests",
     "reboot:tests",
     "scheduler:tests",
+    "suspend:tests",
     "syscalls:tests",
     "sysrq:tests",
     "vdso:tests",

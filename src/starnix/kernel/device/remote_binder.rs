@@ -635,6 +635,13 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         drop(baton);
                     }
                 }
+                fbinder::ContainerPowerControllerRequest::RegisterWakeWatcher {
+                    payload, ..
+                } => {
+                    if let Some(watcher) = payload.watcher {
+                        crate::power::create_watcher_for_wake_events(watcher);
+                    }
+                }
                 unknown => log_warn!("Unknown ContainerPowerController request: {:#?}", unknown),
             };
             crate::power::clear_wake_proxy_signal(proxy_event);

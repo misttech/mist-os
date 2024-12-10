@@ -60,6 +60,15 @@ open protocol Manager {
         /// The name of the proxy, used for debugging purposes.
         5: name string:PROXY_NAME_LEN;
     });
+
+    /// Registers an eventpair that will be signaled when the container is suspended or resumed.
+    /// The signals are ASLEEP(USER_1) and AWAKE(USER_0).
+    ///
+    /// The kernel returns AWAKE upon initial registration of the eventpair.
+    flexible RegisterWakeWatcher(resource table {
+        /// The event that will be signaled when the container's wake status changes.
+        1: watcher zx.Handle:EVENTPAIR;
+    }) -> ();
 };
 
 type SuspendError = flexible enum {
