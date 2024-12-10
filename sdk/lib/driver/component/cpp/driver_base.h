@@ -193,6 +193,7 @@ class DriverBase {
   // This is the name of the node that the driver is bound to.
   const std::optional<std::string>& node_name() const { return start_args_.node_name(); }
 
+#if FUCHSIA_API_LEVEL_AT_MOST(NEXT)
   // Returns the node properties of the node the driver is bound to or its parents.
   // Returns the node's own node properties if `parent_node_name` is "default" and the node is a
   // non-composite.
@@ -201,6 +202,7 @@ class DriverBase {
   // Returns an empty vector if the parent does not exist.
   cpp20::span<const fuchsia_driver_framework::NodeProperty> node_properties(
       const std::string& parent_node_name = "default") const;
+#endif
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
   // Returns the node properties of the node the driver is bound to or its parents.
@@ -291,8 +293,11 @@ class DriverBase {
 
   std::string name_;
   DriverStartArgs start_args_;
+
+#if FUCHSIA_API_LEVEL_AT_MOST(NEXT)
   std::unordered_map<std::string, cpp20::span<const fuchsia_driver_framework::NodeProperty>>
       node_properties_;
+#endif
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
   std::unordered_map<std::string, cpp20::span<const fuchsia_driver_framework::NodeProperty2>>
