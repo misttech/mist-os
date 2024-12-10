@@ -22,6 +22,7 @@ pub enum MetricValue {
     Bytes(Vec<u8>),
     Problem(Problem),
     Lambda(Box<Lambda>),
+    Node,
 }
 
 /// Some kind of problematic non-value. In most cases, this should be treated as a thrown error.
@@ -88,6 +89,7 @@ impl std::fmt::Display for MetricValue {
             MetricValue::Bytes(n) => write!(f, "Bytes({:?})", n),
             MetricValue::Problem(p) => write!(f, "{:?}", p),
             MetricValue::Lambda(n) => write!(f, "Fn({:?})", n),
+            MetricValue::Node => write!(f, "Node"),
         }
     }
 }

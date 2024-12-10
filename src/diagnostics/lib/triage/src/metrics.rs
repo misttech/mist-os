@@ -140,6 +140,8 @@ pub enum Function {
     Any,
     Filter,
     Count,
+    CountChildren,
+    CountProperties,
     Nanos,
     Micros,
     Millis,
@@ -563,7 +565,10 @@ impl<'a> MetricState<'a> {
                 short_circuit_behavior: ShortCircuitBehavior::True,
             }),
             Function::Filter => self.filter(namespace, operands),
-            Function::Count => self.count(namespace, operands),
+            Function::Count | Function::CountProperties => {
+                self.count_properties(namespace, operands)
+            }
+            Function::CountChildren => self.count_children(namespace, operands),
             Function::Nanos => self.time(namespace, operands, 1),
             Function::Micros => self.time(namespace, operands, 1_000),
             Function::Millis => self.time(namespace, operands, 1_000_000),
@@ -846,10 +851,10 @@ impl<'a> MetricState<'a> {
         MetricValue::Vector(result)
     }
 
-    /// This implements the Count() function.
-    fn count(&self, namespace: &str, operands: &[ExpressionTree]) -> MetricValue {
+    /// This implements the CountProperties() function.
+    fn count_properties(&self, namespace: &str, operands: &[ExpressionTree]) -> MetricValue {
         if operands.len() != 1 {
-            return syntax_error("Count requires one argument, a vector");
+            return syntax_error("CountProperties requires one argument, a vector");
         }
         // TODO(https://fxbug.dev/42136933): Refactor all the arg-sanitizing boilerplate into one function
         match self.evaluate(namespace, &operands[0]) {
@@ -862,11 +867,41 @@ impl<'a> MetricState<'a> {
                     })
                     .collect::<Vec<_>>();
                 match errors.len() {
-                    0 => MetricValue::Int(items.len() as i64),
+                    0 => MetricValue::Int(
+                        items.iter().filter(|metric| !matches!(metric, MetricValue::Node)).count()
+                            as i64,
+                    ),
                     _ => MetricValue::Problem(Self::important_problem(errors)),
                 }
             }
-            bad => value_error(format!("Count only works on vectors, not {}", bad)),
+            bad => value_error(format!("CountProperties only works on vectors, not {}", bad)),
+        }
+    }
+
+    /// This implements the CountChildren() function.
+    fn count_children(&self, namespace: &str, operands: &[ExpressionTree]) -> MetricValue {
+        if operands.len() != 1 {
+            return syntax_error("CountChildren requires one argument, a vector");
+        }
+        // TODO(https://fxbug.dev/42136933): Refactor all the arg-sanitizing boilerplate into one function
+        match self.evaluate(namespace, &operands[0]) {
+            MetricValue::Vector(items) => {
+                let errors = items
+                    .iter()
+                    .filter_map(|item| match item {
+                        MetricValue::Problem(problem) => Some(problem),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
+                match errors.len() {
+                    0 => MetricValue::Int(
+                        items.iter().filter(|metric| matches!(metric, MetricValue::Node)).count()
+                            as i64,
+                    ),
+                    _ => MetricValue::Problem(Self::important_problem(errors)),
+                }
+            }
+            bad => value_error(format!("CountChildren only works on vectors, not {}", bad)),
         }
     }
 
@@ -1647,10 +1682,10 @@ mod test {
     #[fuchsia::test]
     fn test_ignores_in_expressions() {
         let dbz = "ValueError: Division by zero";
-        assert_problem!(eval!("Count([1, 2, 3/0])"), dbz);
-        assert_problem!(eval!("Count([1/0, 2, 3/0])"), dbz);
-        assert_problem!(eval!("Count([1/?0, 2, 3/?0])"), format!("Ignore: {}", dbz));
-        assert_problem!(eval!("Count([1/0, 2, 3/?0])"), dbz);
+        assert_problem!(eval!("CountProperties([1, 2, 3/0])"), dbz);
+        assert_problem!(eval!("CountProperties([1/0, 2, 3/0])"), dbz);
+        assert_problem!(eval!("CountProperties([1/?0, 2, 3/?0])"), format!("Ignore: {}", dbz));
+        assert_problem!(eval!("CountProperties([1/0, 2, 3/?0])"), dbz);
         // And() short-circuits so it will only see the first error
         assert_problem!(eval!("And(1 > 0, 3/0 > 0)"), dbz);
         assert_problem!(eval!("And(1/0 > 0, 3/0 > 0)"), dbz);

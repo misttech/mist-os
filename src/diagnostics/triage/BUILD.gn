@@ -37,6 +37,7 @@ copy("copy_configs") {
   sources = [
     "test_data/config/annotation_tests.triage",
     "test_data/config/bad_repeat.triage",
+    "test_data/config/count_test.triage",
     "test_data/config/error_rate.triage",
     "test_data/config/log_tests.triage",
     "test_data/config/map_fold.triage",
