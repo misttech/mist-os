@@ -60,7 +60,6 @@
                 "CryptoTest.CreateAsymmetricKeyHandleFailsForBadInput",
                 "CryptoTest.CreateAsymmetricKeyHandleRSA",
                 "CryptoTest.CreateKeyHandleWorksWithTypicalKeySize",
-                "CryptoTest.DeriveDeviceKeyIntoHandleFailsForBadInput",
                 "CryptoTest.DeriveKeyFromKeyHandleWorks1",
                 "CryptoTest.DeriveKeyFromKeyHandleWorks2",
                 "CryptoTest.DeriveKeyFromKeyHandleWorks256BitDerivingKey",
@@ -100,12 +99,16 @@
         {
             type: "skip",
             matchers: [
-                // TODO(https://fxbug.dev/898589): These succeed in ARM builds but fail in x86 ones.
+                // TODO(https://fxbug.dev/348474598): These succeed in ARM builds but fail in x86 ones.
                 // Maybe not unrelatedly, they also generate ASan failures. More investigation is
                 // needed.
                 "CryptoTest.Crc32Cont_OutputBufferBasic",
                 "CryptoTest.Crc32Cont_OutputBufferFailsWithBadInput",
-            ]
-        }
+
+                // TODO(https://fxbug.dev/348474598): Seems to pass spuriously sometimes. Perhaps related
+                // to the ASAN issues cited above.
+                "CryptoTest.DeriveDeviceKeyIntoHandleFailsForBadInput",
+            ],
+        },
     ],
 }
