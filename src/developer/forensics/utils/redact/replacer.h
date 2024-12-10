@@ -68,13 +68,25 @@ Replacer ReplaceWithIdFormatString(std::string_view pattern, std::string_view fo
 // Constructs a Replacer that substitutes all instances IPv4 address with "<REDACTED-IPV4: %d>"
 Replacer ReplaceIPv4();
 
+// Constructs a Replacer that substitutes all instances of IPv4 addresses from FIDL debug output
+// with "<REDACTED-IPV4: %d>"
+Replacer ReplaceFidlIPv4();
+
 // Constructs a Replacer that substitutes all instances IPv6 address with some variation of
 // "<REDACTED-IPV6: %d>"
 Replacer ReplaceIPv6();
 
+// Constructs a Replacer that substitutes all instances of IPv6 addresses from FIDL debug output
+// with "<REDACTED-IPV6: %d>"
+Replacer ReplaceFidlIPv6();
+
 // Constructs a Replacer that substitutes all instances of MAC address with a string like
 // "<REDACTED-MAC: %d>"
 Replacer ReplaceMac();
+
+// Constructs a Replacer that substitutes all instances of MAC addresses from FIDL debug output
+// with "<REDACTED-MAC: %d>"
+Replacer ReplaceFidlMac();
 
 // Constructs a Replacer that substitutes all instances of SSIDs with a string like
 // "<REDACTED-SSID: %d>"

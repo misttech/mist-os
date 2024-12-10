@@ -192,6 +192,27 @@ Replacer ReplaceIPv4() {
 
 namespace {
 
+// Matches a string like "Ipv4Address { addr: [1, 2, 3, 4] }". The two inner capture groups are used
+// to replace just the address within the match.
+constexpr re2::LazyRE2 kFidlIpv4 =
+    MakeLazyRE2(R"(((Ipv4Address { )addr: \[(?:[0-9a-fA-F]{1,3}, ){3}[0-9a-fA-F]{1,3}]( })))");
+
+std::string RedactFidlIPv4(RedactionIdCache& cache, const std::string& match) {
+  std::string content = match;
+  const std::string replacement =
+      fxl::StringPrintf("\\2<REDACTED-IPV4: %d>\\3", cache.GetId(match));
+  RE2::GlobalReplace(&content, *kFidlIpv4, replacement);
+  return content;
+}
+
+}  // namespace
+
+Replacer ReplaceFidlIPv4() {
+  return FunctionBasedReplacer(kFidlIpv4->pattern(), /*ignore_prefixes=*/{}, RedactFidlIPv4);
+}
+
+namespace {
+
 constexpr std::string_view kIPv6Pattern{
     // IPv6 without ::
     R"(()"
@@ -246,6 +267,28 @@ std::string RedactIPv6(RedactionIdCache& cache, const std::string& match) {
 
 Replacer ReplaceIPv6() {
   return FunctionBasedReplacer(kIPv6Pattern, /*ignore_prefixes=*/{}, RedactIPv6);
+}
+
+namespace {
+
+// Matches a string like
+// "Ipv6Address { addr: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] }". The two inner
+// capture groups are used to replace just the address within the match.
+constexpr re2::LazyRE2 kFidlIpv6 =
+    MakeLazyRE2(R"(((Ipv6Address { )addr: \[(?:[0-9a-fA-F]{1,3}, ){15}[0-9a-fA-F]{1,3}]( })))");
+
+std::string RedactFidlIPv6(RedactionIdCache& cache, const std::string& match) {
+  std::string content = match;
+  const std::string replacement =
+      fxl::StringPrintf("\\2<REDACTED-IPV6: %d>\\3", cache.GetId(match));
+  RE2::GlobalReplace(&content, *kFidlIpv6, replacement);
+  return content;
+}
+
+}  // namespace
+
+Replacer ReplaceFidlIPv6() {
+  return FunctionBasedReplacer(kFidlIpv6->pattern(), /*ignore_prefixes=*/{}, RedactFidlIPv6);
 }
 
 namespace mac_utils {
@@ -303,6 +346,26 @@ std::string RedactMac(RedactionIdCache& cache, const std::string& mac) {
 
 Replacer ReplaceMac() {
   return FunctionBasedReplacer(mac_utils::kMacPattern, /*ignore_prefixes=*/{}, RedactMac);
+}
+
+namespace {
+
+// Matches a string like "MacAddress { octets: [1, 2, 3, 4, 5, 6] }". The two inner capture groups
+// are used to replace just the address within the match.
+constexpr re2::LazyRE2 kFidlMac =
+    MakeLazyRE2(R"(((MacAddress { )octets: \[(?:[0-9a-fA-F]{1,3}, ){5}[0-9a-fA-F]{1,3}]( })))");
+
+std::string RedactFidlMac(RedactionIdCache& cache, const std::string& match) {
+  std::string content = match;
+  const std::string replacement = fxl::StringPrintf("\\2<REDACTED-MAC: %d>\\3", cache.GetId(match));
+  RE2::GlobalReplace(&content, *kFidlMac, replacement);
+  return content;
+}
+
+}  // namespace
+
+Replacer ReplaceFidlMac() {
+  return FunctionBasedReplacer(kFidlMac->pattern(), /*ignore_prefixes=*/{}, RedactFidlMac);
 }
 
 namespace {

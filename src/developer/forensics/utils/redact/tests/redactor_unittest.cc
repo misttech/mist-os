@@ -108,6 +108,14 @@ TEST_F(RedactorTest, Check) {
             "456 elf:1234567890abcdefABCDEF0123456789 789");
   EXPECT_EQ(Redact("456 build_id: '5f2c0ede0fa479b9b997c4fce6d4cf24' 789"),
             "456 build_id: '5f2c0ede0fa479b9b997c4fce6d4cf24' 789");
+  EXPECT_EQ(Redact("ipv4 fidl debug: Ipv4Address { addr: [1, 255, FF, FF] }"),
+            "ipv4 fidl debug: Ipv4Address { <REDACTED-IPV4: 29> }");
+  EXPECT_EQ(
+      Redact(
+          "ipv6 fidl debug: Ipv6Address { addr: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 255, FF, FF] }"),
+      "ipv6 fidl debug: Ipv6Address { <REDACTED-IPV6: 30> }");
+  EXPECT_EQ(Redact("mac fidl debug: MacAddress { octets: [1, 2, 3, 255, FF, FF] }"),
+            "mac fidl debug: MacAddress { <REDACTED-MAC: 31> }");
 }
 
 TEST_F(RedactorTest, Canary) {

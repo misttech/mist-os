@@ -39,10 +39,12 @@ IPv4: 8.8.8.8,
 IPv4_New: 8.9.10.42,
 IPv4_Dup: 8.8.8.8,
 IPv4_WithPort: 8.8.8.8:8080,
+IPv4_Fidl: Ipv4Address { addr: [1, 255, FF, FF] }
 IPv461: ::ffff:12.34.56.78,
 IPv462: ::ffff:ab12:cd34,
 IPv6: 2001:503:eEa3:0:0:0:0:30,
 IPv6_WithPort: [2001:503:eEa3:0:0:0:0:30]:8080,
+IPv6_Fidl: Ipv6Address { addr: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 255, FF, FF] }
 IPv6C: fec8::7d84:c1dc:ab34:656a,
 IPv6LL: fe80::7d84:c1dc:ab34:656a,
 UUID: ddd0fA34-1016-11eb-adc1-0242ac120002,
@@ -50,6 +52,7 @@ MAC: de:ad:BE:EF:42:5a,
 MAC_dashes: de-ad-BE-EF-42-5a,
 MAC_dots: de.ad.BE.EF.42.5a,
 MAC_mixed: de.ad-BE:EF.42-5a,
+MAC_Fidl: MacAddress { octets: [1, 2, 3, 255, FF, FF] }
 SSID: <ssid-666F6F>,
 HTTP: http://fuchsia.dev/fuchsia/testing?q=Test,
 HTTPS: https://fuchsia.dev/fuchsia/testing?q=Test,
@@ -75,22 +78,25 @@ IPv4: <REDACTED-IPV4: 1>,
 IPv4_New: <REDACTED-IPV4: 2>,
 IPv4_Dup: <REDACTED-IPV4: 1>,
 IPv4_WithPort: <REDACTED-IPV4: 1>:8080,
+IPv4_Fidl: Ipv4Address { <REDACTED-IPV4: 5> }
 IPv461: ::ffff:<REDACTED-IPV4: 3>,
-IPv462: ::ffff:<REDACTED-IPV4: 5>,
-IPv6: <REDACTED-IPV6: 6>,
-IPv6_WithPort: [<REDACTED-IPV6: 6>]:8080,
-IPv6C: <REDACTED-IPV6: 7>,
-IPv6LL: fe80:<REDACTED-IPV6-LL: 8>,
+IPv462: ::ffff:<REDACTED-IPV4: 6>,
+IPv6: <REDACTED-IPV6: 7>,
+IPv6_WithPort: [<REDACTED-IPV6: 7>]:8080,
+IPv6_Fidl: Ipv6Address { <REDACTED-IPV6: 14> }
+IPv6C: <REDACTED-IPV6: 8>,
+IPv6LL: fe80:<REDACTED-IPV6-LL: 9>,
 UUID: <REDACTED-UUID>,
-MAC: de:ad:BE:<REDACTED-MAC: 13>,
-MAC_dashes: de-ad-BE-<REDACTED-MAC: 13>,
-MAC_dots: de.ad.BE.<REDACTED-MAC: 13>,
-MAC_mixed: de.ad-BE:<REDACTED-MAC: 13>,
-SSID: <REDACTED-SSID: 14>,
+MAC: de:ad:BE:<REDACTED-MAC: 15>,
+MAC_dashes: de-ad-BE-<REDACTED-MAC: 15>,
+MAC_dots: de.ad.BE.<REDACTED-MAC: 15>,
+MAC_mixed: de.ad-BE:<REDACTED-MAC: 15>,
+MAC_Fidl: MacAddress { <REDACTED-MAC: 16> }
+SSID: <REDACTED-SSID: 17>,
 HTTP: <REDACTED-URL>,
 HTTPS: <REDACTED-URL>,
-HEX: <REDACTED-HEX: 15>,
-HEX: <REDACTED-HEX: 16>,
+HEX: <REDACTED-HEX: 18>,
+HEX: <REDACTED-HEX: 19>,
 v4Current: 0.1.2.3,
 v4Loopback: 127.1.2.3,
 v4LocalAddr: 169.254.12.34,
@@ -98,12 +104,12 @@ v4LocalMulti: 224.0.0.123,
 v4Multi: <REDACTED-IPV4: 4>,
 broadcast: 255.255.255.255,
 v6zeroes: :: ::1,
-v6LeadingZeroes: <REDACTED-IPV6: 9>,
-v6TrailingZeroes: <REDACTED-IPV6: 10>,
-v6LinkLocal: feB2:<REDACTED-IPV6-LL: 11>,
+v6LeadingZeroes: <REDACTED-IPV6: 10>,
+v6TrailingZeroes: <REDACTED-IPV6: 11>,
+v6LinkLocal: feB2:<REDACTED-IPV6-LL: 12>,
 v6LocalMulticast: ff72:111:222:333:444:555:666:777,
-v6Multicast: ff77:<REDACTED-IPV6-MULTI: 12>,
-obfuscatedGaiaId: <REDACTED-OBFUSCATED-GAIA-ID: 17>)";
+v6Multicast: ff77:<REDACTED-IPV6-MULTI: 13>,
+obfuscatedGaiaId: <REDACTED-OBFUSCATED-GAIA-ID: 20>)";
 
 }  // namespace
 
@@ -114,8 +120,11 @@ Redactor::Redactor(const int starting_id, inspect::UintProperty cache_size,
                    inspect::BoolProperty redaction_enabled)
     : RedactorBase(std::move(redaction_enabled)), cache_(std::move(cache_size), starting_id) {
   Add(ReplaceIPv4())
+      .Add(ReplaceFidlIPv4())
       .Add(ReplaceIPv6())
+      .Add(ReplaceFidlIPv6())
       .Add(ReplaceMac())
+      .Add(ReplaceFidlMac())
       .Add(ReplaceSsid())
       .AddJsonReplacer(ReplaceIPv4())
       .AddJsonReplacer(ReplaceIPv6())
