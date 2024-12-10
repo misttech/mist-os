@@ -724,14 +724,8 @@ impl<I: IpExt, E: Inspectable> Inspectable for ConnectionCommon<I, E> {
 #[derive(Debug, Clone)]
 enum ProtocolState {
     Tcp(tcp::Connection),
-    Udp {
-        /// Whether this connection has seen packets in both directions.
-        established: bool,
-    },
-    Other {
-        /// Whether this connection has seen packets in both directions.
-        established: bool,
-    },
+    Udp,
+    Other,
 }
 
 impl ProtocolState {
@@ -748,14 +742,7 @@ impl ProtocolState {
                 );
                 tcp_conn.update(&segment, *payload_len, dir)
             }
-            ProtocolState::Udp { established } | ProtocolState::Other { established } => {
-                match dir {
-                    ConnectionDirection::Original => (),
-                    ConnectionDirection::Reply => *established = true,
-                }
-
-                Ok(ConnectionUpdateAction::NoAction)
-            }
+            ProtocolState::Udp | ProtocolState::Other => Ok(ConnectionUpdateAction::NoAction),
         }
     }
 }
@@ -898,10 +885,8 @@ impl<I: IpExt, E: Default, BC: FilterBindingsContext> ConnectionExclusive<I, E, 
                             self_connected,
                         )?)
                     }
-                    TransportProtocol::Udp => ProtocolState::Udp { established: false },
-                    TransportProtocol::Icmp | TransportProtocol::Other(_) => {
-                        ProtocolState::Other { established: false }
-                    }
+                    TransportProtocol::Udp => ProtocolState::Udp,
+                    TransportProtocol::Icmp | TransportProtocol::Other(_) => ProtocolState::Other,
                 },
             },
             do_not_insert: false,
@@ -988,12 +973,12 @@ impl<I: IpExt, E, BT: FilterBindingsTypes> ConnectionShared<I, E, BT> {
 
         let expiry_duration = match state.protocol_state {
             ProtocolState::Tcp(tcp_conn) => tcp_conn.expiry_duration(state.establishment_lifecycle),
-            ProtocolState::Udp { .. } => CONNECTION_EXPIRY_TIME_UDP,
+            ProtocolState::Udp => CONNECTION_EXPIRY_TIME_UDP,
             // ICMP ends up here. The ICMP messages we track are simple
             // request/response protocols, so we always expect to get a response
             // quickly (within 2 RTT). Any followup messages (e.g. if making
             // periodic ECHO requests) should reuse this existing connection.
-            ProtocolState::Other { .. } => CONNECTION_EXPIRY_OTHER,
+            ProtocolState::Other => CONNECTION_EXPIRY_OTHER,
         };
 
         duration >= expiry_duration
