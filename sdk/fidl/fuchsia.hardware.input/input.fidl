@@ -17,7 +17,7 @@ closed protocol DeviceReportsReader {
     /// This will block until there is at least one report available.
     /// If there is already one outstanding Hanging-Get, calling this again will
     /// return ZX_ERR_ALREADY_BOUND.
-    strict ReadReports() -> (struct {
+    strict ReadReports() -> (resource struct {
         reports vector<fuchsia.hardware.hidbus.Report>:MAX_REPORTS_COUNT;
     }) error zx.Status;
 };
@@ -46,7 +46,7 @@ closed protocol Device {
     /// the view of the monotonic clock.
     /// If status is ZX_ERR_SHOULD_WAIT the client can wait on the event
     /// from `GetReportsEvent`.
-    strict ReadReport() -> (struct {
+    strict ReadReport() -> (resource struct {
         report fuchsia.hardware.hidbus.Report;
     }) error zx.Status;
 

@@ -467,7 +467,7 @@ mod tests {
                             report_event_clone
                                 .signal_handle(zx::Signals::USER_0, zx::Signals::NONE)
                                 .expect("Failed to clear event signal");
-                            let _ = responder.send(Ok(&fhidbus::Report {
+                            let _ = responder.send(Ok(fhidbus::Report {
                                 buf: Some((&[lid_state_clone.get()]).to_vec()),
                                 timestamp: Some(0),
                                 ..Default::default()
