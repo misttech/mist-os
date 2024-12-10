@@ -206,6 +206,7 @@ impl SocketOps for RemoteUnixDomainSocket {
         let signal_handler = SignalHandler {
             inner: SignalHandlerInner::ZxHandle(Self::get_events_from_signals),
             event_handler: handler,
+            err_code: None,
         };
         let canceler = waiter
             .wake_on_zircon_signals(

@@ -184,8 +184,9 @@ impl ThreadState {
     }
 }
 
-type SyscallRestartFunc =
-    dyn FnOnce(&mut CurrentTask) -> Result<SyscallResult, Errno> + Send + Sync;
+type SyscallRestartFunc = dyn FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<SyscallResult, Errno>
+    + Send
+    + Sync;
 
 impl Releasable for CurrentTask {
     type Context<'a: 'b, 'b> = &'b mut Locked<'a, TaskRelease>;
@@ -257,10 +258,13 @@ impl CurrentTask {
 
     pub fn set_syscall_restart_func<R: Into<SyscallResult>>(
         &mut self,
-        f: impl FnOnce(&mut CurrentTask) -> Result<R, Errno> + Send + Sync + 'static,
+        f: impl FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<R, Errno>
+            + Send
+            + Sync
+            + 'static,
     ) {
         self.thread_state.syscall_restart_func =
-            Some(Box::new(|current_task| Ok(f(current_task)?.into())));
+            Some(Box::new(|locked, current_task| Ok(f(locked, current_task)?.into())));
     }
 
     /// Sets the task's signal mask to `signal_mask` and runs `wait_function`.

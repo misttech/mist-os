@@ -513,11 +513,11 @@ pub fn prepare_to_restart_syscall(
 }
 
 pub fn sys_restart_syscall(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
 ) -> Result<SyscallResult, Errno> {
     match current_task.thread_state.syscall_restart_func.take() {
-        Some(f) => f(current_task),
+        Some(f) => f(locked, current_task),
         None => {
             // This may indicate a bug where a syscall returns ERESTART_RESTARTBLOCK without
             // setting a restart func. But it can also be triggered by userspace, e.g. by directly

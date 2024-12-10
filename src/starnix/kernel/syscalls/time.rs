@@ -261,7 +261,7 @@ fn clock_nanosleep_boot_with_deadline(
                 ));
                 current_task.write_object(user_remaining, &remaining)?;
             }
-            current_task.set_syscall_restart_func(move |current_task| {
+            current_task.set_syscall_restart_func(move |_locked, current_task| {
                 clock_nanosleep_boot_with_deadline(
                     current_task,
                     is_absolute,

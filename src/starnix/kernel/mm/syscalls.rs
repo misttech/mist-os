@@ -7,7 +7,7 @@ use crate::mm::{
     DesiredAddress, FutexKey, MappingName, MappingOptions, MemoryAccessorExt, MremapFlags,
     PrivateFutexKey, ProtectionFlags, SharedFutexKey, PAGE_SIZE,
 };
-use crate::task::{CurrentTask, Task};
+use crate::task::{CurrentTask, TargetTime, Task};
 use crate::time::utc::estimate_boot_deadline_from_utc;
 use crate::vfs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::FdNumber;
@@ -373,7 +373,7 @@ pub fn sys_membarrier(
 }
 
 pub fn sys_futex(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     addr: UserAddress,
     op: u32,
@@ -383,13 +383,32 @@ pub fn sys_futex(
     value3: u32,
 ) -> Result<usize, Errno> {
     if op & FUTEX_PRIVATE_FLAG != 0 {
-        do_futex::<PrivateFutexKey>(current_task, addr, op, value, timeout_or_value2, addr2, value3)
+        do_futex::<PrivateFutexKey>(
+            locked,
+            current_task,
+            addr,
+            op,
+            value,
+            timeout_or_value2,
+            addr2,
+            value3,
+        )
     } else {
-        do_futex::<SharedFutexKey>(current_task, addr, op, value, timeout_or_value2, addr2, value3)
+        do_futex::<SharedFutexKey>(
+            locked,
+            current_task,
+            addr,
+            op,
+            value,
+            timeout_or_value2,
+            addr2,
+            value3,
+        )
     }
 }
 
 fn do_futex<Key: FutexKey>(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     addr: UserAddress,
     op: u32,
@@ -427,15 +446,9 @@ fn do_futex<Key: FutexKey>(
     let read_deadline = |current_task: &CurrentTask| {
         let timespec = read_timespec(current_task)?;
         if is_realtime {
-            track_stub!(TODO("https://fxbug.dev/356912301"), "FUTEX_CLOCK_REALTIME deadline");
-            let utc_time = time_from_timespec::<UtcTimeline>(timespec)?;
-            let boot_time = estimate_boot_deadline_from_utc(utc_time);
-            // TODO(https://fxbug.dev/361583830): Set up a PortWaiter on zx::BootTimer and use
-            // that to cancel the futex wait when the deadline is specified
-            let timeout = boot_time - zx::BootInstant::get();
-            Ok(zx::MonotonicInstant::after(zx::MonotonicDuration::from_nanos(timeout.into_nanos())))
+            Ok(TargetTime::RealTime(time_from_timespec::<UtcTimeline>(timespec)?))
         } else {
-            time_from_timespec::<zx::MonotonicTimeline>(timespec)
+            Ok(TargetTime::Monotonic(time_from_timespec::<zx::MonotonicTimeline>(timespec)?))
         }
     };
 
@@ -443,7 +456,14 @@ fn do_futex<Key: FutexKey>(
         FUTEX_WAIT => {
             let deadline = read_timeout(current_task)?;
             let bitset = FUTEX_BITSET_MATCH_ANY;
-            do_futex_wait_with_restart::<Key>(current_task, addr, value, bitset, deadline)?;
+            do_futex_wait_with_restart::<Key>(
+                locked,
+                current_task,
+                addr,
+                value,
+                bitset,
+                TargetTime::Monotonic(deadline),
+            )?;
             Ok(0)
         }
         FUTEX_WAKE => futexes.wake(current_task, addr, value as usize, FUTEX_BITSET_MATCH_ANY),
@@ -456,7 +476,7 @@ fn do_futex<Key: FutexKey>(
                 return error!(EINVAL);
             }
             let deadline = read_deadline(current_task)?;
-            do_futex_wait_with_restart::<Key>(current_task, addr, value, value3, deadline)?;
+            do_futex_wait_with_restart::<Key>(locked, current_task, addr, value, value3, deadline)?;
             Ok(0)
         }
         FUTEX_WAKE_BITSET => {
@@ -506,18 +526,35 @@ fn do_futex<Key: FutexKey>(
 }
 
 fn do_futex_wait_with_restart<Key: FutexKey>(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     addr: UserAddress,
     value: u32,
     mask: u32,
-    deadline: zx::MonotonicInstant,
+    deadline: TargetTime,
 ) -> Result<(), Errno> {
     let futexes = Key::get_table_from_task(current_task);
-    let result = futexes.wait(current_task, addr, value, mask, deadline);
+    let result = match deadline {
+        TargetTime::Monotonic(mono_deadline) => {
+            futexes.wait(current_task, addr, value, mask, mono_deadline)
+        }
+        TargetTime::BootInstant(boot_deadline) => {
+            let timer_slack =
+                zx::Duration::from_nanos(current_task.read().get_timerslack_ns() as i64);
+            futexes.wait_boot(locked, current_task, addr, value, mask, boot_deadline, timer_slack)
+        }
+        TargetTime::RealTime(utc_deadline) => {
+            // We convert real time deadlines to boot time deadlines since we cannot wait using a UTC deadline.
+            let boot_deadline = estimate_boot_deadline_from_utc(utc_deadline);
+            let timer_slack =
+                zx::Duration::from_nanos(current_task.read().get_timerslack_ns() as i64);
+            futexes.wait_boot(locked, current_task, addr, value, mask, boot_deadline, timer_slack)
+        }
+    };
     match result {
         Err(err) if err == EINTR => {
-            current_task.set_syscall_restart_func(move |current_task| {
-                do_futex_wait_with_restart::<Key>(current_task, addr, value, mask, deadline)
+            current_task.set_syscall_restart_func(move |locked, current_task| {
+                do_futex_wait_with_restart::<Key>(locked, current_task, addr, value, mask, deadline)
             });
             error!(ERESTART_RESTARTBLOCK)
         }

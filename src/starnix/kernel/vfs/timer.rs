@@ -279,6 +279,7 @@ impl FileOps for TimerFile {
         let signal_handler = SignalHandler {
             inner: SignalHandlerInner::ZxHandle(TimerFile::get_events_from_signals),
             event_handler,
+            err_code: None,
         };
         let canceler = waiter
             .wake_on_zircon_signals(

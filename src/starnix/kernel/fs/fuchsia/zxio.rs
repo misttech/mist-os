@@ -84,6 +84,7 @@ pub fn zxio_wait_async(
             get_events_from_zxio_signals,
         }),
         event_handler,
+        err_code: None,
     };
 
     // unwrap OK here as errors are only generated from misuse
