@@ -166,7 +166,8 @@ where
     T::Lock: ExclusiveLock<L::Data>,
 {
     type Data = L::Data;
-    type Guard<'l> = <T::Lock as ExclusiveLock<L::Data>>::Guard<'l>
+    type Guard<'l>
+        = <T::Lock as ExclusiveLock<L::Data>>::Guard<'l>
     where
         Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
@@ -182,10 +183,12 @@ where
     T::Lock: ReadWriteLock<L::Data>,
 {
     type Data = L::Data;
-    type ReadGuard<'l> = <T::Lock as ReadWriteLock<L::Data>>::ReadGuard<'l>
+    type ReadGuard<'l>
+        = <T::Lock as ReadWriteLock<L::Data>>::ReadGuard<'l>
     where
         Self: 'l;
-    type WriteGuard<'l> = <T::Lock as ReadWriteLock<L::Data>>::WriteGuard<'l>
+    type WriteGuard<'l>
+        = <T::Lock as ReadWriteLock<L::Data>>::WriteGuard<'l>
     where
         Self: 'l;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -218,7 +221,8 @@ where
 {
     type Data = <L as UnlockedAccessMarkerFor<T>>::Data;
 
-    type Guard<'l> = &'l <L as UnlockedAccessMarkerFor<T>>::Data
+    type Guard<'l>
+        = &'l <L as UnlockedAccessMarkerFor<T>>::Data
     where
         Self: 'l;
 
@@ -239,7 +243,10 @@ mod example {
 
     impl<T> LockFor<LockLevel> for Mutex<T> {
         type Data = T;
-        type Guard<'l> = MutexGuard<'l, T> where Self: 'l;
+        type Guard<'l>
+            = MutexGuard<'l, T>
+        where
+            Self: 'l;
 
         fn lock(&self) -> Self::Guard<'_> {
             self.lock().unwrap()
@@ -248,8 +255,14 @@ mod example {
 
     impl<T> RwLockFor<LockLevel> for RwLock<T> {
         type Data = T;
-        type ReadGuard<'l> = RwLockReadGuard<'l, T> where Self: 'l;
-        type WriteGuard<'l> = RwLockWriteGuard<'l, T> where Self: 'l;
+        type ReadGuard<'l>
+            = RwLockReadGuard<'l, T>
+        where
+            Self: 'l;
+        type WriteGuard<'l>
+            = RwLockWriteGuard<'l, T>
+        where
+            Self: 'l;
 
         fn read_lock(&self) -> Self::ReadGuard<'_> {
             self.read().unwrap()

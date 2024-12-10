@@ -112,15 +112,17 @@ mod locked {
         T: Deref,
         T::Target: Sized,
     {
-        type AtLockLevel<'l, M> = Locked<&'l T::Target, M>
-    where
-        M: 'l,
-        T: 'l;
+        type AtLockLevel<'l, M>
+            = Locked<&'l T::Target, M>
+        where
+            M: 'l,
+            T: 'l;
 
-        type CastWrapper<X> = Locked<X, L>
-    where
-        X: Deref,
-        X::Target: Sized;
+        type CastWrapper<X>
+            = Locked<X, L>
+        where
+            X: Deref,
+            X::Target: Sized;
 
         fn wrap<'l, M>(locked: ExternalLocked<&'l T::Target, M>) -> Self::AtLockLevel<'l, M>
         where

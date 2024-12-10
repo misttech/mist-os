@@ -151,7 +151,10 @@ where
     BC: BindingsContext,
 {
     type Data = MulticastForwardingCounters<I>;
-    type Guard<'l> = &'l MulticastForwardingCounters<I> where Self: 'l;
+    type Guard<'l>
+        = &'l MulticastForwardingCounters<I>
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         self.inner_ip_state().multicast_forwarding_counters()

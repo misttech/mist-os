@@ -653,7 +653,8 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> SocketMapAddr
 
     type SharingState = ();
 
-    type Inserter<'a> = core::convert::Infallible
+    type Inserter<'a>
+        = core::convert::Infallible
     where
         Self: 'a;
 
