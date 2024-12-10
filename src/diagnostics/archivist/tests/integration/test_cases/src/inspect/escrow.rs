@@ -87,7 +87,7 @@ async fn escrow_inspect_data() {
 }
 
 async fn read_data(realm_proxy: &RealmProxyClient, retry: RetryConfig) -> Vec<InspectData> {
-    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
+    let accessor = utils::connect_accessor(realm_proxy, utils::ALL_PIPELINE).await;
     ArchiveReader::new()
         .with_archive(accessor)
         .add_selector(format!("{PUPPET_NAME}:root"))

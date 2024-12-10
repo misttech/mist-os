@@ -353,6 +353,7 @@ async fn get_supported_mac_roles(
     })
 }
 
+#[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
 async fn create_iface(
     new_iface_sink: &mpsc::UnboundedSender<NewIface>,
     phys: &PhyMap,

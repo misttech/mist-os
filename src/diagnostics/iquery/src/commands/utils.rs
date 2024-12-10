@@ -25,10 +25,10 @@ pub async fn connect_accessor<P: DiscoverableProtocolMarker>(
     proxy: &fsys2::RealmQueryProxy,
 ) -> Result<P::Proxy, Error> {
     let proxy = connect_to_instance_protocol_at_path::<P>(
-        &moniker,
+        moniker,
         OpenDirType::Exposed,
         &format!("{ACCESSORS_DICTIONARY}/{accessor_name}"),
-        &proxy,
+        proxy,
     )
     .await
     .map_err(|e| Error::ConnectToProtocol(accessor_name.to_string(), anyhow!("{:?}", e)))?;
