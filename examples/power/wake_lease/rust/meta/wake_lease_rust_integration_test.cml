@@ -27,7 +27,10 @@
             from: "#test-power-broker",
         },
         {
-            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+            protocol: [
+                "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.BootControl",
+            ],
             from: "#test-system-activity-governor",
         },
     ],
