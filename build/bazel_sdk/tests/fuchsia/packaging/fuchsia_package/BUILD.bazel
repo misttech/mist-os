@@ -4,6 +4,7 @@
 
 load("@fuchsia_sdk//fuchsia:defs.bzl", "get_fuchsia_api_levels")
 load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test")
+load("//fuchsia/packaging:common_utils.bzl", "failure_test")
 load("//test_utils:api_levels.bzl", "some_valid_numerical_api_level_as_string")
 
 NUMERICAL_LEVEL_ABI_REVISION = [
@@ -74,6 +75,17 @@ test_suite(
         ":cc_driver_pkg_with_tool_test",
         ":cc_pkg_at_numerical_api_level_test",
         ":cc_pkg_at_next_test",
+
+        # TODO(https://fxbug.dev/354047162): Enable once the issue described in
+        # the test is resolved.
+        # ":cc_pkg_at_retired_api_level_test",
+
+        # The scenarios in these tests fail as expected but during the
+        # transition, which avoids `expect_failure`, causing the tests to fail.
+        # TODO(https://fxbug.dev/354047162): Enable these two tests once the
+        # error does not occur during the transition.
+        # ":pkg_at_unknown_numerical_api_level_test",
+        # ":pkg_at_lowercase_next_api_level_test",
     ],
     visibility = ["//visibility:public"],
 )
@@ -265,4 +277,54 @@ fuchsia_package_checker_test(
     manifests = MANIFESTS_FOR_PKG_WITHOUT_CC_COMPONENT,
     package_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_at_next_api_level_without_cc_component",
     structured_config_files = STRUCTURED_CONFIG_FILES,
+)
+
+# This test does not currently behave as expected as described below.
+# API level "21" is known in version_history.json but "unsupported", and the
+# SDK does not currently respect API level status. The test gives a different
+# wrong result depending on whether ":cc_component" is included in the package:
+# 1. With ":cc_component", there is a dependency on fdio, and the result is
+# similar to https://fxbug.dev/382560521 except that we do not expect the
+# artifacts to ever exist.
+# 2. Without ":cc_component", the test unexpectedly passes because the SDK does
+# not filter the retired API level, and there is no dependency on fdio.
+# TODO(https://fxbug.dev/354047162): Make it behave as expected and enable it.
+failure_test(
+    name = "cc_pkg_at_retired_api_level_test",
+    size = "small",
+    expected_failure_message = 'ERROR: "21" is not an API level supported by this SDK. API level should be one of ["',
+    tags = ["manual"],
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_at_retired_api_level",
+)
+
+failure_test(
+    name = "pkg_at_unknown_numerical_api_level_test",
+    size = "small",
+
+    # This test currently fails because the following error occurs in `fuchsia_transition`:
+    # Error in fail: No metadata found for API level:  90000
+    # ERROR: .../build/bazel_sdk/tests/fuchsia/packaging/fuchsia_package/cc_component/BUILD.bazel:177:16: Errors encountered while applying Starlark transition
+    # ERROR: Analysis of target '//fuchsia/packaging/fuchsia_package:pkg_at_unknown_numerical_api_level_test' failed; build aborted: Analysis failed
+    # TODO(https://fxbug.dev/354047162): Make it fail outside the
+    # transition with the following error:
+    # expected_failure_message = 'ERROR: "90000" is not an API level supported by this SDK. API level should be one of ["',
+    expected_failure_message = "No metadata found for API level:  90000",
+    tags = ["manual"],
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_at_unknown_numerical_api_level",
+)
+
+failure_test(
+    name = "pkg_at_lowercase_next_api_level_test",
+    size = "small",
+
+    # This test currently fails because the following error occurs in `fuchsia_transition`:
+    # Error in fail: No metadata found for API level:  next
+    # ERROR: .../build/bazel_sdk/tests/fuchsia/packaging/fuchsia_package/cc_component/BUILD.bazel:143:16: Errors encountered while applying Starlark transition
+    # ERROR: Analysis of target '//fuchsia/packaging/fuchsia_package:pkg_at_lowercase_next_api_level_test' failed; build aborted: Analysis failed
+    # TODO(https://fxbug.dev/354047162): Make it fail outside the
+    # transition with the following error:
+    # expected_failure_message = 'ERROR: "next" is not an API level supported by this SDK. API level should be one of ["',
+    expected_failure_message = "No metadata found for API level:  next",
+    tags = ["manual"],
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_at_lowercase_next_api_level",
 )

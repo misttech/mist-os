@@ -6,6 +6,7 @@
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_driver_component", "fuchsia_package", "get_component_manifests", "get_driver_component_manifests")
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+load("//fuchsia/packaging:common_utils.bzl", "failure_test")
 load("//test_utils:make_file.bzl", "make_fake_component_manifest", "make_file")
 
 ## Name Tests
@@ -217,6 +218,66 @@ def _test_api_levels():
         archive_name = "pkg_at_next_api_level_archive.far",
     )
 
+    # API level "21" is known to version_history.json but has been retired ("unsupported").
+    fuchsia_package(
+        name = "pkg_at_retired_api_level",
+        package_name = "pkg_at_retired_api_level_for_test",
+        fuchsia_api_level = "21",
+        components = [":component_1"],
+        tags = ["manual"],
+    )
+
+    failure_test(
+        name = "failure_test_retired_api_level",
+        expected_failure_message = 'ERROR: "21" is not an API level supported by this SDK. API level should be one of ["',
+        target_under_test = ":pkg_at_retired_api_level",
+        tags = ["manual"],
+    )
+
+    fuchsia_package(
+        name = "pkg_at_unknown_numerical_api_level",
+        package_name = "pkg_at_unknown_numerical_api_level_for_test",
+        fuchsia_api_level = "90000",
+        components = [":component_1"],
+        tags = ["manual"],
+    )
+
+    failure_test(
+        name = "failure_test_unknown_numerical_api_level",
+        # This test currently fails because the following error occurs in `fuchsia_transition`:
+        # Error in fail: No metadata found for API level:  90000
+        # ERROR: .../build/bazel_sdk/tests/fuchsia/packaging/provider_tests/BUILD.bazel:24:27: Errors encountered while applying Starlark transition
+        # ERROR: Analysis of target '//fuchsia/packaging/provider_tests:failure_test_unknown_numerical_api_level' failed; build aborted: Analysis failed
+        # TODO(https://fxbug.dev/354047162): Make it fail outside the
+        # transition with the following error:
+        # expected_failure_message = 'ERROR: "90000" is not an API level supported by this SDK. API level should be one of ["',
+        expected_failure_message = "No metadata found for API level:  90000",
+        target_under_test = ":pkg_at_unknown_numerical_api_level",
+        tags = ["manual"],
+    )
+
+    fuchsia_package(
+        name = "pkg_at_lowercase_next_api_level",
+        package_name = "pkg_at_lowercase_next_api_level_for_test",
+        fuchsia_api_level = "next",
+        components = [":component_1"],
+        tags = ["manual"],
+    )
+
+    failure_test(
+        name = "failure_test_lowercase_next_api_level",
+        # This test currently fails because the following error occurs in `fuchsia_transition`:
+        # Error in fail: No metadata found for API level:  next
+        # ERROR: .../build/bazel_sdk/tests/fuchsia/packaging/provider_tests/BUILD.bazel:24:27: Errors encountered while applying Starlark transition
+        # ERROR: Analysis of target '//fuchsia/packaging/provider_tests:failure_test_lowercase_next_api_level' failed; build aborted: Analysis failed
+        # TODO(https://fxbug.dev/354047162): Make it fail outside the
+        # transition with the following error:
+        # expected_failure_message = 'ERROR: "next" is not an API level supported by this SDK. API level should be one of ["',
+        expected_failure_message = "No metadata found for API level:  next",
+        target_under_test = ":pkg_at_lowercase_next_api_level",
+        tags = ["manual"],
+    )
+
 # Entry point from the BUILD file; macro for running each test case's macro and
 # declaring a test suite that wraps them together.
 def fuchsia_package_test_suite(name, **kwargs):
@@ -234,6 +295,17 @@ def fuchsia_package_test_suite(name, **kwargs):
             ":dependencies_test_single_driver",
             ":dependencies_test_composite",
             ":next_api_level",
+
+            # The scenario in this test currently succeeds because the SDK ignores API level status.
+            # TODO(https://fxbug.dev/354047162): Enable once the SDK respects API level status.
+            # ":failure_test_retired_api_level",
+
+            # The scenarios in these tests fail as expected but during the
+            # transition, which avoids `expect_failure`, causing the tests to fail.
+            # TODO(https://fxbug.dev/354047162): Enable these two tests once the
+            # error does not occur during the transition.
+            # ":failure_test_unknown_numerical_api_level",
+            # ":failure_test_lowercase_next_api_level",
         ],
         **kwargs
     )
