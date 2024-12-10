@@ -18,7 +18,6 @@
 #include <fbl/ref_ptr.h>
 
 namespace unit_testing {
-
 namespace {
 
 using starnix::FsContext;
@@ -45,10 +44,44 @@ bool test_chdir() {
 
   ASSERT_STREQ("/", (*current_task)->fs()->cwd().path_escaping_chroot());
   END_TEST;
+
+  auto bin = current_task->open_file("bin", OpenFlags(OpenFlagsEnum::RDONLY));
+  ASSERT_TRUE(bin.is_ok(), "missing bin directory");
+
+  auto result = (*current_task)->fs()->chdir(*current_task, bin.value()->name_.to_passive());
+  ASSERT_TRUE(result.is_ok(), "Failed to chdir");
+  ASSERT_STREQ("/bin", (*current_task)->fs()->cwd().path_escaping_chroot());
+
+  // Now that we have changed directories to bin, we're opening a file
+  // relative to that directory, which doesn't exist.
+  ASSERT_TRUE(current_task->open_file("bin", OpenFlags(OpenFlagsEnum::RDONLY)).is_error());
+
+  // However, bin still exists in the root directory.
+  ASSERT_TRUE(current_task->open_file("/bin", OpenFlags(OpenFlagsEnum::RDONLY)).is_ok());
+
+  auto previous_directory = current_task->open_file("..", OpenFlags(OpenFlagsEnum::RDONLY));
+  ASSERT_TRUE(previous_directory.is_ok(), "failed to open ..");
+
+  result =
+      (*current_task)->fs()->chdir(*current_task, previous_directory.value()->name_.to_passive());
+  ASSERT_TRUE(result.is_ok(), "Failed to chdir");
+  ASSERT_STREQ("/", (*current_task)->fs()->cwd().path_escaping_chroot());
+
+  // Now bin exists again because we've gone back to the root.
+  ASSERT_TRUE(current_task->open_file("bin", OpenFlags(OpenFlagsEnum::RDONLY)).is_ok());
+
+  // Repeating the .. doesn't do anything because we're already at the root.
+  previous_directory = current_task->open_file("..", OpenFlags(OpenFlagsEnum::RDONLY));
+  ASSERT_TRUE(previous_directory.is_ok(), "failed to open ..");
+
+  result =
+      (*current_task)->fs()->chdir(*current_task, previous_directory.value()->name_.to_passive());
+  ASSERT_TRUE(result.is_ok(), "Failed to chdir");
+  ASSERT_STREQ("/", (*current_task)->fs()->cwd().path_escaping_chroot());
+  ASSERT_TRUE(current_task->open_file("bin", OpenFlags(OpenFlagsEnum::RDONLY)).is_ok());
 }
 
 }  // namespace
-
 }  // namespace unit_testing
 
 UNITTEST_START_TESTCASE(starnix_fs_context)

@@ -17,6 +17,8 @@
 
 #include <ktl/enforce.h>
 
+#include <linux/capability.h>
+
 namespace starnix {
 
 NamespaceNode FsContext::cwd() const {
@@ -27,6 +29,35 @@ NamespaceNode FsContext::cwd() const {
 NamespaceNode FsContext::root() const {
   auto state = state_.Read();
   return state->root_.to_passive();
+}
+
+fit::result<Errno> FsContext::chdir(const CurrentTask& current_task,
+                                    const NamespaceNode& name) const {
+  auto result = name.check_access(current_task, Access(starnix_uapi::AccessEnum::EXEC),
+                                  CheckAccessReason::Chdir);
+  if (result.is_error()) {
+    return result;
+  }
+
+  auto state = state_.Write();
+  state->cwd_ = name.into_active();
+  return fit::ok();
+}
+
+fit::result<Errno> FsContext::chroot(const CurrentTask& current_task,
+                                     const NamespaceNode& name) const {
+  auto access_result = name.check_access(current_task, Access(starnix_uapi::AccessEnum::EXEC),
+                                         CheckAccessReason::Chroot);
+  if (access_result.is_error()) {
+    return fit::error(errno(EACCES));
+  }
+  if (!current_task->creds().has_capability(starnix_uapi::kCapSysChroot)) {
+    return fit::error(errno(EPERM));
+  }
+
+  auto state = state_.Write();
+  state->root_ = name.into_active();
+  return fit::ok();
 }
 
 FileMode FsContext::umask() const { return state_.Read()->umask_; }

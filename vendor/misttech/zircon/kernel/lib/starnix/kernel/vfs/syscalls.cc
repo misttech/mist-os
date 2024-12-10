@@ -239,6 +239,25 @@ fit::result<Errno, FdNumber> sys_openat(const CurrentTask& current_task, FdNumbe
   return do_openat(current_task, dir_fd, user_path, flags, mode, ResolveFlags::empty());
 }
 
+fit::result<Errno> sys_chroot(const CurrentTask& current_task,
+                              starnix_uapi::UserCString user_path) {
+  auto name = lookup_at(current_task, FdNumber::AT_FDCWD_, user_path, LookupFlags()) _EP(name);
+  if (!name->entry_->node_->is_dir()) {
+    return fit::error(errno(ENOTDIR));
+  }
+
+  auto result = current_task->fs()->chroot(current_task, name.value()) _EP(result);
+  return fit::ok();
+}
+
+fit::result<Errno> sys_chdir(const CurrentTask& current_task, starnix_uapi::UserCString user_path) {
+  auto name = lookup_at(current_task, FdNumber::AT_FDCWD_, user_path, LookupFlags()) _EP(name);
+  if (!name->entry_->node_->is_dir()) {
+    return fit::error(errno(ENOTDIR));
+  }
+  return current_task->fs()->chdir(current_task, name.value());
+}
+
 fit::result<Errno> sys_fstat(const CurrentTask& current_task, FdNumber fd,
                              starnix_uapi::UserRef<struct ::stat> buffer) {
   // O_PATH allowed for:
