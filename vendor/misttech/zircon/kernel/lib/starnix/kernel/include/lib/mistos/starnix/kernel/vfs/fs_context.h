@@ -40,6 +40,13 @@ struct FsContextState {
 
   // See <https://man7.org/linux/man-pages/man2/umask.2.html>
   FileMode umask_;
+
+ private:
+  /// Set a new namespace for this FsContext.
+  ///
+  /// The root and cwd nodes will be translated to equivalent nodes in the new namespace.
+  /// Returns EINVAL if either node cannot be found in the new namespace.
+  fit::result<Errno> set_namespace(fbl::RefPtr<Namespace> new_ns);
 };
 
 class FsContext : public fbl::RefCounted<FsContext> {
