@@ -923,16 +923,20 @@ pub fn sys_prctl(
                 }
                 Some(name)
             };
-            current_task.mm().set_mapping_name(addr, length, name)?;
+            current_task
+                .mm()
+                .ok_or_else(|| errno!(EINVAL))?
+                .set_mapping_name(addr, length, name)?;
             Ok(().into())
         }
         PR_SET_DUMPABLE => {
-            let mut dumpable = current_task.mm().dumpable.lock(locked);
+            let mut dumpable =
+                current_task.mm().ok_or_else(|| errno!(EINVAL))?.dumpable.lock(locked);
             *dumpable = if arg2 == 1 { DumpPolicy::User } else { DumpPolicy::Disable };
             Ok(().into())
         }
         PR_GET_DUMPABLE => {
-            let dumpable = current_task.mm().dumpable.lock(locked);
+            let dumpable = current_task.mm().ok_or_else(|| errno!(EINVAL))?.dumpable.lock(locked);
             Ok(match *dumpable {
                 DumpPolicy::Disable => 0.into(),
                 DumpPolicy::User => 1.into(),
@@ -1248,7 +1252,7 @@ pub fn do_prlimit64(
             // The stack size is fixed at the moment, but
             // if MAP_GROWSDOWN is implemented this should
             // report the limit that it can be grown.
-            let mm_state = target_task.mm().state.read();
+            let mm_state = target_task.mm().ok_or_else(|| errno!(EINVAL))?.state.read();
             let stack_size = mm_state.stack_size as u64;
             rlimit { rlim_cur: stack_size, rlim_max: stack_size }
         }
@@ -1817,9 +1821,10 @@ pub fn sys_kcmp(
             obfuscate_arc(&task1.thread_group.signal_actions)
                 .cmp(&obfuscate_arc(&task2.thread_group.signal_actions)),
         )),
-        KcmpResource::VM => {
-            Ok(encode_ordering(obfuscate_arc(&task1.mm()).cmp(&obfuscate_arc(&task2.mm()))))
-        }
+        KcmpResource::VM => Ok(encode_ordering(
+            obfuscate_arc(task1.mm().ok_or_else(|| errno!(EINVAL))?)
+                .cmp(&obfuscate_arc(task2.mm().ok_or_else(|| errno!(EINVAL))?)),
+        )),
         _ => error!(EINVAL),
     }
 }
@@ -1922,13 +1927,17 @@ mod tests {
             Some("test-name".into()),
             current_task
                 .mm()
+                .unwrap()
                 .get_mapping_name(mapped_address + 24u64)
                 .expect("failed to get address")
         );
 
         sys_munmap(&mut locked, &current_task, mapped_address, *PAGE_SIZE as usize)
             .expect("failed to unmap memory");
-        assert_eq!(error!(EFAULT), current_task.mm().get_mapping_name(mapped_address + 24u64));
+        assert_eq!(
+            error!(EFAULT),
+            current_task.mm().unwrap().get_mapping_name(mapped_address + 24u64)
+        );
     }
 
     #[::fuchsia::test]

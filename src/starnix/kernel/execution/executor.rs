@@ -417,7 +417,7 @@ where
         signal_actions,
     );
 
-    Ok(TaskInfo { thread: None, thread_group, memory_manager }.into())
+    Ok(TaskInfo { thread: None, thread_group, memory_manager: Some(memory_manager) }.into())
 }
 
 pub fn execute_task_with_prerun_result<L, F, R, G>(
@@ -745,7 +745,7 @@ pub struct TaskInfo {
     pub thread_group: OwnedRef<ThreadGroup>,
 
     /// The memory manager to use for the task.
-    pub memory_manager: Arc<MemoryManager>,
+    pub memory_manager: Option<Arc<MemoryManager>>,
 }
 
 impl Releasable for TaskInfo {

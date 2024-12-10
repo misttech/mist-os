@@ -334,7 +334,7 @@ impl<Key: FutexKey> FutexTable<Key> {
     }
 
     fn load_futex_value(current_task: &CurrentTask, addr: FutexAddress) -> Result<u32, Errno> {
-        current_task.mm().atomic_load_u32_relaxed(addr)
+        current_task.mm().ok_or_else(|| errno!(EINVAL))?.atomic_load_u32_relaxed(addr)
     }
 }
 
@@ -471,7 +471,7 @@ pub trait FutexKey: Sized + Ord + Hash + Clone {
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno>;
 
-    fn get_table_from_task(task: &Task) -> &FutexTable<Self>;
+    fn get_table_from_task(task: &Task) -> Result<&FutexTable<Self>, Errno>;
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
@@ -489,13 +489,14 @@ impl FutexKey for PrivateFutexKey {
         addr: FutexAddress,
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno> {
-        let (memory, offset) = task.mm().get_mapping_memory(addr.into(), perms)?;
+        let (memory, offset) =
+            task.mm().ok_or_else(|| errno!(EINVAL))?.get_mapping_memory(addr.into(), perms)?;
         let key = PrivateFutexKey { addr };
         Ok((FutexOperand { memory, offset }, key))
     }
 
-    fn get_table_from_task(task: &Task) -> &FutexTable<Self> {
-        &task.mm().futex
+    fn get_table_from_task(task: &Task) -> Result<&FutexTable<Self>, Errno> {
+        Ok(&task.mm().ok_or_else(|| errno!(EINVAL))?.futex)
     }
 }
 
@@ -517,13 +518,14 @@ impl FutexKey for SharedFutexKey {
         addr: FutexAddress,
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno> {
-        let (memory, offset) = task.mm().get_mapping_memory(addr.into(), perms)?;
+        let (memory, offset) =
+            task.mm().ok_or_else(|| errno!(EINVAL))?.get_mapping_memory(addr.into(), perms)?;
         let key = SharedFutexKey::new(&memory, offset)?;
         Ok((FutexOperand { memory, offset }, key))
     }
 
-    fn get_table_from_task(task: &Task) -> &FutexTable<Self> {
-        &task.kernel().shared_futexes
+    fn get_table_from_task(task: &Task) -> Result<&FutexTable<Self>, Errno> {
+        Ok(&task.kernel().shared_futexes)
     }
 }
 

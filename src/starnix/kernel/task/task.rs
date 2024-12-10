@@ -966,6 +966,7 @@ pub struct Task {
 }
 
 /// The decoded cross-platform parts we care about for page fault exception reports.
+#[derive(Debug)]
 pub struct PageFaultExceptionReport {
     pub faulting_address: u64,
     pub not_present: bool, // Set when the page fault was due to a not-present page.
@@ -978,7 +979,11 @@ impl Task {
     }
 
     pub fn has_same_address_space(&self, other: &Self) -> bool {
-        Arc::ptr_eq(self.mm(), other.mm())
+        match (self.mm(), other.mm()) {
+            (Some(this), Some(other)) => Arc::ptr_eq(this, other),
+            (None, None) => true,
+            _ => false,
+        }
     }
 
     pub fn flags(&self) -> TaskFlags {
@@ -1069,7 +1074,7 @@ impl Task {
         thread_group: OwnedRef<ThreadGroup>,
         thread: Option<zx::Thread>,
         files: FdTable,
-        mm: Arc<MemoryManager>,
+        mm: Option<Arc<MemoryManager>>,
         // The only case where fs should be None if when building the initial task that is the
         // used to build the initial FsContext.
         fs: Arc<FsContext>,
@@ -1094,7 +1099,7 @@ impl Task {
             thread_group,
             thread: RwLock::new(thread),
             files,
-            mm: Some(mm),
+            mm,
             fs: Some(RwLock::new(fs)),
             abstract_socket_namespace,
             abstract_vsock_namespace,
@@ -1165,8 +1170,8 @@ impl Task {
         self.fs.as_ref().expect("fs must be set").read().clone()
     }
 
-    pub fn mm(&self) -> &Arc<MemoryManager> {
-        self.mm.as_ref().expect("mm must be set")
+    pub fn mm(&self) -> Option<&Arc<MemoryManager>> {
+        self.mm.as_ref()
     }
 
     pub fn unshare_fs(&self) {
@@ -1280,7 +1285,7 @@ impl Task {
         //      PR_SET_DUMPABLE in prctl(2)), and the caller does not have
         //      the CAP_SYS_PTRACE capability in the user namespace of the
         //      target process.
-        let dumpable = *target.mm().dumpable.lock(locked);
+        let dumpable = *target.mm().ok_or_else(|| errno!(EINVAL))?.dumpable.lock(locked);
         if dumpable != DumpPolicy::User && !creds.has_capability(CAP_SYS_PTRACE) {
             return error!(EPERM);
         }
@@ -1357,8 +1362,12 @@ impl Task {
     }
 
     pub fn read_argv(&self, max_len: usize) -> Result<Vec<FsString>, Errno> {
+        // argv is empty for kthreads
+        let Some(mm) = self.mm() else {
+            return Ok(vec![]);
+        };
         let (argv_start, argv_end) = {
-            let mm_state = self.mm().state.read();
+            let mm_state = mm.state.read();
             (mm_state.argv_start, mm_state.argv_end)
         };
 
@@ -1367,8 +1376,10 @@ impl Task {
     }
 
     pub fn read_env(&self, max_len: usize) -> Result<Vec<FsString>, Errno> {
+        // environment is empty for kthreads
+        let Some(mm) = self.mm() else { return Ok(vec![]) };
         let (env_start, env_end) = {
-            let mm_state = self.mm().state.read();
+            let mm_state = mm.state.read();
             (mm_state.environ_start, mm_state.environ_end)
         };
 
@@ -1568,7 +1579,7 @@ impl MemoryAccessor for Task {
         // is being read from a task different than the `CurrentTask`. When
         // this `Task` is not current, its address space is not mapped
         // so we need to go through the VMO.
-        self.mm().syscall_read_memory(addr, bytes)
+        self.mm().ok_or_else(|| errno!(EINVAL))?.syscall_read_memory(addr, bytes)
     }
 
     fn read_memory_partial_until_null_byte<'a>(
@@ -1580,7 +1591,9 @@ impl MemoryAccessor for Task {
         // is being read from a task different than the `CurrentTask`. When
         // this `Task` is not current, its address space is not mapped
         // so we need to go through the VMO.
-        self.mm().syscall_read_memory_partial_until_null_byte(addr, bytes)
+        self.mm()
+            .ok_or_else(|| errno!(EINVAL))?
+            .syscall_read_memory_partial_until_null_byte(addr, bytes)
     }
 
     fn read_memory_partial<'a>(
@@ -1592,7 +1605,7 @@ impl MemoryAccessor for Task {
         // is being read from a task different than the `CurrentTask`. When
         // this `Task` is not current, its address space is not mapped
         // so we need to go through the VMO.
-        self.mm().syscall_read_memory_partial(addr, bytes)
+        self.mm().ok_or_else(|| errno!(EINVAL))?.syscall_read_memory_partial(addr, bytes)
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
@@ -1600,7 +1613,7 @@ impl MemoryAccessor for Task {
         // is being written to a task different than the `CurrentTask`. When
         // this `Task` is not current, its address space is not mapped
         // so we need to go through the VMO.
-        self.mm().syscall_write_memory(addr, bytes)
+        self.mm().ok_or_else(|| errno!(EINVAL))?.syscall_write_memory(addr, bytes)
     }
 
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
@@ -1608,7 +1621,7 @@ impl MemoryAccessor for Task {
         // is being written to a task different than the `CurrentTask`. When
         // this `Task` is not current, its address space is not mapped
         // so we need to go through the VMO.
-        self.mm().syscall_write_memory_partial(addr, bytes)
+        self.mm().ok_or_else(|| errno!(EINVAL))?.syscall_write_memory_partial(addr, bytes)
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
@@ -1616,13 +1629,13 @@ impl MemoryAccessor for Task {
         // is being zeroed from a task different than the `CurrentTask`. When
         // this `Task` is not current, its address space is not mapped
         // so we need to go through the VMO.
-        self.mm().syscall_zero(addr, length)
+        self.mm().ok_or_else(|| errno!(EINVAL))?.syscall_zero(addr, length)
     }
 }
 
 impl TaskMemoryAccessor for Task {
-    fn maximum_valid_address(&self) -> UserAddress {
-        self.mm().maximum_valid_user_address
+    fn maximum_valid_address(&self) -> Option<UserAddress> {
+        self.mm().map(|mm| mm.maximum_valid_user_address)
     }
 }
 

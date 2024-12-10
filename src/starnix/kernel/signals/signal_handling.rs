@@ -429,7 +429,7 @@ pub fn dispatch_signal_handler(
         &siginfo,
         action,
         UserAddress::from(stack_pointer),
-    );
+    )?;
 
     // Write the signal stack frame at the updated stack pointer.
     task.write_memory(UserAddress::from(stack_pointer), signal_stack_frame.as_bytes())?;

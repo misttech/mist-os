@@ -2357,6 +2357,7 @@ fn do_epoll_pwait(
     // memory is actually written, the events will be lost. This check is not a guarantee.
     current_task
         .mm()
+        .ok_or_else(|| errno!(EINVAL))?
         .check_plausible(events.addr(), max_events * std::mem::size_of::<EpollEvent>())?;
 
     let active_events = if !user_sigmask.is_null() {
@@ -2935,7 +2936,10 @@ pub fn sys_io_setup(
     }
     let ctx_id = AioContext::create(current_task, max_operations)?;
     current_task.write_object(user_ctx_idp, &ctx_id).map_err(|e| {
-        let _ = current_task.mm().destroy_aio_context(ctx_id.into());
+        let _ = current_task
+            .mm()
+            .expect("previous sys_io_setup code verified mm exists")
+            .destroy_aio_context(ctx_id.into());
         e
     })?;
     Ok(())
@@ -2952,7 +2956,11 @@ pub fn sys_io_submit(
     if nr == 0 {
         return Ok(0);
     }
-    let ctx = current_task.mm().get_aio_context(ctx_id.into()).ok_or_else(|| errno!(EINVAL))?;
+    let ctx = current_task
+        .mm()
+        .ok_or_else(|| errno!(EINVAL))?
+        .get_aio_context(ctx_id.into())
+        .ok_or_else(|| errno!(EINVAL))?;
 
     // `iocbpp` is an array of addresses to iocb's.
     let mut num_submitted: i32 = 0;
@@ -2994,7 +3002,11 @@ pub fn sys_io_getevents(
     let max_results = nr as usize;
     let deadline = deadline_after_timespec(current_task, user_timeout)?;
 
-    let ctx = current_task.mm().get_aio_context(ctx_id.into()).ok_or_else(|| errno!(EINVAL))?;
+    let ctx = current_task
+        .mm()
+        .ok_or_else(|| errno!(EINVAL))?
+        .get_aio_context(ctx_id.into())
+        .ok_or_else(|| errno!(EINVAL))?;
     let events = ctx.get_events(current_task, min_results, max_results, deadline)?;
     current_task.write_objects(events_ref, &events)?;
 
@@ -3009,7 +3021,11 @@ pub fn sys_io_cancel(
     _result: UserRef<io_event>,
 ) -> Result<(), Errno> {
     let _iocb = current_task.read_object(user_iocb)?;
-    let _ctx = current_task.mm().get_aio_context(ctx_id.into()).ok_or_else(|| errno!(EINVAL))?;
+    let _ctx = current_task
+        .mm()
+        .ok_or_else(|| errno!(EINVAL))?
+        .get_aio_context(ctx_id.into())
+        .ok_or_else(|| errno!(EINVAL))?;
 
     track_stub!(TODO("https://fxbug.dev/297433877"), "io_cancel");
     return error!(ENOSYS);
@@ -3020,7 +3036,8 @@ pub fn sys_io_destroy(
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
 ) -> Result<(), Errno> {
-    let aio_context = current_task.mm().destroy_aio_context(ctx_id.into())?;
+    let aio_context =
+        current_task.mm().ok_or_else(|| errno!(EINVAL))?.destroy_aio_context(ctx_id.into())?;
     std::mem::drop(aio_context);
     Ok(())
 }

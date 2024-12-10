@@ -200,7 +200,7 @@ impl FileOps for Ashmem {
             })?
             .clone();
 
-        let mapped_addr = current_task.mm().map_memory(
+        let mapped_addr = current_task.mm().ok_or_else(|| errno!(EINVAL))?.map_memory(
             addr,
             memory,
             memory_offset,

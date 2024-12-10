@@ -369,7 +369,7 @@ mod tests {
         let page_size = *PAGE_SIZE;
 
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         assert!(mm.inflight_vmspliced_payloads.payloads.lock().is_empty());
 

@@ -152,7 +152,13 @@ where
     if flags & MAP_ANONYMOUS != 0 {
         trace_duration!(CATEGORY_STARNIX_MM, c"AnonymousMmap");
         profile_duration!("AnonymousMmap");
-        current_task.mm().map_anonymous(addr, length, prot_flags, options, MappingName::None)
+        current_task.mm().ok_or_else(|| errno!(EINVAL))?.map_anonymous(
+            addr,
+            length,
+            prot_flags,
+            options,
+            MappingName::None,
+        )
     } else {
         trace_duration!(CATEGORY_STARNIX_MM, c"FileBackedMmap");
         profile_duration!("FileBackedMmap");
@@ -182,7 +188,7 @@ pub fn sys_mprotect(
         track_stub!(TODO("https://fxbug.dev/322874672"), "mprotect parse protection", prot);
         errno!(EINVAL)
     })?;
-    current_task.mm().protect(addr, length, prot_flags)?;
+    current_task.mm().ok_or_else(|| errno!(EINVAL))?.protect(addr, length, prot_flags)?;
     Ok(())
 }
 
@@ -196,8 +202,14 @@ pub fn sys_mremap(
     new_addr: UserAddress,
 ) -> Result<UserAddress, Errno> {
     let flags = MremapFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL))?;
-    let addr =
-        current_task.mm().remap(current_task, addr, old_length, new_length, flags, new_addr)?;
+    let addr = current_task.mm().ok_or_else(|| errno!(EINVAL))?.remap(
+        current_task,
+        addr,
+        old_length,
+        new_length,
+        flags,
+        new_addr,
+    )?;
     Ok(addr)
 }
 
@@ -207,7 +219,7 @@ pub fn sys_munmap(
     addr: UserAddress,
     length: usize,
 ) -> Result<(), Errno> {
-    current_task.mm().unmap(addr, length)?;
+    current_task.mm().ok_or_else(|| errno!(EINVAL))?.unmap(addr, length)?;
     Ok(())
 }
 
@@ -221,7 +233,7 @@ pub fn sys_msync(
     track_stub!(TODO("https://fxbug.dev/322874588"), "msync");
     // Perform some basic validation of the address range given to satisfy gvisor tests that
     // use msync as a way to probe whether a page is mapped or not.
-    current_task.mm().ensure_mapped(addr, length)?;
+    current_task.mm().ok_or_else(|| errno!(EINVAL))?.ensure_mapped(addr, length)?;
     Ok(())
 }
 
@@ -232,7 +244,7 @@ pub fn sys_madvise(
     length: usize,
     advice: u32,
 ) -> Result<(), Errno> {
-    current_task.mm().madvise(current_task, addr, length, advice)?;
+    current_task.mm().ok_or_else(|| errno!(EINVAL))?.madvise(current_task, addr, length, advice)?;
     Ok(())
 }
 
@@ -241,7 +253,7 @@ pub fn sys_brk(
     current_task: &CurrentTask,
     addr: UserAddress,
 ) -> Result<UserAddress, Errno> {
-    current_task.mm().set_brk(current_task, addr)
+    current_task.mm().ok_or_else(|| errno!(EINVAL))?.set_brk(current_task, addr)
 }
 
 pub fn sys_process_vm_readv(
@@ -417,7 +429,7 @@ fn do_futex<Key: FutexKey>(
     addr2: UserAddress,
     value3: u32,
 ) -> Result<usize, Errno> {
-    let futexes = Key::get_table_from_task(current_task);
+    let futexes = Key::get_table_from_task(current_task)?;
 
     let is_realtime = op & FUTEX_CLOCK_REALTIME != 0;
     let cmd = op & (FUTEX_CMD_MASK as u32);
@@ -533,7 +545,7 @@ fn do_futex_wait_with_restart<Key: FutexKey>(
     mask: u32,
     deadline: TargetTime,
 ) -> Result<(), Errno> {
-    let futexes = Key::get_table_from_task(current_task);
+    let futexes = Key::get_table_from_task(current_task)?;
     let result = match deadline {
         TargetTime::Monotonic(mono_deadline) => {
             futexes.wait(current_task, addr, value, mask, mono_deadline)
@@ -1167,6 +1179,7 @@ mod tests {
 
         let dst_addr = current_task
             .mm()
+            .unwrap()
             .map_memory(
                 DesiredAddress::Any,
                 dst_memory.into(),

@@ -1210,7 +1210,9 @@ mod tests {
                 )
                 .expect("Task")
                 .into();
-                task.mm().initialize_mmap_layout_for_test(ArchWidth::Arch64);
+                task.mm()
+                    .ok_or_else(|| errno!(EINVAL))?
+                    .initialize_mmap_layout_for_test(ArchWidth::Arch64);
 
                 let remote_binder_handle =
                     RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task);

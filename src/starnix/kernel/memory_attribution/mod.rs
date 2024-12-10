@@ -197,5 +197,5 @@ fn updated_principal(thread_group: &ThreadGroup) -> Option<fattribution::Attribu
 ///
 /// If all tasks in the thread group has been killed, returns `None`.
 fn get_mm(thread_group: &ThreadGroup) -> Option<Arc<MemoryManager>> {
-    thread_group.read().tasks().find_map(|task| Some(task.mm().clone()))
+    thread_group.read().tasks().find_map(|task| task.mm().cloned())
 }

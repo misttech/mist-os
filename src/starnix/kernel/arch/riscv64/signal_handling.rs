@@ -11,7 +11,9 @@ use starnix_logging::log_debug;
 use starnix_uapi::errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK};
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::user_address::UserAddress;
-use starnix_uapi::{self as uapi, error, sigaction, sigaltstack, sigcontext, siginfo_t, ucontext};
+use starnix_uapi::{
+    self as uapi, errno, error, sigaction, sigaltstack, sigcontext, siginfo_t, ucontext,
+};
 
 /// The size of the red zone.
 pub const RED_ZONE_SIZE: u64 = 0;
@@ -58,7 +60,7 @@ impl SignalStackFrame {
         siginfo: &SignalInfo,
         _action: sigaction,
         stack_pointer: UserAddress,
-    ) -> SignalStackFrame {
+    ) -> Result<SignalStackFrame, Errno> {
         let context = ucontext {
             uc_flags: 0,
             uc_link: Default::default(),
@@ -82,7 +84,9 @@ impl SignalStackFrame {
         };
 
         let vdso_sigreturn_offset = task.kernel().vdso.sigreturn_offset;
-        let sigreturn_addr = task.mm().state.read().vdso_base.ptr() as u64 + vdso_sigreturn_offset;
+        let sigreturn_addr = task.mm().ok_or_else(|| errno!(EINVAL))?.state.read().vdso_base.ptr()
+            as u64
+            + vdso_sigreturn_offset;
         registers.ra = sigreturn_addr;
 
         let v_registers_addr = stack_pointer.ptr()
@@ -116,7 +120,7 @@ impl SignalStackFrame {
                 as u32,
         };
 
-        sigstack
+        Ok(sigstack)
     }
 
     pub fn as_bytes(&self) -> &[u8; SIG_STACK_SIZE] {

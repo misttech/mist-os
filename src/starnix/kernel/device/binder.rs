@@ -4233,7 +4233,8 @@ impl BinderDriver {
         ));
 
         // Map the VMO into the binder process' address space.
-        let user_address = current_task.mm().map_memory(
+        let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
+        let user_address = mm.map_memory(
             addr,
             memory.clone(),
             0,
@@ -4254,7 +4255,7 @@ impl BinderDriver {
             Err(err) => {
                 // Try to cleanup by unmapping from userspace, but ignore any errors. We
                 // can't really recover from them.
-                let _ = current_task.mm().unmap(user_address, length);
+                let _ = mm.unmap(user_address, length);
                 Err(err)
             }
         }

@@ -14,8 +14,6 @@
 #include <sys/timerfd.h>
 #include <unistd.h>
 
-#include <filesystem>
-
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
@@ -336,6 +334,161 @@ TEST_F(ProcTaskDirTest, PidDirCorrectIno) {
   SAFE_SYSCALL(close(fd));
 
   ASSERT_EQ(pre_stat.st_ino, post_stat.st_ino) << "Inode number incorrectly seen to change";
+}
+
+TEST_F(ProcTaskDirTest, SelfAuxvIsNotEmpty) {
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/self/auxv", &contents));
+  ASSERT_THAT(contents.size(), testing::Gt(0));
+}
+TEST_F(ProcTaskDirTest, KthreadAuxvIsEmpty) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+  }
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/2/auxv", &contents));
+  ASSERT_EQ(contents.size(), 0ul);
+}
+
+TEST_F(ProcTaskDirTest, SelfCmdlineIsNotEmpty) {
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/self/cmdline", &contents));
+  ASSERT_THAT(contents.size(), testing::Gt(0));
+}
+TEST_F(ProcTaskDirTest, KthreadCmdlineIsEmpty) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+  }
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/2/cmdline", &contents));
+  ASSERT_EQ(contents.size(), 0ul);
+}
+
+TEST_F(ProcTaskDirTest, SelfEnvironIsNotEmpty) {
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/self/environ", &contents));
+  ASSERT_THAT(contents.size(), testing::Gt(0));
+}
+TEST_F(ProcTaskDirTest, KthreadEnvironIsEmpty) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+  }
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/2/environ", &contents));
+  ASSERT_EQ(contents.size(), 0ul);
+}
+
+TEST_F(ProcTaskDirTest, SelfExeSymlinkIsValid) {
+  char buf[1000];
+  ASSERT_THAT(readlink("/proc/self/exe", buf, 1000), testing::Gt(0));
+}
+TEST_F(ProcTaskDirTest, KthreadExeSymlinkIsNotValid) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+  }
+  char buf[1000];
+  ASSERT_EQ(readlink("/proc/2/exe", buf, 1000), -1);
+}
+
+TEST_F(ProcTaskDirTest, SelfSmapsIsNotEmpty) {
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/self/smaps", &contents));
+  ASSERT_THAT(contents.size(), testing::Gt(0));
+}
+TEST_F(ProcTaskDirTest, KthreadSmapsIsEmpty) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+  }
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/2/smaps", &contents));
+  ASSERT_EQ(contents.size(), 0ul);
+}
+
+TEST_F(ProcTaskDirTest, SelfStatIsNotEmpty) {
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/self/stat", &contents));
+  ASSERT_THAT(contents.size(), testing::Gt(0));
+}
+TEST_F(ProcTaskDirTest, KthreadStatIsNotEmpty) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+  }
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/2/stat", &contents));
+  ASSERT_THAT(contents.size(), testing::Gt(0));
+}
+
+TEST_F(ProcTaskDirTest, SelfStatmIsNotEmpty) {
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/self/statm", &contents));
+  ASSERT_THAT(contents.size(), testing::Gt(0));
+}
+TEST_F(ProcTaskDirTest, KthreadStatmIsAllZeroes) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+  }
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/2/statm", &contents));
+  ASSERT_EQ(contents, "0 0 0 0 0 0 0\n");
+}
+
+TEST_F(ProcTaskDirTest, SelfStatusSensibleOutput) {
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/self/status", &contents));
+  EXPECT_THAT(contents, testing::HasSubstr("Name:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nUmask:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nSigBlk:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nSigPnd:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nShdPnd:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nState:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nTgid:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nPid:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nPPid:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nUid:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nGid:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nGroups:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nVmSize:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nVmRSS:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nRssAnon:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nRssFile:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nRssShmem:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nRssShmem:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nVmData:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nVmStk:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nVmExe:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nVmSwap:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nThreads:"));
+}
+
+TEST_F(ProcTaskDirTest, KthreadStatusSensibleOutput) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+  }
+  std::string contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/2/status", &contents));
+  EXPECT_THAT(contents, testing::HasSubstr("Name:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nUmask:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nSigBlk:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nSigPnd:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nShdPnd:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nState:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nTgid:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nPid:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nPPid:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nUid:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nGid:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nGroups:"));
+  EXPECT_THAT(contents, Not(testing::HasSubstr("\nVmSize:")));
+  EXPECT_THAT(contents, Not(testing::HasSubstr("\nVmRSS:")));
+  EXPECT_THAT(contents, Not(testing::HasSubstr("\nRssAnon:")));
+  EXPECT_THAT(contents, Not(testing::HasSubstr("\nRssFile:")));
+  EXPECT_THAT(contents, Not(testing::HasSubstr("\nRssShmem:")));
+  EXPECT_THAT(contents, Not(testing::HasSubstr("\nRssShmem:")));
+  EXPECT_THAT(contents, Not(testing::HasSubstr("\nVmData:")));
+  EXPECT_THAT(contents, Not(testing::HasSubstr("\nVmStk:")));
+  EXPECT_THAT(contents, Not(testing::HasSubstr("\nVmExe:")));
+  EXPECT_THAT(contents, Not(testing::HasSubstr("\nVmSwap:")));
+  EXPECT_THAT(contents, testing::HasSubstr("\nThreads:"));
 }
 
 constexpr char kProcSelfFdPath[] = "/proc/self/fd/%d";
