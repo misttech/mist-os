@@ -456,17 +456,14 @@ impl ElfRunner {
         // Add process ID to the runtime dir.
         runtime_dir.add_process_id(pid);
 
-        #[cfg(feature = "tracing")]
-        if fuchsia_trace::category_enabled(c"component:start") {
-            fuchsia_trace::instant!(
-                c"component:start",
-                c"elf",
-                fuchsia_trace::Scope::Thread,
-                "moniker" => format!("{}", moniker).as_str(),
-                "url" => resolved_url.as_str(),
-                "pid" => pid
-            );
-        }
+        fuchsia_trace::instant!(
+            c"component:start",
+            c"elf",
+            fuchsia_trace::Scope::Thread,
+            "moniker" => format!("{}", moniker).as_str(),
+            "url" => resolved_url.as_str(),
+            "pid" => pid
+        );
 
         // Add process start time to the runtime dir.
         let process_start_mono_ns =
