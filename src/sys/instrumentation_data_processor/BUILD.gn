@@ -1,0 +1,27 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+
+source_set("lib") {
+  testonly = true
+
+  sources = [ "instrumentation_data_processor.h" ]
+
+  public_deps = [ "//zircon/system/ulib/debugdata" ]
+}
+
+executable("instrumentation_data_processor_bin") {
+  sources = [ "instrumentation_data_processor.cc" ]
+}
+
+# TODO: https://fxbug.dev/42068707 - This component is under construction.
+fuchsia_component("instrumentation_data_processor_component") {
+  manifest = "meta/instrumentation_data_processor.cml"
+  deps = [ ":instrumentation_data_processor_bin" ]
+}
+
+fuchsia_package("instrumentation_data_processor") {
+  deps = [ ":instrumentation_data_processor_component" ]
+}

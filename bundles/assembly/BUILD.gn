@@ -186,6 +186,13 @@ assembly_input_bundle("bootstrap") {
             "//src/bringup/bin/device-name-provider/meta/device-name-provider.bootstrap_shard.cml",
             "//src/zircon/bin/role_manager/meta/role_manager.bootstrap_shard.cml",
           ]
+
+          # Enabling profiling fundamentally changes how the platform is
+          # compiled and requires the addition of instrumentation_data_processor
+          # component to collect and process profiles.
+          if (is_profile) {
+            shards += [ "//src/sys/instrumentation_data_processor/meta/instrumentation_data_processor.bootstrap_shard.cml" ]
+          }
         },
       ]
     },

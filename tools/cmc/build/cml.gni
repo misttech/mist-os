@@ -38,15 +38,23 @@ import("//tools/cmc/build/expect_includes.gni")
 template("cm") {
   input_manifest = invoker.manifest
 
-  # for the profile variant we need to inject a use clause for DebugData.
+  # We need to inject a use clause for DebugData for the coverage and profile variants.
+  # is_coverage is true for profile and coverage variants.
   needs_debugdata = is_coverage
 
   if (needs_debugdata) {
     cmc_merge("${target_name}_merge") {
-      sources = [
-        "//build/config/sanitizers/debugdata.cml",
-        invoker.manifest,
-      ]
+      if (is_profile) {
+        sources = [
+          "//build/config/profile/instrumentation_data.cml",
+          invoker.manifest,
+        ]
+      } else {
+        sources = [
+          "//sdk/lib/sys/testing/coverage.shard.cml",
+          invoker.manifest,
+        ]
+      }
       output_name = "${target_name}_merge.cml"
       forward_variables_from(invoker,
                              [

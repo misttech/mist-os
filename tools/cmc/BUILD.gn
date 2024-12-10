@@ -140,8 +140,14 @@ fuchsia_structured_config_values("example_component_config_values") {
 
 group("tests") {
   testonly = true
-  deps = [
-    ":cmc_integration_test",
-    ":cmc_lib_test($host_toolchain)",
-  ]
+  deps = [ ":cmc_lib_test($host_toolchain)" ]
+
+  # Ensure that cmc_integration_test does not run when profile variant is
+  # selected. This test adds a use for fuchsia.debugdata.Publisher capability
+  # via debug for coverage variant, and profile variant adds a use for this
+  # capability via diagnostics dictionary, which results in duplicate use
+  # target protocol error.
+  if (!is_profile) {
+    deps += [ ":cmc_integration_test" ]
+  }
 }
