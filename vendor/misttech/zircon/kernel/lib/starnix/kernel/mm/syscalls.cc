@@ -23,8 +23,6 @@
 
 namespace starnix {
 
-using namespace starnix_uapi;
-
 namespace {
 #ifdef __x86_64__
 // Returns any platform-specific mmap flags
