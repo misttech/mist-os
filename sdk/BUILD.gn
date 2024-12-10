@@ -716,7 +716,7 @@ sdk_molecule("core_data") {
 
 sdk_molecule("core_documentation") {
   category = "partner"
-  deps = [ "//third_party/Vulkan-Loader/src:vulkan_license" ]
+  deps = [ "//third_party/Vulkan-Loader:vulkan_license" ]
 }
 
 sdk_molecule("core_loadable_modules") {
@@ -748,7 +748,7 @@ sdk_molecule("core_cc_prebuilt_libraries") {
     "//sdk/lib/vfs/internal:vfs_internal_sdk",
     "//src/devices/bin/driver_runtime:driver_runtime_sdk",
     "//src/performance/memory/heapdump/instrumentation:instrumentation_sdk",
-    "//third_party/Vulkan-Loader/src:libvulkan_sdk",
+    "//third_party/Vulkan-Loader:libvulkan_sdk",
     "//zircon/system/ulib/sync:sync_sdk",
     "//zircon/system/ulib/syslog:syslog_sdk",
     "//zircon/system/ulib/trace-engine:trace-engine_sdk",

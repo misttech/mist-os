@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 # The path to shaderc dependencies.
-shaderc_glslang_dir = "//third_party/glslang/src"
-shaderc_spirv_tools_dir = "//third_party/spirv-tools/src"
-shaderc_spirv_cross_dir = "//third_party/spirv-cross/src"
-shaderc_spirv_headers_dir = "//third_party/spirv-headers/src"
+shaderc_glslang_dir = "//third_party/glslang"
+shaderc_spirv_tools_dir = "//third_party/spirv-tools"
+shaderc_spirv_cross_dir = "//third_party/spirv-cross"
+shaderc_spirv_headers_dir = "//third_party/spirv-headers"
