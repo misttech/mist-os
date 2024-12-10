@@ -882,11 +882,12 @@ TEST_F(OutputPipelineTest, PipelineWithEffectsV2) {
                 output[(k * 2) + c] = input[(k * 2) + c] + 1;
               }
             }
-            fuchsia_audio_effects::wire::ProcessMetrics metrics(arena);
-            metrics.set_name(arena, "stage");
-            metrics.set_wall_time(arena, 10);
-            metrics.set_cpu_time(arena, 100);
-            metrics_vector.push_back(std::move(metrics));
+            auto metrics = fuchsia_audio_effects::wire::ProcessMetrics::Builder(arena)
+                               .name("stage")
+                               .wall_time(10)
+                               .cpu_time(100)
+                               .Build();
+            metrics_vector.push_back(metrics);
             return ZX_OK;
           },
       .process_in_place = false,
