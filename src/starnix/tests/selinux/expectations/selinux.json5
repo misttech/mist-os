@@ -47,7 +47,6 @@
                 "*notify*",
                 "*open*",
                 "*perf_event*",
-                "*readlink*",
                 "*rxdir*",
                 "*sem*",
                 "*setattr*",

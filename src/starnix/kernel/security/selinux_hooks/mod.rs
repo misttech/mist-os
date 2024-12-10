@@ -179,17 +179,25 @@ where
         }
         FileSystemLabelingScheme::GenFsCon => {
             let fs_type = fs_node.fs().name();
+            let fs_node_class = file_class_from_file_mode(fs_node.info().mode)?;
+
             // This will give us the path of the node from the root node of the filesystem,
             // excluding the path of the filesystem's mount point. For example, assuming that
             // filesystem "proc" is mounted in "/proc" and if the actual full path to the
             // fs_node is "/proc/bootconfig" then, get_fs_relative_path will return
             // "/bootconfig". This matches the path definitions in the genfscon statements.
-            let sub_path = get_fs_relative_path(dir_entry);
+            let sub_path = if fs_node_class == FileClass::Link {
+                // Investigation for https://fxbug.dev/378863048 suggests that symlinks' paths are
+                // ignored, so that they use the filesystem's root label.
+                "/".into()
+            } else {
+                get_fs_relative_path(dir_entry)
+            };
+
             let class_id = security_server
-                .class_id_by_name(
-                    ObjectClass::from(file_class_from_file_mode(fs_node.info().mode)?).name(),
-                )
+                .class_id_by_name(ObjectClass::from(fs_node_class).name())
                 .map_err(|_| errno!(EINVAL))?;
+
             security_server
                 .genfscon_label_for_fs_and_path(
                     fs_type.into(),
@@ -665,8 +673,7 @@ pub(super) fn check_fs_node_read_link_access(
     let current_sid = current_task.security_state.lock().current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
-    todo_check_permission!(
-        TODO("https://fxbug.dev/378863048", "Check read permission on links."),
+    check_permission(
         &security_server.as_permission_check(),
         current_sid,
         file_sid,
