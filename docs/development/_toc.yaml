@@ -91,9 +91,12 @@ toc:
 - title: "Test"
   section:
   - include: /docs/development/testing/_toc.yaml
-- title: "Diagnose"
+- title: "Observe and Diagnose"
   section:
   - include: /docs/development/diagnostics/_toc.yaml
+  - title: "Trace"
+    section:
+    - include: /docs/development/tracing/_toc.yaml
   - title: "Error codes"
     section:
     - include: /docs/development/error_codes/_toc.yaml
@@ -106,9 +109,6 @@ toc:
 - title: "Monitoring"
   section:
   - include: /docs/development/monitoring/_toc.yaml
-- title: "Trace"
-  section:
-  - include: /docs/development/tracing/_toc.yaml
 - title: "Profile"
   section:
   - include: /docs/development/profiling/_toc.yaml
