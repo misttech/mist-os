@@ -190,6 +190,55 @@ fuchsia_package(
     visibility = ["//visibility:public"],
 )
 
+# Same as `pkg_at_unknown_numerical_api_level` but without `cc_component`.
+# TODO(https://fxbug.dev/382560521): Remove once the test can use `pkg_at_unknown_numerical_api_level`.
+fuchsia_package(
+    name = "pkg_at_unknown_numerical_api_level_without_cc_component",
+    package_name = "pkg_at_unknown_numerical_api_level_without_cc_component_for_test",
+    components = [
+        ":empty_component",
+    ],
+    fuchsia_api_level = "90000",
+    resources = [
+        ":sc-values",
+        ":simple_file_resource",
+    ],
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+# Package that does not specify `fuchsia_api_level`.
+fuchsia_package(
+    name = "pkg_without_api_level",
+    package_name = "pkg_without_api_level_for_test",
+    components = [
+        ":cc_component",
+        ":empty_component",
+    ],
+    resources = [
+        ":sc-values",
+        ":simple_file_resource",
+    ],
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+# Same as `pkg_without_api_level` but without `cc_component`.
+# TODO(https://fxbug.dev/382560521): Remove once the test can use `pkg_without_api_level`.
+fuchsia_package(
+    name = "pkg_without_api_level_without_cc_component",
+    package_name = "pkg_without_api_level_without_cc_component_for_test",
+    components = [
+        ":empty_component",
+    ],
+    resources = [
+        ":sc-values",
+        ":simple_file_resource",
+    ],
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
 # Test Resources
 make_file(
     name = "simple_file",

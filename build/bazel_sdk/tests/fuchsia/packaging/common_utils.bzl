@@ -17,3 +17,36 @@ failure_test = analysistest.make(
         "expected_failure_message": attr.string(),
     },
 )
+
+no_repo_default_api_level_failure_test = analysistest.make(
+    _failure_test_impl,
+    expect_failure = True,
+    attrs = {
+        "expected_failure_message": attr.string(),
+    },
+    config_settings = {
+        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "",
+    },
+)
+
+unknown_repo_default_api_level_failure_test = analysistest.make(
+    _failure_test_impl,
+    expect_failure = True,
+    attrs = {
+        "expected_failure_message": attr.string(),
+    },
+    config_settings = {
+        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "98765",
+    },
+)
+
+unknown_override_api_level_failure_test = analysistest.make(
+    _failure_test_impl,
+    expect_failure = True,
+    attrs = {
+        "expected_failure_message": attr.string(),
+    },
+    config_settings = {
+        "@fuchsia_sdk//fuchsia:fuchsia_api_level": "123456",
+    },
+)

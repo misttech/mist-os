@@ -3,8 +3,8 @@
 # found in the LICENSE file.
 
 load("@fuchsia_sdk//fuchsia:defs.bzl", "get_fuchsia_api_levels")
-load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test")
-load("//fuchsia/packaging:common_utils.bzl", "failure_test")
+load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test", "no_repo_default_api_level_fuchsia_package_checker_test", "repo_default_api_level_next_fuchsia_package_checker_test", "repo_default_unknown_and_override_next_api_level_fuchsia_package_checker_test", "repo_default_unknown_api_level_fuchsia_package_checker_test")
+load("//fuchsia/packaging:common_utils.bzl", "failure_test", "no_repo_default_api_level_failure_test", "unknown_override_api_level_failure_test", "unknown_repo_default_api_level_failure_test")
 load("//test_utils:api_levels.bzl", "some_valid_numerical_api_level_as_string")
 
 NUMERICAL_LEVEL_ABI_REVISION = [
@@ -23,6 +23,13 @@ HEAD_ABI_REVISION = [
     level.abi_revision
     for level in get_fuchsia_api_levels()
     if level.api_level == "HEAD"
+][0]
+
+REPO_DEFAULT_ABI_REVISION = [
+    level.abi_revision
+    for level in get_fuchsia_api_levels()
+    # TODO(https://fxbug.dev/354047162): Figure out a way to automate the API level name.
+    if level.api_level == "15"
 ][0]
 
 # Values used in tests of `pkg_for_test` and variantes for different levels.
@@ -86,6 +93,22 @@ test_suite(
         # error does not occur during the transition.
         # ":pkg_at_unknown_numerical_api_level_test",
         # ":pkg_at_lowercase_next_api_level_test",
+        ":pkg_at_next_api_level_and_no_repo_default",
+        ":pkg_at_next_api_level_and_unknown_repo_default",
+        ":override_api_level_overrides_unknown_repo_default",
+        ":override_api_level_overrides_unknown_package_and_repo_default",
+
+        # TODO(https://fxbug.dev/354047162): Update repo default to a supported level and enable.
+        # ":pkg_without_api_level_and_some_supported_repo_default",
+        ":pkg_without_api_level_and_repo_default_next",
+
+        # This test fails as expected but during the transition, which avoids expect_failure.
+        # TODO(https://fxbug.dev/354047162): Enable once the error is not during the transition.
+        # ":failure_test_pkg_without_api_level_and_no_repo_default",
+
+        # TODO(https://fxbug.dev/354047162): Enable two once the error is not during the transition.
+        # ":failure_test_pkg_without_api_level_and_unknown_repo_default",
+        # ":failure_test_pkg_at_next_api_level_with_unknown_override_api_level",
     ],
     visibility = ["//visibility:public"],
 )
@@ -327,4 +350,118 @@ failure_test(
     expected_failure_message = "No metadata found for API level:  next",
     tags = ["manual"],
     target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_at_lowercase_next_api_level",
+)
+
+no_repo_default_api_level_fuchsia_package_checker_test(
+    name = "pkg_at_next_api_level_and_no_repo_default",
+    size = "small",
+    expected_abi_revision = NEXT_ABI_REVISION,
+
+    # With ":cc_component", this test would fail if artifacts for "NEXT" have not been built.
+    # TODO(https://fxbug.dev/382560521): Only run this test when that is the
+    # case and remove `_without_cc_component`/`_WITHOUT_CC_COMPONENT` below.
+    expected_blobs_to_file_names = EXPECTED_BLOBS_IN_PKG_WITHOUT_CC_COMPONENT,
+    manifests = MANIFESTS_FOR_PKG_WITHOUT_CC_COMPONENT,
+    structured_config_files = STRUCTURED_CONFIG_FILES,
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_at_next_api_level_without_cc_component",
+)
+
+repo_default_unknown_api_level_fuchsia_package_checker_test(
+    name = "pkg_at_next_api_level_and_unknown_repo_default",
+    size = "small",
+    expected_abi_revision = NEXT_ABI_REVISION,
+
+    # With ":cc_component", this test would fail if artifacts for "NEXT" have not been built.
+    # TODO(https://fxbug.dev/382560521): Only run this test when that is the
+    # case and remove `_without_cc_component`/`_WITHOUT_CC_COMPONENT` below.
+    expected_blobs_to_file_names = EXPECTED_BLOBS_IN_PKG_WITHOUT_CC_COMPONENT,
+    manifests = MANIFESTS_FOR_PKG_WITHOUT_CC_COMPONENT,
+    structured_config_files = STRUCTURED_CONFIG_FILES,
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_at_next_api_level_without_cc_component",
+)
+
+repo_default_unknown_and_override_next_api_level_fuchsia_package_checker_test(
+    name = "override_api_level_overrides_unknown_repo_default",
+    size = "small",
+    expected_abi_revision = NEXT_ABI_REVISION,
+
+    # With ":cc_component", this test would fail if artifacts for "NEXT" have not been built.
+    # TODO(https://fxbug.dev/382560521): Only run this test when that is the
+    # case and remove `_without_cc_component`/`_WITHOUT_CC_COMPONENT` below.
+    expected_blobs_to_file_names = EXPECTED_BLOBS_IN_PKG_WITHOUT_CC_COMPONENT,
+    manifests = MANIFESTS_FOR_PKG_WITHOUT_CC_COMPONENT,
+    structured_config_files = STRUCTURED_CONFIG_FILES,
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_without_api_level_without_cc_component",
+)
+
+repo_default_unknown_and_override_next_api_level_fuchsia_package_checker_test(
+    name = "override_api_level_overrides_unknown_package_and_repo_default",
+    size = "small",
+    expected_abi_revision = NEXT_ABI_REVISION,
+
+    # With ":cc_component", this test would fail if artifacts for "NEXT" have not been built.
+    # TODO(https://fxbug.dev/382560521): Only run this test when that is the
+    # case and remove `_without_cc_component`/`_WITHOUT_CC_COMPONENT` below.
+    expected_blobs_to_file_names = EXPECTED_BLOBS_IN_PKG_WITHOUT_CC_COMPONENT,
+    manifests = MANIFESTS_FOR_PKG_WITHOUT_CC_COMPONENT,
+    structured_config_files = STRUCTURED_CONFIG_FILES,
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_at_unknown_numerical_api_level_without_cc_component",
+)
+
+# The test workspace has a default API level, which will be used.
+fuchsia_package_checker_test(
+    name = "pkg_without_api_level_and_some_supported_repo_default",
+
+    # With ":cc_component", this test would fail if artifacts for the API level
+    # the level specified in `//build/bazel_sdk/tests/.bazelrc` have not been built.
+    # TODO(https://fxbug.dev/382560521): Only run this test when that is the
+    # case and remove `_without_cc_component`/`_WITHOUT_CC_COMPONENT` below.
+    package_name = "pkg_without_api_level_without_cc_component_for_test",
+    size = "small",
+    expected_abi_revision = REPO_DEFAULT_ABI_REVISION,
+    expected_blobs_to_file_names = EXPECTED_BLOBS_IN_PKG_WITHOUT_CC_COMPONENT,
+    manifests = MANIFESTS_FOR_PKG_WITHOUT_CC_COMPONENT,
+    package_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_without_api_level_without_cc_component",
+    structured_config_files = STRUCTURED_CONFIG_FILES,
+)
+
+repo_default_api_level_next_fuchsia_package_checker_test(
+    name = "pkg_without_api_level_and_repo_default_next",
+    size = "small",
+    expected_abi_revision = NEXT_ABI_REVISION,
+
+    # With ":cc_component", this test would fail if artifacts for "NEXT" have not been built.
+    # TODO(https://fxbug.dev/382560521): Only run this test when that is the
+    # case and remove `_without_cc_component`/`_WITHOUT_CC_COMPONENT` below.
+    expected_blobs_to_file_names = EXPECTED_BLOBS_IN_PKG_WITHOUT_CC_COMPONENT,
+    manifests = MANIFESTS_FOR_PKG_WITHOUT_CC_COMPONENT,
+    structured_config_files = STRUCTURED_CONFIG_FILES,
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_without_api_level_without_cc_component",
+)
+
+no_repo_default_api_level_failure_test(
+    name = "failure_test_pkg_without_api_level_and_no_repo_default",
+    expected_failure_message = '\'pkg_without_api_level_for_test\' does not have a valid API level set. Valid API levels are ["',
+    tags = ["manual"],
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_without_api_level",
+)
+
+unknown_repo_default_api_level_failure_test(
+    name = "failure_test_pkg_without_api_level_and_unknown_repo_default",
+
+    # TODO(https://fxbug.dev/354047162): Make the error as follows:
+    # expected_failure_message = 'ERROR: "98765" is not an API level supported by this SDK. API level should be one of ["',
+    expected_failure_message = "No metadata found for API level:  98765",
+    tags = ["manual"],
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_without_api_level",
+)
+
+unknown_override_api_level_failure_test(
+    name = "failure_test_pkg_at_next_api_level_with_unknown_override_api_level",
+
+    # TODO(https://fxbug.dev/354047162): Make the error as follows:
+    # expected_failure_message = 'ERROR: "123456" is not an API level supported by this SDK. API level should be one of ["',
+    expected_failure_message = "No metadata found for API level:  123456",
+    tags = ["manual"],
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_at_next_api_level",
 )
