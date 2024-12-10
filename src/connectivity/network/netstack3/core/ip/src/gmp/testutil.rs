@@ -172,6 +172,10 @@ impl gmp::v2::ProtocolConfig for FakeGmpConfig {
     fn query_response_interval(&self) -> NonZeroDuration {
         gmp::v2::DEFAULT_QUERY_RESPONSE_INTERVAL
     }
+
+    fn unsolicited_report_interval(&self) -> NonZeroDuration {
+        gmp::v2::DEFAULT_UNSOLICITED_REPORT_INTERVAL
+    }
 }
 
 pub(super) type FakeCtx<I> = CtxPair<FakeGmpContext<I>, FakeGmpBindingsContext<I>>;

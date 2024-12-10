@@ -297,7 +297,7 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
             GmpMode::V1 { compat: _ } => {
                 v1::join_group(&mut core_ctx, bindings_ctx, device, group_addr, state)
             }
-            GmpMode::V2 => v2::join_group(&mut core_ctx, bindings_ctx, device, group_addr, state),
+            GmpMode::V2 => v2::join_group(bindings_ctx, group_addr, state),
         })
     }
 
@@ -311,7 +311,7 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
             GmpMode::V1 { compat: _ } => {
                 v1::leave_group(&mut core_ctx, bindings_ctx, device, group_addr, state)
             }
-            GmpMode::V2 => v2::leave_group(&mut core_ctx, bindings_ctx, device, group_addr, state),
+            GmpMode::V2 => v2::leave_group(bindings_ctx, group_addr, state),
         })
     }
 }
@@ -391,7 +391,7 @@ impl<I: Ip> From<v2::TimerId<I>> for TimerIdInner<I> {
 pub struct GmpState<I: Ip, BT: GmpBindingsTypes> {
     timers: LocalTimerHeap<TimerIdInner<I>, (), BT>,
     mode: GmpMode,
-    v2_proto: v2::ProtocolState,
+    v2_proto: v2::ProtocolState<I>,
 }
 
 // NB: This block is not bound on GmpBindingsContext because we don't need
@@ -492,7 +492,6 @@ impl<I: Ip, BT: GmpBindingsTypes> GmpGroupState<I, BT> {
     }
 
     /// Like [`GmpGroupState::v2_mut`] but returns a non mutable borrow.
-    #[cfg(test)]
     fn v2(&self) -> &v2::GroupState<I> {
         match &self.version_specific {
             GmpGroupStateByVersion::V2(v2) => v2,
@@ -510,6 +509,19 @@ impl<I: Ip, BT: GmpBindingsTypes> GmpGroupState<I, BT> {
         match version_specific {
             GmpGroupStateByVersion::V1(v1) => v1,
             GmpGroupStateByVersion::V2(_) => panic!("expected GMP v1"),
+        }
+    }
+
+    /// Equivalent to [`GmpGroupState::v2_mut`] but drops all remaining state.
+    ///
+    /// # Panics
+    ///
+    /// See [`GmpGroupState::v2`].
+    fn into_v2(self) -> v2::GroupState<I> {
+        let Self { version_specific } = self;
+        match version_specific {
+            GmpGroupStateByVersion::V2(v2) => v2,
+            GmpGroupStateByVersion::V1(_) => panic!("expected GMP v2"),
         }
     }
 
@@ -806,6 +818,7 @@ impl<A: IpAddress> QueryTarget<A> {
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
+    use core::num::NonZeroU8;
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
@@ -936,9 +949,11 @@ mod tests {
     fn disable_clears_v2_state<I: TestIpExt>() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
             testutil::new_context_with_mode::<I>(GmpMode::V1 { compat: false });
-        let v2::ProtocolState { robustness_variable, query_interval } = &mut core_ctx.gmp.v2_proto;
+        let v2::ProtocolState { robustness_variable, query_interval, left_groups } =
+            &mut core_ctx.gmp.v2_proto;
         *robustness_variable = robustness_variable.checked_add(1).unwrap();
         *query_interval = *query_interval + Duration::from_secs(20);
+        *left_groups = [(I::GROUP_ADDR1, NonZeroU8::new(1).unwrap())].into_iter().collect();
         core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
         assert_eq!(core_ctx.gmp.v2_proto, v2::ProtocolState::default());
     }

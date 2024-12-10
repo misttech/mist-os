@@ -397,6 +397,10 @@ impl gmp::v2::ProtocolConfig for MldConfig {
     fn query_response_interval(&self) -> NonZeroDuration {
         gmp::v2::DEFAULT_QUERY_RESPONSE_INTERVAL
     }
+
+    fn unsolicited_report_interval(&self) -> NonZeroDuration {
+        gmp::v2::DEFAULT_UNSOLICITED_REPORT_INTERVAL
+    }
 }
 
 /// An MLD timer to delay the sending of a report.

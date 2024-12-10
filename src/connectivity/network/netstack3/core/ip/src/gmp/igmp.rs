@@ -681,6 +681,10 @@ impl gmp::v2::ProtocolConfig for IgmpConfig {
     fn query_response_interval(&self) -> NonZeroDuration {
         gmp::v2::DEFAULT_QUERY_RESPONSE_INTERVAL
     }
+
+    fn unsolicited_report_interval(&self) -> NonZeroDuration {
+        gmp::v2::DEFAULT_UNSOLICITED_REPORT_INTERVAL
+    }
 }
 
 #[cfg(test)]
