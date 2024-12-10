@@ -5,7 +5,7 @@
 use super::{missing, syntax_error, MetricValue};
 use crate::config::{DataFetcher, DiagnosticData, Source};
 use anyhow::{anyhow, bail, Context, Error, Result};
-use diagnostics_hierarchy::{DiagnosticsHierarchy, SelectResult};
+use diagnostics_hierarchy::DiagnosticsHierarchy;
 use fidl_fuchsia_diagnostics::Selector;
 use fidl_fuchsia_inspect::DEFAULT_TREE_NAME;
 use moniker::ExtendedMoniker;
@@ -22,14 +22,14 @@ use std::sync::LazyLock;
 /// [Fetcher] is a source of values to feed into the calculations. It may contain data either
 /// from snapshot.zip files (e.g. inspect.json data that can be accessed via "select" entries)
 /// or supplied in the specification of a trial.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Fetcher<'a> {
     FileData(FileDataFetcher<'a>),
     TrialData(TrialDataFetcher<'a>),
 }
 
 /// [FileDataFetcher] contains fetchers for data in snapshot.zip files.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct FileDataFetcher<'a> {
     pub inspect: &'a InspectFetcher,
     pub syslog: &'a TextFetcher,
@@ -96,7 +96,7 @@ impl<'a> FileDataFetcher<'a> {
 
 /// [TrialDataFetcher] stores the key-value lookup for metric names whose values are given as
 /// part of a trial (under the "test" section of the .triage files).
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct TrialDataFetcher<'a> {
     values: &'a HashMap<String, JsonValue>,
     pub(crate) klog: &'a TextFetcher,
@@ -218,7 +218,7 @@ impl ComponentInspectInfo {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct KeyValueFetcher {
     pub map: JsonMap<String, JsonValue>,
 }
@@ -264,7 +264,7 @@ impl KeyValueFetcher {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct TextFetcher {
     pub lines: Vec<String>,
 }
@@ -291,7 +291,7 @@ impl TextFetcher {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct InspectFetcher {
     pub components: Vec<ComponentInspectInfo>,
     pub component_errors: Vec<anyhow::Error>,
@@ -384,48 +384,28 @@ impl InspectFetcher {
     }
 
     fn try_fetch(&self, selector_string: &SelectorString) -> Result<Vec<MetricValue>, Error> {
-        let mut intermediate_results = Vec::new();
+        let mut properties = Vec::new();
         let mut found_component = false;
-        for component in &self.components {
+        for component in self.components.iter() {
             if !component.matches_selector(&selector_string.parsed_selector) {
                 continue;
             }
             found_component = true;
             let selector = selector_string.parsed_selector.clone();
-            intermediate_results.push(diagnostics_hierarchy::select_from_hierarchy(
-                &component.processed_data,
-                &selector,
-            )?);
+            for property in
+                diagnostics_hierarchy::select_from_hierarchy(&component.processed_data, &selector)?
+                    .into_iter()
+            {
+                properties.push(property.clone())
+            }
         }
-
         if !found_component {
             return Ok(vec![missing(format!(
                 "No component found matching selector {}",
                 selector_string.body,
             ))]);
         }
-
-        let mut result = vec![];
-        for r in intermediate_results {
-            match r {
-                SelectResult::Properties(p) => {
-                    result.extend(p.into_iter().cloned().map(MetricValue::from))
-                }
-                SelectResult::Nodes(n) => {
-                    for node in n {
-                        for _ in &node.children {
-                            result.push(MetricValue::Node);
-                        }
-
-                        for prop in &node.properties {
-                            result.push(MetricValue::from(prop.clone()));
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(result)
+        Ok(properties.into_iter().map(MetricValue::from).collect())
     }
 
     pub fn fetch(&self, selector: &SelectorString) -> Vec<MetricValue> {

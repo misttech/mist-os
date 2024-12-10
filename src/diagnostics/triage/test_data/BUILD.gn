@@ -18,7 +18,6 @@ if (is_host) {
   triage_config_test("triage_sample_config_test") {
     sources = [
       "annotation_tests.triage",
-      "count_test.triage",
       "error_rate.triage",
       "log_tests.triage",
       "map_fold.triage",

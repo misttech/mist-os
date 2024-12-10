@@ -5,7 +5,7 @@
     eval: {
         // The timestamps output by OMCL are monontonic time, and Now() is as well.
         last_24_hours: "Fn([time], time > Now() - Hours(24))",
-        installation_errors_today: "CountProperties(Filter(last_24_hours, installation_error_timestamps))",
+        installation_errors_today: "Count(Filter(last_24_hours, installation_error_timestamps))",
     },
     act: {
         installation_error_today: {

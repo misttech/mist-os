@@ -286,8 +286,6 @@ fn function_name_parser(i: ParsingContext<'_>) -> ParsingResult<'_, Function> {
             function!("Any", Any),
             function!("Filter", Filter),
             function!("Apply", Apply),
-            function!("CountChildren", CountChildren),
-            function!("CountProperties", CountProperties),
             function!("Count", Count),
             function!("Nanos", Nanos),
             function!("Micros", Micros),

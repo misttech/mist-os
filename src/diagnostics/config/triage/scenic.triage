@@ -14,7 +14,7 @@
         ],
     },
     eval: {
-        measurement_count: "CountProperties(sample_array)",
+        measurement_count: "Count(sample_array)",
 
         // We measure over 10 minutes.
         measurement_period_seconds: "60 * measurement_count",

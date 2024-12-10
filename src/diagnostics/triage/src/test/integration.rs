@@ -417,30 +417,3 @@ integration_test!(
     1,
     "looks like a bundle, but key file2 must contain a string"
 );
-
-integration_test!(
-    count_function_works_on_node_selector,
-    vec!["count_test.triage"],
-    vec![],
-    vec![],
-    1,
-    "foo count is 3"
-);
-
-integration_test!(
-    count_function_works_on_property_selector,
-    vec!["count_test.triage"],
-    vec![],
-    vec![],
-    1,
-    "property_2 count is 2"
-);
-
-integration_test!(
-    child_count_function_works,
-    vec!["count_test.triage"],
-    vec![],
-    vec![],
-    1,
-    "foo child count is 2"
-);

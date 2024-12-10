@@ -717,14 +717,14 @@
             "filter_ok4": {
                 "metric": {
                     "Eval": {
-                        "raw_expression": "Missing(CountProperties(with_missing_element))",
+                        "raw_expression": "Missing(Count(with_missing_element))",
                         "parsed_expression": {
                             "Function": [
                                 "Missing",
                                 [
                                     {
                                         "Function": [
-                                            "CountProperties",
+                                            "Count",
                                             [
                                                 {
                                                     "Variable": {
@@ -1001,7 +1001,7 @@
             "count_with_missing": {
                 "metric": {
                     "Eval": {
-                        "raw_expression": "Fn([v], CountProperties(Map(Fn([a], Missing(a)), v)))",
+                        "raw_expression": "Fn([v], Count(Map(Fn([a], Missing(a)), v)))",
                         "parsed_expression": {
                             "Function": [
                                 "Lambda",
@@ -1017,7 +1017,7 @@
                                     },
                                     {
                                         "Function": [
-                                            "CountProperties",
+                                            "Count",
                                             [
                                                 {
                                                     "Function": [
@@ -1074,7 +1074,7 @@
                         ],
                         "body": {
                             "Function": [
-                                "CountProperties",
+                                "Count",
                                 [
                                     {
                                         "Function": [
@@ -1125,14 +1125,14 @@
             "count_ok3": {
                 "metric": {
                     "Eval": {
-                        "raw_expression": "Problem(CountProperties(5))",
+                        "raw_expression": "Problem(Count(5))",
                         "parsed_expression": {
                             "Function": [
                                 "Problem",
                                 [
                                     {
                                         "Function": [
-                                            "CountProperties",
+                                            "Count",
                                             [
                                                 {
                                                     "Value": {
@@ -1277,14 +1277,14 @@
             "count_ok2": {
                 "metric": {
                     "Eval": {
-                        "raw_expression": "CountProperties([]) == 0",
+                        "raw_expression": "Count([]) == 0",
                         "parsed_expression": {
                             "Function": [
                                 "Equals",
                                 [
                                     {
                                         "Function": [
-                                            "CountProperties",
+                                            "Count",
                                             [
                                                 {
                                                     "Vector": []
@@ -1309,14 +1309,14 @@
             "count_ok1": {
                 "metric": {
                     "Eval": {
-                        "raw_expression": "CountProperties([1, 'b', 2 == 2]) == 3",
+                        "raw_expression": "Count([1, 'b', 2 == 2]) == 3",
                         "parsed_expression": {
                             "Function": [
                                 "Equals",
                                 [
                                     {
                                         "Function": [
-                                            "CountProperties",
+                                            "Count",
                                             [
                                                 {
                                                     "Vector": [
@@ -1966,14 +1966,14 @@
             "count_ok4": {
                 "metric": {
                     "Eval": {
-                        "raw_expression": "Problem(CountProperties([1, 'b', 2 == 2, missing]))",
+                        "raw_expression": "Problem(Count([1, 'b', 2 == 2, missing]))",
                         "parsed_expression": {
                             "Function": [
                                 "Problem",
                                 [
                                     {
                                         "Function": [
-                                            "CountProperties",
+                                            "Count",
                                             [
                                                 {
                                                     "Vector": [
