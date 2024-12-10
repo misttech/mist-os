@@ -32,6 +32,14 @@
 
 #include "private.h"
 
+namespace ktl::ranges {
+
+using std::ranges::copy;
+
+}
+
+#include <algorithm>
+
 #include <ktl/enforce.h>
 
 #define LOCAL_TRACE STARNIX_KERNEL_RUNNER_GLOBAL_TRACE(0)
@@ -134,7 +142,7 @@ fit::result<Error, Container> create_container(const Config& config) {
       argv.push_back(DEFAULT_INIT, &ac);
       ZX_ASSERT(ac.check());
     } else {
-      ktl::copy(config.init.begin(), config.init.end(), util::back_inserter(argv));
+      ktl::ranges::copy(config.init, util::back_inserter(argv));
     }
     return ktl::move(argv);
   }();
