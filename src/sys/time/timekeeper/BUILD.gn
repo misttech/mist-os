@@ -23,12 +23,14 @@ timekeeper_deps = [
   ":timekeeper-config",
   "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
   "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+  "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_rust",
   "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_rust",
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
   "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
   "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
   "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
+  "//sdk/fidl/fuchsia.time.alarms:fuchsia.time.alarms_rust",
   "//sdk/fidl/fuchsia.time.external:fuchsia.time.external_rust",
   "//sdk/fidl/fuchsia.time.test:fuchsia.time.test_rust",
   "//sdk/lib/device-watcher/rust",
@@ -61,6 +63,7 @@ timekeeper_deps = [
 ]
 
 timekeeper_sources = [
+  "src/alarms/mod.rs",
   "src/clock_manager.rs",
   "src/diagnostics/cobalt.rs",
   "src/diagnostics/composite.rs",
