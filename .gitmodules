@@ -13,26 +13,6 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/KhronosGroup/OpenCL-ICD-Loader
 	name = third_party/OpenCL-ICD-Loader
 	ignore = all
-[submodule "third_party/Vulkan-Headers"]
-	path = third_party/Vulkan-Headers
-	url = https://fuchsia.googlesource.com/third_party/Vulkan-Headers
-	name = third_party/Vulkan-Headers
-	ignore = all
-[submodule "third_party/Vulkan-Loader"]
-	path = third_party/Vulkan-Loader
-	url = https://fuchsia.googlesource.com/third_party/Vulkan-Loader
-	name = third_party/Vulkan-Loader
-	ignore = all
-[submodule "third_party/Vulkan-Tools"]
-	path = third_party/Vulkan-Tools
-	url = https://fuchsia.googlesource.com/third_party/Vulkan-Tools
-	name = third_party/Vulkan-Tools
-	ignore = all
-[submodule "third_party/Vulkan-ValidationLayers"]
-	path = third_party/Vulkan-ValidationLayers
-	url = https://fuchsia.googlesource.com/third_party/Vulkan-ValidationLayers
-	name = third_party/Vulkan-ValidationLayers
-	ignore = all
 [submodule "third_party/abseil-cpp"]
 	path = third_party/abseil-cpp
 	url = https://fuchsia.googlesource.com/third_party/abseil-cpp
@@ -197,11 +177,6 @@
 	path = third_party/glog
 	url = https://fuchsia.googlesource.com/third_party/glog
 	name = third_party/glog
-	ignore = all
-[submodule "third_party/glslang"]
-	path = third_party/glslang
-	url = https://fuchsia.googlesource.com/third_party/glslang
-	name = third_party/glslang
 	ignore = all
 [submodule "third_party/go"]
 	path = third_party/go
@@ -427,26 +402,6 @@
 	path = third_party/scudo/src
 	url = https://llvm.googlesource.com/scudo
 	name = scudo
-	ignore = all
-[submodule "third_party/shaderc"]
-	path = third_party/shaderc
-	url = https://fuchsia.googlesource.com/third_party/shaderc
-	name = third_party/shaderc
-	ignore = all
-[submodule "third_party/spirv-cross"]
-	path = third_party/spirv-cross
-	url = https://fuchsia.googlesource.com/third_party/spirv-cross
-	name = third_party/spirv-cross
-	ignore = all
-[submodule "third_party/spirv-headers"]
-	path = third_party/spirv-headers
-	url = https://fuchsia.googlesource.com/third_party/spirv-headers
-	name = third_party/spirv-headers
-	ignore = all
-[submodule "third_party/spirv-tools"]
-	path = third_party/spirv-tools
-	url = https://fuchsia.googlesource.com/third_party/spirv-tools
-	name = third_party/spirv-tools
 	ignore = all
 [submodule "third_party/syzkaller"]
 	path = third_party/syzkaller
@@ -725,4 +680,49 @@
 	path = third_party/pylibs/pyflakes/src
 	url = https://fuchsia.googlesource.com/third_party/github.com/PyCQA/pyflakes
 	name = third_party/pylibs/pyflakes
+	ignore = all
+[submodule "third_party/Vulkan-Headers/src"]
+	path = third_party/Vulkan-Headers/src
+	url = https://fuchsia.googlesource.com/third_party/Vulkan-Headers
+	name = third_party/Vulkan-Headers
+	ignore = all
+[submodule "third_party/Vulkan-Loader/src"]
+	path = third_party/Vulkan-Loader/src
+	url = https://fuchsia.googlesource.com/third_party/Vulkan-Loader
+	name = third_party/Vulkan-Loader
+	ignore = all
+[submodule "third_party/Vulkan-Tools/src"]
+	path = third_party/Vulkan-Tools/src
+	url = https://fuchsia.googlesource.com/third_party/Vulkan-Tools
+	name = third_party/Vulkan-Tools
+	ignore = all
+[submodule "third_party/Vulkan-ValidationLayers/src"]
+	path = third_party/Vulkan-ValidationLayers/src
+	url = https://fuchsia.googlesource.com/third_party/Vulkan-ValidationLayers
+	name = third_party/Vulkan-ValidationLayers
+	ignore = all
+[submodule "third_party/glslang/src"]
+	path = third_party/glslang/src
+	url = https://fuchsia.googlesource.com/third_party/glslang
+	name = third_party/glslang
+	ignore = all
+[submodule "third_party/shaderc/src"]
+	path = third_party/shaderc/src
+	url = https://fuchsia.googlesource.com/third_party/shaderc
+	name = third_party/shaderc
+	ignore = all
+[submodule "third_party/spirv-cross/src"]
+	path = third_party/spirv-cross/src
+	url = https://fuchsia.googlesource.com/third_party/spirv-cross
+	name = third_party/spirv-cross
+	ignore = all
+[submodule "third_party/spirv-headers/src"]
+	path = third_party/spirv-headers/src
+	url = https://fuchsia.googlesource.com/third_party/spirv-headers
+	name = third_party/spirv-headers
+	ignore = all
+[submodule "third_party/spirv-tools/src"]
+	path = third_party/spirv-tools/src
+	url = https://fuchsia.googlesource.com/third_party/spirv-tools
+	name = third_party/spirv-tools
 	ignore = all
