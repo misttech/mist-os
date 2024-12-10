@@ -6,7 +6,6 @@
         {
             name: "audio_device_registry",
             url: "fuchsia-pkg://fuchsia.com/audio_device_registry#meta/audio_device_registry.cm",
-            startup: "eager",
             environment: "#core-env",
         },
     ],
