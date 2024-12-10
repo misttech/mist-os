@@ -426,7 +426,8 @@ impl<I: FidlRouteAdminIpExt> UserRouteSet<I> {
                 },
                 Err(err) => match err {
                     routes::ChangeError::TableRemoved => {
-                        warn!("the table backing this route set has been removed");
+                        // We don't care if the backing route table has been
+                        // closed; we're already closing the route set.
                     }
                     routes::ChangeError::DeviceRemoved => {
                         unreachable!("closing a route set should not require upgrading a DeviceId")
