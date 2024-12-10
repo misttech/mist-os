@@ -5,6 +5,11 @@
 #ifndef SRC_DEVICES_LIB_DMA_BUFFER_INCLUDE_LIB_DMA_BUFFER_PHYS_ITER_H_
 #define SRC_DEVICES_LIB_DMA_BUFFER_INCLUDE_LIB_DMA_BUFFER_PHYS_ITER_H_
 
+#include <zircon/assert.h>
+#include <zircon/syscalls.h>
+#include <zircon/types.h>
+
+#include <algorithm>
 #include <utility>
 
 namespace dma_buffer {
@@ -44,7 +49,7 @@ class PhysIter {
         chunk_count_{chunk_count},
         vmo_offset_{vmo_offset},
         buf_length_{buf_length},
-        max_length_{max_length},
+        max_length_{max_length == 0 ? UINT64_MAX : max_length},
         chunk_size_{chunk_size} {
     ZX_ASSERT(chunk_list_ != nullptr);
     ZX_ASSERT(chunk_count_ > 0);
