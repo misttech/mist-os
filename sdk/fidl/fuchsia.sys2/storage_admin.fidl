@@ -46,16 +46,6 @@ type DeletionError = strict enum {
 closed protocol StorageAdmin {
     /// Opens the isolated directory for the given component. The open request will provision
     /// the storage if it hasn't been already.
-    @available(removed=25)
-    strict OpenComponentStorage(resource struct {
-        relative_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-        flags fuchsia.io.OpenFlags;
-        mode fuchsia.io.ModeType;
-        object server_end:fuchsia.io.Node;
-    });
-
-    /// Opens the isolated directory for the given component. The open request will provision
-    /// the storage if it hasn't been already.
     @available(added=25)
     strict OpenStorage(resource struct {
         relative_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
@@ -93,6 +83,31 @@ closed protocol StorageAdmin {
     /// Returns fuchsia.component.Error::INTERNAL only if no storage at all could be cleared.
     /// Returns successfully even if some errors happen during the deletion progress.
     strict DeleteAllStorageContents() -> () error DeletionError;
+
+    /// [DEPRECATED - Use OpenStorage instead.]
+    ///
+    /// Opens the isolated directory for the given component. The open request will provision
+    /// the storage if it hasn't been already.
+    @available(replaced=25, renamed="DeprecatedOpenComponentStorage")
+    strict OpenComponentStorage(resource struct {
+        relative_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        flags fuchsia.io.OpenFlags;
+        mode fuchsia.io.ModeType;
+        object server_end:fuchsia.io.Node;
+    });
+
+    /// [DEPRECATED - Use OpenStorage instead.]
+    ///
+    /// Opens the isolated directory for the given component. The open request will provision
+    /// the storage if it hasn't been already.
+    @available(added=25, removed=NEXT)
+    @selector("OpenComponentStorage")
+    strict DeprecatedOpenComponentStorage(resource struct {
+        relative_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        flags fuchsia.io.OpenFlags;
+        mode fuchsia.io.ModeType;
+        object server_end:fuchsia.io.Node;
+    });
 };
 
 /// An iterator protocol for returning a set of components using a storage capability. See

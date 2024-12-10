@@ -156,11 +156,7 @@ impl StorageAdmin {
 
         while let Some(request) = stream.try_next().await? {
             match request {
-                #[cfg(any(
-                    fuchsia_api_level_less_than = "25",
-                    fuchsia_api_level_at_least = "PLATFORM"
-                ))]
-                fsys::StorageAdminRequest::OpenComponentStorage {
+                fsys::StorageAdminRequest::DeprecatedOpenComponentStorage {
                     relative_moniker,
                     flags,
                     mode,
@@ -180,7 +176,6 @@ impl StorageAdmin {
                     .await?;
                     dir_proxy.open(flags, mode, ".", object)?;
                 }
-                #[cfg(fuchsia_api_level_at_least = "25")]
                 fsys::StorageAdminRequest::OpenStorage { relative_moniker, object, responder } => {
                     let fut = async {
                         let moniker = Moniker::parse_str(&relative_moniker)

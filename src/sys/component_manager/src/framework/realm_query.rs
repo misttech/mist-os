@@ -103,11 +103,7 @@ impl RealmQuery {
                     let result = construct_namespace(&model, &scope_moniker, &moniker).await;
                     responder.send(result)
                 }
-                #[cfg(any(
-                    fuchsia_api_level_less_than = "25",
-                    fuchsia_api_level_at_least = "PLATFORM"
-                ))]
-                fsys::RealmQueryRequest::Open {
+                fsys::RealmQueryRequest::DeprecatedOpen {
                     moniker,
                     dir_type,
                     flags,
@@ -129,7 +125,6 @@ impl RealmQuery {
                     .await;
                     responder.send(result)
                 }
-                #[cfg(fuchsia_api_level_at_least = "25")]
                 fsys::RealmQueryRequest::OpenDirectory { moniker, dir_type, object, responder } => {
                     let result =
                         open_directory(&model, &scope_moniker, &moniker, dir_type, object).await;
@@ -1023,7 +1018,7 @@ mod tests {
         let (outgoing_dir, server_end) = create_endpoints::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
-            .open(
+            .deprecated_open(
                 "./",
                 fsys::OpenDirType::OutgoingDir,
                 fio::OpenFlags::empty(),
@@ -1041,7 +1036,7 @@ mod tests {
         let (runtime_dir, server_end) = create_endpoints::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
-            .open(
+            .deprecated_open(
                 "./",
                 fsys::OpenDirType::RuntimeDir,
                 fio::OpenFlags::empty(),
@@ -1059,7 +1054,7 @@ mod tests {
         let (pkg_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
-            .open(
+            .deprecated_open(
                 "./",
                 fsys::OpenDirType::PackageDir,
                 fio::OpenFlags::empty(),
@@ -1074,7 +1069,7 @@ mod tests {
         let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
-            .open(
+            .deprecated_open(
                 "./",
                 fsys::OpenDirType::ExposedDir,
                 fio::OpenFlags::empty(),
@@ -1089,7 +1084,7 @@ mod tests {
         let (svc_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
-            .open(
+            .deprecated_open(
                 "./",
                 fsys::OpenDirType::NamespaceDir,
                 fio::OpenFlags::empty(),

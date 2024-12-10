@@ -184,7 +184,7 @@ async fn setup_realm(mock_runner: Arc<MockRunner>) -> Fixture {
     let (introspector, server_end) =
         fidl::endpoints::create_proxy::<fcomponent::IntrospectorMarker>();
     realm_query
-        .open(
+        .deprecated_open(
             ".",
             fsys2::OpenDirType::ExposedDir,
             fio::OpenFlags::empty(),
@@ -198,7 +198,7 @@ async fn setup_realm(mock_runner: Arc<MockRunner>) -> Fixture {
 
     let (realm, server_end) = fidl::endpoints::create_proxy::<fcomponent::RealmMarker>();
     realm_query
-        .open(
+        .deprecated_open(
             ".",
             fsys2::OpenDirType::ExposedDir,
             fio::OpenFlags::empty(),

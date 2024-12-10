@@ -451,7 +451,7 @@ pub async fn get_runtime(
     let runtime_dir = RemoteDirectory::from_proxy(runtime_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
-        .open(
+        .deprecated_open(
             &moniker_str,
             fsys::OpenDirType::RuntimeDir,
             fio::OpenFlags::RIGHT_READABLE,
@@ -527,7 +527,7 @@ pub async fn get_outgoing_capabilities(
     let out_dir = RemoteDirectory::from_proxy(out_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
-        .open(
+        .deprecated_open(
             &moniker_str,
             fsys::OpenDirType::OutgoingDir,
             fio::OpenFlags::RIGHT_READABLE,
@@ -551,7 +551,7 @@ pub async fn get_merkle_root(
     let (meta_file, server_end) = create_proxy::<fio::FileMarker>();
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
-        .open(
+        .deprecated_open(
             &moniker_str,
             fsys::OpenDirType::PackageDir,
             fio::OpenFlags::RIGHT_READABLE,

@@ -298,7 +298,7 @@ async fn open_component_dir_for_moniker(
         _ => fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     };
     match realm_query
-        .open(&moniker, dir_type.clone(), flags, fio::ModeType::empty(), ".", server_end)
+        .deprecated_open(&moniker, dir_type.clone(), flags, fio::ModeType::empty(), ".", server_end)
         .await?
     {
         Ok(()) => Ok(dir),

@@ -703,7 +703,7 @@ mod tests {
     fn setup_fake_realm_query(capability_set: fsys::OpenDirType) -> fsys::RealmQueryProxy {
         fidl::endpoints::spawn_stream_handler(move |request: fsys::RealmQueryRequest| async move {
             match request {
-                fsys::RealmQueryRequest::Open {
+                fsys::RealmQueryRequest::DeprecatedOpen {
                     moniker,
                     dir_type,
                     flags,

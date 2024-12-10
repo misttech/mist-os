@@ -303,17 +303,6 @@ closed protocol RealmQuery {
         namespace vector<fuchsia.component.runner.ComponentNamespaceEntry>:MAX;
     }) error ConstructNamespaceError;
 
-    /// Makes an fuchsia.io.Directory/Open call on a directory in an instance.
-    @available(added=11, removed=25)
-    strict Open(resource struct {
-        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-        dir_type OpenDirType;
-        flags fuchsia.io.OpenFlags;
-        mode fuchsia.io.ModeType;
-        path string:fuchsia.io.MAX_PATH_LENGTH;
-        object server_end:fuchsia.io.Node;
-    }) -> () error OpenError;
-
     /// Opens the specified directory in an instance.
     @available(added=25)
     strict OpenDirectory(resource struct {
@@ -329,6 +318,33 @@ closed protocol RealmQuery {
         storage_name fuchsia.component.decl.name;
         server_end server_end:StorageAdmin;
     }) -> () error ConnectToStorageAdminError;
+
+    /// [DEPRECATED - Use OpenDirectory instead.]
+    ///
+    /// Makes an fuchsia.io.Directory/Open call on a directory in an instance.
+    @available(added=11, replaced=25, renamed="DeprecatedOpen")
+    strict Open(resource struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        dir_type OpenDirType;
+        flags fuchsia.io.OpenFlags;
+        mode fuchsia.io.ModeType;
+        path string:fuchsia.io.MAX_PATH_LENGTH;
+        object server_end:fuchsia.io.Node;
+    }) -> () error OpenError;
+
+    /// [DEPRECATED - Use OpenDirectory instead.]
+    ///
+    /// Makes an fuchsia.io.Directory/Open call on a directory in an instance.
+    @available(added=25, removed=NEXT)
+    @selector("Open")
+    strict DeprecatedOpen(resource struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        dir_type OpenDirType;
+        flags fuchsia.io.OpenFlags;
+        mode fuchsia.io.ModeType;
+        path string:fuchsia.io.MAX_PATH_LENGTH;
+        object server_end:fuchsia.io.Node;
+    }) -> () error OpenError;
 };
 
 /// Manages structured configuration override values for components.

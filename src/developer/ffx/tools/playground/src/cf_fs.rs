@@ -588,7 +588,7 @@ mod test {
                         let iterator = serve_instance_iterator(instances);
                         responder.send(Ok(iterator)).unwrap();
                     }
-                    sys2::RealmQueryRequest::Open {
+                    sys2::RealmQueryRequest::DeprecatedOpen {
                         moniker,
                         dir_type,
                         flags,
@@ -598,7 +598,7 @@ mod test {
                         responder,
                     } => {
                         eprintln!(
-                            "Open call for {} for {:?} at path '{}' with flags {:?}",
+                            "DeprecatedOpen call for {} for {:?} at path '{}' with flags {:?}",
                             moniker, dir_type, path, flags
                         );
                         let moniker = Moniker::parse_str(&moniker).unwrap().to_string();

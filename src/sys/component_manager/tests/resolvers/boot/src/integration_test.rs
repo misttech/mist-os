@@ -103,7 +103,7 @@ async fn boot_resolver_can_be_routed_from_component_manager() {
     let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>();
     let server_end = server_end.into_channel().into();
     realm_query
-        .open(
+        .deprecated_open(
             ".",
             fsys::OpenDirType::ExposedDir,
             fio::OpenFlags::empty(),

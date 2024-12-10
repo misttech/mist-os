@@ -739,6 +739,16 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.sys2/RealmQuery.DeprecatedOpen",
+        "strictness": "strict",
+        "ordinal": "300145885525636112",
+        "direction": "two_way",
+        "request": "fuchsia.sys2/RealmQueryDeprecatedOpenRequest",
+        "response": "fuchsia.sys2/RealmQuery_DeprecatedOpen_Response",
+        "error": "fuchsia.sys2/OpenError"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.sys2/RealmQuery.GetAllInstances",
         "strictness": "strict",
         "ordinal": "8888565754690841927",
@@ -834,6 +844,47 @@
     {
         "kind": "struct",
         "name": "fuchsia.sys2/RealmQueryConstructNamespaceRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys2/RealmQueryDeprecatedOpenRequest.dir_type",
+        "ordinal": "2",
+        "type": "fuchsia.sys2/OpenDirType"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys2/RealmQueryDeprecatedOpenRequest.flags",
+        "ordinal": "3",
+        "type": "fuchsia.io/OpenFlags"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys2/RealmQueryDeprecatedOpenRequest.mode",
+        "ordinal": "4",
+        "type": "fuchsia.io/ModeType"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys2/RealmQueryDeprecatedOpenRequest.moniker",
+        "ordinal": "1",
+        "type": "string:4096"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys2/RealmQueryDeprecatedOpenRequest.object",
+        "ordinal": "6",
+        "type": "server_end:fuchsia.io/Node"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys2/RealmQueryDeprecatedOpenRequest.path",
+        "ordinal": "5",
+        "type": "string:4095"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys2/RealmQueryDeprecatedOpenRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "enum/member",
@@ -1353,6 +1404,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.sys2/StorageAdmin.DeprecatedOpenComponentStorage",
+        "strictness": "strict",
+        "ordinal": "4468298420184115997",
+        "direction": "one_way",
+        "request": "fuchsia.sys2/StorageAdminDeprecatedOpenComponentStorageRequest"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.sys2/StorageAdmin.GetStatus",
         "strictness": "strict",
         "ordinal": "8586643915409794760",
@@ -1405,6 +1464,35 @@
     {
         "kind": "struct",
         "name": "fuchsia.sys2/StorageAdminDeleteComponentStorageRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys2/StorageAdminDeprecatedOpenComponentStorageRequest.flags",
+        "ordinal": "2",
+        "type": "fuchsia.io/OpenFlags"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys2/StorageAdminDeprecatedOpenComponentStorageRequest.mode",
+        "ordinal": "3",
+        "type": "fuchsia.io/ModeType"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys2/StorageAdminDeprecatedOpenComponentStorageRequest.object",
+        "ordinal": "4",
+        "type": "server_end:fuchsia.io/Node"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys2/StorageAdminDeprecatedOpenComponentStorageRequest.relative_moniker",
+        "ordinal": "1",
+        "type": "string:4096"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys2/StorageAdminDeprecatedOpenComponentStorageRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
