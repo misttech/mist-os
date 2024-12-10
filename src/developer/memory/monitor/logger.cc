@@ -50,8 +50,8 @@ void Logger::Log() {
   memory::TextPrinter p(oss);
 
   p.PrintDigest(d);
-  auto str = oss.str();
-  std::replace(str.begin(), str.end(), '\n', ' ');
+  auto str = std::move(oss).str();
+  std::ranges::replace(str, '\n', ' ');
   FX_LOGS(INFO) << str;
 
   task_.PostDelayed(dispatcher_, duration_);

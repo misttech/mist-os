@@ -148,7 +148,7 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
           [this](const Capture& c, Digest* d) { GetDigest(c, d); }, &config_),
       level_(pressure_signaler::Level::kNumLevels) {
   auto bucket_matches = CreateBucketMatchesFromConfigData();
-  digester_ = std::make_unique<Digester>(Digester(bucket_matches));
+  digester_ = std::make_unique<Digester>(bucket_matches);
   high_water_ = std::make_unique<HighWater>(
       "/cache", kHighWaterPollFrequency, kHighWaterThreshold, dispatcher_,
       [this](Capture* c, CaptureLevel l) { return capture_maker_->GetCapture(c, l); },

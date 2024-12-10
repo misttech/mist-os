@@ -164,7 +164,7 @@ StarnixCaptureStrategy::Finalize(OS& os) {
         starnix_kernel_cutoff = mapping.base + mapping.size;
       }
       if (mapping.type == ZX_INFO_MAPS_TYPE_MAPPING) {
-        if (koid_to_vmo_.find(mapping.u.mapping.vmo_koid) == koid_to_vmo_.end()) {
+        if (!koid_to_vmo_.contains(mapping.u.mapping.vmo_koid)) {
           // It is a new VMO that we haven't captured. This can happen if the list of VMOs change
           // while we do the data collection.
           continue;

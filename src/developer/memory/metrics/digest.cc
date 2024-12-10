@@ -6,17 +6,15 @@
 
 #include <lib/trace/event.h>
 
+#include <ranges>
+
 #include "src/developer/memory/metrics/bucket_match.h"
 
 namespace memory {
 Digest::Digest(const Capture& capture, Digester* digester) { digester->Digest(capture, this); }
 
-Digester::Digester(const std::vector<BucketMatch>& bucket_matches) {
-  bucket_matches_.reserve(bucket_matches.size());
-  for (const auto& bucket_match : bucket_matches) {
-    bucket_matches_.emplace_back(bucket_match);
-  }
-}
+Digester::Digester(const std::vector<BucketMatch>& bucket_matches)
+    : bucket_matches_(bucket_matches) {}
 
 void Digester::Digest(const Capture& capture, class Digest* digest) {
   TRACE_DURATION("memory_metrics", "Digester::Digest");
@@ -48,8 +46,8 @@ void Digester::Digest(const Capture& capture, class Digest* digest) {
     }
   }
 
-  std::sort(digest->buckets_.begin(), digest->buckets_.end(),
-            [](const Bucket& a, const Bucket& b) { return a.size() > b.size(); });
+  std::ranges::sort(digest->buckets_,
+                    [](const Bucket& a, const Bucket& b) { return a.size() > b.size(); });
   FractionalBytes undigested_size{};
   for (auto v : digest->undigested_vmos_) {
     undigested_size += capture.vmo_for_koid(v).committed_bytes;
