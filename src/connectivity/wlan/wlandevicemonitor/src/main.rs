@@ -10,46 +10,16 @@ mod watchable_map;
 mod watcher_service;
 
 use anyhow::Error;
-use fuchsia_async as fasync;
-use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
+use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{Inspector, InspectorConfig};
 use futures::channel::mpsc;
 use futures::future::{try_join4, BoxFuture};
-use futures::{StreamExt, TryFutureExt};
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use std::sync::Arc;
 use tracing::{error, info};
+use {fidl_fuchsia_wlan_device_service as fidl_svc, fuchsia_async as fasync};
 
 const PHY_PATH: &str = "/dev/class/wlanphy";
-
-#[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
-async fn serve_fidl(
-    mut fs: ServiceFs<ServiceObjLocal<'_, ()>>,
-    phys: Arc<device::PhyMap>,
-    ifaces: Arc<device::IfaceMap>,
-    watcher_service: watcher_service::WatcherService<device::PhyDevice, device::IfaceDevice>,
-    new_iface_sink: mpsc::UnboundedSender<device::NewIface>,
-    iface_counter: Arc<service::IfaceCounter>,
-    ifaces_tree: Arc<inspect::IfacesTree>,
-    cfg: wlandevicemonitor_config::Config,
-) -> Result<(), Error> {
-    fs.dir("svc").add_fidl_service(move |reqs| {
-        let fut = service::serve_monitor_requests(
-            reqs,
-            phys.clone(),
-            ifaces.clone(),
-            watcher_service.clone(),
-            new_iface_sink.clone(),
-            iface_counter.clone(),
-            Arc::clone(&ifaces_tree),
-            wlandevicemonitor_config::Config { ..cfg },
-        )
-        .unwrap_or_else(|e| error!("error serving device monitor API: {}", e));
-        fasync::Task::spawn(fut).detach()
-    });
-    fs.take_and_serve_directory_handle()?;
-    fs.collect::<()>().await;
-    Ok(())
-}
 
 fn serve_phys(
     phys: Arc<device::PhyMap>,
@@ -77,8 +47,6 @@ async fn main() -> Result<(), Error> {
     let (watcher_service, watcher_fut) =
         watcher_service::serve_watchers(phys.clone(), ifaces.clone(), phy_events, iface_events);
 
-    let fs = ServiceFs::new_local();
-
     let inspector = Inspector::new(InspectorConfig::default().size(inspect::VMO_SIZE_BYTES));
     let _inspect_server_task =
         inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
@@ -92,23 +60,44 @@ async fn main() -> Result<(), Error> {
     let iface_counter = Arc::new(service::IfaceCounter::new());
 
     let (new_iface_sink, new_iface_stream) = mpsc::unbounded();
-    let fidl_fut = serve_fidl(
-        fs,
-        phys.clone(),
-        ifaces.clone(),
-        watcher_service,
-        new_iface_sink,
-        iface_counter,
-        Arc::clone(&ifaces_tree),
-        cfg,
-    );
 
-    let new_iface_fut = service::handle_new_iface_stream(
-        phys.clone(),
-        ifaces.clone(),
-        ifaces_tree,
-        new_iface_stream,
-    );
+    let mut fs = ServiceFs::new_local();
+    fs.dir("svc").add_fidl_service(fidl_svc::DeviceMonitorRequestStream::from);
+    fs.take_and_serve_directory_handle()?;
+
+    // Arbitrarily limit number of clients to 1000. In practice, it's usually one or two.
+    // TODO(https://fxbug.dev/382306025): While the wlandevicemonitor component can support many
+    // clients, we could simplify the design of the component by serving only one client at a time.
+    const MAX_CONCURRENT: usize = 1000;
+    let fidl_fut = fs.map(Ok).try_for_each_concurrent(MAX_CONCURRENT, {
+        // Rebind these variables to borrows so the borrows can be moved into the FnMut.
+        let phys = &phys;
+        let ifaces = &ifaces;
+        let watcher_service = &watcher_service;
+        let new_iface_sink = &new_iface_sink;
+        let iface_counter = &iface_counter;
+        let ifaces_tree = &ifaces_tree;
+        let cfg = &cfg;
+        move |mut s: fidl_svc::DeviceMonitorRequestStream| async move {
+            while let Ok(Some(request)) = s.try_next().await {
+                service::handle_monitor_request(
+                    request,
+                    phys,
+                    ifaces,
+                    watcher_service,
+                    new_iface_sink,
+                    iface_counter,
+                    ifaces_tree,
+                    cfg,
+                )
+                .await?
+            }
+            Ok(())
+        }
+    });
+
+    let new_iface_fut =
+        service::handle_new_iface_stream(&phys, &ifaces, &ifaces_tree, new_iface_stream);
 
     let ((), (), (), ()) = try_join4(
         fidl_fut,
