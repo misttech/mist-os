@@ -42,7 +42,7 @@ constexpr zx::duration kBaudRateSwitchDelay = zx::msec(200);
 const std::unordered_map<uint16_t, std::string> BtHciBroadcom::kFirmwareMap = {
     {PDEV_PID_BCM43458, "BCM4345C5.hcd"},
     {PDEV_PID_BCM4359, "BCM4359C0.hcd"},
-};
+    {PDEV_PID_BCM4381A1, "BCM4381A1.hcd"}};
 
 HciEventHandler::HciEventHandler(fit::function<void(std::vector<uint8_t>&)> on_receive_callback)
     : on_receive_callback_(std::move(on_receive_callback)) {}
