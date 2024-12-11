@@ -561,12 +561,20 @@ fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const ktl::st
 
   auto resolved_elf = resolve_executable(*this, executable, path, argv, environ) _EP(resolved_elf);
 
+  UserAndOrGroupId maybe_set_id;
+  if ((*this)->kernel()->features_.enable_suid) {
+    auto result = resolved_elf->file->name_->suid_and_sgid(*this) _EP(result);
+    maybe_set_id = result.value();
+  } else {
+    maybe_set_id = UserAndOrGroupId();
+  }
+
   if (task_->thread_group_->Read()->tasks_count() > 1) {
     // track_stub !(TODO("https://fxbug.dev/297434895"), "exec on multithread process");
     return fit::error(errno(EINVAL));
   }
 
-  auto err = finish_exec(path, resolved_elf.value());
+  auto err = finish_exec(path, resolved_elf.value(), maybe_set_id);
   if (err.is_error()) {
     TRACEF("warning: unrecoverable error in exec: %u\n", err.error_value().error_code());
     /*
@@ -582,12 +590,12 @@ fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const ktl::st
     self.ptrace_event(PtraceOptions::TRACEEXEC, self.task.id as u64);
     self.signal_vfork();
   */
-
   return fit::ok();
 }
 
 fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
-                                            const ResolvedElf& resolved_elf) {
+                                            const ResolvedElf& resolved_elf,
+                                            UserAndOrGroupId& maybe_set_id) {
   LTRACEF_LEVEL(2, "path=[%.*s]\n", static_cast<int>(path.size()), path.data());
 
   //  Now that the exec will definitely finish (or crash), notify owners of
@@ -603,9 +611,64 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
   }
 
   // Update the SELinux state, if enabled.
-  /*
-  selinux_hooks::update_state_on_exec(self, &resolved_elf.selinux_state);
-  */
+  // TODO: Do we need to update this state after up the creds for exec?
+  // selinux_hooks::update_state_on_exec(self, &resolved_elf.selinux_state);
+
+  {
+    auto state = (*this)->Write();
+
+    // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
+    //
+    //   The aforementioned transformations of the effective IDs are not
+    //   performed (i.e., the set-user-ID and set-group-ID bits are
+    //   ignored) if any of the following is true:
+    //
+    //   * the no_new_privs attribute is set for the calling thread (see
+    //      prctl(2));
+    //
+    //   *  the underlying filesystem is mounted nosuid (the MS_NOSUID
+    //      flag for mount(2)); or
+    //
+    //   *  the calling process is being ptraced.
+    //
+    // The MS_NOSUID check is in `NamespaceNode::suid_and_sgid()`.
+    if (state->no_new_privs() || state->is_ptraced()) {
+      maybe_set_id.clear();
+    }
+
+    // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
+    //
+    //   The process's "dumpable" attribute is set to the value 1,
+    //   unless a set-user-ID program, a set-group-ID program, or a
+    //   program with capabilities is being executed, in which case the
+    //   dumpable flag may instead be reset to the value in
+    //   /proc/sys/fs/suid_dumpable, in the circumstances described
+    //   under PR_SET_DUMPABLE in prctl(2).
+    /*
+    let dumpable = if maybe_set_id.is_none() { DumpPolicy::User }
+    else {DumpPolicy::Disable};
+    *self.mm().dumpable.lock(locked) = dumpable;
+    */
+
+    auto persistent_info = (*this)->persistent_info_->Lock();
+    /*
+    state.set_sigaltstack(None);
+    state.robust_list_head = UserAddress::NULL.into();
+    */
+
+    // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
+    //
+    //   If a set-user-ID or set-group-ID
+    //   program is being executed, then the parent death signal set by
+    //   prctl(2) PR_SET_PDEATHSIG flag is cleared.
+    //
+    // TODO(https://fxbug.dev/356684424): Implement the behavior above once we support
+    // the PR_SET_PDEATHSIG flag.
+
+    // TODO(tbodt): Check whether capability xattrs are set on the file, and grant/limit
+    // capabilities accordingly.
+    persistent_info->creds_mut().exec(maybe_set_id);
+  }
 
   auto start_info = load_executable(*this, resolved_elf, path) _EP(start_info);
   auto regs = zx_thread_state_general_regs_t_from(start_info.value());
@@ -766,7 +829,8 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
     if (!dir.entry_->node_->is_dir()) {
       return fit::error(errno(ENOTDIR));
     }
-    _EP(dir.check_access(*this, Access(AccessEnum::EXEC), CheckAccessReason::InternalPermissionChecks));
+    _EP(dir.check_access(*this, Access(AccessEnum::EXEC),
+                         CheckAccessReason::InternalPermissionChecks));
   }
 
   return fit::ok(ktl::pair(dir, path));

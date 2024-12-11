@@ -254,6 +254,15 @@ NamespaceNode NamespaceNode::with_new_entry(DirEntryHandle entry) const {
   return NamespaceNode{.mount_ = mount_, .entry_ = ktl::move(entry)};
 }
 
+fit::result<Errno, UserAndOrGroupId> NamespaceNode::suid_and_sgid(
+    const CurrentTask& current_task) const {
+  if (mount_.flags().contains(MountFlagsEnum::NOSUID)) {
+    return fit::ok(UserAndOrGroupId());
+  }
+  auto creds = current_task->creds();
+  return entry_->node_->info()->suid_and_sgid(creds);
+}
+
 NamespaceNode NamespaceNode::enter_mount() const {
   // While the child is a mountpoint, replace child with the mount's root.
   auto enter_one_mount = [](const NamespaceNode& node) -> ktl::optional<NamespaceNode> {

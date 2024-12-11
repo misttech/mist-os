@@ -257,7 +257,8 @@ class CurrentTask : public TaskMemoryAccessor {
   // After the memory is unmapped, any failure in exec is unrecoverable and results in the
   // process crashing. This function is for that second half; any error returned from this
   // function will be considered unrecoverable.
-  fit::result<Errno> finish_exec(const ktl::string_view& path, const ResolvedElf& resolved_elf);
+  fit::result<Errno> finish_exec(const ktl::string_view& path, const ResolvedElf& resolved_elf,
+                                 UserAndOrGroupId& maybe_set_id);
 
  public:
   // Create a process that is a child of the `init` process.
