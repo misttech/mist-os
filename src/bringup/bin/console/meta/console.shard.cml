@@ -312,6 +312,7 @@
             protocol: [
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.BootControl",
             ],
             from: "#system-activity-governor",
             to: "#console-launcher",
