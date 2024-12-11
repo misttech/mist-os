@@ -247,17 +247,16 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   /// All mounts.
   Mounts mounts_;
 
- public:
   /// impl Kernel
   static fit::result<zx_status_t, fbl::RefPtr<Kernel>> New(BString cmdline,
                                                            KernelFeatures features);
 
   /// impl Kernel (namespace.rs)
-  uint64_t get_next_mount_id() { return next_mount_id_.next(); }
+  uint64_t get_next_mount_id() const { return next_mount_id_.next(); }
 
-  uint64_t get_next_peer_group_id() { return next_peer_group_id_.next(); }
+  uint64_t get_next_peer_group_id() const { return next_peer_group_id_.next(); }
 
-  uint64_t get_next_namespace_id() { return next_namespace_id_.next(); }
+  uint64_t get_next_namespace_id() const { return next_namespace_id_.next(); }
 
   // C++
   ~Kernel();
