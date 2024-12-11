@@ -991,8 +991,8 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         const rect_u_t image_area = {
             .x = 0,
             .y = 0,
-            .width = banjo_layer.image_metadata.width,
-            .height = banjo_layer.image_metadata.height,
+            .width = banjo_layer.image_metadata.dimensions.width,
+            .height = banjo_layer.image_metadata.dimensions.height,
         };
         invalid = !OriginRectangleContains(image_area, banjo_layer.image_source);
 

@@ -75,7 +75,8 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
           .display_destination = {.x = 0, .y = 0, .width = 0, .height = 0},
           .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
           .image_handle = INVALID_DISPLAY_ID,
-          .image_metadata = {.width = 0, .height = 0, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
+          .image_metadata = {.dimensions = {.width = 0, .height = 0},
+                             .tiling_type = IMAGE_TILING_TYPE_LINEAR},
           .fallback_color =
               {
                   .format = static_cast<uint32_t>(fuchsia_images2::PixelFormat::kR8G8B8A8),
@@ -117,8 +118,8 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     ZX_DEBUG_ASSERT_MSG(
         static_cast<const layer_t*>(&test_layer) == &test_configs[0].layer_list[0],
         "test_layer should be a non-const alias for the first layer in test_configs");
-    test_layer.image_metadata.width = width;
-    test_layer.image_metadata.height = height;
+    test_layer.image_metadata.dimensions.width = width;
+    test_layer.image_metadata.dimensions.height = height;
     test_layer.image_source.width = width;
     test_layer.image_source.height = height;
     test_layer.display_destination.width = width;

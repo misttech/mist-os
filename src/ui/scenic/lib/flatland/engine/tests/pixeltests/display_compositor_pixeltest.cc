@@ -500,11 +500,11 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // TODO(https://fxbug.dev/332521780): Display clients will be required to
     // pass the captured display's mode information.
-    fuchsia_hardware_display_types::ImageMetadata image_metadata = {{
-        .width = display->width_in_px(),
-        .height = display->height_in_px(),
+    fuchsia_hardware_display_types::ImageMetadata image_metadata({
+        .dimensions = fuchsia_math::SizeU(
+            {.width = display->width_in_px(), .height = display->height_in_px()}),
         .tiling_type = fuchsia_hardware_display_types::kImageTilingTypeCapture,
-    }};
+    });
 
     zx_status_t import_status = scenic_impl::ImportImageForCapture(
         *display_coordinator, image_metadata, collection_id, 0, image_id);

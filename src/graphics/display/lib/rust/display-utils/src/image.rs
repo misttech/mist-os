@@ -129,8 +129,7 @@ impl Drop for Image {
 impl From<&ImageParameters> for fdisplay_types::ImageMetadata {
     fn from(src: &ImageParameters) -> Self {
         Self {
-            width: src.width,
-            height: src.height,
+            dimensions: fidl_fuchsia_math::SizeU { width: src.width, height: src.height },
             tiling_type: fdisplay_types::IMAGE_TILING_TYPE_LINEAR,
         }
     }

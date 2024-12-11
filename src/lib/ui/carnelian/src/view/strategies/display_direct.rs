@@ -388,8 +388,7 @@ impl DisplayDirectViewStrategy {
         };
 
         let image_metadata = ImageMetadata {
-            width: unsize.width,
-            height: unsize.height,
+            dimensions: fidl_fuchsia_math::SizeU { width: unsize.width, height: unsize.height },
             tiling_type: image_tiling_type,
         };
 

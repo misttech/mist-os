@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fidl/fuchsia.math/cpp/fidl.h>
 #include <lib/async-testing/test_loop.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/async/cpp/wait.h>
@@ -229,11 +230,10 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   // We should now be able to also import an image to the display coordinator, using the
   // display-specific buffer collection id. If it returns OK, then we know that the renderer
   // did fully set the DC constraints.
-  fuchsia_hardware_display_types::ImageMetadata image_metadata = {{
-      .width = kWidth,
-      .height = kHeight,
+  fuchsia_hardware_display_types::ImageMetadata image_metadata({
+      .dimensions = fuchsia_math::SizeU({.width = kWidth, .height = kHeight}),
       .tiling_type = fuchsia_hardware_display_types::kImageTilingTypeLinear,
-  }};
+  });
 
   // Try to import the image into the display coordinator API and make sure it succeeds.
   allocation::GlobalImageId display_image_id = allocation::GenerateUniqueImageId();
@@ -299,11 +299,10 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       sysmem_allocator_.get(), std::move(tokens.local_token), kNumVmos, kWidth, kHeight);
 
   // Import the images to the display.
-  fuchsia_hardware_display_types::ImageMetadata image_metadata = {{
-      .width = kWidth,
-      .height = kHeight,
+  fuchsia_hardware_display_types::ImageMetadata image_metadata({
+      .dimensions = fuchsia_math::SizeU({.width = kWidth, .height = kHeight}),
       .tiling_type = fuchsia_hardware_display_types::kImageTilingTypeLinear,
-  }};
+  });
   allocation::GlobalImageId image_ids[kNumVmos];
   for (uint32_t i = 0; i < kNumVmos; i++) {
     image_ids[i] = allocation::GenerateUniqueImageId();

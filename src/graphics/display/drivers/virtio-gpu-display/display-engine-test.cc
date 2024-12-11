@@ -440,8 +440,7 @@ TEST_F(VirtioGpuTest, ImportImage) {
 
   // Invalid import: bad collection id
   static constexpr image_metadata_t kDefaultImageMetadata = {
-      .width = 800,
-      .height = 600,
+      .dimensions = {.width = 800, .height = 600},
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   constexpr display::DriverBufferCollectionId kInvalidCollectionId(100);

@@ -414,8 +414,7 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
 
   // Invalid import: bad collection id
   static constexpr image_metadata_t kDisplayImageMetadata = {
-      .width = kWidthPx,
-      .height = kHeightPx,
+      .dimensions = {.width = kWidthPx, .height = kHeightPx},
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   uint64_t kBanjoInvalidCollectionId = 100;
@@ -433,8 +432,7 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
 
   // Invalid import: bad width
   static constexpr image_metadata_t kImageMetadataWithIncorrectWidth = {
-      .width = kWidthPx * 2,
-      .height = kHeightPx,
+      .dimensions = {.width = kWidthPx * 2, .height = kHeightPx},
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   image_handle = 0;
@@ -444,8 +442,7 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
 
   // Invalid import: bad height
   static constexpr image_metadata_t kImageMetadataWithIncorrectHeight = {
-      .width = kWidthPx,
-      .height = kHeightPx * 2,
+      .dimensions = {.width = kWidthPx, .height = kHeightPx * 2},
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   image_handle = 0;

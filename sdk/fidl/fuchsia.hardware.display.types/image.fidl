@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display.types;
 
+using fuchsia.math;
+
 /// Specifies how individual pixels are arranged in an image buffer.
 ///
 /// The tiling format influences other image parameters, such as dimensions
@@ -61,9 +63,8 @@ type ImageBufferUsage = struct {
 // here. Prune this structure, replacing members with querying properties on the
 // associated sysmem BufferCollection.
 type ImageMetadata = struct {
-    /// The width and height of the image in pixels.
-    width uint32;
-    height uint32;
+    /// The image size, in pixels.
+    dimensions fuchsia.math.SizeU;
 
     /// Specifies how individual pixels are arranged in an image buffer.
     ///

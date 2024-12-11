@@ -188,20 +188,21 @@ zx::result<display::DriverImageId> DisplayEngine::ImportVmoImage(
       PixelFormatAndModifier(pixel_format,
                              /* ignored */
                              fuchsia_images2::PixelFormatModifier::kLinear));
-  color_buffer->size = fbl::round_up(image_metadata.width * image_metadata.height * bytes_per_pixel,
-                                     static_cast<uint32_t>(PAGE_SIZE));
+  color_buffer->size = fbl::round_up(
+      image_metadata.dimensions.width * image_metadata.dimensions.height * bytes_per_pixel,
+      static_cast<uint32_t>(PAGE_SIZE));
 
   // Linear images must be pinned.
   color_buffer->pinned_vmo =
       rc_->pipe_io()->PinVmo(vmo, ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, offset, color_buffer->size);
 
   color_buffer->vmo = std::move(vmo);
-  color_buffer->width = image_metadata.width;
-  color_buffer->height = image_metadata.height;
+  color_buffer->width = image_metadata.dimensions.width;
+  color_buffer->height = image_metadata.dimensions.height;
   color_buffer->format = color_buffer_format;
 
-  zx::result<HostColorBufferId> create_result =
-      rc_->CreateColorBuffer(image_metadata.width, image_metadata.height, color_buffer_format);
+  zx::result<HostColorBufferId> create_result = rc_->CreateColorBuffer(
+      image_metadata.dimensions.width, image_metadata.dimensions.height, color_buffer_format);
   if (create_result.is_error()) {
     FDF_LOG(ERROR, "%s: failed to create color buffer: %s", kTag, create_result.status_string());
     return create_result.take_error();
@@ -416,8 +417,8 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
         const rect_u_t image_area = {
             .x = 0,
             .y = 0,
-            .width = layer0.image_metadata.width,
-            .height = layer0.image_metadata.height,
+            .width = layer0.image_metadata.dimensions.width,
+            .height = layer0.image_metadata.dimensions.height,
         };
         if (memcmp(&layer0.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
           // TODO(https://fxbug.dev/42111727): Need to provide proper flag to indicate driver only

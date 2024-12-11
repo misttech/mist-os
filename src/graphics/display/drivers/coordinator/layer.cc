@@ -213,8 +213,10 @@ bool Layer::AppendToConfig(fbl::DoublyLinkedList<LayerNode*>* list) {
 void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
   pending_layer_.image_handle = INVALID_DISPLAY_ID;
   pending_layer_.image_metadata = display::ImageMetadata(image_metadata).ToBanjo();
-  const rect_u_t image_area = {
-      .x = 0, .y = 0, .width = image_metadata.width, .height = image_metadata.height};
+  const rect_u_t image_area = {.x = 0,
+                               .y = 0,
+                               .width = image_metadata.dimensions.width,
+                               .height = image_metadata.dimensions.height};
   pending_layer_.fallback_color = {
       .format = static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
       .bytes = {0, 0, 0, 0, 0, 0, 0, 0}};
@@ -258,8 +260,8 @@ void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color) {
       static_cast<fuchsia_images2_pixel_format_enum_value_t>(color.format);
   std::ranges::copy(color.bytes, pending_layer_.fallback_color.bytes);
 
-  pending_layer_.image_metadata = {
-      .width = 0, .height = 0, .tiling_type = IMAGE_TILING_TYPE_LINEAR};
+  pending_layer_.image_metadata = {.dimensions = {.width = 0, .height = 0},
+                                   .tiling_type = IMAGE_TILING_TYPE_LINEAR};
   pending_layer_.image_source = {.x = 0, .y = 0, .width = 0, .height = 0};
   pending_layer_.display_destination = {.x = 0, .y = 0, .width = 0, .height = 0};
 

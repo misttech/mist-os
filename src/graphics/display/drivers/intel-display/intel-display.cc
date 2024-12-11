@@ -981,7 +981,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
   fidl::Arena arena;
   auto format =
       ImageConstraintsToFormat(arena, collection_info.settings().image_format_constraints(),
-                               image_metadata->width, image_metadata->height);
+                               image_metadata->dimensions.width, image_metadata->dimensions.height);
   if (!format.is_ok()) {
     FDF_LOG(ERROR, "Failed to get format from constraints");
     return ZX_ERR_INVALID_ARGS;
@@ -997,11 +997,11 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
   const uint32_t bytes_per_pixel =
       ImageFormatStrideBytesPerWidthPixel(PixelFormatAndModifierFromImageFormat(format.value()));
 
-  ZX_DEBUG_ASSERT(
-      length >=
-      width_in_tiles(image_metadata->tiling_type, image_metadata->width, bytes_per_pixel) *
-          height_in_tiles(image_metadata->tiling_type, image_metadata->height) *
-          get_tile_byte_size(image_metadata->tiling_type));
+  ZX_DEBUG_ASSERT(length >= width_in_tiles(image_metadata->tiling_type,
+                                           image_metadata->dimensions.width, bytes_per_pixel) *
+                                height_in_tiles(image_metadata->tiling_type,
+                                                image_metadata->dimensions.height) *
+                                get_tile_byte_size(image_metadata->tiling_type));
 
   uint32_t align;
   if (image_metadata->tiling_type == IMAGE_TILING_TYPE_LINEAR) {
@@ -1619,8 +1619,8 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
     bool merge_all = false;
     if (banjo_display_config.layer_count > 3) {
       bool layer0_is_solid_color_fill =
-          (banjo_display_config.layer_list[0].image_metadata.width == 0 ||
-           banjo_display_config.layer_list[0].image_metadata.height == 0);
+          (banjo_display_config.layer_list[0].image_metadata.dimensions.width == 0 ||
+           banjo_display_config.layer_list[0].image_metadata.dimensions.height == 0);
       merge_all = banjo_display_config.layer_count > 4 || layer0_is_solid_color_fill;
     }
     if (!merge_all && banjo_display_config.cc_flags) {
@@ -1642,7 +1642,8 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
     for (unsigned j = 0; j < banjo_display_config.layer_count; j++) {
       const layer_t& layer = banjo_display_config.layer_list[j];
 
-      if (layer.image_metadata.width != 0 && layer.image_metadata.height != 0) {
+      if (layer.image_metadata.dimensions.width != 0 &&
+          layer.image_metadata.dimensions.height != 0) {
         if (layer.image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_90 ||
             layer.image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_270) {
           // Linear and x tiled images don't support 90/270 rotation

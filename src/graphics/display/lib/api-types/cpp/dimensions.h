@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DIMENSIONS_H_
 
 #include <fidl/fuchsia.math/cpp/wire.h>
+#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <zircon/assert.h>
 
 #include <cstdint>
@@ -39,6 +40,15 @@ class Dimensions {
 
   // True iff `fidl_size` is convertible to a valid Dimensions instance.
   [[nodiscard]] static constexpr bool IsValid(const fuchsia_math::wire::SizeU& fidl_size);
+  [[nodiscard]] static constexpr bool IsValid(const size_u_t& banjo_size);
+
+  // `banjo_size` must be convertible to a valid Dimensions instance.
+  //
+  // This is not a constructor to allow designated initializer syntax. Making
+  // this a constructor would introduce ambiguity when designated initializer
+  // syntax is used, because `size_u_t` has the same field names as our
+  // supported designated initializer syntax.
+  [[nodiscard]] static constexpr Dimensions From(const size_u_t& banjo_size);
 
   // `fidl_size` must be convertible to a valid Dimensions instance.
   //
@@ -61,6 +71,7 @@ class Dimensions {
   friend constexpr bool operator!=(const Dimensions& lhs, const Dimensions& rhs);
 
   constexpr fuchsia_math::wire::SizeU ToFidl() const;
+  constexpr size_u_t ToBanjo() const;
 
   // Guaranteed to be in [0, `kMaxWidth`].
   constexpr int32_t width() const { return width_; }
@@ -82,6 +93,7 @@ class Dimensions {
   // IsValid() variant with developer-friendly debug assertions.
   static constexpr void DebugAssertIsValid(const Dimensions::ConstructorArgs& args);
   static constexpr void DebugAssertIsValid(const fuchsia_math::wire::SizeU& fidl_size);
+  static constexpr void DebugAssertIsValid(const size_u_t& banjo_size);
 
   int32_t width_;
   int32_t height_;
@@ -107,6 +119,26 @@ constexpr bool Dimensions::IsValid(const fuchsia_math::wire::SizeU& fidl_size) {
   return width_is_zero == height_is_zero;
 }
 
+// static
+constexpr bool Dimensions::IsValid(const size_u_t& banjo_size) {
+  if (banjo_size.width < 0) {
+    return false;
+  }
+  if (banjo_size.width > kMaxWidth) {
+    return false;
+  }
+  if (banjo_size.height < 0) {
+    return false;
+  }
+  if (banjo_size.height > kMaxHeight) {
+    return false;
+  }
+
+  const bool width_is_zero = (banjo_size.width == 0);
+  const bool height_is_zero = (banjo_size.height == 0);
+  return width_is_zero == height_is_zero;
+}
+
 constexpr Dimensions::Dimensions(const ConstructorArgs& args)
     : width_(args.width), height_(args.height) {
   DebugAssertIsValid(args);
@@ -121,6 +153,15 @@ constexpr Dimensions Dimensions::From(const fuchsia_math::wire::SizeU& fidl_size
   });
 }
 
+// static
+constexpr Dimensions Dimensions::From(const size_u_t& banjo_size) {
+  DebugAssertIsValid(banjo_size);
+  return Dimensions({
+      .width = static_cast<int32_t>(banjo_size.width),
+      .height = static_cast<int32_t>(banjo_size.height),
+  });
+}
+
 constexpr bool operator==(const Dimensions& lhs, const Dimensions& rhs) {
   return lhs.width_ == rhs.width_ && lhs.height_ == rhs.height_;
 }
@@ -129,6 +170,15 @@ constexpr bool operator!=(const Dimensions& lhs, const Dimensions& rhs) { return
 
 constexpr fuchsia_math::wire::SizeU Dimensions::ToFidl() const {
   return fuchsia_math::wire::SizeU{
+      // The casts are guaranteed not to overflow (causing UB) because of the
+      // allowed ranges on image widths and heights.
+      .width = static_cast<uint32_t>(width_),
+      .height = static_cast<uint32_t>(height_),
+  };
+}
+
+constexpr size_u_t Dimensions::ToBanjo() const {
+  return size_u_t{
       // The casts are guaranteed not to overflow (causing UB) because of the
       // allowed ranges on image widths and heights.
       .width = static_cast<uint32_t>(width_),
@@ -150,6 +200,13 @@ constexpr void Dimensions::DebugAssertIsValid(const fuchsia_math::wire::SizeU& f
   ZX_DEBUG_ASSERT(fidl_size.width <= kMaxWidth);
   ZX_DEBUG_ASSERT(fidl_size.height <= kMaxHeight);
   ZX_DEBUG_ASSERT((fidl_size.width == 0) == (fidl_size.height == 0));
+}
+
+// static
+constexpr void Dimensions::DebugAssertIsValid(const size_u_t& banjo_size) {
+  ZX_DEBUG_ASSERT(banjo_size.width <= kMaxWidth);
+  ZX_DEBUG_ASSERT(banjo_size.height <= kMaxHeight);
+  ZX_DEBUG_ASSERT((banjo_size.width == 0) == (banjo_size.height == 0));
 }
 
 }  // namespace display

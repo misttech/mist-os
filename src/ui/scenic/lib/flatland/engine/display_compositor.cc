@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.math/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fidl/fuchsia.ui.composition/cpp/hlcpp_conversion.h>
@@ -406,10 +407,9 @@ fuchsia_hardware_display_types::ImageMetadata DisplayCompositor::CreateImageMeta
   FX_DCHECK(buffer_collection_pixel_format_modifier_.count(metadata.collection_id));
   const auto pixel_format_modifier =
       buffer_collection_pixel_format_modifier_.at(metadata.collection_id);
-  return fuchsia_hardware_display_types::ImageMetadata{
-      {.width = metadata.width,
-       .height = metadata.height,
-       .tiling_type = BufferCollectionPixelFormatToImageTilingType(pixel_format_modifier)}};
+  return fuchsia_hardware_display_types::ImageMetadata(
+      {{.dimensions = fuchsia_math::SizeU({.width = metadata.width, .height = metadata.height}),
+        .tiling_type = BufferCollectionPixelFormatToImageTilingType(pixel_format_modifier)}});
 }
 
 bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metadata,

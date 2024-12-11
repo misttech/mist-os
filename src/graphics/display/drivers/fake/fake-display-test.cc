@@ -296,15 +296,15 @@ layer_t CreatePrimaryLayerConfig(uint64_t image_handle, const image_metadata_t& 
           {
               .x = 0,
               .y = 0,
-              .width = image_metadata.width,
-              .height = image_metadata.height,
+              .width = image_metadata.dimensions.width,
+              .height = image_metadata.dimensions.height,
           },
       .image_source =
           {
               .x = 0,
               .y = 0,
-              .width = image_metadata.width,
-              .height = image_metadata.height,
+              .width = image_metadata.dimensions.width,
+              .height = image_metadata.dimensions.height,
           },
       .image_handle = image_handle,
       .image_metadata = image_metadata,
@@ -417,8 +417,7 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
 
   // Set BufferCollection buffer memory constraints.
   static constexpr const image_metadata_t kDisplayImageMetadata = {
-      .width = 1024,
-      .height = 768,
+      .dimensions = {.width = 1024, .height = 768},
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
 
@@ -431,8 +430,8 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
       fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena);
   set_constraints_request.constraints(
       CreateImageConstraints(arena,
-                             /*min_size_bytes=*/kDisplayImageMetadata.width *
-                                 kDisplayImageMetadata.height * bytes_per_pixel,
+                             /*min_size_bytes=*/kDisplayImageMetadata.dimensions.width *
+                                 kDisplayImageMetadata.dimensions.height * bytes_per_pixel,
                              kPixelFormat.pixel_format));
   fidl::Status set_constraints_status =
       collection_client->SetConstraints(set_constraints_request.Build());
@@ -446,8 +445,7 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
   // test cases.
   // Invalid import: Bad image type.
   static constexpr const image_metadata_t kInvalidTilingTypeMetadata = {
-      .width = 1024,
-      .height = 768,
+      .dimensions = {.width = 1024, .height = 768},
       .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
   };
   uint64_t image_handle = 0;
@@ -654,8 +652,7 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
 
   // Import framebuffer image.
   static constexpr image_metadata_t kFramebufferImageMetadata = {
-      .width = kDisplayWidth,
-      .height = kDisplayHeight,
+      .dimensions = {.width = kDisplayWidth, .height = kDisplayHeight},
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
 

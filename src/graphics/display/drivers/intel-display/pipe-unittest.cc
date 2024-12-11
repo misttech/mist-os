@@ -74,12 +74,8 @@ layer_t CreatePrimaryLayerConfig(uint64_t handle) {
       .display_destination = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
       .image_source = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
       .image_handle = handle,
-      .image_metadata =
-          {
-              .width = kWidth,
-              .height = kHeight,
-              .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-          },
+      .image_metadata = {.dimensions = {.width = kWidth, .height = kHeight},
+                         .tiling_type = IMAGE_TILING_TYPE_LINEAR},
       .alpha_mode = ALPHA_DISABLE,
       .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
   };

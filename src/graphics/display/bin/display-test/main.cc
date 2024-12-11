@@ -492,8 +492,8 @@ zx_status_t capture_setup(Display& display) {
   // TODO(https://fxbug.dev/332521780): Display clients will be required to
   // pass the captured display's mode information.
   fhdt::wire::ImageMetadata capture_metadata = {
-      .width = display.mode().active_area.width,
-      .height = display.mode().active_area.height,
+      .dimensions = {.width = display.mode().active_area.width,
+                     .height = display.mode().active_area.height},
       .tiling_type = fhdt::wire::kImageTilingTypeCapture,
   };
   fidl::WireResult import_capture_result = dc->ImportImage(

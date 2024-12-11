@@ -446,9 +446,10 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
 
   auto bottom_color = pipe_regs.PipeBottomColor().FromValue(0);
   bottom_color.set_csc_enable(!!banjo_display_config->cc_flags);
-  bool has_color_layer = banjo_display_config->layer_count &&
-                         (banjo_display_config->layer_list[0].image_metadata.width == 0 ||
-                          banjo_display_config->layer_list[0].image_metadata.height == 0);
+  bool has_color_layer =
+      banjo_display_config->layer_count &&
+      (banjo_display_config->layer_list[0].image_metadata.dimensions.width == 0 ||
+       banjo_display_config->layer_list[0].image_metadata.dimensions.height == 0);
   if (has_color_layer) {
     const layer_t* layer = &banjo_display_config->layer_list[0];
     const auto format =
@@ -549,7 +550,8 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, boo
     x_offset = primary->image_source.x;
     y_offset = primary->image_source.y;
   } else {
-    uint32_t tile_height = height_in_tiles(image_metadata.tiling_type, image_metadata.height);
+    uint32_t tile_height =
+        height_in_tiles(image_metadata.tiling_type, image_metadata.dimensions.height);
     uint32_t tile_px_height = get_tile_px_height(image_metadata.tiling_type);
     uint32_t total_height = tile_height * tile_px_height;
 

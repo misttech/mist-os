@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
+#include <fidl/fuchsia.math/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -375,11 +376,10 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
   const fuchsia_hardware_display_types::ImageBufferUsage image_buffer_usage{
       kImageTilingType,
   };
-  const fuchsia_hardware_display_types::ImageMetadata image_metadata{
-      extent.width,
-      extent.height,
-      image_buffer_usage.tiling_type(),
-  };
+  const fuchsia_hardware_display_types::ImageMetadata image_metadata({
+      .dimensions = fuchsia_math::SizeU({.width = extent.width, .height = extent.height}),
+      .tiling_type = image_buffer_usage.tiling_type(),
+  });
 
   display_coordinator_->SetBufferCollectionConstraints({kBufferCollectionId, image_buffer_usage})
       .ThenExactlyOnce(

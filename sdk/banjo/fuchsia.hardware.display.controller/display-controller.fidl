@@ -28,6 +28,12 @@ type ImageBufferUsage = struct {
     tiling_type uint32;
 };
 
+/// Equivalent to the [`fuchsia.math/SizeU`] FIDL type.
+type SizeU = struct {
+    width uint32;
+    height uint32;
+};
+
 /// Describes how an image is stored in a buffer of a sysmem BufferCollection.
 ///
 /// The buffer is dedicated to storing a single image. The properties below are
@@ -36,9 +42,8 @@ type ImageBufferUsage = struct {
 // here. Prune this structure, replacing members with querying properties on the
 // associated sysmem BufferCollection.
 type ImageMetadata = struct {
-    /// The width and height of the image in pixels.
-    width uint32;
-    height uint32;
+    /// The image size, in pixels.
+    dimensions SizeU;
 
     /// Specifies how individual pixels are arranged in an image buffer.
     ///

@@ -146,8 +146,8 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColor) {
   };
   for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].image_handle = INVALID_DISPLAY_ID;
-    layer_[i][0].image_metadata = {
-        .width = 0, .height = 0, .tiling_type = IMAGE_TILING_TYPE_LINEAR};
+    layer_[i][0].image_metadata = {.dimensions = {.width = 0, .height = 0},
+                                   .tiling_type = IMAGE_TILING_TYPE_LINEAR};
     layer_[i][0].display_destination = kDisplayArea;
     layer_[i][0].image_source = {.x = 0, .y = 0, .width = 0, .height = 0};
     layer_[i][0].alpha_mode = ALPHA_DISABLE;
@@ -177,8 +177,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerPrimary) {
   for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].display_destination = kDisplayArea;
     layer_[i][0].image_source = kDisplayArea;
-    layer_[i][0].image_metadata.width = 1024;
-    layer_[i][0].image_metadata.height = 768;
+    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
     layer_[i][0].alpha_mode = ALPHA_DISABLE;
     layer_[i][0].image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY;
   }
@@ -211,8 +210,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerDestFrame) {
   for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].display_destination = kDisplayDestination;
     layer_[i][0].image_source = kImageSource;
-    layer_[i][0].image_metadata.width = 1024;
-    layer_[i][0].image_metadata.height = 768;
+    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
   }
 
   size_t actual_result_size = 0;
@@ -243,8 +241,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerSrcFrame) {
   for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].display_destination = kDisplayArea;
     layer_[i][0].image_source = kImageSource;
-    layer_[i][0].image_metadata.width = 1024;
-    layer_[i][0].image_metadata.height = 768;
+    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
   }
 
   size_t actual_result_size = 0;
@@ -269,8 +266,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerAlpha) {
   for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].display_destination = kDisplayArea;
     layer_[i][0].image_source = kDisplayArea;
-    layer_[i][0].image_metadata.width = 1024;
-    layer_[i][0].image_metadata.height = 768;
+    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
     layer_[i][0].alpha_mode = ALPHA_HW_MULTIPLY;
   }
 
@@ -296,8 +292,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerTransform) {
   for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].display_destination = kDisplayArea;
     layer_[i][0].image_source = kDisplayArea;
-    layer_[i][0].image_metadata.width = 1024;
-    layer_[i][0].image_metadata.height = 768;
+    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
     layer_[i][0].image_source_transformation = COORDINATE_TRANSFORMATION_REFLECT_X;
   }
 
@@ -323,8 +318,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColorCoversion) {
   for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].display_destination = kDisplayArea;
     layer_[i][0].image_source = kDisplayArea;
-    layer_[i][0].image_metadata.width = 1024;
-    layer_[i][0].image_metadata.height = 768;
+    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
     configs_[i].cc_flags = COLOR_CONVERSION_POSTOFFSET;
   }
 
@@ -358,8 +352,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
   for (size_t i = 0; i < kDisplayCount; i++) {
     layer_[i][0].display_destination = kDisplayDestination;
     layer_[i][0].image_source = kImageSource;
-    layer_[i][0].image_metadata.width = 1024;
-    layer_[i][0].image_metadata.height = 768;
+    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
     layer_[i][0].alpha_mode = ALPHA_HW_MULTIPLY;
     layer_[i][0].image_source_transformation = COORDINATE_TRANSFORMATION_ROTATE_CCW_180;
     configs_[i].cc_flags = COLOR_CONVERSION_POSTOFFSET;
