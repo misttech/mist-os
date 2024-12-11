@@ -78,6 +78,27 @@ fuchsia_component("incoming_integration_test") {
   manifest = "meta/incoming_integration_test.cml"
 }
 
+cc_test_executable("service_watcher_unittests") {
+  testonly = true
+
+  sources = [ "service_watcher_test.cc" ]
+
+  deps = [
+    "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp",
+    "//sdk/lib/async-testing",
+    "//sdk/lib/component/incoming/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+fuchsia_component("service_watcher_tests") {
+  testonly = true
+  deps = [ ":service_watcher_unittests" ]
+  manifest = "meta/service_watcher_unittests.cml"
+}
+
 executable("echo_service_client_bin") {
   testonly = true
 
@@ -118,6 +139,7 @@ fuchsia_test_package("component_cpp_incoming_tests") {
   test_components = [
     ":incoming_test",
     ":incoming_integration_test",
+    ":service_watcher_tests",
   ]
 
   deps = [
