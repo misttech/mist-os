@@ -50,8 +50,8 @@ source_set("sdhci-driver-source") {
   ]
   public_deps = [
     ":dma-descriptor-builder",
-    "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//src/devices/block/lib/sdmmc",
     "//src/devices/lib/dma-buffer",
@@ -90,10 +90,11 @@ test("sdhci-test-bin") {
   sources = [ "sdhci-test.cc" ]
   deps = [
     ":sdhci-driver-source",
+    "//sdk/lib/async-default",
+    "//sdk/lib/driver/fake-bti/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/lib/mmio",
     "//src/devices/lib/mmio:test_helper",
-    "//src/devices/testing/fake-bti",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",

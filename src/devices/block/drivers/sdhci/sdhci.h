@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_SDHCI_SDHCI_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_SDHCI_SDHCI_H_
 
-#include <fuchsia/hardware/sdhci/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.sdhci/cpp/driver/fidl.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
 #include <lib/dma-buffer/buffer.h>
 #include <lib/driver/compat/cpp/compat.h>
@@ -193,7 +193,7 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
   zx_status_t Init();
 
   bool SupportsAdma2() const {
-    return (info_.caps & SDMMC_HOST_CAP_DMA) && !(quirks_ & SDHCI_QUIRK_NO_DMA);
+    return (info_.caps & SDMMC_HOST_CAP_DMA) && !(quirks_ & fuchsia_hardware_sdhci::Quirk::kNoDma);
   }
 
   void EnableInterrupts() TA_REQ(mtx_);
@@ -230,7 +230,8 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
   thrd_t irq_thread_;
   bool irq_thread_started_ = false;
 
-  ddk::SdhciProtocolClient sdhci_;
+  fdf::WireSyncClient<fuchsia_hardware_sdhci::Device> sdhci_;
+  fdf::Arena arena_{'SDHC'};
 
   zx::bti bti_;
 
@@ -244,7 +245,7 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
   sdmmc_host_info_t info_ = {};
 
   // Controller specific quirks
-  uint64_t quirks_;
+  fuchsia_hardware_sdhci::Quirk quirks_;
   uint64_t dma_boundary_alignment_;
 
   // Base clock rate

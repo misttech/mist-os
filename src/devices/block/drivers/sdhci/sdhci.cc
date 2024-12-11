@@ -187,12 +187,12 @@ bool Sdhci::CmdStageComplete() {
 
   // Read the response data.
   if (pending_request_->cmd_flags & SDMMC_RESP_LEN_136) {
-    if (quirks_ & SDHCI_QUIRK_STRIP_RESPONSE_CRC) {
+    if (quirks_ & fuchsia_hardware_sdhci::Quirk::kStripResponseCrc) {
       pending_request_->response[0] = (response_3 << 8) | ((response_2 >> 24) & 0xFF);
       pending_request_->response[1] = (response_2 << 8) | ((response_1 >> 24) & 0xFF);
       pending_request_->response[2] = (response_1 << 8) | ((response_0 >> 24) & 0xFF);
       pending_request_->response[3] = (response_0 << 8);
-    } else if (quirks_ & SDHCI_QUIRK_STRIP_RESPONSE_CRC_PRESERVE_ORDER) {
+    } else if (quirks_ & fuchsia_hardware_sdhci::Quirk::kStripResponseCrcPreserveOrder) {
       pending_request_->response[0] = (response_0 << 8);
       pending_request_->response[1] = (response_1 << 8) | ((response_0 >> 24) & 0xFF);
       pending_request_->response[2] = (response_2 << 8) | ((response_1 >> 24) & 0xFF);
@@ -829,10 +829,17 @@ zx_status_t Sdhci::SdmmcSetBusFreq(uint32_t bus_freq) {
 }
 
 zx_status_t Sdhci::SetBusClock(uint32_t frequency_hz) {
-  if (zx_status_t status = sdhci_.VendorSetBusClock(frequency_hz); status == ZX_OK) {
+  fdf::WireUnownedResult result = sdhci_.buffer(arena_)->VendorSetBusClock(frequency_hz);
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to send VendorSetBusClock request: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_ok()) {
     return ZX_OK;
-  } else if (status != ZX_ERR_STOP) {
-    return status;
+  }
+  if (result->error_value() != ZX_ERR_STOP) {
+    FDF_LOG(ERROR, "Failed to set bus clock: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
 
   // Turn off the SD clock before messing with the clock rate.
@@ -910,7 +917,13 @@ zx_status_t Sdhci::SdmmcSetTiming(sdmmc_timing_t timing) {
 
 zx_status_t Sdhci::SdmmcHwReset() {
   std::lock_guard<std::mutex> lock(mtx_);
-  sdhci_.HwReset();
+
+  fdf::WireUnownedResult result = sdhci_.buffer(arena_)->HwReset();
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to send HwReset request: %s", result.status_string());
+    return result.status();
+  }
+
   return ZX_OK;
 }
 
@@ -1041,21 +1054,27 @@ zx_status_t Sdhci::Init() {
   base_clock_ = caps0.base_clock_frequency_hz();
   if (base_clock_ == 0) {
     // try to get controller specific base clock
-    base_clock_ = sdhci_.GetBaseClock();
+    fdf::WireUnownedResult base_clock = sdhci_.buffer(arena_)->GetBaseClock();
+    if (!base_clock.ok()) {
+      FDF_LOG(ERROR, "Failed to send GetBaseClock request: %s", base_clock.status_string());
+      return base_clock.status();
+    }
+    base_clock_ = base_clock->clock;
   }
   if (base_clock_ == 0) {
     FDF_LOG(ERROR, "sdhci: base clock is 0!");
     return ZX_ERR_INTERNAL;
   }
 
-  const bool non_standard_tuning = quirks_ & SDHCI_QUIRK_NON_STANDARD_TUNING;
+  const bool non_standard_tuning =
+      static_cast<bool>(quirks_ & fuchsia_hardware_sdhci::Quirk::kNonStandardTuning);
   const bool tuning_for_sdr50 = caps1.use_tuning_for_sdr50();
 
   // Get controller capabilities
   if (caps0.bus_width_8_support()) {
     info_.caps |= SDMMC_HOST_CAP_BUS_WIDTH_8;
   }
-  if (caps0.adma2_support() && !(quirks_ & SDHCI_QUIRK_NO_DMA)) {
+  if (caps0.adma2_support() && !(quirks_ & fuchsia_hardware_sdhci::Quirk::kNoDma)) {
     info_.caps |= SDMMC_HOST_CAP_DMA;
   }
   if (caps0.voltage_3v3_support()) {
@@ -1064,7 +1083,7 @@ zx_status_t Sdhci::Init() {
   if (caps1.sdr50_support() && (!non_standard_tuning || !tuning_for_sdr50)) {
     info_.caps |= SDMMC_HOST_CAP_SDR50;
   }
-  if (caps1.ddr50_support() && !(quirks_ & SDHCI_QUIRK_NO_DDR)) {
+  if (caps1.ddr50_support() && !(quirks_ & fuchsia_hardware_sdhci::Quirk::kNoDdr)) {
     info_.caps |= SDMMC_HOST_CAP_DDR50;
   }
   if (caps1.sdr104_support() && !non_standard_tuning) {
@@ -1148,12 +1167,12 @@ zx_status_t Sdhci::Init() {
 
   // Set controller preferences
   fuchsia_hardware_sdmmc::SdmmcHostPrefs speed_capabilities{};
-  if (quirks_ & SDHCI_QUIRK_NON_STANDARD_TUNING) {
+  if (quirks_ & fuchsia_hardware_sdhci::Quirk::kNonStandardTuning) {
     // Disable HS200 and HS400 if tuning cannot be performed as per the spec.
     speed_capabilities |= fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200 |
                           fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400;
   }
-  if (quirks_ & SDHCI_QUIRK_NO_DDR) {
+  if (quirks_ & fuchsia_hardware_sdhci::Quirk::kNoDdr) {
     speed_capabilities |= fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr |
                           fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400;
   }
@@ -1214,11 +1233,19 @@ zx_status_t Sdhci::Init() {
 zx_status_t Sdhci::InitMmio() {
   // Map the Device Registers so that we can perform MMIO against the device.
   zx::vmo vmo;
-  zx_off_t vmo_offset = 0;
-  zx_status_t status = sdhci_.GetMmio(&vmo, &vmo_offset);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "sdhci: error %d in get_mmio", status);
-    return status;
+  zx_off_t vmo_offset;
+  {
+    fdf::WireUnownedResult mmio = sdhci_.buffer(arena_)->GetMmio();
+    if (!mmio.ok()) {
+      FDF_LOG(ERROR, "Failed to send GetMmio request: %s", mmio.status_string());
+      return mmio.status();
+    }
+    if (mmio->is_error()) {
+      FDF_LOG(ERROR, "Failed to get mmio: %s", zx_status_get_string(mmio->error_value()));
+      return mmio->error_value();
+    }
+    vmo = std::move(mmio.value()->mmio);
+    vmo_offset = mmio.value()->offset;
   }
 
   zx::result<fdf::MmioBuffer> regs_mmio_buffer = fdf::MmioBuffer::Create(
@@ -1233,15 +1260,13 @@ zx_status_t Sdhci::InitMmio() {
 }
 
 zx::result<> Sdhci::Start() {
-  zx::result<ddk::SdhciProtocolClient> sdhci =
-      compat::ConnectBanjo<ddk::SdhciProtocolClient>(incoming());
-  if (sdhci.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect SdhciProtocolClient: %s", sdhci.status_string());
-    return sdhci.take_error();
-  }
-  sdhci_ = *sdhci;
-  if (!sdhci_.is_valid()) {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  {
+    zx::result sdhci = incoming()->Connect<fuchsia_hardware_sdhci::Service::Device>();
+    if (sdhci.is_error()) {
+      FDF_LOG(ERROR, "Failed to connect to sdhci: %s", sdhci.status_string());
+      return sdhci.take_error();
+    }
+    sdhci_.Bind(std::move(sdhci.value()));
   }
 
   zx_status_t status = InitMmio();
@@ -1249,22 +1274,45 @@ zx::result<> Sdhci::Start() {
     return zx::error(status);
   }
 
-  status = sdhci_.GetBti(0, &bti_);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "sdhci: error %d in get_bti", status);
-    return zx::error(status);
+  {
+    fdf::WireUnownedResult bti = sdhci_.buffer(arena_)->GetBti(0);
+    if (!bti.ok()) {
+      FDF_LOG(ERROR, "Failed to send GetBti request: %s", bti.status_string());
+      return zx::error(bti.status());
+    }
+    if (bti->is_error()) {
+      FDF_LOG(ERROR, "Failed to get bti: %s", zx_status_get_string(bti->error_value()));
+      return zx::error(bti->error_value());
+    }
+    bti_ = std::move(bti.value()->bti);
   }
 
-  status = sdhci_.GetInterrupt(&irq_);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "sdhci: error %d in get_interrupt", status);
-    return zx::error(status);
+  {
+    fdf::WireUnownedResult irq = sdhci_.buffer(arena_)->GetInterrupt();
+    if (!irq.ok()) {
+      FDF_LOG(ERROR, "Failed to send GetInterrupt request: %s", irq.status_string());
+      return zx::error(irq.status());
+    }
+    if (irq->is_error()) {
+      FDF_LOG(ERROR, "Failed to get interrupt: %s", zx_status_get_string(irq->error_value()));
+      return zx::error(irq->error_value());
+    }
+    irq_ = std::move(irq.value()->irq);
   }
 
   dma_boundary_alignment_ = 0;
-  quirks_ = sdhci_.GetQuirks(&dma_boundary_alignment_);
 
-  if (!(quirks_ & SDHCI_QUIRK_USE_DMA_BOUNDARY_ALIGNMENT)) {
+  {
+    fdf::WireUnownedResult quirks = sdhci_.buffer(arena_)->GetQuirks();
+    if (!quirks.ok()) {
+      FDF_LOG(ERROR, "Failed to send GetQuirks request: %s", quirks.status_string());
+      return zx::error(quirks.status());
+    }
+    quirks_ = quirks.value().quirks;
+    dma_boundary_alignment_ = quirks.value().dma_boundary_alignment;
+  }
+
+  if (!(quirks_ & fuchsia_hardware_sdhci::Quirk::kUseDmaBoundaryAlignment)) {
     dma_boundary_alignment_ = 0;
   } else if (dma_boundary_alignment_ == 0) {
     FDF_LOG(ERROR, "sdhci: DMA boundary alignment is zero");
