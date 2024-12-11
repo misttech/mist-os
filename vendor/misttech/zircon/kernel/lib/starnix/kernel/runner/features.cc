@@ -44,7 +44,7 @@ fit::result<mtl::Error, Features> parse_features(
     }
   }
 
-  return fit::ok(ktl::move(features));
+  return fit::ok(features);
 }
 
 }  // namespace starnix_kernel_runner
