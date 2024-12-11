@@ -17,7 +17,7 @@ use crate::object_store::{
 };
 use crate::range::RangeExt;
 use crate::round::round_up;
-use anyhow::Error;
+use anyhow::{bail, Error};
 use rustc_hash::FxHashSet as HashSet;
 use std::cell::UnsafeCell;
 use std::collections::btree_map::BTreeMap;
@@ -583,32 +583,59 @@ impl<'a> ScannedStore<'a> {
         Ok(())
     }
 
-    // Performs some checks on the child link and records information such as the sub-directory
-    // count that get verified later.
+    /// Performs some checks on the child link and records information such as the sub-directory
+    /// count that get verified later.
     fn process_child(
         &mut self,
         parent_id: u64,
         child_id: u64,
         object_descriptor: &ObjectDescriptor,
-        casefold: bool,
-        child_encrypted: bool,
+        object_key_data: &ObjectKeyData,
     ) -> Result<(), Error> {
         let mut child_wrapping_key_id = None;
         if let Some(ScannedObject::Directory(dir)) = self.objects.get(&parent_id) {
-            if dir.casefold != casefold {
-                self.fsck.error(FsckError::CasefoldInconsistency(
-                    self.store_id,
-                    parent_id,
-                    child_id,
-                ))?;
-            }
-            if dir.wrapping_key_id.is_none() && child_encrypted {
-                self.fsck.error(FsckError::UnencryptedDirectoryHasEncryptedChild(
-                    self.store_id,
-                    parent_id,
-                    child_id,
-                ))?;
-            }
+            match object_key_data {
+                ObjectKeyData::Child { .. } => {
+                    if dir.casefold {
+                        self.fsck.error(FsckError::CasefoldInconsistency(
+                            self.store_id,
+                            parent_id,
+                            child_id,
+                        ))?;
+                    }
+                }
+                ObjectKeyData::CasefoldChild { .. } => {
+                    if !dir.casefold {
+                        self.fsck.error(FsckError::CasefoldInconsistency(
+                            self.store_id,
+                            parent_id,
+                            child_id,
+                        ))?;
+                    }
+                }
+                ObjectKeyData::EncryptedChild { casefold_hash, .. } => {
+                    if dir.wrapping_key_id.is_none() {
+                        self.fsck.error(FsckError::UnencryptedDirectoryHasEncryptedChild(
+                            self.store_id,
+                            parent_id,
+                            child_id,
+                        ))?;
+                    }
+                    if !dir.casefold && *casefold_hash != 0 {
+                        self.fsck.error(FsckError::CasefoldInconsistency(
+                            self.store_id,
+                            parent_id,
+                            child_id,
+                        ))?;
+                    }
+                }
+                _ => {
+                    bail!(
+                        "Unexpected object_key_data type in process_child: {:?}",
+                        object_key_data
+                    );
+                }
+            };
         }
         match (self.objects.get_mut(&child_id), object_descriptor) {
             (
@@ -621,7 +648,7 @@ impl<'a> ScannedStore<'a> {
                 Some(ScannedObject::Directory(ScannedDir { parent, wrapping_key_id, .. })),
                 ObjectDescriptor::Directory,
             ) => {
-                if child_encrypted {
+                if matches!(object_key_data, ObjectKeyData::EncryptedChild { .. }) {
                     if let Some(id) = wrapping_key_id {
                         child_wrapping_key_id = Some(*id);
                     } else {
@@ -679,7 +706,7 @@ impl<'a> ScannedStore<'a> {
                 ..
             })) => {
                 if let Some(parent_wrapping_key_id) = *wrapping_key_id {
-                    if !child_encrypted {
+                    if !matches!(object_key_data, ObjectKeyData::EncryptedChild { .. }) {
                         self.fsck.error(FsckError::EncryptedDirectoryHasUnencryptedChild(
                             self.store_id,
                             parent_id,
@@ -980,20 +1007,27 @@ async fn scan_extents_and_directory_children<'a>(
                 };
             }
             ItemRef {
-                key: ObjectKey { object_id, data: ObjectKeyData::Child { .. } },
+                key: ObjectKey { object_id, data: object_key_data @ ObjectKeyData::Child { .. } },
                 value: ObjectValue::Child(ChildValue { object_id: child_id, object_descriptor }),
                 ..
-            } => scanned.process_child(*object_id, *child_id, object_descriptor, false, false)?,
-            ItemRef {
-                key: ObjectKey { object_id, data: ObjectKeyData::EncryptedChild { .. } },
+            }
+            | ItemRef {
+                key:
+                    ObjectKey {
+                        object_id,
+                        data: object_key_data @ ObjectKeyData::EncryptedChild { .. },
+                    },
                 value: ObjectValue::Child(ChildValue { object_id: child_id, object_descriptor }),
                 ..
-            } => scanned.process_child(*object_id, *child_id, object_descriptor, false, true)?,
-            ItemRef {
-                key: ObjectKey { object_id, data: ObjectKeyData::CasefoldChild { .. } },
+            }
+            | ItemRef {
+                key:
+                    ObjectKey { object_id, data: object_key_data @ ObjectKeyData::CasefoldChild { .. } },
                 value: ObjectValue::Child(ChildValue { object_id: child_id, object_descriptor }),
                 ..
-            } => scanned.process_child(*object_id, *child_id, object_descriptor, true, false)?,
+            } => {
+                scanned.process_child(*object_id, *child_id, object_descriptor, object_key_data)?
+            }
             _ => {}
         }
         iter.advance().await?;

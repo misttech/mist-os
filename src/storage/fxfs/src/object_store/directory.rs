@@ -3625,7 +3625,8 @@ mod tests {
         {
             let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
             let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
-            let store = root_volume.volume("vol", Some(crypt)).await.expect("volume failed");
+            let store =
+                root_volume.volume("vol", Some(crypt.clone())).await.expect("volume failed");
             let dir = Directory::open(&store, object_id).await.expect("open failed");
             assert!(dir.casefold());
 
@@ -3646,6 +3647,11 @@ mod tests {
                 iter.advance().await.expect("advance");
             }
             assert_eq!(1, count, "unexpected number of entries.");
+
+            crate::fsck::fsck(fs.clone()).await.unwrap();
+            crate::fsck::fsck_volume(fs.as_ref(), store.store_object_id(), Some(crypt.clone()))
+                .await
+                .unwrap();
 
             fs.close().await.expect("Close failed");
         }
