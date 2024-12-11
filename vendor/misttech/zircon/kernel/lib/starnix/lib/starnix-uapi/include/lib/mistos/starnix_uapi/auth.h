@@ -29,6 +29,30 @@ struct FsCred {
   static FsCred root() { return {.uid_ = 0, .gid_ = 0}; }
 };
 
+// User credentials containing various user IDs
+struct UserCredentials {
+  uid_t uid_;
+  uid_t euid_;
+  uid_t saved_uid_;
+  uid_t fsuid_;
+};
+
+// Optional user and group IDs
+struct UserAndOrGroupId {
+  ktl::optional<uid_t> uid_;
+  ktl::optional<gid_t> gid_;
+
+  // impl UserAndOrGroupId
+  bool is_none() const { return !uid_.has_value() && !gid_.has_value(); }
+
+  bool is_some() const { return !is_none(); }
+
+  void clear() {
+    uid_ = ktl::nullopt;
+    gid_ = ktl::nullopt;
+  }
+};
+
 struct Capabilities {
   uint64_t mask_;
 
@@ -274,6 +298,9 @@ struct Credentials {
     return egid_ == gid || std::ranges::find(groups_, gid) != groups_.end();
   }
 
+  /// Returns whether or not the task has the given capability.
+  bool has_capability(Capabilities capability) const { return cap_effective_.contains(capability); }
+
   fit::result<Errno> check_access(starnix_uapi::Access access, uid_t node_uid, gid_t node_gid,
                                   FileMode mode) const {
     auto mode_bits = mode.bits();
@@ -300,10 +327,178 @@ struct Credentials {
     return fit::ok();
   }
 
-  /// Returns whether or not the task has the given capability.
-  bool has_capability(Capabilities capability) const { return cap_effective_.contains(capability); }
+  void apply_suid_and_sgid(UserAndOrGroupId& maybe_set_id) {
+    if (maybe_set_id.is_none()) {
+      return;
+    }
+
+    UserCredentials prev = {
+        .uid_ = uid_, .euid_ = euid_, .saved_uid_ = saved_uid_, .fsuid_ = fsuid_};
+
+    if (maybe_set_id.uid_.has_value()) {
+      euid_ = maybe_set_id.uid_.value();
+      fsuid_ = maybe_set_id.uid_.value();
+    }
+
+    if (maybe_set_id.gid_.has_value()) {
+      egid_ = maybe_set_id.gid_.value();
+      fsgid_ = maybe_set_id.gid_.value();
+    }
+
+    update_capabilities(prev);
+  }
+
+  void exec(UserAndOrGroupId& maybe_set_id) {
+    bool is_suid_or_sgid = maybe_set_id.is_some();
+
+    // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
+    //
+    //   If the set-user-ID bit is set on the program file referred to by
+    //   pathname, then the effective user ID of the calling process is
+    //   changed to that of the owner of the program file.  Similarly, if
+    //   the set-group-ID bit is set on the program file, then the
+    //   effective group ID of the calling process is set to the group of
+    //   the program file.
+    apply_suid_and_sgid(maybe_set_id);
+
+    // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
+    //
+    //   The effective user ID of the process is copied to the saved set-
+    //   user-ID; similarly, the effective group ID is copied to the saved
+    //   set-group-ID.  This copying takes place after any effective ID
+    //   changes that occur because of the set-user-ID and set-group-ID
+    //   mode bits.
+    saved_uid_ = euid_;
+    saved_gid_ = egid_;
+
+    // From <https://man7.org/linux/man-pages/man7/capabilities.7.html>:
+    //
+    //   During an execve(2), the kernel calculates the new capabilities
+    //   of the process using the following algorithm:
+    //   P'(ambient)     = (file is privileged) ? 0 : P(ambient)
+    //   P'(permitted)   = (P(inheritable) & F(inheritable)) |
+    //                     (F(permitted) & P(bounding)) | P'(ambient)
+    //   P'(effective)   = F(effective) ? P'(permitted) : P'(ambient)
+    //   P'(inheritable) = P(inheritable)    [i.e., unchanged]
+    //   P'(bounding)    = P(bounding)       [i.e., unchanged]
+    // where:
+    //   P()    denotes the value of a thread capability set before
+    //          the execve(2)
+    //   P'()   denotes the value of a thread capability set after the
+    //          execve(2)
+    //   F()    denotes a file capability set
+
+    // a privileged file is one that has capabilities or
+    // has the set-user-ID or set-group-ID bit set.
+    // TODO(https://fxbug.dev/328629782): Add support for file capabilities.
+    bool file_is_privileged = is_suid_or_sgid;
+
+    // After having performed any changes to the process effective ID
+    // that were triggered by the set-user-ID mode bit of the binary—
+    // e.g., switching the effective user ID to 0 (root) because a set-
+    // user-ID-root program was executed—the kernel calculates the file
+    // capability sets as follows:
+
+    // (1)  If the real or effective user ID of the process is 0 (root),
+    //  then the file inheritable and permitted sets are ignored;
+    //  instead they are notionally considered to be all ones (i.e.,
+    //  all capabilities enabled).
+    Capabilities file_permitted = Capabilities::empty();
+    Capabilities file_inheritable = Capabilities::empty();
+    if (uid_ == 0 || euid_ == 0) {
+      file_permitted = Capabilities::all();
+      file_inheritable = Capabilities::all();
+    }
+
+    // (2)  If the effective user ID of the process is 0 (root) or the
+    //  file effective bit is in fact enabled, then the file
+    //  effective bit is notionally defined to be one (enabled).
+    bool file_effective = euid_ == 0;
+
+    // TODO(https://fxbug.dev/328629782): File capabilities are honored for set-user-ID-root
+    // binaries with capabilities executed by non-root users. See "Set-user-ID-root programs
+    // that have file capabilities" in the man page.
+
+    //   P'(ambient)     = (file is privileged) ? 0 : P(ambient)
+    cap_ambient_ = file_is_privileged ? Capabilities::empty() : cap_ambient_;
+
+    //   P'(permitted)   = (P(inheritable) & F(inheritable)) |
+    //                     (F(permitted) & P(bounding)) | P'(ambient)
+    cap_permitted_ =
+        (cap_inheritable_ & file_inheritable) | (file_permitted & cap_bounding_) | cap_ambient_;
+
+    //   P'(effective)   = F(effective) ? P'(permitted) : P'(ambient)
+    cap_effective_ = file_effective ? cap_permitted_ : cap_ambient_;
+
+    securebits_.remove(SecureBitsEnum::KEEP_CAPS);
+  }
 
   FsCred as_fscred() const { return {.uid_ = fsuid_, .gid_ = fsgid_}; }
+
+  FsCred euid_as_fscred() const { return {.uid_ = euid_, .gid_ = egid_}; }
+
+  FsCred uid_as_fscred() const { return {.uid_ = uid_, .gid_ = gid_}; }
+
+  UserCredentials copy_user_credentials() const {
+    return {
+        .uid_ = uid_,
+        .euid_ = euid_,
+        .saved_uid_ = saved_uid_,
+        .fsuid_ = fsuid_,
+    };
+  }
+
+  void update_capabilities(const UserCredentials& prev) {
+    // If one or more of the real, effective, or saved set user IDs
+    // was previously 0, and as a result of the UID changes all of
+    // these IDs have a nonzero value, then all capabilities are
+    // cleared from the permitted, effective, and ambient capability
+    // sets.
+    //
+    // SECBIT_KEEP_CAPS: Setting this flag allows a thread that has one or more 0
+    // UIDs to retain capabilities in its permitted set when it
+    // switches all of its UIDs to nonzero values.
+    // The setting of the SECBIT_KEEP_CAPS flag is ignored if the
+    // SECBIT_NO_SETUID_FIXUP flag is set.  (The latter flag
+    // provides a superset of the effect of the former flag.)
+    if (!securebits_.contains(SecureBitsEnum::KEEP_CAPS) &&
+        !securebits_.contains(SecureBitsEnum::NO_SETUID_FIXUP) &&
+        (prev.uid_ == 0 || prev.euid_ == 0 || prev.saved_uid_ == 0) &&
+        (uid_ != 0 && euid_ != 0 && saved_uid_ != 0)) {
+      cap_permitted_ = Capabilities::empty();
+      cap_effective_ = Capabilities::empty();
+      cap_ambient_ = Capabilities::empty();
+    }
+
+    // If the effective user ID is changed from 0 to nonzero, then
+    // all capabilities are cleared from the effective set.
+    if (prev.euid_ == 0 && euid_ != 0) {
+      cap_effective_ = Capabilities::empty();
+    } else if (prev.euid_ != 0 && euid_ == 0) {
+      // If the effective user ID is changed from nonzero to 0, then
+      // the permitted set is copied to the effective set.
+      cap_effective_ = cap_permitted_;
+    }
+
+    // If the filesystem user ID is changed from 0 to nonzero (see
+    // setfsuid(2)), then the following capabilities are cleared from
+    // the effective set: CAP_CHOWN, CAP_DAC_OVERRIDE,
+    // CAP_DAC_READ_SEARCH, CAP_FOWNER, CAP_FSETID,
+    // CAP_LINUX_IMMUTABLE (since Linux 2.6.30), CAP_MAC_OVERRIDE,
+    // and CAP_MKNOD (since Linux 2.6.30).
+    const Capabilities fs_capabilities = kCapChown | kCapDacOverride | kCapDacReadSearch |
+                                         kCapFowner | kCapFsetid | kCapLinuxImmutable |
+                                         kCapMacOverride | kCapMknod;
+
+    if (prev.fsuid_ == 0 && fsuid_ != 0) {
+      cap_effective_ = cap_effective_.difference(fs_capabilities);
+    } else if (prev.fsuid_ != 0 && fsuid_ == 0) {
+      // If the filesystem UID is changed from nonzero to 0, then any
+      // of these capabilities that are enabled in the permitted set
+      // are enabled in the effective set.
+      cap_effective_ = cap_effective_.union_with(cap_permitted_ & fs_capabilities);
+    }
+  }
 
   // C++
   Credentials() : securebits_(SecureBits::empty()) {}
