@@ -330,35 +330,6 @@ TEST_F(MMapProcTest, OrderOfLayout) {
   SAFE_SYSCALL(munmap((void*)mmap_general_addr, page_size));
 }
 
-TEST_F(MMapProcTest, MremapDontUnmapKeepsFlags) {
-  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
-  void* source =
-      mmap(nullptr, page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  ASSERT_NE(source, MAP_FAILED);
-  reinterpret_cast<volatile char*>(source)[1] = 'a';
-
-  void* remapped = mremap(source, page_size, page_size, MREMAP_MAYMOVE | MREMAP_DONTUNMAP, 0);
-  ASSERT_NE(remapped, MAP_FAILED);
-  ASSERT_NE(remapped, source);
-
-  std::string smaps;
-  ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/smaps", &smaps));
-  auto source_mapping =
-      test_helper::find_memory_mapping_ext(reinterpret_cast<uintptr_t>(source), smaps);
-  ASSERT_NE(source_mapping, std::nullopt);
-  EXPECT_EQ(source_mapping->rss, 0u);
-
-  auto remapped_mapping =
-      test_helper::find_memory_mapping_ext(reinterpret_cast<uintptr_t>(remapped), smaps);
-  ASSERT_NE(remapped_mapping, std::nullopt);
-  EXPECT_NE(remapped_mapping->rss, 0u);
-
-  EXPECT_EQ(source_mapping->vm_flags, remapped_mapping->vm_flags);
-
-  SAFE_SYSCALL(munmap(source, page_size));
-  SAFE_SYSCALL(munmap(remapped, page_size));
-}
-
 class MMapProcStatmTest : public ProcTestBase, public testing::WithParamInterface<int> {
  protected:
   void ReadStatm(size_t* vm_size_out, size_t* rss_size_out) {

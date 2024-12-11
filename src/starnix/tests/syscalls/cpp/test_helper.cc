@@ -22,8 +22,6 @@
 #include <unistd.h>
 
 #include <fstream>
-#include <optional>
-#include <string_view>
 
 #include <gtest/gtest.h>
 #include <linux/capability.h>
@@ -237,73 +235,50 @@ std::string get_tmp_path() {
   return tmp_path;
 }
 
-namespace {
-std::optional<MemoryMapping> parse_mapping_entry(std::string_view line) {
-  // format:
-  // start-end perms offset device inode path
-  std::vector<std::string_view> parts =
-      fxl::SplitString(line, " ", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
-  if (parts.size() < 5) {
-    return std::nullopt;
-  }
-  std::vector<std::string_view> addrs =
-      fxl::SplitString(parts[0], "-", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
-  if (addrs.size() != 2) {
-    return std::nullopt;
-  }
-
-  uintptr_t start;
-  uintptr_t end;
-
-  if (!fxl::StringToNumberWithError(addrs[0], &start, fxl::Base::k16) ||
-      !fxl::StringToNumberWithError(addrs[1], &end, fxl::Base::k16)) {
-    return std::nullopt;
-  }
-
-  size_t offset;
-  size_t inode;
-  if (!fxl::StringToNumberWithError(parts[2], &offset, fxl::Base::k16) ||
-      !fxl::StringToNumberWithError(parts[4], &inode, fxl::Base::k10)) {
-    return std::nullopt;
-  }
-
-  std::string pathname;
-  if (parts.size() > 5) {
-    // The pathname always starts at pos 73.
-    pathname = line.substr(73);
-  }
-
-  return MemoryMapping{
-      start, end, std::string(parts[1]), offset, std::string(parts[3]), inode, pathname,
-  };
-}
-
-std::optional<size_t> parse_field_in_kb(std::string_view value) {
-  const std::string_view suffix = " kB";
-  if (!value.ends_with(suffix)) {
-    return std::nullopt;
-  }
-
-  value.remove_suffix(suffix.length());
-  size_t result;
-  if (!fxl::StringToNumberWithError(value, &result, fxl::Base::k10)) {
-    return std::nullopt;
-  }
-  return result;
-}
-}  // namespace
-
 std::optional<MemoryMapping> find_memory_mapping(std::function<bool(const MemoryMapping &)> match,
                                                  std::string_view maps) {
   std::vector<std::string_view> lines =
       fxl::SplitString(maps, "\n", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+  // format:
+  // start-end perms offset device inode path
   for (auto line : lines) {
-    std::optional<MemoryMapping> mapping = parse_mapping_entry(line);
-    if (!mapping) {
+    std::vector<std::string_view> parts =
+        fxl::SplitString(line, " ", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+    if (parts.size() < 5) {
+      return std::nullopt;
+    }
+    std::vector<std::string_view> addrs =
+        fxl::SplitString(parts[0], "-", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+    if (addrs.size() != 2) {
       return std::nullopt;
     }
 
-    if (match(*mapping)) {
+    uintptr_t start;
+    uintptr_t end;
+
+    if (!fxl::StringToNumberWithError(addrs[0], &start, fxl::Base::k16) ||
+        !fxl::StringToNumberWithError(addrs[1], &end, fxl::Base::k16)) {
+      return std::nullopt;
+    }
+
+    size_t offset;
+    size_t inode;
+    if (!fxl::StringToNumberWithError(parts[2], &offset, fxl::Base::k16) ||
+        !fxl::StringToNumberWithError(parts[4], &inode, fxl::Base::k10)) {
+      return std::nullopt;
+    }
+
+    std::string pathname;
+    if (parts.size() > 5) {
+      // The pathname always starts at pos 73.
+      pathname = line.substr(73);
+    }
+
+    MemoryMapping mapping = {
+        start, end, std::string(parts[1]), offset, std::string(parts[3]), inode, pathname,
+    };
+
+    if (match(mapping)) {
       return mapping;
     }
   }
@@ -313,52 +288,6 @@ std::optional<MemoryMapping> find_memory_mapping(std::function<bool(const Memory
 std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_view maps) {
   return find_memory_mapping(
       [addr](const MemoryMapping &mapping) { return mapping.start <= addr && addr < mapping.end; },
-      maps);
-}
-
-std::optional<MemoryMappingExt> find_memory_mapping_ext(
-    std::function<bool(const MemoryMappingExt &)> match, std::string_view maps) {
-  std::vector<std::string_view> lines =
-      fxl::SplitString(maps, "\n", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
-  std::optional<MemoryMappingExt> current_mapping;
-  for (auto line : lines) {
-    std::optional<MemoryMapping> maybe_new_mapping = parse_mapping_entry(line);
-    if (maybe_new_mapping) {
-      if (current_mapping && match(*current_mapping)) {
-        return current_mapping;
-      }
-
-      current_mapping = *maybe_new_mapping;
-      continue;
-    }
-    std::vector<std::string_view> fields =
-        fxl::SplitString(line, ":", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
-    if (fields.size() != 2) {
-      return std::nullopt;
-    }
-    if (fields[0] == "Rss") {
-      if (std::optional<size_t> rss = parse_field_in_kb(fields[1])) {
-        current_mapping->rss = *rss;
-      } else {
-        return std::nullopt;
-      }
-    }
-    if (fields[0] == "VmFlags") {
-      current_mapping->vm_flags =
-          fxl::SplitStringCopy(fields[1], " ", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
-    }
-  }
-  if (current_mapping && match(*current_mapping)) {
-    return current_mapping;
-  }
-  return std::nullopt;
-}
-
-std::optional<MemoryMappingExt> find_memory_mapping_ext(uintptr_t addr, std::string_view maps) {
-  return find_memory_mapping_ext(
-      [addr](const MemoryMappingExt &mapping) {
-        return mapping.start <= addr && addr < mapping.end;
-      },
       maps);
 }
 
