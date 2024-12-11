@@ -65,7 +65,7 @@ def print_suggested_sources(varname, sources):
       ]
     """
     print("  {} = [".format(varname), file=sys.stderr)
-    for source in sources:
+    for source in sorted(sources):
         print('    "{}",'.format(source), file=sys.stderr)
     print("  ]", file=sys.stderr)
 
