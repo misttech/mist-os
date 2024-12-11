@@ -232,6 +232,11 @@ def main() -> int:
         default=None,
         help="If set, write the API level to this file in the output directory.",
     )
+    parser.add_argument(
+        "--update-goldens",
+        action="store_true",
+        help="Update goldens rather than failing.",
+    )
 
     args = parser.parse_args()
 
@@ -320,6 +325,9 @@ def main() -> int:
         gn_api_level = str(int(api_level))
 
     args_gn_content += f"current_build_target_api_level = {gn_api_level}\n"
+
+    if args.update_goldens:
+        args_gn_content += f"update_goldens = true\n"
 
     logger.info(f"{build_dir}: args.gn content:\n{args_gn_content}")
     if (
