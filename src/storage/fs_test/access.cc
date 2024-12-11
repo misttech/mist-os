@@ -5,7 +5,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/fd.h>
 #include <lib/zx/channel.h>
@@ -180,74 +180,20 @@ class DirectoryPermissionTest : public AccessTest {
   }
 };
 
-void CloneFdAsReadOnlyHelper(fbl::unique_fd in_fd, fbl::unique_fd* out_fd) {
-  // Obtain the underlying connection behind |in_fd|.
-  fdio_cpp::FdioCaller fdio_caller(std::move(in_fd));
-
-  // Clone |in_fd| as read-only; the entire tree under the new connection now becomes read-only
-  auto endpoints = fidl::Endpoints<fio::Node>::Create();
-
-  auto clone_result =
-      fidl::WireCall(fdio_caller.borrow_as<fio::Node>())
-          ->DeprecatedClone(fio::wire::OpenFlags::kRightReadable, std::move(endpoints.server));
-  ASSERT_EQ(clone_result.status(), ZX_OK);
-
-  // Turn the handle back to an fd to test posix functions
-  fbl::unique_fd fd = ([&]() -> fbl::unique_fd {
-    int tmp_fd = -1;
-    zx_status_t status = fdio_fd_create(endpoints.client.TakeChannel().release(), &tmp_fd);
-    EXPECT_GT(tmp_fd, 0);
-    EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
-    return fbl::unique_fd(tmp_fd);
-  })();
-  ASSERT_TRUE(fd.is_valid());
-  *out_fd = std::move(fd);
-}
-
-TEST_P(DirectoryPermissionTest, TestCloneWithBadFlags) {
-  fio::wire::OpenFlags rights[] = {
-      fio::wire::OpenFlags::kRightReadable,
-      fio::wire::OpenFlags::kRightWritable,
-  };
-
-  // CLONE_FLAG_SAME_RIGHTS cannot appear together with any specific rights.
-  for (fio::wire::OpenFlags right : rights) {
-    fbl::unique_fd foo_fd(open(GetPath("foo").c_str(), O_RDONLY | O_DIRECTORY, 0644));
-    ASSERT_GT(foo_fd.get(), 0);
-
-    // Obtain the underlying connection behind |foo_fd|.
-    fdio_cpp::FdioCaller fdio_caller(std::move(foo_fd));
-
-    auto endpoints = fidl::Endpoints<fio::Node>::Create();
-
-    auto clone_result = fidl::WireCall(fdio_caller.borrow_as<fio::Node>())
-                            ->DeprecatedClone(fio::wire::OpenFlags::kCloneSameRights | right,
-                                              std::move(endpoints.server));
-    ASSERT_EQ(clone_result.status(), ZX_OK);
-    auto describe_result = fidl::WireCall(endpoints.client)->Query();
-    ASSERT_EQ(describe_result.status(), ZX_ERR_PEER_CLOSED);
+zx::result<fbl::unique_fd> ReopenDirectoryAsReadOnly(fbl::unique_fd dir_fd) {
+  // Obtain the underlying connection behind |dir_fd| and re-open it with only readable rights.
+  fdio_cpp::FdioCaller fdio_caller(std::move(dir_fd));
+  auto [client, server] = fidl::Endpoints<fio::Directory>::Create();
+  auto dir = fdio_caller.borrow_as<fio::Directory>();
+  auto open_result = fidl::WireCall(dir)->Open3(
+      ".", fio::kPermReadable | fio::Flags::kProtocolDirectory, {}, server.TakeChannel());
+  if (open_result.status() != ZX_OK) {
+    return zx::error(open_result.status());
   }
-}
-
-TEST_P(DirectoryPermissionTest, TestCloneCannotIncreaseRights) {
-  fbl::unique_fd foo_fd(open(GetPath("foo").c_str(), O_RDONLY | O_DIRECTORY, 0644));
-  ASSERT_GT(foo_fd.get(), 0);
-
-  fbl::unique_fd foo_readonly;
-  ASSERT_NO_FATAL_FAILURE(CloneFdAsReadOnlyHelper(std::move(foo_fd), &foo_readonly));
-
-  // Attempt to clone the read-only fd back to read-write.
-  fdio_cpp::FdioCaller fdio_caller(std::move(foo_readonly));
-
-  auto endpoints = fidl::Endpoints<fio::Node>::Create();
-
-  auto clone_result = fidl::WireCall(fdio_caller.borrow_as<fio::Node>())
-                          ->DeprecatedClone(fio::wire::OpenFlags::kRightReadable |
-                                                fio::wire::OpenFlags::kRightWritable,
-                                            std::move(endpoints.server));
-  ASSERT_EQ(clone_result.status(), ZX_OK);
-  auto describe_result = fidl::WireCall(endpoints.client)->Query();
-  ASSERT_EQ(describe_result.status(), ZX_ERR_PEER_CLOSED);
+  fbl::unique_fd out_fd;
+  zx_status_t status =
+      fdio_fd_create(client.TakeChannel().release(), out_fd.reset_and_get_address());
+  return zx::make_result(status, std::move(out_fd));
 }
 
 TEST_P(DirectoryPermissionTest, TestFaccessat) {
@@ -264,12 +210,12 @@ TEST_P(DirectoryPermissionTest, TestFaccessat) {
   EXPECT_EQ(faccessat(foo_fd.get(), "sub_dir/", R_OK | W_OK, 0), 0);
   EXPECT_EQ(faccessat(foo_fd.get(), "sub_dir/sub_file", R_OK | W_OK, 0), 0);
 
-  fbl::unique_fd rdonly_fd;
-  ASSERT_NO_FATAL_FAILURE(CloneFdAsReadOnlyHelper(std::move(foo_fd), &rdonly_fd));
+  zx::result<fbl::unique_fd> rdonly_fd = ReopenDirectoryAsReadOnly(std::move(foo_fd));
+  ASSERT_TRUE(rdonly_fd.is_ok()) << rdonly_fd.status_string();
 
   // Verify the tree is read-only
-  EXPECT_EQ(faccessat(rdonly_fd.get(), "bar_file", R_OK, 0), 0);
-  EXPECT_EQ(faccessat(rdonly_fd.get(), "bar_file", W_OK, 0), -1);
+  EXPECT_EQ(faccessat(rdonly_fd->get(), "bar_file", R_OK, 0), 0);
+  EXPECT_EQ(faccessat(rdonly_fd->get(), "bar_file", W_OK, 0), -1);
 }
 
 TEST_P(DirectoryPermissionTest, TestOpathDirectoryAccess) {
@@ -291,23 +237,23 @@ TEST_P(DirectoryPermissionTest, TestRestrictDirectoryAccess) {
   fbl::unique_fd foo_fd(open(GetPath("foo").c_str(), O_RDONLY | O_DIRECTORY, 0644));
   ASSERT_GT(foo_fd.get(), 0);
 
-  fbl::unique_fd rdonly_fd;
-  ASSERT_NO_FATAL_FAILURE(CloneFdAsReadOnlyHelper(std::move(foo_fd), &rdonly_fd));
+  zx::result<fbl::unique_fd> rdonly_fd = ReopenDirectoryAsReadOnly(std::move(foo_fd));
+  ASSERT_TRUE(rdonly_fd.is_ok()) << rdonly_fd.status_string();
 
   // Verify the tree is read-only
-  int bar_file_fd = openat(rdonly_fd.get(), "bar_file", O_RDONLY, 0644);
+  int bar_file_fd = openat(rdonly_fd->get(), "bar_file", O_RDONLY, 0644);
   ASSERT_GT(bar_file_fd, 0);
   ASSERT_EQ(close(bar_file_fd), 0);
 
-  bar_file_fd = openat(rdonly_fd.get(), "bar_file", O_RDWR, 0644);
+  bar_file_fd = openat(rdonly_fd->get(), "bar_file", O_RDWR, 0644);
   ASSERT_LT(bar_file_fd, 0);
   ASSERT_EQ(errno, EACCES);
 
-  int sub_file_fd = openat(rdonly_fd.get(), "sub_dir/sub_file", O_RDONLY, 0644);
+  int sub_file_fd = openat(rdonly_fd->get(), "sub_dir/sub_file", O_RDONLY, 0644);
   ASSERT_GT(sub_file_fd, 0);
   ASSERT_EQ(close(sub_file_fd), 0);
 
-  sub_file_fd = openat(rdonly_fd.get(), "sub_dir/sub_file", O_RDWR, 0644);
+  sub_file_fd = openat(rdonly_fd->get(), "sub_dir/sub_file", O_RDWR, 0644);
   ASSERT_LT(sub_file_fd, 0);
   ASSERT_EQ(errno, EACCES);
 }
@@ -328,23 +274,23 @@ TEST_P(DirectoryPermissionTest, TestModifyingFileTime) {
   ASSERT_EQ(utimensat(foo_fd.get(), "sub_dir", ts, 0), 0);
   ASSERT_EQ(utimensat(foo_fd.get(), "sub_dir/", ts, 0), 0);
 
-  // Clone foo_fd it as read-only.
-  fbl::unique_fd rdonly_fd;
-  ASSERT_NO_FATAL_FAILURE(CloneFdAsReadOnlyHelper(std::move(foo_fd), &rdonly_fd));
+  // Reopen foo_fd as a read-only connection.
+  zx::result<fbl::unique_fd> rdonly_fd = ReopenDirectoryAsReadOnly(std::move(foo_fd));
+  ASSERT_TRUE(rdonly_fd.is_ok()) << rdonly_fd.status_string();
 
   // futimens on the read-only clone is not allowed
-  ASSERT_LT(futimens(rdonly_fd.get(), ts), 0);
+  ASSERT_LT(futimens(rdonly_fd->get(), ts), 0);
   ASSERT_EQ(errno, EBADF);
   // utimensat on bar_file is not allowed because the parent is read-only
-  ASSERT_LT(utimensat(rdonly_fd.get(), "bar_file", ts, 0), 0);
+  ASSERT_LT(utimensat(rdonly_fd->get(), "bar_file", ts, 0), 0);
   ASSERT_EQ(errno, EACCES);
   // utimensat on sub_dir is not allowed because the parent is read-only
-  ASSERT_LT(utimensat(rdonly_fd.get(), "sub_dir", ts, 0), 0);
+  ASSERT_LT(utimensat(rdonly_fd->get(), "sub_dir", ts, 0), 0);
   ASSERT_EQ(errno, EACCES);
-  ASSERT_LT(utimensat(rdonly_fd.get(), "sub_dir/", ts, 0), 0);
+  ASSERT_LT(utimensat(rdonly_fd->get(), "sub_dir/", ts, 0), 0);
   ASSERT_EQ(errno, EACCES);
   // futimens on bar_file is not allowed because it requires write access
-  int bar_file_fd = openat(rdonly_fd.get(), "bar_file", O_RDONLY, 0644);
+  int bar_file_fd = openat(rdonly_fd->get(), "bar_file", O_RDONLY, 0644);
   ASSERT_GT(bar_file_fd, 0);
   ASSERT_LT(futimens(bar_file_fd, ts), 0);
   ASSERT_EQ(errno, EBADF);
