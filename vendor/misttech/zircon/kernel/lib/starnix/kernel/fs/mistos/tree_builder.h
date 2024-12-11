@@ -78,27 +78,24 @@ class TreeBuilder {
             [&](Directory& d) -> fit::result<zx_status_t> {
               if (++rest == full_path.end()) {
                 return inserter(d.entries_, name, full_path, ktl::move(traversed));
-              } else {
-                auto next_component = *rest;
-                fbl::AllocChecker ac;
-                traversed.push_back(name, &ac);
-                if (!ac.check()) {
-                  return fit::error(ZX_ERR_NO_MEMORY);
-                }
-                auto entry = d.entries_.find(name);
-                if (entry == d.entries_.end()) {
-                  auto child = TreeBuilder(ktl::move(Directory()));
-                  _EP(child.add_path(full_path, ktl::move(traversed), next_component, rest,
-                                     inserter));
-                  auto [_it, inserted] = d.entries_.emplace(name, ktl::move(child));
-                  ZX_ASSERT(inserted);
-                  return fit::ok();
-
-                } else {
-                  return entry->second.add_path(full_path, ktl::move(traversed), next_component,
-                                                rest, inserter);
-                }
               }
+              auto next_component = *rest;
+              fbl::AllocChecker ac;
+              traversed.push_back(name, &ac);
+              if (!ac.check()) {
+                return fit::error(ZX_ERR_NO_MEMORY);
+              }
+              auto entry = d.entries_.find(name);
+              if (entry == d.entries_.end()) {
+                auto child = TreeBuilder(ktl::move(Directory()));
+                _EP(child.add_path(full_path, ktl::move(traversed), next_component, rest,
+                                   inserter));
+                auto [_it, inserted] = d.entries_.emplace(name, ktl::move(child));
+                ZX_ASSERT(inserted);
+                return fit::ok();
+              }
+              return entry->second.add_path(full_path, ktl::move(traversed), next_component, rest,
+                                            inserter);
             },
             [&](Leaf&) -> fit::result<zx_status_t> { return fit::error(ZX_ERR_BAD_PATH); }},
         variant_);
@@ -165,9 +162,8 @@ class TreeBuilder {
                       variant_);
   }
 
- private:
-  TreeBuilder(Directory dir) : variant_(ktl::move(dir)) {}
-  TreeBuilder(Leaf leaf) : variant_(ktl::move(leaf)) {}
+  explicit TreeBuilder(Directory dir) : variant_(ktl::move(dir)) {}
+  explicit TreeBuilder(Leaf leaf) : variant_(ktl::move(leaf)) {}
 
   // Helpers from the reference documentation for std::visit<>, to allow
   // visit-by-overload of the std::variant<>
