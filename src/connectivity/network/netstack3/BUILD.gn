@@ -80,6 +80,10 @@ common_deps = [
   "//src/lib/diagnostics/inspect/runtime/rust:unchecked_includes",
 ]
 
+if (is_mistos) {
+  common_deps -= [ "//src/starnix/lib/ebpf" ]
+}
+
 common_test_deps = [
   "core:netstack3-core-testutils",
   "fuchsia:netstack3-fuchsia-testutils",

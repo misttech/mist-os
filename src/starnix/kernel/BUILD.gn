@@ -468,6 +468,7 @@ rustc_library("starnix_core") {
       "//src/lib/ui/fuchsia-scenic",
       "//src/lib/vulkan",
       "//src/starnix/lib/ebpf",
+      "//src/starnix/lib/ebpf-api",
       "//third_party/rust_crates:slab",
     ]
   }
