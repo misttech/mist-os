@@ -212,6 +212,37 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   fit::result<Errno> check_access(const CurrentTask& current_task, const MountInfo& mount,
                                   Access access, CheckAccessReason reason) const;
 
+  template <typename Fn>
+  fit::result<Errno> update_attributes(const CurrentTask& current_task, Fn&& mutator) const {
+    auto info = info_.Write();
+    auto new_info = *info;
+    _EP(mutator(new_info));
+
+    zxio_node_attr_has_t has;
+    has.modification_time_ = false;  // info->time_modify_ != new_info.time_modify_;
+    has.access_time_ = false;        // info->time_access_ != new_info.time_access_;
+    has.mode_ = info->mode_ != new_info.mode_;
+    has.uid_ = info->uid_ != new_info.uid_;
+    has.gid_ = info->gid_ != new_info.gid_;
+    has.rdev_ = info->rdev_ != new_info.rdev_;
+    has.casefold_ = false;  // info->casefold_ != new_info.casefold_;
+
+    // Call `update_attributes(..)` to persist the changes for the following fields.
+    if (has.modification_time_ || has.access_time_ || has.mode_ || has.uid_ || has.gid_ ||
+        has.rdev_ || has.casefold_) {
+      _EP(ops_->update_attributes(current_task, new_info, has));
+    }
+
+    *info = new_info;
+    return fit::ok();
+  }
+
+  /// Set the permissions on this FsNode to the given values.
+  ///
+  /// Does not change the IFMT of the node.
+  fit::result<Errno> chmod(const CurrentTask& current_task, const MountInfo& mount,
+                           FileMode mode) const;
+
   /// Whether this node is a regular file.
   bool is_reg() const { return info()->mode_.is_reg(); }
 

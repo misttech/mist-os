@@ -36,6 +36,11 @@ fit::result<Errno> sys_arch_prctl(CurrentTask& current_task, uint32_t code,
   }
 }
 
+fit::result<Errno> sys_chmod(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
+                             starnix_uapi::FileMode mode) {
+  return sys_fchmodat(current_task, FdNumber::AT_FDCWD_, user_path, mode);
+}
+
 /// The parameter order for `clone` varies by architecture.
 fit::result<Errno, pid_t> sys_clone(CurrentTask& current_task, uint64_t flags,
                                     starnix_uapi::UserAddress user_stack,

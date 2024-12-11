@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_NODE_OPS_H_
-#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_NODE_OPS_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_NODE_OPS_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_NODE_OPS_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/falloc.h>
@@ -74,6 +74,30 @@ class ValueOrSize {
 
  private:
   Variant variant_;
+};
+
+struct zxio_node_attr_has_t {
+  bool protocols_;
+  bool abilities_;
+  bool id_;
+  bool content_size_;
+  bool storage_size_;
+  bool link_count_;
+  bool creation_time_;
+  bool modification_time_;
+  bool change_time_;
+  bool access_time_;
+  bool mode_;
+  bool uid_;
+  bool gid_;
+  bool rdev_;
+  bool fsverity_options_;
+  bool fsverity_root_hash_;
+  bool fsverity_enabled_;
+  bool object_type_;
+  bool casefold_;
+  bool wrapping_key_id_;
+  bool selinux_context_;
 };
 
 class FsNodeOps {
@@ -198,7 +222,9 @@ class FsNodeOps {
   virtual bool filesystem_manages_timestamps(const FsNode& node) const { return false; }
 
   /// Update node attributes persistently.
-  virtual fit::result<Errno> update_attributes(const FsNodeInfo& info, int has) const {
+  virtual fit::result<Errno> update_attributes(const CurrentTask& current_task,
+                                               const FsNodeInfo& info,
+                                               zxio_node_attr_has_t has) const {
     return fit::ok();
   }
 
@@ -400,4 +426,4 @@ class XattrStorage {
 
 }  // namespace starnix
 
-#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_NODE_OPS_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_NODE_OPS_H_

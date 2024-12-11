@@ -228,6 +228,27 @@ fit::result<Errno> FsNode::check_access(const CurrentTask& current_task, const M
   return ops_->check_access(*this, current_task, access, info_, reason);
 }
 
+fit::result<Errno> FsNode::chmod(const CurrentTask& current_task, const MountInfo& mount,
+                                 FileMode mode) const {
+  _EP(mount.check_readonly_filesystem());
+
+  auto update_attributes_fn = [&](FsNodeInfo& info) -> fit::result<Errno> {
+    auto creds = current_task->creds();
+    if (!creds.has_capability(kCapFowner)) {
+      if (info.uid_ != creds.euid_) {
+        return fit::error(errno(EPERM));
+      }
+      if (info.gid_ != creds.egid_ && !creds.is_in_group(info.gid_)) {
+        mode &= ~FileMode::ISGID;
+      }
+    }
+    info.chmod(mode);
+    return fit::ok();
+  };
+
+  return update_attributes(current_task, update_attributes_fn);
+}
+
 fit::result<Errno, struct stat> FsNode::stat(const CurrentTask& current_task) const {
   auto result = fetch_and_refresh_info(current_task) _EP(result);
   auto info = result.value();

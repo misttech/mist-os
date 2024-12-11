@@ -115,6 +115,12 @@ fit::result<Errno, size_t> sys_readlinkat(const CurrentTask& current_task, FdNum
 fit::result<Errno> sys_mkdirat(const CurrentTask& current_task, FdNumber dir_fd,
                                starnix_uapi::UserCString user_path, starnix_uapi::FileMode mode);
 
+fit::result<Errno> sys_fchmod(const CurrentTask& current_task, FdNumber fd,
+                              starnix_uapi::FileMode mode);
+
+fit::result<Errno> sys_fchmodat(const CurrentTask& current_task, FdNumber dir_fd,
+                                starnix_uapi::UserCString user_path, starnix_uapi::FileMode mode);
+
 fit::result<Errno, size_t> sys_getcwd(const CurrentTask& current_task,
                                       starnix_uapi::UserAddress buf, size_t size);
 

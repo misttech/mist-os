@@ -334,6 +334,25 @@ fit::result<Errno> sys_mkdirat(const CurrentTask& current_task, FdNumber dir_fd,
   return fit::ok();
 }
 
+fit::result<Errno> sys_fchmod(const CurrentTask& current_task, FdNumber fd,
+                              starnix_uapi::FileMode mode) {
+  // Remove the filetype from the mode
+  auto permissions_mode = mode & FileMode::PERMISSIONS;
+  auto file = current_task->files_.get(fd) _EP(file);
+  _EP(file->name_->entry_->node_->chmod(current_task, file->name_->mount_, permissions_mode));
+  // file->name_->entry_.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
+  return fit::ok();
+}
+
+fit::result<Errno> sys_fchmodat(const CurrentTask& current_task, FdNumber dir_fd,
+                                starnix_uapi::UserCString user_path, starnix_uapi::FileMode mode) {
+  auto permissions_mode = mode & FileMode::PERMISSIONS;
+  auto name = lookup_at(current_task, dir_fd, user_path, LookupFlags()) _EP(name);
+  _EP(name->entry_->node_->chmod(current_task, name->mount_, permissions_mode));
+  // name->entry_.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
+  return fit::ok();
+}
+
 fit::result<Errno, size_t> sys_getcwd(const CurrentTask& current_task,
                                       starnix_uapi::UserAddress buf, size_t size) {
   return fit::error(errno(ENOTSUP));
