@@ -86,12 +86,12 @@ cc_test_executable("gdc_task_unittest_bin") {
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/lib/driver/mock-mmio-reg/cpp",
     "//sdk/lib/zbi-format",
     "//src/camera/drivers/test_utils",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/devices/testing/fake-bti",
-    "//src/devices/testing/mock-mmio-reg:mock-mmio-reg-zxtest",
     "//src/devices/testing/no_ddk",
     "//src/lib/fsl",
     "//zircon/system/ulib/zx",

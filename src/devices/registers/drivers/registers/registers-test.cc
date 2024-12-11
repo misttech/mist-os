@@ -5,10 +5,10 @@
 #include "registers.h"
 
 #include <lib/ddk/metadata.h>
+#include <lib/driver/mock-mmio-reg/cpp/mock-mmio-reg.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
-#include <mock-mmio-reg/mock-mmio-reg.h>
 
 #include "src/devices/lib/fidl-metadata/registers.h"
 
@@ -41,7 +41,7 @@ class TestRegistersDevice : public RegistersDevice {
   zx::result<> MapMmio(fuchsia_hardware_registers::wire::Mask::Tag& tag) override {
     std::map<uint32_t, std::shared_ptr<MmioInfo>> mmios;
     for (uint32_t i = 0; i < kRegCount; i++) {
-      mock_mmio_[i] = std::make_unique<ddk_mock::MockMmioRegRegion>(
+      mock_mmio_[i] = std::make_unique<mock_mmio::MockMmioRegRegion>(
           SWITCH_BY_TAG(tag, GetSize), kRegSize / SWITCH_BY_TAG(tag, GetSize));
 
       zx::result<MmioInfo> mmio_info =
@@ -53,7 +53,7 @@ class TestRegistersDevice : public RegistersDevice {
     return zx::ok();
   }
 
-  std::array<std::unique_ptr<ddk_mock::MockMmioRegRegion>, kRegCount> mock_mmio_;
+  std::array<std::unique_ptr<mock_mmio::MockMmioRegRegion>, kRegCount> mock_mmio_;
 };
 
 class RegistersDeviceTestEnvironment : fdf_testing::Environment {
