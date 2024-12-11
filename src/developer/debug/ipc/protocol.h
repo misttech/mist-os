@@ -37,7 +37,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to the numbered API level currently represented by "NEXT".
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 67;
+constexpr uint32_t kCurrentProtocolVersion = 68;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -866,10 +866,19 @@ struct NotifyComponentStarting {
   // |recursive| option set..
   std::optional<Filter> filter;
 
+  // Each match is guaranteed to have exactly one entry in |matched_pids| which corresponds to the
+  // job in this component's runtime directory. Not all components have an associated runtime
+  // directory, which will create a FilterMatch with a single ZX_KOID_INVALID.
+  std::vector<FilterMatch> matching_filters;
+
   void Serialize(Serializer& ser, uint32_t ver) {
     ser | timestamp | component;
     if (ver >= 67) {
       ser | filter;
+    }
+
+    if (ver >= 68) {
+      ser | matching_filters;
     }
   }
 };

@@ -12,5 +12,6 @@
 #include <ktl/optional.h>
 
 constexpr ktl::optional<uint64_t> kArchAllocationMinAddr = ktl::nullopt;
+constexpr ktl::optional<uint64_t> kArchAllocationMaxAddr = ktl::nullopt;
 
 #endif  // ZIRCON_KERNEL_ARCH_ARM64_PHYS_INCLUDE_PHYS_ARCH_ARCH_ALLOCATION_H_

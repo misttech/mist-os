@@ -123,6 +123,14 @@ open protocol ContainerPowerController {
         /// Wake call.
         2: wake_lock zx.Handle:EVENTPAIR;
     });
+
+    /// Registers an eventpair that will be signaled when the container is suspended or resumed.
+    /// The signals are ASLEEP(USER_1) and AWAKE(USER_0).
+    ///
+    /// The kernel returns AWAKE upon initial registration of the eventpair.
+    flexible RegisterWakeWatcher(resource table {
+        1: watcher zx.Handle:EVENTPAIR;
+    }) -> ();
 };
 
 /// Protocol that allows Starnix to control binder servers and clients in other

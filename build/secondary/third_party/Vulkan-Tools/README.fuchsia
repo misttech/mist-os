@@ -1,0 +1,8 @@
+Name: Vulkan-Tools
+License: Apache 2.0
+License File: LICENSE.txt
+Upstream Git: https://github.com/KhronosGroup/Vulkan-Tools
+Description:
+
+Provides Khronos official Vulkan Tools and Utilities.
+

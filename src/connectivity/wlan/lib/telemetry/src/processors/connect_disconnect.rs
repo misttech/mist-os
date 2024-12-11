@@ -82,7 +82,7 @@ impl From<&BssDescription> for InspectConnectedNetwork {
             protection: format!("{:?}", bss_description.protection()),
             ht_cap: bss_description.raw_ht_cap().map(|cap| cap.bytes.into()),
             vht_cap: bss_description.raw_vht_cap().map(|cap| cap.bytes.into()),
-            wsc: bss_description.probe_resp_wsc().as_ref().map(|wsc| InspectNetworkWsc::from(wsc)),
+            wsc: bss_description.probe_resp_wsc().as_ref().map(InspectNetworkWsc::from),
             is_wmm_assoc: bss_description.find_wmm_param().is_some(),
             wmm_param: bss_description.find_wmm_param().map(|bytes| bytes.into()),
         }
@@ -171,7 +171,7 @@ impl ConnectDisconnectLogger {
             inspect_node,
             inspect_metadata_node,
             persistence_req_sender,
-            ConnectDisconnectTimeSeries::new(&time_matrix_client, inspect_metadata_path),
+            ConnectDisconnectTimeSeries::new(time_matrix_client, inspect_metadata_path),
         )
     }
 
@@ -215,12 +215,10 @@ impl ConnectDisconnectLogger {
     }
 
     pub fn is_connected(&self) -> bool {
-        match &*self.connection_state.lock() {
-            ConnectionState::Connected(_) => true,
-            _ => false,
-        }
+        matches!(&*self.connection_state.lock(), ConnectionState::Connected(_))
     }
 
+    #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
     pub async fn log_connect_attempt(
         &self,
         result: fidl_ieee80211::StatusCode,

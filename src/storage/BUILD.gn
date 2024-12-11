@@ -31,7 +31,6 @@ group("tests") {
     "lib:tests",
     "memfs:tests",
     "minfs:tests",
-    "storage-host:tests",
     "stress-tests",
     "stressor:tests",
     "testing:tests",

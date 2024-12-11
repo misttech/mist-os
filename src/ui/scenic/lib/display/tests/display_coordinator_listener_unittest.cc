@@ -80,10 +80,8 @@ TEST_F(DisplayCoordinatorListenerTest, OnDisplaysChanged) {
                                       /*on_vsync=*/nullptr, /*on_client_ownership_change=*/nullptr);
 
   fuchsia_hardware_display::Mode test_mode = {{
-      .horizontal_resolution = 1024,
-      .vertical_resolution = 800,
-      .refresh_rate_e2 = 60,
-      .flags = 0,
+      .active_area = fuchsia_math::SizeU({.width = 1024, .height = 800}),
+      .refresh_rate_millihertz = 60'000,
   }};
   fuchsia_hardware_display::Info test_display = {{
       .id = fuchsia_hardware_display_types::DisplayId(1),

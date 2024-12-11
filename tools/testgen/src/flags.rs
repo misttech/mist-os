@@ -6,6 +6,7 @@
 /// `fx testgen`. Please run that command to make sure the output looks correct before
 /// submitting changes.
 use argh::FromArgs;
+use diagnostics_log::set_minimum_severity;
 use tracing::Level;
 
 /// testgen generates a Fuchsia test.
@@ -26,14 +27,10 @@ pub(crate) enum Subcommand {
 }
 
 impl Flags {
-    #[must_use]
-    pub fn setup_logging(&self) -> impl Drop {
-        let subscriber = tracing_subscriber::fmt::Subscriber::builder()
-            .with_max_level(match self.verbose_logging {
-                true => Level::INFO,
-                false => Level::ERROR,
-            })
-            .finish();
-        tracing::subscriber::set_default(subscriber)
+    pub fn setup_logging(&self) {
+        set_minimum_severity(match self.verbose_logging {
+            true => Level::INFO,
+            false => Level::ERROR,
+        });
     }
 }

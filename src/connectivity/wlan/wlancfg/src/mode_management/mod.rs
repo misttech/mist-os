@@ -89,6 +89,10 @@ pub enum IfaceFailure {
 // is useful only for associating a failure with a PHY.
 impl PartialEq for IfaceFailure {
     fn eq(&self, other: &Self) -> bool {
+        #[allow(
+            clippy::match_like_matches_macro,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
         match (*self, *other) {
             (IfaceFailure::CanceledScan { .. }, IfaceFailure::CanceledScan { .. }) => true,
             (IfaceFailure::FailedScan { .. }, IfaceFailure::FailedScan { .. }) => true,

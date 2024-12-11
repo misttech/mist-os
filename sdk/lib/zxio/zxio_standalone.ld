@@ -11,7 +11,6 @@
 		zxio_create;
 		zxio_create_symlink;
 		zxio_create_with_info;
-		zxio_create_with_on_open;
 		zxio_create_with_on_representation;
 		zxio_default_maybe_faultable_copy;
 		zxio_dirent_iterator_destroy;
@@ -33,8 +32,6 @@
 		zxio_listen;
 		zxio_maybe_faultable_copy;
 		zxio_open;
-		zxio_open3;
-		zxio_open_async;
 		zxio_read;
 		zxio_read_at;
 		zxio_read_link;

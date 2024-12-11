@@ -4,7 +4,7 @@
 use addr::TargetAddr;
 use anyhow::{Context as _, Result};
 use compat_info::CompatibilityInfo;
-use errors::{ffx_bail, FfxError};
+use errors::ffx_bail;
 use ffx_config::keys::TARGET_DEFAULT_KEY;
 use ffx_config::EnvironmentContext;
 use fidl::endpoints::create_proxy;
@@ -20,6 +20,7 @@ use futures::future::{pending, Either};
 use futures::{select, Future, FutureExt, TryStreamExt};
 use std::net::IpAddr;
 use std::time::Duration;
+use target_errors::FfxTargetError;
 use thiserror::Error;
 use timeout::timeout;
 use tracing::{debug, info};
@@ -81,8 +82,8 @@ pub async fn get_remote_proxy(
         {
             Ok(p) => break Ok(p),
             Err(e) => {
-                let e = e.downcast::<FfxError>()?;
-                let FfxError::TargetConnectionError { err, .. } = e else {
+                let e = e.downcast::<FfxTargetError>()?;
+                let FfxTargetError::TargetConnectionError { err, .. } = e else {
                     break Err(e.into());
                 };
                 match err {
@@ -158,7 +159,7 @@ async fn get_remote_proxy_impl(
     let target_spec = target_spec.as_ref().map(ToString::to_string);
     match res {
         Ok(_) => Ok(remote_proxy),
-        Err(err) => Err(anyhow::Error::new(FfxError::TargetConnectionError {
+        Err(err) => Err(anyhow::Error::new(FfxTargetError::TargetConnectionError {
             err,
             target: target_spec,
             logs: Some(target_proxy.get_ssh_logs().await?),
@@ -191,7 +192,7 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
                 tc_server_end.into_channel(),
             )
             .await?
-            .map_err(|err| FfxError::DaemonError { err, target: t_clone })?;
+            .map_err(|err| FfxTargetError::DaemonError { err: err.into(), target: t_clone })?;
         Result::<()>::Ok(())
     };
     let t_clone = target.clone();
@@ -212,8 +213,8 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
             ),
         )
         .await
-        .map_err(|_| FfxError::DaemonError { err: DaemonError::Timeout, target: t_clone })??
-        .map_err(|err| FfxError::OpenTargetError { err, target })?;
+        .map_err(|_| FfxTargetError::DaemonError { err: DaemonError::Timeout, target: t_clone })??
+        .map_err(|err| FfxTargetError::OpenTargetError { err, target })?;
         Result::<()>::Ok(())
     };
     let fut = async move {
@@ -330,7 +331,7 @@ async fn wait_for_device_inner(
     futures_lite::FutureExt::or(knock_fut, async {
         timer.await;
         Err(ffx_command::Error::User(
-            FfxError::DaemonError { err: DaemonError::Timeout, target: target_spec }.into(),
+            FfxTargetError::DaemonError { err: DaemonError::Timeout, target: target_spec }.into(),
         ))
     })
     .await
@@ -550,7 +551,7 @@ pub async fn add_manual_target(
             taddr_str,
             if taddr.port() == 0 { DEFAULT_SSH_PORT } else { taddr.port() }
         ));
-        FfxError::TargetConnectionError { err, target, logs }.into()
+        FfxTargetError::TargetConnectionError { err, target, logs }.into()
     })
 }
 

@@ -6,7 +6,12 @@
 
 load("//fuchsia/private:fuchsia_cc.bzl", "fuchsia_wrap_cc_binary")
 
-def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
+def fuchsia_cc_driver(
+        name,
+        srcs = [],
+        output_name = None,
+        deps = [],
+        **kwargs):
     """Creates a binary driver which targets Fuchsia.
 
     Wraps a cc_shared_library rule and provides appropriate defaults.
@@ -33,9 +38,20 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
     # remove it the fuchsia_wrap_cc_binary to fail with an unknown attribute.
     kwargs.pop("linkshared", None)
 
+    # Compute the label of the private linker script.
+    #
+    # NOTE: A value of //fuchsia/private:driver.ld will not work here, as it will
+    # be interpreted as a package 'fucshia' or the project's workspace itself.
+    #
+    # Using @rules_fuchsia//fuchsia/private:driver.ld would break client workspaces
+    # that still use a standalone @fuchsia_sdk repository.
+    driver_ld_target = "@fuchsia_sdk//fuchsia/private:driver.ld"
+
     shared_lib_name = (output_name or "lib{}".format(name)).removesuffix(".so") + ".so"
 
     # Ensure we are packaging the lib/libdriver_runtime.so
+    # NOTE: @rules_fuchsia should not depend on @fuchsia_sdk directly. Instead a
+    # toolchain should be used to add one layer of indirection.
     deps.append(
         "@fuchsia_sdk//pkg/driver_runtime_shared_lib",
     )
@@ -45,7 +61,7 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
         # and to make the driver framework symbols global.
         "-Wl,--undefined-version",
         "-Wl,--version-script",
-        "$(location @fuchsia_sdk//fuchsia/private:driver.ld)",
+        "$(location %s)" % driver_ld_target,
     ]
 
     # maintain backwards compatability with cc_binary
@@ -84,7 +100,7 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
     native.cc_shared_library(
         name = cc_shared_library_name,
         deps = shared_library_deps,
-        additional_linker_inputs = ["@fuchsia_sdk//fuchsia/private:driver.ld"],
+        additional_linker_inputs = [driver_ld_target],
         user_link_flags = user_link_flags,
         shared_lib_name = shared_lib_name,
         features = features,
@@ -110,5 +126,5 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
         tags = tags,
         # TODO(352586714) Enable this check when we understand why the symbols are getting
         # pulled in.
-        # restricted_symbols = "@fuchsia_sdk//fuchsia/private:driver_restricted_symbols.txt",
+        # restricted_symbols = "//fuchsia/private:driver_restricted_symbols.txt",
     )

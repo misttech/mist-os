@@ -213,7 +213,7 @@ pub fn process_flag_template(emu_config: &EmulatorConfiguration) -> Result<FlagD
             &emu_config.runtime.template
         ))?
     } else {
-        if emu_config.guest.is_efi() || emu_config.guest.is_gpt() {
+        if emu_config.guest.is_efi() || emu_config.guest.is_gpt {
             EFI_FLAGS_TEMPLATE_STR.to_string()
         } else {
             DEFAULT_FLAGS_TEMPLATE_STR.to_string()

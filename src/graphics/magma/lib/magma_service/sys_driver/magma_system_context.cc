@@ -11,81 +11,97 @@
 #include <unordered_set>
 #include <vector>
 
+#include "lib/magma/magma_common_defs.h"
 #include "magma_system_connection.h"
 #include "magma_system_device.h"
 
 namespace msd {
-magma::Status MagmaSystemContext::ExecuteCommandBufferWithResources(
-    std::unique_ptr<magma_command_buffer> cmd_buf, std::vector<magma_exec_resource> resources,
-    std::vector<uint64_t> semaphores) {
-  // used to keep resources in scope until msd_context_execute_command_buffer returns
+
+magma::Status MagmaSystemContext::ExecuteCommandBuffers(
+    std::vector<magma_exec_command_buffer>& command_buffers,
+    std::vector<magma_exec_resource>& resources, std::vector<uint64_t>& wait_semaphore_ids,
+    std::vector<uint64_t>& signal_semaphore_ids, uint64_t flags) {
   std::vector<std::shared_ptr<MagmaSystemBuffer>> system_resources;
-  system_resources.reserve(cmd_buf->resource_count);
+  system_resources.reserve(resources.size());
 
-  // the resources to be sent to the MSD driver
-  auto msd_resources = std::vector<msd::Buffer*>();
-  msd_resources.reserve(cmd_buf->resource_count);
+  std::vector<msd::Buffer*> msd_buffers;
+  msd_buffers.reserve(resources.size());
 
-  // validate batch buffer index
-  if (cmd_buf->resource_count > 0 &&
-      cmd_buf->batch_buffer_resource_index >= cmd_buf->resource_count)
-    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
-                          "ExecuteCommandBuffer: batch buffer resource index invalid");
+  // validate resources
+  for (auto& resource : resources) {
+    uint64_t id = resource.buffer_id;
 
-  if (cmd_buf->resource_count == 0) {
-    // These shouldn't be used.
-    cmd_buf->batch_buffer_resource_index = 0;
-    cmd_buf->batch_start_offset = 0;
-  }
-
-  // validate exec resources
-  for (uint32_t i = 0; i < cmd_buf->resource_count; i++) {
-    uint64_t id = resources[i].buffer_id;
-
-    auto buf = owner_->LookupBufferForContext(id);
-    if (!buf)
+    auto buffer = owner_->LookupBufferForContext(id);
+    if (!buffer) {
       return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
                             "ExecuteCommandBuffer: exec resource has invalid buffer handle");
+    }
 
-    system_resources.push_back(buf);
-    msd_resources.push_back(buf->msd_buf());
+    system_resources.push_back(buffer);
+    msd_buffers.push_back(buffer->msd_buf());
+  }
 
-    if (i == cmd_buf->batch_buffer_resource_index) {
-      // validate batch start
-      if (cmd_buf->batch_start_offset >= buf->size())
-        return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "invalid batch start offset 0x%lx",
-                              cmd_buf->batch_start_offset);
+  // validate command buffer
+  for (auto& command_buffer : command_buffers) {
+    if (command_buffer.resource_index >= resources.size()) {
+      return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
+                            "ExecuteCommandBuffer: invalid command buffer resource index");
+    }
+
+    if (command_buffer.start_offset >= system_resources[command_buffer.resource_index]->size()) {
+      return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "invalid batch start offset 0x%lx",
+                            command_buffer.start_offset);
     }
   }
 
-  // used to keep semaphores in scope until msd_context_execute_command_buffer returns
-  std::vector<msd::Semaphore*> msd_wait_semaphores(cmd_buf->wait_semaphore_count);
-  std::vector<msd::Semaphore*> msd_signal_semaphores(cmd_buf->signal_semaphore_count);
+  std::vector<msd::Semaphore*> msd_wait_semaphores;
+  msd_wait_semaphores.reserve(wait_semaphore_ids.size());
+
+  std::vector<msd::Semaphore*> msd_signal_semaphores;
+  msd_signal_semaphores.reserve(signal_semaphore_ids.size());
 
   // validate semaphores
-  for (uint32_t i = 0; i < cmd_buf->wait_semaphore_count; i++) {
-    auto semaphore = owner_->LookupSemaphoreForContext(semaphores[i]);
-    if (!semaphore)
+  for (auto& semaphore_id : wait_semaphore_ids) {
+    auto semaphore = owner_->LookupSemaphoreForContext(semaphore_id);
+    if (!semaphore) {
       return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "wait semaphore id not found 0x%" PRIx64,
-                            semaphores[i]);
-    msd_wait_semaphores[i] = semaphore->msd_semaphore();
+                            semaphore_id);
+    }
+    msd_wait_semaphores.push_back(semaphore->msd_semaphore());
   }
-  for (uint32_t i = 0; i < cmd_buf->signal_semaphore_count; i++) {
-    auto semaphore =
-        owner_->LookupSemaphoreForContext(semaphores[cmd_buf->wait_semaphore_count + i]);
-    if (!semaphore)
+  for (auto& semaphore_id : signal_semaphore_ids) {
+    auto semaphore = owner_->LookupSemaphoreForContext(semaphore_id);
+    if (!semaphore) {
       return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "signal semaphore id not found 0x%" PRIx64,
-                            semaphores[cmd_buf->wait_semaphore_count + i]);
-    msd_signal_semaphores[i] = semaphore->msd_semaphore();
+                            semaphore_id);
+    }
+    msd_signal_semaphores.push_back(semaphore->msd_semaphore());
   }
 
-  // submit command buffer to driver
-  magma_status_t result = msd_ctx()->ExecuteCommandBufferWithResources(
-      cmd_buf.get(), resources.data(), msd_resources.data(), msd_wait_semaphores.data(),
-      msd_signal_semaphores.data());
+  magma_status_t status = msd_ctx()->ExecuteCommandBuffers(
+      command_buffers, resources, msd_buffers, msd_wait_semaphores, msd_signal_semaphores);
 
-  return MAGMA_DRET_MSG(
-      result, "ExecuteCommandBuffer: msd_context_execute_command_buffer failed: %d", result);
+  if (status == MAGMA_STATUS_UNIMPLEMENTED) {
+    if (command_buffers.size() > 1) {
+      return MAGMA_DRET_MSG(MAGMA_STATUS_UNIMPLEMENTED,
+                            "can't fallback to ExecuteCommandBufferWithResources");
+    }
+    const bool has_command_buffers = command_buffers.size() > 0;
+
+    struct magma_command_buffer magma_command_buffer = {
+        .resource_count = static_cast<uint32_t>(resources.size()),
+        .batch_buffer_resource_index = has_command_buffers ? command_buffers[0].resource_index : 0,
+        .batch_start_offset = has_command_buffers ? command_buffers[0].start_offset : 0,
+        .wait_semaphore_count = static_cast<uint32_t>(msd_wait_semaphores.size()),
+        .signal_semaphore_count = static_cast<uint32_t>(msd_signal_semaphores.size()),
+        .flags = flags,
+    };
+    return msd_ctx()->ExecuteCommandBufferWithResources(
+        &magma_command_buffer, resources.data(), msd_buffers.data(), msd_wait_semaphores.data(),
+        msd_signal_semaphores.data());
+  }
+
+  return MAGMA_DRET_MSG(status, "ExecuteCommandBuffers failed: %d", status);
 }
 
 magma::Status MagmaSystemContext::ExecuteImmediateCommands(uint64_t commands_size, void* commands,

@@ -31,11 +31,6 @@
             from: "self",
         },
         {
-            service: "fuchsia.storage.partitions.PartitionService",
-            from: "void",
-            availability: "optional",
-        },
-        {
             protocol: "fuchsia.fxfs.CryptManagement",
             from: "void",
             availability: "optional",

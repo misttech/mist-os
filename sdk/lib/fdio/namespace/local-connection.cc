@@ -66,11 +66,6 @@ struct local_connection : public fdio_t {
 
   // Expects a canonical path (no ..) with no leading
   // slash and no trailing slash
-  zx::result<fdio_ptr> open_deprecated(std::string_view path, fio::wire::OpenFlags flags) override {
-    auto& dir = local_dir();
-    return dir.fs->OpenAtDeprecated(fbl::RefPtr(dir.vn), path, flags);
-  }
-
   zx::result<fdio_ptr> open(std::string_view path, fio::Flags flags) override {
     auto& dir = local_dir();
     return dir.fs->OpenAt(fbl::RefPtr(dir.vn), path, flags);

@@ -148,7 +148,7 @@ pub fn serve_realm_query(
                     let iterator = serve_instance_iterator(instances);
                     responder.send(Ok(iterator)).unwrap();
                 }
-                fsys::RealmQueryRequest::Open {
+                fsys::RealmQueryRequest::DeprecatedOpen {
                     moniker,
                     dir_type,
                     flags: deprecated_flags,

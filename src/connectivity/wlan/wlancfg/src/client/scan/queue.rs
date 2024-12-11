@@ -136,6 +136,10 @@ impl RequestQueue {
         for req in self.queue.drain(..) {
             if req.can_be_fulfilled_by(&sme_request) {
                 // Send the results to this requester
+                #[allow(
+                    clippy::redundant_pattern_matching,
+                    reason = "mass allow for https://fxbug.dev/381896734"
+                )]
                 if let Err(_) = req.responder.send(result.clone()) {
                     warn!("Failed to send scan results to requester, receiving end was dropped. Request reason: {:?}, ssid count: {}, channel count: {}", req.reason, req.ssids.len(), req.channels.len());
                 };

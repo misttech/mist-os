@@ -124,7 +124,7 @@ where
         .connect_to_protocol(svc_name, server_end.into_channel())
         .await
         .bug_context("Connecting to protocol")?
-        .map_err(|err| Error::User(errors::map_daemon_error(svc_name, err)))?;
+        .map_err(|err| Error::User(target_errors::map_daemon_error(svc_name, err)))?;
 
     Ok(proxy)
 }

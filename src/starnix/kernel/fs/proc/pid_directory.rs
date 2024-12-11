@@ -218,7 +218,10 @@ fn static_directory_builder_with_common_task_entries<'a>(
         CallbackSymlinkNode::new({
             let task = WeakRef::from(task);
             move || {
-                if let Some(node) = Task::from_weak(&task)?.mm().executable_node() {
+                // /proc/<pid>/exe is not a valid symlink for kthreads
+                if let Some(node) =
+                    Task::from_weak(&task)?.mm().map(|mm| mm.executable_node()).flatten()
+                {
                     Ok(SymlinkTarget::Node(node))
                 } else {
                     error!(ENOENT)
@@ -689,8 +692,12 @@ impl DynamicFileSource for CmdlineFile {
         } else {
             return Ok(());
         };
+        // /proc/<pid>/cmdline doesn't contain anything for kthreads
+        let Some(mm) = task.mm() else {
+            return Ok(());
+        };
         let (start, end) = {
-            let mm_state = task.mm().state.read();
+            let mm_state = mm.state.read();
             (mm_state.argv_start, mm_state.argv_end)
         };
         fill_buf_from_addr_range(&task, start, end, sink)
@@ -708,8 +715,12 @@ impl EnvironFile {
 impl DynamicFileSource for EnvironFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let task = Task::from_weak(&self.0)?;
+        // /proc/<pid>/environ doesn't contain anything for kthreads
+        let Some(mm) = task.mm() else {
+            return Ok(());
+        };
         let (start, end) = {
-            let mm_state = task.mm().state.read();
+            let mm_state = mm.state.read();
             (mm_state.environ_start, mm_state.environ_end)
         };
         fill_buf_from_addr_range(&task, start, end, sink)
@@ -727,8 +738,12 @@ impl AuxvFile {
 impl DynamicFileSource for AuxvFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let task = Task::from_weak(&self.0)?;
+        // /proc/<pid>/auxv doesn't contain anything for kthreads
+        let Some(mm) = task.mm() else {
+            return Ok(());
+        };
         let (start, end) = {
-            let mm_state = task.mm().state.read();
+            let mm_state = mm.state.read();
             (mm_state.auxv_start, mm_state.auxv_end)
         };
         fill_buf_from_addr_range(&task, start, end, sink)
@@ -983,13 +998,13 @@ impl DynamicFileSource for StatFile {
         let nice: i64;
         let num_threads: i64; // 20
         let itrealvalue: i64 = 0;
-        let starttime: u64;
-        let vsize: usize;
-        let rss: usize;
-        let rsslim: u64; // 25
+        let mut starttime: u64 = 0;
+        let mut vsize: usize = 0;
+        let mut rss: usize = 0;
+        let mut rsslim: u64 = 0; // 25
         let startcode: u64 = 0;
         let endcode: u64 = 0;
-        let startstack: usize;
+        let mut startstack: usize = 0;
         let kstkesp: u64 = 0;
         let kstkeip: u64 = 0; // 30
         let signal: u64 = 0;
@@ -1009,10 +1024,10 @@ impl DynamicFileSource for StatFile {
         let start_data: u64 = 0; // 45
         let end_data: u64 = 0;
         let start_brk: u64 = 0;
-        let arg_start: usize;
-        let arg_end: usize;
-        let env_start: usize; // 50
-        let env_end: usize;
+        let mut arg_start: usize = 0;
+        let mut arg_end: usize = 0;
+        let mut env_start: usize = 0; // 50
+        let mut env_end: usize = 0;
         let exit_code: i32 = 0;
 
         pid = task.get_tid();
@@ -1050,24 +1065,27 @@ impl DynamicFileSource for StatFile {
         utime = duration_to_scheduler_clock(time_stats.user_time);
         stime = duration_to_scheduler_clock(time_stats.system_time);
 
-        let info = task.thread_group.process.info().map_err(|_| errno!(EIO))?;
-        starttime = duration_to_scheduler_clock(
-            zx::MonotonicInstant::from_nanos(info.start_time) - zx::MonotonicInstant::ZERO,
-        ) as u64;
+        if let Ok(info) = task.thread_group.process.info() {
+            starttime = duration_to_scheduler_clock(
+                zx::MonotonicInstant::from_nanos(info.start_time) - zx::MonotonicInstant::ZERO,
+            ) as u64;
+        }
 
-        let mem_stats = task.mm().get_stats().map_err(|_| errno!(EIO))?;
-        let page_size = *PAGE_SIZE as usize;
-        vsize = mem_stats.vm_size;
-        rss = mem_stats.vm_rss / page_size;
-        rsslim = task.thread_group.limits.lock().get(Resource::RSS).rlim_max;
+        if let Some(mm) = task.mm() {
+            let mem_stats = mm.get_stats().map_err(|_| errno!(EIO))?;
+            let page_size = *PAGE_SIZE as usize;
+            vsize = mem_stats.vm_size;
+            rss = mem_stats.vm_rss / page_size;
+            rsslim = task.thread_group.limits.lock().get(Resource::RSS).rlim_max;
 
-        {
-            let mm_state = task.mm().state.read();
-            startstack = mm_state.stack_start.ptr();
-            arg_start = mm_state.argv_start.ptr();
-            arg_end = mm_state.argv_end.ptr();
-            env_start = mm_state.environ_start.ptr();
-            env_end = mm_state.environ_end.ptr();
+            {
+                let mm_state = mm.state.read();
+                startstack = mm_state.stack_start.ptr();
+                arg_start = mm_state.argv_start.ptr();
+                arg_end = mm_state.argv_end.ptr();
+                env_start = mm_state.environ_start.ptr();
+                env_end = mm_state.environ_end.ptr();
+            }
         }
 
         writeln!(
@@ -1088,7 +1106,11 @@ impl StatmFile {
 }
 impl DynamicFileSource for StatmFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let mem_stats = Task::from_weak(&self.0)?.mm().get_stats().map_err(|_| errno!(EIO))?;
+        let mem_stats = if let Some(mm) = Task::from_weak(&self.0)?.mm() {
+            mm.get_stats().map_err(|_| errno!(EIO))?
+        } else {
+            Default::default()
+        };
         let page_size = *PAGE_SIZE as usize;
 
         // 5th and 7th fields are deprecated and should be set to 0.
@@ -1172,16 +1194,18 @@ impl DynamicFileSource for StatusFile {
         track_stub!(TODO("https://fxbug.dev/322873739"), "/proc/pid/status fsuid");
 
         if let Some(task) = task {
-            let mem_stats = task.mm().get_stats().map_err(|_| errno!(EIO))?;
-            writeln!(sink, "VmSize:\t{} kB", mem_stats.vm_size / 1024)?;
-            writeln!(sink, "VmRSS:\t{} kB", mem_stats.vm_rss / 1024)?;
-            writeln!(sink, "RssAnon:\t{} kB", mem_stats.rss_anonymous / 1024)?;
-            writeln!(sink, "RssFile:\t{} kB", mem_stats.rss_file / 1024)?;
-            writeln!(sink, "RssShmem:\t{} kB", mem_stats.rss_shared / 1024)?;
-            writeln!(sink, "VmData:\t{} kB", mem_stats.vm_data / 1024)?;
-            writeln!(sink, "VmStk:\t{} kB", mem_stats.vm_stack / 1024)?;
-            writeln!(sink, "VmExe:\t{} kB", mem_stats.vm_exe / 1024)?;
-            writeln!(sink, "VmSwap:\t{} kB", mem_stats.vm_swap / 1024)?;
+            if let Some(mm) = task.mm() {
+                let mem_stats = mm.get_stats().map_err(|_| errno!(EIO))?;
+                writeln!(sink, "VmSize:\t{} kB", mem_stats.vm_size / 1024)?;
+                writeln!(sink, "VmRSS:\t{} kB", mem_stats.vm_rss / 1024)?;
+                writeln!(sink, "RssAnon:\t{} kB", mem_stats.rss_anonymous / 1024)?;
+                writeln!(sink, "RssFile:\t{} kB", mem_stats.rss_file / 1024)?;
+                writeln!(sink, "RssShmem:\t{} kB", mem_stats.rss_shared / 1024)?;
+                writeln!(sink, "VmData:\t{} kB", mem_stats.vm_data / 1024)?;
+                writeln!(sink, "VmStk:\t{} kB", mem_stats.vm_stack / 1024)?;
+                writeln!(sink, "VmExe:\t{} kB", mem_stats.vm_exe / 1024)?;
+                writeln!(sink, "VmSwap:\t{} kB", mem_stats.vm_swap / 1024)?;
+            }
         }
 
         // There should be at least on thread in Zombie processes.

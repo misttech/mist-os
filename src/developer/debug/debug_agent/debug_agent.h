@@ -70,7 +70,7 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
   void OnProcessChanged(ProcessChangedHow how, std::unique_ptr<ProcessHandle> process);
 
   // Notified by ComponentManager.
-  void OnComponentStarted(const std::string& moniker, const std::string& url);
+  void OnComponentStarted(const std::string& moniker, const std::string& url, zx_koid_t job_koid);
   void OnComponentExited(const std::string& moniker, const std::string& url);
   void OnTestComponentExited(const std::string& url);
 
@@ -172,6 +172,8 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
 
   void OnProcessEnteredLimbo(const LimboProvider::Record& record);
 
+  // Warning: Be very careful when using the returned vector and modifying |filters_|. If an action
+  // causes |filters_| to be reallocated, the returned pointers will be invalidated.
   std::vector<const Filter*> GetMatchingFiltersForComponentInfo(const std::string& moniker,
                                                                 const std::string& url) const;
 

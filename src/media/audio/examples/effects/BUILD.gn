@@ -58,9 +58,6 @@ cc_test_executable("test_bin") {
     "//third_party/googletest:gmock",
     "//zircon/system/ulib/fbl",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_unittest_package("audio_effects_example_tests") {

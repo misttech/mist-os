@@ -1442,7 +1442,10 @@ mod tests {
     impl<I: Eq> SocketMapAddrStateSpec for Multiple<I> {
         type Id = I;
         type SharingState = char;
-        type Inserter<'a> = &'a mut Vec<I> where I: 'a;
+        type Inserter<'a>
+            = &'a mut Vec<I>
+        where
+            I: 'a;
 
         fn new(new_sharing_state: &char, id: I) -> Self {
             Self(*new_sharing_state, vec![id])

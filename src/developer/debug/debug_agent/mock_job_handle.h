@@ -52,6 +52,12 @@ class MockJobHandle final : public JobHandle {
     return debug::Status();
   }
 
+  void AddChildJob(MockJobHandle job) { child_jobs_.push_back(std::move(job)); }
+
+  void AddChildProcess(MockProcessHandle process) {
+    child_processes_.push_back(std::move(process));
+  }
+
  private:
   zx_koid_t job_koid_;
   std::string name_;

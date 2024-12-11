@@ -57,8 +57,8 @@ pub trait Environment: Send + Sync {
     /// Attaches the specified driver to the device.
     async fn attach_driver(&self, device: &mut dyn Device, driver_path: &str) -> Result<(), Error>;
 
-    /// Binds an instance of storage-host to the given device.
-    async fn launch_storage_host(&mut self, device: &mut dyn Device) -> Result<(), Error>;
+    /// Binds an instance of the GPT component to the given device.
+    async fn launch_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error>;
 
     /// Returns a proxy for the exposed dir of the partition table manager.  This can be called
     /// before the manager is bound and it will get routed once bound.
@@ -735,7 +735,7 @@ impl Environment for FshostEnvironment {
         self.launcher.attach_driver(device, driver_path).await
     }
 
-    async fn launch_storage_host(&mut self, device: &mut dyn Device) -> Result<(), Error> {
+    async fn launch_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error> {
         if self.gpt.is_serving() {
             // If we want to support multiple GPT devices, we'll need to change Environment to
             // separate the system GPT and other GPTs.

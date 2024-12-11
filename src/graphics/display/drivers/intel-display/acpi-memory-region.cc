@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/acpi-memory-region.h"
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/resource.h>
@@ -85,8 +86,11 @@ AcpiMemoryRegion::~AcpiMemoryRegion() {
     const zx_vaddr_t region_base = reinterpret_cast<zx_vaddr_t>(region_data_.data());
     auto [first_page_address, vmo_size] = RoundToPageBoundaries(region_base, region_data_.size());
 
-    zx_status_t unmap_status = zx::vmar::root_self()->unmap(region_base, vmo_size);
-    ZX_DEBUG_ASSERT(unmap_status == ZX_OK);
+    zx_status_t unmap_status = zx::vmar::root_self()->unmap(first_page_address, vmo_size);
+    if (unmap_status != ZX_OK) {
+      FDF_LOG(ERROR, "Failed to unmap ACPI memory region (base = %p, size = %zu): %s",
+              region_data_.data(), region_data_.size(), zx_status_get_string(unmap_status));
+    }
   }
 }
 

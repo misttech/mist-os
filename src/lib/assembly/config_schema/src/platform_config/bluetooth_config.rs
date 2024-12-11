@@ -21,44 +21,39 @@ pub enum Snoop {
 /// Configuration options for Bluetooth audio streaming (bt-a2dp).
 // TODO(b/324894109): Add profile-specific arguments
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
 pub struct A2dpConfig {
-    #[serde(default)]
     pub enabled: bool,
 }
 
 /// Configuration options for Bluetooth media info and controls (bt-avrcp).
 // TODO(b/324894109): Add profile-specific arguments
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
 pub struct AvrcpConfig {
-    #[serde(default)]
     pub enabled: bool,
 }
 
 /// Configuration options for Bluetooth Device Identification profile (bt-device-id).
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
 pub struct DeviceIdConfig {
     /// Enable the device identification profile (`bt-device-id`).
-    #[serde(default)]
     pub enabled: bool,
     /// Uniquely identifies the Vendor of the device.
     /// Mandatory if `enabled` is true.
-    #[serde(default)]
     pub vendor_id: u16,
     /// Uniquely identifies the product - typically a value assigned by the Vendor.
     /// Mandatory if `enabled` is true.
-    #[serde(default)]
     pub product_id: u16,
     /// Device release number.
     /// Mandatory if `enabled` is true.
-    #[serde(default)]
     pub version: u16,
     /// If `true`, designates this identification as the primary service record for this device.
     /// Mandatory if `enabled` is true.
-    #[serde(default)]
     pub primary: bool,
     /// A human-readable description of the service.
     /// Optional if `enabled` is true.
-    #[serde(default)]
     pub service_description: Option<String>,
 }
 
@@ -112,10 +107,11 @@ pub enum HfpCodecId {
 
 /// Configuration options for Bluetooth hands free (bt-hfp).
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
 pub struct HfpConfig {
     /// Enable hands free calling audio gateway (`bt-hfp-audio-gateway`).
-    #[serde(default)]
     pub enabled: bool,
+
     /// The set of AudioGateway features that are enabled.
     /// Features not included are disabled by default, with the exception of the
     /// following which are always enabled:
@@ -124,59 +120,53 @@ pub struct HfpConfig {
     ///  - Codec Negotiation
     ///  - HF Indicators
     ///  - eSCO S4
-    #[serde(default)]
     pub audio_gateway: Vec<HfpAudioGatewayFeature>,
+
     /// The set of codecs that are enabled to use.
     /// If MSBC is enabled, Wide Band Speech will be enabled
     /// If LC3 is enabled, Super Wide Band will be enabled
     /// By default, all codecs supported (either by the controller as specified below) will be enabled.
-    #[serde(default)]
     pub codecs_supported: Vec<HfpCodecId>,
     /// Set of codec ids that the Bluetooth controller can encode.
     /// Codecs not supported will be ignored.
     /// Codecs not in this list but in codecs_supported will be encoded locally and sent inband.
-    #[serde(default)]
     pub controller_encodes: Vec<HfpCodecId>,
 }
 
 /// Configuration options for Bluetooth message access profile (bt-map)
 /// client equipment role.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
 pub struct MapConfig {
     /// Enable message access client equipment (`bt-map-mce`).
-    #[serde(default)]
     pub mce_enabled: bool,
 }
 
 /// Platform configuration to enable Bluetooth profiles.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
 pub struct BluetoothProfilesConfig {
     /// Specifies the configuration for `bt-a2dp`.
-    #[serde(default)]
     pub a2dp: A2dpConfig,
 
     /// Specifies the configuration for `bt-avrcp`.
-    #[serde(default)]
     pub avrcp: AvrcpConfig,
 
     /// Specifies the configuration for `bt-device-id`.
-    #[serde(default)]
     pub did: DeviceIdConfig,
 
     /// Specifies the configuration for `bt-hfp`.
-    #[serde(default)]
     pub hfp: HfpConfig,
 
     /// Specifies the configuration for `bt-map`.
-    #[serde(default)]
     pub map: MapConfig,
 }
 
 /// Platform configuration for Bluetooth core features.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
 pub struct BluetoothCoreConfig {
     /// Enable BR/EDR legacy pairing.
-    #[serde(default)]
     pub legacy_pairing_enabled: bool,
 }
 

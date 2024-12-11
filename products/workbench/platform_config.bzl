@@ -11,7 +11,7 @@ assembly process.
 
 load("@fuchsia_build_info//:args.bzl", "delegated_network_provisioning")
 load(
-    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "@rules_fuchsia//fuchsia:assembly.bzl",
     "BUILD_TYPES",
 )
 

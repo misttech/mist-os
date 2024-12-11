@@ -343,13 +343,14 @@ fshost_integration_test_package("fshost_integration_tests_storage_host_fxfs") {
     storage_host = true
   }
   extra_deps = [
+    "//src/storage/gpt/component",
     "//src/storage/lib/blob_writer:blob-writer",
-    "//src/storage/storage-host",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
   ]
 }
 
-fshost_integration_test_package("fshost_integration_tests_storage_host_minfs") {
+fshost_integration_test_package(
+    "fshost_integration_tests_storage_host_fvm_minfs") {
   options = {
     data_filesystem_format = "minfs"
     use_disk_migration = false
@@ -358,12 +359,12 @@ fshost_integration_test_package("fshost_integration_tests_storage_host_minfs") {
   }
   extra_deps = [
     "//src/storage/fvm:fvm-component",
-    "//src/storage/storage-host",
+    "//src/storage/gpt/component",
   ]
 }
 
 fshost_integration_test_package(
-    "fshost_integration_tests_storage_host_minfs_no_zxcrypt") {
+    "fshost_integration_tests_storage_host_fvm_minfs_no_zxcrypt") {
   data_filesystem_variant = "minfs-no-zxcrypt"
   options = {
     data_filesystem_format = "minfs"
@@ -374,7 +375,7 @@ fshost_integration_test_package(
   }
   extra_deps = [
     "//src/storage/fvm:fvm-component",
-    "//src/storage/storage-host",
+    "//src/storage/gpt/component",
   ]
 }
 
@@ -426,8 +427,8 @@ group("tests") {
     ":fshost_integration_tests_fxfs_no_fxblob",
     ":fshost_integration_tests_minfs",
     ":fshost_integration_tests_minfs_no_zxcrypt",
+    ":fshost_integration_tests_storage_host_fvm_minfs",
+    ":fshost_integration_tests_storage_host_fvm_minfs_no_zxcrypt",
     ":fshost_integration_tests_storage_host_fxfs",
-    ":fshost_integration_tests_storage_host_minfs",
-    ":fshost_integration_tests_storage_host_minfs_no_zxcrypt",
   ]
 }

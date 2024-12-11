@@ -23,6 +23,7 @@ TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
   // setting both exec state level and app activity level to active.
   test_sagcontrol::SystemActivityGovernorState state = GetBootCompleteState();
   ASSERT_EQ(ChangeSagState(state), ZX_OK);
+  ASSERT_TRUE(SetBootComplete());
 
   auto result = component::Connect<fuchsia_diagnostics::ArchiveAccessor>();
   ASSERT_EQ(ZX_OK, result.status_value());

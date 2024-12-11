@@ -7,10 +7,8 @@ use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the starnix area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct PlatformStarnixConfig {
-    #[serde(default)]
     pub enabled: bool,
-    #[serde(default)]
     pub enable_android_support: bool,
 }

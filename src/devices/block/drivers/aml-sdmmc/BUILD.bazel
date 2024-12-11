@@ -3,12 +3,13 @@
 # found in the LICENSE file.
 
 load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "@rules_fuchsia//fuchsia:defs.bzl",
     "fuchsia_cc_driver",
     "fuchsia_component_manifest",
     "fuchsia_driver_bind_bytecode",
     "fuchsia_driver_component",
     "fuchsia_package",
+    "fuchsia_prebuilt_package",
     "fuchsia_structured_config_cpp_elf_lib",
     "fuchsia_structured_config_values",
 )
@@ -108,4 +109,12 @@ fuchsia_package(
     package_repository_name = "fuchsia.com",
     resources = [":sc-values"],
     visibility = ["//visibility:public"],
+)
+
+fuchsia_prebuilt_package(
+    name = "aml-sdmmc",
+    archive = "@gn_targets//src/devices/block/drivers/aml-sdmmc:package",
+    drivers = [
+        "meta/aml-sdmmc.cm",
+    ],
 )

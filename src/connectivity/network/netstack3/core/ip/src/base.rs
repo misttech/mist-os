@@ -32,15 +32,15 @@ use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
-    HandleableTimer, Inspectable, Inspector, InstantContext, IpAddressId, IpDeviceAddr, IpExt,
-    Matcher as _, NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
-    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
-    WrapBroadcastMarker,
+    HandleableTimer, Inspectable, Inspector, InstantContext, IpAddressId, IpDeviceAddr,
+    IpDeviceAddressIdContext, IpExt, Matcher as _, NestedIntoCoreTimerCtx, NotFoundError,
+    RngContext, SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
+    TimerHandler, TracingContext, WeakIpAddressId, WrapBroadcastMarker,
 };
 use netstack3_filter::{
-    self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
-    FilterHandler as _, FilterIpContext, FilterIpExt, FilterIpMetadata, FilterTimerId,
-    ForwardedPacket, IngressVerdict, IpPacket, TransportPacketSerializer, Tuple,
+    self as filter, ConnectionDirection, ConntrackConnection, FilterBindingsContext,
+    FilterBindingsTypes, FilterHandler as _, FilterIpContext, FilterIpExt, FilterIpMetadata,
+    FilterTimerId, ForwardedPacket, IngressVerdict, IpPacket, TransportPacketSerializer, Tuple,
     WeakConnectionError, WeakConntrackConnection,
 };
 use packet::{
@@ -59,7 +59,9 @@ use crate::internal::device::slaac::SlaacCounters;
 use crate::internal::device::state::{
     IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv6AddressFlags, Ipv6AddressState,
 };
-use crate::internal::device::{self, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext};
+use crate::internal::device::{
+    self, IpAddressIdExt, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext,
+};
 use crate::internal::fragmentation::{
     FragmentableIpSerializer, FragmentationCounters, FragmentationIpExt, IpFragmenter,
 };
@@ -154,8 +156,9 @@ impl TransportReceiveError {
 /// as part of multicast forwarding).
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct IpLayerPacketMetadata<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> {
-    conntrack_connection: Option<ConntrackConnection<I, BT>>,
+pub struct IpLayerPacketMetadata<I: packet_formats::ip::IpExt, A, BT: FilterBindingsTypes> {
+    conntrack_connection_and_direction:
+        Option<(ConntrackConnection<I, A, BT>, ConnectionDirection)>,
     #[cfg(debug_assertions)]
     drop_check: IpLayerPacketMetadataDropCheck,
 }
@@ -183,10 +186,12 @@ pub struct DeviceIpLayerMetadata {
     /// packets with the same connection at every filtering hook even when NAT may
     /// have been performed on them, causing them to no longer match the original or
     /// reply tuples of the connection.
-    conntrack_entry: Option<WeakConntrackConnection>,
+    conntrack_entry: Option<(WeakConntrackConnection, ConnectionDirection)>,
 }
 
-impl<I: IpLayerIpExt, BT: FilterBindingsTypes> IpLayerPacketMetadata<I, BT> {
+impl<I: IpLayerIpExt, A: WeakIpAddressId<I::Addr>, BT: FilterBindingsTypes>
+    IpLayerPacketMetadata<I, A, BT>
+{
     fn from_device_ip_layer_metadata<CC>(
         core_ctx: &mut CC,
         DeviceIpLayerMetadata { conntrack_entry }: DeviceIpLayerMetadata,
@@ -194,10 +199,16 @@ impl<I: IpLayerIpExt, BT: FilterBindingsTypes> IpLayerPacketMetadata<I, BT> {
     where
         CC: CounterContext<IpCounters<I>>,
     {
-        match conntrack_entry.map(WeakConntrackConnection::into_inner).transpose() {
+        match conntrack_entry
+            .map(|(conn, dir)| conn.into_inner().map(|conn| (conn, dir)))
+            .transpose()
+        {
             // Either the packet was tracked and we've preserved its conntrack entry across
             // loopback, or it was untracked and we just stash the `None`.
-            Ok(conn) => IpLayerPacketMetadata { conntrack_connection: conn, ..Default::default() },
+            Ok(conn_and_dir) => IpLayerPacketMetadata {
+                conntrack_connection_and_direction: conn_and_dir,
+                ..Default::default()
+            },
             // Conntrack entry was removed from table after packet was enqueued in loopback.
             Err(WeakConnectionError::EntryRemoved) => IpLayerPacketMetadata::default(),
             // Conntrack entry no longer matches the packet (for example, it could be that
@@ -212,7 +223,7 @@ impl<I: IpLayerIpExt, BT: FilterBindingsTypes> IpLayerPacketMetadata<I, BT> {
     }
 }
 
-impl<I: IpExt, BT: FilterBindingsTypes> IpLayerPacketMetadata<I, BT> {
+impl<I: IpExt, A, BT: FilterBindingsTypes> IpLayerPacketMetadata<I, A, BT> {
     /// Acknowledge that it's okay to drop this packet metadata.
     ///
     /// When compiled with debug assertions, dropping [`IplayerPacketMetadata`]
@@ -236,18 +247,21 @@ impl Drop for IpLayerPacketMetadataDropCheck {
     }
 }
 
-impl<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, BT>
-    for IpLayerPacketMetadata<I, BT>
+impl<I: packet_formats::ip::IpExt, A, BT: FilterBindingsTypes> FilterIpMetadata<I, A, BT>
+    for IpLayerPacketMetadata<I, A, BT>
 {
-    fn take_conntrack_connection(&mut self) -> Option<ConntrackConnection<I, BT>> {
-        self.conntrack_connection.take()
+    fn take_connection_and_direction(
+        &mut self,
+    ) -> Option<(ConntrackConnection<I, A, BT>, ConnectionDirection)> {
+        self.conntrack_connection_and_direction.take()
     }
 
-    fn replace_conntrack_connection(
+    fn replace_connection_and_direction(
         &mut self,
-        conn: ConntrackConnection<I, BT>,
-    ) -> Option<ConntrackConnection<I, BT>> {
-        self.conntrack_connection.replace(conn)
+        conn: ConntrackConnection<I, A, BT>,
+        direction: ConnectionDirection,
+    ) -> Option<ConntrackConnection<I, A, BT>> {
+        self.conntrack_connection_and_direction.replace((conn, direction)).map(|(conn, _dir)| conn)
     }
 }
 
@@ -665,7 +679,13 @@ pub enum Ipv6PresentAddressStatus {
 
 /// An extension trait providing IP layer properties.
 pub trait IpLayerIpExt:
-    IpExt + MulticastRouteIpExt + IcmpHandlerIpExt + FilterIpExt + FragmentationIpExt
+    IpExt
+    + MulticastRouteIpExt
+    + IcmpHandlerIpExt
+    + FilterIpExt
+    + FragmentationIpExt
+    + IpDeviceIpExt
+    + IpAddressIdExt
 {
     /// IP Address status.
     type AddressStatus: Debug;
@@ -1473,7 +1493,7 @@ impl<
             SpecifiedAddr<I::Addr>,
         >,
         body: S,
-        packet_metadata: IpLayerPacketMetadata<I, BC>,
+        packet_metadata: IpLayerPacketMetadata<I, CC::WeakAddressId, BC>,
     ) -> Result<(), IpSendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
@@ -1783,9 +1803,9 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
 }
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
-    OrderedLockAccess<filter::State<I, BT>> for IpStateInner<I, D, BT>
+    OrderedLockAccess<filter::State<I, I::Weak<BT>, BT>> for IpStateInner<I, D, BT>
 {
-    type Lock = RwLock<filter::State<I, BT>>;
+    type Lock = RwLock<filter::State<I, I::Weak<BT>, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.filter)
     }
@@ -1911,6 +1931,7 @@ pub trait IpStateBindingsTypes:
     + RawIpSocketsBindingsTypes
     + FilterBindingsTypes
     + MulticastForwardingBindingsTypes
+    + IpDeviceStateBindingsTypes
 {
 }
 impl<BT> IpStateBindingsTypes for BT where
@@ -1919,6 +1940,7 @@ impl<BT> IpStateBindingsTypes for BT where
         + RawIpSocketsBindingsTypes
         + FilterBindingsTypes
         + MulticastForwardingBindingsTypes
+        + IpDeviceStateBindingsTypes
 {
 }
 
@@ -1929,7 +1951,7 @@ pub struct RoutingTableId<I: Ip, D>(StrongRc<RwLock<RoutingTable<I, D>>>);
 impl<I: Ip, D> Debug for RoutingTableId<I, D> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        f.debug_tuple("RoutingTabeId").field(&StrongRc::debug_id(rc)).finish()
+        f.debug_tuple("RoutingTableId").field(&StrongRc::debug_id(rc)).finish()
     }
 }
 
@@ -1966,7 +1988,7 @@ pub struct WeakRoutingTableId<I: Ip, D>(WeakRc<RwLock<RoutingTable<I, D>>>);
 impl<I: Ip, D> Debug for WeakRoutingTableId<I, D> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        f.debug_tuple("WeakRoutingTabeId").field(&WeakRc::debug_id(rc)).finish()
+        f.debug_tuple("WeakRoutingTableId").field(&WeakRc::debug_id(rc)).finish()
     }
 }
 
@@ -1984,7 +2006,7 @@ pub struct IpStateInner<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateB
     counters: IpCounters<I>,
     raw_sockets: RwLock<RawIpSocketMap<I, D::Weak, BT>>,
     raw_socket_counters: RawIpSocketCounters<I>,
-    filter: RwLock<filter::State<I, BT>>,
+    filter: RwLock<filter::State<I, I::Weak<BT>, BT>>,
     // Make sure the primary IDs are dropped last. Also note that the following hash map also stores
     // the primary ID to the main table, and if the user (Bindings) attempts to remove the main
     // table without dropping `main_table_id` first, it will panic. This serves as an assertion
@@ -2022,7 +2044,7 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpSta
 
     /// Provides direct access to the filtering state.
     #[cfg(any(test, feature = "testutils"))]
-    pub fn filter(&self) -> &RwLock<filter::State<I, BT>> {
+    pub fn filter(&self) -> &RwLock<filter::State<I, I::Weak<BT>, BT>> {
         &self.filter
     }
 }
@@ -2231,7 +2253,7 @@ fn dispatch_receive_ipv4_packet<
     device: &'b CC::DeviceId,
     frame_dst: Option<FrameDestination>,
     mut packet: Ipv4Packet<&'a mut [u8]>,
-    mut packet_metadata: IpLayerPacketMetadata<Ipv4, BC>,
+    mut packet_metadata: IpLayerPacketMetadata<Ipv4, CC::WeakAddressId, BC>,
     transparent_override: Option<TransparentLocalDelivery<Ipv4>>,
     broadcast_marker: Option<<Ipv4 as BroadcastIpExt>::BroadcastMarker>,
 ) -> Result<(), IcmpErrorSender<'b, Ipv4, CC::DeviceId>> {
@@ -2322,7 +2344,7 @@ fn dispatch_receive_ipv6_packet<
     device: &'b CC::DeviceId,
     frame_dst: Option<FrameDestination>,
     mut packet: Ipv6Packet<&'a mut [u8]>,
-    mut packet_metadata: IpLayerPacketMetadata<Ipv6, BC>,
+    mut packet_metadata: IpLayerPacketMetadata<Ipv6, CC::WeakAddressId, BC>,
     meta: ReceiveIpPacketMeta<Ipv6>,
 ) -> Result<(), IcmpErrorSender<'b, Ipv6, CC::DeviceId>> {
     // TODO(https://fxbug.dev/42095067): Once we support multiple extension
@@ -2412,10 +2434,10 @@ fn dispatch_receive_ipv6_packet<
 /// determination of how to forward. This is advantageous because forwarding
 /// requires the underlying packet buffer, which cannot be "moved" in certain
 /// contexts.
-pub(crate) struct IpPacketForwarder<'a, I: IpLayerIpExt, D, BT: FilterBindingsTypes> {
+pub(crate) struct IpPacketForwarder<'a, I: IpLayerIpExt, D, A, BT: FilterBindingsTypes> {
     inbound_device: &'a D,
     outbound_device: &'a D,
-    packet_meta: IpLayerPacketMetadata<I, BT>,
+    packet_meta: IpLayerPacketMetadata<I, A, BT>,
     src_ip: I::RecvSrcAddr,
     dst_ip: SpecifiedAddr<I::Addr>,
     destination: IpPacketDestination<I, &'a D>,
@@ -2424,7 +2446,7 @@ pub(crate) struct IpPacketForwarder<'a, I: IpLayerIpExt, D, BT: FilterBindingsTy
     frame_dst: Option<FrameDestination>,
 }
 
-impl<'a, I, D, BC> IpPacketForwarder<'a, I, D, BC>
+impl<'a, I, D, A, BC> IpPacketForwarder<'a, I, D, A, BC>
 where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, D>,
@@ -2433,7 +2455,7 @@ where
     fn forward_with_buffer<CC, B>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, buffer: B)
     where
         B: BufferMut,
-        CC: IpLayerForwardingContext<I, BC, DeviceId = D>,
+        CC: IpLayerForwardingContext<I, BC, DeviceId = D, WeakAddressId = A>,
     {
         let Self {
             inbound_device,
@@ -2509,17 +2531,17 @@ where
 }
 
 /// The action to take for a packet that was a candidate for forwarding.
-pub(crate) enum ForwardingAction<'a, I: IpLayerIpExt, D, BT: FilterBindingsTypes> {
+pub(crate) enum ForwardingAction<'a, I: IpLayerIpExt, D, A, BT: FilterBindingsTypes> {
     /// Drop the packet without forwarding it or generating an ICMP error.
     SilentlyDrop,
     /// Forward the packet, as specified by the [`IpPacketForwarder`].
-    Forward(IpPacketForwarder<'a, I, D, BT>),
+    Forward(IpPacketForwarder<'a, I, D, A, BT>),
     /// Drop the packet without forwarding, and generate an ICMP error as
     /// specified by the [`IcmpErrorSender`].
     DropWithIcmpError(IcmpErrorSender<'a, I, D>),
 }
 
-impl<'a, I, D, BC> ForwardingAction<'a, I, D, BC>
+impl<'a, I, D, A, BC> ForwardingAction<'a, I, D, A, BC>
 where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, D>,
@@ -2532,7 +2554,7 @@ where
         buffer: B,
     ) where
         B: BufferMut,
-        CC: IpLayerForwardingContext<I, BC, DeviceId = D>,
+        CC: IpLayerForwardingContext<I, BC, DeviceId = D, WeakAddressId = A>,
     {
         match self {
             ForwardingAction::SilentlyDrop => {}
@@ -2550,7 +2572,7 @@ where
 pub(crate) fn determine_ip_packet_forwarding_action<'a, 'b, I, BC, CC>(
     core_ctx: &'a mut CC,
     mut packet: I::Packet<&'a mut [u8]>,
-    mut packet_meta: IpLayerPacketMetadata<I, BC>,
+    mut packet_meta: IpLayerPacketMetadata<I, CC::WeakAddressId, BC>,
     minimum_ttl: Option<u8>,
     inbound_device: &'b CC::DeviceId,
     outbound_device: &'b CC::DeviceId,
@@ -2558,7 +2580,7 @@ pub(crate) fn determine_ip_packet_forwarding_action<'a, 'b, I, BC, CC>(
     frame_dst: Option<FrameDestination>,
     src_ip: I::RecvSrcAddr,
     dst_ip: SpecifiedAddr<I::Addr>,
-) -> ForwardingAction<'b, I, CC::DeviceId, BC>
+) -> ForwardingAction<'b, I, CC::DeviceId, CC::WeakAddressId, BC>
 where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, CC::DeviceId>,
@@ -2705,13 +2727,13 @@ pub(crate) fn send_ip_frame<I, CC, BC, S>(
     device: &CC::DeviceId,
     destination: IpPacketDestination<I, &CC::DeviceId>,
     mut body: S,
-    mut packet_metadata: IpLayerPacketMetadata<I, BC>,
+    mut packet_metadata: IpLayerPacketMetadata<I, CC::WeakAddressId, BC>,
     limit_mtu: Mtu,
 ) -> Result<(), IpSendFrameError<S>>
 where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
-    CC: IpLayerEgressContext<I, BC> + IpDeviceMtuContext<I>,
+    CC: IpLayerEgressContext<I, BC> + IpDeviceMtuContext<I> + IpDeviceAddressIdContext<I>,
     S: FragmentableIpSerializer<I, Buffer: BufferMut> + IpPacket<I>,
 {
     let (verdict, proof) = core_ctx.filter_handler().egress_hook(
@@ -2733,9 +2755,9 @@ where
     // device layer so it can be reused on ingress to the IP layer.
     let conntrack_entry = if device.is_loopback() {
         packet_metadata
-            .conntrack_connection
+            .conntrack_connection_and_direction
             .take()
-            .and_then(|conn| WeakConntrackConnection::new(&conn))
+            .and_then(|(conn, dir)| WeakConntrackConnection::new(&conn).map(|conn| (conn, dir)))
     } else {
         None
     };
@@ -4361,7 +4383,7 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
         Option<SpecifiedAddr<I::Addr>>,
     >,
     body: S,
-    packet_metadata: IpLayerPacketMetadata<I, BC>,
+    packet_metadata: IpLayerPacketMetadata<I, CC::WeakAddressId, BC>,
 ) -> Result<(), IpSendFrameError<S>>
 where
     I: IpLayerIpExt,
@@ -4403,10 +4425,15 @@ where
 
 /// Abstracts access to a [`filter::FilterHandler`] for core contexts.
 pub trait FilterHandlerProvider<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes>:
-    DeviceIdContext<AnyDevice, DeviceId: filter::InterfaceProperties<BT::DeviceClass>>
+    IpDeviceAddressIdContext<I, DeviceId: filter::InterfaceProperties<BT::DeviceClass>>
 {
     /// The filter handler.
-    type Handler<'a>: filter::FilterHandler<I, BT, DeviceId = Self::DeviceId>
+    type Handler<'a>: filter::FilterHandler<
+        I,
+        BT,
+        DeviceId = Self::DeviceId,
+        WeakAddressId = Self::WeakAddressId,
+    >
     where
         Self: 'a;
 
@@ -4419,7 +4446,7 @@ pub(crate) mod testutil {
     use super::*;
 
     use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId};
-    use netstack3_base::{SendFrameContext, SendFrameError, SendableFrameMeta};
+    use netstack3_base::{AssignedAddrIpExt, SendFrameContext, SendFrameError, SendableFrameMeta};
     use packet::Serializer;
 
     /// A [`SendIpPacketMeta`] for dual stack contextx.
@@ -4503,7 +4530,7 @@ pub(crate) mod testutil {
 
     impl<I, BC, S, Meta, DeviceId> FilterHandlerProvider<I, BC> for FakeCoreCtx<S, Meta, DeviceId>
     where
-        I: packet_formats::ip::IpExt,
+        I: packet_formats::ip::IpExt + AssignedAddrIpExt,
         BC: FilterBindingsContext,
         DeviceId: FakeStrongDeviceId + filter::InterfaceProperties<BC::DeviceClass>,
     {

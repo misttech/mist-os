@@ -10,27 +10,9 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor",
+            dictionary: "diagnostics-accessors",
             from: "parent",
-            as: "fuchsia.diagnostics.RealArchiveAccessor",
-            to: [ "#inspect_test_runner" ],
-        },
-        {
-            protocol: "fuchsia.diagnostics.FeedbackArchiveAccessor",
-            from: "parent",
-            as: "fuchsia.diagnostics.RealFeedbackArchiveAccessor",
-            to: [ "#inspect_test_runner" ],
-        },
-        {
-            protocol: "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-            from: "parent",
-            as: "fuchsia.diagnostics.RealLegacyMetricsArchiveAccessor",
-            to: [ "#inspect_test_runner" ],
-        },
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "parent",
-            to: [ "#inspect_test_runner" ],
+            to: "#inspect_test_runner",
         },
     ],
 }

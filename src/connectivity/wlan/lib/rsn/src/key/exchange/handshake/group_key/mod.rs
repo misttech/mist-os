@@ -23,6 +23,7 @@ pub struct GroupKeyHandshakeFrame<B: SplitByteSlice> {
 }
 
 impl<B: SplitByteSlice> GroupKeyHandshakeFrame<B> {
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn from_verified(frame: Dot11VerifiedKeyFrame<B>, role: Role) -> Result<Self, Error> {
         // Safe since the frame will be wrapped again in a `Dot11VerifiedKeyFrame` when being accessed.
         let raw_frame = frame.unsafe_get_raw();
@@ -125,6 +126,7 @@ pub struct Config {
 pub struct GroupKey(RoleHandler);
 
 impl GroupKey {
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn new(cfg: Config, kck: &[u8], kek: &[u8]) -> Result<GroupKey, Error> {
         let handler = match &cfg.role {
             Role::Supplicant => RoleHandler::Supplicant(Supplicant {
@@ -148,6 +150,7 @@ impl GroupKey {
         }
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_eapol_key_frame<B: SplitByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,

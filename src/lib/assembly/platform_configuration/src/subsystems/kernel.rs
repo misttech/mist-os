@@ -164,6 +164,18 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             builder.kernel_arg(KernelArg::AslrEntropyBits(aslr_entropy_bits));
         }
 
+        if kernel_config.cprng.seed_require_jitterentropy {
+            builder.kernel_arg(KernelArg::CprngSeedRequireJitterEntropy(true))
+        }
+
+        if kernel_config.cprng.seed_require_cmdline {
+            builder.kernel_arg(KernelArg::CprngSeedRequireCmdline(true))
+        }
+
+        if kernel_config.cprng.reseed_require_jitterentropy {
+            builder.kernel_arg(KernelArg::CprngReseedRequireJitterEntropy(true))
+        }
+
         if let Some(memory_limit_mb) = kernel_config.memory_limit_mb {
             builder.kernel_arg(KernelArg::MemoryLimitMib(memory_limit_mb));
         }

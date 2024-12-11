@@ -354,9 +354,6 @@ group("test_data") {
   public_deps = [
     ":custom_artifact_realm_test",
     ":data_storage_test",
-    ":debug-data-test",
-    ":debug_data_spam_test",
-    ":debug_data_write_test",
     ":disabled-test-example",
     ":echo_test_client",
     ":echo_test_realm",
@@ -370,7 +367,6 @@ group("test_data") {
     ":no-onfinished-after-test-example",
     ":no-test-example",
     ":no_suite_service",
-    ":nonhermetic_capability_test",
     ":passing-test-example",
     ":run-closes-channel-example",
     ":run-hangs-example",
@@ -379,4 +375,18 @@ group("test_data") {
     "//examples/components/routing/rust/echo_server:echo_server_cmp",
     "//examples/tests/rust:custom_artifact_user_cmp",
   ]
+
+  # Ensure that these tests do not run when profile variant is selected.
+  # These tests add a use for fuchsia.debugdata.Publisher capability
+  # via debug for coverage variant, and profile variant adds a use for this
+  # capability via diagnostics dictionary, which results in duplicate use
+  # target protocol error.
+  if (!is_profile) {
+    public_deps += [
+      ":debug-data-test",
+      ":debug_data_spam_test",
+      ":debug_data_write_test",
+      ":nonhermetic_capability_test",
+    ]
+  }
 }

@@ -1063,17 +1063,33 @@ impl<T> From<T> for BorrowedOrOwned<'_, T> {
 }
 
 /// LockManager holds the locks that transactions might have taken.  A TransactionManager
-/// implementation would typically have one of these.  Three different kinds of locks are supported.
-/// There are read locks and write locks, which are as one would expect.  The third kind of lock is
-/// a _transaction_ lock.  When first acquired, these block other writes but do not block reads.
-/// When it is time to commit a transaction, these locks are upgraded to full write locks and then
-/// dropped after committing (unless commit_and_continue is used).  This way, reads are only blocked
-/// for the shortest possible time.  It follows that write locks should be used sparingly.  Locks
-/// are granted in order with one exception: when a lock is in the initial _transaction_ lock state
+/// implementation would typically have one of these.
+///
+/// Three different kinds of locks are supported.  There are read locks and write locks, which are
+/// as one would expect.  The third kind of lock is a _transaction_ lock (which is also known as an
+/// upgradeable read lock).  When first acquired, these block other writes (including other
+/// transaction locks) but do not block reads.  When it is time to commit a transaction, these locks
+/// are upgraded to full write locks (without ever dropping the lock) and then dropped after
+/// committing (unless commit_and_continue is used).  This way, reads are only blocked for the
+/// shortest possible time.  It follows that write locks should be used sparingly.  Locks are
+/// granted in order with one exception: when a lock is in the initial _transaction_ lock state
 /// (LockState::Locked), all read locks are allowed even if there are other tasks waiting for the
 /// lock.  The reason for this is because we allow read locks to be taken by tasks that have taken a
 /// _transaction_ lock (i.e. recursion is allowed).  In other cases, such as when a writer is
 /// waiting and there are only readers, readers will queue up behind the writer.
+///
+/// To summarize:
+///
+/// +-------------------------+-----------------+----------------+------------------+
+/// |                         | While read_lock | While txn_lock | While write_lock |
+/// |                         | is held         | is held        | is held          |
+/// +-------------------------+-----------------+----------------+------------------+
+/// | Can acquire read_lock?  | true            | true           | false            |
+/// +-------------------------+-----------------+----------------+------------------+
+/// | Can acquire txn_lock?   | true            | false          | false            |
+/// +-------------------------+-----------------+----------------+------------------+
+/// | Can acquire write_lock? | false           | false          | false            |
+/// +-------------------------+-----------------+----------------+------------------+
 pub struct LockManager {
     locks: Mutex<Locks>,
 }
@@ -1245,7 +1261,8 @@ enum LockState {
     // In this state, there are only readers.
     ReadLock,
 
-    // This state is used for transactions to lock other writers, but it still allows readers.
+    // This state is used for transactions to lock other writers (including other transactions), but
+    // it still allows readers.
     Locked,
 
     // A writer has exclusive access; all other readers and writers are blocked.

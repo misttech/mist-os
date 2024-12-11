@@ -24,7 +24,7 @@ using cobalt_registry::MemoryMigratedMetricDimensionBucket;
 using TimeSinceBoot = cobalt_registry::MemoryLeakMigratedMetricDimensionTimeSinceBoot;
 
 namespace {
-static const std::map<zx_duration_t, TimeSinceBoot> UptimeLevelMap = {
+const std::map<zx_duration_t, TimeSinceBoot> UptimeLevelMap = {
     {zx_duration_from_min(1), TimeSinceBoot::Up},
     {zx_duration_from_min(30), TimeSinceBoot::UpOneMinute},
     {zx_duration_from_hour(1), TimeSinceBoot::UpThirtyMinutes},

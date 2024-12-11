@@ -6164,8 +6164,14 @@ static zx_status_t brcmf_notify_start_auth(struct brcmf_if* ifp, const struct br
   assoc_mgr_cmd_t cmd;
   zx_status_t err = ZX_OK;
   bcme_status_t fw_err = BCME_OK;
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
+    return ZX_ERR_INTERNAL;
+  }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacSaeHandshakeInd ind = {};
+  auto builder =
+      fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcSaeHandshakeIndRequest::Builder(*arena);
   brcmf_ext_auth* auth_start_evt = (brcmf_ext_auth*)data;
 
   if (!(brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state) ||
@@ -6178,7 +6184,11 @@ static zx_status_t brcmf_notify_start_auth(struct brcmf_if* ifp, const struct br
             "The peer addr received from data is: " FMT_MAC ", the addr in event_msg is: " FMT_MAC
             "\n",
             FMT_MAC_ARGS(auth_start_evt->bssid), FMT_MAC_ARGS(e->addr));
-  memcpy(ind.peer_sta_address.data(), &auth_start_evt->bssid, ETH_ALEN);
+
+  fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::copy(std::begin(auth_start_evt->bssid), std::end(auth_start_evt->bssid),
+            peer_sta_address.begin());
+  builder.peer_sta_address(peer_sta_address);
 
   // SAE four-way authentication start.
   brcmf_set_bit(brcmf_vif_status_bit_t::SAE_AUTHENTICATING, &ifp->vif->sme_state);
@@ -6195,12 +6205,8 @@ static zx_status_t brcmf_notify_start_auth(struct brcmf_if* ifp, const struct br
               brcmf_fil_get_errstr(fw_err));
     return err;
   }
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-  auto result = ndev->if_proto.buffer(*arena)->SaeHandshakeInd(ind);
+
+  auto result = ndev->if_proto.buffer(*arena)->SaeHandshakeInd(builder.Build());
   if (!result.ok()) {
     BRCMF_ERR("Failed to send sae handshake ind result.status: %s", result.status_string());
     return ZX_ERR_INTERNAL;

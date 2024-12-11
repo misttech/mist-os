@@ -18,7 +18,7 @@ pub(crate) struct NestedNla<'a, T> {
     nlas: &'a [T],
 }
 
-impl<'a, T: Nla> Nla for NestedNla<'a, T> {
+impl<T: Nla> Nla for NestedNla<'_, T> {
     fn value_len(&self) -> usize {
         self.nlas.buffer_len()
     }
@@ -32,7 +32,7 @@ impl<'a, T: Nla> Nla for NestedNla<'a, T> {
     }
 }
 
-pub(crate) fn to_nested_nlas<'a, T>(list: &'a Vec<Vec<T>>) -> Vec<NestedNla<'a, T>> {
+pub(crate) fn to_nested_nlas<T>(list: &[Vec<T>]) -> Vec<NestedNla<'_, T>> {
     list.iter().enumerate().map(|(idx, nlas)| NestedNla { index: idx as u16 + 1, nlas }).collect()
 }
 
@@ -45,7 +45,7 @@ pub(crate) struct NestedValue<'a, T> {
     value: &'a T,
 }
 
-impl<'a, T: NlaValue> Nla for NestedValue<'a, T> {
+impl<T: NlaValue> Nla for NestedValue<'_, T> {
     fn value_len(&self) -> usize {
         self.value.value_len()
     }
@@ -59,7 +59,7 @@ impl<'a, T: NlaValue> Nla for NestedValue<'a, T> {
     }
 }
 
-pub(crate) fn to_nested_values<'a, T>(list: &'a Vec<T>) -> Vec<NestedValue<'a, T>> {
+pub(crate) fn to_nested_values<T>(list: &[T]) -> Vec<NestedValue<'_, T>> {
     list.iter()
         .enumerate()
         .map(|(idx, value)| NestedValue { index: idx as u16 + 1, value })

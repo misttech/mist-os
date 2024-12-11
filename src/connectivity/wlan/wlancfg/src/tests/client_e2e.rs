@@ -34,6 +34,10 @@ use tracing::{debug, info};
 use wlan_common::scan::write_vmo;
 use wlan_common::test_utils::ExpectWithin;
 use wlan_common::{assert_variant, random_fidl_bss_description};
+#[allow(
+    clippy::single_component_path_imports,
+    reason = "mass allow for https://fxbug.dev/381896734"
+)]
 use {
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common_security as fidl_common_security,

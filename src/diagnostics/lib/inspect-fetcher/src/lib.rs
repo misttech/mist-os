@@ -9,7 +9,7 @@ use tracing::*;
 // Selectors for Inspect data must start with this exact string.
 const INSPECT_PREFIX: &str = "INSPECT:";
 
-/// `InspectFetcher` fetches data from a list of selectors from FeedbackArchiveAccessor.
+/// `InspectFetcher` fetches data from a list of selectors from ArchiveAccessor.
 pub struct InspectFetcher {
     // If we have no selectors, we don't want to actually fetch anything.
     // (Fetching with no selectors fetches all Inspect data.)

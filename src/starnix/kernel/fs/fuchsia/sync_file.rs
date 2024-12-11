@@ -311,6 +311,7 @@ impl FileOps for SyncFile {
                     events: FdEvents::POLLIN,
                 }),
                 event_handler: event_handler.clone(),
+                err_code: None,
             };
 
             let canceler_result = waiter.wake_on_zircon_signals(

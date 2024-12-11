@@ -3,13 +3,14 @@
 # found in the LICENSE file.
 
 load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "@rules_fuchsia//fuchsia:defs.bzl",
     "fuchsia_cc_driver",
     "fuchsia_cc_test",
     "fuchsia_component_manifest",
     "fuchsia_driver_bind_bytecode",
     "fuchsia_driver_component",
     "fuchsia_package",
+    "fuchsia_prebuilt_package",
     "fuchsia_unittest_package",
 )
 
@@ -146,4 +147,20 @@ fuchsia_unittest_package(
     fuchsia_api_level = "HEAD",
     unit_tests = [":aml-g12-composite-test-bin"],
     visibility = ["//visibility:public"],
+)
+
+fuchsia_prebuilt_package(
+    name = "aml-g12-tdm-package",
+    archive = "@gn_targets//src/media/audio/drivers/aml-g12-tdm:aml-g12-tdm-package",
+    drivers = [
+        "meta/aml-g12-tdm.cm",
+    ],
+)
+
+fuchsia_prebuilt_package(
+    name = "aml-g12-tdm-dai-package",
+    archive = "@gn_targets//src/media/audio/drivers/aml-g12-tdm:aml-g12-tdm-dai-package",
+    drivers = [
+        "meta/aml-g12-tdm-dai.cm",
+    ],
 )

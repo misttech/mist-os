@@ -354,7 +354,7 @@ See also:
 [glossary.realm]: /docs/glossary/README.md#realm
 [glossary.zbi]: /docs/glossary/README.md#zircon-boot-image
 [inspect]: /docs/development/diagnostics/inspect/README.md
-[inspect-codelab]: /docs/development/diagnostics/inspect/codelab/codelab.md
+[inspect-codelab]: /docs/development/diagnostics/inspect/codelab.md
 [inspect-validator]: /docs/reference/diagnostics/inspect/validator/README.md
 [inspect-vmo-format]: /docs/reference/platform-spec/diagnostics/inspect-vmo-format.md
 [inspect-vmo-format-update]: /docs/reference/diagnostics/inspect/updating-vmo-format.md

@@ -56,10 +56,6 @@ cc_test_executable("test") {
     "//third_party/googletest:gmock",
     "//zircon/system/ulib/fzl",
   ]
-
-  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
 fuchsia_unittest_package("audio_effects_loader_unittests") {

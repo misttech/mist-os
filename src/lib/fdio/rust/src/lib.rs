@@ -54,28 +54,6 @@ pub fn service_connect_at(
     zx::Status::ok(status)
 }
 
-/// *DEPRECATED* - Use [`open`] instead.
-///
-/// Opens the remote object at the given `path` with the given `flags` asynchronously.
-/// ('asynchronous' here is referring to fuchsia.io.Directory.Open not having a return value).
-///
-/// Wraps fdio_open.
-// TODO(https://fxbug.dev/376575307): Migrate to use [`open`] and remove this.
-pub fn open_deprecated(
-    path: &str,
-    flags: fio::OpenFlags,
-    channel: zx::Channel,
-) -> Result<(), zx::Status> {
-    let path = CString::new(path).map_err(|NulError { .. }| zx::Status::INVALID_ARGS)?;
-    let path = path.as_ptr();
-    let flags = flags.bits();
-
-    // The channel is always consumed.
-    let channel = channel.into_raw();
-    let status = unsafe { fdio_sys::fdio_open(path, flags, channel) };
-    zx::Status::ok(status)
-}
-
 /// Opens the remote object at the given `path` with the given `flags` asynchronously.
 /// ('asynchronous' here is referring to fuchsia.io.Directory.Open not having a return value).
 ///
@@ -88,33 +66,6 @@ pub fn open(path: &str, flags: fio::Flags, channel: zx::Channel) -> Result<(), z
     // The channel is always consumed.
     let channel = channel.into_raw();
     let status = unsafe { fdio_sys::fdio_open3(path, flags, channel) };
-    zx::Status::ok(status)
-}
-
-/// *DEPRECATED* - Use [`open_at`] instead.
-///
-/// Opens the remote object at the given `path` relative to the given `dir` with the given `flags`
-/// asynchronously. ('asynchronous' here is referring to fuchsia.io.Directory.Open not having a
-/// return value).
-///
-/// `dir` must be a directory protocol channel.
-///
-/// Wraps fdio_open_at.
-// TODO(https://fxbug.dev/376575307): Migrate to use [`open_at`] and remove this.
-pub fn open_at_deprecated(
-    dir: &zx::Channel,
-    path: &str,
-    flags: fio::OpenFlags,
-    channel: zx::Channel,
-) -> Result<(), zx::Status> {
-    let dir = dir.raw_handle();
-    let path = CString::new(path).map_err(|NulError { .. }| zx::Status::INVALID_ARGS)?;
-    let path = path.as_ptr();
-    let flags = flags.bits();
-
-    // The channel is always consumed.
-    let channel = channel.into_raw();
-    let status = unsafe { fdio_sys::fdio_open_at(dir, path, flags, channel) };
     zx::Status::ok(status)
 }
 
@@ -142,31 +93,6 @@ pub fn open_at(
     zx::Status::ok(status)
 }
 
-/// *DEPRECATED* - Use [`open_fd`] instead.
-///
-/// Opens the remote object at the given `path` with the given `flags` synchronously, and on
-/// success, binds that channel to a file descriptor and returns it.
-///
-/// Wraps fdio_open_fd.
-// TODO(https://fxbug.dev/376575307): Migrate to use [`open_fd`] and remove this.
-pub fn open_fd_deprecated(path: &str, flags: fio::OpenFlags) -> Result<File, zx::Status> {
-    let path = CString::new(path).map_err(|NulError { .. }| zx::Status::INVALID_ARGS)?;
-    let path = path.as_ptr();
-    let flags = flags.bits();
-
-    // file descriptors are always positive; we expect fdio to initialize this to a legal value.
-    let mut fd = MaybeUninit::new(-1);
-    let status = {
-        let fd = fd.as_mut_ptr();
-        unsafe { fdio_sys::fdio_open_fd(path, flags, fd) }
-    };
-    let () = zx::Status::ok(status)?;
-    let fd = unsafe { fd.assume_init() };
-    debug_assert!(fd >= 0, "{} >= 0", fd);
-    let f = unsafe { File::from_raw_fd(fd) };
-    Ok(f)
-}
-
 /// Opens the remote object at the given `path` with the given `flags` synchronously, and on
 /// success, binds that channel to a file descriptor and returns it.
 ///
@@ -181,39 +107,6 @@ pub fn open_fd(path: &str, flags: fio::Flags) -> Result<File, zx::Status> {
     let status = {
         let fd = fd.as_mut_ptr();
         unsafe { fdio_sys::fdio_open3_fd(path, flags, fd) }
-    };
-    let () = zx::Status::ok(status)?;
-    let fd = unsafe { fd.assume_init() };
-    debug_assert!(fd >= 0, "{} >= 0", fd);
-    let f = unsafe { File::from_raw_fd(fd) };
-    Ok(f)
-}
-
-/// *DEPRECATED* - Use [`open_fd_at`] instead.
-///
-/// Opens the remote object at the given `path` relative to the given `dir` with the given `flags`
-/// synchronously, and on success, binds that channel to a file descriptor and returns it.
-///
-/// `dir` must be backed by a directory protocol channel (even though it is
-/// wrapped in a std::fs::File).
-///
-/// Wraps fdio_open_fd_at.
-// TODO(https://fxbug.dev/376575307): Migrate to use [`open_fd_at`] and remove this.
-pub fn open_fd_at_deprecated(
-    dir: &File,
-    path: &str,
-    flags: fio::OpenFlags,
-) -> Result<File, zx::Status> {
-    let dir = dir.as_raw_fd();
-    let path = CString::new(path).map_err(|NulError { .. }| zx::Status::INVALID_ARGS)?;
-    let path = path.as_ptr();
-    let flags = flags.bits();
-
-    // file descriptors are always positive; we expect fdio to initialize this to a legal value.
-    let mut fd = MaybeUninit::new(-1);
-    let status = {
-        let fd = fd.as_mut_ptr();
-        unsafe { fdio_sys::fdio_open_fd_at(dir, path, flags, fd) }
     };
     let () = zx::Status::ok(status)?;
     let fd = unsafe { fd.assume_init() };
@@ -786,28 +679,6 @@ impl Namespace {
     ///
     /// |path| must be absolute.
     ///
-    /// This corresponds with fdio_ns_open in C.
-    pub fn open_deprecated(
-        &self,
-        path: &str,
-        flags: fio::OpenFlags,
-        channel: zx::Channel,
-    ) -> Result<(), zx::Status> {
-        let &Self { ns } = self;
-        let path = CString::new(path)?;
-        let path = path.as_ptr();
-        let flags = flags.bits();
-
-        // The channel is always consumed.
-        let channel = channel.into_raw();
-        let status = unsafe { fdio_sys::fdio_ns_open(ns, path, flags, channel) };
-        zx::Status::ok(status)
-    }
-
-    /// Open an object at |path| relative to the root of this namespace with |flags|.
-    ///
-    /// |path| must be absolute.
-    ///
     /// This corresponds with fdio_ns_open3 in C.
     pub fn open(
         &self,
@@ -932,22 +803,6 @@ mod tests {
         let path = "/test_path1";
 
         assert_eq!(namespace.bind(path, ns_client), Ok(()));
-        assert_eq!(namespace.open_deprecated(path, fio::OpenFlags::empty(), ns_server), Ok(()));
-        assert_eq!(namespace.unbind(path), Ok(()));
-    }
-
-    #[test]
-    fn namespace_bind_open3_unbind() {
-        let namespace = Namespace::installed().unwrap();
-        // client => ns_server => ns_client => server
-        //        ^            ^            ^-- zx channel connection
-        //        |            |-- connected through namespace bind/connect
-        //        |-- zx channel connection
-        let (ns_client, _server) = fidl::endpoints::create_endpoints();
-        let (_client, ns_server) = zx::Channel::create();
-        let path = "/test_path1";
-
-        assert_eq!(namespace.bind(path, ns_client), Ok(()));
         assert_eq!(namespace.open(path, fio::Flags::empty(), ns_server), Ok(()));
         assert_eq!(namespace.unbind(path), Ok(()));
     }
@@ -967,13 +822,7 @@ mod tests {
     #[test]
     fn namespace_open_error() {
         let namespace = Namespace::installed().unwrap();
-        let (_client, ns_server) = zx::Channel::create();
         let path = "/test_path3";
-
-        assert_eq!(
-            namespace.open_deprecated(path, fio::OpenFlags::empty(), ns_server),
-            Err(zx::Status::NOT_FOUND)
-        );
 
         let (_client, ns_server) = zx::Channel::create();
         assert_eq!(
@@ -1080,14 +929,11 @@ mod tests {
         // fdio_open requires paths to be absolute
         {
             let (_, pkg_server) = zx::Channel::create();
-            assert_eq!(
-                open_deprecated("pkg", fio::OpenFlags::RIGHT_READABLE, pkg_server),
-                Err(zx::Status::NOT_FOUND)
-            );
+            assert_eq!(open("pkg", fio::PERM_READABLE, pkg_server), Err(zx::Status::NOT_FOUND));
         }
 
         let (pkg_client, pkg_server) = zx::Channel::create();
-        assert_eq!(open_deprecated("/pkg", fio::OpenFlags::RIGHT_READABLE, pkg_server), Ok(()));
+        assert_eq!(open("/pkg", fio::PERM_READABLE, pkg_server), Ok(()));
 
         // fdio_open/fdio_open_at disallow paths that are too long
         {
@@ -1095,33 +941,30 @@ mod tests {
                 .sample_string(&mut rand::thread_rng(), libc::PATH_MAX.try_into().unwrap());
             let (_, server) = zx::Channel::create();
             assert_eq!(
-                open_at_deprecated(&pkg_client, &path, fio::OpenFlags::empty(), server),
+                open_at(&pkg_client, &path, fio::Flags::empty(), server),
                 Err(zx::Status::INVALID_ARGS)
             );
         }
 
         let (_, bin_server) = zx::Channel::create();
-        assert_eq!(
-            open_at_deprecated(&pkg_client, "bin", fio::OpenFlags::RIGHT_READABLE, bin_server),
-            Ok(())
-        );
+        assert_eq!(open_at(&pkg_client, "bin", fio::PERM_READABLE, bin_server), Ok(()));
     }
 
     // Simple tests of the fdio_open_fd and fdio_open_fd_at wrappers. These aren't intended to
     // exhaustively test the fdio functions - there are separate tests for that - but they do
     // exercise one success and one failure case for each function.
     #[test]
-    fn fdio_open_fd_and_open_fd_at_deprecated() {
-        let pkg_fd = open_fd_deprecated("/pkg", fio::OpenFlags::RIGHT_READABLE)
-            .expect("Failed to open /pkg using fdio_open_fd");
+    fn fdio_open_fd_and_open_fd_at() {
+        let pkg_fd =
+            open_fd("/pkg", fio::PERM_READABLE).expect("Failed to open /pkg using fdio_open_fd");
 
         // Trying to open a non-existent directory should fail.
         assert_matches!(
-            open_fd_at_deprecated(&pkg_fd, "blahblah", fio::OpenFlags::RIGHT_READABLE),
+            open_fd_at(&pkg_fd, "blahblah", fio::PERM_READABLE),
             Err(zx::Status::NOT_FOUND)
         );
 
-        let _: File = open_fd_at_deprecated(&pkg_fd, "bin", fio::OpenFlags::RIGHT_READABLE)
+        let _: File = open_fd_at(&pkg_fd, "bin", fio::PERM_READABLE)
             .expect("Failed to open bin/ subdirectory using fdio_open_fd_at");
     }
 }

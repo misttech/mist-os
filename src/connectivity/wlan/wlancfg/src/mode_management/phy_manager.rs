@@ -831,6 +831,10 @@ impl PhyManagerApi for PhyManager {
                 RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { iface_id }) => {
                     for (_, phy_container) in self.phys.iter_mut() {
                         if phy_container.ap_ifaces.remove(&iface_id) {
+                            #[allow(
+                                clippy::redundant_pattern_matching,
+                                reason = "mass allow for https://fxbug.dev/381896734"
+                            )]
                             if let Err(_) = destroy_iface(
                                 &self.device_monitor,
                                 iface_id,
@@ -847,6 +851,10 @@ impl PhyManagerApi for PhyManager {
                         }
 
                         if let Some(client_info) = phy_container.client_ifaces.remove(&iface_id) {
+                            #[allow(
+                                clippy::redundant_pattern_matching,
+                                reason = "mass allow for https://fxbug.dev/381896734"
+                            )]
                             if let Err(_) = destroy_iface(
                                 &self.device_monitor,
                                 iface_id,
@@ -1384,7 +1392,7 @@ mod tests {
                 send_get_supported_mac_roles_response(
                     &mut exec,
                     &mut test_values.monitor_stream,
-                    Ok(&vec![fidl_common::WlanMacRole::Client]),
+                    Ok(&[fidl_common::WlanMacRole::Client]),
                 );
 
                 assert_variant!(exec.run_until_stalled(&mut add_phy_fut), Poll::Ready(Ok(())));
@@ -1440,7 +1448,7 @@ mod tests {
             // either order.
             assert_eq!(phy_container.client_ifaces.len(), 1);
             phy_container.client_ifaces.iter().for_each(|(iface_id, security_support)| {
-                assert_eq!(iface_ids.insert(*iface_id), true);
+                assert!(iface_ids.insert(*iface_id));
                 assert_eq!(*security_support, fake_security_support());
             });
             assert!(phy_container.defects.events.is_empty());

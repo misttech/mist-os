@@ -25,10 +25,10 @@ pub async fn connect_accessor<P: DiscoverableProtocolMarker>(
     proxy: &fsys2::RealmQueryProxy,
 ) -> Result<P::Proxy, Error> {
     let proxy = connect_to_instance_protocol_at_path::<P>(
-        &moniker,
+        moniker,
         OpenDirType::Exposed,
         &format!("{ACCESSORS_DICTIONARY}/{accessor_name}"),
-        &proxy,
+        proxy,
     )
     .await
     .map_err(|e| Error::ConnectToProtocol(accessor_name.to_string(), anyhow!("{:?}", e)))?;
@@ -44,6 +44,7 @@ pub async fn get_selectors_for_manifest<P: DiagnosticsProvider>(
 ) -> Result<Vec<Selector>, Error> {
     let list_command = ListCommand {
         manifest: Some(manifest.clone()),
+        component: None,
         with_url: false,
         accessor: accessor.clone(),
     };
@@ -181,7 +182,7 @@ pub async fn process_component_query_with_partial_selectors<P: DiagnosticsProvid
     Ok(results)
 }
 
-fn add_tree_name(mut selector: Selector, tree_name: String) -> Result<Selector, Error> {
+fn add_tree_name(selector: &mut Selector, tree_name: String) -> Result<(), Error> {
     match selector.tree_names {
         None => selector.tree_names = Some(TreeNames::Some(vec![tree_name])),
         Some(ref mut names) => match names {
@@ -200,38 +201,38 @@ fn add_tree_name(mut selector: Selector, tree_name: String) -> Result<Selector, 
             }
         },
     }
-
-    Ok(selector)
+    Ok(())
 }
 
-/// Expand selectors.
-pub fn expand_selectors(
-    selectors: Vec<Selector>,
+/// Expand selectors with a tree name. If a tree name is given, the selectors will be guaranteed to
+/// include the tree name given unless they already have a tree name set. If no tree name is given
+/// and the selectors carry no tree name, then they'll be updated to target all tree names
+/// associated with the component.
+pub fn ensure_tree_field_is_set(
+    selectors: &mut Vec<Selector>,
     tree_name: Option<String>,
-) -> Result<Vec<Selector>, Error> {
-    let mut result = vec![];
-
+) -> Result<(), Error> {
     if selectors.is_empty() {
         let Some(tree_name) = tree_name else {
-            return Ok(result);
+            return Ok(());
         };
 
         // Safety: "**:*" is a valid selector
         let mut selector = selectors::parse_verbose("**:*").unwrap();
         selector.tree_names = Some(TreeNames::Some(vec![tree_name]));
-        return Ok(vec![selector]);
+        selectors.push(selector);
+        return Ok(());
     }
 
-    for mut selector in selectors {
+    for selector in selectors.iter_mut() {
         if let Some(tree_name) = &tree_name {
-            selector = add_tree_name(selector, tree_name.clone())?;
+            add_tree_name(selector, tree_name.clone())?;
         } else if selector.tree_names.is_none() {
             selector.tree_names = Some(TreeNames::All(All {}))
         }
-        result.push(selector)
     }
 
-    Ok(result)
+    Ok(())
 }
 
 /// Get all the exposed `ArchiveAccessor` from any child component which
@@ -321,46 +322,49 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn test_expand_selectors() {
+    fn test_ensure_tree_field_is_set() {
         let name = Some("abc".to_string());
-
         let expected = vec![
             parse_verbose("core/one:[name=abc]root").unwrap(),
             parse_verbose("core/one:[name=xyz, name=abc]root").unwrap(),
         ];
 
-        let actual = expand_selectors(
-            vec![
-                parse_verbose("core/one:root").unwrap(),
-                parse_verbose("core/one:[name=xyz]root").unwrap(),
-            ],
-            name.clone(),
-        )
-        .unwrap();
-
+        let mut actual = vec![
+            parse_verbose("core/one:root").unwrap(),
+            parse_verbose("core/one:[name=xyz]root").unwrap(),
+        ];
+        ensure_tree_field_is_set(&mut actual, name.clone()).unwrap();
         assert_eq!(actual, expected);
+    }
 
+    #[fuchsia::test]
+    fn test_ensure_tree_field_is_set_noop_when_tree_names_set() {
         let expected = vec![
             parse_verbose("core/one:[...]root").unwrap(),
             parse_verbose("core/one:[name=xyz]root").unwrap(),
         ];
-
-        let actual = expand_selectors(
-            vec![
-                parse_verbose("core/one:root").unwrap(),
-                parse_verbose("core/one:[name=xyz]root").unwrap(),
-            ],
-            None,
-        )
-        .unwrap();
-
+        let mut actual = vec![
+            parse_verbose("core/one:root").unwrap(),
+            parse_verbose("core/one:[name=xyz]root").unwrap(),
+        ];
+        ensure_tree_field_is_set(&mut actual, None).unwrap();
         assert_eq!(actual, expected);
+    }
 
+    #[fuchsia::test]
+    fn test_ensure_tree_field_is_set_noop_on_empty_vec_no_name() {
+        let mut actual = vec![];
+        ensure_tree_field_is_set(&mut actual, None).unwrap();
+        assert_eq!(actual, vec![]);
+    }
+
+    #[fuchsia::test]
+    fn test_ensure_tree_field_is_set_all_components_when_empty_and_name() {
         let expected = vec![parse_verbose("**:[name=abc]*").unwrap()];
-        let actual = expand_selectors(vec![], name).unwrap();
+        let mut actual = vec![];
+        let name = Some("abc".to_string());
+        ensure_tree_field_is_set(&mut actual, name).unwrap();
         assert_eq!(actual, expected);
-
-        assert_eq!(expand_selectors(vec![], None).unwrap(), vec![]);
     }
 
     struct FakeProvider {

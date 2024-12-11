@@ -7,23 +7,19 @@
 
 #include "src/media/audio/audio_core/v1/mix_stage.h"
 #include "src/media/audio/audio_core/v1/packet_queue.h"
-#include "src/media/audio/audio_core/v1/testing/packet_factory.h"
 #include "src/media/audio/audio_core/v1/testing/threading_model_fixture.h"
 #include "src/media/audio/lib/clock/clone_mono.h"
 #include "src/media/audio/lib/clock/testing/clock_test.h"
-
-using testing::Each;
-using testing::FloatEq;
 
 namespace media::audio {
 namespace {
 
 // Used when the ReadLockContext is unused by the test.
-static media::audio::ReadableStream::ReadLockContext rlctx;
+media::audio::ReadableStream::ReadLockContext rlctx;
 
-enum class ClockMode { SAME, WITH_OFFSET, RATE_ADJUST };
+enum class ClockMode : uint8_t { SAME, WITH_OFFSET, RATE_ADJUST };
 
-enum class Direction { Render, Capture };
+enum class Direction : uint8_t { Render, Capture };
 
 constexpr uint32_t kDefaultNumChannels = 2;
 constexpr uint32_t kDefaultFrameRate = 48000;
@@ -78,35 +74,35 @@ const Format kDefaultFormat =
 // Adjustable/RevertToMono use the error to rate-adjust the source clock. MicroSrc interprets a
 // positive error as "we need to consume MORE SLOWLY", whereas Adjustable/RevertToMono interpret a
 // positive error as "we need to SPEED UP the source clock".
-static constexpr float kMicroSrcPrimaryErrPpmMultiplier = -10.01;
-static constexpr float kAdjustablePrimaryErrPpmMultiplier = 35.0;
-static constexpr float kRevertToMonoPrimaryErrPpmMultiplier = 10.01;
+constexpr float kMicroSrcPrimaryErrPpmMultiplier = -10.01f;
+constexpr float kAdjustablePrimaryErrPpmMultiplier = 35.0;
+constexpr float kRevertToMonoPrimaryErrPpmMultiplier = 10.01f;
 
-static constexpr float kMicroSrcSecondaryErrPpmMultiplier = 0.9;
-static constexpr float kAdjustableSecondaryErrPpmMultiplier = -25;
-static constexpr float kRevertToMonoSecondaryErrPpmMultiplier = -0.1;
+constexpr float kMicroSrcSecondaryErrPpmMultiplier = 0.9f;
+constexpr float kAdjustableSecondaryErrPpmMultiplier = -25;
+constexpr float kRevertToMonoSecondaryErrPpmMultiplier = -0.1f;
 
-static constexpr int32_t kMicroSrcLimitMixCountOneUsecErr = 4;
-static constexpr int32_t kAdjustableLimitMixCountOneUsecErr = 125;
-static constexpr int32_t kRevertToMonoLimitMixCountOneUsecErr = 5;
+constexpr int32_t kMicroSrcLimitMixCountOneUsecErr = 4;
+constexpr int32_t kAdjustableLimitMixCountOneUsecErr = 125;
+constexpr int32_t kRevertToMonoLimitMixCountOneUsecErr = 5;
 
-static constexpr int32_t kMicroSrcLimitMixCountOnePercentErr = 12;
-static constexpr int32_t kAdjustableLimitMixCountOnePercentErr = 175;
-static constexpr int32_t kRevertToMonoLimitMixCountOnePercentErr = 5;
+constexpr int32_t kMicroSrcLimitMixCountOnePercentErr = 12;
+constexpr int32_t kAdjustableLimitMixCountOnePercentErr = 175;
+constexpr int32_t kRevertToMonoLimitMixCountOnePercentErr = 5;
 
-static constexpr int32_t kMicroSrcMixCountUntilSettled = 15;
-static constexpr int32_t kAdjustableMixCountUntilSettled = 180;
-static constexpr int32_t kRevertToMonoMixCountUntilSettled = 5;
+constexpr int32_t kMicroSrcMixCountUntilSettled = 15;
+constexpr int32_t kAdjustableMixCountUntilSettled = 180;
+constexpr int32_t kRevertToMonoMixCountUntilSettled = 5;
 
 // We validate Micro-SRC much faster than real-time, so we can test settling for much longer.
-static constexpr int32_t kMicroSrcMixCountSettledVerificationPeriod = 1000;
-static constexpr int32_t kAdjustableMixCountSettledVerificationPeriod = 20;
-static constexpr int32_t kRevertToMonoMixCountSettledVerificationPeriod = 20;
+constexpr int32_t kMicroSrcMixCountSettledVerificationPeriod = 1000;
+constexpr int32_t kAdjustableMixCountSettledVerificationPeriod = 20;
+constexpr int32_t kRevertToMonoMixCountSettledVerificationPeriod = 20;
 
 // Error thresholds
-static constexpr auto kMicroSrcLimitSettledErr = zx::nsec(15);
-static constexpr auto kAdjustableLimitSettledErr = zx::nsec(100);
-static constexpr auto kRevertToMonoLimitSettledErr = zx::nsec(10);
+constexpr auto kMicroSrcLimitSettledErr = zx::nsec(15);
+constexpr auto kAdjustableLimitSettledErr = zx::nsec(100);
+constexpr auto kRevertToMonoLimitSettledErr = zx::nsec(10);
 
 // When tuning a new set of PID coefficients, set this to enable additional results logging.
 constexpr bool kDisplayForPidCoefficientsTuning = false;
@@ -116,7 +112,7 @@ constexpr bool kTraceClockSyncConvergence = false;
 class MixStageClockTest : public testing::ThreadingModelFixture {
  protected:
   // We measure long-running position across mixes of 10ms (our block size).
-  // TODO(https://fxbug.dev/42134393): If our mix timeslice shortens, adjust the below and retune the PIDs.
+  // TODO(https://fxbug.dev/42134393): If our mix timeslice shortens, adjust below and retune PIDs.
   static constexpr zx::duration kClockSyncMixDuration = zx::msec(10);
   static constexpr uint32_t kFramesToMix =
       kDefaultFrameRate * kClockSyncMixDuration.to_msecs() / 1000;
@@ -127,11 +123,13 @@ class MixStageClockTest : public testing::ThreadingModelFixture {
   void VerifySync(ClockMode clock_mode, int32_t rate_adjust_ppm = 0);
 
   virtual void SetRateLimits(int32_t rate_adjust_ppm);
-  zx::duration PrimaryErrorLimit(int32_t rate_adjust_ppm) {
-    return zx::duration(rate_adjust_ppm * primary_err_ppm_multiplier_);
+  zx::duration PrimaryErrorLimit(int32_t rate_adjust_ppm) const {
+    return zx::duration(
+        static_cast<int64_t>(static_cast<double>(rate_adjust_ppm) * primary_err_ppm_multiplier_));
   }
-  zx::duration SecondaryErrorLimit(int32_t rate_adjust_ppm) {
-    return zx::duration(rate_adjust_ppm * secondary_err_ppm_multiplier_);
+  zx::duration SecondaryErrorLimit(int32_t rate_adjust_ppm) const {
+    return zx::duration(
+        static_cast<int64_t>(static_cast<double>(rate_adjust_ppm) * secondary_err_ppm_multiplier_));
   }
 
   virtual void SetClocks(ClockMode clock_mode, int32_t rate_adjust_ppm) = 0;
@@ -432,7 +430,8 @@ void MixStageClockTest::SyncTest(int32_t rate_adjust_ppm) {
       context().clock_factory()->AdvanceMonoTimeBy(kClockSyncMixDuration);
     }
 
-    mix_stage_->ReadLock(rlctx, Fixed(kFramesToMix * mix_count), kFramesToMix);
+    mix_stage_->ReadLock(rlctx, Fixed(static_cast<int64_t>(kFramesToMix) * mix_count),
+                         kFramesToMix);
     ASSERT_EQ(state.next_dest_frame(), kFramesToMix * (mix_count + 1));
 
     // Track the worst-case position errors (overall min/max, 1%, 1us, final-settled).

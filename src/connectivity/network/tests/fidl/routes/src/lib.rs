@@ -28,6 +28,9 @@ use netstack_testing_common::realms::{
 };
 use netstack_testing_macros::netstack_test;
 use routes_common::{test_route, TestSetup};
+
+use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
+use fidl_fuchsia_net_routes_ext::FidlRouteIpExt;
 use {
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx_status,
@@ -998,4 +1001,105 @@ async fn route_watcher_in_specific_table<
             .await,
         None
     );
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn get_route_table_name<I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+    let routes = realm
+        .connect_to_protocol::<fnet_routes::StateMarker>()
+        .expect("failed to connect to routes/State");
+    let routes = &routes;
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("failed to connect to fuchsia.net.routes.admin.RouteTableProvider");
+    let route_table_provider = &route_table_provider;
+    let main_route_table = realm
+        .connect_to_protocol::<I::RouteTableMarker>()
+        .expect("failed to connect to main route table");
+    let main_route_table_id = fnet_routes_ext::admin::get_table_id::<I>(&main_route_table)
+        .await
+        .expect("get main route table ID");
+
+    const USER_TABLE_NAME: &str = "route-table-name";
+    const MAIN_V4_NAME: &str = "main_v4";
+    const MAIN_V6_NAME: &str = "main_v6";
+
+    let create_route_table_and_get_id = |name: Option<&str>| {
+        let name = name.map(str::to_owned);
+        async move {
+            let table = fnet_routes_ext::admin::new_route_table::<I>(&route_table_provider, name)
+                .expect("create named route table");
+            let table_id =
+                fnet_routes_ext::admin::get_table_id::<I>(&table).await.expect("get table ID");
+            (table, table_id)
+        }
+    };
+
+    let nonexistent_table_id = fnet_routes_ext::TableId::new(5555);
+
+    let (named_table, named_table_id) = create_route_table_and_get_id(Some(USER_TABLE_NAME)).await;
+    let (unnamed_table, unnamed_table_id) = create_route_table_and_get_id(None).await;
+
+    // Main table
+    {
+        let want = Ok(match I::VERSION {
+            IpVersion::V4 => MAIN_V4_NAME,
+            IpVersion::V6 => MAIN_V6_NAME,
+        }
+        .to_owned());
+        let got = routes
+            .get_route_table_name(main_route_table_id.get())
+            .await
+            .expect("should not get FIDL error");
+        assert_eq!(got, want);
+    }
+
+    // Named table
+    {
+        let want = Ok(USER_TABLE_NAME.to_owned());
+        let got = routes
+            .get_route_table_name(named_table_id.get())
+            .await
+            .expect("should not get FIDL error");
+        assert_eq!(got, want);
+    }
+
+    // Unnamed table
+    {
+        let want = Ok("".to_owned());
+        let got = routes
+            .get_route_table_name(unnamed_table_id.get())
+            .await
+            .expect("should not get FIDL error");
+        assert_eq!(got, want);
+    }
+
+    // Nonexistent table
+    {
+        let want = Err(fnet_routes::StateGetRouteTableNameError::NoTable);
+        let got = routes
+            .get_route_table_name(nonexistent_table_id.get())
+            .await
+            .expect("should not get FIDL error");
+        assert_eq!(got, want);
+    }
+
+    // After removing the tables, `get_route_table_name` should return `Err(NoTable)`.
+    for table in [named_table, unnamed_table] {
+        fnet_routes_ext::admin::remove_route_table::<I>(&table)
+            .await
+            .expect("should not get FIDL error")
+            .expect("remove should succeed");
+    }
+
+    for table_id in [named_table_id, unnamed_table_id] {
+        let want = Err(fnet_routes::StateGetRouteTableNameError::NoTable);
+        let got =
+            routes.get_route_table_name(table_id.get()).await.expect("should not get FIDL error");
+        assert_eq!(got, want);
+    }
 }

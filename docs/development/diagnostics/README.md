@@ -120,7 +120,6 @@ You may also want to:
 You can also follow the diagnostics codelabs:
 
 * [Implement Inspect for a component][inspect-codelab]
-* [Implement diagnostics in tests][diagnostics-test-codelab]
 * [Use ffx log to retrieve logs from a device][logging-docs]
 * [Use ffx triage to analyze snapshots][triage-codelab]
 
@@ -143,8 +142,7 @@ You can also follow the tracing tutorials and guides:
 [understand-log]: /docs/development/diagnostics/logs/viewing.md
 [zxdb-docs]: /docs/development/debugger/README.md
 [logs-concepts]: /docs/concepts/components/diagnostics/README.md#logs
-[inspect-codelab]: /docs/development/diagnostics/inspect/codelab/codelab.md
-[diagnostics-test-codelab]: /docs/development/diagnostics/workshop/codelab.md
+[inspect-codelab]: /docs/development/diagnostics/inspect/codelab.md
 [triage-codelab]: /docs/development/diagnostics/triage/codelab.md
 [logging-docs]: /docs/development/diagnostics/logs/README.md
 [tracing-docs]: /docs/concepts/kernel/tracing-system.md

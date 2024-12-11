@@ -272,6 +272,11 @@ where
         let Self(inner) = self;
         inner.upgrade().map(AddressId)
     }
+
+    fn is_assigned(&self) -> bool {
+        let Self(inner) = self;
+        inner.strong_count() != 0
+    }
 }
 
 /// The flags for an IP device.
@@ -284,7 +289,7 @@ pub struct IpDeviceFlags {
 /// The state kept for each device to handle multicast group membership.
 pub struct IpDeviceMulticastGroups<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> {
     /// Multicast groups this device has joined.
-    pub groups: MulticastGroupSet<I::Addr, GmpGroupState<BT>>,
+    pub groups: MulticastGroupSet<I::Addr, GmpGroupState<I, BT>>,
     /// Protocol-specific GMP state.
     pub gmp_proto: I::GmpProtoState<BT>,
     /// GMP state.

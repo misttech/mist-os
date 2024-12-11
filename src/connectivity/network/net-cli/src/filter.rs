@@ -294,9 +294,9 @@ pub(super) async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
     connector: &C,
 ) -> Result<(), Error> {
     use opts::filter::{
-        Accept, Action, Create, Domain, Drop, FilterEnum, Hook, Jump, List, Namespace, NamespaceId,
-        Redirect, Remove, Resource, ResourceId, Return, Routine, RoutineId, RoutineType, Rule,
-        RuleId, TransparentProxy, TransportProtocolMatcher,
+        Accept, Action, Create, Domain, Drop, FilterEnum, Hook, Jump, List, Masquerade, Namespace,
+        NamespaceId, PortRange, Redirect, Remove, Resource, ResourceId, Return, Routine, RoutineId,
+        RoutineType, Rule, RuleId, TransparentProxy, TransportProtocolMatcher,
     };
 
     match cmd {
@@ -500,19 +500,17 @@ pub(super) async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
                             };
                             fnet_filter_ext::Action::TransparentProxy(tproxy)
                         }
-                        Action::Redirect(Redirect { min_dst_port, max_dst_port }) => {
-                            let dst_port = match (min_dst_port, max_dst_port) {
-                                (None, None) => None,
-                                (Some(_), None) | (None, Some(_)) => {
-                                    return Err(anyhow!(
-                                        "specified one end of dst port range but not the other"
-                                    ))
-                                }
-                                (Some(min), Some(max)) => {
-                                    Some(fnet_filter_ext::PortRange(min..=max))
-                                }
-                            };
-                            fnet_filter_ext::Action::Redirect { dst_port }
+                        Action::Redirect(Redirect { dst_port }) => {
+                            fnet_filter_ext::Action::Redirect {
+                                dst_port: dst_port
+                                    .map(|PortRange(range)| fnet_filter_ext::PortRange(range)),
+                            }
+                        }
+                        Action::Masquerade(Masquerade { src_port }) => {
+                            fnet_filter_ext::Action::Masquerade {
+                                src_port: src_port
+                                    .map(|PortRange(range)| fnet_filter_ext::PortRange(range)),
+                            }
                         }
                     },
                 }),

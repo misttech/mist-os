@@ -59,6 +59,8 @@ fho::embedded_plugin!(ServerStartTool);
 impl FfxMain for ServerStartTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        let new_logname = self.log_basename();
+
         let result = match (
             self.cmd.background,
             self.cmd.daemon,
@@ -80,6 +82,7 @@ impl FfxMain for ServerStartTool {
                     self.context,
                     self.target_proxy_connector,
                     self.rcs_proxy_connector,
+                    self.repos,
                     writer,
                     mode,
                 ))
@@ -93,6 +96,7 @@ impl FfxMain for ServerStartTool {
                 if let Some(running) = serve_impl_validate_args(
                     &server::to_serve_command(&self.cmd),
                     &self.rcs_proxy_connector,
+                    self.repos,
                     &self.context,
                 )
                 .await?
@@ -117,16 +121,35 @@ impl FfxMain for ServerStartTool {
                 ];
                 args.extend(server::to_argv(&self.cmd));
 
-                if let Some(log_basename) = self.log_basename() {
+                if let Some(log_basename) = new_logname {
+                    let wait_for_start_timeout: u64 =
+                        match self.context.get::<u64, _>("repository.background_startup_timeout") {
+                            Ok(v) => v.into(),
+                            Err(e) => {
+                                tracing::warn!("Error reading startup timeout: {e}");
+                                60
+                            }
+                        };
+
                     daemonize(&args, log_basename, self.context.clone(), true)
                         .await
                         .map_err(|e| bug!(e))?;
-                    return server::wait_for_start(
+                    return match server::wait_for_start(
                         self.context.clone(),
                         self.cmd,
-                        Duration::from_secs(30),
+                        Duration::from_secs(wait_for_start_timeout),
                     )
-                    .await;
+                    .await
+                    {
+                        Ok(_) => {
+                            tracing::debug!("Daemonized server started successfully");
+                            Ok(())
+                        }
+                        core::result::Result::Err(e) => {
+                            tracing::warn!("Daemonized server did not start successfully: {e}");
+                            Err(e)
+                        }
+                    };
                 } else {
                     return_bug!("Cannot daemonize repository server without a log file basename");
                 }
@@ -161,6 +184,7 @@ impl FfxMain for ServerStartTool {
             }
         }
     }
+
     fn log_basename(&self) -> Option<String> {
         match (self.cmd.daemon, self.cmd.foreground, self.cmd.background, self.cmd.disconnected) {
             // Daemon based servers are logged with ffx.daemon.log.

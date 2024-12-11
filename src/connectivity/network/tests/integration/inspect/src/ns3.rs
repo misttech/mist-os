@@ -1304,7 +1304,7 @@ async fn inspect_filtering_state(name: &str) {
                 "conntrack": {
                     "table_limit_drops": 0u64,
                     "table_limit_hits": 0u64,
-                    "num_connections": 0u64,
+                    "num_entries": 0u64,
                     "connections": {},
                 },
             },
@@ -1346,7 +1346,7 @@ async fn inspect_filtering_state(name: &str) {
                 "conntrack": {
                     "table_limit_drops": 0u64,
                     "table_limit_hits": 0u64,
-                    "num_connections": 0u64,
+                    "num_entries": 0u64,
                     "connections": {},
                 },
             },
@@ -1540,7 +1540,7 @@ async fn inspect_filtering_state(name: &str) {
                 "conntrack": {
                     "table_limit_drops": 0u64,
                     "table_limit_hits": 0u64,
-                    "num_connections": 0u64,
+                    "num_entries": 0u64,
                     "connections": {},
                 }
             },
@@ -1617,7 +1617,7 @@ async fn inspect_filtering_state(name: &str) {
                 "conntrack": {
                     "table_limit_drops": 0u64,
                     "table_limit_hits": 0u64,
-                    "num_connections": 0u64,
+                    "num_entries": 0u64,
                     "connections": {},
                 }
             },

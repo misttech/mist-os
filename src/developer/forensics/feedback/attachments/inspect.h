@@ -23,7 +23,7 @@ namespace forensics::feedback {
 
 // Collects the Inspect data.
 //
-// fuchsia.diagnostics.FeedbackArchiveAccessor is expected to be in |services|.
+// fuchsia.diagnostics.ArchiveAccessor.feedback is expected to be in |services|.
 class Inspect : public AttachmentProvider {
  public:
   Inspect(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,

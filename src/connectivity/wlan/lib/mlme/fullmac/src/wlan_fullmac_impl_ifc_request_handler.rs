@@ -139,10 +139,10 @@ fn handle_one_request(
                 info: fullmac_to_mlme::convert_pmk_info(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::SaeHandshakeInd { ind, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::SaeHandshakeInd { payload, responder } => {
             responder.send().context("Failed to respond to SaeHandshakeInd")?;
             driver_event_sink.0.send(FullmacDriverEvent::SaeHandshakeInd {
-                ind: fullmac_to_mlme::convert_sae_handshake_indication(ind),
+                ind: fullmac_to_mlme::convert_sae_handshake_indication(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::SaeFrameRx { frame, responder } => {

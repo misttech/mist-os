@@ -59,9 +59,19 @@
             to: "#paver",
         },
         {
+            protocol: [
+                "fuchsia.storage.partitions.PartitionsAdmin",
+                "fuchsia.storage.partitions.PartitionsManager",
+            ],
+            from: "#fshost",
+            to: "#paver",
+            availability: "optional",
+        },
+        {
             service: [ "fuchsia.storage.partitions.PartitionService" ],
             from: "#fshost",
             to: "#paver",
+            availability: "optional",
         },
     ],
     expose: [

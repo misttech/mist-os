@@ -21,11 +21,6 @@
             from: "parent",
             to: "#elf_runner",
         },
-        {
-            dictionary: "diagnostics",
-            from: "parent",
-            to: "#elf_runner",
-        },
     ],
     environments: [
         {

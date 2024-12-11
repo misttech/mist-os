@@ -44,6 +44,7 @@ class DebugAgentServer : public fidl::Server<fuchsia_debugger::DebugAgent>,
   // and exception notifications.
   void OnNotification(const debug_ipc::NotifyProcessStarting& notify) override;
   void OnNotification(const debug_ipc::NotifyException& notify) override;
+  void OnNotification(const debug_ipc::NotifyComponentStarting& notify) override;
 
  private:
   // The test fixture is a friend so that we can access the private methods that are doing all the

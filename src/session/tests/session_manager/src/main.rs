@@ -253,6 +253,7 @@ impl SessionManagerPowerTest {
         // Route power protocols to `session-manager` using a proxying local child.
         let sag_realm_1 = sag_realm.clone();
         let sag_realm_2 = sag_realm.clone();
+        let sag_realm_3 = sag_realm.clone();
         let mut fs = ServiceFs::new();
         fs.dir("svc")
             .add_service_connector(move |server_end: ServerEnd<fbroker::TopologyMarker>| {
@@ -262,15 +263,20 @@ impl SessionManagerPowerTest {
                 })
                 .detach();
             })
-            .add_service_connector(
-                move |server_end: ServerEnd<fsystem::ActivityGovernorMarker>| {
-                    let sag_realm_2 = sag_realm_2.clone();
-                    fasync::Task::spawn(async move {
-                        sag_realm_2.connect_server_end_to_protocol(server_end).await.unwrap()
-                    })
-                    .detach();
-                },
-            );
+            .add_service_connector(move |server_end: ServerEnd<fsystem::ActivityGovernorMarker>| {
+                let sag_realm_2 = sag_realm_2.clone();
+                fasync::Task::spawn(async move {
+                    sag_realm_2.connect_server_end_to_protocol(server_end).await.unwrap()
+                })
+                .detach();
+            })
+            .add_service_connector(move |server_end: ServerEnd<fsystem::BootControlMarker>| {
+                let sag_realm_3 = sag_realm_3.clone();
+                fasync::Task::spawn(async move {
+                    sag_realm_3.connect_server_end_to_protocol(server_end).await.unwrap()
+                })
+                .detach();
+            });
         let fs_holder = Mutex::new(Some(fs));
         let sag_proxy = builder
             .add_local_child(
@@ -297,6 +303,7 @@ impl SessionManagerPowerTest {
                     .capability(Capability::protocol_by_name(
                         "fuchsia.power.system.ActivityGovernor",
                     ))
+                    .capability(Capability::protocol_by_name("fuchsia.power.system.BootControl"))
                     .from(&sag_proxy)
                     .to(&session_manager),
             )
@@ -338,13 +345,10 @@ impl SessionManagerPowerTest {
             realm.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
         let (namespace, server_end) = create_endpoints::<fio::DirectoryMarker>();
         realm_query
-            .open(
+            .open_directory(
                 "session-manager/session:session",
                 fsys2::OpenDirType::NamespaceDir,
-                fio::OpenFlags::empty(),
-                fio::ModeType::empty(),
-                ".",
-                server_end.into_channel().into(),
+                server_end,
             )
             .await
             .unwrap()

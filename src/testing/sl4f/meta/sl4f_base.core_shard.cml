@@ -163,7 +163,6 @@
         {
             protocol: [
                 "fuchsia.device.NameProvider",
-                "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.paver.Paver",
                 "fuchsia.sys2.LifecycleController.root",
@@ -172,6 +171,11 @@
                 "fuchsia.sysmem2.Allocator",
             ],
             from: "parent",
+            to: "#sl4f",
+        },
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor",
+            from: "parent/diagnostics-accessors",
             to: "#sl4f",
         },
         {

@@ -7,24 +7,19 @@ use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the starnix area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct PlatformMediaConfig {
-    #[serde(default)]
     pub audio: Option<AudioConfig>,
 
-    #[serde(default)]
     pub camera: CameraConfig,
 
-    #[serde(default)]
     pub multizone_leader: MultizoneConfig,
 
     /// Enable platform-provided video and audio decoders and encoders.
-    #[serde(default)]
     pub enable_codecs: bool,
 
     /// Enable a platform-provided service that allows active media players (sessions) to be
     /// published and discovered, primarily for user control of those sessiosn.
-    #[serde(default)]
     pub enable_sessions: bool,
 }
 
@@ -41,27 +36,26 @@ pub enum AudioConfig {
 
 /// Configuration options for the AudioCore stack.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct AudioCoreConfig {
     /// Route the ADC device to audio_core.
-    #[serde(default)]
     pub use_adc_device: bool,
 }
 
 /// The camera settings for the platform.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
 pub struct CameraConfig {
-    #[serde(default)]
     pub enabled: bool,
 }
 
 /// The multizone_leader settings for the platform.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
 pub struct MultizoneConfig {
     /// The component url for the multizone leader component.
     /// The component should expose these capabilities:
     ///   fuchsia.media.SessionAudioConsumerFactory
     ///   google.cast.multizone.Leader
-    #[serde(default)]
     pub component_url: Option<String>,
 }

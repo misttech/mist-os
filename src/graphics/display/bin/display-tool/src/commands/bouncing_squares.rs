@@ -109,8 +109,8 @@ impl Scene for BouncingSquaresScene {
 pub async fn run(coordinator: &Coordinator, display: &DisplayInfo) -> Result<()> {
     // Obtain the display resolution based on the display's preferred mode.
     let (width, height) = {
-        let mode = display.0.modes[0];
-        (mode.horizontal_resolution, mode.vertical_resolution)
+        let mode = &display.0.modes[0];
+        (mode.active_area.width, mode.active_area.height)
     };
 
     let scene = BouncingSquaresScene::new(width, height);

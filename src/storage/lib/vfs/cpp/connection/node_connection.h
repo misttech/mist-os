@@ -40,7 +40,12 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   // |fuchsia.io/Node| operations.
   //
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  void DeprecatedClone(DeprecatedCloneRequestView request,
+                       DeprecatedCloneCompleter::Sync& completer) final;
+#else
   void Clone(CloneRequestView request, CloneCompleter::Sync& completer) final;
+#endif
   void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) final;
   void Close(CloseCompleter::Sync& completer) final;
   void Query(QueryCompleter::Sync& completer) final;
@@ -70,6 +75,14 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   }
   void RemoveExtendedAttribute(RemoveExtendedAttributeRequestView request,
                                RemoveExtendedAttributeCompleter::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+#endif
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  void GetFlags2(GetFlags2Completer::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void SetFlags2(SetFlags2RequestView request, SetFlags2Completer::Sync& completer) final {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 #endif

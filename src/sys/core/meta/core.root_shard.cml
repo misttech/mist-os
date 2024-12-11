@@ -167,12 +167,7 @@
         {
             protocol: [
                 "fuchsia.device.NameProvider",
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.host.ArchiveAccessor",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.diagnostics.LogSettings",
-                "fuchsia.diagnostics.LoWPANArchiveAccessor",
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.fshost.Admin",
@@ -283,10 +278,16 @@
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.BootControl",
             ],
             from: "#bootstrap",
             to: "#core",
             availability: "optional",
+        },
+        {
+            dictionary: "diagnostics-accessors",
+            from: "#bootstrap",
+            to: "#core",
         },
         {
             dictionary: "toolbox",

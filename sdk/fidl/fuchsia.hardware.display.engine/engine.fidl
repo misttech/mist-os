@@ -249,11 +249,80 @@ type RawDisplayInfo = resource struct {
     pixel_formats vector<fuchsia.images2.PixelFormat>:MAX_COUNT_DISPLAY_PIXEL_FORMATS;
 };
 
+/// Receives events on a display engine.
+///
+/// An [`EngineListener`] may be registered to the engine through the [`Engine`]
+/// protocol before it receives any events.
+///
+/// This protocol only consists of one-way calls.
+///
+/// This protocol is `open` while under development.
+/// TODO(https://fxbug.dev/316631158): Make it `closed` once the API is
+/// stabilized.
+@transport("Driver")
+open protocol EngineListener {
+    /// Called when a display is connected.
+    ///
+    /// Display Engine drivers must emit this event for all displays connected
+    /// prior to initialization.
+    flexible OnDisplayAdded(resource struct {
+        display_info RawDisplayInfo;
+    });
+
+    /// Called when a display is removed.
+    ///
+    /// `display_id` must be a valid display ID that occurred in a previous
+    /// `OnDisplayAdded()` event.
+    ///
+    /// Display Engine drivers must have finished accessing all images which
+    /// were on the removed display before calling `OnDisplayRemoved()`.
+    flexible OnDisplayRemoved(struct {
+        display_id uint64;
+    });
+
+    /// Called at the start of each display device's vertical synchronization
+    /// (Vsync) period, regardless of whether the display has applied any
+    /// configuration.
+    ///
+    /// Arguments
+    /// - `timestamp`
+    ///      The ZX_CLOCK_MONOTONIC timestamp at which the vsync occurred.
+    /// - `config_stamp`
+    ///      The config stamp of the latest configuration that is currently
+    ///      fully applied to all the layers of the display with `display_id`.
+    ///        If none of the configurations are currently fully applied to
+    ///      this display, a null value will be passed to the driver.
+    ///        Note that an `ApplyConfiguration()` call may contain multiple
+    ///      configurations with a certain `config_stamp`; Only the application
+    ///      status of the configuration with ID `display_id` is related.
+    flexible OnDisplayVsync(struct {
+        display_id uint64;
+        timestamp zx.Time;
+        config_stamp fuchsia.hardware.display.types.ConfigStamp;
+    });
+
+    /// Called when a previous display capture triggered by
+    /// [`Engine.StartCapture`] is completed.
+    ///
+    /// The display Engine emits an [`OnCaptureComplete`] event only if
+    /// [`IsCaptureSupported`] returns `true`.
+    flexible OnCaptureComplete();
+};
+
 /// This protocol is `open` while under development.
 /// TODO(b/316631158): We should make it `closed` once the API is stabilized.
 @discoverable
 @transport("Driver")
 open protocol Engine {
+    /// Sets a `EngineListener` that listens to display events on this display
+    /// engine.
+    ///
+    /// There must be exactly one `EngineListener` set for the display engine
+    /// before any other functions are called.
+    flexible SetListener(resource struct {
+        engine_listener client_end:EngineListener;
+    }) -> ();
+
     /// Import a sysmem buffer collection token.
     ///
     /// Returns ZX_ERR_ALREADY_EXISTS if `collection_id` is in use.
@@ -440,56 +509,6 @@ open protocol Engine {
     flexible ReleaseCapture(struct {
         capture_image_id ImageId;
     }) -> () error zx.Status;
-
-    /// Triggered when a previous display capture triggered by [`StartCapture`]
-    /// is completed.
-    ///
-    /// The display Engine emits an [`OnCaptureComplete`] event only if
-    /// [`IsCaptureSupported`] returns `true`.
-    flexible -> OnCaptureComplete();
-
-    /// Emitted when a display is connected.
-    ///
-    /// Display Engine drivers must emit this event for all displays connected
-    /// prior to initialization.
-    flexible -> OnDisplayAdded(resource struct {
-        display_info RawDisplayInfo;
-    });
-
-    /// Emitted when a display is removed.
-    ///
-    /// `display_id` must be a valid display ID that occurred in a previous
-    /// `OnDisplayAdded()` event.
-    ///
-    /// Display Engine drivers must have finished accessing all images which
-    /// were on the removed display before emitting the `OnDisplayRemoved()`
-    /// event.
-    flexible -> OnDisplayRemoved(struct {
-        display_id uint64;
-    });
-
-    /// Events which are invoked when display vsync occurs.
-    ///
-    /// Arguments
-    /// - `timestamp`
-    ///      The ZX_CLOCK_MONOTONIC timestamp at which the vsync occurred.
-    /// - `config_stamp`
-    ///      The config stamp of the latest configuration that is currently
-    ///      fully applied to all the layers of the display with `display_id`.
-    ///        If none of the configurations are currently fully applied to
-    ///      this display, a null value will be passed to the driver.
-    ///        Note that an `ApplyConfiguration()` call may contain multiple
-    ///      configurations with a certain `config_stamp`; Only the application
-    ///      status of the configuration with ID `display_id` is related.
-    ///
-    /// The driver must emit this event as close as possible to the start of
-    /// every display's VSync period, even if the display has no images
-    /// displayed.
-    flexible -> OnDisplayVsync(struct {
-        display_id uint64;
-        timestamp zx.Time;
-        config_stamp box<fuchsia.hardware.display.types.ConfigStamp>;
-    });
 
     // A noop method with a response from the server that should be used
     // by clients who optionally use this library to determine availability.

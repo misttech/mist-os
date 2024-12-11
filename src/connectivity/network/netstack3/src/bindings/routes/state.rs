@@ -68,8 +68,16 @@ pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, ctx: Ctx) {
                     .unwrap_or_log("failed to respond");
                 Ok(())
             }
-            fnet_routes::StateRequest::GetRouteTableName { table_id: _, responder: _ } => {
-                todo!("TODO(https://fxbug.dev/336205291): Implement for main table");
+            fnet_routes::StateRequest::GetRouteTableName { table_id, responder } => {
+                match routes::TableIdEither::new(table_id) {
+                    routes::TableIdEither::V4(id) => {
+                        ctx.bindings_ctx().get_route_table_name(id, responder)
+                    }
+                    routes::TableIdEither::V6(id) => {
+                        ctx.bindings_ctx().get_route_table_name(id, responder)
+                    }
+                }
+                Ok(())
             }
         }
     })

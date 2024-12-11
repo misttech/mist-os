@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use tracing::*;
 
 // The capability name for the Inspect reader
-const INSPECT_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.FeedbackArchiveAccessor";
+const INSPECT_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.ArchiveAccessor.feedback";
 
 #[derive(Clone)]
 pub(crate) struct Fetcher(UnboundedSender<FetchCommand>);

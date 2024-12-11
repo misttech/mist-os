@@ -91,12 +91,12 @@ where
         self.inner.lock().map.clone()
     }
 
-    pub fn get<Q: ?Sized>(&self, k: &Q) -> Option<Arc<V>>
+    pub fn get<Q>(&self, k: &Q) -> Option<Arc<V>>
     where
         K: ::std::borrow::Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
     {
-        self.inner.lock().map.get(k).map(|v| v.clone())
+        self.inner.lock().map.get(k).cloned()
     }
 }
 

@@ -63,6 +63,7 @@
             protocol: [
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.BootControl",
             ],
             from: "parent",
             availability: "optional",
@@ -115,8 +116,6 @@
                 "fuchsia.camera3.DeviceWatcher",
                 "fuchsia.cobalt.SystemDataUpdater",
                 "fuchsia.device.NameProvider",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-                "fuchsia.diagnostics.LoWPANArchiveAccessor",
                 "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReportingProductRegister",
                 "fuchsia.feedback.DataProvider",
@@ -484,24 +483,6 @@
             availability: "same_as_target",
         },
         {
-            // TODO(https://fxbug.dev/42057100): These additional `protocol` offers to the
-            // `#session` collection are only required by the `terminal`
-            // component. `terminal` is launched as a member of the `elements`
-            // collection of the application shell (a descendent of the
-            // workstation session, which is launched as a member of the
-            // `#session` collection). If/when there is a way to route
-            // capabilities to specific descendents (and specific collection
-            // members), these protocols should be routed only to terminal.
-            //
-            // Other (current and future) components launched under the
-            // `#session` collection should not `use` these protocols without
-            // first getting a security policy review.
-            protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
-            from: "parent",
-            to: [ "#session" ],
-            availability: "same_as_target",
-        },
-        {
             // TODO(https://fxbug.dev/42057100): These additional `directory` offers to
             // the `#session` collection are only required by the `terminal`
             // component. `terminal` is launched as a member of the `elements`
@@ -520,6 +501,11 @@
             ],
             from: "parent",
             to: [ "#session" ],
+        },
+        {
+            dictionary: "diagnostics-accessors",
+            from: "parent",
+            to: "#session",
         },
         {
             directory: [

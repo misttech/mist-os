@@ -23,10 +23,9 @@ pub enum FeedbackBuildTypeConfig {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct ForensicsOptions {
     /// The build type config Feedback should use.
-    #[serde(default)]
     pub build_type_override: Option<FeedbackBuildTypeConfig>,
 }
 
@@ -35,7 +34,7 @@ pub struct ForensicsOptions {
 /// Developer Overrides struct that is similar to the AssemblyConfig struct,
 /// but has extra fields added that allow it to convey extra fields.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct DeveloperOverrides {
     /// The label of the target used to define the overrides.
     pub target_name: Option<String>,
@@ -45,48 +44,40 @@ pub struct DeveloperOverrides {
     /// behavior of assembly.
     ///
     /// Using these will generate warnings.
-    #[serde(default)]
     pub developer_only_options: DeveloperOnlyOptions,
 
     /// Developer overrides for the kernel.
     ///
     /// Using these will generate warnings.
-    #[serde(default)]
     pub kernel: KernelOptions,
 
     /// Developer overrides for the platform configuration.
     ///
     /// This is a 'Value' so that it can be be used to overlay the product's
     /// platform configuration before that's parsed into it's real type.
-    #[serde(default)]
     pub platform: serde_json::Value,
 
     /// Developer overrides for the product configuration
     ///
     /// This is a 'Value' so that it can be be used to overlay the product's
     /// product configuration before that's parsed into it's real type.
-    #[serde(default)]
     pub product: serde_json::Value,
 
     /// Developer overrides for the board configuration
     ///
     /// This is a 'Value' so that it can be be used to overlay the
     /// board configuration before that's parsed into it's real type.
-    #[serde(default)]
     pub board: serde_json::Value,
 
     /// Packages to add to the build.
-    #[serde(default)]
     #[file_relative_paths]
     pub packages: Vec<PackageDetails>,
 
     /// Compiled components to add to the build
-    #[serde(default)]
     pub packages_to_compile: Vec<CompiledPackageDefinition>,
 
     /// Map of the names of packages that contain shell commands to the list of
     /// commands within each.
-    #[serde(default)]
     pub shell_commands: ShellCommands,
 
     /// Map of files to apply to the platform and product configuration schemas.
@@ -95,7 +86,6 @@ pub struct DeveloperOverrides {
     /// path to the file that contains the developer overrides, and it's
     /// otherwise not known that they they are file paths, as these fields are
     /// all serde_json::Value type.
-    #[serde(default)]
     #[file_relative_paths]
     pub developer_provided_files: Vec<DeveloperProvidedFilesNode>,
 }
@@ -103,7 +93,7 @@ pub struct DeveloperOverrides {
 /// Special flags for assembly that can only be used in the context of developer
 /// overrides.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct DeveloperOnlyOptions {
     /// Force all non-bootfs packages known to assembly to be in the base package
     /// set (cache, universe, etc.).
@@ -111,24 +101,20 @@ pub struct DeveloperOnlyOptions {
     /// This feature exists to enable the use of a product image that has cache
     /// or universe packages in a context where networking is unavailable or
     /// a package server cannot be run.
-    #[serde(default)]
     pub all_packages_in_base: bool,
 
     /// Whether to enable netboot mode for assembly.
-    #[serde(default)]
     pub netboot_mode: bool,
 
-    #[serde(default)]
-    pub forensics_options: Option<ForensicsOptions>,
+    pub forensics_options: ForensicsOptions,
 }
 
 /// Kernel options and settings that are only to be used in the context of local
 /// developer overrides.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct KernelOptions {
     /// Additional kernel command line args to add to the assembled ZBI.
-    #[serde(default)]
     pub command_line_args: Vec<String>,
 }
 
@@ -152,7 +138,7 @@ pub struct KernelOptions {
 ///     }
 ///   }
 ///
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct DeveloperProvidedFilesNode {
     /// The path to a json object, in "foo.bar" notation.

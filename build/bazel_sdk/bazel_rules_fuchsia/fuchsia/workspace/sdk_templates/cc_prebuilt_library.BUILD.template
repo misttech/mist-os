@@ -1,8 +1,8 @@
 load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "@{{rules_fuchsia}}//fuchsia:defs.bzl",
     "variant_select",
 )
-load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("@{{rules_fuchsia}}//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 # Note: the cc_library / cc_import combo serves two purposes:
 #  - it allows the use of a select clause to target the proper architecture;

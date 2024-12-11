@@ -77,6 +77,7 @@ fuchsia_driver_component("focaltech") {
 
 fuchsia_driver_package("package") {
   package_name = "focaltech"
+  export_to_bazel = true
   driver_components = [ ":focaltech" ]
 }
 
@@ -108,6 +109,7 @@ fuchsia_driver_component("focaltech-sherlock") {
 
 fuchsia_driver_package("focaltech-sherlock-package") {
   package_name = "focaltech-sherlock"
+  export_to_bazel = true
   driver_components = [ ":focaltech-sherlock" ]
 }
 

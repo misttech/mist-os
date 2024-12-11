@@ -5,7 +5,6 @@
 #ifndef SRC_SYS_FUZZING_REALMFUZZER_TESTING_COVERAGE_H_
 #define SRC_SYS_FUZZING_REALMFUZZER_TESTING_COVERAGE_H_
 
-#include <fuchsia/debugdata/cpp/fidl.h>
 #include <fuchsia/fuzzer/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/interface_request.h>

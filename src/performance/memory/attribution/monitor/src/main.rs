@@ -6,10 +6,12 @@ use anyhow::{Context, Error};
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use fuchsia_component::server::ServiceFs;
+use fuchsia_trace::duration;
 use futures::StreamExt;
 use resources::Job;
 use snapshot::AttributionSnapshot;
 use std::sync::Arc;
+use traces::CATEGORY_MEMORY_CAPTURE;
 use tracing::{error, warn};
 
 use {
@@ -127,9 +129,11 @@ async fn provide_snapshot(
     kernel_stats: &fkernel::StatsProxy,
     snapshot: zx::Socket,
 ) -> Result<(), Error> {
+    duration!(CATEGORY_MEMORY_CAPTURE, c"provide_snapshot");
     let attribution_state = attribution_client.get_attributions();
     let kernel_resources =
         resources::KernelResources::get_resources(&root_job, &attribution_state)?;
+
     let memory_stats = kernel_stats.get_memory_stats().await?;
     let compression_stats = kernel_stats.get_memory_stats_compression().await?;
 

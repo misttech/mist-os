@@ -85,18 +85,16 @@ class ConnectionBaseTestClass(AsyncAdapter, base_test.BaseTestClass):
                 f"Found existing ifaces: {response.iface_list}. Every test suite should start with no ifaces."
             )
 
-        req = fidl_svc.CreateIfaceRequest(
-            phy_id=self.phy_id,
-            role=fidl_common.WlanMacRole.CLIENT,
-            sta_addr=[0, 0, 0, 0, 0, 0],
-        )
-        response = await self.device_monitor_proxy.create_iface(req=req)
-        assert_equal(
-            response.status,
-            ZxStatus.ZX_OK,
-            "DeviceMonitor.CreateIface() failed",
-        )
-        self.iface_id = response.resp.iface_id
+        response = (
+            await self.device_monitor_proxy.create_iface(
+                phy_id=self.phy_id,
+                role=fidl_common.WlanMacRole.CLIENT,
+                sta_address=[0, 0, 0, 0, 0, 0],
+            )
+        ).unwrap()
+        if response.iface_id is None:
+            fail("DeviceMonitor.CreateIface() response is missing a iface_id")
+        self.iface_id = response.iface_id
 
         proxy, server = Channel.create()
         (

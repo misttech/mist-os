@@ -69,6 +69,10 @@ mod tests {
         assert_eq!(format!("{}", result.unwrap_err()), "no available association ID");
     }
 
+    #[allow(
+        clippy::legacy_numeric_constants,
+        reason = "mass allow for https://fxbug.dev/381896734"
+    )]
     #[test]
     fn test_map_no_available_assoc_id() {
         let mut aid_map: Map = Default::default();

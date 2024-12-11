@@ -92,6 +92,7 @@ fuchsia_structured_config_values("sc-values") {
 
 fuchsia_driver_package("package") {
   package_name = "aml-uart"
+  export_to_bazel = true
   driver_components = [ ":aml-uart" ]
   deps = [ ":sc-values" ]
 }

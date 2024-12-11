@@ -14,7 +14,7 @@
     use: [
         {
             protocol: [
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.ArchiveAccessor.feedback",
                 "fuchsia.update.Listener",
             ],
             from: "parent",

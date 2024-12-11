@@ -22,6 +22,7 @@ fuchsia_driver_component("aml-rawnand") {
 
 fuchsia_driver_package("package") {
   package_name = "aml-rawnand"
+  export_to_bazel = true
   driver_components = [ ":aml-rawnand" ]
 }
 

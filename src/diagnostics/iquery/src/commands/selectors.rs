@@ -55,7 +55,7 @@ impl Command for SelectorsCommand {
             return Err(Error::invalid_arguments("Expected 1 or more selectors. Got zero."));
         }
 
-        let selectors = if let Some(component) = self.component {
+        let mut selectors = if let Some(component) = self.component {
             utils::process_component_query_with_partial_selectors(
                 component,
                 self.selectors.into_iter(),
@@ -74,8 +74,7 @@ impl Command for SelectorsCommand {
             utils::process_fuzzy_inputs(self.selectors, provider).await?
         };
 
-        let selectors = utils::expand_selectors(selectors, None)?;
-
+        utils::ensure_tree_field_is_set(&mut selectors, None)?;
         let mut results =
             provider.snapshot::<Inspect>(self.accessor.as_deref(), selectors.into_iter()).await?;
         for result in results.iter_mut() {

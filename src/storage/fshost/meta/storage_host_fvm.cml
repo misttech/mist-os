@@ -1,0 +1,22 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "//src/storage/fshost/meta/storage_host_fvm_base.shard.cml" ],
+    children: [
+        {
+            name: "fvm",
+            url: "fuchsia-boot:///fvm2#meta/fvm2.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.scheduler.RoleManager",
+            ],
+            from: "parent",
+            to: "#fvm",
+        },
+    ],
+}

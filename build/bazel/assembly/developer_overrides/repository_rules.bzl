@@ -22,7 +22,7 @@ def _generate_developer_overrides_repository_impl(repo_ctx):
         "# DO NOT EDIT! Automatically generated.",
         "",
         "load(",
-        "    \"@fuchsia_sdk//fuchsia:assembly.bzl\",",
+        "    \"@rules_fuchsia//fuchsia:assembly.bzl\",",
         "    \"fuchsia_assembly_developer_overrides_list\",",
         "    \"fuchsia_prebuilt_assembly_developer_overrides\",",
         ")",

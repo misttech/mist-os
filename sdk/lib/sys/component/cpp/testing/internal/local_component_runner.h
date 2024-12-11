@@ -22,6 +22,8 @@ namespace internal {
 
 class LocalComponentRunner;
 
+// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
 class LocalComponentInstance final : public fuchsia::component::runner::ComponentController {
  public:
   // Constructed by the LocalComponentRunner when the runner receives a request
@@ -96,6 +98,70 @@ class LocalComponentInstance final : public fuchsia::component::runner::Componen
   fit::closure on_stop_;
 };
 
+#else
+class LocalComponentInstance final : public fuchsia::component::runner::ComponentController {
+ public:
+  // Constructed by the LocalComponentRunner when the runner receives a request
+  // to start a local component.
+  explicit LocalComponentInstance(
+      fidl::InterfaceRequest<fuchsia::component::runner::ComponentController> controller,
+      async_dispatcher_t* dispatcher, LocalComponentFactory component_factory,
+      fuchsia::component::runner::ComponentStartInfo start_info,
+      fit::function<void()> on_instance_exit);
+
+  LocalComponentInstance(LocalComponentInstance&& other) = delete;
+  LocalComponentInstance& operator=(LocalComponentInstance&& other) = delete;
+
+  LocalComponentInstance(const LocalComponentInstance& other) = delete;
+  LocalComponentInstance& operator=(const LocalComponentInstance& other) = delete;
+
+  // Called after constructing the |LocalComponentInstance|, to start the
+  // component.
+  void Start();
+
+  // Returns true after Start() and before Exit().
+  bool IsRunning();
+
+ private:
+  // fuchsia::component::runner::ComponentController
+  void Stop() override;
+
+  // fuchsia::component::runner::ComponentController
+  void Kill() override { Exit(ZX_ERR_CANCELED); }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
+  // fuchsia::component::runner::ComponentController
+  void handle_unknown_method(uint64_t ordinal, bool has_response) override;
+#endif
+
+  // Close the ComponentController and call the given on_exit function.
+  void Exit(zx_status_t);
+
+  fidl::Binding<fuchsia::component::runner::ComponentController> binding_;
+
+  // If a |LocalComponentImplBase| calls `Exit()` during
+  // `LocalComponentImplBase::OnStart()`, the LocalComponentInstance will _not_
+  // immediately call `LocalComponentInstance::Exit()`. It will save the
+  // provided status, and call `LocalComponentInstance::Exit()` after the
+  // component has `started_`.
+  cpp17::optional<zx_status_t> pending_exit_status_;
+
+  // Set to true at the beginning of `Start()`, and false at the completion
+  // of `Start()`.
+  bool starting_;
+
+  // Set to true at the completion of `Start()`.
+  bool started_;
+
+  // Called when the component is exiting, purposefully or as a result of a
+  // ComponentController::Kill().
+  fit::closure on_exit_;
+
+  std::unique_ptr<LocalComponentImplBase> local_component_;
+};
+
+#endif  // #if FUCHSIA_API_LEVEL_LESS_THAN(17)
+
 using LocalComponents = std::map<std::string, LocalComponentKind>;
 using LocalComponentInstances = std::map<std::string, std::unique_ptr<LocalComponentInstance>>;
 
@@ -127,11 +193,16 @@ class LocalComponentRunner final : fuchsia::component::runner::ComponentRunner {
   // can be started again).
   bool ContainsReadyComponent(std::string name) const;
 
+  std::unique_ptr<LocalComponentImplBase> SetComponentToRunning(std::string name);
+  void SetComponentToReady(std::string name);
+
   // The list of components that are not running but can be started.
   LocalComponents ready_components_;
+  // The list of components that are running.
+  LocalComponents running_components_;
 
   // ComponentInstance objects for components that have been started.
-  LocalComponentInstances running_components_;
+  LocalComponentInstances running_component_instances_;
   fidl::Binding<fuchsia::component::runner::ComponentRunner> binding_;
   async_dispatcher_t* dispatcher_;
 };

@@ -25,14 +25,10 @@ toc:
     path: /docs/development/diagnostics/inspect/health.md
   - title: "Rust libraries"
     path: /docs/development/diagnostics/inspect/rust.md
-  - title: "Inspect codelab"
-    section:
-    - title: "Overview"
-      path: /docs/development/diagnostics/inspect/codelab/README.md
-    - title: "Codelab"
-      path: /docs/development/diagnostics/inspect/codelab/codelab.md
   - title: "Using Inspect for drivers"
     path: /docs/development/drivers/diagnostics/inspect.md
+  - title: "Codelab: Using Inspect"
+    path: /docs/development/diagnostics/inspect/codelab.md
 - title: "Log"
   section:
   - title: "Overview"
@@ -61,15 +57,9 @@ toc:
     path: /docs/development/diagnostics/triage/README.md
   - title: "Configuring Triage"
     path: /docs/development/diagnostics/triage/config.md
-  - title: "Codelab"
-    path: /docs/development/diagnostics/triage/codelab.md
   - title: "Triage (fx triage)"
     path: /docs/development/diagnostics/triage/fx_triage.md
-- title: "Diagnostics and Testing Workshop"
-  section:
-  - title: "Overview"
-    path: /docs/development/diagnostics/workshop/README.md
-  - title: "Codelab"
-    path: /docs/development/diagnostics/workshop/codelab.md
+  - title: "Codelab: Using Triage"
+    path: /docs/development/diagnostics/triage/codelab.md
 
 

@@ -29,8 +29,8 @@ fn get_display_coordinator_path() -> anyhow::Result<String> {
 fn convert_info(info: &Info) -> DisplayInfo {
     DisplayInfo {
         id: format!("[mfgr: '{}', model: '{}']", info.manufacturer_name, info.monitor_name),
-        width: info.modes[0].horizontal_resolution,
-        height: info.modes[0].vertical_resolution,
+        width: info.modes[0].active_area.width,
+        height: info.modes[0].active_area.height,
     }
 }
 

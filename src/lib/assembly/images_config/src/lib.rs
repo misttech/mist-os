@@ -17,8 +17,9 @@ pub use images_config::{
 };
 
 pub use board_filesystem_config::{
-    BoardFilesystemConfig, PostProcessingScript, VBMetaDescriptor, ZbiCompression,
+    BoardFilesystemConfig, GptMode, PostProcessingScript, VBMetaDescriptor, ZbiCompression,
 };
+
 pub use product_filesystem_config::{
     BlobFvmVolumeConfig, BlobfsLayout, DataFilesystemFormat, DataFvmVolumeConfig,
     FilesystemImageMode, FvmVolumeConfig, ImageName, ProductFilesystemConfig, VolumeConfig,

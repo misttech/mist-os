@@ -124,7 +124,7 @@ fn create_tee_manager(
         // all of the contents and includes into assembly resources.
         contents: vec![],
         includes: vec![],
-        bootfs_package: Default::default(),
+        bootfs_package: false,
     };
     builder
         .compiled_package(destination.clone(), def)
@@ -255,7 +255,7 @@ fn create_tee_clients(
             })
         }
 
-        if let Some(true) = tee_client.additional_required_features.persistent_storage {
+        if tee_client.additional_required_features.persistent_storage {
             offer.push(cml::Offer {
                 storage: Some(create_name("data")?.into()),
                 ..cml::Offer::empty(
@@ -265,7 +265,7 @@ fn create_tee_clients(
             })
         }
 
-        if let Some(true) = tee_client.additional_required_features.tmp_storage {
+        if tee_client.additional_required_features.tmp_storage {
             offer.push(cml::Offer {
                 storage: Some(create_name("tmp")?.into()),
                 ..cml::Offer::empty(
@@ -275,7 +275,7 @@ fn create_tee_clients(
             })
         }
 
-        if let Some(true) = tee_client.additional_required_features.securemem {
+        if tee_client.additional_required_features.securemem {
             offer.push(cml::Offer {
                 directory: Some(create_name("dev-securemem")?.into()),
                 rights: Some(cml::Rights(vec![cml::Right::ReadAlias])),
@@ -312,7 +312,7 @@ fn create_tee_clients(
         components,
         contents: Default::default(),
         includes: Default::default(),
-        bootfs_package: Default::default(),
+        bootfs_package: false,
     };
 
     builder
@@ -360,7 +360,7 @@ mod tests {
             components,
             contents,
             includes,
-            bootfs_package: None,
+            bootfs_package: false,
         } = compiled_package
         {
             assert_eq!(components.len(), 1);
@@ -528,7 +528,7 @@ mod tests {
             components,
             contents,
             includes,
-            bootfs_package: None,
+            bootfs_package: false,
         } = compiled_package
         {
             assert_eq!(components.len(), 1);
@@ -596,9 +596,9 @@ mod tests {
                 ("baz".to_string(), "qux".to_string()),
             ])),
             additional_required_features: TeeClientFeatures {
-                tmp_storage: Some(true),
-                persistent_storage: Some(true),
-                securemem: Some(true),
+                tmp_storage: true,
+                persistent_storage: true,
+                securemem: true,
             },
         }];
 

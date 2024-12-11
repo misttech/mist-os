@@ -29,11 +29,20 @@ def fuchsia_devicetree_visitor(name, output_name = None, additional_linker_input
     additional_linker_inputs = kwargs.pop("additional_linker_inputs", [])
     user_link_flags = kwargs.pop("user_link_flags", [])
 
+    # Compute the label of the linker script.
+    #
+    # NOTE: A value of //fuchsia/private:driver.ld will not work here, as it will
+    # be interpreted as a package 'fucshia' or the project's workspace itself.
+    #
+    # Using @rules_fuchsia//fuchsia/private:driver.ld would break client workspaces
+    # that still use a standalone @fuchsia_sdk repository.
+    visitor_ld_target = "@fuchsia_sdk//fuchsia/private:visitor.ld"
+
     user_link_flags.extend([
         "-Wl,--version-script",
-        "$(location @fuchsia_sdk//fuchsia/private:visitor.ld)",
+        "$(location %s)" % visitor_ld_target,
     ])
-    additional_linker_inputs.append("@fuchsia_sdk//fuchsia/private:visitor.ld")
+    additional_linker_inputs.append(visitor_ld_target)
 
     shared_lib_name = "{}_shared_lib".format(name)
     native.cc_shared_library(

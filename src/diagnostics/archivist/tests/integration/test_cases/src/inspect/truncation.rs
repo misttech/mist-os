@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::test_topology;
+use crate::{test_topology, utils};
 use diagnostics_reader::{ArchiveReader, Data, Inspect};
 use fidl_fuchsia_archivist_test as ftest;
-use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 
 #[fuchsia::test]
 async fn accessor_truncation_test() {
@@ -35,7 +34,7 @@ async fn accessor_truncation_test() {
         writers.push(writer);
     }
 
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     let mut reader = ArchiveReader::new();
     reader.with_archive(accessor);
     let data = reader

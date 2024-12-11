@@ -25,12 +25,16 @@
         {
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.process.Launcher",
                 "fuchsia.sysinfo.SysInfo",
             ],
             from: "parent",
+            to: "#feedback",
+        },
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor.feedback",
+            from: "parent/diagnostics-accessors",
             to: "#feedback",
         },
         {

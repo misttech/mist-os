@@ -235,11 +235,7 @@ fn new_scan_request(
         scan_type: fidl_mlme::ScanTypes::Passive,
         probe_delay: 0,
         // TODO(https://fxbug.dev/42169913): SME silently ignores unsupported channels
-        channel_list: get_channels_to_scan(
-            &device_info,
-            spectrum_management_support,
-            &scan_request,
-        ),
+        channel_list: get_channels_to_scan(device_info, spectrum_management_support, &scan_request),
         ssid_list: ssid_list.into_iter().map(Ssid::into).collect(),
         min_channel_time: PASSIVE_SCAN_CHANNEL_MS,
         max_channel_time: PASSIVE_SCAN_CHANNEL_MS,
@@ -325,7 +321,7 @@ fn get_channels_to_scan(
             }
             true
         })
-        .map(|chan| *chan)
+        .copied()
         .collect();
 
     if channels.is_empty() {

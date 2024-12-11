@@ -47,7 +47,15 @@
             ],
         },
         {
+            protocol: [
+                "fuchsia.storage.partitions.PartitionsAdmin",
+                "fuchsia.storage.partitions.PartitionsManager",
+            ],
+            availability: "optional",
+        },
+        {
             service: [ "fuchsia.storage.partitions.PartitionService" ],
+            availability: "optional",
         },
     ],
     expose: [

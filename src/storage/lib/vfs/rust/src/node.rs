@@ -157,13 +157,18 @@ impl<N: Node> Connection<N> {
     /// Handle a [`NodeRequest`].
     async fn handle_request(&mut self, req: fio::NodeRequest) -> Result<ConnectionState, Error> {
         match req {
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::DeprecatedClone { flags, object, control_handle: _ } => {
+                self.handle_clone_deprecated(flags, object);
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::NodeRequest::Clone { flags, object, control_handle: _ } => {
-                self.handle_clone(flags, object);
+                self.handle_clone_deprecated(flags, object);
             }
             fio::NodeRequest::Clone2 { request, control_handle: _ } => {
                 // TODO(https://fxbug.dev/324112547): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `request` channel was provided.
-                self.handle_reopen(ServerEnd::new(request.into_channel()));
+                self.handle_clone(ServerEnd::new(request.into_channel()));
             }
             fio::NodeRequest::Close { responder } => {
                 responder.send(Ok(()))?;
@@ -222,12 +227,24 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::QueryFilesystem { responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw(), None)?;
             }
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            fio::NodeRequest::GetFlags2 { responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            fio::NodeRequest::SetFlags2 { flags: _, responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
             fio::NodeRequest::_UnknownMethod { .. } => (),
         }
         Ok(ConnectionState::Alive)
     }
 
-    fn handle_clone(&mut self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {
+    fn handle_clone_deprecated(
+        &mut self,
+        flags: fio::OpenFlags,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
         flags.to_object_request(server_end).handle(|object_request| {
             let options = inherit_rights_for_clone(fio::OpenFlags::NODE_REFERENCE, flags)?
                 .to_node_options(self.node.entry_info().type_())?;
@@ -248,7 +265,7 @@ impl<N: Node> Connection<N> {
         });
     }
 
-    fn handle_reopen(&mut self, server_end: ServerEnd<fio::NodeMarker>) {
+    fn handle_clone(&mut self, server_end: ServerEnd<fio::NodeMarker>) {
         self.node.will_clone();
         let connection = Self {
             scope: self.scope.clone(),

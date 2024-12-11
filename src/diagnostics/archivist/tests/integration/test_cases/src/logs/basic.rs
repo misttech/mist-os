@@ -4,9 +4,9 @@
 
 use crate::logs::utils::Listener;
 use crate::puppet::PuppetProxyExt;
-use crate::test_topology;
+use crate::{test_topology, utils};
 use diagnostics_reader::{ArchiveReader, Logs};
-use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Severity};
+use fidl_fuchsia_diagnostics::Severity;
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage, LogProxy};
 use futures::channel::mpsc;
 use futures::{Stream, StreamExt};
@@ -106,11 +106,7 @@ async fn listen_for_syslog_routed_stdio() {
     .await
     .unwrap();
 
-    let accessor = realm_proxy
-        .connect_to_protocol::<ArchiveAccessorMarker>()
-        .await
-        .expect("ArchiveAccessor unavailable");
-
+    let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     let mut reader = ArchiveReader::new();
     reader.with_archive(accessor);
     let (mut logs, mut errors) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();

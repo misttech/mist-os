@@ -19,11 +19,6 @@ __BEGIN_CDECLS
 
 #define GBL_EFI_FASTBOOT_SERIAL_NUMBER_MAX_LEN_UTF8 32
 
-typedef struct gbl_efi_fastboot_arg {
-  const uint8_t* str_utf8;
-  size_t len;
-} gbl_efi_fastboot_arg;
-
 typedef struct gbl_efi_fastboot_policy {
   // Indicates whether device can be unlocked
   bool can_unlock;
@@ -50,7 +45,8 @@ enum GBL_EFI_FASTBOOT_LOCK_FLAGS {
   GBL_EFI_FASTBOOT_GBL_EFI_CRITICAL_LOCKED = 0x1 << 1,
 };
 
-typedef void const* gbl_efi_fastboot_token;
+typedef void (*get_var_callback)(void* context, const char* const* args, size_t num_args,
+                                 const char* val);
 
 typedef struct gbl_efi_fastboot_protocol {
   // Revision of the protocol supported.
@@ -59,14 +55,11 @@ typedef struct gbl_efi_fastboot_protocol {
   uint8_t serial_number[GBL_EFI_FASTBOOT_SERIAL_NUMBER_MAX_LEN_UTF8];
 
   // Fastboot variable methods
-  efi_status (*get_var)(struct gbl_efi_fastboot_protocol* self, const gbl_efi_fastboot_arg* args,
-                        size_t num_args, uint8_t* buf, size_t* bufsize,
-                        gbl_efi_fastboot_token hint) EFIAPI;
-  efi_status (*start_var_iterator)(struct gbl_efi_fastboot_protocol* self,
-                                   gbl_efi_fastboot_token* token) EFIAPI;
-  efi_status (*get_next_var_args)(struct gbl_efi_fastboot_protocol* self,
-                                  gbl_efi_fastboot_arg* args, size_t* num_args,
-                                  gbl_efi_fastboot_token* token) EFIAPI;
+  efi_status (*get_var)(struct gbl_efi_fastboot_protocol* self, const char* const* args,
+                        size_t num_args, uint8_t* out, size_t* out_size) EFIAPI;
+
+  efi_status (*get_var_all)(struct gbl_efi_fastboot_protocol* self, void* ctx,
+                            get_var_callback cb) EFIAPI;
 
   // Fastboot oem function methods
   efi_status (*run_oem_function)(struct gbl_efi_fastboot_protocol* self, const uint8_t* command,

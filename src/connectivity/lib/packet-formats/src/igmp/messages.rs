@@ -118,8 +118,13 @@ impl MembershipQueryData {
     const QRV_MSK: u8 = 0x07;
 
     /// Returns the the number of sources.
-    pub fn number_of_sources(self) -> u16 {
+    pub fn number_of_sources(&self) -> u16 {
         self.number_of_sources.get()
+    }
+
+    /// Returns the query's group address.
+    pub fn group_address(&self) -> Ipv4Addr {
+        self.group_address
     }
 
     /// Gets value of `S Flag`.
@@ -129,7 +134,7 @@ impl MembershipQueryData {
     /// however, suppress the querier election or the normal "host-side"
     /// processing of a Query that a router may be required to perform as a
     /// consequence of itself being a group member.
-    pub fn suppress_router_side_processing(self) -> bool {
+    pub fn suppress_router_side_processing(&self) -> bool {
         (self.sqrv & Self::S_FLAG) != 0
     }
 
@@ -146,7 +151,7 @@ impl MembershipQueryData {
     /// configured value.
     ///
     /// [RFC 3376 section 8.1]: https://tools.ietf.org/html/rfc3376#section-8.1
-    pub fn querier_robustness_variable(self) -> u8 {
+    pub fn querier_robustness_variable(&self) -> u8 {
         self.sqrv & Self::QRV_MSK
     }
 
@@ -160,7 +165,7 @@ impl MembershipQueryData {
     /// `DEFAULT_QUERY_INTERVAL`.
     ///
     /// [RFC 3376 section 8.2]: https://tools.ietf.org/html/rfc3376#section-8.2
-    pub fn querier_query_interval(self) -> core::time::Duration {
+    pub fn querier_query_interval(&self) -> core::time::Duration {
         // qqic is represented in a packed floating point format and interpreted
         // as units of seconds.
         Igmpv3QQIC::from(self.qqic).into()

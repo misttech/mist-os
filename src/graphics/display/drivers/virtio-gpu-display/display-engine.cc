@@ -42,6 +42,7 @@
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 #include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
@@ -185,16 +186,12 @@ void DisplayEngine::ReleaseImage(display::DriverImageId image_id) {
   }
 }
 
-config_check_result_t DisplayEngine::CheckConfiguration(
+bool DisplayEngine::CheckConfiguration(
     display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
-    cpp20::span<layer_composition_operations_t> out_layer_composition_operations,
-    size_t* out_layer_composition_operations_actual) {
+    cpp20::span<display::LayerCompositionOperations> layer_composition_operations) {
   ZX_DEBUG_ASSERT(display_id == kDisplayId);
 
-  ZX_DEBUG_ASSERT(out_layer_composition_operations.size() >= layers.size());
-  ZX_DEBUG_ASSERT(!out_layer_composition_operations_actual ||
-                  *out_layer_composition_operations_actual == layers.size());
-
+  ZX_DEBUG_ASSERT(layer_composition_operations.size() == layers.size());
   ZX_DEBUG_ASSERT(layers.size() == 1);
 
   const display::DriverLayer& layer = layers[0];
@@ -205,30 +202,29 @@ config_check_result_t DisplayEngine::CheckConfiguration(
       .height = static_cast<int32_t>(current_display_.scanout_info.geometry.height),
   });
 
-  config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
+  bool is_supported_configuration = true;
   if (layer.display_destination() != display_area) {
     // TODO(costan): Doesn't seem right?
-    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    layer_composition_operations[0] = layer_composition_operations[0].WithMergeBase();
+    is_supported_configuration = false;
   }
   if (layer.image_source() != layer.display_destination()) {
-    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
-    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    layer_composition_operations[0] = layer_composition_operations[0].WithFrameScale();
+    is_supported_configuration = false;
   }
   if (layer.image_metadata().dimensions() != layer.image_source().dimensions()) {
-    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_SRC_FRAME;
-    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    layer_composition_operations[0] = layer_composition_operations[0].WithSrcFrame();
+    is_supported_configuration = false;
   }
   if (layer.alpha_mode() != display::AlphaMode::kDisable) {
-    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
-    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    layer_composition_operations[0] = layer_composition_operations[0].WithAlpha();
+    is_supported_configuration = false;
   }
   if (layer.image_source_transformation() != display::CoordinateTransformation::kIdentity) {
-    out_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
-    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    layer_composition_operations[0] = layer_composition_operations[0].WithTransform();
+    is_supported_configuration = false;
   }
-
-  return check_result;
+  return is_supported_configuration;
 }
 
 void DisplayEngine::ApplyConfiguration(display::DisplayId display_id,

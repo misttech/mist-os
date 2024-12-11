@@ -16,9 +16,9 @@ pub struct NewPhyDevice {
     pub device_path: String,
 }
 
-pub fn watch_phy_devices<'a>(
-    device_directory: &'a str,
-) -> Result<impl Stream<Item = Result<NewPhyDevice, anyhow::Error>> + 'a, anyhow::Error> {
+pub fn watch_phy_devices(
+    device_directory: &str,
+) -> Result<impl Stream<Item = Result<NewPhyDevice, anyhow::Error>> + '_, anyhow::Error> {
     let directory = fuchsia_fs::directory::open_in_namespace(device_directory, fio::Flags::empty())
         .context("open directory")?;
     Ok(async move {
@@ -60,7 +60,7 @@ pub fn watch_phy_devices<'a>(
                 let mut id: u16 = 0;
                 while s != 0 {
                     id |= s as u16;
-                    s = s >> 16;
+                    s >>= 16;
                 }
                 Ok(Some(NewPhyDevice {
                     id,
@@ -108,6 +108,10 @@ mod tests {
             .expect("phy_watcher ended without yielding a phy")
             .expect("phy_watcher returned an error");
 
+        #[allow(
+            clippy::redundant_pattern_matching,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
         if let Poll::Ready(..) = poll!(phy_watcher.next()) {
             panic!("phy_watcher found more than one phy");
         }
@@ -137,6 +141,10 @@ mod tests {
                 .expect("phy_watcher returned an error");
         }
 
+        #[allow(
+            clippy::redundant_pattern_matching,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
         if let Poll::Ready(..) = poll!(phy_watcher.next()) {
             panic!("phy_watcher found more than one phy");
         }

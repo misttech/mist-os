@@ -766,7 +766,7 @@ async fn open3_file_get_representation() {
 }
 
 #[fuchsia::test]
-async fn open3_dir_optional_rights() {
+async fn open3_dir_inherit_rights() {
     let harness = TestHarness::new().await;
 
     let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
@@ -786,6 +786,11 @@ async fn open3_dir_optional_rights() {
     assert_eq!(
         proxy.get_connection_info().await.expect("get_connection_info failed").rights.unwrap(),
         fio::Operations::READ_BYTES | fio::INHERITED_WRITE_PERMISSIONS,
+    );
+    // TODO(https://fxbug.dev/377534441): Update this when GetFlags2 is supported.
+    assert_eq!(
+        zx::Status::ok(proxy.get_flags2().await.expect("get_flags2 failed").unwrap_err()),
+        Err(zx::Status::NOT_SUPPORTED),
     );
 }
 

@@ -27,7 +27,6 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use wlan_common::bss::{BssDescription, Protection as BssProtection};
 use wlan_common::capabilities::derive_join_capabilities;
-use wlan_common::channel::Channel;
 use wlan_common::ie::rsn::rsne;
 use wlan_common::ie::{self, wsc};
 use wlan_common::scan::{Compatibility, ScanResult};
@@ -158,29 +157,29 @@ impl ClientConfig {
         match bss.protection() {
             BssProtection::Open => vec![SecurityDescriptor::OPEN],
             BssProtection::Wep => {
-                has_wep_support().then(|| vec![SecurityDescriptor::WEP]).unwrap_or_else(|| vec![])
+                has_wep_support().then(|| vec![SecurityDescriptor::WEP]).unwrap_or_default()
             }
             BssProtection::Wpa1 => {
-                has_wpa1_support().then(|| vec![SecurityDescriptor::WPA1]).unwrap_or_else(|| vec![])
+                has_wpa1_support().then(|| vec![SecurityDescriptor::WPA1]).unwrap_or_default()
             }
             BssProtection::Wpa1Wpa2PersonalTkipOnly | BssProtection::Wpa1Wpa2Personal => {
                 has_wpa2_support()
-                    .then(|| SecurityDescriptor::WPA2_PERSONAL)
+                    .then_some(SecurityDescriptor::WPA2_PERSONAL)
                     .into_iter()
-                    .chain(has_wpa1_support().then(|| SecurityDescriptor::WPA1))
+                    .chain(has_wpa1_support().then_some(SecurityDescriptor::WPA1))
                     .collect()
             }
             BssProtection::Wpa2PersonalTkipOnly | BssProtection::Wpa2Personal => has_wpa2_support()
                 .then(|| vec![SecurityDescriptor::WPA2_PERSONAL])
-                .unwrap_or_else(|| vec![]),
+                .unwrap_or_default(),
             BssProtection::Wpa2Wpa3Personal => has_wpa3_support()
-                .then(|| SecurityDescriptor::WPA3_PERSONAL)
+                .then_some(SecurityDescriptor::WPA3_PERSONAL)
                 .into_iter()
-                .chain(has_wpa2_support().then(|| SecurityDescriptor::WPA2_PERSONAL))
+                .chain(has_wpa2_support().then_some(SecurityDescriptor::WPA2_PERSONAL))
                 .collect(),
             BssProtection::Wpa3Personal => has_wpa3_support()
                 .then(|| vec![SecurityDescriptor::WPA3_PERSONAL])
-                .unwrap_or_else(|| vec![]),
+                .unwrap_or_default(),
             // TODO(https://fxbug.dev/42174395): Implement conversions for WPA Enterprise protocols.
             BssProtection::Wpa2Enterprise | BssProtection::Wpa3Enterprise => vec![],
             BssProtection::Unknown => vec![],
@@ -192,7 +191,7 @@ impl ClientConfig {
         bss: &BssDescription,
         device_info: &fidl_mlme::DeviceInfo,
     ) -> bool {
-        derive_join_capabilities(Channel::from(bss.channel), bss.rates(), device_info).is_ok()
+        derive_join_capabilities(bss.channel, bss.rates(), device_info).is_ok()
     }
 }
 
@@ -294,6 +293,11 @@ pub enum ConnectFailure {
 
 impl ConnectFailure {
     // TODO(https://fxbug.dev/42163244): ConnectFailure::is_timeout is not useful, remove it
+    #[allow(clippy::collapsible_match, reason = "mass allow for https://fxbug.dev/381896734")]
+    #[allow(
+        clippy::match_like_matches_macro,
+        reason = "mass allow for https://fxbug.dev/381896734"
+    )]
     pub fn is_timeout(&self) -> bool {
         // Note: For association, we don't have a failure type for timeout, so cannot deduce
         //       whether an association failure is due to timeout.
@@ -428,6 +432,10 @@ pub struct RoamFailure {
 impl RoamFailure {
     /// Returns true if failure was likely caused by rejected credentials.
     /// Very similar to `ConnectFailure::likely_due_to_credential_rejected`.
+    #[allow(
+        clippy::match_like_matches_macro,
+        reason = "mass allow for https://fxbug.dev/381896734"
+    )]
     pub fn likely_due_to_credential_rejected(&self) -> bool {
         match self.failure_type {
             // WPA1 and WPA2
@@ -582,6 +590,7 @@ impl From<ClientSmeStatus> for fidl_sme::ClientStatusResponse {
 }
 
 impl ClientSme {
+    #[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn new(
         cfg: ClientConfig,
         info: fidl_mlme::DeviceInfo,
@@ -842,8 +851,7 @@ impl super::Station for ClientSme {
             }
             fidl_mlme::MlmeEvent::OnWmmStatusResp { status, resp } => {
                 for responder in self.wmm_status_responders.drain(..) {
-                    let result =
-                        if status == zx::sys::ZX_OK { Ok(resp.clone()) } else { Err(status) };
+                    let result = if status == zx::sys::ZX_OK { Ok(resp) } else { Err(status) };
                     responder.respond(result);
                 }
                 let event = fidl_mlme::MlmeEvent::OnWmmStatusResp { status, resp };
@@ -907,7 +915,7 @@ mod tests {
     use test_case::test_case;
     use wlan_common::{
         assert_variant,
-        channel::Cbw,
+        channel::{Cbw, Channel},
         fake_bss_description, fake_fidl_bss_description,
         ie::{fake_ht_cap_bytes, fake_vht_cap_bytes, /*rsn::akm,*/ IeType},
         security::{wep::WEP40_KEY_BYTES, wpa::credential::PSK_SIZE_BYTES},
@@ -950,9 +958,7 @@ mod tests {
         fidl_security::Authentication {
             protocol: fidl_security::Protocol::Wpa1,
             credentials: Some(Box::new(fidl_security::Credentials::Wpa(
-                fidl_security::WpaCredentials::Passphrase(
-                    b"password".as_slice().try_into().unwrap(),
-                ),
+                fidl_security::WpaCredentials::Passphrase(b"password".as_slice().into()),
             ))),
         }
     }
@@ -961,7 +967,7 @@ mod tests {
         fidl_security::Authentication {
             protocol: fidl_security::Protocol::Wpa2Personal,
             credentials: Some(Box::new(fidl_security::Credentials::Wpa(
-                fidl_security::WpaCredentials::Psk([1; PSK_SIZE_BYTES].into()),
+                fidl_security::WpaCredentials::Psk([1; PSK_SIZE_BYTES]),
             ))),
         }
     }
@@ -970,9 +976,7 @@ mod tests {
         fidl_security::Authentication {
             protocol: fidl_security::Protocol::Wpa2Personal,
             credentials: Some(Box::new(fidl_security::Credentials::Wpa(
-                fidl_security::WpaCredentials::Passphrase(
-                    b"password".as_slice().try_into().unwrap(),
-                ),
+                fidl_security::WpaCredentials::Passphrase(b"password".as_slice().into()),
             ))),
         }
     }
@@ -981,9 +985,7 @@ mod tests {
         fidl_security::Authentication {
             protocol: fidl_security::Protocol::Wpa3Personal,
             credentials: Some(Box::new(fidl_security::Credentials::Wpa(
-                fidl_security::WpaCredentials::Passphrase(
-                    b"password".as_slice().try_into().unwrap(),
-                ),
+                fidl_security::WpaCredentials::Passphrase(b"password".as_slice().into()),
             ))),
         }
     }
@@ -1233,7 +1235,7 @@ mod tests {
         let failure = RoamFailure {
             status_code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
             failure_type: RoamFailureType::EstablishRsnaFailure,
-            selected_bssid: selected_bss.bssid.clone(),
+            selected_bssid: selected_bss.bssid,
             disconnect_info,
             auth_method: Some(auth::MethodName::Psk),
             establish_rsna_failure_reason: Some(failure_reason),
@@ -1266,7 +1268,7 @@ mod tests {
         let failure = RoamFailure {
             status_code: fidl_ieee80211::StatusCode::RejectedSequenceTimeout,
             failure_type: RoamFailureType::ReassociationFailure,
-            selected_bssid: selected_bss.bssid.clone(),
+            selected_bssid: selected_bss.bssid,
             disconnect_info,
             auth_method: Some(auth::MethodName::Sae),
             establish_rsna_failure_reason: None,
@@ -1297,7 +1299,7 @@ mod tests {
         let failure = RoamFailure {
             status_code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
             failure_type: RoamFailureType::ReassociationFailure,
-            selected_bssid: selected_bss.bssid.clone(),
+            selected_bssid: selected_bss.bssid,
             disconnect_info,
             auth_method: Some(auth::MethodName::Psk),
             establish_rsna_failure_reason: None,
@@ -1332,7 +1334,7 @@ mod tests {
         let failure = RoamFailure {
             status_code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
             failure_type: RoamFailureType::EstablishRsnaFailure,
-            selected_bssid: selected_bss.bssid.clone(),
+            selected_bssid: selected_bss.bssid,
             disconnect_info,
             auth_method: Some(auth::MethodName::Psk),
             establish_rsna_failure_reason: Some(EstablishRsnaFailureReason::StartSupplicantFailed),
@@ -1365,7 +1367,7 @@ mod tests {
         let failure = RoamFailure {
             status_code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
             failure_type: RoamFailureType::ReassociationFailure,
-            selected_bssid: selected_bss.bssid.clone(),
+            selected_bssid: selected_bss.bssid,
             disconnect_info,
             auth_method: Some(auth::MethodName::Sae),
             establish_rsna_failure_reason: None,
@@ -1396,7 +1398,7 @@ mod tests {
         let failure = RoamFailure {
             status_code: fidl_ieee80211::StatusCode::StatusInvalidElement,
             failure_type: RoamFailureType::ReassociationFailure,
-            selected_bssid: selected_bss.bssid.clone(),
+            selected_bssid: selected_bss.bssid,
             disconnect_info,
             auth_method: Some(auth::MethodName::Psk),
             establish_rsna_failure_reason: None,
@@ -1795,9 +1797,7 @@ mod tests {
             fidl_security::Authentication {
                 protocol: fidl_security::Protocol::Wpa2Personal,
                 credentials: Some(Box::new(fidl_security::Credentials::Wpa(
-                    fidl_security::WpaCredentials::Passphrase(
-                        b"nope".as_slice().try_into().unwrap(),
-                    ),
+                    fidl_security::WpaCredentials::Passphrase(b"nope".as_slice().into()),
                 ))),
             },
         ));
@@ -1956,9 +1956,13 @@ mod tests {
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::WmmStatusReq)));
 
         let resp = fake_wmm_status_resp();
+        #[allow(
+            clippy::redundant_field_names,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
         sme.on_mlme_event(fidl_mlme::MlmeEvent::OnWmmStatusResp {
             status: zx::sys::ZX_OK,
-            resp: resp.clone(),
+            resp: resp,
         });
 
         assert_eq!(receiver.try_recv(), Ok(Some(Ok(resp))));
@@ -2000,12 +2004,9 @@ mod tests {
 
         let mut persist_event = None;
         while let Ok(Some((_timeout, timed_event))) = time_stream.try_next() {
-            match timed_event.event {
-                Event::InspectPulsePersist(..) => {
-                    persist_event = Some(timed_event);
-                    break;
-                }
-                _ => (),
+            if let Event::InspectPulsePersist(..) = timed_event.event {
+                persist_event = Some(timed_event);
+                break;
             }
         }
         assert!(persist_event.is_some());

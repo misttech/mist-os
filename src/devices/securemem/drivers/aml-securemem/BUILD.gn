@@ -71,6 +71,7 @@ fuchsia_driver_component("aml-securemem") {
 
 fuchsia_driver_package("package") {
   package_name = "aml-securemem"
+  export_to_bazel = true
   driver_components = [ ":aml-securemem" ]
 }
 

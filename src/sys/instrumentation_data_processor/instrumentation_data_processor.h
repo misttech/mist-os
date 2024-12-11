@@ -1,0 +1,8 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#ifndef SRC_SYS_INSTRUMENTATION_DATA_PROCESSOR_INSTRUMENTATION_DATA_PROCESSOR_H_
+#define SRC_SYS_INSTRUMENTATION_DATA_PROCESSOR_INSTRUMENTATION_DATA_PROCESSOR_H_
+
+#endif  // SRC_SYS_INSTRUMENTATION_DATA_PROCESSOR_INSTRUMENTATION_DATA_PROCESSOR_H_

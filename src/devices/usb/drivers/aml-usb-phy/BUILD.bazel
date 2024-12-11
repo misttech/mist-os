@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "@rules_fuchsia//fuchsia:defs.bzl",
     "fuchsia_cc_driver",
     "fuchsia_cc_test",
     "fuchsia_component_manifest",

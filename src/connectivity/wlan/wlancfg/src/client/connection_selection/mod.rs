@@ -925,7 +925,7 @@ mod tests {
             .perf_stats
             .connect_failures
             .get_recent_for_network(fasync::MonotonicInstant::now() - RECENT_FAILURE_WINDOW)
-            .get(0)
+            .first()
             .expect("failed to get recent failure")
             .time;
         let recent_failures = vec![ConnectFailure {
@@ -1710,6 +1710,7 @@ mod tests {
         );
     }
 
+    #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
     #[fuchsia::test]
     async fn recorded_metrics_on_scan() {
         let (telemetry_sender, mut telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);

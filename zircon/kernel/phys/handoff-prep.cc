@@ -172,6 +172,7 @@ void HandoffPrep::SetMemory() {
       // The allocations that should survive into the hand-off.
       case memalloc::Type::kDataZbi:
       case memalloc::Type::kKernel:
+      case memalloc::Type::kKernelPageTables:
       case memalloc::Type::kPhysDebugdata:
       case memalloc::Type::kPeripheral:
       case memalloc::Type::kPhysLog:
@@ -181,6 +182,22 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kUserboot:
       case memalloc::Type::kVdso:
         return type;
+
+      // The identity map needs to be installed at the time of hand-off, but
+      // shouldn't actually be used by the kernel after that; mark it for
+      // clean-up.
+      case memalloc::Type::kTemporaryIdentityPageTables:
+#ifdef __x86_64__
+        // TODO(https://fxbug.dev/42164859): Hack! Some of the identity map
+        // page tables are reused on x86 to map the kernel to [-4GiB, -3GiB).
+        // Accordingly, we expediently waste a few pages by marking them all
+        // as kernel page tables. When the kernel mapping is constructed in
+        // physboot, the identity map can be marked as temporary hand-off
+        // memory.
+        return memalloc::Type::kKernelPageTables;
+#else
+        return memalloc::Type::kTemporaryPhysHandoff;
+#endif
 
       // An NVRAM range should no longer be treated like normal RAM. The kernel
       // will access it through PhysHandoff::nvram via its own mapping for it.

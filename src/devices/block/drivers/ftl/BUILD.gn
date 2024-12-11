@@ -46,6 +46,7 @@ fuchsia_driver_component("ftl") {
 
 fuchsia_driver_package("package") {
   package_name = "ftl"
+  export_to_bazel = true
   driver_components = [ ":ftl" ]
 }
 

@@ -1,12 +1,12 @@
 load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "@{{rules_fuchsia}}//fuchsia:defs.bzl",
     "fuchsia_bind_cc_library",
     "fuchsia_fidl_library",
     "fuchsia_fidl_bind_library",
     "fuchsia_fidl_hlcpp_library",
     "fuchsia_fidl_llcpp_library",
 )
-load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("@{{rules_fuchsia}}//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 fuchsia_fidl_library(
     name = "{{name}}",

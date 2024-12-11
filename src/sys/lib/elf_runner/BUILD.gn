@@ -38,6 +38,7 @@ rustc_library("elf_runner") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/fuchsia-sync",
     "//src/lib/process_builder",
+    "//src/lib/trace/rust:trace",
     "//src/performance/memory/attribution/server",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/component_manager/lib/logger",

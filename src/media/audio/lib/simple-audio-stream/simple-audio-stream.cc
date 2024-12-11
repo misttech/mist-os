@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.audio/cpp/wire_types.h>
 #include <lib/async/dispatcher.h>
 #include <lib/ddk/debug.h>
+#include <lib/fidl/cpp/wire/array.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/simple-audio-stream/simple-audio-stream.h>
@@ -13,6 +15,7 @@
 #include <zircon/device/audio.h>
 #include <zircon/errors.h>
 
+#include <cstdint>
 #include <utility>
 
 #include <audio-proto-utils/format-utils.h>
@@ -156,11 +159,12 @@ zx_status_t SimpleAudioStream::NotifyPlugDetect() {
   for (auto& channel : stream_channels_) {
     if (channel.plug_completer_) {
       fidl::Arena allocator;
-      audio_fidl::wire::PlugState plug_state(allocator);
-      plug_state.set_plugged(pd_flags_ & AUDIO_PDNF_PLUGGED)
-          .set_plug_state_time(allocator, plug_time_);
+      auto plug_state = audio_fidl::wire::PlugState::Builder(allocator)
+                            .plugged(pd_flags_ & AUDIO_PDNF_PLUGGED)
+                            .plug_state_time(plug_time_)
+                            .Build();
 
-      channel.plug_completer_->Reply(std::move(plug_state));
+      channel.plug_completer_->Reply(plug_state);
       channel.plug_completer_.reset();
     }
   }
@@ -211,7 +215,8 @@ void SimpleAudioStream::Connect(ConnectRequestView request, ConnectCompleter::Sy
   fbl::AutoLock channel_lock(&channel_lock_);
   if (shutting_down_) {
     zxlogf(ERROR, "Can't retrieve the stream channel -- we are closing");
-    return completer.Close(ZX_ERR_BAD_STATE);
+    completer.Close(ZX_ERR_BAD_STATE);
+    return;
   }
 
   // Attempt to allocate a new driver channel and bind it to us.  If we don't
@@ -429,7 +434,8 @@ void SimpleAudioStream::CreateRingBuffer(
     fbl::AutoLock channel_lock(&channel_lock_);
     if (shutting_down_) {
       zxlogf(ERROR, "Already shutting down when trying to create ring buffer");
-      return completer.Close(ZX_ERR_BAD_STATE);
+      completer.Close(ZX_ERR_BAD_STATE);
+      return;
     }
 
     rb_channel_ = Channel::Create<Channel>();
@@ -463,16 +469,16 @@ void SimpleAudioStream::WatchGainState(StreamChannel* channel,
   // Reply is delayed if there is no change since the last reported gain state.
   if (channel->last_reported_gain_state_ != cur_gain_state_) {
     fidl::Arena allocator;
-    audio_fidl::wire::GainState gain_state(allocator);
+    auto gain_state = audio_fidl::wire::GainState::Builder(allocator);
     if (cur_gain_state_.can_mute) {
-      gain_state.set_muted(cur_gain_state_.cur_mute);
+      gain_state.muted(cur_gain_state_.cur_mute);
     }
     if (cur_gain_state_.can_agc) {
-      gain_state.set_agc_enabled(cur_gain_state_.cur_agc);
+      gain_state.agc_enabled(cur_gain_state_.cur_agc);
     }
-    gain_state.set_gain_db(cur_gain_state_.cur_gain);
+    gain_state.gain_db(cur_gain_state_.cur_gain);
     channel->last_reported_gain_state_ = cur_gain_state_;
-    channel->gain_completer_->Reply(std::move(gain_state));
+    channel->gain_completer_->Reply(gain_state.Build());
     channel->gain_completer_.reset();
   }
 }
@@ -492,11 +498,13 @@ void SimpleAudioStream::WatchPlugState(StreamChannel* channel,
   if (channel->last_reported_plugged_state_ == StreamChannel::Plugged::kNotReported ||
       (channel->last_reported_plugged_state_ == StreamChannel::Plugged::kPlugged) != plugged) {
     fidl::Arena allocator;
-    audio_fidl::wire::PlugState plug_state(allocator);
-    plug_state.set_plugged(plugged).set_plug_state_time(allocator, plug_time_);
+    auto plug_state = audio_fidl::wire::PlugState::Builder(allocator)
+                          .plugged(plugged)
+                          .plug_state_time(plug_time_)
+                          .Build();
     channel->last_reported_plugged_state_ =
         plugged ? StreamChannel::Plugged::kPlugged : StreamChannel::Plugged::kUnplugged;
-    channel->plug_completer_->Reply(std::move(plug_state));
+    channel->plug_completer_->Reply(plug_state);
     channel->plug_completer_.reset();
   }
 }
@@ -586,7 +594,7 @@ void SimpleAudioStream::SetGain(audio_fidl::wire::GainState target_state,
   fbl::AutoLock channel_lock(&channel_lock_);
   for (auto& channel : stream_channels_) {
     if (channel.gain_completer_) {
-      channel.gain_completer_->Reply(std::move(target_state));
+      channel.gain_completer_->Reply(target_state);
       channel.gain_completer_.reset();
     }
   }
@@ -610,34 +618,36 @@ void SimpleAudioStream::GetProperties(
     fidl::WireServer<audio_fidl::StreamConfig>::GetPropertiesCompleter::Sync& completer) {
   ScopedToken t(domain_token());
   fidl::Arena allocator;
-  audio_fidl::wire::StreamProperties stream_properties(allocator);
-  stream_properties.set_unique_id(allocator);
+
+  fidl::Array<uint8_t, audio_fidl::wire::kUniqueIdSize> uid_array;
   for (size_t i = 0; i < audio_fidl::wire::kUniqueIdSize; ++i) {
-    stream_properties.unique_id().data_[i] = unique_id_.data[i];
+    uid_array[i] = unique_id_.data[i];
   }
+  auto stream_properties =
+      audio_fidl::wire::StreamProperties::Builder(allocator).unique_id(uid_array);
 
   auto product = fidl::StringView::FromExternal(prod_name_);
   auto manufacturer = fidl::StringView::FromExternal(mfr_name_);
 
-  stream_properties.set_is_input(is_input())
-      .set_can_mute(cur_gain_state_.can_mute)
-      .set_can_agc(cur_gain_state_.can_agc)
-      .set_min_gain_db(cur_gain_state_.min_gain)
-      .set_max_gain_db(cur_gain_state_.max_gain)
-      .set_gain_step_db(cur_gain_state_.gain_step)
-      .set_product(allocator, product)
-      .set_manufacturer(allocator, manufacturer)
-      .set_clock_domain(clock_domain_);
+  stream_properties.is_input(is_input())
+      .can_mute(cur_gain_state_.can_mute)
+      .can_agc(cur_gain_state_.can_agc)
+      .min_gain_db(cur_gain_state_.min_gain)
+      .max_gain_db(cur_gain_state_.max_gain)
+      .gain_step_db(cur_gain_state_.gain_step)
+      .product(product)
+      .manufacturer(manufacturer)
+      .clock_domain(clock_domain_);
 
   if (pd_flags_ & AUDIO_PDNF_CAN_NOTIFY) {
-    stream_properties.set_plug_detect_capabilities(
+    stream_properties.plug_detect_capabilities(
         audio_fidl::wire::PlugDetectCapabilities::kCanAsyncNotify);
   } else if (pd_flags_ & AUDIO_PDNF_HARDWIRED) {
-    stream_properties.set_plug_detect_capabilities(
+    stream_properties.plug_detect_capabilities(
         audio_fidl::wire::PlugDetectCapabilities::kHardwired);
   }
 
-  completer.Reply(std::move(stream_properties));
+  completer.Reply(stream_properties.Build());
 }
 
 void SimpleAudioStream::GetSupportedFormats(
@@ -701,55 +711,54 @@ void SimpleAudioStream::GetSupportedFormats(
   // Needs to be alive until the reply is sent.
   for (size_t i = 0; i < fidl_compatible_formats.size(); ++i) {
     FidlCompatibleFormats& src = fidl_compatible_formats[i];
-    audio_fidl::wire::PcmSupportedFormats formats;
-    formats.Allocate(allocator);
+    auto formats = audio_fidl::wire::PcmSupportedFormats::Builder(allocator);
     fidl::VectorView<audio_fidl::wire::ChannelSet> channel_sets(allocator,
                                                                 src.number_of_channels.size());
 
-    for (uint8_t j = 0; j < src.number_of_channels.size(); ++j) {
+    for (size_t j = 0; j < src.number_of_channels.size(); ++j) {
       fidl::VectorView<audio_fidl::wire::ChannelAttributes> attributes(allocator,
                                                                        src.number_of_channels[j]);
       if (src.frequency_ranges.size()) {
         ZX_ASSERT_MSG(ranges_with_one_number_of_channels,
                       "must have only one number_of_channels for frequency ranges usage");
         for (uint8_t k = 0; k < src.number_of_channels[j]; ++k) {
-          attributes[k].Allocate(allocator);
-          attributes[k].set_min_frequency(src.frequency_ranges[k].min_frequency);
-          attributes[k].set_max_frequency(src.frequency_ranges[k].max_frequency);
+          attributes[k] = audio_fidl::wire::ChannelAttributes::Builder(allocator)
+                              .min_frequency(src.frequency_ranges[k].min_frequency)
+                              .max_frequency(src.frequency_ranges[k].max_frequency)
+                              .Build();
         }
       }
-      channel_sets[j].Allocate(allocator);
-      channel_sets[j].set_attributes(allocator, std::move(attributes));
+      channel_sets[j] =
+          audio_fidl::wire::ChannelSet::Builder(allocator).attributes(attributes).Build();
     }
-    formats.set_channel_sets(allocator, std::move(channel_sets));
-    formats.set_sample_formats(allocator,
-                               ::fidl::VectorView<audio_fidl::wire::SampleFormat>::FromExternal(
-                                   src.sample_formats.data(), src.sample_formats.size()));
-    formats.set_frame_rates(allocator, ::fidl::VectorView<uint32_t>::FromExternal(
-                                           src.frame_rates.data(), src.frame_rates.size()));
-    formats.set_bytes_per_sample(
-        allocator, ::fidl::VectorView<uint8_t>::FromExternal(src.bytes_per_sample.data(),
-                                                             src.bytes_per_sample.size()));
-    formats.set_valid_bits_per_sample(
-        allocator, ::fidl::VectorView<uint8_t>::FromExternal(src.valid_bits_per_sample.data(),
-                                                             src.valid_bits_per_sample.size()));
-    fidl_formats[i].Allocate(allocator);
-    fidl_formats[i].set_pcm_supported_formats(allocator, std::move(formats));
+    formats.channel_sets(channel_sets);
+    formats.sample_formats(::fidl::VectorView<audio_fidl::wire::SampleFormat>::FromExternal(
+        src.sample_formats.data(), src.sample_formats.size()));
+    formats.frame_rates(
+        ::fidl::VectorView<uint32_t>::FromExternal(src.frame_rates.data(), src.frame_rates.size()));
+    formats.bytes_per_sample(::fidl::VectorView<uint8_t>::FromExternal(
+        src.bytes_per_sample.data(), src.bytes_per_sample.size()));
+    formats.valid_bits_per_sample(::fidl::VectorView<uint8_t>::FromExternal(
+        src.valid_bits_per_sample.data(), src.valid_bits_per_sample.size()));
+    fidl_formats[i] = audio_fidl::wire::SupportedFormats::Builder(allocator)
+                          .pcm_supported_formats(formats.Build())
+                          .Build();
   }
 
-  completer.Reply(std::move(fidl_formats));
+  completer.Reply(fidl_formats);
 }
 
 // Ring Buffer GetProperties.
 void SimpleAudioStream::GetProperties(GetPropertiesCompleter::Sync& completer) {
   ScopedToken t(domain_token());
   fidl::Arena allocator;
-  audio_fidl::wire::RingBufferProperties ring_buffer_properties(allocator);
-  ring_buffer_properties.set_driver_transfer_bytes(driver_transfer_bytes_)
-      .set_needs_cache_flush_or_invalidate(true)
-      .set_turn_on_delay(allocator, turn_on_delay_nsec_);
+  auto ring_buffer_properties = audio_fidl::wire::RingBufferProperties::Builder(allocator)
+                                    .driver_transfer_bytes(driver_transfer_bytes_)
+                                    .needs_cache_flush_or_invalidate(true)
+                                    .turn_on_delay(turn_on_delay_nsec_)
+                                    .Build();
 
-  completer.Reply(std::move(ring_buffer_properties));
+  completer.Reply(ring_buffer_properties);
 }
 
 void SimpleAudioStream::GetVmo(GetVmoRequestView request, GetVmoCompleter::Sync& completer) {

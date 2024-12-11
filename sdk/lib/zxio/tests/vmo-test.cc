@@ -103,8 +103,6 @@ TEST_F(VmoTest, Basic) {
   EXPECT_EQ(actual, sizeof(buffer));
 
   constexpr std::string_view name("hello");
-  ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED,
-                zxio_open_async(io, {}, name.data(), name.length(), ZX_HANDLE_INVALID));
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_unlink(io, name.data(), name.length(), 0));
 }
 

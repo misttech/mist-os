@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::test_topology;
+use crate::{test_topology, utils};
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Data, Logs, RetryConfig};
 use fidl_fuchsia_archivist_test::LogPuppetLogRequest;
-use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Severity};
+use fidl_fuchsia_diagnostics::Severity;
 use futures::StreamExt;
 use {fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync};
 
@@ -25,8 +25,7 @@ async fn test_logs_lifecycle() {
     .await
     .expect("create base topology");
 
-    let accessor = realm.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
-
+    let accessor = utils::connect_accessor(&realm, utils::ALL_PIPELINE).await;
     let mut reader = ArchiveReader::new();
     reader
         .with_archive(accessor)

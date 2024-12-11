@@ -107,6 +107,7 @@ TEST_F(PowerSystemIntegration, SuspendResume) {
   // setting both exec state level and app activity level to active.
   test_sagcontrol::SystemActivityGovernorState state = GetBootCompleteState();
   ASSERT_EQ(ChangeSagState(state, kPollDuration), ZX_OK);
+  ASSERT_TRUE(SetBootComplete());
 
   diagnostics::reader::ArchiveReader reader(dispatcher());
 
@@ -213,6 +214,7 @@ TEST_F(PowerSystemIntegration, PowerIdle) {
   // setting both exec state level and app activity level to active.
   test_sagcontrol::SystemActivityGovernorState state = GetBootCompleteState();
   ASSERT_EQ(ChangeSagState(state, kPollDuration), ZX_OK);
+  ASSERT_TRUE(SetBootComplete());
 
   diagnostics::reader::ArchiveReader reader(dispatcher());
   const InspectSelectors s = GetInspectSelectors(reader);

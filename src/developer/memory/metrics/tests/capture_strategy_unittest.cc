@@ -203,7 +203,7 @@ TEST_F(StarnixCaptureStrategyTest, NoStarnixProcess) {
 
   strategy.OnNewProcess(os, std::move(process_0), std::move(handle_0));
   strategy.OnNewProcess(os, std::move(process_1), std::move(handle_1));
-  auto result = strategy.Finalize(os);
+  auto result = StarnixCaptureStrategy::Finalize(os, std::move(strategy));
   EXPECT_TRUE(result.is_ok());
 
   auto& [koid_to_process, koid_to_vmo] = result.value();
@@ -244,7 +244,7 @@ TEST_F(StarnixCaptureStrategyTest, WithStarnixProcess) {
   strategy.OnNewProcess(os, std::move(process_1), std::move(handle_1));
   strategy.OnNewProcess(os, std::move(process_2), std::move(handle_2));
   strategy.OnNewProcess(os, std::move(process_3), std::move(handle_3));
-  auto result = strategy.Finalize(os);
+  auto result = StarnixCaptureStrategy::Finalize(os, std::move(strategy));
   EXPECT_TRUE(result.is_ok());
 
   auto& [koid_to_process, koid_to_vmo] = result.value();

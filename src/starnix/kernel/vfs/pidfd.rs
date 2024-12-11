@@ -84,6 +84,7 @@ impl FileOps for PidFdFileObject {
         let signal_handler = SignalHandler {
             inner: SignalHandlerInner::ZxHandle(PidFdFileObject::get_events_from_signals),
             event_handler: handler,
+            err_code: None,
         };
         let canceler = waiter
             .wake_on_zircon_signals(

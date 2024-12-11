@@ -715,7 +715,7 @@ pub struct Mldv2QueryMessageHeader {
     /// In a Query message, the Multicast Address field is set to zero when
     /// sending a General Query, and set to a specific IPv6 multicast address
     /// when sending a Multicast-Address-Specific Query.
-    pub group_addr: Ipv6Addr,
+    group_addr: Ipv6Addr,
 
     /// Tracks 4 reserved bits, the s_flag defined in [RFC 3810 section 5.1.7]
     /// and the qrv defined in [RFC 3810 section 5.1.8].
@@ -741,23 +741,28 @@ impl Mldv2QueryMessageHeader {
         Mldv2ResponseDelay(self.max_response_code.get())
     }
 
+    /// Returns the query's group address.
+    pub fn group_address(&self) -> Ipv6Addr {
+        self.group_addr
+    }
+
     /// Returns the number of sources.
-    pub fn number_of_sources(self) -> u16 {
+    pub fn number_of_sources(&self) -> u16 {
         self.number_of_sources.get()
     }
 
     /// Returns the S Flag (Suppress Router-Side Processing).
-    pub fn suppress_router_side_processing(self) -> bool {
+    pub fn suppress_router_side_processing(&self) -> bool {
         (self.sqrv & Self::S_FLAG_MASK) != 0
     }
 
     /// Returns the Querier's Robustness Variable.
-    pub fn querier_robustness_variable(self) -> u8 {
+    pub fn querier_robustness_variable(&self) -> u8 {
         self.sqrv & Self::QRV_MASK
     }
 
     /// Returns the Querier's Query Interval Code.
-    pub fn querier_query_interval(self) -> Duration {
+    pub fn querier_query_interval(&self) -> Duration {
         Mldv2QQIC::from(self.qqic).into()
     }
 }

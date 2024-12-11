@@ -23,6 +23,7 @@
 namespace flatland {
 
 const std::vector<uint8_t> kTransparent = {0, 0, 0, 0};
+constexpr uint32_t kAlphaIndex = 3;
 
 bool CpuRenderer::ImportBufferCollection(
     allocation::GlobalBufferCollectionId collection_id,
@@ -242,34 +243,46 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
         render_target_map_itr_->second.first, HostPointerAccessMode::kWriteOnly,
         [&image_map_itr_, image, render_target, image_pixels_per_row, render_target_pixels_per_row,
          image_type, render_type](uint8_t* render_target_ptr, uint32_t render_target_num_bytes) {
-          MapHostPointer(image_map_itr_->second.first, HostPointerAccessMode::kReadOnly,
-                         [render_target_ptr, image, render_target, image_pixels_per_row,
-                          render_target_pixels_per_row, image_type,
-                          render_type](const uint8_t* image_ptr, uint32_t image_num_bytes) {
-                           uint32_t min_height = std::min(image.height, render_target.height);
-                           uint32_t min_width = std::min(image.width, render_target.width);
+          MapHostPointer(
+              image_map_itr_->second.first, HostPointerAccessMode::kReadOnly,
+              [render_target_ptr, image, render_target, image_pixels_per_row,
+               render_target_pixels_per_row, image_type,
+               render_type](const uint8_t* image_ptr, uint32_t image_num_bytes) {
+                uint32_t min_height = std::min(image.height, render_target.height);
+                uint32_t min_width = std::min(image.width, render_target.width);
 
-                           // Avoid allocation in the inner loop.
-                           std::vector<uint8_t> color;
-                           color.reserve(kBytesPerPixel);
-                           for (uint32_t y = 0; y < min_height; y++) {
-                             // Copy image pixels into the render target.
-                             //
-                             // Note that the stride of the buffer may be different
-                             // than the width of the image due to memory alignment, so we use the
-                             // pixels per row instead.
-                             for (uint32_t x = 0; x < min_width; x++) {
-                               utils::Pixel pixel = utils::Pixel::FromVmo(
-                                   image_ptr, image_pixels_per_row, x, y, image_type);
-                               pixel.ToFormat(render_type, color);
-                               uint32_t start = y * render_target_pixels_per_row * kBytesPerPixel +
-                                                x * kBytesPerPixel;
-                               for (uint32_t offset = 0; offset < kBytesPerPixel; offset++) {
-                                 render_target_ptr[start + offset] = color[offset];
-                               }
-                             }
-                           }
-                         });
+                // Avoid allocation in the inner loop.
+                std::vector<uint8_t> color;
+                color.reserve(kBytesPerPixel);
+                for (uint32_t y = 0; y < min_height; y++) {
+                  // Copy image pixels into the render target.
+                  //
+                  // Note that the stride of the buffer may be different
+                  // than the width of the image due to memory alignment, so we use the
+                  // pixels per row instead.
+                  for (uint32_t x = 0; x < min_width; x++) {
+                    utils::Pixel pixel =
+                        utils::Pixel::FromVmo(image_ptr, image_pixels_per_row, x, y, image_type);
+                    pixel.ToFormat(render_type, color);
+                    uint32_t start =
+                        y * render_target_pixels_per_row * kBytesPerPixel + x * kBytesPerPixel;
+                    for (uint32_t offset = 0; offset < kBytesPerPixel; offset++) {
+                      const uint32_t index = start + offset;
+                      switch (image.blend_mode) {
+                        case fuchsia_ui_composition::BlendMode::kSrc:
+                          render_target_ptr[index] = color[offset];
+                          break;
+                        case fuchsia_ui_composition::BlendMode::kSrcOver:
+                          render_target_ptr[index] =
+                              color[offset] +
+                              static_cast<uint8_t>((1.f - image.multiply_color[kAlphaIndex]) *
+                                                   render_target_ptr[index]);
+                          break;
+                      }
+                    }
+                  }
+                }
+              });
         });
   }
 

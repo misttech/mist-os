@@ -115,6 +115,7 @@ where
 /// Download a single file from `gcs_url` to an in-ram string.
 ///
 /// `gcs_url` is the full GCS url, e.g. "gs://bucket/path/to/file".
+
 pub(crate) async fn string_from_gcs<F, I>(
     gcs_url: &str,
     auth_flow: &AuthFlowChoice,
@@ -131,15 +132,11 @@ where
     let mut result = Vec::new();
     loop {
         tracing::debug!("gcs_bucket {:?}, gcs_path {:?}", gcs_bucket, gcs_path);
-        match client
-            .write(gcs_bucket, gcs_path, &mut result, progress)
-            .await
-            .context("writing to string")
-        {
+        match client.write(gcs_bucket, gcs_path, &mut result, progress).await {
             Ok(ProgressResponse::Continue) => break,
             Ok(ProgressResponse::Cancel) => {
                 tracing::info!("ProgressResponse requesting cancel, exiting");
-                std::process::exit(1);
+                bail!("ProgressResponse requesting cancel, exiting")
             }
             Err(e) => match e.downcast_ref::<GcsError>() {
                 Some(GcsError::NeedNewAccessToken) => {
@@ -160,12 +157,7 @@ where
                     e,
                     gcs_err,
                 ),
-                None => bail!(
-                    "Cannot get data from gs://{}/{} to string (Non-GcsError), error {:?}",
-                    gcs_bucket,
-                    gcs_path,
-                    e,
-                ),
+                None => return Err(e),
             },
         }
     }
@@ -243,18 +235,4 @@ where
     credentials.oauth2.refresh_token = refresh_token.to_string();
     credentials.save().await.context("writing refresh token")?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO(https://fxbug.dev/42174484): This test requires mocks for interactivity and
-    // https. The test is currently disabled.
-    #[ignore]
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_update_refresh_token() {
-        let ui = structured_ui::MockUi::new();
-        update_refresh_token(&AuthFlowChoice::Default, &ui).await.expect("set refresh token");
-    }
 }

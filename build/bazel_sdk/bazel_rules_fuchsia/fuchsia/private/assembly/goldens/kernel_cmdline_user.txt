@@ -7,6 +7,12 @@
 ?kernel.compression.reclaim_zero_forks=true
 ?kernel.compression.storage-strategy=tri_page
 ?kernel.compression.strategy=lz4
+?kernel.cprng-reseed-require.jitterentropy=false
+?kernel.cprng-reseed-require.jitterentropy=true
+?kernel.cprng-seed-require.cmdline=false
+?kernel.cprng-seed-require.cmdline=true
+?kernel.cprng-seed-require.jitterentropy=false
+?kernel.cprng-seed-require.jitterentropy=true
 ?kernel.enable-debugging-syscalls=false
 ?kernel.enable-serial-syscalls=false
 ?kernel.halt-on-panic=false

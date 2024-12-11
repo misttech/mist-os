@@ -58,7 +58,7 @@ common_board_configuration = {
     fxfs = {
       size_checker_maximum_bytes = 5216665600
     }
-    gpt_all = true
+    gpt = "allow_multiple"
   }
 }
 

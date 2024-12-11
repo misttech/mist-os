@@ -36,7 +36,7 @@ pub fn construct_s_wpa(a_wpa: &WpaIe) -> WpaIe {
         cipher::Cipher { oui: Oui::MSFT, suite_type: cipher::TKIP }
     };
     WpaIe {
-        multicast_cipher: a_wpa.multicast_cipher.clone(),
+        multicast_cipher: a_wpa.multicast_cipher,
         unicast_cipher_list: vec![unicast_cipher],
         akm_list: vec![akm::Akm { oui: Oui::MSFT, suite_type: akm::PSK }],
     }
@@ -51,7 +51,7 @@ mod tests {
     fn test_incompatible_multicast_cipher() {
         let mut a_wpa = test_utils::make_wpa1_ie();
         a_wpa.multicast_cipher = cipher::Cipher { oui: Oui::MSFT, suite_type: cipher::WEP_40 };
-        assert_eq!(is_legacy_wpa_compatible(&a_wpa), false);
+        assert!(!is_legacy_wpa_compatible(&a_wpa));
     }
 
     #[test]
@@ -59,14 +59,14 @@ mod tests {
         let mut a_wpa = test_utils::make_wpa1_ie();
         a_wpa.unicast_cipher_list =
             vec![cipher::Cipher { oui: Oui::DOT11, suite_type: cipher::WEP_40 }];
-        assert_eq!(is_legacy_wpa_compatible(&a_wpa), false);
+        assert!(!is_legacy_wpa_compatible(&a_wpa));
     }
 
     #[test]
     fn test_incompatible_akm() {
         let mut a_wpa = test_utils::make_wpa1_ie();
         a_wpa.akm_list = vec![akm::Akm { oui: Oui::DOT11, suite_type: akm::EAP }];
-        assert_eq!(is_legacy_wpa_compatible(&a_wpa), false);
+        assert!(!is_legacy_wpa_compatible(&a_wpa));
     }
 
     #[test]
@@ -99,13 +99,13 @@ mod tests {
     fn test_no_unicast_cipher() {
         let mut a_wpa = test_utils::make_wpa1_ie();
         a_wpa.unicast_cipher_list = vec![];
-        assert_eq!(is_legacy_wpa_compatible(&a_wpa), false);
+        assert!(!is_legacy_wpa_compatible(&a_wpa));
     }
 
     #[test]
     fn test_no_akm() {
         let mut a_wpa = test_utils::make_wpa1_ie();
         a_wpa.akm_list = vec![];
-        assert_eq!(is_legacy_wpa_compatible(&a_wpa), false);
+        assert!(!is_legacy_wpa_compatible(&a_wpa));
     }
 }

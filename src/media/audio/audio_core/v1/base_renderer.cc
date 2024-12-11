@@ -6,6 +6,8 @@
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <limits>
+
 #include <ffl/string.h>
 
 #include "src/media/audio/audio_core/shared/logging_flags.h"
@@ -171,7 +173,8 @@ bool BaseRenderer::ValidateConfig() {
         Fixed::FromRaw((frac_frames_per_pts_tick_.Scale(1) + 1) >> 1);
   } else {
     pts_continuity_threshold_frac_frame_ =
-        Fixed::FromRaw(static_cast<double>(frac_fps.raw_value()) * pts_continuity_threshold_);
+        Fixed::FromRaw(static_cast<int64_t>(static_cast<double>(frac_fps.raw_value()) *
+                                            static_cast<double>(pts_continuity_threshold_)));
   }
 
   FX_LOGS(DEBUG) << " threshold_set_: " << pts_continuity_threshold_set_
@@ -187,10 +190,11 @@ bool BaseRenderer::ValidateConfig() {
   // outputs (and selecting resampling filters) might belong here as well.
 
   // Initialize the WavWriter here.
-  wav_writer_.Initialize(nullptr, format()->stream_type().sample_format,
-                         format()->stream_type().channels,
-                         format()->stream_type().frames_per_second,
-                         (format()->bytes_per_frame() * 8) / format()->stream_type().channels);
+  wav_writer_.Initialize(
+      nullptr, format()->stream_type().sample_format,
+      static_cast<uint16_t>(format()->stream_type().channels),
+      format()->stream_type().frames_per_second,
+      static_cast<uint16_t>((format()->bytes_per_frame() * 8) / format()->stream_type().channels));
 
   config_validated_ = true;
   return true;
@@ -355,7 +359,7 @@ void BaseRenderer::SetPtsUnits(uint32_t tick_per_second_numerator,
 
   reporter_->SetPtsUnits(tick_per_second_numerator, tick_per_second_denominator);
 
-  pts_ticks_per_second_ = std::move(pts_ticks_per_sec);
+  pts_ticks_per_second_ = pts_ticks_per_sec;
 
   // Things went well, cancel the cleanup hook. If our config had been validated previously, it will
   // have to be revalidated as we move into the operational phase of our life.
@@ -623,7 +627,8 @@ void BaseRenderer::SendPacketInternal(fuchsia::media::StreamPacket packet,
   }
   frames_received_ += frame_count;
 
-  uint32_t frame_offset = packet.payload_offset / frame_size;
+  FX_DCHECK(packet.payload_offset / frame_size <= std::numeric_limits<uint32_t>::max());
+  uint32_t frame_offset = static_cast<uint32_t>(packet.payload_offset / frame_size);
   FX_LOGS(TRACE) << " [pkt " << ffl::String::DecRational << packet_ffpts << ", now "
                  << next_frac_frame_pts_ << "] => " << start_pts << " - "
                  << Fixed(start_pts + Fixed::FromRaw(pts_to_frac_frames_.Apply(frame_count)))
@@ -640,7 +645,8 @@ void BaseRenderer::SendPacketInternal(fuchsia::media::StreamPacket packet,
   }
 
   // Regardless of timing, capture this data to file.
-  wav_writer_.Write(packet_buff, packet.payload_size);
+  FX_DCHECK(packet.payload_size <= std::numeric_limits<uint32_t>::max());
+  wav_writer_.Write(packet_buff, static_cast<uint32_t>(packet.payload_size));
   wav_writer_.UpdateHeader();
 
   // Snap the starting pts to an input frame boundary.
@@ -838,11 +844,7 @@ void BaseRenderer::PlayInternal(zx::time reference_time, zx::time media_time,
       return true;
     }
     x = f.Apply(t + max_duration);
-    if (over_or_underflow(x) || over_or_underflow(f.ApplyInverse(x))) {
-      return true;
-    }
-
-    return false;
+    return (over_or_underflow(x) || over_or_underflow(f.ApplyInverse(x)));
   };
 
   // TODO(mpuryear): What do we want to do here if we are already playing?

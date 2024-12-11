@@ -149,7 +149,10 @@ mod test {
 
     impl LockFor<A> for FakeLocked {
         type Data = u32;
-        type Guard<'l> = MutexGuard<'l, u32> where Self: 'l;
+        type Guard<'l>
+            = MutexGuard<'l, u32>
+        where
+            Self: 'l;
         fn lock(&self) -> Self::Guard<'_> {
             self.a.lock().unwrap()
         }
@@ -157,7 +160,10 @@ mod test {
 
     impl LockFor<C> for FakeLocked {
         type Data = char;
-        type Guard<'l> = MutexGuard<'l, char> where Self: 'l;
+        type Guard<'l>
+            = MutexGuard<'l, char>
+        where
+            Self: 'l;
         fn lock(&self) -> Self::Guard<'_> {
             self.c.lock().unwrap()
         }

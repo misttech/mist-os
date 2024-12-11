@@ -18,7 +18,7 @@ use wlan_common::channel::{Cbw, Channel};
 use wlan_telemetry::{self, TelemetryEvent, TelemetrySender};
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-    fidl_fuchsia_wlan_wlanix as fidl_wlanix, fuchsia_async as fasync, fuchsia_inspect,
+    fidl_fuchsia_wlan_wlanix as fidl_wlanix, fuchsia_async as fasync,
 };
 
 mod bss_scorer;
@@ -555,7 +555,7 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                     fasync::MonotonicInstant::now() - ctx.most_recent_connect_time;
                 telemetry_sender.send(TelemetryEvent::Disconnect {
                     info: wlan_telemetry::DisconnectInfo {
-                        connected_duration: connected_duration,
+                        connected_duration,
                         is_sme_reconnecting: info.is_sme_reconnecting,
                         disconnect_source: info.disconnect_source,
                         original_bss_desc: ctx.original_bss_desc.clone(),
@@ -635,7 +635,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
             info!("fidl_wlanix::SupplicantStaNetworkRequest::Select");
             let (ssid, passphrase, bssid) = {
                 let state = sta_network_state.lock();
-                (state.ssid.clone(), state.passphrase.clone(), state.bssid.clone())
+                (state.ssid.clone(), state.passphrase.clone(), state.bssid)
             };
             let (result, connection_ctx) = match ssid {
                 Some(ssid) => match iface.connect_to_network(&ssid[..], passphrase, bssid).await {
@@ -666,7 +666,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                                 most_recent_connect_time: fasync::MonotonicInstant::now(),
                                 current_rssi_dbm: connected.bss.rssi_dbm,
                                 current_snr_db: connected.bss.snr_db,
-                                current_channel: connected.bss.channel.clone(),
+                                current_channel: connected.bss.channel,
                             }),
                         )
                     }
@@ -1309,7 +1309,7 @@ fn convert_scan_result(result: fidl_sme::ScanResult) -> Nl80211Attr {
         // TODO(b/316038074): Determine whether we should provide real chain signals.
         Nl80211BssAttr::ChainSignal(vec![ChainSignalAttr {
             id: 0,
-            rssi: result.bss_description.rssi_dbm.into(),
+            rssi: result.bss_description.rssi_dbm,
         }]),
     ])
 }
@@ -1492,7 +1492,7 @@ async fn serve_fidl<I: IfaceManager>(
         serve_wlanix(reqs, Arc::clone(&state), Arc::clone(&iface_manager), telemetry_sender.clone())
     });
     fs.take_and_serve_directory_handle()?;
-    fs.for_each_concurrent(None, |t| async { t.await }).await;
+    fs.for_each_concurrent(None, |t| t).await;
     Ok(())
 }
 
@@ -1526,7 +1526,7 @@ async fn main() {
             // `try_join!()`.
             (wlan_telemetry::setup_disconnected_persistence_req_sender(), OptionFuture::from(None))
         });
-    const CLIENT_STATS_NODE_NAME: &'static str = "client_stats";
+    const CLIENT_STATS_NODE_NAME: &str = "client_stats";
     let (telemetry_sender, serve_telemetry_fut) = wlan_telemetry::serve_telemetry(
         cobalt_logger,
         iface_manager.clone_device_monitor_svc(),
@@ -2273,7 +2273,7 @@ mod tests {
             control_handle
                 .send_on_disconnect(&fidl_sme::DisconnectInfo {
                     is_sme_reconnecting: mocked_is_sme_reconnecting,
-                    disconnect_source: mocked_disconnect_source.clone(),
+                    disconnect_source: mocked_disconnect_source,
                 })
                 .expect("Failed to send OnDisconnect");
         }
@@ -2368,7 +2368,7 @@ mod tests {
             control_handle
                 .send_on_disconnect(&fidl_sme::DisconnectInfo {
                     is_sme_reconnecting: mocked_is_sme_reconnecting,
-                    disconnect_source: mocked_disconnect_source.clone(),
+                    disconnect_source: mocked_disconnect_source,
                 })
                 .expect("Failed to send OnDisconnect");
         }

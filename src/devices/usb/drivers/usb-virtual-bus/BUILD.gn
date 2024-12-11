@@ -32,6 +32,7 @@ source_set("common") {
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/usb/lib/usb",
+    "//src/devices/usb/lib/usb:usb-fidl",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",

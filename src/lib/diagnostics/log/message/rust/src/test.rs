@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![cfg_attr(
+    target_arch = "aarch64",
+    allow(clippy::unnecessary_cast, reason = "mass allow for https://fxbug.dev/381896734")
+)]
+
 use super::*;
 use assert_matches::assert_matches;
 use diagnostics_data::*;
@@ -119,7 +124,7 @@ fn tags_no_message() {
     let mut packet = test_packet();
     let end = 12;
     packet.data[0] = end as c_char - 1;
-    packet.fill_data(1..end, 'A' as _);
+    packet.fill_data(1..end, b'A' as c_char);
     packet.data[end] = 0;
 
     let buffer = &packet.as_bytes()[..MIN_PACKET_SIZE + end]; // omit null-terminated
@@ -136,13 +141,13 @@ fn tags_with_message() {
     let a_end = a_start + a_count;
 
     packet.data[0] = a_count as c_char;
-    packet.fill_data(a_start..a_end, 'A' as _);
+    packet.fill_data(a_start..a_end, b'A' as c_char);
     packet.data[a_end] = 0; // terminate tags
 
     let b_start = a_start + a_count + 1;
     let b_count = 5;
     let b_end = b_start + b_count;
-    packet.fill_data(b_start..b_end, 'B' as _);
+    packet.fill_data(b_start..b_end, b'B' as c_char);
 
     let data_size = b_start + b_count;
 
@@ -174,14 +179,14 @@ fn two_tags_no_message() {
     let a_end = a_start + a_count;
 
     packet.data[0] = a_count as c_char;
-    packet.fill_data(a_start..a_end, 'A' as _);
+    packet.fill_data(a_start..a_end, b'A' as c_char);
 
     let b_start = a_end + 1;
     let b_count = 5;
     let b_end = b_start + b_count;
 
     packet.data[a_end] = b_count as c_char;
-    packet.fill_data(b_start..b_end, 'B' as _);
+    packet.fill_data(b_start..b_end, b'B' as c_char);
 
     let buffer = &packet.as_bytes()[..MIN_PACKET_SIZE + b_end];
     let parsed = LoggerMessage::try_from(buffer);
@@ -197,19 +202,19 @@ fn two_tags_with_message() {
     let a_end = a_start + a_count;
 
     packet.data[0] = a_count as c_char;
-    packet.fill_data(a_start..a_end, 'A' as _);
+    packet.fill_data(a_start..a_end, b'A' as c_char);
 
     let b_start = a_end + 1;
     let b_count = 5;
     let b_end = b_start + b_count;
 
     packet.data[a_end] = b_count as c_char;
-    packet.fill_data(b_start..b_end, 'B' as _);
+    packet.fill_data(b_start..b_end, b'B' as c_char);
 
     let c_start = b_end + 1;
     let c_count = 5;
     let c_end = c_start + c_count;
-    packet.fill_data(c_start..c_end, 'C' as _);
+    packet.fill_data(c_start..c_end, b'C' as c_char);
 
     let data_size = c_start + c_count;
 
@@ -246,14 +251,14 @@ fn max_tags_with_message() {
         let end = start + tag_len;
 
         packet.data[start - 1] = tag_len as c_char;
-        let ascii = 'A' as c_char + tag_num as c_char;
+        let ascii = b'A' as c_char + tag_num as c_char;
         packet.fill_data(start..end, ascii);
     }
 
     let msg_start = tags_start + (tag_size * MAX_TAGS);
     let msg_len = 5;
     let msg_end = msg_start + msg_len;
-    let msg_ascii = 'A' as c_char + MAX_TAGS as c_char;
+    let msg_ascii = b'A' as c_char + MAX_TAGS as c_char;
     packet.fill_data(msg_start..msg_end, msg_ascii);
 
     let min_buffer = &packet.as_bytes()[..METADATA_SIZE + msg_end + 1]; // null-terminated
@@ -269,7 +274,7 @@ fn max_tags_with_message() {
         crate::from_logger(get_test_identity(), LoggerMessage::try_from(full_buffer).unwrap());
 
     let tag_properties = (0..MAX_TAGS as _)
-        .map(|tag_num| String::from_utf8(vec![('A' as c_char + tag_num) as u8; tag_len]).unwrap())
+        .map(|tag_num| String::from_utf8(vec![(b'A' as c_char + tag_num) as u8; tag_len]).unwrap())
         .collect::<Vec<_>>();
     let mut builder = LogsDataBuilder::new(BuilderArgs {
         timestamp: Timestamp::from_nanos(packet.metadata.time),
@@ -301,7 +306,7 @@ fn max_tags() {
         let end = start + tag_len;
 
         packet.data[start - 1] = tag_len as c_char;
-        let ascii = 'A' as c_char + tag_num as c_char;
+        let ascii = b'A' as c_char + tag_num as c_char;
         packet.fill_data(start..end, ascii);
     }
 
@@ -330,7 +335,7 @@ fn max_tags() {
     .set_message("".to_string());
     for tag_num in 0..MAX_TAGS as _ {
         builder =
-            builder.add_tag(String::from_utf8(vec![('A' as c_char + tag_num) as u8; 2]).unwrap());
+            builder.add_tag(String::from_utf8(vec![(b'A' as c_char + tag_num) as u8; 2]).unwrap());
     }
     assert_eq!(parsed, builder.build());
 }
@@ -339,8 +344,8 @@ fn max_tags() {
 fn no_tags_with_message() {
     let mut packet = test_packet();
     packet.data[0] = 0;
-    packet.data[1] = 'A' as _;
-    packet.data[2] = 'A' as _; // measured size ends here
+    packet.data[1] = b'A' as c_char;
+    packet.data[2] = b'A' as c_char; // measured size ends here
     packet.data[3] = 0;
 
     let buffer = &packet.as_bytes()[..METADATA_SIZE + 4]; // 0 tag size + 2 byte message + null

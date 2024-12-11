@@ -109,7 +109,10 @@ pub(crate) mod testutil {
     }
 
     impl<R: RngCore> RngContext for FakeCryptoRng<R> {
-        type Rng<'a> = &'a mut Self where Self: 'a;
+        type Rng<'a>
+            = &'a mut Self
+        where
+            Self: 'a;
 
         fn rng(&mut self) -> Self::Rng<'_> {
             self

@@ -105,7 +105,10 @@ impl<BC: BindingsContext, I: IpExt> UnlockedAccess<crate::lock_ordering::RawIpSo
     for StackState<BC>
 {
     type Data = RawIpSocketCounters<I>;
-    type Guard<'l> = &'l RawIpSocketCounters<I> where Self: 'l;
+    type Guard<'l>
+        = &'l RawIpSocketCounters<I>
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         self.inner_ip_state().raw_ip_socket_counters()

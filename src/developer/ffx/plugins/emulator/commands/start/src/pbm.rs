@@ -17,6 +17,7 @@ use ffx_emulator_config::convert_bundle_to_configs;
 use ffx_emulator_start_args::StartCommand;
 use fho::{bug, user_error};
 use pbms::ProductBundle;
+use regex::Regex;
 use sdk_metadata::{CpuArchitecture, VirtualDeviceManifest};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -340,13 +341,49 @@ fn parse_host_port_maps(
     Ok(())
 }
 
+/// Check if name follows the scheme "fuchsia-5254-Y-Z" where the last three sections represent a
+/// valid mac address. If so, return X and Y as u8s, else None.
+fn check_for_emulator_mac(name: &str) -> Option<Vec<u8>> {
+    let re =
+        Regex::new(r"fuchsia-5254-([0-9a-f]{2})([0-9a-f]{2})-([0-9a-f]{2})([0-9a-f]{2})$").unwrap();
+    let mac = re.replace_all(name, "$1:$2:$3:$4");
+    if name == mac {
+        // The name does not follow the expected scheme, cannot parse an acceptable mac.
+        None
+    } else {
+        let v: Vec<_> =
+            mac.split(":").into_iter().map(|x| u8::from_str_radix(x, 16).unwrap()).collect();
+        Some(v)
+    }
+}
+
 /// Generate a unique MAC address based on the instance name. If using the default instance name
 /// of fuchsia-emulator, this will be 52:54:47:5e:82:ef.
-fn generate_mac_address(name: &str) -> String {
-    let mut hasher = DefaultHasher::new();
-    hasher.write(name.as_bytes());
-    let hashed = hasher.finish();
-    let bytes = hashed.to_be_bytes();
+/// If the provided emulator name matches "fuchsia-5254-Y-Z" and the last three
+/// sections can be converted into a valid MAC address, it will use this address directly.
+///
+/// Rationale for this behavior: We currently cannot persist the kernel parameter `zircon.nodename`
+/// from a running Fuchsia system across reboots, but by passing in a kernel boot command line from
+/// outside. In the case of performing an `fx ota` we typically do not have this kernel commandline
+/// after the reboot. In the absence of a setting for `zircon.nodename`, the running Fuchsia will
+/// call itself 'fuchsia-X-Y-Z' where X,Y,Z are derived from its mac address, and ffx will
+/// recognise the target by this name. Thus, in order to ensure the target does not change its name
+/// after `fx ota`, it needs to be named `fuchsia-X-Y-Z` upon startup. But we also must ensure that
+/// the system's mac address is not created by hashing the string `fuchsia-X-Y-Z`, as this results
+/// in a _different_ mac (as `X-Y-Z` does not hash to itself but to _different_ `P-Q-R`). This in
+/// turn would cause the machine's name to change to `fuchsia-P-Q-R` where P,Q,R correspond to its
+/// mac address and are different from X-Y-Z). Hence, if a machine name like "fuchsia-5254-Y-Z" and
+/// Y,Z are hex numbers is provided, we use those as mac address directly, and skip hashing. This
+/// results in the machine rebooting without change of mac address or nodename.
+pub(crate) fn generate_mac_address(name: &str) -> String {
+    let bytes = if let Some(v) = check_for_emulator_mac(name) {
+        v
+    } else {
+        let mut hasher = DefaultHasher::new();
+        hasher.write(name.as_bytes());
+        let hashed = hasher.finish();
+        hashed.to_be_bytes().to_vec()
+    };
     format!("52:54:{:02x}:{:02x}:{:02x}:{:02x}", bytes[0], bytes[1], bytes[2], bytes[3])
 }
 
@@ -707,6 +744,10 @@ mod tests {
         let first = generate_mac_address("");
         assert!(regex.is_match(&first), "{:?} isn't a valid MAC address", first);
 
+        // Make sure a name following the scheme "fuchsia-5254-Y-Z" returns the embedded mac address
+        let first = generate_mac_address("fuchsia-5254-1234-abcd");
+        assert_eq!(first, "52:54:12:34:ab:cd");
+
         Ok(())
     }
 
@@ -922,5 +963,24 @@ mod tests {
         assert_eq!(emu_config.runtime.addl_emu_args, vec!["-some-arg"]);
         assert_eq!(emu_config.runtime.addl_kernel_args, vec!["-karg"]);
         assert_eq!(emu_config.runtime.addl_env.get("a-key").unwrap(), "a-value");
+    }
+
+    #[test]
+    fn test_check_for_emulator_mac_conforming_to_scheme() {
+        let name = "fuchsia-5254-0123-cdef";
+        let v = vec![0x01, 0x23, 0xcd, 0xef];
+        assert_eq!(check_for_emulator_mac(name), Some(v));
+    }
+
+    #[test]
+    fn test_check_for_emulator_mac_almost_conforming_to_scheme() {
+        let name = "fuchsia-5452-0123-cdef";
+        assert!(check_for_emulator_mac(name).is_none());
+    }
+
+    #[test]
+    fn test_check_for_emulator_mac_arbitrary_name() {
+        let name = "New_York_Rio_Tokyo";
+        assert!(check_for_emulator_mac(name).is_none());
     }
 }

@@ -30,7 +30,7 @@ def fuchsia_packaged_component_info_to_json(info):
     }
 
 def format(target):
-    info = providers(target)["@@fuchsia_sdk//fuchsia/private:providers.bzl%FuchsiaPackageInfo"]
+    info = providers(target)["@@rules_fuchsia//fuchsia/private:providers.bzl%FuchsiaPackageInfo"]
     result = {
         "fuchsia_cpu": info.fuchsia_cpu,
         "package_name": info.package_name,

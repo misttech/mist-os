@@ -371,7 +371,7 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
         finally:
             return annotation
 
-    kind = type_ir["kind"]
+    kind = type_ir["kind_v2"]
     if kind == "identifier":
         ident = type_ir.raw_identifier()
         ty = get_type_by_identifier(ident, root_ir, recurse_guard)
@@ -385,17 +385,30 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
     elif kind == "vector" or kind == "array":
         element_type = type_ir["element_type"]
         if (
-            element_type["kind"] == "primitive"
+            element_type["kind_v2"] == "primitive"
             and element_type["subtype"] == "uint8"
         ):
             return wrap_optional(bytes)
         else:
             ty = type_annotation(element_type, root_ir, recurse_guard)
             return wrap_optional(Sequence[ty])
-    elif kind == "request":
-        return wrap_optional(
-            fidl_ident_to_py_library_member(type_ir["subtype"]) + ".Server"
-        )
+    elif kind == "endpoint":
+        # TODO(https://fxbug.dev/383175226): This inconsistency between client
+        # and server may not be correct. Add test coverage for `client_end`.
+        if type_ir["role"] == "client":
+            return wrap_optional(
+                get_type_by_identifier(
+                    type_ir["protocol"], root_ir, recurse_guard
+                )
+            )
+        elif type_ir["role"] == "server":
+            return wrap_optional(
+                fidl_ident_to_py_library_member(type_ir["protocol"]) + ".Server"
+            )
+        else:
+            raise TypeError(
+                f"As yet unsupported endpoint role in library {root_ir['name']}: {type_ir['role']}"
+            )
     elif kind == "internal":
         internal_kind = type_ir["subtype"]
         return internal_kind_to_type(internal_kind)
@@ -684,7 +697,7 @@ def primitive_converter(subtype: str) -> type:
 def const_declaration(ir, root_ir, recurse_guard=None) -> FIDLConstant:
     """Constructs a Python type from a FIDL IR const declaration."""
     name = fidl_ident_to_py_library_member(ir.name())
-    kind = ir["type"]["kind"]
+    kind = ir["type"]["kind_v2"]
     if kind == "primitive":
         converter = primitive_converter(ir["type"]["subtype"])
         return FIDLConstant(name, converter(ir["value"]["value"]))
@@ -859,7 +872,7 @@ def get_fidl_method_response_payload_ident(ir: Method, root_ir) -> str:
     assert ir.has_response()
     response_ident = ""
     if ir.get("maybe_response_payload"):
-        response_kind = ir.maybe_response_payload()["kind"]
+        response_kind = ir.maybe_response_payload()["kind_v2"]
         if response_kind == "identifier":
             ident = ir.maybe_response_payload().raw_identifier()
             # Just ensures the module for this is going to be imported.

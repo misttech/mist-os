@@ -417,7 +417,7 @@ where
         signal_actions,
     );
 
-    Ok(TaskInfo { thread: None, thread_group, memory_manager }.into())
+    Ok(TaskInfo { thread: None, thread_group, memory_manager: Some(memory_manager) }.into())
 }
 
 pub fn execute_task_with_prerun_result<L, F, R, G>(
@@ -623,7 +623,7 @@ fn process_completed_exception(
                 if let Some(status) = deliver_signal(
                     current_task,
                     task_state,
-                    signal,
+                    signal.into(),
                     &mut registers,
                     &current_task.thread_state.extended_pstate,
                 ) {
@@ -745,7 +745,7 @@ pub struct TaskInfo {
     pub thread_group: OwnedRef<ThreadGroup>,
 
     /// The memory manager to use for the task.
-    pub memory_manager: Arc<MemoryManager>,
+    pub memory_manager: Option<Arc<MemoryManager>>,
 }
 
 impl Releasable for TaskInfo {

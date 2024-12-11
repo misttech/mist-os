@@ -844,16 +844,14 @@ where
     }
 }
 
-impl<'a, Item> IpPacketBuilder<Ipv4>
-    for Ipv4PacketBuilderWithOptions<'a, core::slice::Iter<'a, Item>>
+impl<'a, I> IpPacketBuilder<Ipv4> for Ipv4PacketBuilderWithOptions<'a, I>
 where
-    Item: Debug,
-    &'a Item: Borrow<Ipv4Option<'a>>,
+    I: Default + Debug + Clone + Iterator<Item: Borrow<Ipv4Option<'a>>>,
 {
     fn new(src_ip: Ipv4Addr, dst_ip: Ipv4Addr, ttl: u8, proto: Ipv4Proto) -> Self {
         Ipv4PacketBuilderWithOptions::new(
             Ipv4PacketBuilder::new(src_ip, dst_ip, ttl, proto),
-            [].iter(),
+            I::default(),
         )
         .expect("packet builder with no options should be valid")
     }

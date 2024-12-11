@@ -5,20 +5,22 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DIMENSIONS_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DIMENSIONS_H_
 
+#include <fidl/fuchsia.math/cpp/wire.h>
 #include <zircon/assert.h>
 
 #include <cstdint>
 
 namespace display {
 
-// The size of a rectangular region of pixels within a raster image.
+// FIDL type [`fuchsia.math/SizeU`] representation useful for the display stack.
 //
 // Similar to the VkExtent2D concept in the Vulkan API.
 //
-// See `::fuchsia_math::wire::RectU` for references.
+// See `::fuchsia_math::wire::SizeU` for references.
 //
-// Instances are guaranteed to represent dimensions supported by the display
-// stack.
+// Instances represent the dimensions (sizes) of rectangular axis-aligned
+// regions inside raster images. Instances are guaranteed to represent
+// dimensions supported by the display stack.
 //
 // The canonical representation of empty region dimensions is 0x0 (width and
 // height are both zero). Instances are guaranteed to only use the canonical
@@ -27,7 +29,6 @@ class Dimensions {
  private:
   // Enables creating instances using the designated initializer syntax.
   struct ConstructorArgs;
-  struct ConstructorArgsUnsigned;
 
  public:
   // The maximum image width supported by the display stack.
@@ -36,23 +37,21 @@ class Dimensions {
   // The maximum image height supported by the display stack.
   static constexpr int kMaxHeight = 65535;
 
-  // True iff the arguments would make up a valid Dimensions instance.
-  [[nodiscard]] static constexpr bool IsValid(const ConstructorArgs& args);
+  // True iff `fidl_size` is convertible to a valid Dimensions instance.
+  [[nodiscard]] static constexpr bool IsValid(const fuchsia_math::wire::SizeU& fidl_size);
 
-  // True iff the arguments would make up a valid Dimensions instance.
+  // `fidl_size` must be convertible to a valid Dimensions instance.
   //
-  // Provided to facilitate validating FIDL / Banjo API inputs.
-  [[nodiscard]] static constexpr bool IsValid(const ConstructorArgsUnsigned& args);
+  // This is not a constructor to allow designated initializer syntax. Making
+  // this a constructor would introduce ambiguity when designated initializer
+  // syntax is used, because `fuchsia.math/SizeU` has the same field names as
+  // our supported designated initializer syntax.
+  [[nodiscard]] static constexpr Dimensions From(const fuchsia_math::wire::SizeU& fidl_size);
 
   // Constructor that enables the designated initializer syntax.
   //
   // NOLINTNEXTLINE(google-explicit-constructor)
   constexpr Dimensions(const Dimensions::ConstructorArgs& args);
-
-  // Constructor for FIDL / Banjo API inputs.
-  //
-  // NOLINTNEXTLINE(google-explicit-constructor)
-  constexpr Dimensions(const Dimensions::ConstructorArgsUnsigned& args);
 
   Dimensions(const Dimensions&) = default;
   Dimensions& operator=(const Dimensions&) = default;
@@ -60,6 +59,8 @@ class Dimensions {
 
   friend constexpr bool operator==(const Dimensions& lhs, const Dimensions& rhs);
   friend constexpr bool operator!=(const Dimensions& lhs, const Dimensions& rhs);
+
+  constexpr fuchsia_math::wire::SizeU ToFidl() const;
 
   // Guaranteed to be in [0, `kMaxWidth`].
   constexpr int32_t width() const { return width_; }
@@ -76,62 +77,48 @@ class Dimensions {
     int32_t height;
   };
 
-  // For constructing from FIDL / Banjo API inputs.
+  // In debug mode, asserts that IsValid() would return true.
   //
-  // The field names must differ from `ConstructorArgs` to avoid designated
-  // initializer ambiguity errors.
-  struct ConstructorArgsUnsigned {
-    uint32_t unsigned_width;
-    uint32_t unsigned_height;
-  };
+  // IsValid() variant with developer-friendly debug assertions.
+  static constexpr void DebugAssertIsValid(const Dimensions::ConstructorArgs& args);
+  static constexpr void DebugAssertIsValid(const fuchsia_math::wire::SizeU& fidl_size);
 
   int32_t width_;
   int32_t height_;
 };
 
 // static
-constexpr bool Dimensions::IsValid(const ConstructorArgs& args) {
-  if (args.width < 0 || args.width > kMaxWidth) {
+constexpr bool Dimensions::IsValid(const fuchsia_math::wire::SizeU& fidl_size) {
+  if (fidl_size.width < 0) {
     return false;
   }
-  if (args.height < 0 || args.height > kMaxHeight) {
+  if (fidl_size.width > kMaxWidth) {
+    return false;
+  }
+  if (fidl_size.height < 0) {
+    return false;
+  }
+  if (fidl_size.height > kMaxHeight) {
     return false;
   }
 
-  const bool width_is_zero = (args.width == 0);
-  const bool height_is_zero = (args.height == 0);
+  const bool width_is_zero = (fidl_size.width == 0);
+  const bool height_is_zero = (fidl_size.height == 0);
   return width_is_zero == height_is_zero;
+}
+
+constexpr Dimensions::Dimensions(const ConstructorArgs& args)
+    : width_(args.width), height_(args.height) {
+  DebugAssertIsValid(args);
 }
 
 // static
-constexpr bool Dimensions::IsValid(const ConstructorArgsUnsigned& args) {
-  if (args.unsigned_width > kMaxWidth) {
-    return false;
-  }
-  if (args.unsigned_height > kMaxHeight) {
-    return false;
-  }
-
-  const bool width_is_zero = (args.unsigned_width == 0);
-  const bool height_is_zero = (args.unsigned_height == 0);
-  return width_is_zero == height_is_zero;
-}
-
-constexpr Dimensions::Dimensions(const Dimensions::ConstructorArgs& args)
-    : width_(args.width), height_(args.height) {
-  ZX_DEBUG_ASSERT(args.width >= 0);
-  ZX_DEBUG_ASSERT(args.width <= kMaxWidth);
-  ZX_DEBUG_ASSERT(args.height >= 0);
-  ZX_DEBUG_ASSERT(args.height <= kMaxHeight);
-  ZX_DEBUG_ASSERT((args.width == 0) == (args.height == 0));
-}
-
-constexpr Dimensions::Dimensions(const Dimensions::ConstructorArgsUnsigned& args)
-    : width_(static_cast<int32_t>(args.unsigned_width)),
-      height_(static_cast<int32_t>(args.unsigned_height)) {
-  ZX_DEBUG_ASSERT(args.unsigned_width <= kMaxWidth);
-  ZX_DEBUG_ASSERT(args.unsigned_height <= kMaxHeight);
-  ZX_DEBUG_ASSERT((args.unsigned_width == 0) == (args.unsigned_height == 0));
+constexpr Dimensions Dimensions::From(const fuchsia_math::wire::SizeU& fidl_size) {
+  DebugAssertIsValid(fidl_size);
+  return Dimensions({
+      .width = static_cast<int32_t>(fidl_size.width),
+      .height = static_cast<int32_t>(fidl_size.height),
+  });
 }
 
 constexpr bool operator==(const Dimensions& lhs, const Dimensions& rhs) {
@@ -139,6 +126,31 @@ constexpr bool operator==(const Dimensions& lhs, const Dimensions& rhs) {
 }
 
 constexpr bool operator!=(const Dimensions& lhs, const Dimensions& rhs) { return !(lhs == rhs); }
+
+constexpr fuchsia_math::wire::SizeU Dimensions::ToFidl() const {
+  return fuchsia_math::wire::SizeU{
+      // The casts are guaranteed not to overflow (causing UB) because of the
+      // allowed ranges on image widths and heights.
+      .width = static_cast<uint32_t>(width_),
+      .height = static_cast<uint32_t>(height_),
+  };
+}
+
+// static
+constexpr void Dimensions::DebugAssertIsValid(const Dimensions::ConstructorArgs& args) {
+  ZX_DEBUG_ASSERT(args.width >= 0);
+  ZX_DEBUG_ASSERT(args.width <= kMaxWidth);
+  ZX_DEBUG_ASSERT(args.height >= 0);
+  ZX_DEBUG_ASSERT(args.height <= kMaxHeight);
+  ZX_DEBUG_ASSERT((args.width == 0) == (args.height == 0));
+}
+
+// static
+constexpr void Dimensions::DebugAssertIsValid(const fuchsia_math::wire::SizeU& fidl_size) {
+  ZX_DEBUG_ASSERT(fidl_size.width <= kMaxWidth);
+  ZX_DEBUG_ASSERT(fidl_size.height <= kMaxHeight);
+  ZX_DEBUG_ASSERT((fidl_size.width == 0) == (fidl_size.height == 0));
+}
 
 }  // namespace display
 

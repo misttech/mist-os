@@ -546,6 +546,12 @@ async fn serve_failing_blobfs(mut stream: fio::DirectoryRequestStream) -> Result
             fio::DirectoryRequest::SetFlags { flags: _, responder } => {
                 responder.send(zx::Status::IO.into_raw())?
             }
+            fio::DirectoryRequest::GetFlags2 { responder } => {
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            fio::DirectoryRequest::SetFlags2 { flags: _, responder } => {
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            }
             fio::DirectoryRequest::Open { flags: _, mode: _, path, object, control_handle: _ } => {
                 if &path == "." {
                     launch_cloned_blobfs(object);

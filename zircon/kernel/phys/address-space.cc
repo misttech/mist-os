@@ -56,7 +56,16 @@ fit::result<AddressSpace::MapError> AddressSpace::Map(uint64_t vaddr, uint64_t s
   if constexpr (!kExecuteOnlyAllowed) {
     settings.access.readable |= !settings.access.writable && settings.access.executable;
   }
+
+  // TODO(https://fxbug.dev/42164859): Hack! Some of the identity map page
+  // tables are reused on x86 to map the kernel to [-4GiB, -3GiB). So mark
+  // everything as global for now. The kernel proper does CR4 reset when
+  // unmapping the identity map anyway.
+#ifdef __x86_64__
+  settings.global = true;
+#else
   settings.global = upper;
+#endif
 
   if constexpr (kDualSpaces) {
     if (upper) {

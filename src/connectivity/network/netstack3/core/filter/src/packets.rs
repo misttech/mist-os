@@ -14,7 +14,9 @@ use packet::{
     GrowBufferMut, InnerSerializer, Nested, PacketConstraints, ParsablePacket, ParseBuffer,
     ParseMetadata, ReusableBuffer, SerializeError, Serializer, SliceBufViewMut,
 };
-use packet_formats::icmp::mld::{MulticastListenerDone, MulticastListenerReport};
+use packet_formats::icmp::mld::{
+    MulticastListenerDone, MulticastListenerReport, MulticastListenerReportV2,
+};
 use packet_formats::icmp::ndp::options::NdpOptionBuilder;
 use packet_formats::icmp::ndp::{NeighborAdvertisement, NeighborSolicitation, RouterSolicitation};
 use packet_formats::icmp::{
@@ -23,6 +25,7 @@ use packet_formats::icmp::{
     Icmpv4ParameterProblem, Icmpv4TimestampReply, Icmpv6MessageType, Icmpv6PacketRaw,
     Icmpv6PacketTooBig, Icmpv6ParameterProblem,
 };
+use packet_formats::igmp::messages::IgmpMembershipReportV3Builder;
 use packet_formats::igmp::{self, IgmpPacketBuilder};
 use packet_formats::ip::{IpExt, IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::{Ipv4Packet, Ipv4PacketRaw};
@@ -1015,6 +1018,7 @@ unsupported_icmp_message_type!(NeighborAdvertisement, Ipv6);
 unsupported_icmp_message_type!(RouterSolicitation, Ipv6);
 unsupported_icmp_message_type!(MulticastListenerDone, Ipv6);
 unsupported_icmp_message_type!(MulticastListenerReport, Ipv6);
+unsupported_icmp_message_type!(MulticastListenerReportV2, Ipv6);
 
 // Transport layer packet inspection is not currently supported for any ICMP
 // error message types.
@@ -1048,6 +1052,25 @@ impl<M: igmp::MessageType<EmptyBuf>> MaybeTransportPacketMut<Ipv4>
         = Never
     where
         M: 'a;
+
+    fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
+        None
+    }
+}
+
+impl<I> MaybeTransportPacket for InnerSerializer<IgmpMembershipReportV3Builder<I>, EmptyBuf> {
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        None
+    }
+}
+
+impl<I> MaybeTransportPacketMut<Ipv4>
+    for InnerSerializer<IgmpMembershipReportV3Builder<I>, EmptyBuf>
+{
+    type TransportPacketMut<'a>
+        = Never
+    where
+        I: 'a;
 
     fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
         None
@@ -1507,19 +1530,19 @@ pub mod testutil {
         impl TestIpExt for Ipv4 {
             const SRC_IP: Self::Addr = net_ip_v4!("192.0.2.1");
             const DST_IP: Self::Addr = net_ip_v4!("192.0.2.2");
-            const SRC_IP_2: Self::Addr = net_ip_v4!("192.0.2.8");
-            const DST_IP_2: Self::Addr = net_ip_v4!("192.0.2.9");
-            const IP_OUTSIDE_SUBNET: Self::Addr = net_ip_v4!("192.0.2.4");
-            const SUBNET: Subnet<Self::Addr> = net_subnet_v4!("192.0.2.0/30");
+            const SRC_IP_2: Self::Addr = net_ip_v4!("192.0.2.3");
+            const DST_IP_2: Self::Addr = net_ip_v4!("192.0.2.4");
+            const IP_OUTSIDE_SUBNET: Self::Addr = net_ip_v4!("192.0.3.1");
+            const SUBNET: Subnet<Self::Addr> = net_subnet_v4!("192.0.2.0/24");
         }
 
         impl TestIpExt for Ipv6 {
             const SRC_IP: Self::Addr = net_ip_v6!("2001:db8::1");
             const DST_IP: Self::Addr = net_ip_v6!("2001:db8::2");
-            const SRC_IP_2: Self::Addr = net_ip_v6!("2001:db8::8");
-            const DST_IP_2: Self::Addr = net_ip_v6!("2001:db8::9");
-            const IP_OUTSIDE_SUBNET: Self::Addr = net_ip_v6!("2001:db8::4");
-            const SUBNET: Subnet<Self::Addr> = net_subnet_v6!("2001:db8::/126");
+            const SRC_IP_2: Self::Addr = net_ip_v6!("2001:db8::3");
+            const DST_IP_2: Self::Addr = net_ip_v6!("2001:db8::4");
+            const IP_OUTSIDE_SUBNET: Self::Addr = net_ip_v6!("2001:db8:ffff::1");
+            const SUBNET: Subnet<Self::Addr> = net_subnet_v6!("2001:db8::/64");
         }
 
         #[derive(Clone, Debug, PartialEq)]

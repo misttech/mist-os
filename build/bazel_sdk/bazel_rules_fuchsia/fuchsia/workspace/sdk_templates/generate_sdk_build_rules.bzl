@@ -6,6 +6,7 @@
 
 # Disable Python formatting, see below why.
 # fmt: off
+# pyformat: disable
 
 # NOTE: This file can be run either as Starlark (from a Bazel repository rule)
 # or as Python (from a Bazel action). Do not use any statement or types that cannot
@@ -360,6 +361,7 @@ def _generate_bind_library_build_rules(
                 meta["sources"],
                 remove_prefix = lib_base_path,
             ),
+            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(
@@ -398,6 +400,7 @@ def _generate_sysroot_build_rules(
         _sdk_template_path(runtime, "sysroot"),
         {
             "{{relative_dir}}": relative_dir,
+            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
 
@@ -448,6 +451,7 @@ def _generate_sysroot_build_rules(
             {
                 "{{srcs}}": _get_starlark_dict(runtime, srcs),
                 "{{strip_prefix}}": strip_prefix,
+                "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
 
@@ -596,6 +600,7 @@ def _generate_companion_host_tool_build_rules(
         {
             "{{name}}": name,
             "{{files}}": _get_starlark_list(runtime, tool_files),
+            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
 
@@ -685,6 +690,7 @@ def _generate_fidl_library_build_rules(
                 "",
                 "_llcpp_cc",
             ),
+            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(
@@ -724,6 +730,7 @@ def _generate_component_manifest_rules(
                         "{{name}}": name,
                         "{{source}}": shard_name,
                         "{{include_path}}": include_path,
+                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
                     },
                 )
                 process_context.files_to_copy[meta["_meta_sdk_root"]].append(f)
@@ -842,6 +849,7 @@ def _generate_cc_source_library_build_rules(
             "{{copts}}": _get_starlark_list(runtime, copts),
             "{{alwayslink}}": str(alwayslink),
             "{{verify_cc_head_api_level_name}}": verify_cc_head_api_level_name,
+            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(
@@ -989,6 +997,7 @@ def _generate_cc_prebuilt_library_build_rules(
             {
                 "{{link_lib}}": _final_bazel_path(variant.link_lib),
                 "{{library_type}}": meta["format"],
+                "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
         process_context.files_to_copy[meta["_meta_sdk_root"]].append(
@@ -1010,6 +1019,7 @@ def _generate_cc_prebuilt_library_build_rules(
                     {
                         "{{dist_lib}}": _final_bazel_path(dist_lib),
                         "{{dist_path}}": variant.dist_lib_dest,
+                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
                     },
                 )
             else:
@@ -1024,6 +1034,7 @@ def _generate_cc_prebuilt_library_build_rules(
                         "{{stripped_file}}": _final_bazel_path(dist_lib),
                         "{{unstripped_file}}": _final_bazel_path(debug_lib),
                         "{{dist_path}}": variant.dist_lib_dest,
+                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
                     },
                 )
                 if debug_lib != dist_lib:
@@ -1056,6 +1067,7 @@ def _generate_cc_prebuilt_library_build_rules(
             {
                 "{{link_lib}}": _final_bazel_path(linklib),
                 "{{library_type}}": meta["format"],
+                "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
         process_context.files_to_copy[meta["_meta_sdk_root"]].append(linklib)
@@ -1076,6 +1088,7 @@ def _generate_cc_prebuilt_library_build_rules(
                     {
                         "{{dist_lib}}": _final_bazel_path(dist_lib),
                         "{{dist_path}}": meta["binaries"][arch]["dist_path"],
+                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
                     },
                 )
             else:
@@ -1090,6 +1103,7 @@ def _generate_cc_prebuilt_library_build_rules(
                         "{{stripped_file}}": _final_bazel_path(dist_lib),
                         "{{unstripped_file}}": _final_bazel_path(debug_lib),
                         "{{dist_path}}": meta["binaries"][arch]["dist_path"],
+                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
                     },
                 )
                 if debug_lib != dist_lib:
@@ -1112,6 +1126,7 @@ def _generate_cc_prebuilt_library_build_rules(
         {
             "{{prebuilt_select}}": prebuilt_select_str,
             "{{dist_select}}": dist_select_str,
+            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
     _merge_template(
@@ -1138,6 +1153,7 @@ def _generate_package_build_rules(
 
     # Parse package variants from metadata.
     name = _get_target_name(meta["name"])
+
     package_variants = [
         runtime.make_struct(
             name = "%s_%s_api_%s" %
@@ -1148,7 +1164,7 @@ def _generate_package_build_rules(
             constraint = "is_%s_api_%s" %
                          (variant["arch"], _get_api_level(variant)),
             os = "@platforms//os:fuchsia",
-            cpu = _FUCHSIA_CPU_CONSTRAINT_MAP[variant["arch"]],
+            cpu = _FUCHSIA_CPU_CONSTRAINT_MAP[variant["arch"]].replace("@fuchsia_sdk", "@" + process_context.rules_fuchsia),
             api_level = _fuchsia_api_level_constraint(
                 _get_api_level(variant),
                 None,
@@ -1177,11 +1193,14 @@ def _generate_package_build_rules(
                     variant.manifest,
                 ),
                 "{{deprecation}}": variant.deprecation,
+                "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
         process_context.files_to_copy[meta["_meta_sdk_root"]].extend(
             variant.files,
         )
+
+    rules_fuchsia = process_context.rules_fuchsia
 
     _merge_template(
         ctx,
@@ -1192,9 +1211,9 @@ def _generate_package_build_rules(
             "{{select_map}}": _get_starlark_dict(
                 runtime,
                 {
-                    "@fuchsia_sdk//fuchsia/constraints:%s" %
-                    variant.constraint: ":%s" %
-                                        variant.name
+                    "@%s//fuchsia/constraints:%s" %
+                    (rules_fuchsia, variant.constraint): ":%s" %
+                                                         variant.name
                     for variant in package_variants
                 },
             ),
@@ -1267,6 +1286,7 @@ def _generate_python_e2e_test_rules(
                 "{{test_binary}}": "%s_bin" % name,
                 "{{data}}": _get_starlark_list(runtime, files),
                 "{{deprecation}}": _api_level_deprecation_message(api_level),
+                "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
 
@@ -1327,6 +1347,7 @@ def _generate_loadable_module_build_rules(
                     ],
                 ),
                 "{{dest}}": dest_prefix,
+                "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
 
@@ -1347,6 +1368,7 @@ def _generate_loadable_module_build_rules(
                 ],
             ),
             "{{dest}}": dest_prefix,
+            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
 
@@ -1422,6 +1444,7 @@ def _write_cmc_includes(runtime, process_context):
         {
             "{{name}}": "cmc_includes",
             "{{deps}}": str(process_context.component_manifest_targets),
+            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
 
@@ -1574,6 +1597,7 @@ def _generate_sdk_build_rules(
         runtime,
         manifests,
         constants,
+        rules_fuchsia_name,
         filter_types = None,
         exclude_types = None):
     """Generates BUILD.bazel rules from the sdk metadata
@@ -1582,6 +1606,8 @@ def _generate_sdk_build_rules(
         runtime: A runtime value describing the current repository context and runtime environment.
         manifests: a list of paths to the meta data manifests.
         constants: A struct returned by generated_sdk_constants
+        rules_fuchsia_name: The name of the repository containing SDK rules.
+           This should be either "rules_fuchsia" or "fuchsia_sdk".
         filter_types: tuple of sdk element types. If given, do not process any sdk element types that are not in this tuple
         exclude_types: tuple of sdk element types. If given, do not process any sdk element types in this tuple
     """
@@ -1633,6 +1659,7 @@ def _generate_sdk_build_rules(
         files_to_copy = files_to_copy,
         component_manifest_targets = [],
         constants = constants,
+        rules_fuchsia = rules_fuchsia_name,
     )
 
     for dir in dir_to_meta.keys():
@@ -1654,15 +1681,82 @@ def _generate_sdk_build_rules(
     }
     runtime.file_copier(files_to_copy)
 
-def _merge_rules_fuchsia(runtime):
+def _merge_rules_fuchsia(runtime, use_rules_fuchsia):
     ctx = runtime.ctx
     rules_fuchsia_root = runtime.label_to_path("//:BUILD.bazel").dirname
-    ctx.symlink(rules_fuchsia_root.get_child("fuchsia"), "fuchsia")
 
-    # LINT.IfChange
-    # Link the common directory so that we can later use it as its own repo.
-    ctx.symlink(rules_fuchsia_root.get_child("common"), "common")
-    # LINT.ThenChange(../rules_fuchsia_deps.bzl)
+    def _adjust_content_for_rules_fuchsia(content):
+        # Adjust "//fuchsia//<foo> into "@fuchsia//fuchsia
+        content = content.replace("\"//fuchsia", "\"@rules_fuchsia//fuchsia")
+
+        # As a special case, continue to use @fuchsia_sdk//fuchsia:fuchsia_api_level
+        # as a user-settable build attribute.
+        content = content.replace("@rules_fuchsia//fuchsia:fuchsia_api_level", "@fuchsia_sdk//fuchsia:fuchsia_api_level")
+
+        # Another special case if @fuchsia_sdk//fuchsia:toolchain which is still referenced
+        # directly in @rules_fuchsia at the moment.
+        content = content.replace("@rules_fuchsia//fuchsia:toolchain", "@fuchsia_sdk//fuchsia:toolchain")
+
+        return content
+
+    if use_rules_fuchsia:
+        # For backwards compatibility, ensure that a statement like
+        # load("@fuchsia_sdk//fuchsia:defs.bzl", "foo") is equivalent
+        # to load("@rules_fuchsia//fuchsia:defs.bzl", "foo").
+        #
+        # This is done by copying the .bzl files from @rules_fuchsia//fuchsia/
+        # into @fuchsia_sdk//fuchsia/ after changing the load() label references
+        # in them from "//fuchsia<something>" to
+        # "@rules_fuchsia//fuchsia<something>" instead. This works because all
+        # these files simply re-exports symbols loaded from other source
+        # packages.
+        child_directories = [
+            "fuchsia/constraints/platforms",
+            "fuchsia/constraints",
+            "fuchsia",
+        ]
+        for child_dir in child_directories:
+            source_dir = rules_fuchsia_root.get_child(child_dir)
+            for build_file in source_dir.readdir():
+                if not build_file.is_dir:
+                    content = ctx.read(build_file)
+                    content = _adjust_content_for_rules_fuchsia(content)
+                    ctx.file(child_dir + "/" + build_file.basename, content)
+
+        # @fuchsia_sdk//fuchsia/private:driver.ld,
+        # @fuchsia_sdk//fuchsia/private:driver_restricted_symbols.txt are
+        # accessed by the fuchsia_cc_driver() macro which is run in the
+        # context of project-specific BUILD.bazel files. Create two alias()
+        # targets to @rules_fuchsia//fuchsia/private:<name> for these
+        #
+        # Similarly, visitor.ld is used by fuchsia_devicetree_visitor().
+        ctx.file(
+            "fuchsia/private/BUILD.bazel",
+            """# AUTO-GENERATED - DO NOT EDIT
+alias(
+    name = "driver.ld",
+    actual = "@rules_fuchsia//fuchsia/private:driver.ld",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "driver_restricted_symbols.txt",
+    actual = "@rules_fuchsia//fuchsia/private:driver_restricted_symbols.txt",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "visitor.ld",
+    actual = "@rules_fuchsia//fuchsia/private:visitor.ld",
+    visibility = ["//visibility:public"],
+)
+""",
+        )
+    else:
+        # Simply symlink the content of @rules_fuchsia into the current
+        # repository instead.
+        ctx.symlink(rules_fuchsia_root.get_child("common"), "common")
+        ctx.symlink(rules_fuchsia_root.get_child("fuchsia"), "fuchsia")
 
     rules_fuchsia_build = ctx.read(
         rules_fuchsia_root.get_child("BUILD.bazel"),
@@ -1691,6 +1785,11 @@ def _merge_rules_fuchsia(runtime):
     if not ctx.path(".build-id").exists:
         ctx.file(".build-id/.empty-on-purpose")
 
+    if use_rules_fuchsia:
+        content = ctx.read("BUILD.bazel")
+        content = _adjust_content_for_rules_fuchsia(content)
+        ctx.file("BUILD.bazel", content)
+
 def _export_all_files(runtime):
     ctx = runtime.ctx
 
@@ -1717,7 +1816,7 @@ def _export_all_files(runtime):
         executable = False,
     )
 
-def generate_sdk_repository(runtime, manifests):
+def generate_sdk_repository(runtime, manifests, use_rules_fuchsia):
     """Populate the current repository directory.
 
     Args:
@@ -1726,8 +1825,14 @@ def generate_sdk_repository(runtime, manifests):
             the "root" key, which has a string path value (absolute) pointing to an input IDK export
             directory, and the "manifest" key, which has a path string, relative to the root, pointing
             to the IDK manifest (which is typically just "meta/manifest.json").
+        rules_fuchsia_name: Name of the repository used to load rule definitions in the generated
+            repository. Bazel projects whose build files already all target definitions from @rules_fuchsia
+            can set this to "rules_fuchsia", otherwise this should be set to "fuchsia_sdk" for
+            backwards compatibility.
     """
     constants = _generate_sdk_constants(runtime, manifests)
+
+    rules_fuchsia_name = "rules_fuchsia" if use_rules_fuchsia else "fuchsia_sdk"
 
     ctx = runtime.ctx
 
@@ -1739,15 +1844,16 @@ def generate_sdk_repository(runtime, manifests):
         substitutions = {
             "{{HOST_CPU}}": constants.host_cpus[0],
             "{{SDK_ID}}": _sdk_id_from_manifests(runtime, manifests),
+            "{{rules_fuchsia}}": rules_fuchsia_name,
         },
         executable = False,
     )
 
     # TODO(https://fxbug.dev/42068729): Allow _generate_sdk_build_rules to provide
     # substitutions directly to the call to ctx.template above.
-    _generate_sdk_build_rules(runtime, manifests, constants)
+    _generate_sdk_build_rules(runtime, manifests, constants, rules_fuchsia_name)
 
-    _merge_rules_fuchsia(runtime)
+    _merge_rules_fuchsia(runtime, use_rules_fuchsia)
 
     # Should only be called after all BUILD.bazel files have been added.
     _export_all_files(runtime)

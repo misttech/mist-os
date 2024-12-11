@@ -4,7 +4,7 @@
 
 """Rule to make a Fuchsia package directory available during build."""
 
-load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 
 def _fuchsia_package_directory_impl(ctx):
     return [

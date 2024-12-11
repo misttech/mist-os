@@ -95,6 +95,7 @@ fn safe_join(base: &Path, relative: &Path) -> Result<PathBuf> {
 ///
 /// Files will be nested under `local_dir` which must exist when this function
 /// is called.
+
 async fn transfer_download_v1<F, I>(
     transfer_manifest_url: &url::Url,
     transfer_manifest: &TransferManifestV1,
@@ -285,7 +286,7 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_filter_transfer_manifest_for_repository_artifacts() {
         let original_manifest = TransferManifestV1 {
             entries: vec![
@@ -374,7 +375,7 @@ mod tests {
         assert_eq!(expected, actual)
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_filter_transfer_manifest_for_flash_artifacts() {
         let original_manifest = TransferManifestV1 {
             entries: vec![

@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 
 #include "src/developer/debug/debug_agent/arch.h"
 #include "src/developer/debug/debug_agent/binary_launcher.h"
@@ -985,10 +986,11 @@ void DebugAgent::OnProcessChanged(ProcessChangedHow how,
   // If we have a job only filter then we only watch for exceptions from the parent job and do not
   // attach to the process (but we do create a DebuggedProcess object for it below).
   if (job_only) {
-    // Already attached, nothing to do. This path is quite common when we are attaching to jobs
-    // located relatively high in a job tree which can spawn many processes. We will get many
-    // notifications of new processes.
-    if (GetDebuggedJob(process_handle->GetJobKoid())) {
+    // Already attached to this job and have a DebuggedProcess for it, there's nothing to do.
+    // This path is quite common when we are attaching to jobs located relatively high in a job tree
+    // which can spawn many processes. We will get many notifications of new processes.
+    if (GetDebuggedJob(process_handle->GetJobKoid()) &&
+        GetDebuggedProcess(process_handle->GetKoid())) {
       return;
     }
 
@@ -1053,12 +1055,18 @@ void DebugAgent::OnProcessChanged(ProcessChangedHow how,
   }
 }
 
-void DebugAgent::OnComponentStarted(const std::string& moniker, const std::string& url) {
-  auto matched_filters = GetMatchingFiltersForComponentInfo(moniker, url);
+void DebugAgent::OnComponentStarted(const std::string& moniker, const std::string& url,
+                                    zx_koid_t job_koid) {
+  auto matching_filters = GetMatchingFiltersForComponentInfo(moniker, url);
   debug_ipc::NotifyComponentStarting notify;
 
+  // The filter installed as a result of a matching recursive filter. There will only ever be at
+  // most one of these, since multiple recursive filters that match this component will all install
+  // identical moniker prefix filters.
+  std::optional<debug_ipc::Filter> maybe_realm_filter = std::nullopt;
+
   // Install recursive filters.
-  for (auto filter : matched_filters) {
+  for (auto filter : matching_filters) {
     if (filter != nullptr && filter->filter().config.recursive) {
       // When any recursive filter matches here, we install a component moniker prefix filter so
       // that any sub-components created as children of this one are attached implicitly. Only one
@@ -1069,25 +1077,32 @@ void DebugAgent::OnComponentStarted(const std::string& moniker, const std::strin
       // this filter will include a filter id and with all of the settings given here. Notably, we
       // do not enable the recursive flag on this filter, which would be redundant with the parent
       // filter.
-      debug_ipc::Filter realm_filter;
-      realm_filter.type = debug_ipc::Filter::Type::kComponentMonikerPrefix;
-      realm_filter.pattern = moniker;
-      realm_filter.config.weak = filter->filter().config.weak;
+      maybe_realm_filter = debug_ipc::Filter();
+      maybe_realm_filter->type = debug_ipc::Filter::Type::kComponentMonikerPrefix;
+      maybe_realm_filter->pattern = moniker;
+      maybe_realm_filter->config.weak = filter->filter().config.weak;
 
-      filters_.emplace_back(realm_filter);
-
-      notify.filter = realm_filter;
+      notify.filter = maybe_realm_filter;
     }
+
+    // All matching filters are reported in the notification.
+    notify.matching_filters.emplace_back(filter->filter().id, std::vector<uint64_t>{job_koid});
   }
 
   // And add the component information.
-  if (!matched_filters.empty()) {
+  if (!matching_filters.empty()) {
     notify.component.moniker = moniker;
     notify.component.url = url;
     notify.timestamp = GetNowTimestamp();
 
     // Only send the notification if something matched.
     SendNotification(notify);
+  }
+
+  // Lastly, insert the new filter if we have one. If this causes |filters_| to reallocate, then the
+  // pointers in |matching_filters| are now invalid.
+  if (maybe_realm_filter) {
+    filters_.emplace_back(*maybe_realm_filter);
   }
 }
 

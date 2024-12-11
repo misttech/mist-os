@@ -20,8 +20,6 @@ sdk_source_set("cpp") {
     "service_aggregate.h",
     "service_handler.cc",
     "service_handler.h",
-    "service_watcher.cc",
-    "service_watcher.h",
   ]
 
   public_deps = [
@@ -47,7 +45,6 @@ cc_test_executable("sys_service_unittests") {
     "service_aggregate_test.cc",
     "service_handler_test.cc",
     "service_test.cc",
-    "service_watcher_test.cc",
     "test_base.h",
   ]
 

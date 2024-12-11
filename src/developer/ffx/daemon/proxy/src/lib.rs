@@ -4,7 +4,7 @@
 
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
-use errors::{ffx_bail, ffx_error, FfxError};
+use errors::{ffx_bail, ffx_error};
 use fdomain_client::fidl::DiscoverableProtocolMarker;
 use fdomain_fuchsia_developer_remotecontrol::{
     RemoteControlMarker as FRemoteControlMarker, RemoteControlProxy as FRemoteControlProxy,
@@ -24,6 +24,7 @@ use futures::{FutureExt, SinkExt};
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use target_errors::FfxTargetError;
 use timeout::timeout;
 
 /// The different ways to check the daemon's version against the local process' information
@@ -183,8 +184,8 @@ impl Injection {
         Ok(target_proxy)
     }
 
-    fn daemon_timeout_error(&self) -> FfxError {
-        FfxError::DaemonError { err: DaemonError::Timeout, target: self.target_spec.clone() }
+    fn daemon_timeout_error(&self) -> FfxTargetError {
+        FfxTargetError::DaemonError { err: DaemonError::Timeout, target: self.target_spec.clone() }
     }
 
     async fn daemon_factory_impl(
@@ -275,7 +276,7 @@ impl Injector for Injection {
             tracing::warn!("Timed out getting remote control proxy for: {:?}", self.target_spec);
             match target_info.lock().unwrap().take() {
                 Some(TargetInfo { nodename: Some(name), .. }) => {
-                    FfxError::DaemonError { err: DaemonError::Timeout, target: Some(name) }
+                    FfxTargetError::DaemonError { err: DaemonError::Timeout, target: Some(name) }
                 }
                 _ => timeout_error,
             }
@@ -877,8 +878,8 @@ mod test {
 
         let error = injection.remote_factory().await.unwrap_err();
 
-        match error.downcast::<FfxError>().unwrap() {
-            FfxError::DaemonError { err: DaemonError::Timeout, target } => {
+        match error.downcast::<FfxTargetError>().unwrap() {
+            FfxTargetError::DaemonError { err: DaemonError::Timeout, target } => {
                 assert_eq!(target.as_deref(), Some(""));
             }
             err => panic!("Unexpected: {err}"),
@@ -1011,8 +1012,8 @@ mod test {
         let mut target_info = None;
         let res = injection.init_remote_proxy(&mut target_info).await;
         assert!(res.is_err());
-        let err = res.unwrap_err().downcast::<FfxError>().unwrap();
-        let FfxError::TargetConnectionError { err, .. } = err else {
+        let err = res.unwrap_err().downcast::<FfxTargetError>().unwrap();
+        let FfxTargetError::TargetConnectionError { err, .. } = err else {
             panic!("Unexpected error: {err:?}");
         };
         assert_eq!(err, TargetConnectionError::KeyVerificationFailure);

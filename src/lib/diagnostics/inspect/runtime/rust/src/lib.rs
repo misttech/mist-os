@@ -203,6 +203,7 @@ impl PublishedInspectController {
 
     /// Escrows a frozen copy of the VMO of the associated Inspector replacing the current live
     /// handle in the server.
+    /// This will not capture lazy nodes or properties.
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
     pub async fn escrow_frozen(self, opts: EscrowOptions) -> Option<EscrowToken> {
         let inspect_sink = match opts.inspect_sink {

@@ -2347,7 +2347,7 @@ fn conntrack_entry_retained_across_loopback<I: TestDualStackIpExt + IpExt>(
         FilterIpContext::<I, _>::with_filter_state(
             &mut ctx.core_ctx(),
             |netstack3_filter::State { conntrack, .. }| {
-                assert_eq!(conntrack.num_connections(), 1);
+                assert_eq!(conntrack.num_entries(), 2);
                 assert!(conntrack.contains_tuple(&tuple));
             },
         );
@@ -2367,7 +2367,7 @@ fn conntrack_entry_retained_across_loopback<I: TestDualStackIpExt + IpExt>(
             {
                 let conntrack = &mut ctx.core_ctx.common_ip::<I>().filter().write().conntrack;
                 assert_matches!(conntrack.remove_connection(&original_tuple(local_port)), Some(_));
-                assert_eq!(conntrack.num_connections(), 0);
+                assert_eq!(conntrack.num_entries(), 0);
             }
             // ...then a new connection should be created for the packet (based on its post-
             // NAT state) when it is handled at the IP layer.

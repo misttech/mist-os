@@ -4,11 +4,10 @@
 
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, PAGE_SIZE};
-use crate::task::{CurrentTask, Task};
-
+use crate::task::{CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, Task, Waiter};
 use futures::channel::oneshot;
 use starnix_logging::log_error;
-use starnix_sync::{InterruptibleEvent, Mutex};
+use starnix_sync::{InterruptibleEvent, Locked, Mutex, Unlocked};
 use starnix_types::futex_address::FutexAddress;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::user_address::UserAddress;
@@ -38,6 +37,50 @@ impl<Key: FutexKey> Default for FutexTable<Key> {
 }
 
 impl<Key: FutexKey> FutexTable<Key> {
+    /// Wait on the futex at the given address given a boot deadline.
+    ///
+    /// See FUTEX_WAIT when passed a deadline in CLOCK_REALTIME.
+    pub fn wait_boot(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        addr: UserAddress,
+        value: u32,
+        mask: u32,
+        deadline: zx::BootInstant,
+        timer_slack: zx::BootDuration,
+    ) -> Result<(), Errno> {
+        let addr = FutexAddress::try_from(addr)?;
+        let mut state = self.state.lock();
+        // As the state is locked, no wake can happen before the waiter is registered.
+        // If the addr is remapped, we will read stale data, but we will not miss a futex wake.
+        let loaded_value = Self::load_futex_value(current_task, addr)?;
+        if value != loaded_value {
+            return Err(errno!(EAGAIN));
+        }
+
+        let key = Key::get_key(current_task, addr)?;
+        let waiter = Arc::new(Waiter::new());
+        let timer = zx::BootTimer::create();
+        let signal_handler = SignalHandler {
+            inner: SignalHandlerInner::None,
+            event_handler: EventHandler::None,
+            err_code: Some(errno!(ETIMEDOUT)),
+        };
+        waiter
+            .wake_on_zircon_signals(&timer, zx::Signals::TIMER_SIGNALED, signal_handler)
+            .expect("wait can only fail in OOM conditions");
+        timer
+            .set(deadline, timer_slack)
+            .expect("timer set cannot fail with valid handles and slack");
+        state.get_waiters_or_default(key).add(FutexWaiter {
+            mask,
+            notifiable: FutexNotifiable::new_internal_boot(Arc::downgrade(&waiter)),
+        });
+        std::mem::drop(state);
+        waiter.wait(locked, current_task)
+    }
+
     /// Wait on the futex at the given address.
     ///
     /// See FUTEX_WAIT.
@@ -291,7 +334,7 @@ impl<Key: FutexKey> FutexTable<Key> {
     }
 
     fn load_futex_value(current_task: &CurrentTask, addr: FutexAddress) -> Result<u32, Errno> {
-        current_task.mm().atomic_load_u32_relaxed(addr)
+        current_task.mm().ok_or_else(|| errno!(EINVAL))?.atomic_load_u32_relaxed(addr)
     }
 }
 
@@ -428,7 +471,7 @@ pub trait FutexKey: Sized + Ord + Hash + Clone {
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno>;
 
-    fn get_table_from_task(task: &Task) -> &FutexTable<Self>;
+    fn get_table_from_task(task: &Task) -> Result<&FutexTable<Self>, Errno>;
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
@@ -446,13 +489,14 @@ impl FutexKey for PrivateFutexKey {
         addr: FutexAddress,
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno> {
-        let (memory, offset) = task.mm().get_mapping_memory(addr.into(), perms)?;
+        let (memory, offset) =
+            task.mm().ok_or_else(|| errno!(EINVAL))?.get_mapping_memory(addr.into(), perms)?;
         let key = PrivateFutexKey { addr };
         Ok((FutexOperand { memory, offset }, key))
     }
 
-    fn get_table_from_task(task: &Task) -> &FutexTable<Self> {
-        &task.mm().futex
+    fn get_table_from_task(task: &Task) -> Result<&FutexTable<Self>, Errno> {
+        Ok(&task.mm().ok_or_else(|| errno!(EINVAL))?.futex)
     }
 }
 
@@ -474,13 +518,14 @@ impl FutexKey for SharedFutexKey {
         addr: FutexAddress,
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno> {
-        let (memory, offset) = task.mm().get_mapping_memory(addr.into(), perms)?;
+        let (memory, offset) =
+            task.mm().ok_or_else(|| errno!(EINVAL))?.get_mapping_memory(addr.into(), perms)?;
         let key = SharedFutexKey::new(&memory, offset)?;
         Ok((FutexOperand { memory, offset }, key))
     }
 
-    fn get_table_from_task(task: &Task) -> &FutexTable<Self> {
-        &task.kernel().shared_futexes
+    fn get_table_from_task(task: &Task) -> Result<&FutexTable<Self>, Errno> {
+        Ok(&task.kernel().shared_futexes)
     }
 }
 
@@ -555,6 +600,8 @@ impl<Key: FutexKey> FutexTableState<Key> {
 enum FutexNotifiable {
     /// An internal process waiting on a Futex.
     Internal(Weak<InterruptibleEvent>),
+    // An internal process waiting on a Futex with a boot deadline.
+    InternalBoot(Weak<Waiter>),
     /// An external process waiting on a Futex.
     // The sender needs to be an option so that one can send the notification while only holding a
     // mut reference on the ExternalWaiter.
@@ -564,6 +611,10 @@ enum FutexNotifiable {
 impl FutexNotifiable {
     fn new_internal(event: Weak<InterruptibleEvent>) -> Self {
         Self::Internal(event)
+    }
+
+    fn new_internal_boot(waiter: Weak<Waiter>) -> Self {
+        Self::InternalBoot(waiter)
     }
 
     fn new_external(sender: oneshot::Sender<()>) -> Self {
@@ -577,6 +628,14 @@ impl FutexNotifiable {
             Self::Internal(event) => {
                 if let Some(event) = event.upgrade() {
                     event.notify();
+                    true
+                } else {
+                    false
+                }
+            }
+            Self::InternalBoot(waiter) => {
+                if let Some(waiter) = waiter.upgrade() {
+                    waiter.notify();
                     true
                 } else {
                     false

@@ -61,11 +61,13 @@ impl NegotiatedProtection {
         derive_key_descriptor_version(key_descriptor_type, self)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn integrity_algorithm(&self) -> Result<Box<dyn integrity::Algorithm>, Error> {
         integrity_algorithm(self.key_descriptor_version(), &self.akm)
             .ok_or(Error::UnknownIntegrityAlgorithm)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn keywrap_algorithm(&self) -> Result<Box<dyn keywrap::Algorithm>, Error> {
         keywrap_algorithm(self.key_descriptor_version(), &self.akm)
             .ok_or(Error::UnknownKeywrapAlgorithm)
@@ -161,6 +163,7 @@ impl NegotiatedProtection {
 pub struct EncryptedKeyData<B: SplitByteSlice>(eapol::KeyFrameRx<B>);
 
 impl<B: SplitByteSlice> EncryptedKeyData<B> {
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Yields a tuple of the captured EAPOL Key frame and its decrypted key data if encryption
     /// was successful. Otherwise, an Error is returned.
     pub fn decrypt(
@@ -182,6 +185,7 @@ impl<B: SplitByteSlice> EncryptedKeyData<B> {
 pub struct WithUnverifiedMic<B: SplitByteSlice>(eapol::KeyFrameRx<B>);
 
 impl<B: SplitByteSlice> WithUnverifiedMic<B> {
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Yields the captured EAPOL Key frame if the MIC was successfully verified.
     /// The Key frame is wrapped to enforce decryption of potentially encrypted key data.
     /// Returns an Error if the MIC is invalid.
@@ -232,6 +236,7 @@ impl<B: SplitByteSlice> Dot11VerifiedKeyFrame<B> {
     // the counter to the counter value contained in each message the Authenticator sends.
     //
     // [1]: IEEE 802.11-2016 12.7.2 EAPOL-Key frames
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn from_frame(
         frame: eapol::KeyFrameRx<B>,
         role: &Role,

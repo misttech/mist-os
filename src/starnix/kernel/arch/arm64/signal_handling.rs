@@ -12,8 +12,8 @@ use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    __NR_restart_syscall, _aarch64_ctx, error, esr_context, fpsimd_context, sigaction, sigaltstack,
-    sigcontext, siginfo_t, ucontext, ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
+    __NR_restart_syscall, _aarch64_ctx, errno, error, esr_context, fpsimd_context, sigaction,
+    sigaltstack, sigcontext, siginfo_t, ucontext, ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
 };
 use zerocopy::{FromBytes, IntoBytes};
 
@@ -45,7 +45,7 @@ impl SignalStackFrame {
         siginfo: &SignalInfo,
         _action: sigaction,
         _stack_pointer: UserAddress,
-    ) -> SignalStackFrame {
+    ) -> Result<SignalStackFrame, Errno> {
         let mut regs = registers.r.to_vec();
         // TODO(https://fxbug.dev/380405833) Do we need to capture r[14] here?
         regs.push(registers.lr);
@@ -80,10 +80,12 @@ impl SignalStackFrame {
         };
 
         let vdso_sigreturn_offset = task.kernel().vdso.sigreturn_offset;
-        let sigreturn_addr = task.mm().state.read().vdso_base.ptr() as u64 + vdso_sigreturn_offset;
+        let sigreturn_addr = task.mm().ok_or_else(|| errno!(EINVAL))?.state.read().vdso_base.ptr()
+            as u64
+            + vdso_sigreturn_offset;
         registers.lr = sigreturn_addr;
 
-        SignalStackFrame { context, siginfo_bytes: siginfo.as_siginfo_bytes() }
+        Ok(SignalStackFrame { context, siginfo_bytes: siginfo.as_siginfo_bytes() })
     }
 
     pub fn as_bytes(&self) -> &[u8; SIG_STACK_SIZE] {

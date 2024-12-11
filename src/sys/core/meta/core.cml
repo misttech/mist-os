@@ -182,11 +182,6 @@
             ],
         },
         {
-            protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
-            from: "parent",
-            to: [ "#timekeeper" ],
-        },
-        {
             protocol: [
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",

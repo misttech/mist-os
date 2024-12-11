@@ -215,7 +215,7 @@ impl Idle {
                 }
             },
             Protection::Wep(ref key) => {
-                let wep_key = build_wep_set_key_descriptor(cmd.bss.bssid.clone(), key);
+                let wep_key = build_wep_set_key_descriptor(cmd.bss.bssid, key);
                 inspect_log!(context.inspect.rsn_events.lock(), {
                     derived_key: "WEP",
                     cipher: format!("{:?}", cipher::Cipher::new_dot11(wep_key.cipher_suite_type.into_primitive() as u8)),
@@ -243,7 +243,7 @@ impl Idle {
         let msg = connect_cmd_inspect_summary(&cmd);
         let _ = state_change_ctx.replace(StateChangeContext::Connect {
             msg,
-            bssid: cmd.bss.bssid.clone(),
+            bssid: cmd.bss.bssid,
             ssid: cmd.bss.ssid.clone(),
         });
 
@@ -282,9 +282,9 @@ impl Idle {
     }
 }
 
-fn parse_wmm_from_ies(ies: &Vec<u8>) -> Option<ie::WmmParam> {
+fn parse_wmm_from_ies(ies: &[u8]) -> Option<ie::WmmParam> {
     let mut wmm_param = None;
-    for (id, body) in ie::Reader::new(&ies[..]) {
+    for (id, body) in ie::Reader::new(ies) {
         if id == ie::Id::VENDOR_SPECIFIC {
             if let Ok(ie::VendorIe::WmmParam(wmm_param_body)) = ie::parse_vendor_ie(body) {
                 match ie::parse_wmm_param(wmm_param_body) {
@@ -318,7 +318,7 @@ impl Connecting {
                 match LinkState::new(self.cmd.protection, context) {
                     Ok(link_state) => link_state,
                     Err(failure_reason) => {
-                        let msg = format!("Connect terminated; failed to initialize LinkState");
+                        let msg = "Connect terminated; failed to initialize LinkState".to_string();
                         error!("{}", msg);
                         state_change_ctx.set_msg(msg);
                         send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
@@ -360,7 +360,7 @@ impl Connecting {
                 });
             }
         };
-        state_change_ctx.set_msg(format!("Connect succeeded"));
+        state_change_ctx.set_msg("Connect succeeded".to_string());
 
         if let LinkState::LinkUp(_) = link_state {
             report_connect_finished(&mut self.cmd.connect_txn_sink, ConnectResult::Success);
@@ -469,7 +469,7 @@ impl Connecting {
                 send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
                 let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
                 state_change_ctx.set_msg(msg);
-                return Err(Disconnecting {
+                Err(Disconnecting {
                     cfg: self.cfg,
                     action: PostDisconnectAction::ReportConnectFinished {
                         sink: self.cmd.connect_txn_sink,
@@ -482,7 +482,7 @@ impl Connecting {
                         ),
                     },
                     timeout_id,
-                });
+                })
             }
         }
     }
@@ -587,10 +587,8 @@ impl Associated {
 
         match connected_duration {
             Some(_duration) => {
-                let fidl_disconnect_info = fidl_sme::DisconnectInfo {
-                    is_sme_reconnecting: false,
-                    disconnect_source: disconnect_source.into(),
-                };
+                let fidl_disconnect_info =
+                    fidl_sme::DisconnectInfo { is_sme_reconnecting: false, disconnect_source };
                 self.connect_txn_sink
                     .send(ConnectTransactionEvent::OnDisconnect { info: fidl_disconnect_info });
             }
@@ -722,7 +720,7 @@ impl Associated {
         resp: fidl_internal::WmmStatusResponse,
     ) {
         if status == zx::sys::ZX_OK {
-            let wmm_param = self.wmm_param.get_or_insert_with(|| ie::WmmParam::default());
+            let wmm_param = self.wmm_param.get_or_insert_default();
             let mut wmm_info = wmm_param.wmm_info.ap_wmm_info();
             wmm_info.set_uapsd(resp.apsd);
             wmm_param.wmm_info.0 = wmm_info.0;
@@ -927,6 +925,7 @@ impl Roaming {
         }
     }
 
+    #[allow(clippy::wrong_self_convention, reason = "mass allow for https://fxbug.dev/381896734")]
     fn to_idle(
         mut self,
         msg: String,
@@ -1443,6 +1442,10 @@ impl ClientState {
         }
     }
 
+    #[allow(
+        clippy::match_like_matches_macro,
+        reason = "mass allow for https://fxbug.dev/381896734"
+    )]
     fn in_transition_state(&self) -> bool {
         match self {
             Self::Idle(_) => false,
@@ -1473,7 +1476,7 @@ impl ClientState {
                         rssi_dbm: latest_ap_state.rssi_dbm,
                         snr_db: latest_ap_state.snr_db,
                         signal_report_time: associated.last_signal_report_time,
-                        channel: latest_ap_state.channel.clone(),
+                        channel: latest_ap_state.channel,
                         protection: latest_ap_state.protection(),
                         ht_cap: latest_ap_state.raw_ht_cap(),
                         vht_cap: latest_ap_state.raw_vht_cap(),
@@ -1483,7 +1486,7 @@ impl ClientState {
                 }
                 _ => unreachable!(),
             },
-            Self::Roaming(roaming) => ClientSmeStatus::Roaming(roaming.cmd.bss.bssid.clone()),
+            Self::Roaming(roaming) => ClientSmeStatus::Roaming(roaming.cmd.bss.bssid),
             Self::Disconnecting(disconnecting) => match &disconnecting.action {
                 PostDisconnectAction::BeginConnect { cmd } => {
                     ClientSmeStatus::Connecting(cmd.bss.ssid.clone())
@@ -1585,7 +1588,7 @@ fn roam_internal(
                     result: RoamFailure {
                         status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
                         failure_type: RoamFailureType::SelectNetworkFailure,
-                        selected_bssid: selected_bss.bssid.clone(),
+                        selected_bssid: selected_bss.bssid,
                         disconnect_info,
                         auth_method: state.auth_method,
                         selected_bss: Some(selected_bss),
@@ -1606,7 +1609,7 @@ fn roam_internal(
 
     _ = state_change_ctx.replace(StateChangeContext::Roam {
         msg: "Roam attempt in progress".to_owned(),
-        bssid: selected_bssid.into(),
+        bssid: selected_bssid,
     });
     Ok(Roaming {
         cfg: state.cfg,
@@ -1674,6 +1677,7 @@ fn roam_handle_result(
         )));
     }
 
+    #[allow(clippy::clone_on_copy, reason = "mass allow for https://fxbug.dev/381896734")]
     match result_fields.status_code {
         fidl_ieee80211::StatusCode::Success => {
             let wmm_param = parse_wmm_from_ies(&result_fields.association_ies);
@@ -1830,7 +1834,7 @@ fn process_sae_frame_rx(
     frame: fidl_mlme::SaeFrame,
     context: &mut Context,
 ) -> Result<(), anyhow::Error> {
-    let peer_sta_address = MacAddr::from(frame.peer_sta_address.clone());
+    let peer_sta_address = MacAddr::from(frame.peer_sta_address);
     let supplicant = match protection {
         Protection::Rsna(rsna) => &mut rsna.supplicant,
         _ => bail!("Unexpected SAE frame received"),
@@ -1842,6 +1846,7 @@ fn process_sae_frame_rx(
     Ok(())
 }
 
+#[allow(clippy::single_match, reason = "mass allow for https://fxbug.dev/381896734")]
 fn process_sae_timeout(
     protection: &mut Protection,
     bssid: Bssid,
@@ -2885,7 +2890,7 @@ mod tests {
 
         let (supplicant, suppl_mock) = mock_psk_supplicant();
         let (command, _connect_txn_stream) = connect_command_wpa2(supplicant);
-        let bssid = command.bss.bssid.clone();
+        let bssid = command.bss.bssid;
 
         // Start in an "Connecting" state
         let state = ClientState::from(testing::new_state(Connecting {
@@ -3464,9 +3469,13 @@ mod tests {
         let state = link_up_state(cmd);
         let selected_bssid = [0, 1, 2, 3, 4, 5];
         selected_bss.bssid = selected_bssid.into();
+        #[allow(
+            clippy::redundant_field_names,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
         let roam_start_ind = MlmeEvent::RoamStartInd {
             ind: fidl_mlme::RoamStartIndication {
-                selected_bssid: selected_bssid.clone(),
+                selected_bssid: selected_bssid,
                 original_association_maintained: false,
                 selected_bss: (*selected_bss).clone().into(),
             },
@@ -3577,9 +3586,13 @@ mod tests {
 
         let state = link_up_state(cmd);
         // Initiate a roam attempt.
+        #[allow(
+            clippy::redundant_field_names,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
         let roam_start_ind = MlmeEvent::RoamStartInd {
             ind: fidl_mlme::RoamStartIndication {
-                selected_bssid: selected_bssid.clone(),
+                selected_bssid: selected_bssid,
                 original_association_maintained: false,
                 selected_bss: selected_bss.clone().into(),
             },
@@ -3772,18 +3785,18 @@ mod tests {
     fn malformed_roam_req_causes_disconnect() {
         let mut h = TestHelper::new();
         let (cmd, mut connect_txn_stream) = connect_command_one();
-        let original_bssid = cmd.bss.bssid.clone();
+        let original_bssid = cmd.bss.bssid;
         let state = link_up_state(cmd);
         // Note: this is intentionally malformed. Roam cannot proceed without the missing data, such
         // as the IEs.
         let selected_bss = malformed_bss_description();
 
-        let state = state.roam(&mut h.context, selected_bss.clone().into());
+        let state = state.roam(&mut h.context, selected_bss.clone());
 
         // Check that SME sends a deauthenticate request to the current BSS, since roam has not started.
         expect_deauth_req(
             &mut h.mlme_stream,
-            original_bssid.into(),
+            original_bssid,
             fidl_ieee80211::ReasonCode::StaLeaving,
         );
 
@@ -3812,7 +3825,7 @@ mod tests {
         let (supplicant, _suppl_mock) = mock_psk_supplicant();
 
         let (cmd, mut connect_txn_stream) = connect_command_wpa2(supplicant);
-        let original_bssid = cmd.bss.bssid.clone();
+        let original_bssid = cmd.bss.bssid;
 
         // Note: intentionally incorrect security config is created for this test.
         let mut selected_bss = fake_bss_description!(Wpa1, ssid: Ssid::try_from("wpa2").unwrap());
@@ -3826,7 +3839,7 @@ mod tests {
         // Check that SME sends a deauthenticate request to original BSS.
         expect_deauth_req(
             &mut h.mlme_stream,
-            original_bssid.into(),
+            original_bssid,
             fidl_ieee80211::ReasonCode::StaLeaving,
         );
 
@@ -3949,7 +3962,7 @@ mod tests {
             },
         };
         let state = state.on_mlme_event(roam_start_ind, &mut h.context);
-        assert_connecting(state, &(*original_bss));
+        assert_connecting(state, &original_bss);
 
         // Nothing should be sent upward.
         assert_variant!(connect_txn_stream.try_next(), Ok(None));
@@ -3968,7 +3981,7 @@ mod tests {
 
         let state = state.roam(&mut h.context, fidl_selected_bss);
 
-        assert_connecting(state, &(*original_bss));
+        assert_connecting(state, &original_bss);
 
         // Nothing should be sent upward.
         assert_variant!(connect_txn_stream.try_next(), Ok(None));
@@ -4041,9 +4054,13 @@ mod tests {
         let selected_bssid = [1, 2, 3, 4, 5, 6];
         let state = roaming_state(cmd, selected_bssid.into());
         let status_code = fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported;
+        #[allow(
+            clippy::redundant_field_names,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
         let roam_result_ind = MlmeEvent::RoamResultInd {
             ind: fidl_mlme::RoamResultIndication {
-                selected_bssid: selected_bssid.clone(),
+                selected_bssid: selected_bssid,
                 status_code,
                 original_association_maintained: false,
                 target_bss_authenticated: true,
@@ -4748,7 +4765,7 @@ mod tests {
         let state = link_up_state(cmd);
 
         let input_info = fidl_internal::ChannelSwitchInfo { new_channel: 36 };
-        let switch_ind = MlmeEvent::OnChannelSwitched { info: input_info.clone() };
+        let switch_ind = MlmeEvent::OnChannelSwitched { info: input_info };
 
         assert_variant!(&state, ClientState::Associated(state) => {
             assert_eq!(state.latest_ap_state.channel.primary, 1);
@@ -4842,8 +4859,7 @@ mod tests {
         let (cmd, mut connect_txn_stream) = connect_command_one();
         let state = link_up_state(cmd);
         let input_ind = fidl_internal::SignalReportIndication { rssi_dbm: -42, snr_db: 20 };
-        let state =
-            state.on_mlme_event(MlmeEvent::SignalReport { ind: input_ind.clone() }, &mut h.context);
+        let state = state.on_mlme_event(MlmeEvent::SignalReport { ind: input_ind }, &mut h.context);
         let serving_ap_info = assert_variant!(state.status(),
                                                      ClientSmeStatus::Connected(serving_ap_info) =>
                                                      serving_ap_info);
@@ -4861,8 +4877,7 @@ mod tests {
         assert!(signal_report_time < time_b);
 
         let input_ind = fidl_internal::SignalReportIndication { rssi_dbm: -24, snr_db: 10 };
-        let state =
-            state.on_mlme_event(MlmeEvent::SignalReport { ind: input_ind.clone() }, &mut h.context);
+        let state = state.on_mlme_event(MlmeEvent::SignalReport { ind: input_ind }, &mut h.context);
         let serving_ap_info = assert_variant!(state.status(),
                                                      ClientSmeStatus::Connected(serving_ap_info) =>
                                                      serving_ap_info);
@@ -5124,7 +5139,7 @@ mod tests {
     ) -> ClientState {
         suppl_mock.set_on_eapol_frame_updates(update_sink);
         // (mlme->sme) Send an EapolInd
-        let eapol_ind = create_eapol_ind(bssid.clone(), test_utils::eapol_key_frame().into());
+        let eapol_ind = create_eapol_ind(bssid, test_utils::eapol_key_frame().into());
         state.on_mlme_event(eapol_ind, &mut helper.context)
     }
 
@@ -5208,7 +5223,7 @@ mod tests {
     fn expect_set_ptk(mlme_stream: &mut MlmeStream, bssid: Bssid) {
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
             assert_eq!(set_keys_req.keylist.len(), 1);
-            let k = set_keys_req.keylist.get(0).expect("expect key descriptor");
+            let k = set_keys_req.keylist.first().expect("expect key descriptor");
             assert_eq!(k.key, vec![0xCCu8; test_utils::cipher().tk_bytes().unwrap() as usize]);
             assert_eq!(k.key_id, 0);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Pairwise);
@@ -5222,7 +5237,7 @@ mod tests {
     fn expect_set_gtk(mlme_stream: &mut MlmeStream) {
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
             assert_eq!(set_keys_req.keylist.len(), 1);
-            let k = set_keys_req.keylist.get(0).expect("expect key descriptor");
+            let k = set_keys_req.keylist.first().expect("expect key descriptor");
             assert_eq!(&k.key[..], &test_utils::gtk_bytes()[..]);
             assert_eq!(k.key_id, 2);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Group);
@@ -5236,7 +5251,7 @@ mod tests {
     fn expect_set_wpa1_ptk(mlme_stream: &mut MlmeStream, bssid: Bssid) {
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
             assert_eq!(set_keys_req.keylist.len(), 1);
-            let k = set_keys_req.keylist.get(0).expect("expect key descriptor");
+            let k = set_keys_req.keylist.first().expect("expect key descriptor");
             assert_eq!(k.key, vec![0xCCu8; test_utils::wpa1_cipher().tk_bytes().unwrap() as usize]);
             assert_eq!(k.key_id, 0);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Pairwise);
@@ -5250,7 +5265,7 @@ mod tests {
     fn expect_set_wpa1_gtk(mlme_stream: &mut MlmeStream) {
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
             assert_eq!(set_keys_req.keylist.len(), 1);
-            let k = set_keys_req.keylist.get(0).expect("expect key descriptor");
+            let k = set_keys_req.keylist.first().expect("expect key descriptor");
             assert_eq!(&k.key[..], &test_utils::wpa1_gtk_bytes()[..]);
             assert_eq!(k.key_id, 2);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Group);
@@ -5374,22 +5389,20 @@ mod tests {
         reason: fidl_sme::UserDisconnectReason,
     ) -> ClientState {
         let bssid = match &state {
-            ClientState::Connecting(state) => state.cmd.bss.bssid.clone(),
-            ClientState::Associated(state) => state.latest_ap_state.bssid.clone(),
+            ClientState::Connecting(state) => state.cmd.bss.bssid,
+            ClientState::Associated(state) => state.latest_ap_state.bssid,
             other => panic!("Unexpected state {:?} when disconnecting", other),
         };
         let (mut disconnect_fut, responder) = make_disconnect_request(h);
         state = state.disconnect(&mut h.context, reason, responder);
         assert_variant!(&state, ClientState::Disconnecting(_));
         assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Pending);
-        let state = state
-            .on_mlme_event(
-                fidl_mlme::MlmeEvent::DeauthenticateConf {
-                    resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bssid.to_array() },
-                },
-                &mut h.context,
-            )
-            .into();
+        let state = state.on_mlme_event(
+            fidl_mlme::MlmeEvent::DeauthenticateConf {
+                resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bssid.to_array() },
+            },
+            &mut h.context,
+        );
         assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
         state
     }
@@ -5473,7 +5486,7 @@ mod tests {
     fn roaming_state(cmd: ConnectCommand, selected_bssid: Bssid) -> ClientState {
         let auth_method = cmd.protection.rsn_auth_method();
         let mut selected_bss = cmd.bss.clone();
-        selected_bss.bssid = selected_bssid.into();
+        selected_bss.bssid = selected_bssid;
         testing::new_state(Roaming {
             cfg: ClientConfig::default(),
             cmd: ConnectCommand {

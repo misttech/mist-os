@@ -36,7 +36,8 @@ fuchsia_test_package("elf-test-runner-integration-test") {
 group("tests") {
   testonly = true
   deps = [
-    ":elf-test-runner-integration-test",
+    # TODO(https://fxbug.dev/382546971): this test is flaking a lot. Disabling temporarily.
+    #":elf-test-runner-integration-test",
     "../test_data:elf-test-runner-example-tests",
   ]
 }

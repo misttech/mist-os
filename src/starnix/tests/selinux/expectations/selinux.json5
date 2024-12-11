@@ -47,7 +47,6 @@
                 "*notify*",
                 "*open*",
                 "*perf_event*",
-                "*readlink*",
                 "*rxdir*",
                 "*sem*",
                 "*setattr*",
@@ -65,6 +64,7 @@
                 "filesystem",
                 "fs_filesystem",
                 "glblub",
+                "overlay",
                 "userfaultfd",
                 "watchkey",
 

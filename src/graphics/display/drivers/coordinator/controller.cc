@@ -906,7 +906,7 @@ zx::result<> Controller::Initialize() {
     return vsync_monitor_init_result.take_error();
   }
 
-  engine_driver_client_->RegisterDisplayEngineListener({
+  engine_driver_client_->SetListener({
       .ops = &display_engine_listener_protocol_ops_,
       .ctx = this,
   });
@@ -949,7 +949,7 @@ void Controller::PrepareStop() {
 
   // Deregister the Controller itself from the display engine driver while both
   // drivers are still alive.
-  engine_driver_client_->DeregisterDisplayEngineListener();
+  engine_driver_client_->UnsetListener();
 }
 
 void Controller::Stop() { FDF_LOG(INFO, "Controller::Stop"); }

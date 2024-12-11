@@ -69,24 +69,23 @@ FUNCTION(_start)
     lla     shadow_call_sp, boot_shadow_call_stack
 #endif
 
+    // We modify the currently live address space below. Store the address of
+    // the root page table both here in s4 for local use and in a variable for
+    // later use by secondaries.
+    csrr    s4, satp
+    li      t0, RISCV64_SATP_PPN_MASK
+    and     s4, s4, t0
+    slli    s4, s4, PAGE_SIZE_SHIFT
+    sd      s4, riscv64_kernel_bootstrap_translation_table_phys, t0
+
     // call into the riscv64 boot mapping code to give it a chance to initialize its page tables
     sub     a0, s3, s2  // Argument is (virtual - physical) delta.
     call    riscv64_boot_map_init
 
     // void riscv64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr, size_t len, pte_t flags);
 
-    // Set up an identity map for bootstrapping the mmu now and later when secondary cores are initialized.
-    // Global pages are explicitly not used here since it's within the user address space range and
-    // we dont want any stale TLB entries when context switching to user space later.
-    lla     a0, riscv64_kernel_bootstrap_translation_table
-    li      a1, 0
-    li      a2, 0
-    li      a3, ARCH_PHYSMAP_SIZE
-    li      a4, RISCV64_PTE_A | RISCV64_PTE_D | RISCV64_PTE_PERM_MASK | RISCV64_PTE_V
-    call    riscv64_boot_map
-
     // map a large run of physical memory at the base of the kernel's address space
-    lla     a0, riscv64_kernel_bootstrap_translation_table
+    mv      a0, s4
     li      a1, KERNEL_ASPACE_BASE
     li      a2, 0
     li      a3, ARCH_PHYSMAP_SIZE
@@ -95,7 +94,7 @@ FUNCTION(_start)
 
     // map the kernel to a fixed address
     // note: mapping the kernel here with full rwx, this will get locked down later in vm initialization
-    lla     a0, riscv64_kernel_bootstrap_translation_table
+    mv      a0, s4
     mv      a1, s3                 // 2nd arg: Virtual __executable_start.
     lla     a2, __executable_start // 3rd arg: Physical __executable_start.
     lla     a3, _end               // Physical _end.
@@ -105,17 +104,6 @@ FUNCTION(_start)
 
     // ensure it's written out
     fence   w,w
-
-    // set the satp register and enable the mmu
-    // ASID 0, riscv64_kernel_translation_table address
-    lla     t0, riscv64_kernel_bootstrap_translation_table
-    srli    t1, t0, PAGE_SIZE_SHIFT
-    li      t2, (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT)
-    or      t1, t1, t2
-    csrw    satp, t1
-
-    // global tlb fence
-    sfence.vma  zero, zero
 
     // mmu is initialized and we're running out of an identity physical map
 
@@ -163,7 +151,7 @@ END_FUNCTION(_start)
 // Entry point for secondary cpus when started from SBI
 FUNCTION(riscv64_secondary_entry_asm)
     // Enable the MMU with the ASID 0, prefilled by _start
-    lla     t0, riscv64_kernel_bootstrap_translation_table
+    ld      t0, riscv64_kernel_bootstrap_translation_table_phys
     srli    t1, t0, PAGE_SIZE_SHIFT
     li      t2, (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT)
     or      t1, t1, t2

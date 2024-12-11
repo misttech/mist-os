@@ -5,15 +5,15 @@
 #include "src/media/audio/audio_core/v1/effects_stage_v2.h"
 
 #include <fuchsia/media/cpp/fidl.h>
+#include <lib/fidl/cpp/wire/vector_view.h>
 
 #include <atomic>
+#include <vector>
 
 #include <fbl/algorithm.h>
 
 #include "src/media/audio/audio_core/shared/logging_flags.h"
-#include "src/media/audio/audio_core/shared/mixer/intersect.h"
 #include "src/media/audio/audio_core/v1/silence_padding_stream.h"
-#include "src/media/audio/audio_core/v1/threading_model.h"
 
 namespace media::audio {
 namespace {
@@ -139,56 +139,61 @@ zx_status_t PartialOverlap(const fuchsia_mem::wire::Range& a, const fuchsia_mem:
 
 // Make a copy of 'src' so the config can be edited. The resulting config takes ownership of
 // all handles from 'src'. https://fxbug.dev/42167245 explains why this is necessary.
-fuchsia_audio_effects::wire::ProcessorConfiguration CloneConfigAndTakeHandles(
-    fidl::AnyArena& arena, fuchsia_audio_effects::wire::ProcessorConfiguration src) {
-  fuchsia_audio_effects::wire::ProcessorConfiguration dst(arena);
+fidl::WireTableBuilder<::fuchsia_audio_effects::wire::ProcessorConfiguration>
+CloneConfigAndTakeHandles(fidl::AnyArena& arena,
+                          fuchsia_audio_effects::wire::ProcessorConfiguration src) {
+  auto dst = fuchsia_audio_effects::wire::ProcessorConfiguration::Builder(arena);
 
   if (src.has_processor()) {
-    dst.set_processor(std::move(src.processor()));
+    dst.processor(std::move(src.processor()));
   }
 
   if (src.has_inputs()) {
-    dst.set_inputs(arena, arena, src.inputs().count());
+    std::vector<fuchsia_audio_effects::wire::InputConfiguration> inputs;
     for (size_t k = 0; k < src.inputs().count(); k++) {
       auto& src_input = src.inputs()[k];
-      auto& dst_input = dst.inputs()[k];
-      dst_input.Allocate(arena);
+      auto dst_input = fuchsia_audio_effects::wire::InputConfiguration::Builder(arena);
       if (src_input.has_format()) {
-        dst_input.set_format(arena, std::move(src_input.format()));
+        dst_input.format(src_input.format());
       }
       if (src_input.has_buffer()) {
-        dst_input.set_buffer(arena, std::move(src_input.buffer()));
+        dst_input.buffer(std::move(src_input.buffer()));
       }
+      inputs.emplace_back(dst_input.Build());
     }
+    dst.inputs(inputs);
   }
 
   if (src.has_outputs()) {
-    dst.set_outputs(arena, arena, src.outputs().count());
+    std::vector<fuchsia_audio_effects::wire::OutputConfiguration> outputs;
+
     for (size_t k = 0; k < src.outputs().count(); k++) {
       auto& src_output = src.outputs()[k];
-      auto& dst_output = dst.outputs()[k];
-      dst_output.Allocate(arena);
+      auto dst_output = fuchsia_audio_effects::wire::OutputConfiguration::Builder(arena);
+
       if (src_output.has_format()) {
-        dst_output.set_format(arena, std::move(src_output.format()));
+        dst_output.format(src_output.format());
       }
       if (src_output.has_buffer()) {
-        dst_output.set_buffer(arena, std::move(src_output.buffer()));
+        dst_output.buffer(std::move(src_output.buffer()));
       }
       if (src_output.has_latency_frames()) {
-        dst_output.set_latency_frames(arena, src_output.latency_frames());
+        dst_output.latency_frames(src_output.latency_frames());
       }
       if (src_output.has_ring_out_frames()) {
-        dst_output.set_ring_out_frames(arena, src_output.ring_out_frames());
+        dst_output.ring_out_frames(src_output.ring_out_frames());
       }
+      outputs.emplace_back(dst_output.Build());
     }
+    dst.outputs(outputs);
   }
 
   if (src.has_max_frames_per_call()) {
-    dst.set_max_frames_per_call(arena, src.max_frames_per_call());
+    dst.max_frames_per_call(src.max_frames_per_call());
   }
 
   if (src.has_block_size_frames()) {
-    dst.set_block_size_frames(arena, src.block_size_frames());
+    dst.block_size_frames(src.block_size_frames());
   }
 
   return dst;
@@ -253,14 +258,14 @@ EffectsStageV2::FidlBuffers EffectsStageV2::FidlBuffers::Create(
 
 // static
 fpromise::result<std::shared_ptr<EffectsStageV2>, zx_status_t> EffectsStageV2::Create(
-    fuchsia_audio_effects::wire::ProcessorConfiguration config,
+    fuchsia_audio_effects::wire::ProcessorConfiguration original_config,
     std::shared_ptr<ReadableStream> source) {
   TRACE_DURATION("audio", "EffectsStageV2::Create");
 
   // The arena's initial size doesn't matter: this is not on the critical path
   // so it's OK to allocate.
   fidl::Arena<128> arena;
-  config = CloneConfigAndTakeHandles(arena, config);
+  auto config = CloneConfigAndTakeHandles(arena, original_config);
 
   // Validate the ProcessorConfiguration.
   // NOTE: This implementation supports exactly one FLOAT input and one FLOAT output.
@@ -312,16 +317,31 @@ fpromise::result<std::shared_ptr<EffectsStageV2>, zx_status_t> EffectsStageV2::C
   const uint64_t default_max_frames_per_call = input.buffer().size / bytes_per_frame;
 
   if (!config.has_block_size_frames()) {
-    config.set_block_size_frames(arena, 1);
+    config.block_size_frames(1);
   }
   if (!config.has_max_frames_per_call()) {
-    config.set_max_frames_per_call(arena, default_max_frames_per_call);
+    config.max_frames_per_call(default_max_frames_per_call);
   }
-  if (!output.has_latency_frames()) {
-    output.set_latency_frames(arena, 0);
-  }
-  if (!output.has_ring_out_frames()) {
-    output.set_ring_out_frames(arena, 0);
+  if (!output.has_latency_frames() || !output.has_ring_out_frames()) {
+    // If we need to update this output configuration, just recreate the entire vector.
+    fidl::VectorView<fuchsia_audio_effects::wire::OutputConfiguration> outputs(arena, 1);
+    auto new_output = fuchsia_audio_effects::wire::OutputConfiguration::Builder(arena)
+                          .buffer(std::move(output.buffer()))
+                          .format(output.format());
+    if (output.has_latency_frames()) {
+      new_output.latency_frames(output.latency_frames());
+    } else {
+      new_output.latency_frames(0);
+    }
+    if (output.has_ring_out_frames()) {
+      new_output.ring_out_frames(output.ring_out_frames());
+    } else {
+      new_output.ring_out_frames(0);
+    }
+    outputs[0] = new_output.Build();
+    config.outputs(fidl::ObjectView{arena, outputs});
+
+    output = config.outputs()[0];
   }
 
   // Ensure the block size is satisfiable.
@@ -332,21 +352,23 @@ fpromise::result<std::shared_ptr<EffectsStageV2>, zx_status_t> EffectsStageV2::C
   }
 
   // Now round down max_frames_per_call so it satisfies the requested block size.
-  config.set_max_frames_per_call(
-      arena, fbl::round_down(config.max_frames_per_call(), config.block_size_frames()));
+  config.max_frames_per_call(
+      fbl::round_down(config.max_frames_per_call(), config.block_size_frames()));
 
+  auto final_config = config.Build();
   // Validate buffer sizes.
-  if (config.max_frames_per_call() > default_max_frames_per_call) {
-    FX_LOGS(ERROR) << "ProcessorConfiguration max_frames_per_call (" << config.max_frames_per_call()
-                   << ") > input buffer size (" << default_max_frames_per_call << " frames)";
+  if (final_config.max_frames_per_call() > default_max_frames_per_call) {
+    FX_LOGS(ERROR) << "ProcessorConfiguration max_frames_per_call ("
+                   << final_config.max_frames_per_call() << ") > input buffer size ("
+                   << default_max_frames_per_call << " frames)";
     return fpromise::error(ZX_ERR_INVALID_ARGS);
   }
 
   // Validate that we won't crash when trying to access the input and output buffers.
-  if (auto status = ValidateMemRange(true, input.buffer(), config); status != ZX_OK) {
+  if (auto status = ValidateMemRange(true, input.buffer(), final_config); status != ZX_OK) {
     return fpromise::error(status);
   }
-  if (auto status = ValidateMemRange(false, output.buffer(), config); status != ZX_OK) {
+  if (auto status = ValidateMemRange(false, output.buffer(), final_config); status != ZX_OK) {
     return fpromise::error(status);
   }
 
@@ -375,7 +397,7 @@ fpromise::result<std::shared_ptr<EffectsStageV2>, zx_status_t> EffectsStageV2::C
    public:
     MakeSharedEnabler(fuchsia_audio_effects::wire::ProcessorConfiguration config,
                       std::shared_ptr<ReadableStream> source)
-        : EffectsStageV2(std::move(config), std::move(source)) {}
+        : EffectsStageV2(config, std::move(source)) {}
   };
 
   if constexpr (kLogEffectsV2CtorValues) {
@@ -394,20 +416,20 @@ fpromise::result<std::shared_ptr<EffectsStageV2>, zx_status_t> EffectsStageV2::C
                   << " channel_count " << output.format().channel_count;
   }
 
-  return fpromise::ok(std::make_shared<MakeSharedEnabler>(std::move(config), std::move(source)));
+  return fpromise::ok(std::make_shared<MakeSharedEnabler>(final_config, std::move(source)));
 }
 
 EffectsStageV2::EffectsStageV2(fuchsia_audio_effects::wire::ProcessorConfiguration config,
                                std::shared_ptr<ReadableStream> source)
     : ReadableStream("EffectsStageV2", ToOldFormat(config.outputs()[0].format())),
-      source_(SilencePaddingStream::WrapIfNeeded(std::move(source),
-                                                 Fixed(config.outputs()[0].ring_out_frames()),
-                                                 /*fractional_gaps_round_down=*/false)),
+      source_(SilencePaddingStream::WrapIfNeeded(
+          std::move(source), Fixed(static_cast<int64_t>(config.outputs()[0].ring_out_frames())),
+          /*fractional_gaps_round_down=*/false)),
       processor_(fidl::WireSyncClient(std::move(config.processor()))),
       fidl_buffers_(FidlBuffers::Create(config.inputs()[0].buffer(), config.outputs()[0].buffer())),
-      max_frames_per_call_(config.max_frames_per_call()),
-      block_size_frames_(config.block_size_frames()),
-      output_shift_frames_(config.outputs()[0].latency_frames()),
+      max_frames_per_call_(static_cast<int64_t>(config.max_frames_per_call())),
+      block_size_frames_(static_cast<int64_t>(config.block_size_frames())),
+      output_shift_frames_(static_cast<int64_t>(config.outputs()[0].latency_frames())),
       source_buffer_(source_->format(), max_frames_per_call_) {
   // Initialize our lead time. Passing 0 here will resolve to our effect's lead time
   // not counting the impact of any downstream processors.
@@ -558,11 +580,13 @@ void EffectsStageV2::CallProcess(ReadLockContext& ctx, StreamUsageMask source_us
   // This arena is just used to store one pointer per field of ProcessOptions.
   // The actual data is stored in the above arrays.
   fidl::Arena<64> arena;
-  fuchsia_audio_effects::wire::ProcessOptions options(arena);
-  options.set_total_applied_gain_db_per_input(
-      fidl::ObjectView<fidl::VectorView<float>>::FromExternal(&total_applied_gain_db_vector));
-  options.set_usage_mask_per_input(
-      fidl::ObjectView<fidl::VectorView<uint32_t>>::FromExternal(&usage_mask_vector));
+  auto options =
+      fuchsia_audio_effects::wire::ProcessOptions::Builder(arena)
+          .total_applied_gain_db_per_input(fidl::ObjectView<fidl::VectorView<float>>::FromExternal(
+              &total_applied_gain_db_vector))
+          .usage_mask_per_input(
+              fidl::ObjectView<fidl::VectorView<uint32_t>>::FromExternal(&usage_mask_vector))
+          .Build();
 
   // The source data needs to be copied into the pre-negotiated input buffer.
   memmove(fidl_buffers_.input, source_buffer_.payload(),

@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 
 #include "fidl/fuchsia.hardware.suspend/cpp/natural_types.h"
+#include "fidl/fuchsia.power.system/cpp/natural_types.h"
 #include "fidl/test.suspendcontrol/cpp/natural_types.h"
 
 namespace system_integration_utils {
@@ -73,6 +74,23 @@ zx_status_t TestLoopBase::AwaitSystemSuspend() {
   std::cout << "Suspend confirmed" << std::endl;
 
   return ZX_OK;
+}
+
+bool TestLoopBase::SetBootComplete() {
+  {
+    auto result = component::Connect<fuchsia_power_system::BootControl>();
+    if (result.status_value()) {
+      std::cout << "Failed to connect to BootControl" << std::endl;
+      return false;
+    }
+    auto client_end = std::move(result.value());
+    auto status = fidl::WireCall(client_end)->SetBootComplete();
+    if (!status.ok()) {
+      std::cout << "Failed to SetBootComplete" << std::endl;
+      return false;
+    }
+  }
+  return true;
 }
 
 zx_status_t TestLoopBase::StartSystemResume() {

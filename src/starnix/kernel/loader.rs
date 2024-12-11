@@ -596,14 +596,15 @@ pub fn load_executable(
     resolved_elf: ResolvedElf,
     original_path: &CStr,
 ) -> Result<ThreadStartInfo, Errno> {
+    let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
     let main_elf = load_elf(
         resolved_elf.file,
         resolved_elf.memory,
-        current_task.mm(),
+        mm,
         resolved_elf.file_write_guard,
         LoadElfUsage::MainElf,
     )?;
-    current_task.mm().initialize_brk_origin(
+    mm.initialize_brk_origin(
         main_elf.arch_width,
         UserAddress::from_ptr(main_elf.file_base)
             .checked_add(main_elf.length)
@@ -615,7 +616,7 @@ pub fn load_executable(
             load_elf(
                 interp.file,
                 interp.memory,
-                current_task.mm(),
+                mm,
                 interp.file_write_guard,
                 LoadElfUsage::Interpreter,
             )
@@ -661,7 +662,7 @@ pub fn load_executable(
     // Map the time values VMO used by libfasttime. We map this right behind the vvar so that
     // userspace sees this as one big vvar block in memory.
     let time_values_size = ZX_TIME_VALUES_MEMORY.get_size();
-    let time_values_map_result = current_task.mm().map_memory(
+    let time_values_map_result = mm.map_memory(
         DesiredAddress::Any,
         ZX_TIME_VALUES_MEMORY.clone(),
         0,
@@ -685,7 +686,7 @@ pub fn load_executable(
     );
 
     // Overwrite the second part of the vvar mapping with starnix's vvar.
-    let vvar_map_result = current_task.mm().map_memory(
+    let vvar_map_result = mm.map_memory(
         DesiredAddress::FixedOverwrite(time_values_map_result + time_values_size),
         vvar_memory,
         0,
@@ -698,7 +699,7 @@ pub fn load_executable(
     )?;
 
     // Overwrite the third part of the vvar mapping to contain the vDSO clone.
-    let vdso_base = current_task.mm().map_memory(
+    let vdso_base = mm.map_memory(
         DesiredAddress::FixedOverwrite(vvar_map_result + vvar_size),
         vdso_executable,
         0,
@@ -744,7 +745,7 @@ pub fn load_executable(
     .expect("stack is too big");
 
     let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
-    let stack_base = current_task.mm().map_stack(stack_size, prot_flags)?;
+    let stack_base = mm.map_stack(stack_size, prot_flags)?;
 
     let stack = stack_base + (stack_size - 8);
 
@@ -758,7 +759,7 @@ pub fn load_executable(
         main_elf.arch_width,
     )?;
 
-    let mut mm_state = current_task.mm().state.write();
+    let mut mm_state = mm.state.write();
     mm_state.stack_size = stack_size;
     mm_state.stack_start = stack.stack_pointer;
     mm_state.auxv_start = stack.auxv_start;
@@ -906,7 +907,7 @@ mod tests {
     async fn test_load_hello_starnix() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
         exec_hello_starnix(&mut locked, &mut current_task).expect("failed to load executable");
-        assert!(current_task.mm().get_mapping_count() > 0);
+        assert!(current_task.mm().unwrap().get_mapping_count() > 0);
     }
 
     // TODO(https://fxbug.dev/42072654): Figure out why this snapshot fails.
@@ -917,9 +918,16 @@ mod tests {
         exec_hello_starnix(&mut locked, &mut current_task).expect("failed to load executable");
 
         let current2 = create_task(&mut locked, &kernel, "another-task");
-        current_task.mm().snapshot_to(&mut locked, current2.mm()).expect("failed to snapshot mm");
+        current_task
+            .mm()
+            .unwrap()
+            .snapshot_to(&mut locked, current2.mm().unwrap())
+            .expect("failed to snapshot mm");
 
-        assert_eq!(current_task.mm().get_mapping_count(), current2.mm().get_mapping_count());
+        assert_eq!(
+            current_task.mm().unwrap().get_mapping_count(),
+            current2.mm().unwrap().get_mapping_count()
+        );
     }
 
     #[::fuchsia::test]

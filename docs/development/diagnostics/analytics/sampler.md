@@ -52,7 +52,7 @@ instrumentation in your component. Please see the
 1.  Create a Sampler configuration defining the transformation from Inspect to
     Cobalt. [See existing config files].
 
-[Inspect Codelab]: /docs/development/diagnostics/inspect/codelab/README.md
+[Inspect Codelab]: /docs/development/diagnostics/inspect/codelab.md
 [Cobalt metric]: https://fuchsia.dev/reference/fidl/fuchsia.metrics
 [ComponentInspector]: /sdk/lib/inspect/component/cpp/component.h
 [inspect_runtime]: /src/lib/diagnostics/inspect/runtime/rust/README.md

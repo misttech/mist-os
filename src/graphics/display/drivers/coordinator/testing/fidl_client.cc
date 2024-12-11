@@ -26,7 +26,6 @@
 
 namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;
-namespace sysmem1 = fuchsia_sysmem;
 namespace sysmem2 = fuchsia_sysmem2;
 
 namespace display_coordinator {
@@ -43,9 +42,11 @@ TestFidlClient::Display::Display(const fhd::wire::Info& info) {
   manufacturer_name_ = fbl::String(info.manufacturer_name.data());
   monitor_name_ = fbl::String(info.monitor_name.data());
   monitor_serial_ = fbl::String(info.monitor_serial.data());
-  image_metadata_.height = modes_[0].vertical_resolution;
-  image_metadata_.width = modes_[0].horizontal_resolution;
-  image_metadata_.tiling_type = fhdt::wire::kImageTilingTypeLinear;
+  image_metadata_ = {
+      .width = modes_[0].active_area.width,
+      .height = modes_[0].active_area.height,
+      .tiling_type = fhdt::wire::kImageTilingTypeLinear,
+  };
 }
 
 display::DisplayId TestFidlClient::display_id() const { return displays_[0].id_; }

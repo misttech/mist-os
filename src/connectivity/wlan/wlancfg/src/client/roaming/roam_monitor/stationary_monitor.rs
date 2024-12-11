@@ -74,6 +74,7 @@ impl StationaryMonitor {
 
     // Handle signal report indiciations. Update internal connection data, if necessary. Returns
     // true if a roam search should be initiated.
+    #[allow(clippy::needless_return, reason = "mass allow for https://fxbug.dev/381896734")]
     async fn handle_signal_report(
         &mut self,
         stats: fidl_internal::SignalReportIndication,

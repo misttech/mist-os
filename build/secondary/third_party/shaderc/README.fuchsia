@@ -1,0 +1,7 @@
+Name: shaderc
+License: Apache 2.0
+License File: LICENSE
+Upstream Git: https://github.com/google/shaderc
+Description:
+
+A collection of tools, libraries and tests for shader compilation.

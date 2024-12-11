@@ -1646,6 +1646,79 @@ async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_h
 }
 
 #[fuchsia::test]
+async fn test_activity_governor_acquire_wake_lease_raises_execution_state_to_suspending(
+) -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let element_info_provider = realm
+        .connect_to_service_instance::<fbroker::ElementInfoProviderServiceMarker>(
+            &"system_activity_governor",
+        )
+        .await
+        .expect("failed to connect to service ElementInfoProviderService")
+        .connect_to_status_provider()
+        .expect("failed to connect to protocol ElementInfoProvider");
+
+    let status_endpoints: HashMap<String, fbroker::StatusProxy> = element_info_provider
+        .get_status_endpoints()
+        .await?
+        .unwrap()
+        .into_iter()
+        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy()))
+        .collect();
+
+    let es_status = status_endpoints.get("execution_state").unwrap();
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 2);
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let wake_lease_name = "wake_lease";
+    let wake_lease = activity_governor.acquire_wake_lease(wake_lease_name).await.unwrap().unwrap();
+
+    // Trigger "boot complete" signal.
+    {
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await.unwrap();
+    }
+
+    // Execution State should be at the "Suspending" power level, 1.
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 1);
+
+    let server_token_koid = &wake_lease.basic_info().unwrap().related_koid.raw_koid().to_string();
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {
+                var server_token_koid: {
+                    created_at: NonZeroUintProperty,
+                    client_token_koid: wake_lease.get_koid().unwrap().raw_koid(),
+                    name: wake_lease_name,
+                    type: AnyStringProperty,
+                }
+            },
+        }
+    );
+
+    drop(wake_lease);
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {},
+            config: {
+                use_suspender: true,
+                wait_for_suspending_token: false,
+            },
+        }
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
 async fn test_activity_governor_take_application_activity_lease() -> Result<()> {
     let (realm, activity_governor_moniker) = create_realm().await?;
     let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
@@ -1784,6 +1857,90 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
         }
     );
 
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_handles_1000_acquired_wake_leases() -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let mut root = TreeAssertion::new("root", false);
+    let mut wake_leases_child = TreeAssertion::new("wake_leases", true);
+    let mut wake_leases = Vec::new();
+
+    for i in 0..1000 {
+        let wake_lease_name = format!("wake_lease{}", i);
+        let wake_lease = activity_governor.acquire_wake_lease(&wake_lease_name).await?.unwrap();
+
+        let server_token_koid =
+            &wake_lease.basic_info().unwrap().related_koid.raw_koid().to_string();
+        let client_token_koid = &wake_lease.get_koid().unwrap().raw_koid();
+
+        let mut wake_lease_child = TreeAssertion::new(server_token_koid, false);
+        wake_lease_child.add_property_assertion("created_at", Box::new(NonZeroUintProperty));
+        wake_lease_child.add_property_assertion("client_token_koid", Box::new(*client_token_koid));
+        wake_lease_child.add_property_assertion("name", Box::new(wake_lease_name));
+        wake_lease_child.add_property_assertion("type", Box::new(AnyStringProperty));
+        wake_leases_child.add_child_assertion(wake_lease_child);
+
+        wake_leases.push(wake_lease);
+    }
+
+    root.add_child_assertion(wake_leases_child);
+
+    let mut reader = ArchiveReader::new();
+
+    reader
+        .select_all_for_moniker(&format!(
+            "{}/{}",
+            REALM_FACTORY_CHILD_NAME, &activity_governor_moniker
+        ))
+        .with_minimum_schema_count(1);
+
+    let inspect = reader
+        .snapshot::<Inspect>()
+        .await?
+        .into_iter()
+        .next()
+        .and_then(|result| result.payload)
+        .ok_or(anyhow::anyhow!("expected one inspect hierarchy"))
+        .unwrap();
+
+    root.run(&inspect).unwrap();
+
+    drop(wake_leases);
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {},
+            config: {
+                use_suspender: true,
+                wait_for_suspending_token: false,
+            },
+        }
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_acquire_wake_lease_returns_error_on_empty_name() -> Result<()> {
+    let (realm, _activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    assert_eq!(
+        fsystem::AcquireWakeLeaseError::InvalidName,
+        activity_governor.acquire_wake_lease("").await?.unwrap_err()
+    );
+
+    // Second call should succeed.
+    activity_governor.acquire_wake_lease("test").await.unwrap().unwrap();
     Ok(())
 }
 

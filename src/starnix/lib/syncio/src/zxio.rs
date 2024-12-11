@@ -717,12 +717,7 @@ pub type zx_info_handle_basic_t = zx_info_handle_basic;
 extern "C" {
     pub fn zxio_create(handle: zx_handle_t, storage: *mut zxio_storage_t) -> zx_status_t;
 }
-extern "C" {
-    pub fn zxio_create_with_on_open(
-        handle: zx_handle_t,
-        storage: *mut zxio_storage_t,
-    ) -> zx_status_t;
-}
+
 extern "C" {
     pub fn zxio_create_with_on_representation(
         handle: zx_handle_t,
@@ -922,29 +917,11 @@ extern "C" {
 extern "C" {
     pub fn zxio_open(
         directory: *mut zxio_t,
-        flags: u32,
-        path: *const ::std::os::raw::c_char,
-        path_len: usize,
-        storage: *mut zxio_storage_t,
-    ) -> zx_status_t;
-}
-extern "C" {
-    pub fn zxio_open3(
-        directory: *mut zxio_t,
         path: *const ::std::os::raw::c_char,
         path_len: usize,
         flags: zxio_open_flags_t,
         options: *const zxio_open_options_t,
         storage: *mut zxio_storage_t,
-    ) -> zx_status_t;
-}
-extern "C" {
-    pub fn zxio_open_async(
-        directory: *mut zxio_t,
-        flags: u32,
-        path: *const ::std::os::raw::c_char,
-        path_len: usize,
-        request: zx_handle_t,
     ) -> zx_status_t;
 }
 extern "C" {

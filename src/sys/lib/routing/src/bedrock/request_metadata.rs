@@ -12,6 +12,7 @@ pub const METADATA_KEY_TYPE: &'static str = "type";
 
 /// The capability type value for a protocol.
 pub const TYPE_PROTOCOL: &'static str = "protocol";
+pub const TYPE_DICTIONARY: &'static str = "dictionary";
 pub const TYPE_CONFIG: &'static str = "configuration";
 
 /// A type which has accessors for route request metadata of type T.
@@ -96,6 +97,19 @@ pub fn protocol_metadata(availability: cm_types::Availability) -> sandbox::Dict 
         .insert(
             cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
             sandbox::Capability::Data(sandbox::Data::String(String::from(TYPE_PROTOCOL))),
+        )
+        .unwrap();
+    metadata.set_metadata(availability);
+    metadata
+}
+
+/// Returns a `Dict` containing Router Request metadata specifying a Dictionary porcelain type.
+pub fn dictionary_metadata(availability: cm_types::Availability) -> sandbox::Dict {
+    let metadata = sandbox::Dict::new();
+    metadata
+        .insert(
+            cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
+            sandbox::Capability::Data(sandbox::Data::String(String::from(TYPE_DICTIONARY))),
         )
         .unwrap();
     metadata.set_metadata(availability);

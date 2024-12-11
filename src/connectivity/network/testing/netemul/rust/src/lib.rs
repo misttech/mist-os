@@ -1195,7 +1195,7 @@ impl<'a> TestInterface<'a> {
     ///
     /// Returns whether the route was newly added to the stack. Returns `Err` if `destination` and
     /// `next_hop` don't share the same IP version.
-    async fn add_route_either(
+    pub async fn add_route_either(
         &self,
         destination: fnet::Subnet,
         next_hop: Option<fnet::IpAddress>,

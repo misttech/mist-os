@@ -846,6 +846,14 @@ async fn get_realm(
                 .to(&resolver),
         )
         .await?;
+    wrapper_realm
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.debugdata.Publisher"))
+                .from(&debug_data)
+                .to(Ref::dictionary(format!("self/{DIAGNOSTICS_DICTIONARY_NAME}"))),
+        )
+        .await?;
 
     // Diagnostics dictionary to resolver and test_root
     wrapper_realm
@@ -863,17 +871,10 @@ async fn get_realm(
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
-                .from(&archivist)
-                .to(Ref::parent())
-                .to(test_root.clone()),
-        )
-        .await?;
-    wrapper_realm
-        .add_route(
-            Route::new()
                 .capability(Capability::protocol::<
                     fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker,
                 >())
+                .from_dictionary("diagnostics-accessors")
                 .from(&archivist)
                 .to(Ref::parent())
                 .to(test_root.clone()),

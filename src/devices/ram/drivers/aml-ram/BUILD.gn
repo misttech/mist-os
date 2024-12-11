@@ -44,6 +44,7 @@ fuchsia_driver_component("aml-ram") {
 
 fuchsia_driver_package("package") {
   package_name = "aml-ram"
+  export_to_bazel = true
   driver_components = [ ":aml-ram" ]
 }
 

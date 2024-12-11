@@ -103,6 +103,17 @@ impl<K: Eq + Hash, V> RefCountedHashMap<K, V> {
     pub fn iter_mut<'a>(&'a mut self) -> impl 'a + Iterator<Item = (&'a K, &'a mut V)> {
         self.inner.iter_mut().map(|(key, (_, value))| (key, value))
     }
+
+    /// An iterator visiting all key-value pairs in arbitrary order, with
+    /// non-mutable references to the values.
+    pub fn iter<'a>(&'a self) -> impl 'a + Iterator<Item = (&'a K, &'a V)> + Clone {
+        self.inner.iter().map(|(key, (_, value))| (key, value))
+    }
+
+    /// Returns whether the map is empty.
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
 }
 
 /// A [`RefCountedHashMap`] where the value is `()`.

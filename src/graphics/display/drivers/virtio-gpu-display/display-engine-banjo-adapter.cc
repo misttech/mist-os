@@ -4,8 +4,6 @@
 
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine-banjo-adapter.h"
 
-#include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
-#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/compat/cpp/device_server.h>
@@ -15,11 +13,9 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <utility>
-
-#include <fbl/alloc_checker.h>
-#include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-banjo.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -50,17 +46,17 @@ compat::DeviceServer::BanjoConfig DisplayEngineBanjoAdapter::CreateBanjoConfig()
   return banjo_config;
 }
 
-void DisplayEngineBanjoAdapter::DisplayEngineRegisterDisplayEngineListener(
+void DisplayEngineBanjoAdapter::DisplayEngineSetListener(
     const display_engine_listener_protocol_t* display_engine_listener) {
   ZX_DEBUG_ASSERT(display_engine_listener);
-  engine_events_.RegisterDisplayEngineListener(display_engine_listener);
+  engine_events_.SetListener(display_engine_listener);
   if (display_engine_listener != nullptr) {
     engine_.OnCoordinatorConnected();
   }
 }
 
-void DisplayEngineBanjoAdapter::DisplayEngineDeregisterDisplayEngineListener() {
-  engine_events_.RegisterDisplayEngineListener(nullptr);
+void DisplayEngineBanjoAdapter::DisplayEngineUnsetListener() {
+  engine_events_.SetListener(nullptr);
 }
 
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineImportBufferCollection(
@@ -178,12 +174,23 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
     // TODO(costan): Add an error code that indicates invalid input.
     return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
-  display::DriverLayer layer(banjo_layers[0]);
-  cpp20::span<const display::DriverLayer> layers(&layer, 1);
+  display::DriverLayer layer0(banjo_layers[0]);
+  cpp20::span<const display::DriverLayer> layers(&layer0, 1);
+  display::LayerCompositionOperations layer0_composition_operations;
+  cpp20::span<display::LayerCompositionOperations> layer_composition_operations(
+      &layer0_composition_operations, 1);
 
-  return engine_.CheckConfiguration(display::ToDisplayId(banjo_display_config.display_id), layers,
-                                    out_layer_composition_operations,
-                                    out_layer_composition_operations_actual);
+  bool is_supported_configuration = engine_.CheckConfiguration(
+      display::ToDisplayId(banjo_display_config.display_id), layers, layer_composition_operations);
+  if (is_supported_configuration) {
+    return CONFIG_CHECK_RESULT_OK;
+  }
+
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = 1;
+  }
+  out_layer_composition_operations[0] = layer0_composition_operations.ToBanjo();
+  return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
 }
 
 void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(

@@ -5,16 +5,15 @@
 use crate::device::{self, IfaceDevice, IfaceMap, NewIface, PhyDevice, PhyMap};
 use crate::inspect::IfacesTree;
 use crate::watcher_service;
-use anyhow::{Context, Error};
+use anyhow::{format_err, Error};
 use core::sync::atomic::AtomicUsize;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_wlan_device_service::{self as fidl_svc, DeviceMonitorRequest};
 use futures::channel::mpsc;
 use futures::stream::FuturesUnordered;
-use futures::{select, StreamExt, TryStreamExt};
-use ieee80211::{MacAddr, MacAddrBytes};
+use futures::{select, StreamExt};
+use ieee80211::{MacAddr, MacAddrBytes, NULL_ADDR};
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
 use tracing::{error, info, warn};
 use wlan_fidl_ext::{ResponderExt, WithName};
 use {
@@ -36,140 +35,133 @@ impl IfaceCounter {
     }
 }
 
-pub(crate) async fn serve_monitor_requests(
-    mut req_stream: fidl_svc::DeviceMonitorRequestStream,
-    phys: Arc<PhyMap>,
-    ifaces: Arc<IfaceMap>,
-    watcher_service: watcher_service::WatcherService<PhyDevice, IfaceDevice>,
-    new_iface_sink: mpsc::UnboundedSender<NewIface>,
-    iface_counter: Arc<IfaceCounter>,
-    ifaces_tree: Arc<IfacesTree>,
-    cfg: wlandevicemonitor_config::Config,
+#[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
+pub(crate) async fn handle_monitor_request(
+    request: DeviceMonitorRequest,
+    phys: &PhyMap,
+    ifaces: &IfaceMap,
+    watcher_service: &watcher_service::WatcherService<PhyDevice, IfaceDevice>,
+    new_iface_sink: &mpsc::UnboundedSender<NewIface>,
+    iface_counter: &IfaceCounter,
+    ifaces_tree: &IfacesTree,
+    cfg: &wlandevicemonitor_config::Config,
 ) -> Result<(), Error> {
-    while let Some(req) = req_stream.try_next().await.context("error running DeviceService")? {
-        match req {
-            DeviceMonitorRequest::ListPhys { responder } => responder.send(&list_phys(&phys)),
-            DeviceMonitorRequest::ListIfaces { responder } => responder.send(&list_ifaces(&ifaces)),
-            DeviceMonitorRequest::GetDevPath { phy_id, responder } => {
-                responder.send(get_dev_path(&phys, phy_id).as_deref())
-            }
-            DeviceMonitorRequest::GetSupportedMacRoles { phy_id, responder } => responder
-                .send(get_supported_mac_roles(&phys, phy_id).await.as_deref().map_err(|e| *e)),
-            DeviceMonitorRequest::WatchDevices { watcher, control_handle: _ } => {
-                watcher_service
-                    .add_watcher(watcher)
-                    .unwrap_or_else(|e| error!("error registering a device watcher: {}", e));
-                Ok(())
-            }
-            DeviceMonitorRequest::GetCountry { phy_id, responder } => {
-                responder.send(get_country(&phys, phy_id).await.as_ref().map_err(|s| s.into_raw()))
-            }
-            DeviceMonitorRequest::SetCountry { req, responder } => {
-                let status = set_country(&phys, req).await;
-                responder.send(status.into_raw())
-            }
-            DeviceMonitorRequest::ClearCountry { req, responder } => {
-                let status = clear_country(&phys, req).await;
-                responder.send(status.into_raw())
-            }
-            DeviceMonitorRequest::SetPowerSaveMode { req, responder } => {
-                let status = set_power_save_mode(&phys, req).await;
-                responder.send(status.into_raw())
-            }
-            DeviceMonitorRequest::GetPowerSaveMode { phy_id, responder } => responder
-                .send(get_power_save_mode(&phys, phy_id).await.as_ref().map_err(|s| s.into_raw())),
-            DeviceMonitorRequest::CreateIface { payload, responder } => {
-                let ((phy_id, role, sta_address), responder) = match responder
-                    .unpack_fields_or_else_send(
-                        (
-                            payload.phy_id.with_name("phy_id"),
-                            payload.role.with_name("role"),
-                            payload.sta_address.with_name("sta_address"),
-                        ),
-                        || Err(fidl_svc::DeviceMonitorError::unknown()),
-                    ) {
-                    Err(e) => {
-                        warn!("Failed to create iface: {:?}", e);
-                        continue;
-                    }
-                    Ok(x) => x,
-                };
-                let sta_address = MacAddr::from(sta_address);
-
-                match create_iface(
-                    &new_iface_sink,
-                    &phys,
-                    phy_id,
-                    role,
-                    sta_address,
-                    &iface_counter,
-                    &cfg,
-                    Arc::clone(&ifaces_tree),
-                )
-                .await
-                {
-                    Ok(new_iface) => {
-                        info!("iface #{} started ({:?})", new_iface.id, new_iface.phy_ownership);
-                        ifaces.insert(
-                            new_iface.id,
-                            IfaceDevice {
-                                phy_ownership: new_iface.phy_ownership,
-                                generic_sme: new_iface.generic_sme,
-                            },
-                        );
-
-                        let resp = fidl_svc::DeviceMonitorCreateIfaceResponse {
-                            iface_id: Some(new_iface.id),
-                            ..Default::default()
-                        };
-                        responder.send(Ok(&resp))
-                    }
-                    Err(status) => {
-                        warn!("Failed to create iface: {}", status);
-                        responder.send(Err(fidl_svc::DeviceMonitorError::unknown()))
-                    }
+    match request {
+        DeviceMonitorRequest::ListPhys { responder } => responder.send(&list_phys(phys))?,
+        DeviceMonitorRequest::ListIfaces { responder } => responder.send(&list_ifaces(ifaces))?,
+        DeviceMonitorRequest::GetDevPath { phy_id, responder } => {
+            responder.send(get_dev_path(phys, phy_id).as_deref())?
+        }
+        DeviceMonitorRequest::GetSupportedMacRoles { phy_id, responder } => responder
+            .send(get_supported_mac_roles(phys, phy_id).await.as_deref().map_err(|e| *e))?,
+        DeviceMonitorRequest::WatchDevices { watcher, control_handle: _ } => {
+            watcher_service
+                .add_watcher(watcher)
+                .unwrap_or_else(|e| error!("error registering a device watcher: {}", e));
+        }
+        DeviceMonitorRequest::GetCountry { phy_id, responder } => {
+            responder.send(get_country(phys, phy_id).await.as_ref().map_err(|s| s.into_raw()))?;
+        }
+        DeviceMonitorRequest::SetCountry { req, responder } => {
+            let status = set_country(phys, req).await;
+            responder.send(status.into_raw())?;
+        }
+        DeviceMonitorRequest::ClearCountry { req, responder } => {
+            let status = clear_country(phys, req).await;
+            responder.send(status.into_raw())?;
+        }
+        DeviceMonitorRequest::SetPowerSaveMode { req, responder } => {
+            let status = set_power_save_mode(phys, req).await;
+            responder.send(status.into_raw())?;
+        }
+        DeviceMonitorRequest::GetPowerSaveMode { phy_id, responder } => responder
+            .send(get_power_save_mode(phys, phy_id).await.as_ref().map_err(|s| s.into_raw()))?,
+        DeviceMonitorRequest::CreateIface { payload, responder } => {
+            let ((phy_id, role, sta_address), responder) = match responder
+                .unpack_fields_or_else_send(
+                    (
+                        payload.phy_id.with_name("phy_id"),
+                        payload.role.with_name("role"),
+                        payload.sta_address.with_name("sta_address"),
+                    ),
+                    || Err(fidl_svc::DeviceMonitorError::unknown()),
+                ) {
+                Err(e) => {
+                    warn!("Failed to create iface: {:?}", e);
+                    return Ok(());
                 }
-            }
-            DeviceMonitorRequest::QueryIface { iface_id, responder } => {
-                let result = query_iface(&ifaces, iface_id).await;
-                responder.send(result.as_ref().map_err(|e| e.into_raw()))
-            }
-            DeviceMonitorRequest::DestroyIface { req, responder } => {
-                let result =
-                    destroy_iface(&phys, &ifaces, Arc::clone(&ifaces_tree), req.iface_id).await;
-                let status = into_status_and_opt(result).0;
-                responder.send(status.into_raw())
-            }
-            DeviceMonitorRequest::GetClientSme { iface_id, sme_server, responder } => {
-                let result = get_client_sme(&ifaces, iface_id, sme_server).await;
-                responder.send(result.map_err(|e| e.into_raw()))
-            }
-            DeviceMonitorRequest::GetApSme { iface_id, sme_server, responder } => {
-                let result = get_ap_sme(&ifaces, iface_id, sme_server).await;
-                responder.send(result.map_err(|e| e.into_raw()))
-            }
-            DeviceMonitorRequest::GetSmeTelemetry { iface_id, telemetry_server, responder } => {
-                let result = get_sme_telemetry(&ifaces, iface_id, telemetry_server).await;
-                responder.send(result.map_err(|e| e.into_raw()))
-            }
-            DeviceMonitorRequest::GetFeatureSupport {
-                iface_id,
-                feature_support_server,
-                responder,
-            } => {
-                let result = get_feature_support(&ifaces, iface_id, feature_support_server).await;
-                responder.send(result.map_err(|e| e.into_raw()))
-            }
-        }?;
-    }
+                Ok(x) => x,
+            };
+            let sta_address = MacAddr::from(sta_address);
 
+            let new_iface = match create_iface(
+                new_iface_sink,
+                phys,
+                phy_id,
+                role,
+                sta_address,
+                iface_counter,
+                cfg,
+                ifaces_tree,
+            )
+            .await
+            {
+                Err(e) => {
+                    error!("{:?}", e.context("Failed to create iface"));
+                    responder.send(Err(fidl_svc::DeviceMonitorError::unknown()))?;
+                    return Ok(());
+                }
+                Ok(new_iface) => new_iface,
+            };
+
+            info!("iface #{} started ({:?})", new_iface.id, new_iface.phy_ownership);
+            ifaces.insert(
+                new_iface.id,
+                IfaceDevice {
+                    phy_ownership: new_iface.phy_ownership,
+                    generic_sme: new_iface.generic_sme,
+                },
+            );
+
+            let resp = fidl_svc::DeviceMonitorCreateIfaceResponse {
+                iface_id: Some(new_iface.id),
+                ..Default::default()
+            };
+            responder.send(Ok(&resp))?;
+        }
+        DeviceMonitorRequest::QueryIface { iface_id, responder } => {
+            let result = query_iface(ifaces, iface_id).await;
+            responder.send(result.as_ref().map_err(|e| e.into_raw()))?;
+        }
+        DeviceMonitorRequest::DestroyIface { req, responder } => {
+            let result = destroy_iface(phys, ifaces, ifaces_tree, req.iface_id).await;
+            let status = into_status_and_opt(result).0;
+            responder.send(status.into_raw())?;
+        }
+        DeviceMonitorRequest::GetClientSme { iface_id, sme_server, responder } => {
+            let result = get_client_sme(ifaces, iface_id, sme_server).await;
+            responder.send(result.map_err(|e| e.into_raw()))?;
+        }
+        DeviceMonitorRequest::GetApSme { iface_id, sme_server, responder } => {
+            let result = get_ap_sme(ifaces, iface_id, sme_server).await;
+            responder.send(result.map_err(|e| e.into_raw()))?;
+        }
+        DeviceMonitorRequest::GetSmeTelemetry { iface_id, telemetry_server, responder } => {
+            let result = get_sme_telemetry(ifaces, iface_id, telemetry_server).await;
+            responder.send(result.map_err(|e| e.into_raw()))?;
+        }
+        DeviceMonitorRequest::GetFeatureSupport { iface_id, feature_support_server, responder } => {
+            let result = get_feature_support(ifaces, iface_id, feature_support_server).await;
+            responder.send(result.map_err(|e| e.into_raw()))?;
+        }
+    }
     Ok(())
 }
 
 pub(crate) async fn handle_new_iface_stream(
-    phys: Arc<PhyMap>,
-    ifaces: Arc<IfaceMap>,
-    ifaces_tree: Arc<IfacesTree>,
+    phys: &PhyMap,
+    ifaces: &IfaceMap,
+    ifaces_tree: &IfacesTree,
     mut iface_stream: mpsc::UnboundedReceiver<NewIface>,
 ) -> Result<(), Error> {
     let mut futures_unordered = FuturesUnordered::new();
@@ -180,9 +172,9 @@ pub(crate) async fn handle_new_iface_stream(
                 if let Some(new_iface) = new_iface {
                     futures_unordered.push(
                         handle_single_new_iface(
-                            phys.clone(),
-                            ifaces.clone(),
-                            Arc::clone(&ifaces_tree),
+                            phys,
+                            ifaces,
+                            ifaces_tree,
                             new_iface
                         )
                     );
@@ -193,9 +185,9 @@ pub(crate) async fn handle_new_iface_stream(
 }
 
 async fn handle_single_new_iface(
-    phys: Arc<PhyMap>,
-    ifaces: Arc<IfaceMap>,
-    ifaces_tree: Arc<IfacesTree>,
+    phys: &PhyMap,
+    ifaces: &IfaceMap,
+    ifaces_tree: &IfacesTree,
     new_iface: NewIface,
 ) {
     let mut event_stream = new_iface.generic_sme.take_event_stream().fuse();
@@ -225,7 +217,7 @@ async fn handle_single_new_iface(
             }
         }
     }
-    match destroy_iface(&phys, &ifaces, ifaces_tree, new_iface.id).await {
+    match destroy_iface(phys, ifaces, ifaces_tree, new_iface.id).await {
         Ok(()) => info!("Destroyed iface {}", new_iface.id),
         Err(e) if e == zx::Status::NOT_FOUND => {
             warn!("destroy_iface - iface {} not found; assume success", new_iface.id)
@@ -348,17 +340,18 @@ async fn get_supported_mac_roles(
     })
 }
 
+#[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
 async fn create_iface(
     new_iface_sink: &mpsc::UnboundedSender<NewIface>,
     phys: &PhyMap,
     phy_id: u16,
     role: fidl_common::WlanMacRole,
     sta_address: MacAddr,
-    iface_counter: &Arc<IfaceCounter>,
+    iface_counter: &IfaceCounter,
     cfg: &wlandevicemonitor_config::Config,
-    ifaces_tree: Arc<IfacesTree>,
-) -> Result<NewIface, zx::Status> {
-    let phy = phys.get(&phy_id).ok_or(zx::Status::NOT_FOUND)?;
+    ifaces_tree: &IfacesTree,
+) -> Result<NewIface, Error> {
+    let phy = phys.get(&phy_id).ok_or_else(|| format_err!("PHY not found: phy_id {}", phy_id))?;
 
     // Create the bootstrap channel. This channel is only used for initial communication
     // with the USME device.
@@ -393,19 +386,11 @@ async fn create_iface(
         .proxy
         .create_iface(phy_req)
         .await
-        .map_err(move |e| {
-            error!("CreateIface failed: phy {}, fidl error {}", phy_id, e);
-            zx::Status::INTERNAL
-        })?
-        .map_err(move |e| {
-            error!("CreateIface failed: phy {}, error {}", phy_id, e);
-            zx::Status::ok(e)
-        })?;
+        .map_err(move |e| format_err!("CreateIface request failed with FIDL error {}", e))?
+        .map_err(move |e| format_err!("CreateIface request failed with error {}", e))?;
 
-    let inspect_vmo = bootstrap_result.await.map_err(|e| {
-        error!("Failed to bootstrap USME: {}", e);
-        zx::Status::INTERNAL
-    })?;
+    let inspect_vmo =
+        bootstrap_result.await.map_err(|e| format_err!("Failed to bootstrap USME: {}", e))?;
 
     let iface_id = iface_counter.next_iface_id() as u16;
     ifaces_tree.add_iface(iface_id, inspect_vmo);
@@ -416,9 +401,28 @@ async fn create_iface(
         generic_sme: generic_sme_proxy,
     };
     new_iface_sink.unbounded_send(new_iface.clone()).map_err(|e| {
-        error!("Failed to register Generic SME event stream with internal handler: {}", e);
-        zx::Status::INTERNAL
+        format_err!("Failed to register Generic SME event stream with internal handler: {}", e)
     })?;
+
+    let fidl_sme::GenericSmeQuery { role: iface_role, sta_addr: iface_sta_address } = new_iface
+        .generic_sme
+        .query()
+        .await
+        .map_err(|e| format_err!("Failed to initially query iface: FIDL error {}", e))?;
+
+    // TODO(https://fxbug.dev/382075991): Log diagnostic information if the initial query contains
+    // incoherent results, compared to the request. However, don't fail iface creation because such
+    // incoherent results have been allowed for some time.
+    if iface_role != role {
+        warn!("Created iface has unexpected role: expected {:?}, actual {:?}", role, iface_role);
+    }
+    if sta_address != NULL_ADDR && iface_sta_address != sta_address.to_array() {
+        warn!(
+            "Created iface has unexpected sta_address: expected {:?}, actual {:?}",
+            sta_address.to_array(),
+            iface_sta_address
+        );
+    }
 
     Ok(new_iface)
 }
@@ -443,14 +447,14 @@ async fn query_iface(
 async fn destroy_iface(
     phys: &PhyMap,
     ifaces: &IfaceMap,
-    ifaces_tree: Arc<IfacesTree>,
+    ifaces_tree: &IfacesTree,
     id: u16,
 ) -> Result<(), zx::Status> {
     info!("destroy_iface(id = {})", id);
     let iface = ifaces.get(&id).ok_or(zx::Status::NOT_FOUND)?;
 
     let (telemetry_proxy, telemetry_server) = fidl::endpoints::create_proxy();
-    let result = get_sme_telemetry(&ifaces, id, telemetry_server).await;
+    let result = get_sme_telemetry(ifaces, id, telemetry_server).await;
     let destroyed_iface_vmo = match result {
         Ok(()) => match telemetry_proxy.clone_inspect_vmo().await {
             Ok(Ok(vmo)) => Some(vmo),
@@ -502,17 +506,12 @@ async fn destroy_iface(
             zx::Status::ok(zx::sys::ZX_OK)
         }
         Err(status) => {
-            match status {
-                zx::sys::ZX_ERR_NOT_FOUND => {
-                    if ifaces.get_snapshot().contains_key(&id) {
-                        info!(
-                            "Encountered NOT_FOUND while removing iface #{} potentially due to recovery.",
-                            id
-                        );
-                        ifaces.remove(&id);
-                    }
-                }
-                _ => {}
+            if status == zx::sys::ZX_ERR_NOT_FOUND && ifaces.get_snapshot().contains_key(&id) {
+                info!(
+                    "Encountered NOT_FOUND while removing iface #{} potentially due to recovery.",
+                    id
+                );
+                ifaces.remove(&id);
             }
             zx::Status::ok(status)
         }
@@ -530,7 +529,7 @@ async fn get_client_sme(
         error!("Failed to request client SME: {}", e);
         zx::Status::INTERNAL
     })?;
-    result.map_err(|e| zx::Status::from_raw(e))
+    result.map_err(zx::Status::from_raw)
 }
 
 async fn get_ap_sme(
@@ -544,7 +543,7 @@ async fn get_ap_sme(
         error!("Failed to request AP SME: {}", e);
         zx::Status::INTERNAL
     })?;
-    result.map_err(|e| zx::Status::from_raw(e))
+    result.map_err(zx::Status::from_raw)
 }
 
 async fn get_sme_telemetry(
@@ -558,7 +557,7 @@ async fn get_sme_telemetry(
         error!("Failed to request SME telemetry: {}", e);
         zx::Status::INTERNAL
     })?;
-    result.map_err(|e| zx::Status::from_raw(e))
+    result.map_err(zx::Status::from_raw)
 }
 
 async fn get_feature_support(
@@ -573,7 +572,7 @@ async fn get_feature_support(
             error!("Failed to request feature support: {}", e);
             zx::Status::INTERNAL
         })?;
-    result.map_err(|e| zx::Status::from_raw(e))
+    result.map_err(zx::Status::from_raw)
 }
 
 fn into_status_and_opt<T>(r: Result<T, zx::Status>) -> (zx::Status, Option<T>) {
@@ -591,16 +590,18 @@ mod tests {
     use fuchsia_inspect::Inspector;
     use futures::future::BoxFuture;
     use futures::task::Poll;
+    use futures::TryStreamExt;
     use ieee80211::NULL_ADDR;
     use std::convert::Infallible;
     use std::pin::pin;
+    use std::sync::Arc;
     use test_case::test_case;
     use wlan_common::assert_variant;
     use {fidl_fuchsia_wlan_common as fidl_wlan_common, fuchsia_async as fasync};
 
     struct TestValues {
         monitor_proxy: fidl_svc::DeviceMonitorProxy,
-        monitor_req_stream: fidl_svc::DeviceMonitorRequestStream,
+        monitor_stream: fidl_svc::DeviceMonitorRequestStream,
         phys: Arc<PhyMap>,
         ifaces: Arc<IfaceMap>,
         watcher_service: watcher_service::WatcherService<PhyDevice, IfaceDevice>,
@@ -614,7 +615,7 @@ mod tests {
 
     fn test_setup() -> TestValues {
         let (monitor_proxy, requests) = create_proxy::<fidl_svc::DeviceMonitorMarker>();
-        let monitor_req_stream = requests.into_stream();
+        let monitor_stream = requests.into_stream();
         let (phys, phy_events) = PhyMap::new();
         let phys = Arc::new(phys);
 
@@ -633,12 +634,12 @@ mod tests {
 
         TestValues {
             monitor_proxy,
-            monitor_req_stream,
+            monitor_stream,
             phys,
             ifaces,
             watcher_service,
             watcher_fut: Box::pin(watcher_fut),
-            new_iface_stream: new_iface_stream,
+            new_iface_stream,
             new_iface_sink,
             iface_counter,
             inspector,
@@ -662,19 +663,47 @@ mod tests {
         wlandevicemonitor_config::Config { wep_supported: false, wpa1_supported: false }
     }
 
+    #[allow(clippy::too_many_arguments)]
+    async fn serve_monitor_requests(
+        mut monitor_stream: fidl_svc::DeviceMonitorRequestStream,
+        phys: &PhyMap,
+        ifaces: &IfaceMap,
+        watcher_service: &watcher_service::WatcherService<PhyDevice, IfaceDevice>,
+        new_iface_sink: &mpsc::UnboundedSender<NewIface>,
+        iface_counter: &IfaceCounter,
+        ifaces_tree: &IfacesTree,
+        cfg: &wlandevicemonitor_config::Config,
+    ) {
+        while let Some(request) = monitor_stream.try_next().await.unwrap() {
+            handle_monitor_request(
+                request,
+                phys,
+                ifaces,
+                watcher_service,
+                new_iface_sink,
+                iface_counter,
+                ifaces_tree,
+                cfg,
+            )
+            .await
+            .unwrap()
+        }
+    }
+
     #[fuchsia::test]
     fn test_list_phys() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys.clone(),
-            test_values.ifaces.clone(),
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
 
@@ -731,15 +760,16 @@ mod tests {
     fn test_list_ifaces() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys.clone(),
-            test_values.ifaces.clone(),
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
 
@@ -789,15 +819,16 @@ mod tests {
         let expected_path = phy.device_path.clone();
         test_values.phys.insert(10u16, phy);
 
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys,
-            test_values.ifaces,
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
@@ -822,15 +853,16 @@ mod tests {
     fn test_get_dev_path_phy_not_found() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys,
-            test_values.ifaces.clone(),
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
 
@@ -855,15 +887,16 @@ mod tests {
         let (phy, mut phy_stream) = fake_phy();
         test_values.phys.insert(10u16, phy);
 
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys,
-            test_values.ifaces,
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
@@ -900,15 +933,16 @@ mod tests {
     fn test_get_mac_roles_phy_not_found() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys,
-            test_values.ifaces.clone(),
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
 
@@ -936,15 +970,16 @@ mod tests {
         let watcher_fut = test_values.watcher_fut;
         let mut watcher_fut = pin!(watcher_fut);
 
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys.clone(),
-            test_values.ifaces.clone(),
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
 
@@ -991,15 +1026,16 @@ mod tests {
         let watcher_fut = test_values.watcher_fut;
         let mut watcher_fut = pin!(watcher_fut);
 
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys.clone(),
-            test_values.ifaces.clone(),
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
 
@@ -1049,15 +1085,16 @@ mod tests {
         let watcher_fut = test_values.watcher_fut;
         let mut watcher_fut = pin!(watcher_fut);
 
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys.clone(),
-            test_values.ifaces.clone(),
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
 
@@ -1109,15 +1146,16 @@ mod tests {
         let watcher_fut = test_values.watcher_fut;
         let mut watcher_fut = pin!(watcher_fut);
 
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys.clone(),
-            test_values.ifaces.clone(),
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
 
@@ -1178,7 +1216,11 @@ mod tests {
         // Initiate a QueryPhy request. The returned future should not be able
         // to produce a result immediately
         // Issue service.fidl::SetCountryRequest()
-        let req_msg = fidl_svc::SetCountryRequest { phy_id, alpha2: alpha2.clone() };
+        #[allow(
+            clippy::redundant_field_names,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
+        let req_msg = fidl_svc::SetCountryRequest { phy_id, alpha2: alpha2 };
         let req_fut = super::set_country(&test_values.phys, req_msg);
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
@@ -1209,7 +1251,11 @@ mod tests {
         // Initiate a QueryPhy request. The returned future should not be able
         // to produce a result immediately
         // Issue service.fidl::SetCountryRequest()
-        let req_msg = fidl_svc::SetCountryRequest { phy_id, alpha2: alpha2.clone() };
+        #[allow(
+            clippy::redundant_field_names,
+            reason = "mass allow for https://fxbug.dev/381896734"
+        )]
+        let req_msg = fidl_svc::SetCountryRequest { phy_id, alpha2: alpha2 };
         let req_fut = super::set_country(&test_values.phys, req_msg);
         let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
@@ -1494,15 +1540,16 @@ mod tests {
     fn create_iface_succeeds(sta_address: [u8; 6]) {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys.clone(),
-            test_values.ifaces,
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
@@ -1516,7 +1563,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // The future to list the ifaces should complete and no ifaces should be present.
-        assert_variant!(exec.run_until_stalled(&mut list_fut),Poll::Ready(Ok(ifaces)) => {
+        assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Ready(Ok(ifaces)) => {
             assert!(ifaces.is_empty())
         });
 
@@ -1537,27 +1584,47 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut create_iface_fut), Poll::Pending);
 
         let bootstrap_channel = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
-        Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
-            assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
-            assert_eq!(req.init_sta_addr, sta_address);
-            responder.send(Ok(123)).expect("failed to send iface id");
-            req.mlme_channel.expect("no MLME channel")
-        });
+            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::CreateIface { req, responder }))) => {
+                assert_eq!(fidl_wlan_common::WlanMacRole::Client, req.role);
+                assert_eq!(req.init_sta_addr, sta_address);
+                responder.send(Ok(123)).expect("failed to send iface id");
+                req.mlme_channel.expect("no MLME channel")
+            }
+        );
 
         // Complete the USME bootstrap.
         let mut bootstrap_stream =
             fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(bootstrap_channel)
                 .into_stream();
-        assert_variant!(
-            exec.run_until_stalled(&mut bootstrap_stream.next()),
+        let mut generic_sme_stream = assert_variant!(
+        exec.run_until_stalled(&mut bootstrap_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
-                responder, ..
-            }))) => responder
+                responder, generic_sme_server, ..
+            }))) => {
+                responder
                 .send(test_values.inspector.duplicate_vmo().unwrap())
-                .expect("Failed to send bootstrap result"));
+                .expect("Failed to send bootstrap result");
+                generic_sme_server.into_stream()
+            }
+        );
 
         // The original future should resolve into a response.
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+        assert_variant!(
+        exec.run_until_stalled(&mut generic_sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::Query {
+                responder
+            }))) => {
+                responder
+                .send(&fidl_sme::GenericSmeQuery {
+                    role: fidl_common::WlanMacRole::Client,
+                    sta_addr: [0, 1, 2, 3, 4, 5],
+                })
+                .expect("Failed to send GenericSme.Query response");
+            }
+        );
+        assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
         assert_variant!(exec.run_until_stalled(&mut create_iface_fut),
         Poll::Ready(Ok(Ok(response))) => {
             assert_eq!(Some(0), response.iface_id);
@@ -1592,15 +1659,16 @@ mod tests {
     fn create_iface_fails_on_error_from_phy() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys.clone(),
-            test_values.ifaces,
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
@@ -1654,15 +1722,16 @@ mod tests {
     fn create_iface_fails_when_fields_are_missing_from_request() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys.clone(),
-            test_values.ifaces,
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
@@ -1722,15 +1791,16 @@ mod tests {
     fn test_create_multiple_ifaces() {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
+        let cfg = fake_wlandevicemonitor_config();
         let service_fut = serve_monitor_requests(
-            test_values.monitor_req_stream,
-            test_values.phys.clone(),
-            test_values.ifaces,
-            test_values.watcher_service,
-            test_values.new_iface_sink,
-            test_values.iface_counter,
-            test_values.ifaces_tree,
-            fake_wlandevicemonitor_config(),
+            test_values.monitor_stream,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.watcher_service,
+            &test_values.new_iface_sink,
+            &test_values.iface_counter,
+            &test_values.ifaces_tree,
+            &cfg,
         );
         let mut service_fut = pin!(service_fut);
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
@@ -1780,16 +1850,32 @@ mod tests {
             let mut bootstrap_stream =
                 fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(bootstrap_channel)
                     .into_stream();
-            assert_variant!(
-                exec.run_until_stalled(&mut bootstrap_stream.next()),
-                Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
-                    responder, ..
-                }))) => responder
-                    .send(test_values.inspector.duplicate_vmo().unwrap())
-                    .expect("Failed to send bootstrap result"));
-
+            let mut generic_sme_stream = assert_variant!(
+            exec.run_until_stalled(&mut bootstrap_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
+                responder, generic_sme_server, ..
+            }))) => {
+                responder
+                .send(test_values.inspector.duplicate_vmo().unwrap())
+                .expect("Failed to send bootstrap result");
+                generic_sme_server.into_stream()
+            });
             // The original future should resolve into a response.
             assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+            assert_variant!(
+            exec.run_until_stalled(&mut generic_sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::Query {
+                responder
+            }))) => {
+                responder
+                .send(&fidl_sme::GenericSmeQuery {
+                    role: fidl_common::WlanMacRole::Client,
+                    sta_addr: sta_address,
+                })
+                .expect("Failed to send GenericSme.Query response");
+            });
+            assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
+
             assert_variant!(exec.run_until_stalled(&mut create_iface_fut),
             Poll::Ready(Ok(Ok(response))) => {
                 assert_eq!(Some(sme_assigned_iface_id), response.iface_id);
@@ -1841,12 +1927,12 @@ mod tests {
             NULL_ADDR,
             &iface_counter,
             &wlandevicemonitor_config::Config { wep_supported: true, wpa1_supported: true },
-            ifaces_tree,
+            &ifaces_tree,
         );
         let mut fut = pin!(fut);
         assert_variant!(
             exec.run_until_stalled(&mut fut),
-            Poll::Ready(Err(zx::Status::NOT_FOUND)),
+            Poll::Ready(Err(_)),
             "expected failure on invalid PHY"
         );
     }
@@ -1878,7 +1964,7 @@ mod tests {
         let destroy_fut = super::destroy_iface(
             &test_values.phys,
             &test_values.ifaces,
-            test_values.ifaces_tree,
+            &test_values.ifaces_tree,
             42,
         );
         let mut destroy_fut = pin!(destroy_fut);
@@ -1907,7 +1993,7 @@ mod tests {
         let destroy_fut = super::destroy_iface(
             &test_values.phys,
             &test_values.ifaces,
-            test_values.ifaces_tree,
+            &test_values.ifaces_tree,
             42,
         );
         let mut destroy_fut = pin!(destroy_fut);
@@ -1939,7 +2025,7 @@ mod tests {
         let destroy_fut = super::destroy_iface(
             &test_values.phys,
             &test_values.ifaces,
-            test_values.ifaces_tree,
+            &test_values.ifaces_tree,
             42,
         );
         let mut destroy_fut = pin!(destroy_fut);
@@ -1977,7 +2063,7 @@ mod tests {
         let fut = super::destroy_iface(
             &test_values.phys,
             &test_values.ifaces,
-            test_values.ifaces_tree,
+            &test_values.ifaces_tree,
             43,
         );
         let mut fut = pin!(fut);
@@ -2003,7 +2089,7 @@ mod tests {
         let fut = super::destroy_iface(
             &test_values.phys,
             &test_values.ifaces,
-            test_values.ifaces_tree,
+            &test_values.ifaces_tree,
             1,
         );
         let mut fut = pin!(fut);
@@ -2021,7 +2107,7 @@ mod tests {
         let destroy_fut = super::destroy_iface(
             &test_values.phys,
             &test_values.ifaces,
-            test_values.ifaces_tree,
+            &test_values.ifaces_tree,
             42,
         );
         let mut destroy_fut = pin!(destroy_fut);
@@ -2226,9 +2312,9 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let new_iface_fut = handle_new_iface_stream(
-            test_values.phys.clone(),
-            test_values.ifaces.clone(),
-            test_values.ifaces_tree,
+            &test_values.phys,
+            &test_values.ifaces,
+            &test_values.ifaces_tree,
             test_values.new_iface_stream,
         );
         let mut new_iface_fut = pin!(new_iface_fut);

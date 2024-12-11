@@ -152,26 +152,40 @@ fuchsia_test_component("test_manager_stress_test_component") {
 fuchsia_test_package("test_manager_stress_test") {
   test_components = [ ":test_manager_stress_test_component" ]
   deps = [ "test_data:debug_data_spam_test" ]
-
+  test_specs = {
+    # Don't run stress tests in parallel as that can put presure on system
+    # resources on smaller boards/devices.
+    parallel = 1
+  }
   subpackages = [ "//src/sys/test_manager:pkg" ]
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":test_manager_specified_realm_test",
-    ":test_manager_stress_test",
-    ":test_manager_test",
     "chromium_tests:tests",
     "diagnostics_tests:tests",
     "nonhermetic_packaged_tests:tests",
-    "test_data:debug-data-test",
-
-    # test_manager_test launches these tests.
-    # TODO(b/301507292): consider reorganizing these tests so that these dependencies
-    # are not necessary.
-    "//examples/components/routing/integration_tests/cpp:subpackaged_echo_integration_test_cpp",
-    "//examples/components/routing/integration_tests/rust:subpackaged_echo_integration_test_rust",
-    "//src/sys/test_runners/gtest/test_data:gtest-runner-example-tests",
   ]
+
+  # TODO: https://fxbug.dev/42068707: Ensure that these tests do not run
+  # when profile variant is selected. These tests add a use for
+  # fuchsia.debugdata.Publisher capability via debug for coverage variant,
+  # and profile variant adds a use for this capability via diagnostics
+  # dictionary, which results in duplicate use target protocol error.
+  if (!is_profile) {
+    deps += [
+      ":test_manager_specified_realm_test",
+      ":test_manager_stress_test",
+      ":test_manager_test",
+      "test_data:debug-data-test",
+
+      # test_manager_test launches these tests.
+      # TODO(b/301507292): consider reorganizing these tests so that these dependencies
+      # are not necessary.
+      "//examples/components/routing/integration_tests/cpp:subpackaged_echo_integration_test_cpp",
+      "//examples/components/routing/integration_tests/rust:subpackaged_echo_integration_test_rust",
+      "//src/sys/test_runners/gtest/test_data:gtest-runner-example-tests",
+    ]
+  }
 }

@@ -28,6 +28,7 @@ FUCHSIA_PLATFORMS_MAP = {
 # The downside is that code removed at HEAD (or NEXT or a recent stable API
 # level) will not be built.
 _TARGET_API_LEVEL = "HEAD"
+_TARGET_API_LEVEL_AS_U32 = 4292870144  # u32_for_fuchsia_api_level(_TARGET_API_LEVEL)
 
 def _cc_std_version_transition_impl(settings, attr):
     input_cpu = settings["//command_line_option:cpu"]
@@ -42,7 +43,7 @@ def _cc_std_version_transition_impl(settings, attr):
     ] + attr.extra_cxxopts
 
     copts = settings["//command_line_option:copt"] + [
-        "-ffuchsia-api-level=4292870144",
+        "-ffuchsia-api-level=%s" % _TARGET_API_LEVEL_AS_U32,
     ] + attr.extra_copts
 
     return {

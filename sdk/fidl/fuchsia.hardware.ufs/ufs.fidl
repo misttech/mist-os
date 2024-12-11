@@ -1,0 +1,88 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.hardware.ufs;
+
+using zx;
+
+/// Maximum supported size of the UPIU (UFS Protocol Information Unit)
+/// This includes the 12-byte basic header segment, transaction-specific fields,
+/// and the data segment.
+const MAX_UPIU_SIZE uint32 = 65600;
+
+@discoverable
+closed protocol Ufs {
+    /// Retrieves and returns the UFS Descriptor.
+    strict ReadDescriptor(struct {
+        descriptor Descriptor;
+    }) -> (struct {
+        data vector<uint8>:MAX_DESCRIPTOR_SIZE;
+    }) error QueryErrorCode;
+
+    /// Writes a UFS Descriptor.
+    strict WriteDescriptor(struct {
+        descriptor Descriptor;
+        data vector<uint8>:MAX_DESCRIPTOR_SIZE;
+    }) -> () error QueryErrorCode;
+
+    /// Reads a flag. A flag is a fixed size single byte value that represents a Boolean value.
+    strict ReadFlag(struct {
+        type Flag;
+    }) -> (struct {
+        value uint8;
+    }) error QueryErrorCode;
+
+    /// Sets a flag.
+    strict SetFlag(struct {
+        flag Flag;
+    }) -> (struct {
+        value uint8;
+    }) error QueryErrorCode;
+
+    /// Clears a flag.
+    strict ClearFlag(struct {
+        flag Flag;
+    }) -> (struct {
+        value uint8;
+    }) error QueryErrorCode;
+
+    /// Toggles a flag.
+    strict ToggleFlag(struct {
+        flag Flag;
+    }) -> (struct {
+        value uint8;
+    }) error QueryErrorCode;
+
+    /// Reads an attribute.
+    strict ReadAttribute(struct {
+        attr Attribute;
+    }) -> (struct {
+        value uint32;
+    }) error QueryErrorCode;
+
+    /// Writes an attribute.
+    strict WriteAttribute(struct {
+        attr Attribute;
+        value uint32;
+    }) -> () error QueryErrorCode;
+
+    /// Sends a UIC command to the UFS device.
+    strict SendUicCommand(UicCommand) -> (struct {
+        result uint32;
+    });
+
+    /// UFS transactions use UPIU packets with a fixed 12-byte header, transaction-specific fields,
+    /// possibly one or more extended header segments and zero or more data segments.
+    /// For direct construction and usage of UPIU packets, use this function.
+    /// The UPIU format is defined in UFS 3.1, section 10.6.
+    strict Request(struct {
+        request vector<uint8>:MAX_UPIU_SIZE;
+    }) -> (struct {
+        response vector<uint8>:MAX_UPIU_SIZE;
+    }) error zx.Status;
+};
+
+service Service {
+    device client_end:Ufs;
+};

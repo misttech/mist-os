@@ -68,14 +68,14 @@ pub async fn connect_to_accessor_selector(
             let Ok(moniker) = Moniker::try_from(component) else {
                 return Err(Error::invalid_accessor(s));
             };
-            connect_accessor::<ArchiveAccessorMarker>(&moniker, accessor_name, &query_proxy).await
+            connect_accessor::<ArchiveAccessorMarker>(&moniker, accessor_name, query_proxy).await
         }
         None => {
             let moniker = Moniker::try_from(ROOT_ARCHIVIST).unwrap();
             connect_accessor::<ArchiveAccessorMarker>(
                 &moniker,
                 ArchiveAccessorMarker::PROTOCOL_NAME,
-                &query_proxy,
+                query_proxy,
             )
             .await
         }

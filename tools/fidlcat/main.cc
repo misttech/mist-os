@@ -162,7 +162,7 @@ int ConsoleMain(int argc, const char* argv[]) {
 
   fidl_codec::LibraryReadError loader_err;
   fidl_codec::LibraryLoader loader(paths, &loader_err);
-  loader.ParseBuiltinSemantic();
+  loader.ParseBuiltinSemantics();
   if (loader_err.value != fidl_codec::LibraryReadError::kOk) {
     FX_LOGS(ERROR) << "Failed to load FIDL definitions. Some FIDL messages may not be decoded.";
   }

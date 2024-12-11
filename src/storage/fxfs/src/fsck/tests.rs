@@ -2190,7 +2190,10 @@ async fn test_encrypted_directory_has_unencrypted_child() {
         .await
         .expect_err("Fsck should fail");
 
-    assert_matches!(&test.errors()[..], [ FsckIssue::Error(FsckError::EncryptedDirectoryHasUnencryptedChild(sid, oid, oid_child)) ] if *sid == store_id && *oid == parent_oid && *oid_child == child_oid);
+    let expected = [FsckIssue::Error(FsckError::EncryptedDirectoryHasUnencryptedChild(
+        store_id, parent_oid, child_oid,
+    ))];
+    assert_eq!(&test.errors()[..], &expected);
 }
 
 #[fuchsia::test]

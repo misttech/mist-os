@@ -28,7 +28,7 @@ const RSN_EVENTS_LIMIT: usize = 50;
 const JOIN_SCAN_EVENTS_LIMIT: usize = 10;
 
 /// Display idle status str
-const IDLE_STR: &'static str = "idle";
+const IDLE_STR: &str = "idle";
 
 /// Wrapper struct SME inspection nodes
 pub struct SmeTree {
@@ -210,11 +210,11 @@ impl ClientSmeStatusNode {
         if status_str == IDLE_STR {
             if let Some(ClientSmeStatus::Connected(serving_ap_info)) = old_status {
                 match self.prev_connected_to.as_mut() {
-                    Some(prev_connected_to) => prev_connected_to.update(&serving_ap_info),
+                    Some(prev_connected_to) => prev_connected_to.update(serving_ap_info),
                     None => {
                         self.prev_connected_to = Some(ServingApInfoNode::new(
                             self.node.create_child("prev_connected_to"),
-                            &serving_ap_info,
+                            serving_ap_info,
                         ));
                     }
                 }
@@ -240,10 +240,10 @@ impl ClientSmeStatusNode {
 
         match &new_status {
             ClientSmeStatus::Connecting(ssid) => match self.connecting_to.as_mut() {
-                Some(connecting_to) => connecting_to.update(&ssid),
+                Some(connecting_to) => connecting_to.update(ssid),
                 None => {
                     self.connecting_to =
-                        Some(ConnectingToNode::new(self.node.create_child("connecting_to"), &ssid));
+                        Some(ConnectingToNode::new(self.node.create_child("connecting_to"), ssid));
                 }
             },
             ClientSmeStatus::Connected(_) | ClientSmeStatus::Roaming(_) | ClientSmeStatus::Idle => {

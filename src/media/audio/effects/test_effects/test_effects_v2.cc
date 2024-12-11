@@ -9,9 +9,6 @@
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <map>
-#include <optional>
-#include <set>
 #include <string>
 
 using ASF = fuchsia_mediastreams::wire::AudioSampleFormat;
@@ -44,7 +41,7 @@ class TestEffectsV2::TestProcessor : public fidl::WireServer<fuchsia_audio_effec
                 size_t output_offset_bytes,
                 fidl::ServerEnd<fuchsia_audio_effects::Processor> server_end,
                 async_dispatcher_t* dispatcher)
-      : process_(process),
+      : process_(std::move(process)),
         binding_(fidl::BindServer(dispatcher, std::move(server_end), this,
                                   [](TestProcessor* impl, fidl::UnbindInfo info,
                                      fidl::ServerEnd<fuchsia_audio_effects::Processor> server_end) {
@@ -106,7 +103,7 @@ zx_status_t TestEffectsV2::AddEffect(TestEffectsV2::Effect effect) {
   FX_CHECK(effect.output_channels > 0);
 
   std::string name(effect.name);
-  if (effects_.count(name) > 0) {
+  if (effects_.contains(name)) {
     FX_LOGS(ERROR) << "effect already added: " << name;
     return ZX_ERR_ALREADY_EXISTS;
   }
@@ -144,7 +141,7 @@ void TestEffectsV2::HandleRequest(
 
 void TestEffectsV2::Create(CreateRequestView request, CreateCompleter::Sync& completer) {
   std::string name(request->name.get());
-  if (effects_.count(name) == 0) {
+  if (!effects_.contains(name)) {
     FX_LOGS(ERROR) << "effect not found: " << name;
     completer.ReplyError(ZX_ERR_NOT_FOUND);
     return;
@@ -153,41 +150,39 @@ void TestEffectsV2::Create(CreateRequestView request, CreateCompleter::Sync& com
   // Translate to a ProcessorConfiguration.
   auto& effect = effects_[name];
   fidl::Arena arena;
-  fuchsia_audio_effects::wire::ProcessorConfiguration config(arena);
+  auto config = fuchsia_audio_effects::wire::ProcessorConfiguration::Builder(arena);
 
   if (effect.max_frames_per_call > 0) {
-    config.set_max_frames_per_call(arena, effect.max_frames_per_call);
+    config.max_frames_per_call(effect.max_frames_per_call);
   }
   if (effect.block_size_frames > 0) {
-    config.set_block_size_frames(arena, effect.block_size_frames);
+    config.block_size_frames(effect.block_size_frames);
   }
 
   fidl::VectorView<fuchsia_audio_effects::wire::InputConfiguration> inputs(arena, 1);
-  inputs[0].Allocate(arena);
-  inputs[0].set_buffer(arena);
-  inputs[0].set_format(arena);
-  inputs[0].format().sample_format = ASF::kFloat;
-  inputs[0].format().channel_count = effect.input_channels;
-  inputs[0].format().frames_per_second = effect.frames_per_second;
-  inputs[0].format().channel_layout =
-      fuchsia_mediastreams::wire::AudioChannelLayout::WithPlaceholder(0);
+  auto input = fuchsia_audio_effects::wire::InputConfiguration::Builder(arena);
+  fuchsia_mediastreams::wire::AudioFormat input_format;
+  input_format.sample_format = ASF::kFloat;
+  input_format.channel_count = effect.input_channels;
+  input_format.frames_per_second = effect.frames_per_second;
+  input_format.channel_layout = fuchsia_mediastreams::wire::AudioChannelLayout::WithPlaceholder(0);
+  input.format(input_format);
 
   fidl::VectorView<fuchsia_audio_effects::wire::OutputConfiguration> outputs(arena, 1);
-  outputs[0].Allocate(arena);
-  outputs[0].set_buffer(arena);
-  outputs[0].set_format(arena);
-  outputs[0].format().sample_format = ASF::kFloat;
-  outputs[0].format().channel_count = effect.output_channels;
-  outputs[0].format().frames_per_second = effect.frames_per_second;
-  outputs[0].format().channel_layout =
-      fuchsia_mediastreams::wire::AudioChannelLayout::WithPlaceholder(0);
-  outputs[0].set_latency_frames(arena, effect.latency_frames);
-  outputs[0].set_ring_out_frames(arena, effect.ring_out_frames);
+  auto output = fuchsia_audio_effects::wire::OutputConfiguration::Builder(arena);
+  fuchsia_mediastreams::wire::AudioFormat output_format;
+  output_format.sample_format = ASF::kFloat;
+  output_format.channel_count = effect.output_channels;
+  output_format.frames_per_second = effect.frames_per_second;
+  output_format.channel_layout = fuchsia_mediastreams::wire::AudioChannelLayout::WithPlaceholder(0);
+  output.format(output_format);
+  output.latency_frames(effect.latency_frames);
+  output.ring_out_frames(effect.ring_out_frames);
 
   // Allocate buffers.
   // If not using in-place processing, put the buffers side-by-side in the same VMO.
-  auto& input_buffer = inputs[0].buffer();
-  auto& output_buffer = outputs[0].buffer();
+  fuchsia_mem::wire::Range input_buffer;
+  fuchsia_mem::wire::Range output_buffer;
 
   size_t buffer_size_frames = effect.max_frames_per_call > 0 ? effect.max_frames_per_call : 256;
   input_buffer.size = buffer_size_frames * effect.input_channels * sizeof(float);
@@ -206,8 +201,12 @@ void TestEffectsV2::Create(CreateRequestView request, CreateCompleter::Sync& com
   input_buffer.vmo = DupVmoOrDie(vmo, ZX_RIGHT_SAME_RIGHTS);
   output_buffer.vmo = DupVmoOrDie(vmo, ZX_RIGHT_SAME_RIGHTS);
 
-  config.set_inputs(fidl::ObjectView{arena, inputs});
-  config.set_outputs(fidl::ObjectView{arena, outputs});
+  input.buffer(std::move(input_buffer));
+  output.buffer(std::move(output_buffer));
+  inputs[0] = input.Build();
+  outputs[0] = output.Build();
+  config.inputs(fidl::ObjectView{arena, inputs});
+  config.outputs(fidl::ObjectView{arena, outputs});
 
   // Spawn a server to implement this processor.
   zx::channel local;
@@ -219,12 +218,13 @@ void TestEffectsV2::Create(CreateRequestView request, CreateCompleter::Sync& com
   auto server_end = fidl::ServerEnd<fuchsia_audio_effects::Processor>{std::move(local)};
   auto client_end = fidl::ClientEnd<fuchsia_audio_effects::Processor>{std::move(remote)};
 
-  config.set_processor(std::move(client_end));
+  config.processor(std::move(client_end));
+  auto processor_config = config.Build();
   processors_.insert(std::make_unique<TestProcessor>(effect.process, std::move(vmo),
                                                      buffer_size_bytes, output_buffer.offset,
                                                      std::move(server_end), dispatcher_));
 
-  completer.ReplySuccess(std::move(config));
+  completer.ReplySuccess(processor_config);
 }
 
 }  // namespace media::audio

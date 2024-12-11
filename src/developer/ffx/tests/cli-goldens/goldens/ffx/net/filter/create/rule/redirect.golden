@@ -14,25 +14,13 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "min-dst-port"
+          "arg_name": "dst-port"
         }
       },
       "optionality": "optional",
-      "long": "--min-dst-port",
+      "long": "--dst-port",
       "short": null,
-      "description": "the minimum destination port used to rewrite the packet (optional)",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "max-dst-port"
-        }
-      },
-      "optionality": "optional",
-      "long": "--max-dst-port",
-      "short": null,
-      "description": "the maximum destination port used to rewrite the packet (optional)",
+      "description": "the destination port range used to rewrite the packet (optional)",
       "hidden": false
     }
   ],

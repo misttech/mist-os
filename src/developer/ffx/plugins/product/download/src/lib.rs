@@ -198,10 +198,23 @@ pub async fn preprocess_cmd<I: structured_ui::Interface>(
     .cloned()
     .collect::<Vec<_>>();
 
+    if products.len() == 0 {
+        let version_msg = if let Some(ver) = &cmd.version {
+            format!(" at version {ver}")
+        } else {
+            format!(" at latest version")
+        };
+
+        return_user_error!(
+            "No product bundle {version_msg} found for {}.\
+        Use ffx product list to list available product bundles.",
+            cmd.manifest_url
+        )
+    }
     if products.len() != 1 {
         return_user_error!(
-            "Expected a single product entry while trying to download a product by name, found {}",
-            products.len()
+            "Expected a single product entry while trying to download a product by name, found {} {:?}",
+            products.len(), products
         );
     }
 

@@ -58,15 +58,11 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
             builder.set_config_capability("fuchsia.virtcon.KeyMap", Config::new_void())?;
         }
         builder.set_config_capability("fuchsia.virtcon.KeyRepeat", Config::new_void())?;
-        if let Some(rounded_corners) = context.board_info.platform.graphics.display.rounded_corners
-        {
-            builder.set_config_capability(
-                "fuchsia.virtcon.RoundedCorners",
-                Config::new(ConfigValueType::Bool, rounded_corners.into()),
-            )?;
-        } else {
-            builder.set_config_capability("fuchsia.virtcon.RoundedCorners", Config::new_void())?;
-        }
+        let rounded_corners = context.board_info.platform.graphics.display.rounded_corners;
+        builder.set_config_capability(
+            "fuchsia.virtcon.RoundedCorners",
+            Config::new(ConfigValueType::Bool, rounded_corners.into()),
+        )?;
         builder.set_config_capability("fuchsia.virtcon.ScrollbackRows", Config::new_void())?;
 
         Ok(())

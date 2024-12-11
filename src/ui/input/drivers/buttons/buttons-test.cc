@@ -133,6 +133,14 @@ class FakeSystemActivityGovernor
     completer.Reply(std::move(wake_lease_remote));
   }
 
+  void RegisterListener(RegisterListenerRequest& request,
+                        RegisterListenerCompleter::Sync& completer) override {
+    listener_client_.Bind(std::move(request.listener().value()),
+                          fdf::Dispatcher::GetCurrent()->async_dispatcher());
+    listener_client_->OnSuspendStarted().Then([this](auto unused) { on_suspend_started_ = true; });
+    completer.Reply();
+  }
+
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     FDF_LOG(ERROR, "unexpected call to %s", name.c_str());
   }
@@ -144,6 +152,8 @@ class FakeSystemActivityGovernor
 
  private:
   std::vector<zx::eventpair> wake_leases_;
+  bool on_suspend_started_ = false;
+  fidl::Client<fuchsia_power_system::ActivityGovernorListener> listener_client_;
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
   bool has_wake_lease_been_taken_ = false;
 };

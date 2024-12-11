@@ -70,11 +70,13 @@ static int StartAudioCore(const fxl::CommandLine& cl) {
       profile_provider.GetFidlRequestHandler());
 
   context->threading_model().RunAndJoinAllThreads();
-  return 0;
+
+  // In normal operation these threads run perpetually, so exiting represents an error condition.
+  return -1;
 }
 
 }  // namespace media::audio
 
 int main(int argc, const char** argv) {
-  media::audio::StartAudioCore(fxl::CommandLineFromArgcArgv(argc, argv));
+  return media::audio::StartAudioCore(fxl::CommandLineFromArgcArgv(argc, argv));
 }

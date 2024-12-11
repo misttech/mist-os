@@ -12,6 +12,7 @@ use netext::parse_address_parts;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::io::Write;
+use target_errors::FfxTargetError;
 
 #[derive(Debug, Serialize, JsonSchema)]
 pub enum CommandStatus {
@@ -86,9 +87,9 @@ pub async fn add_impl(
         break match res {
             Ok(()) => Ok(()),
             Err(e) => {
-                // target_connection_err @ errors::FfxError::TargetConnectionError { err, .. });
-                match e.downcast_ref::<errors::FfxError>() {
-                    Some(errors::FfxError::TargetConnectionError { err, .. }) => {
+                // target_connection_err @ target_errors::FfxTargetError::TargetConnectionError { err, .. });
+                match e.downcast_ref::<FfxTargetError>() {
+                    Some(FfxTargetError::TargetConnectionError { err, .. }) => {
                         // This is just copied from ffx/lib/target/src/ssh_connector.rs
                         // This is, unfortunately, an artifact of having to convert rust errors into FIDL
                         // for the error message response from the daemon.

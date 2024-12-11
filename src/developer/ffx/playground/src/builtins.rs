@@ -643,7 +643,7 @@ mod test {
     #[fuchsia::test]
     async fn req() {
         Test::test(format!(
-            "open /test | req \\i _ @Clone {{ flags: {}, object: $i }}",
+            "open /test | req \\i _ @DeprecatedClone {{ flags: {}, object: $i }}",
             fio::OpenFlags::DESCRIBE.bits()
         ))
         .with_fidl()

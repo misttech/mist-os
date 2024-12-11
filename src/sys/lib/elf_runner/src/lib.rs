@@ -451,9 +451,18 @@ impl ElfRunner {
                 .expect("failed to set process as critical");
         }
 
+        let pid = process.get_koid().map_err(StartComponentError::ProcessGetKoidFailed)?.raw_koid();
+
         // Add process ID to the runtime dir.
-        runtime_dir.add_process_id(
-            process.get_koid().map_err(StartComponentError::ProcessGetKoidFailed)?.raw_koid(),
+        runtime_dir.add_process_id(pid);
+
+        fuchsia_trace::instant!(
+            c"component:start",
+            c"elf",
+            fuchsia_trace::Scope::Thread,
+            "moniker" => format!("{}", moniker).as_str(),
+            "url" => resolved_url.as_str(),
+            "pid" => pid
         );
 
         // Add process start time to the runtime dir.

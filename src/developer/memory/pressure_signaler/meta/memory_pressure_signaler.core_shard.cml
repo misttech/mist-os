@@ -25,6 +25,11 @@
             to: "#memory_pressure_signaler",
         },
         {
+            protocol: "fuchsia.feedback.CrashReporter",
+            from: "#feedback",
+            to: "#memory_pressure_signaler",
+        },
+        {
             directory: "config-data",
             from: "parent",
             to: "#memory_pressure_signaler",

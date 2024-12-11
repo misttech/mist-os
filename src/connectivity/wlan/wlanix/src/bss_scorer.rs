@@ -67,10 +67,7 @@ impl BssScorerInner {
             timestamp: now,
             is_credential_rejected: connect_result.is_credential_rejected,
         };
-        self.recent_connect_failures
-            .entry(bssid)
-            .or_insert_with(|| VecDeque::new())
-            .push_back(failure);
+        self.recent_connect_failures.entry(bssid).or_default().push_back(failure);
     }
 
     pub fn score_bss(&mut self, bss_description: &BssDescription) -> i16 {

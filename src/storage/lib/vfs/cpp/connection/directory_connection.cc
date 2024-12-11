@@ -99,13 +99,19 @@ void DirectoryConnection::Unbind() {
     binding_->Unbind();
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void DirectoryConnection::DeprecatedClone(DeprecatedCloneRequestView request,
+                                          DeprecatedCloneCompleter::Sync& completer) {
+#else
 void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
-  Connection::NodeClone(request->flags, VnodeProtocol::kDirectory, std::move(request->object));
+#endif
+  Connection::NodeCloneDeprecated(request->flags, VnodeProtocol::kDirectory,
+                                  std::move(request->object));
 }
 
 void DirectoryConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
-  Connection::NodeClone2(fio::Flags::kProtocolDirectory | fs::internal::RightsToFlags(rights()),
-                         request->request.TakeChannel());
+  Connection::NodeClone(fio::Flags::kProtocolDirectory | fs::internal::RightsToFlags(rights()),
+                        request->request.TakeChannel());
 }
 
 void DirectoryConnection::Close(CloseCompleter::Sync& completer) {

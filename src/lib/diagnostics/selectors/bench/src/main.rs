@@ -4,20 +4,18 @@
 
 use fuchsia_criterion::criterion::{self, Criterion};
 use fuchsia_criterion::FuchsiaCriterion;
-
 use selectors::FastError;
-use std::mem;
 use std::time::Duration;
+use std::{fmt, mem};
 
 struct Case {
     name: &'static str,
     val: String,
 }
 
-impl Case {
-    #[allow(clippy::inherent_to_string, reason = "mass allow for https://fxbug.dev/381896734")]
-    fn to_string(&self) -> String {
-        format!("{}/{}", self.name, self.val.len())
+impl fmt::Display for Case {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.name, self.val.len())
     }
 }
 
@@ -82,12 +80,9 @@ fn bench_sanitize_string_for_selectors() -> criterion::Benchmark {
         .collect();
 
     for case in cases.into_iter() {
-        bench = bench.with_function(
-            format!("sanitize_string_for_selectors/{}", case.to_string()),
-            move |b| {
-                b.iter(|| criterion::black_box(selectors::sanitize_string_for_selectors(&case.val)))
-            },
-        );
+        bench = bench.with_function(format!("sanitize_string_for_selectors/{}", case), move |b| {
+            b.iter(|| criterion::black_box(selectors::sanitize_string_for_selectors(&case.val)))
+        });
     }
 
     bench
@@ -113,7 +108,7 @@ fn bench_parse_selector() -> criterion::Benchmark {
     });
 
     for case in cases.into_iter() {
-        bench = bench.with_function(format!("parse_selector/{}", case.to_string()), move |b| {
+        bench = bench.with_function(format!("parse_selector/{}", case), move |b| {
             b.iter(|| {
                 criterion::black_box(selectors::parse_selector::<FastError>(&case.val).unwrap())
             })

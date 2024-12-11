@@ -15,13 +15,12 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.diagnostics.RealArchiveAccessor" ],
-        },
-        {
-            protocol: [ "fuchsia.diagnostics.RealFeedbackArchiveAccessor" ],
-        },
-        {
-            protocol: [ "fuchsia.diagnostics.RealLegacyMetricsArchiveAccessor" ],
+            protocol: [
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.diagnostics.ArchiveAccessor.feedback",
+                "fuchsia.diagnostics.ArchiveAccessor.legacy_metrics",
+            ],
+            from: "parent/diagnostics-accessors",
         },
     ],
     expose: [

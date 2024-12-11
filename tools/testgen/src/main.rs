@@ -13,10 +13,7 @@ use anyhow::{bail, Error, Result};
 async fn main() -> Result<(), Error> {
     let flags: flags::Flags = argh::from_env();
 
-    // _ignore is an `impl Drop` that sets the log level back to its default
-    // value when dropped. We hold onto it to prevent that from happening until
-    // the program exits, and setup logging here rather than in each subcommand.
-    let _ignore = flags.setup_logging();
+    flags.setup_logging();
 
     let result = match flags.subcommand {
         flags::Subcommand::IntegrationTest(ref cmd) => cmd.run(&flags).await,

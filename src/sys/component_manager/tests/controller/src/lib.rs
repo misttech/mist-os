@@ -674,10 +674,5 @@ async fn get_exposed_dictionary() {
         .unwrap();
     let echo_cap = store.export(dest_id).await.unwrap().unwrap();
 
-    // TODO(https://fxbug.dev/340891837): The Open type here is a stopgap until we have updated the
-    // exposed dictionary to use other bedrock capability types. Since externally Open is just an
-    // opaque token, there's not much we can do with the capability in this test. But once we
-    // switch over exposed dictionary to use a different capability to represent protocols, we can
-    // update this test to exercise the capability.
-    assert_matches!(echo_cap, fsandbox::Capability::DirEntry(_));
+    assert_matches!(echo_cap, fsandbox::Capability::ConnectorRouter(_));
 }

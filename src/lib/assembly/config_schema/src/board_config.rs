@@ -246,54 +246,46 @@ impl Default for BoardKernelConfig {
 
 /// This struct defines supported Out of memory features.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct OOM {
     /// This option triggers eviction of file pages at the Warning pressure
     /// state, in addition to the default behavior, which is to evict at the
     /// Critical and OOM states.
-    #[serde(default)]
     pub evict_at_warning: bool,
 
     /// This option configures kernel eviction to run continually in the
     /// background to try and keep the system out of memory pressure, as opposed
     /// to triggering one-shot eviction only at memory pressure level
     /// transitions.
-    #[serde(default)]
     pub evict_continuous: bool,
 
     /// This option specifies the free-memory threshold at which the
     /// out-of-memory (OOM) thread will trigger an out-of-memory event and begin
     /// killing processes, or rebooting the system.
-    #[serde(default)]
     pub out_of_memory_mb: Option<u32>,
 
     /// This option specifies the free-memory threshold at which the
     /// out-of-memory (OOM) thread will trigger a critical memory pressure
     /// event, signaling that processes should free up memory.
-    #[serde(default)]
     pub critical_mb: Option<u32>,
 
     /// This option specifies the free-memory threshold at which the
     /// out-of-memory (OOM) thread will trigger a warning memory pressure event,
     /// signaling that processes should slow down memory allocations.
-    #[serde(default)]
     pub warning_mb: Option<u32>,
 }
 
 /// This struct defines platform configurations specified by board.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct PlatformConfig {
     /// Configure connectivity related features
-    #[serde(default)]
     pub connectivity: ConnectivityConfig,
 
     /// Configure development support related features
-    #[serde(default)]
     pub development_support: DevelopmentSupportConfig,
 
     /// Configure development support related features
-    #[serde(default)]
     pub graphics: GraphicsConfig,
 
     /// Sysmem board defaults. This can be overridden field-by-field by the same
@@ -302,13 +294,12 @@ pub struct PlatformConfig {
     /// We don't provide format_costs_persistent_fidl files via this struct, as
     /// a BoardInputBundle provides the files via the BoardProvidedConfig
     /// struct.
-    #[serde(default)]
     pub sysmem_defaults: BoardSysmemConfig,
 }
 
 /// This struct defines connectivity configurations.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct ConnectivityConfig {
     /// Configure network related features
     pub network: NetworkConfig,
@@ -316,7 +307,7 @@ pub struct ConnectivityConfig {
 
 /// This struct defines development support configurations.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct DevelopmentSupportConfig {
     /// Configure debug access port for specific SoC
     pub enable_debug_access_port_for_soc: Option<Arm64DebugDapSoc>,
@@ -324,7 +315,7 @@ pub struct DevelopmentSupportConfig {
 
 /// This struct defines network configurations.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct NetworkConfig {
     /// This option instructs netsvc to use only the device whose topological
     /// path ends with the option's value, with any wildcard `*` characters
@@ -337,7 +328,7 @@ pub struct NetworkConfig {
 
 /// This struct defines graphics configurations.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct GraphicsConfig {
     /// Configure display related features.
     pub display: DisplayConfig,
@@ -345,13 +336,13 @@ pub struct GraphicsConfig {
 
 /// This struct defines display configurations.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct DisplayConfig {
     /// The number of degrees to the rotate the screen display by.
     pub rotation: Option<u32>,
 
     /// Whether the display has rounded corners.
-    pub rounded_corners: Option<bool>,
+    pub rounded_corners: bool,
 }
 
 #[cfg(test)]

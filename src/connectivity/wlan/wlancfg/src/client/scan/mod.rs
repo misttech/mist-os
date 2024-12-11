@@ -341,6 +341,7 @@ impl ScanResultUpdate for LocationSensorUpdater {
     }
 }
 
+#[allow(clippy::ptr_arg, reason = "mass allow for https://fxbug.dev/381896734")]
 /// Converts sme::ScanResult to our internal BSS type, then adds it to a map.
 /// Only keeps the first unique instance of a BSSID
 fn bss_to_network_map(

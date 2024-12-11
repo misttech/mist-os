@@ -110,7 +110,7 @@ pub async fn create() -> Result<RealmInstance, Error> {
             Route::new()
                 .capability(
                     Capability::protocol_by_name("fuchsia.diagnostics.ArchiveAccessor")
-                        .as_("fuchsia.diagnostics.FeedbackArchiveAccessor"),
+                        .as_("fuchsia.diagnostics.ArchiveAccessor.feedback"),
                 )
                 .from(Ref::parent())
                 .to(&persistence),

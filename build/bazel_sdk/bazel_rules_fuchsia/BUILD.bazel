@@ -22,4 +22,11 @@ print_debug_info(
     name = "debug_info",
 )
 
+# All of the starlark files that are exported for documentation.
+filegroup(
+    name = "bzl_srcs",
+    srcs = glob(["*.bzl"]),
+    visibility = ["//fuchsia:__pkg__"],
+)
+
 # __END_FUCHSIA_SDK_INCLUDE__

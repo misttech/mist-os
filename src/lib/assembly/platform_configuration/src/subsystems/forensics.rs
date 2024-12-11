@@ -29,7 +29,7 @@ impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
 
         if *context.build_type != BuildType::Eng {
             if let Some(DeveloperOnlyOptions {
-                forensics_options: Some(ForensicsOptions { build_type_override: Some(_), .. }),
+                forensics_options: ForensicsOptions { build_type_override: Some(_), .. },
                 ..
             }) = context.developer_only_options
             {
@@ -43,10 +43,8 @@ impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
             BuildType::UserDebug => builder.platform_bundle("feedback_userdebug_config"),
             // The eng config is actually an absent override config. Apply override if specified.
             BuildType::Eng => {
-                if let Some(DeveloperOnlyOptions {
-                    forensics_options: Some(forensics_options),
-                    ..
-                }) = context.developer_only_options
+                if let Some(DeveloperOnlyOptions { forensics_options, .. }) =
+                    context.developer_only_options
                 {
                     match forensics_options.build_type_override {
                         Some(FeedbackBuildTypeConfig::EngWithUpload) => {
@@ -101,9 +99,9 @@ mod test {
     #[test]
     fn test_build_type_override() {
         let developer_only_options = DeveloperOnlyOptions {
-            forensics_options: Some(ForensicsOptions {
+            forensics_options: ForensicsOptions {
                 build_type_override: Some(FeedbackBuildTypeConfig::UserDebug),
-            }),
+            },
             ..Default::default()
         };
 
@@ -128,9 +126,9 @@ mod test {
     fn test_build_type_override_bails_on_user_builds() {
         // Build type overrides are only allowed for eng builds.
         let developer_only_options = DeveloperOnlyOptions {
-            forensics_options: Some(ForensicsOptions {
+            forensics_options: ForensicsOptions {
                 build_type_override: Some(FeedbackBuildTypeConfig::UserDebug),
-            }),
+            },
             ..Default::default()
         };
 
@@ -155,9 +153,9 @@ mod test {
     fn test_build_type_override_bails_on_userdebug_builds() {
         // Build type overrides are only allowed for eng builds.
         let developer_only_options = DeveloperOnlyOptions {
-            forensics_options: Some(ForensicsOptions {
+            forensics_options: ForensicsOptions {
                 build_type_override: Some(FeedbackBuildTypeConfig::EngWithUpload),
-            }),
+            },
             ..Default::default()
         };
 

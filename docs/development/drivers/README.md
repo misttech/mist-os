@@ -47,10 +47,10 @@ section.
 
   - [Write a minimal DFv2 driver][write-a-minimal-driver]
   - [Driver examples][driver-examples]
-  - [Composite nodes][composite-nodes]
 
 - Tutorials
 
+  - [Create a composite node][composite-nodes]
   - [Bind rules tutorial][bind-rules-tutorial]
   - [Bind library code generation tutorial][bind-library-code-generation-tutorial]
   - [FIDL tutorial][fidl-tutorial]
@@ -159,7 +159,7 @@ section.
 [migrate-from-banjo-to-fidl]: migration/migrate-from-banjo-to-fidl/overview.md
 [migrate-from-dfv1-to-dfv2]: migration/migrate-from-dfv1-to-dfv2/overview.md
 [fuchsia-driver-development]: developer_guide/driver-development.md
-[composite-nodes]: developer_guide/composite-node.md
+[composite-nodes]: developer_guide/create-a-composite-node.md
 [driver-runtime-api-guidelines]: developer_guide/driver-runtime-api-guidelines.md
 [drivers-rubric]: developer_guide/rubric.md
 [how-to-write-a-display-driver]: driver_guides/display/how_to_write.md

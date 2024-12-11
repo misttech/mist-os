@@ -65,10 +65,14 @@ static bool supports_huge_pages = false;
 using PCIDAllocator = id_allocator::IdAllocator<uint16_t, 4096, 1>;
 static lazy_init::LazyInit<PCIDAllocator> pcid_allocator;
 
-/* top level kernel page tables, initialized in start.S */
-volatile pt_entry_t pml4[NO_OF_PT_ENTRIES] __ALIGNED(PAGE_SIZE);
-volatile pt_entry_t pdp[NO_OF_PT_ENTRIES] __ALIGNED(PAGE_SIZE); /* temporary */
-volatile pt_entry_t pte[NO_OF_PT_ENTRIES] __ALIGNED(PAGE_SIZE);
+// The addresses of some page tables of interest, initialized in start.S.
+paddr_t root_page_table_phys;
+paddr_t id_map_lower_512gib_page_table_phys;
+paddr_t id_map_lower_1gib_page_table_phys;
+
+static pt_entry_t* root_page_table() {
+  return reinterpret_cast<pt_entry_t*>(paddr_to_physmap(root_page_table_phys));
+}
 
 /* top level pdp needed to map the -512GB..0 space */
 volatile pt_entry_t pdp_high[NO_OF_PT_ENTRIES] __ALIGNED(PAGE_SIZE);
@@ -85,9 +89,6 @@ volatile pt_entry_t linear_map_pdp[(64ULL * GB) / (2 * MB)] __ALIGNED(PAGE_SIZE)
 
 static constexpr uint64_t kNumKernelPageTables = (sizeof(linear_map_pdp) / PAGE_SIZE) + 4;
 
-/* which of the above variables is the top level page table */
-#define KERNEL_PT pml4
-
 // When this bit is set in the source operand of a MOV CR3, TLB entries and paging structure
 // caches for the active PCID may be preserved. If the bit is clear, entries will be cleared.
 // See Intel Volume 3A, 4.10.4.1
@@ -101,12 +102,6 @@ uint64_t kernel_relocated_base = KERNEL_BASE - KERNEL_LOAD_OFFSET;
 #else
 uint64_t kernel_relocated_base = 0xffffffff00000000;
 #endif
-
-/* kernel base top level page table in physical space */
-static const paddr_t kernel_pt_phys =
-    (vaddr_t)KERNEL_PT - (vaddr_t)__executable_start + KERNEL_LOAD_OFFSET;
-
-paddr_t x86_kernel_cr3() { return kernel_pt_phys; }
 
 /**
  * @brief  check if the virtual address is canonical
@@ -637,9 +632,9 @@ zx_status_t X86PageTableMmu::InitKernel(void* ctx,
                                         page_alloc_fn_t test_paf) TA_NO_THREAD_SAFETY_ANALYSIS {
   test_page_alloc_func_ = test_paf;
 
-  phys_ = kernel_pt_phys;
-  virt_ = (pt_entry_t*)X86_PHYS_TO_VIRT(kernel_pt_phys);
-  page_ = Pmm::Node().PaddrToPage(kernel_pt_phys);
+  phys_ = root_page_table_phys;
+  virt_ = (pt_entry_t*)X86_PHYS_TO_VIRT(root_page_table_phys);
+  page_ = Pmm::Node().PaddrToPage(root_page_table_phys);
   ctx_ = ctx;
   // These are all the page tables mapped in by start.S into the kernel aspace.
   pages_ = kNumKernelPageTables;
@@ -648,8 +643,9 @@ zx_status_t X86PageTableMmu::InitKernel(void* ctx,
 }
 
 zx_status_t X86PageTableMmu::AliasKernelMappings() {
+  auto upper_half = &(root_page_table()[NO_OF_PT_ENTRIES / 2]);
   // Copy the kernel portion of it from the master kernel pt.
-  memcpy(virt_ + NO_OF_PT_ENTRIES / 2, const_cast<pt_entry_t*>(&KERNEL_PT[NO_OF_PT_ENTRIES / 2]),
+  memcpy(virt_ + NO_OF_PT_ENTRIES / 2, reinterpret_cast<const void*>(upper_half),
          sizeof(pt_entry_t) * NO_OF_PT_ENTRIES / 2);
   return ZX_OK;
 }
@@ -962,12 +958,12 @@ void X86ArchVmAspace::ContextSwitch(X86ArchVmAspace* old_aspace, X86ArchVmAspace
     }
   } else {
     // Switching to the kernel aspace
-    LTRACEF_LEVEL(3, "switching to kernel aspace, pt %#" PRIxPTR "\n", kernel_pt_phys);
+    LTRACEF_LEVEL(3, "switching to kernel aspace, pt %#" PRIxPTR "\n", root_page_table_phys);
 
     // Write the kernel top level page table. Note: even when using PCID we do not
     // need to do anything special here since we are intrinsically loading PCID 0 with
     // the noflush bit clear which is fine since the kernel uses global pages.
-    arch::X86Cr3::Write(kernel_pt_phys);
+    arch::X86Cr3::Write(root_page_table_phys);
     if (old_aspace != nullptr) {
       [[maybe_unused]] uint32_t prev = old_aspace->active_cpus_.fetch_and(~cpu_bit);
       // Make sure we were actually previously running on this CPU
@@ -1028,12 +1024,15 @@ vaddr_t X86ArchVmAspace::PickSpot(vaddr_t base, vaddr_t end, vaddr_t align, size
 uint32_t arch_address_tagging_features() { return 0; }
 
 void x86_mmu_early_init() {
+  root_page_table_phys = arch::X86Cr3::Read().base();
+
   x86_mmu_percpu_init();
 
   x86_mmu_mem_type_init();
 
   // Unmap the lower identity mapping.
-  pml4[0] = 0;
+  root_page_table()[0] = 0;
+
   // As we are still in early init code we cannot use the general page invalidation mechanisms,
   // specifically ones that might use mp_sync_exec or kcounters, so just drop the entire tlb.
   x86_tlb_global_invalidate();
@@ -1077,33 +1076,39 @@ void x86_mmu_init() {
              g_max_vaddr_width, kX86VAddrBits);
 }
 
-// Takes an address, which must be the virtual address of one of the page tables in the kernels
-// data segment, and moves it from the WIRED to the MMU state.
-static void unwire_boot_mmu_page(uintptr_t addr) {
-  // Convert to a phys address.
-  paddr_t paddr = addr - reinterpret_cast<vaddr_t>(__executable_start) + KERNEL_LOAD_OFFSET;
-
-  // Lookup the page.
+// Updates the state of a table as MMU if WIRED, also updating the bookkeeping
+// around the present pages it contributes.
+static void unwire_boot_mmu_page(paddr_t paddr) {  // Lookup the page.
   vm_page_t* page = paddr_to_vm_page(paddr);
   ASSERT(page);
 
-  // Unwire and mark it as an MMU page.
-  pmm_unwire_page(page);
-  page->set_state(vm_page_state::MMU);
+  // Unwire and mark it as an MMU page, unless it already is marked as such.
+  if (page->state() == vm_page_state::WIRED) {
+    pmm_unwire_page(page);
+    page->set_state(vm_page_state::MMU);
+  } else {
+    ASSERT(page->state() == vm_page_state::MMU);
+  }
 
   page->mmu.num_mappings =
       X86PageTableMmu::CountPresentEntries(reinterpret_cast<pt_entry_t*>(paddr_to_physmap(paddr)));
 }
 
 void x86_mmu_prevm_init() {
+  // TODO(https://fxbug.dev/42164859): We are in a transitional state where
+  // some of the tables are stored statically (defined above).
+  auto static_table_paddr = [](volatile pt_entry_t* addr) {
+    return reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<vaddr_t>(__executable_start) +
+           KERNEL_LOAD_OFFSET;
+  };
   // Unwire and mark as in use by the MMU all the page tables that might be part of the kernel
-  // aspace as created by start.S.
-  unwire_boot_mmu_page(reinterpret_cast<uintptr_t>(pml4));
-  unwire_boot_mmu_page(reinterpret_cast<uintptr_t>(pdp));
-  unwire_boot_mmu_page(reinterpret_cast<uintptr_t>(pte));
-  unwire_boot_mmu_page(reinterpret_cast<uintptr_t>(pdp_high));
+  // aspace as created (or inherited) by start.S.
+  unwire_boot_mmu_page(root_page_table_phys);
+  unwire_boot_mmu_page(id_map_lower_512gib_page_table_phys);
+  unwire_boot_mmu_page(id_map_lower_1gib_page_table_phys);
+  unwire_boot_mmu_page(static_table_paddr(pdp_high));
   for (size_t i = 0; i < sizeof(linear_map_pdp) / sizeof(pt_entry_t); i += NO_OF_PT_ENTRIES) {
-    unwire_boot_mmu_page(reinterpret_cast<uintptr_t>(&linear_map_pdp[i]));
+    unwire_boot_mmu_page(static_table_paddr(&linear_map_pdp[i]));
   }
 
   // Use of PCID is detected late and on the boot cpu is this happens after x86_mmu_percpu_init

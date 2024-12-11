@@ -19,12 +19,41 @@ use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::auth::CAP_SYS_ADMIN;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::file_mode::{Access, FileMode};
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::{errno, error};
 use std::sync::Arc;
+
+bitflags::bitflags! {
+    /// The flags about which permissions should be checked when opening an FsNode. Used in the
+    /// `fs_node_permission()` hook.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct PermissionFlags: u32 {
+        const EXEC = 1 as u32;
+        const WRITE = 2 as u32;
+        const READ = 4 as u32;
+        const APPEND = 8 as u32;
+    }
+}
+
+impl From<Access> for PermissionFlags {
+    fn from(access: Access) -> Self {
+        // Note that `Access` doesn't have an `append` bit.
+        let mut permissions = PermissionFlags::empty();
+        if access.contains(Access::READ) {
+            permissions |= PermissionFlags::READ;
+        }
+        if access.contains(Access::WRITE) {
+            permissions |= PermissionFlags::WRITE;
+        }
+        if access.contains(Access::EXEC) {
+            permissions |= PermissionFlags::EXEC;
+        }
+        permissions
+    }
+}
 
 /// Executes the `hook` closure if SELinux is enabled, and has a policy loaded.
 /// If SELinux is not enabled, or has no policy loaded, then the `default` closure is executed,
@@ -303,6 +332,7 @@ pub fn check_fs_node_rmdir_access(
 /// Checks whether the `current_task` can rename the file or directory `moving_node`.
 /// If the rename replaces an existing node, `replaced_node` must contain a reference to the
 /// existing node.
+/// Corresponds to the `inode_rename()` LSM hook.
 pub fn check_fs_node_rename_access(
     current_task: &CurrentTask,
     old_parent: &FsNode,
@@ -310,6 +340,7 @@ pub fn check_fs_node_rename_access(
     new_parent: &FsNode,
     replaced_node: Option<&FsNode>,
 ) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_fs_node_rename_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_rename_access(
             security_server,
@@ -323,12 +354,27 @@ pub fn check_fs_node_rename_access(
 }
 
 /// Checks whether the `current_task` can read the symbolic link in `fs_node`.
+/// Corresponds to the `inode_readlink()` LSM hook.
 pub fn check_fs_node_read_link_access(
     current_task: &CurrentTask,
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_fs_node_read_link_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_read_link_access(security_server, current_task, fs_node)
+    })
+}
+
+/// Checks whether the `current_task` can access an inode.
+/// Corresponds to the `inode_permission()` LSM hook.
+pub fn fs_node_permission(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    permission_flags: PermissionFlags,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.fs_node_permission");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::fs_node_permission(security_server, current_task, fs_node, permission_flags)
     })
 }
 

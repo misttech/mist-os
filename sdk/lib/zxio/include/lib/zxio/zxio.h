@@ -55,14 +55,6 @@ __BEGIN_CDECLS
 ZXIO_EXPORT zx_status_t zxio_create(zx_handle_t handle, zxio_storage_t* storage);
 
 // Like zxio_create for channel objects expecting an incoming
-// fuchsia.io.Node/OnOpen event such as from zxio_open_async.
-//
-// Always consumes |handle|. |handle| must refer to a channel object.
-// TODO(https://fxbug.dev/324111518): Mark this function as deprecated once all callers have been
-// migrated to |zxio_create_with_on_representation|.
-ZXIO_EXPORT zx_status_t zxio_create_with_on_open(zx_handle_t handle, zxio_storage_t* storage);
-
-// Like zxio_create for channel objects expecting an incoming
 // fuchsia.io.Node/OnRepresentation event.
 //
 // |inout_attr|, if specified, will be populated with attributes requested and
@@ -412,37 +404,14 @@ ZXIO_EXPORT zx_status_t zxio_shutdown(zxio_t* io, zxio_shutdown_options_t option
 
 // Directory
 
-// Open a new zxio object relative to the given |directory| and initialize it
-// into |storage|.
-//
-// This call blocks on the remote server.
-//
-// See fuchsia.io/Directory.Open for the available |flags|.
-ZXIO_EXPORT zx_status_t zxio_open(zxio_t* directory, uint32_t flags, const char* path,
-                                  size_t path_len, zxio_storage_t* storage);
-
 // Open a new zxio object relative to the given |directory| and initialize it into |storage|.
 //
 // This call blocks on the remote server.
 //
 // See fuchsia.io/Directory.Open3 for precise semantics of |flags| and |options|.
-ZXIO_EXPORT zx_status_t zxio_open3(zxio_t* directory, const char* path, size_t path_len,
-                                   zxio_open_flags_t flags, const zxio_open_options_t* options,
-                                   zxio_storage_t* storage);
-
-// Open a new object relative to the given |directory|.
-//
-// The object's connection is represented as a |zx_handle_t|. The caller is
-// responsible for creating the |zx_handle_t|, which must be a channel. This
-// call does not block on the remote server.
-//
-// If the caller specifies the flag fuchsia.io.OPEN_FLAG_DESCRIBE then the
-// connection can be wrapped in a zxio object by calling
-// zxio_create_with_on_open().
-//
-// See fuchsia.io for the available |flags|.
-ZXIO_EXPORT zx_status_t zxio_open_async(zxio_t* directory, uint32_t flags, const char* path,
-                                        size_t path_len, zx_handle_t request);
+ZXIO_EXPORT zx_status_t zxio_open(zxio_t* directory, const char* path, size_t path_len,
+                                  zxio_open_flags_t flags, const zxio_open_options_t* options,
+                                  zxio_storage_t* storage);
 
 // Remove a file relative to the given directory. |flags| has the same values
 // and semantics as POSIX's unlinkat |flags| argument.

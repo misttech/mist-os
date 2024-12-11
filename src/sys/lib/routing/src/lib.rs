@@ -19,7 +19,9 @@ pub mod resolving;
 pub mod rights;
 pub mod walk_state;
 
-use crate::bedrock::request_metadata::{protocol_metadata, resolver_metadata, runner_metadata};
+use crate::bedrock::request_metadata::{
+    dictionary_metadata, protocol_metadata, resolver_metadata, runner_metadata,
+};
 use crate::capability_source::{
     CapabilitySource, ComponentCapability, ComponentSource, InternalCapability, VoidSource,
 };
@@ -38,12 +40,13 @@ use crate::walk_state::WalkState;
 use cm_rust::{
     Availability, CapabilityTypeName, ExposeConfigurationDecl, ExposeDecl, ExposeDeclCommon,
     ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
-    ExposeServiceDecl, ExposeSource, OfferConfigurationDecl, OfferDeclCommon, OfferDirectoryDecl,
-    OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl,
-    OfferSource, OfferStorageDecl, OfferTarget, RegistrationDeclCommon, RegistrationSource,
-    ResolverRegistration, RunnerRegistration, SourceName, StorageDecl, StorageDirectorySource,
-    UseConfigurationDecl, UseDecl, UseDeclCommon, UseDirectoryDecl, UseEventStreamDecl,
-    UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource, UseStorageDecl,
+    ExposeServiceDecl, ExposeSource, OfferConfigurationDecl, OfferDeclCommon, OfferDictionaryDecl,
+    OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl,
+    OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget,
+    RegistrationDeclCommon, RegistrationSource, ResolverRegistration, RunnerRegistration,
+    SourceName, StorageDecl, StorageDirectorySource, UseConfigurationDecl, UseDecl, UseDeclCommon,
+    UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl,
+    UseSource, UseStorageDecl,
 };
 use cm_types::{IterablePath, Name, RelativePath};
 use from_enum::FromEnum;
@@ -101,6 +104,7 @@ pub enum RouteRequest {
     OfferRunner(OfferRunnerDecl),
     OfferResolver(OfferResolverDecl),
     OfferConfig(OfferConfigurationDecl),
+    OfferDictionary(OfferDictionaryDecl),
 }
 
 impl From<UseDecl> for RouteRequest {
@@ -200,6 +204,7 @@ impl RouteRequest {
             OfferProtocol(decl) => Some(*decl.availability()),
             OfferConfig(decl) => Some(*decl.availability()),
             OfferStorage(decl) => Some(*decl.availability()),
+            OfferDictionary(decl) => Some(*decl.availability()),
 
             OfferService(_) | Resolver(_) | StorageBackingDirectory(_) | UseRunner(_) => None,
         }
@@ -277,6 +282,9 @@ impl std::fmt::Display for RouteRequest {
             }
             Self::OfferConfig(o) => {
                 write!(f, "config `{}`", o.target_name)
+            }
+            Self::OfferDictionary(o) => {
+                write!(f, "dictionary `{}`", o.target_name)
             }
         }
     }
@@ -433,6 +441,24 @@ where
             route_capability_inner::<Connector, _>(
                 &target_dictionary,
                 &offer_protocol_decl.target_name,
+                metadata,
+                target,
+            )
+            .await
+        }
+        RouteRequest::OfferDictionary(offer_dictionary_decl) => {
+            let target_dictionary =
+                get_dictionary_for_offer_target(target, &offer_dictionary_decl).await?;
+            let metadata = dictionary_metadata(offer_dictionary_decl.availability);
+            metadata
+                .insert(
+                    Name::new(crate::bedrock::with_policy_check::SKIP_POLICY_CHECKS).unwrap(),
+                    Capability::Data(Data::Uint64(1)),
+                )
+                .unwrap();
+            route_capability_inner::<Dict, _>(
+                &target_dictionary,
+                &offer_dictionary_decl.target_name,
                 metadata,
                 target,
             )

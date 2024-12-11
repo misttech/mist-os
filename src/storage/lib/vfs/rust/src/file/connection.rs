@@ -569,13 +569,19 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
     /// that operate on the connection-specific buffer.
     async fn handle_request(&mut self, req: fio::FileRequest) -> Result<ConnectionState, Error> {
         match req {
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::FileRequest::DeprecatedClone { flags, object, control_handle: _ } => {
+                trace::duration!(c"storage", c"File::DeprecatedClone");
+                self.handle_clone_deprecated(flags, object);
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::FileRequest::Clone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"File::Clone");
-                self.handle_clone(flags, object);
+                self.handle_clone_deprecated(flags, object);
             }
             fio::FileRequest::Clone2 { request, control_handle: _ } => {
                 trace::duration!(c"storage", c"File::Clone2");
-                self.handle_clone2(ServerEnd::new(request.into_channel()));
+                self.handle_clone(ServerEnd::new(request.into_channel()));
             }
             fio::FileRequest::Close { responder } => {
                 return Ok(ConnectionState::Closed(responder));
@@ -820,12 +826,24 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 .trace(trace::trace_future_args!(c"storage", c"File::Allocate"))
                 .await?;
             }
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            fio::FileRequest::GetFlags2 { responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            fio::FileRequest::SetFlags2 { flags: _, responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
             fio::FileRequest::_UnknownMethod { .. } => (),
         }
         Ok(ConnectionState::Alive)
     }
 
-    fn handle_clone(&mut self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {
+    fn handle_clone_deprecated(
+        &mut self,
+        flags: fio::OpenFlags,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
         flags.to_object_request(server_end).handle(|object_request| {
             let options =
                 inherit_rights_for_clone(self.options.to_io1(), flags)?.to_file_options()?;
@@ -847,7 +865,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         });
     }
 
-    fn handle_clone2(&mut self, server_end: ServerEnd<fio::FileMarker>) {
+    fn handle_clone(&mut self, server_end: ServerEnd<fio::FileMarker>) {
         let connection = match self.file.clone_connection(self.options) {
             Ok(file) => Self { scope: self.scope.clone(), file, options: self.options },
             Err(status) => {
@@ -1324,7 +1342,9 @@ mod tests {
         // Read from original proxy.
         let _: Vec<u8> = env.proxy.read(6).await.unwrap().map_err(Status::from_raw).unwrap();
         let (clone_proxy, remote) = fidl::endpoints::create_proxy::<fio::FileMarker>();
-        env.proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, remote.into_channel().into()).unwrap();
+        env.proxy
+            .deprecated_clone(fio::OpenFlags::CLONE_SAME_RIGHTS, remote.into_channel().into())
+            .unwrap();
         // Seek and read from clone_proxy.
         let _: u64 = clone_proxy
             .seek(fio::SeekOrigin::Start, 100)

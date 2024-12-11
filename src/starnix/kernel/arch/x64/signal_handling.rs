@@ -85,7 +85,7 @@ impl SignalStackFrame {
         siginfo: &SignalInfo,
         action: sigaction,
         stack_pointer: UserAddress,
-    ) -> SignalStackFrame {
+    ) -> Result<SignalStackFrame, Errno> {
         let fpstate_addr = (uapi::uaddr {
             addr: stack_pointer.ptr() as u64
                 + memoffset::offset_of!(SignalStackFrame, xstate) as u64,
@@ -127,12 +127,12 @@ impl SignalStackFrame {
             uc_sigmask: signal_state.mask().into(),
             ..Default::default()
         };
-        SignalStackFrame {
+        Ok(SignalStackFrame {
             context,
             siginfo_bytes: siginfo.as_siginfo_bytes(),
             restorer_address: action.sa_restorer.addr,
             xstate: get_xstate(extended_pstate),
-        }
+        })
     }
 
     pub fn as_bytes(&self) -> &[u8; SIG_STACK_SIZE] {
@@ -245,7 +245,7 @@ mod tests {
     use crate::mm::memory::MemoryObject;
     use crate::mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags};
     use crate::signals::testing::dequeue_signal_for_test;
-    use crate::signals::{restore_from_signal_handler, SignalDetail};
+    use crate::signals::{restore_from_signal_handler, KernelSignal, SignalDetail};
     use crate::task::Kernel;
     use crate::testing::*;
     use crate::vfs::FileWriteGuardRef;
@@ -535,6 +535,25 @@ mod tests {
         );
     }
 
+    #[::fuchsia::test]
+    async fn kernel_signal_handling() {
+        let (_kernel, mut current_task, mut locked) = create_kernel_and_task_with_stack();
+
+        current_task.write().enqueue_kernel_signal(KernelSignal::Freeze);
+
+        // Queue another user signal to make sure the kernel signal has the priority.
+        current_task.write().enqueue_signal(SignalInfo::new(
+            SIGUSR1,
+            SI_USER as i32,
+            SignalDetail::None,
+        ));
+
+        // Process the signal.
+        dequeue_signal_for_test(&mut locked, &mut current_task);
+
+        assert!(current_task.read().frozen);
+    }
+
     /// Creates a kernel and initial task, giving the task a stack.
     fn create_kernel_and_task_with_stack<'l>(
     ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
@@ -546,6 +565,7 @@ mod tests {
         let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
         let stack_base = current_task
             .mm()
+            .unwrap()
             .map_memory(
                 DesiredAddress::Any,
                 MemoryObject::from(

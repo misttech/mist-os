@@ -60,6 +60,7 @@ fn parse_elements(input: &[u8]) -> IResult<&[u8], Vec<Element>> {
     many0(complete(parse_element))(input)
 }
 
+#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 pub fn extract_elements(key_data: &[u8]) -> Result<Vec<Element>, Error> {
     match parse_elements(&key_data[..]) {
         Ok((_, elements)) => Ok(elements),

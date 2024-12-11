@@ -388,6 +388,7 @@ impl IfaceManagerService {
         Ok(())
     }
 
+    #[allow(clippy::needless_return, reason = "mass allow for https://fxbug.dev/381896734")]
     fn disconnect(
         &mut self,
         network_id: ap_types::NetworkIdentifier,
@@ -630,6 +631,16 @@ impl IfaceManagerService {
     }
 
     async fn handle_added_iface(&mut self, iface_id: u16) -> Result<(), Error> {
+        // Ensure that PhyManager is aware of the new interface.
+        {
+            let mut phy_manager = self.phy_manager.lock().await;
+            phy_manager.on_iface_added(iface_id).await?;
+        }
+
+        self.configure_new_iface(iface_id).await
+    }
+
+    async fn configure_new_iface(&mut self, iface_id: u16) -> Result<(), Error> {
         let iface_info =
             self.dev_monitor_proxy.query_iface(iface_id).await?.map_err(zx::Status::from_raw)?;
 
@@ -822,7 +833,7 @@ impl IfaceManagerService {
         // Resume client interfaces.
         drop(phy_manager);
         for iface_id in client_iface_ids {
-            if let Err(e) = self.handle_added_iface(iface_id).await {
+            if let Err(e) = self.configure_new_iface(iface_id).await {
                 error!("failed to resume client {}: {:?}", iface_id, e);
             };
         }
@@ -853,6 +864,7 @@ impl IfaceManagerService {
         Ok(receiver)
     }
 
+    #[allow(clippy::needless_return, reason = "mass allow for https://fxbug.dev/381896734")]
     fn stop_ap(
         &mut self,
         ssid: ap_types::Ssid,
@@ -1682,8 +1694,9 @@ mod tests {
             unimplemented!()
         }
 
-        async fn on_iface_added(&mut self, _iface_id: u16) -> Result<(), PhyManagerError> {
-            unimplemented!()
+        async fn on_iface_added(&mut self, iface_id: u16) -> Result<(), PhyManagerError> {
+            self.client_ifaces.push(iface_id);
+            Ok(())
         }
 
         fn on_iface_removed(&mut self, _iface_id: u16) {}
@@ -3906,7 +3919,7 @@ mod tests {
 
         {
             // Notify the IfaceManager of a new interface.
-            let fut = iface_manager.handle_added_iface(TEST_CLIENT_IFACE_ID);
+            let fut = iface_manager.configure_new_iface(TEST_CLIENT_IFACE_ID);
             let mut fut = pin!(fut);
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -4014,7 +4027,7 @@ mod tests {
 
         {
             // Notify the IfaceManager of a new interface.
-            let fut = iface_manager.handle_added_iface(TEST_AP_IFACE_ID);
+            let fut = iface_manager.configure_new_iface(TEST_AP_IFACE_ID);
             let mut fut = pin!(fut);
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -4089,7 +4102,7 @@ mod tests {
 
         {
             // Notify the IfaceManager of a new interface.
-            let fut = iface_manager.handle_added_iface(TEST_AP_IFACE_ID);
+            let fut = iface_manager.configure_new_iface(TEST_AP_IFACE_ID);
             let mut fut = pin!(fut);
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -4126,7 +4139,7 @@ mod tests {
 
         // Notify the IfaceManager of a new interface.
         {
-            let fut = iface_manager.handle_added_iface(TEST_CLIENT_IFACE_ID);
+            let fut = iface_manager.configure_new_iface(TEST_CLIENT_IFACE_ID);
             let mut fut = pin!(fut);
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -4170,7 +4183,7 @@ mod tests {
 
         // Notify the IfaceManager of a new interface.
         {
-            let fut = iface_manager.handle_added_iface(TEST_AP_IFACE_ID);
+            let fut = iface_manager.configure_new_iface(TEST_AP_IFACE_ID);
             let mut fut = pin!(fut);
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -4533,16 +4546,19 @@ mod tests {
         let test_values = test_setup(&mut exec);
 
         // Create an empty PhyManager and IfaceManager.
-        let phy_manager = phy_manager::PhyManager::new(
-            test_values.monitor_service_proxy.clone(),
-            recovery::lookup_recovery_profile(""),
-            false,
-            test_values.node.clone_weak(),
-            test_values.telemetry_sender.clone(),
-            test_values.recovery_sender,
-        );
+        let phy_manager = Arc::new(Mutex::new(FakePhyManager {
+            create_iface_ok: false,
+            destroy_iface_ok: false,
+            wpa3_iface: None,
+            set_country_ok: false,
+            country_code: None,
+            client_connections_enabled: false,
+            client_ifaces: vec![],
+            defects: vec![],
+            recovery_sender: None,
+        }));
         let iface_manager = IfaceManagerService::new(
-            Arc::new(Mutex::new(phy_manager)),
+            phy_manager.clone(),
             test_values.client_update_sender,
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
@@ -4573,7 +4589,19 @@ mod tests {
         // Run the service loop to begin processing the request.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        // Expect and interface query and notify that this is a client interface.
+        // Expect that the PhyManager has been notified of the interface.
+        {
+            let phy_manager_fut = phy_manager.lock();
+            let mut phy_manager_fut = pin!(phy_manager_fut);
+            assert_variant!(
+                exec.run_until_stalled(&mut phy_manager_fut),
+                Poll::Ready(phy_manager) => {
+                    assert!(phy_manager.client_ifaces.contains(&TEST_CLIENT_IFACE_ID));
+                }
+            );
+        }
+
+        // Expect an interface query and notify that this is a client interface.
         let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
         assert_variant!(
             poll_service_req(&mut exec, &mut monitor_service_fut),
@@ -5285,6 +5313,7 @@ mod tests {
         let expected_wait_times =
             [2, 4, 8, MAX_AUTO_CONNECT_RETRY_SECONDS, MAX_AUTO_CONNECT_RETRY_SECONDS];
 
+        #[allow(clippy::needless_range_loop, reason = "mass allow for https://fxbug.dev/381896734")]
         for i in 0..5 {
             {
                 let fut = handle_automatic_connection_selection_results(

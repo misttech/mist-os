@@ -64,7 +64,7 @@ mod arch32 {
     use starnix_uapi::errors::Errno;
     use starnix_uapi::file_mode::FileMode;
     use starnix_uapi::uapi::arch32;
-    use starnix_uapi::{error, robust_list_head, uapi};
+    use starnix_uapi::{errno, error, robust_list_head, uapi};
 
     pub fn sys_arch32_set_robust_list(
         _locked: &mut Locked<'_, Unlocked>,
@@ -154,7 +154,7 @@ mod arch32 {
         if !addr.is_lower_32bit() || length >= (1 << 32) {
             return error!(EINVAL);
         }
-        current_task.mm().unmap(addr, length)?;
+        current_task.mm().ok_or_else(|| errno!(EINVAL))?.unmap(addr, length)?;
         Ok(())
     }
 

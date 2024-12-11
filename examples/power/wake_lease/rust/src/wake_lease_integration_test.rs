@@ -46,6 +46,7 @@ impl ActivityGovernorListener {
 async fn wake_lease_blocks_system_suspend_until_release() -> Result<()> {
     let topology = connect_to_protocol::<fbroker::TopologyMarker>()?;
     let sag = connect_to_protocol::<fsystem::ActivityGovernorMarker>()?;
+    let boot_control = connect_to_protocol::<fsystem::BootControlMarker>()?;
 
     // Fetch the dependency token for ApplicationActivity.
     let power_elements = sag.get_power_elements().await?;
@@ -65,6 +66,7 @@ async fn wake_lease_blocks_system_suspend_until_release() -> Result<()> {
     )
     .await?;
     let activity_lease = lease_helper.lease().await?;
+    let _ = boot_control.set_boot_complete().await?;
 
     // Register a Listener on System Activity Governor to check for suspend callbacks.
     let (client, stream) = create_request_stream::<fsystem::ActivityGovernorListenerMarker>();

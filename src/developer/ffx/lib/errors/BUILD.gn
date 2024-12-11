@@ -10,17 +10,18 @@ rustc_library("lib") {
   edition = "2021"
   with_unit_tests = true
   sources = [ "src/lib.rs" ]
+
+  # There should be no dependencies on FIDL or anything to do with
+  # communicating with target devices.
+  assert_no_deps = [
+    "//src/developer/ffx/fidl:*",
+    "//src/lib/fidl/rust/fidl",
+  ]
+
   deps = [
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:thiserror",
   ]
-
-  if (is_host) {
-    deps += [
-      "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
-      "//src/lib/versioning/version-history/rust/data",
-    ]
-  }
 
   test_deps = [ "//third_party/rust_crates:assert_matches" ]
 }

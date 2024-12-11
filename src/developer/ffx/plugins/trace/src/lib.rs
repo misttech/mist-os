@@ -484,7 +484,16 @@ pub async fn trace(
             } else {
                 print_grid(
                     &mut writer,
-                    categories.into_iter().map(|category| category.name).collect(),
+                    categories
+                        .into_iter()
+                        .map(|category| {
+                            if !category.description.is_empty() {
+                                format!("{} ({})", category.name, category.description)
+                            } else {
+                                category.name
+                            }
+                        })
+                        .collect(),
                 )?;
             }
         }
@@ -1041,7 +1050,7 @@ mod tests {
         )
         .await;
         let output = test_buffers.into_stdout_str();
-        let want = "input  kernel  kernel:arch  kernel:ipc\n\n";
+        let want = "input (Input system)\nkernel (All kernel trace events)\nkernel:arch (Kernel arch events)\nkernel:ipc (Kernel ipc events)\n";
         assert_eq!(want, output);
     }
 

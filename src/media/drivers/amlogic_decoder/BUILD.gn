@@ -299,6 +299,7 @@ if (target_cpu == "arm64") {
     }
 
     fuchsia_driver_package("amlogic_decoder-package") {
+      export_to_bazel = true
       driver_components = [ ":amlogic_video_decoder-component" ]
       deps = [ ":amlogic_decoder_firmware" ]
     }

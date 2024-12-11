@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::test_topology;
+use crate::{test_topology, utils};
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_archivist_test::LogPuppetLogRequest;
-use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Severity};
+use fidl_fuchsia_diagnostics::Severity;
 use futures::{FutureExt, StreamExt};
 use realm_proxy_client::RealmProxyClient;
 use {fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync};
@@ -27,7 +27,7 @@ async fn component_selectors_filter_logs() {
     .await
     .expect("create base topology");
 
-    let accessor = realm.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let accessor = utils::connect_accessor(&realm, utils::ALL_PIPELINE).await;
 
     // Start a few components.
     for i in 0..3 {

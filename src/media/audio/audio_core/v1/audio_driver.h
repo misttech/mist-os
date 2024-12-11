@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_AUDIO_CORE_V1_AUDIO_DRIVER_H_
-#define SRC_MEDIA_AUDIO_AUDIO_CORE_V1_AUDIO_DRIVER_H_
+#ifndef FUCHSIA_SRC_MEDIA_AUDIO_AUDIO_CORE_V1_AUDIO_DRIVER_H_
+#define FUCHSIA_SRC_MEDIA_AUDIO_AUDIO_CORE_V1_AUDIO_DRIVER_H_
 
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
@@ -50,7 +50,7 @@ class AudioDriver {
   static constexpr zx::duration kDefaultShortCmdTimeout = zx::sec(2);
   static constexpr zx::duration kDefaultLongCmdTimeout = zx::sec(4);
 
-  enum class State {
+  enum class State : uint8_t {
     Uninitialized,
     MissingDriverInfo,
     Unconfigured,
@@ -149,7 +149,7 @@ class AudioDriver {
   std::shared_ptr<Clock> reference_clock() { return audio_clock_; }
   zx::duration turn_on_delay() const { return turn_on_delay_; }
 
-  // TODO(https://fxbug.dev/42065000): obey the flag when it is false. We behave as if it is always true.
+  // TODO(https://fxbug.dev/42065000): obey the flag when false. We behave as if it is always true.
   bool needs_cache_flush_or_invalidate() const { return needs_cache_flush_or_invalidate_; }
   std::vector<ChannelAttributes> channel_config() { return configured_channel_config_; }
 
@@ -304,4 +304,4 @@ class AudioDriver {
 
 }  // namespace media::audio
 
-#endif  // SRC_MEDIA_AUDIO_AUDIO_CORE_V1_AUDIO_DRIVER_H_
+#endif  // FUCHSIA_SRC_MEDIA_AUDIO_AUDIO_CORE_V1_AUDIO_DRIVER_H_

@@ -57,6 +57,11 @@ TEST(AlphaModeTest, ToAlphaModeWithFidlValue) {
   EXPECT_EQ(AlphaMode::kPremultiplied, transformation);
 }
 
+TEST(AlphaModeTest, ValueForLogging) {
+  EXPECT_EQ(static_cast<uint32_t>(fuchsia_hardware_display_types::wire::AlphaMode::kPremultiplied),
+            AlphaMode::kPremultiplied.ValueForLogging());
+}
+
 TEST(AlphaModeTest, BanjoConversionRoundtrip) {
   EXPECT_EQ(AlphaMode::kPremultiplied, AlphaMode(AlphaMode::kPremultiplied.ToBanjo()));
   EXPECT_EQ(AlphaMode::kDisable, AlphaMode(AlphaMode::kDisable.ToBanjo()));

@@ -32,6 +32,11 @@ fx-gen() {
   return 0
 }
 
+unset -f fx-regenerator
+function fx-regenerator {
+  return 0
+}
+
 TEST_clean_local_environment() {
   # This variable should be empty.
   BT_EXPECT_EMPTY "${devshell_lib_dir}"

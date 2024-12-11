@@ -49,20 +49,25 @@ void FileConnection::Unbind() {
     binding_->Unbind();
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void FileConnection::DeprecatedClone(DeprecatedCloneRequestView request,
+                                     DeprecatedCloneCompleter::Sync& completer) {
+#else
 void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
+#endif
   fio::OpenFlags inherited_flags = {};
   // The APPEND flag should be preserved when cloning a file connection.
   if (append()) {
     inherited_flags |= fio::OpenFlags::kAppend;
   }
-  Connection::NodeClone(request->flags | inherited_flags, VnodeProtocol::kFile,
-                        std::move(request->object));
+  Connection::NodeCloneDeprecated(request->flags | inherited_flags, VnodeProtocol::kFile,
+                                  std::move(request->object));
 }
 
 void FileConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
   const fio::Flags flags = fio::Flags::kProtocolFile | fs::internal::RightsToFlags(rights()) |
                            (append() ? fio::Flags::kFileAppend : fio::Flags());
-  Connection::NodeClone2(flags, request->request.TakeChannel());
+  Connection::NodeClone(flags, request->request.TakeChannel());
 }
 
 void FileConnection::Close(CloseCompleter::Sync& completer) {

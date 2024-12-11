@@ -125,45 +125,6 @@ zx_status_t fdio_namespace::WalkLocked(fbl::RefPtr<LocalVnode>* in_out_vn,
   }
 }
 
-// Open |path| relative to |vn|.
-//
-// |flags| and |mode| are passed to |fuchsia.io/Directory.Open| as |flags| and |mode|, respectively.
-//
-// If |flags| includes |fio::wire::OpenFlags::kDescribe|, this function reads the resulting
-// |fuchsia.io/Node.OnOpen| event from the newly created channel and creates an
-// appropriate object to interact with the remote object.
-//
-// Otherwise, this function creates a generic "remote" object.
-zx::result<fdio_ptr> fdio_namespace::OpenAtDeprecated(fbl::RefPtr<LocalVnode> vn,
-                                                      std::string_view path,
-                                                      fio::wire::OpenFlags flags) const {
-  {
-    fbl::AutoLock lock(&lock_);
-    zx_status_t status = WalkLocked(&vn, &path);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-  }
-
-  return std::visit(
-      fdio_internal::overloaded{
-          [&](LocalVnode::Local& l) -> zx::result<fdio_ptr> { return l.Open(); },
-          [&](LocalVnode::Intermediate& c) -> zx::result<fdio_ptr> { return CreateConnection(vn); },
-          [&](LocalVnode::Remote& s) -> zx::result<fdio_ptr> {
-            // If we're trying to mkdir over top of a mount point,
-            // the correct error is EEXIST
-            if ((flags & fio::wire::OpenFlags::kCreate) && path == ".") {
-              return zx::error(ZX_ERR_ALREADY_EXISTS);
-            }
-
-            // Active remote connections are immutable, so referencing remote here
-            // is safe. We don't want to do a blocking open under the ns lock.
-            return fdio_internal::open_async_deprecated(s.Connection(), path, flags);
-          },
-      },
-      vn->NodeType());
-}
-
 zx::result<fdio_ptr> fdio_namespace::OpenAt(fbl::RefPtr<LocalVnode> vn, std::string_view path,
                                             fio::Flags flags) const {
   {
@@ -182,7 +143,11 @@ zx::result<fdio_ptr> fdio_namespace::OpenAt(fbl::RefPtr<LocalVnode> vn, std::str
             if ((flags & fio::Flags::kFlagMustCreate) && path == ".") {
               return zx::error(ZX_ERR_ALREADY_EXISTS);
             }
-            return fdio_internal::open_async(s.Connection(), path, flags);
+            fdio_ptr io = fbl::MakeRefCounted<fdio_internal::remote>();
+            return zx::make_result(
+                zxio_open(s.Connection(), path.data(), path.length(), zxio_open_flags_t{flags},
+                          /*options*/ {}, &io->zxio_storage()),
+                io);
           },
       },
       vn->NodeType());

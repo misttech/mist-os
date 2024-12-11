@@ -4,7 +4,7 @@
 
 //! Analyze output from fuchsia_inspect_contrib's self profiling feature.
 
-use diagnostics_data::{DiagnosticsHierarchy, ExtendedMoniker, InspectData, Property};
+use diagnostics_data::{DiagnosticsHierarchy, ExtendedMoniker, InspectData};
 use std::collections::BTreeMap;
 
 /// If a duration used less than 0.5% of its parent's CPU time, it's probably not that interesting.
@@ -18,7 +18,6 @@ pub struct SelfProfilesReport {
 }
 
 impl SelfProfilesReport {
-    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn from_snapshot(data: &[InspectData]) -> Result<Vec<Self>, AnalysisError> {
         let mut summaries = vec![];
         for d in data {
@@ -42,7 +41,6 @@ impl SelfProfilesReport {
         None
     }
 
-    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     fn from_node(
         name: &ExtendedMoniker,
         node: &DiagnosticsHierarchy,
@@ -144,7 +142,6 @@ struct DurationSummaryBuilder {
 }
 
 impl DurationSummaryBuilder {
-    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     fn from_inspect(node: &DiagnosticsHierarchy) -> Result<Self, AnalysisError> {
         let mut children = BTreeMap::new();
         for child_node in &node.children {
@@ -159,7 +156,6 @@ impl DurationSummaryBuilder {
         Ok(Self { runtime, count: 0, children, location })
     }
 
-    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     fn from_inspect_recursive(
         node: &DiagnosticsHierarchy,
     ) -> Result<(String, Self), AnalysisError> {
@@ -377,7 +373,6 @@ impl std::fmt::Display for DurationSummary {
     }
 }
 
-#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 fn get_time_property(
     node: &DiagnosticsHierarchy,
     name: &'static str,
@@ -385,7 +380,7 @@ fn get_time_property(
     let property = node.get_property(name).ok_or(AnalysisError::MissingTime { name })?;
     property
         .number_as_int()
-        .ok_or_else(|| AnalysisError::WrongType { name, property: property.clone() })
+        .ok_or_else(|| AnalysisError::WrongType { name, property: property.name().to_string() })
 }
 
 #[derive(Debug)]
@@ -441,7 +436,7 @@ pub enum AnalysisError {
     #[error(
         "Profile duration inspect node's `{name}` property had a non-integer type: {property:?}"
     )]
-    WrongType { name: &'static str, property: Property<String> },
+    WrongType { name: &'static str, property: String },
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

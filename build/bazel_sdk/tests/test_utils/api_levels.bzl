@@ -11,4 +11,8 @@ def some_valid_numerical_api_level_as_string():
     _valid_numerical_api_level = int(INTERNAL_ONLY_VALID_TARGET_APIS[0].api_level)
     if _valid_numerical_api_level < 10 or _valid_numerical_api_level > 1000:
         fail("First API level '%d' is not in expected range." % _valid_numerical_api_level)
-    return str(_valid_numerical_api_level)
+
+    # TODO(https://fxbug.dev/354047162): Use the line below instead once filtering supported levels.
+    # return str(_valid_numerical_api_level)
+    # For now, return a fixed value.
+    return "22"

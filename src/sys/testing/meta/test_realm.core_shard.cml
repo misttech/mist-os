@@ -19,6 +19,11 @@
             to: "#testing",
         },
         {
+            dictionary: "diagnostics-accessors",
+            from: "parent",
+            to: "#testing",
+        },
+        {
             protocol: "fuchsia.fxfs.CryptManagement",
             from: "parent",
             to: "#testing",
@@ -28,9 +33,6 @@
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.kernel.VmexResource",

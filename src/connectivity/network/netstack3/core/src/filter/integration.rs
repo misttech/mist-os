@@ -6,7 +6,7 @@ use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor};
 use lock_order::relation::LockBefore;
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
-use netstack3_base::IpDeviceAddr;
+use netstack3_base::{IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext};
 use netstack3_device::DeviceId;
 use netstack3_filter::{FilterContext, FilterImpl, FilterIpContext, NatContext, State};
 use netstack3_ip::{FilterHandlerProvider, IpLayerIpExt, IpSasHandler, IpStateInner};
@@ -30,12 +30,18 @@ impl<'a, I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::Filt
 }
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
+impl<I: IpLayerIpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
     FilterIpContext<I, BC> for CoreCtx<'_, BC, L>
 {
     type NatCtx<'a> = CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::FilterState<I>>>;
 
-    fn with_filter_state_and_nat_ctx<O, F: FnOnce(&State<I, BC>, &mut Self::NatCtx<'_>) -> O>(
+    fn with_filter_state_and_nat_ctx<
+        O,
+        F: FnOnce(
+            &State<I, <Self as IpDeviceAddressIdContext<I>>::WeakAddressId, BC>,
+            &mut Self::NatCtx<'_>,
+        ) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
@@ -52,15 +58,33 @@ impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<
         &mut self,
         device_id: &Self::DeviceId,
         remote: Option<SpecifiedAddr<<I as Ip>::Addr>>,
-    ) -> Option<IpDeviceAddr<<I as Ip>::Addr>> {
-        IpSasHandler::<I, _>::get_local_addr_for_remote(self, device_id, remote)
+    ) -> Option<Self::AddressId> {
+        IpSasHandler::<I, _>::get_local_addr_id_for_remote(self, device_id, remote)
+    }
+
+    fn get_address_id(
+        &mut self,
+        device_id: &Self::DeviceId,
+        addr: IpDeviceAddr<<I as Ip>::Addr>,
+    ) -> Option<Self::AddressId> {
+        netstack3_ip::device::IpDeviceStateContext::<I, BC>::with_address_ids(
+            self,
+            device_id,
+            |mut addrs, _core_ctx| addrs.find(|assigned| IpAddressId::addr(assigned) == addr),
+        )
     }
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv4>>> FilterContext<BC>
     for CoreCtx<'_, BC, L>
 {
-    fn with_all_filter_state_mut<O, F: FnOnce(&mut State<Ipv4, BC>, &mut State<Ipv6, BC>) -> O>(
+    fn with_all_filter_state_mut<
+        O,
+        F: FnOnce(
+            &mut State<Ipv4, <Self as IpDeviceAddressIdContext<Ipv4>>::WeakAddressId, BC>,
+            &mut State<Ipv6, <Self as IpDeviceAddressIdContext<Ipv6>>::WeakAddressId, BC>,
+        ) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
@@ -70,7 +94,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv4>>
     }
 }
 
-impl<I: IpLayerIpExt, BT: BindingsTypes> DelegatedOrderedLockAccess<State<I, BT>>
+impl<I: IpLayerIpExt, BT: BindingsTypes> DelegatedOrderedLockAccess<State<I, I::Weak<BT>, BT>>
     for StackState<BT>
 {
     type Inner = IpStateInner<I, DeviceId<BT>, BT>;
@@ -82,5 +106,5 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> DelegatedOrderedLockAccess<State<I, BT>
 impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
     for crate::lock_ordering::FilterState<I>
 {
-    type Data = State<I, BT>;
+    type Data = State<I, I::Weak<BT>, BT>;
 }

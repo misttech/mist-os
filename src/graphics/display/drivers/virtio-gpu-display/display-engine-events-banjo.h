@@ -32,8 +32,7 @@ class DisplayEngineEventsBanjo final : public DisplayEngineEventsInterface {
   ~DisplayEngineEventsBanjo();
 
   // `display_engine_listener` may be null.
-  void RegisterDisplayEngineListener(
-      const display_engine_listener_protocol_t* display_engine_listener);
+  void SetListener(const display_engine_listener_protocol_t* display_engine_listener);
 
   // DisplayEngineEventsInterface:
   void OnDisplayAdded(const raw_display_info_t& display_info) override;

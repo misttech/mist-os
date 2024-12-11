@@ -53,6 +53,7 @@ using ::fuchsia_power_broker::Topology;
 using ::fuchsia_power_broker::TopologyAddElementResponse;
 using ::fuchsia_power_system::ActivityGovernor;
 using ::fuchsia_power_system::ApplicationActivityLevel;
+using ::fuchsia_power_system::BootControl;
 using ::fuchsia_power_system::ExecutionStateLevel;
 using ::fuchsia_power_system::PowerElements;
 
@@ -90,6 +91,20 @@ SyncClient<Protocol> Connect() {
   zx::result client_end = component::Connect<Protocol>();
   FX_CHECK(client_end.is_ok());
   return SyncClient(std::move(client_end).value());
+}
+
+bool SetBootComplete() {
+  zx::result boot_control_client = component::Connect<BootControl>();
+  if (!boot_control_client.is_ok()) {
+    FX_LOGS(ERROR) << "Synchronous error when connecting to the fuchsia.power.system/BootControl"
+                   << " protocol: " << boot_control_client.status_string();
+    return false;
+  }
+  auto status = fidl::WireCall(boot_control_client.value())->SetBootComplete();
+  if (!status.ok()) {
+    return false;
+  }
+  return true;
 }
 
 // Returns nullptr if there's an error connecting to required protocols.
@@ -244,6 +259,7 @@ TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
   // we'll drop the lease on ApplicationActivity and check that ExecutionState was held at the
   // kSuspending level (the level that WakeLease has an opportunistic dependency on).
   ElementWithLease aa_element = RaiseApplicationActivity();
+  ASSERT_TRUE(SetBootComplete());
   ASSERT_EQ(GetCurrentLevel(kApplicationActivity), ToUint(ApplicationActivityLevel::kActive));
 
   std::vector<ElementStatusEndpoint> status_endpoints = GetStatusEndpoints();

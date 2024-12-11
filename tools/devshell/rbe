@@ -304,7 +304,7 @@ function check_loas_subcommand() {
 }
 
 function ensure_loas() {
-  gcertstatus --check_remaining=2h > /dev/null || gcert
+  gcertstatus -check_ssh=false --check_remaining=2h > /dev/null || gcert
 }
 
 function ensure_oauth() {

@@ -121,6 +121,11 @@ async fn serve_generic_sme(
     }
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    clippy::type_complexity,
+    reason = "mass allow for https://fxbug.dev/381896734"
+)]
 pub fn create_sme(
     cfg: crate::Config,
     mlme_event_stream: MlmeEventStream,
@@ -262,6 +267,7 @@ where
     }
 }
 
+#[allow(clippy::extra_unused_lifetimes, reason = "mass allow for https://fxbug.dev/381896734")]
 async fn serve_fidl<
     'a,
     C: Clone,
@@ -285,6 +291,11 @@ async fn serve_fidl<
     }
 }
 
+#[allow(
+    clippy::extra_unused_lifetimes,
+    clippy::needless_return,
+    reason = "mass allow for https://fxbug.dev/381896734"
+)]
 async fn serve_fidl_endpoint<
     'a,
     C: Clone,
@@ -396,6 +407,7 @@ mod tests {
         exec: fasync::TestExecutor,
     }
 
+    #[allow(clippy::type_complexity, reason = "mass allow for https://fxbug.dev/381896734")]
     fn start_generic_sme_test(
         role: fidl_common::WlanMacRole,
     ) -> Result<

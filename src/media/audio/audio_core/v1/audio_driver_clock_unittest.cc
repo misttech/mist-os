@@ -23,7 +23,7 @@ const auto kBytesPerFrame = kFormat.bytes_per_frame();
 
 constexpr auto kRingBufferDuration = zx::msec(200);
 constexpr size_t kRingBufferFrames = 9600;  // 200 msec at 48k
-const size_t kHalfRingBufferBytes = kRingBufferFrames * kBytesPerFrame / 2;
+const uint32_t kHalfRingBufferBytes = kRingBufferFrames * kBytesPerFrame / 2;
 
 constexpr auto kStartTime = zx::time(0) + zx::msec(500);
 constexpr auto kNotificationDuration = zx::msec(100);
@@ -159,7 +159,8 @@ TEST_F(AudioDriverClockTest, NotificationsAdjustClockRateSame) {
 // Given notifications suggesting a device runs slow, its clock should be rate-adjusted downward
 TEST_F(AudioDriverClockTest, NotificationsAdjustClockRateDown) {
   // We should be at the ring buffer's halfway point, but we are not quite there yet
-  this->ValidateNotificationsTuneDriverClock(kNonMonotonicDomain, kHalfRingBufferBytes * 0.95);
+  this->ValidateNotificationsTuneDriverClock(kNonMonotonicDomain,
+                                             static_cast<uint32_t>(kHalfRingBufferBytes * 0.95));
 
   auto mono_to_ref = this->driver_->reference_clock()->to_clock_mono().Inverse();
   EXPECT_LT(mono_to_ref.subject_delta(), mono_to_ref.reference_delta());
@@ -168,7 +169,8 @@ TEST_F(AudioDriverClockTest, NotificationsAdjustClockRateDown) {
 // Given notifications suggesting a device runs fast, its clock should be rate-adjusted upward
 TEST_F(AudioDriverClockTest, NotificationsAdjustClockRateUp) {
   // We should be at the ring buffer's halfway point, but we are a little farther along
-  this->ValidateNotificationsTuneDriverClock(kNonMonotonicDomain, kHalfRingBufferBytes * 1.05);
+  this->ValidateNotificationsTuneDriverClock(kNonMonotonicDomain,
+                                             static_cast<uint32_t>(kHalfRingBufferBytes * 1.05));
 
   auto mono_to_ref = this->driver_->reference_clock()->to_clock_mono().Inverse();
   EXPECT_GT(mono_to_ref.subject_delta(), mono_to_ref.reference_delta());
@@ -177,7 +179,8 @@ TEST_F(AudioDriverClockTest, NotificationsAdjustClockRateUp) {
 // In the MONOTONIC domain, no position notifications are sent; thus no rate-adjustment can occur.
 // These values suggest the device runs fast, so if a notification is sent, the rate will change.
 TEST_F(AudioDriverClockTest, NotificationsDontAdjustMonotonicDomain) {
-  this->ValidateNotificationsTuneDriverClock(Clock::kMonotonicDomain, kHalfRingBufferBytes * 1.05);
+  this->ValidateNotificationsTuneDriverClock(Clock::kMonotonicDomain,
+                                             static_cast<uint32_t>(kHalfRingBufferBytes * 1.05));
 
   auto mono_to_ref = this->driver_->reference_clock()->to_clock_mono().Inverse();
   EXPECT_EQ(mono_to_ref.subject_delta(), mono_to_ref.reference_delta());

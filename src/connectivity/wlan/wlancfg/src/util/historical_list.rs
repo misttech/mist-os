@@ -39,6 +39,7 @@ where
         self.0.push_back(historical_data);
     }
 
+    #[allow(clippy::needless_return, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Retrieve list of entries with a time more recent than earliest_time, sorted from oldest to
     /// newest. May be empty.
     pub fn get_recent(&self, earliest_time: fasync::MonotonicInstant) -> Vec<T> {
@@ -46,6 +47,7 @@ where
         return self.0.iter().skip(i).cloned().collect();
     }
 
+    #[allow(clippy::needless_return, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Retrieve list of entries with a time before than latest_time, sorted from oldest to
     /// newest. May be empty.
     pub fn get_before(&self, latest_time: fasync::MonotonicInstant) -> Vec<T> {

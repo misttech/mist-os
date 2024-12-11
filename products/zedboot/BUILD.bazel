@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 load(
-    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "@rules_fuchsia//fuchsia:assembly.bzl",
     "BUILD_TYPES",
     "fuchsia_product",
     "fuchsia_product_configuration",

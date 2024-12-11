@@ -327,11 +327,13 @@ impl NetworkConfig {
         self.hidden_probability >= PROB_IS_HIDDEN
     }
 
+    #[allow(clippy::assign_op_pattern, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn update_seen_multiple_bss(&mut self, multi_bss: bool) {
         self.scan_stats.have_seen_multi_bss = self.scan_stats.have_seen_multi_bss || multi_bss;
         self.scan_stats.num_scans = self.scan_stats.num_scans + 1;
     }
 
+    #[allow(clippy::needless_return, reason = "mass allow for https://fxbug.dev/381896734")]
     /// We say that a BSS is likely a single-BSS network if only 1 BSS has ever been seen at a time
     /// for the network and there have been at least some number of scans for the network.
     pub fn is_likely_single_bss(&self) -> bool {
@@ -368,9 +370,13 @@ impl Credential {
     /// Returns:
     /// - an Open-Credential instance iff `bytes` is empty,
     /// - a Password-Credential in all other cases.
+    #[allow(clippy::doc_lazy_continuation, reason = "mass allow for https://fxbug.dev/381896734")]
     /// This function does not support reading PSK from bytes because the PSK byte length overlaps
+    #[allow(clippy::doc_lazy_continuation, reason = "mass allow for https://fxbug.dev/381896734")]
     /// with a valid password length. This function should only be used to load legacy data, where
+    #[allow(clippy::doc_lazy_continuation, reason = "mass allow for https://fxbug.dev/381896734")]
     /// PSK was not supported.
+    #[allow(clippy::doc_lazy_continuation, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Note: This function is of temporary nature to support legacy code.
     pub fn from_bytes(bytes: impl AsRef<[u8]> + Into<Vec<u8>>) -> Self {
         match bytes.as_ref().len() {

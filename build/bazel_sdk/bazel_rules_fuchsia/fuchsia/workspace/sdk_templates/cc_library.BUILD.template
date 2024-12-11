@@ -1,7 +1,7 @@
 # buildifier: disable=load-on-top
 # buildifier: disable=bzl-visibility
-load("@fuchsia_sdk//fuchsia/private:fuchsia_api_level.bzl", "verify_cc_head_api_level")
-load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("@{{rules_fuchsia}}//fuchsia/private:fuchsia_api_level.bzl", "verify_cc_head_api_level")
+load("@{{rules_fuchsia}}//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 cc_library(
     name = "{{name}}",

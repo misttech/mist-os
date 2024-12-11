@@ -10,9 +10,11 @@
 #include <third_party/modp_b64/modp_b64.h>
 
 #include "src/sys/fuzzing/common/module.h"
+#include "src/sys/fuzzing/common/sancov.h"
 
 namespace fuzzing {
 
+NO_SANITIZE_ALL
 zx_status_t Module::Import(uint8_t* counters, const uintptr_t* pcs, size_t num_pcs) {
   FX_CHECK(counters && pcs && num_pcs);
   if (auto status = counters_.Mirror(counters, num_pcs); status != ZX_OK) {
@@ -48,6 +50,7 @@ zx_status_t Module::Import(uint8_t* counters, const uintptr_t* pcs, size_t num_p
   return ZX_OK;
 }
 
+NO_SANITIZE_ALL
 zx_status_t Module::Share(zx::vmo* out) const {
   if (auto status = counters_.Share(out); status != ZX_OK) {
     FX_LOGS(WARNING) << "Failed to share module: " << zx_status_get_string(status);

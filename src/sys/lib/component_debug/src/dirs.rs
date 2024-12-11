@@ -163,7 +163,7 @@ pub async fn open_in_instance_dir(
 ) -> Result<(), OpenError> {
     let moniker_str = moniker.to_string();
     realm
-        .open(&moniker_str, dir_type.clone().into(), flags, mode, path, object.into())
+        .deprecated_open(&moniker_str, dir_type.clone().into(), flags, mode, path, object.into())
         .await?
         .map_err(|e| match e {
             fsys::OpenError::InstanceNotFound => OpenError::InstanceNotFound(moniker.clone()),
@@ -198,7 +198,7 @@ mod tests {
         // Ensure that connect_to_instance_protocol_at_path() passes the correct arguments to RealmQuery.
         let realm = spawn_stream_handler(move |realm_request| async move {
             match realm_request {
-                fsys::RealmQueryRequest::Open {
+                fsys::RealmQueryRequest::DeprecatedOpen {
                     moniker,
                     dir_type,
                     flags,
@@ -232,7 +232,7 @@ mod tests {
         // Ensure that open_instance_subdir_readable() passes the correct arguments to RealmQuery.
         let realm = spawn_stream_handler(move |realm_request| async move {
             match realm_request {
-                fsys::RealmQueryRequest::Open {
+                fsys::RealmQueryRequest::DeprecatedOpen {
                     moniker,
                     dir_type,
                     flags,

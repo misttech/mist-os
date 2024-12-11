@@ -150,6 +150,7 @@ fuchsia_driver_component("astro-component") {
 
 fuchsia_driver_package("package") {
   package_name = "astro"
+  export_to_bazel = true
   driver_components = [
     ":astro-component",
     "post-init",

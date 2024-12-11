@@ -61,7 +61,7 @@ closed protocol Device {
 
     /// Returns device quirks.
     strict GetQuirks() -> (struct {
-        quirks uint64;
+        quirks Quirk;
         dma_boundary_alignment uint64;
     });
 

@@ -541,7 +541,10 @@ impl<I: crate::transport::tcp::DualStackIpExt, BC: BindingsContext>
     UnlockedAccess<crate::lock_ordering::TcpIsnGenerator<I>> for StackState<BC>
 {
     type Data = IsnGenerator<BC::Instant>;
-    type Guard<'l> = &'l IsnGenerator<BC::Instant> where Self: 'l;
+    type Guard<'l>
+        = &'l IsnGenerator<BC::Instant>
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.transport.tcp_state::<I>().isn_generator
@@ -588,7 +591,10 @@ impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::TcpCounter
     for StackState<BC>
 {
     type Data = TcpCounters<I>;
-    type Guard<'l> = &'l TcpCounters<I> where Self: 'l;
+    type Guard<'l>
+        = &'l TcpCounters<I>
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         self.tcp_counters()
@@ -605,7 +611,10 @@ impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCounter
     for StackState<BC>
 {
     type Data = UdpCounters<I>;
-    type Guard<'l> = &'l UdpCounters<I> where Self: 'l;
+    type Guard<'l>
+        = &'l UdpCounters<I>
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         self.udp_counters()

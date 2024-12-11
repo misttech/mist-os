@@ -28,21 +28,23 @@ namespace {
 struct KTraceCategory {
   const char* name;
   uint32_t group;
+  const char* description;
 };
 
 constexpr KTraceCategory kGroupCategories[] = {
-    {"kernel", KTRACE_GRP_ALL},
-    {"kernel:meta", KTRACE_GRP_META},
-    {"kernel:lifecycle", KTRACE_GRP_LIFECYCLE},
-    {"kernel:sched", KTRACE_GRP_SCHEDULER},
-    {"kernel:tasks", KTRACE_GRP_TASKS},
-    {"kernel:ipc", KTRACE_GRP_IPC},
-    {"kernel:irq", KTRACE_GRP_IRQ},
-    {"kernel:probe", KTRACE_GRP_PROBE},
-    {"kernel:arch", KTRACE_GRP_ARCH},
-    {"kernel:syscall", KTRACE_GRP_SYSCALL},
-    {"kernel:vm", KTRACE_GRP_VM},
-    {"kernel:restricted", KTRACE_GRP_RESTRICTED},
+    {"kernel", KTRACE_GRP_ALL, "All ktrace categories"},
+    {"kernel:meta", KTRACE_GRP_META, "Thread and process names"},
+    {"kernel:lifecycle", KTRACE_GRP_LIFECYCLE, "<unused>"},
+    {"kernel:sched", KTRACE_GRP_SCHEDULER, "Process and thread scheduling information"},
+    {"kernel:tasks", KTRACE_GRP_TASKS, "<unused>"},
+    {"kernel:ipc", KTRACE_GRP_IPC, "Emit an event for each FIDL call"},
+    {"kernel:irq", KTRACE_GRP_IRQ, "Emit a duration event for interrupts"},
+    {"kernel:probe", KTRACE_GRP_PROBE, "Userspace defined zx_ktrace_write events"},
+    {"kernel:arch", KTRACE_GRP_ARCH, "Hypervisor vcpus"},
+    {"kernel:syscall", KTRACE_GRP_SYSCALL, "Emit an event for each syscall"},
+    {"kernel:vm", KTRACE_GRP_VM, "Virtual memory events such as paging, mappings, and accesses"},
+    {"kernel:restricted", KTRACE_GRP_RESTRICTED,
+     "Duration events for when restricted mode is entered"},
 };
 
 // Meta category to retain current contents of ktrace buffer.
@@ -107,7 +109,7 @@ std::vector<trace::KnownCategory> GetKnownCategories() {
   };
 
   for (const auto& category : kGroupCategories) {
-    known_categories.emplace_back(category.name, "");
+    known_categories.emplace_back(category.name, category.description);
   }
 
   return known_categories;

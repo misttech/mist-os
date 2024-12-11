@@ -33,9 +33,9 @@ namespace media::audio {
 namespace {
 
 // Used when the ReadLockContext is unused by the test.
-static media::audio::ReadableStream::ReadLockContext rlctx;
+media::audio::ReadableStream::ReadLockContext rlctx;
 
-enum class ClockMode { SAME, WITH_OFFSET, RATE_ADJUST };
+enum class ClockMode : uint8_t { SAME, WITH_OFFSET, RATE_ADJUST };
 
 constexpr uint32_t kDefaultNumChannels = 2;
 constexpr uint32_t kDefaultFrameRate = 48000;
@@ -65,7 +65,7 @@ class MixStageTest : public testing::ThreadingModelFixture {
                                             device_clock_);
   }
 
-  int64_t duration_to_frames(zx::duration delta) {
+  static int64_t duration_to_frames(zx::duration delta) {
     return kDefaultFormat.frames_per_ns().Scale(delta.to_nsecs());
   }
 
@@ -89,13 +89,13 @@ class MixStageTest : public testing::ThreadingModelFixture {
   void TestMixStageUniformFormats(ClockMode clock_mode);
   void TestMixStageSingleInput(ClockMode clock_mode);
 
-  void ValidateIsPointSampler(std::shared_ptr<Mixer> should_be_point) {
+  static void ValidateIsPointSampler(const std::shared_ptr<Mixer>& should_be_point) {
     EXPECT_LT(should_be_point->pos_filter_width(), Fixed(1))
         << "Mixer pos_filter_width " << should_be_point->pos_filter_width().raw_value()
         << " too large, should be less than " << Fixed(1).raw_value();
   }
 
-  void ValidateIsSincSampler(std::shared_ptr<Mixer> should_be_sinc) {
+  static void ValidateIsSincSampler(const std::shared_ptr<Mixer>& should_be_sinc) {
     EXPECT_GT(should_be_sinc->pos_filter_width(), Fixed(1))
         << "Mixer pos_filter_width " << should_be_sinc->pos_filter_width().raw_value()
         << " too small, should be greater than " << Fixed(1).raw_value();
@@ -107,7 +107,7 @@ class MixStageTest : public testing::ThreadingModelFixture {
   std::shared_ptr<Clock> clone_of_device_clock_;
 };
 
-TEST_F(MixStageTest, AddInput_MixerSelection) {
+TEST_F(MixStageTest, AddInputMixerSelection) {
   const Format kSameFrameRate =
       Format::Create(fuchsia::media::AudioStreamType{
                          .sample_format = fuchsia::media::AudioSampleFormat::SIGNED_16,
@@ -192,18 +192,25 @@ TEST_F(MixStageTest, AddInput_MixerSelection) {
                                                           Mixer::Resampler::SampleAndHold));
 }
 
-// TODO(https://fxbug.dev/42127037): Add tests to verify we can read from mix stages with unaligned frames.
+// TODO(https://fxbug.dev/42127037): Verify we can read from mix stages with unaligned frames.
 
 std::shared_ptr<Clock> MixStageTest::SetPacketFactoryWithOffsetAudioClock(
     zx::duration clock_offset, testing::PacketFactory& factory) {
   auto custom_clock =
-      clock::testing::CreateCustomClock({.start_val = zx::clock::get_monotonic() + clock_offset})
+      clock::testing::CreateCustomClock({
+                                            .start_val = zx::clock::get_monotonic() + clock_offset,
+                                        })
           .take_value();
 
   auto actual_offset = clock::testing::GetOffsetFromMonotonic(custom_clock).take_value();
 
-  int64_t seek_frame = round(
-      static_cast<double>(kDefaultFormat.frames_per_second() * actual_offset.get()) / ZX_SEC(1));
+  // This will not overflow int64, as long as actual_offset <= ~13 hours (for max FPS 192k).
+  EXPECT_LE(actual_offset.get(), ZX_HOUR(13));
+  int64_t product = kDefaultFormat.frames_per_second() * actual_offset.get();
+  int64_t sum = (product >= 0)                     // Here we implement the
+                    ? (product + (ZX_SEC(1) / 2))  // rounding ourselves.
+                    : (product - (ZX_SEC(1) / 2));
+  int64_t seek_frame = sum / ZX_SEC(1);
   factory.SeekToFrame(Fixed(seek_frame));
 
   return context().clock_factory()->CreateClientFixed(std::move(custom_clock));
@@ -271,7 +278,7 @@ void MixStageTest::TestMixStageTrim(ClockMode clock_mode) {
 }
 
 TEST_F(MixStageTest, Trim) { TestMixStageTrim(ClockMode::SAME); }
-TEST_F(MixStageTest, Trim_ClockOffset) { TestMixStageTrim(ClockMode::WITH_OFFSET); }
+TEST_F(MixStageTest, TrimClockOffset) { TestMixStageTrim(ClockMode::WITH_OFFSET); }
 
 void MixStageTest::TestMixStageUniformFormats(ClockMode clock_mode) {
   // Set timeline rate to match our format.
@@ -319,14 +326,14 @@ void MixStageTest::TestMixStageUniformFormats(ClockMode clock_mode) {
   //       -----------------------------------
 
   {
-    packet_queue1->PushPacket(packet_factory1.CreatePacket(0.1, zx::msec(1)));
-    packet_queue1->PushPacket(packet_factory1.CreatePacket(0.2, zx::msec(2)));
-    packet_queue1->PushPacket(packet_factory1.CreatePacket(0.3, zx::msec(3)));
+    packet_queue1->PushPacket(packet_factory1.CreatePacket(0.1f, zx::msec(1)));
+    packet_queue1->PushPacket(packet_factory1.CreatePacket(0.2f, zx::msec(2)));
+    packet_queue1->PushPacket(packet_factory1.CreatePacket(0.3f, zx::msec(3)));
   }
   {
-    packet_queue2->PushPacket(packet_factory2.CreatePacket(0.7, zx::msec(3)));
-    packet_queue2->PushPacket(packet_factory2.CreatePacket(0.5, zx::msec(2)));
-    packet_queue2->PushPacket(packet_factory2.CreatePacket(0.3, zx::msec(1)));
+    packet_queue2->PushPacket(packet_factory2.CreatePacket(0.7f, zx::msec(3)));
+    packet_queue2->PushPacket(packet_factory2.CreatePacket(0.5f, zx::msec(2)));
+    packet_queue2->PushPacket(packet_factory2.CreatePacket(0.3f, zx::msec(1)));
   }
 
   int64_t output_frame_start = 0;
@@ -384,7 +391,7 @@ void MixStageTest::TestMixStageUniformFormats(ClockMode clock_mode) {
 }
 
 TEST_F(MixStageTest, MixUniformFormats) { TestMixStageUniformFormats(ClockMode::SAME); }
-TEST_F(MixStageTest, MixUniformFormats_ClockOffset) {
+TEST_F(MixStageTest, MixUniformFormatsClockOffset) {
   TestMixStageUniformFormats(ClockMode::WITH_OFFSET);
 }
 
@@ -413,12 +420,12 @@ TEST_F(MixStageTest, MixFromRingBuffersSinc) {
 
   // Fill up the ring buffer with non-empty samples so we can observe them in the mix output.
   // The first half of the ring is one value, the second half is another.
-  constexpr float kRingBufferSampleValue1 = 0.5;
-  constexpr float kRingBufferSampleValue2 = 0.7;
+  constexpr float kRingBufferSampleValue1 = 0.5f;
+  constexpr float kRingBufferSampleValue2 = 0.7f;
   float* ring_buffer_samples = reinterpret_cast<float*>(ring_buffer_endpoints.writer->virt());
   for (size_t sample = 0; sample < kRingSizeSamples / 2; ++sample) {
     ring_buffer_samples[sample] = kRingBufferSampleValue1;
-    ring_buffer_samples[kRingSizeSamples / 2 + sample] = kRingBufferSampleValue2;
+    ring_buffer_samples[(kRingSizeSamples / 2) + sample] = kRingBufferSampleValue2;
   }
 
   // Read the ring in two halves, each is assigned a different source value in the ring above.
@@ -545,9 +552,7 @@ void MixStageTest::TestMixStageSingleInput(ClockMode clock_mode) {
 }
 
 TEST_F(MixStageTest, MixSingleInput) { TestMixStageSingleInput(ClockMode::SAME); }
-TEST_F(MixStageTest, MixSingleInput_ClockOffset) {
-  TestMixStageSingleInput(ClockMode::WITH_OFFSET);
-}
+TEST_F(MixStageTest, MixSingleInputClockOffset) { TestMixStageSingleInput(ClockMode::WITH_OFFSET); }
 
 TEST_F(MixStageTest, MixMultipleInputs) {
   // Set timeline rate to match our format.
@@ -1111,16 +1116,16 @@ TEST_F(MixStagePositionTest, SourceDestPositionRelationship) {
   timeline_function_->Update(TimelineFunction(
       Fixed(2 * kDestFramesPerMix).raw_value(), zx::clock::get_monotonic().get(),
       TimelineRate(Fixed(kDefaultFormat.frames_per_second()).raw_value(), zx::sec(1).to_nsecs())));
-  mix_stage_->ReadLock(rlctx, Fixed(2 * kDestFramesPerMix), kDestFramesPerMix);
+  mix_stage_->ReadLock(rlctx, Fixed(2L * kDestFramesPerMix), kDestFramesPerMix);
   EXPECT_EQ(mixer().source_ref_clock_to_frac_source_frames_generation, 3u);
   EXPECT_EQ(state().next_source_frame(), long_running_source_pos + Fixed(2 * kDestFramesPerMix))
       << ffl::String::DecRational << state().next_source_frame();
 
-  EXPECT_EQ(state().next_dest_frame(), Fixed(3 * kDestFramesPerMix).Floor());
+  EXPECT_EQ(state().next_dest_frame(), Fixed(3L * kDestFramesPerMix).Floor());
 }
 
 // Verify that SourceInfo.source_pos_error is set to zero if less than one fractional frame.
-TEST_F(MixStagePositionTest, PosError_IgnoreOneFracFrame) {
+TEST_F(MixStagePositionTest, PosErrorIgnoreOneFracFrame) {
   {
     SCOPED_TRACE("position_error 0 frac frames");
     EXPECT_EQ(GetDurationErrorForFracFrameError(Fixed(0)).to_nsecs(), 0);
@@ -1148,7 +1153,7 @@ TEST_F(MixStagePositionTest, PosError_IgnoreOneFracFrame) {
 }
 
 // Verify that `source_pos_error` correctly rounds to a ns-based equivalent.
-TEST_F(MixStagePositionTest, PosError_RoundToNs) {
+TEST_F(MixStagePositionTest, PosErrorRoundToNs) {
   // Validate floor behavior without step size modulo/denominator present.
   {
     // Source position error 3 frac frames is 7.6 ns, rounds out to 8ns.
@@ -1173,7 +1178,7 @@ TEST_F(MixStagePositionTest, PosError_RoundToNs) {
 }
 
 // Verify that `source_pos_error` correctly incorporates `source_pos_modulo`.
-TEST_F(MixStagePositionTest, PosError_IncludePosModulo) {
+TEST_F(MixStagePositionTest, PosErrorIncludePosModulo) {
   // Validate floor behavior plus `source_pos_modulo/step_size_denominator` contribution
   {
     // Source position error 2 +56/100 frac frames is 6.51ns, rounds out to 7ns.

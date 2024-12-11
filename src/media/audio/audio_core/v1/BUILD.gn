@@ -140,13 +140,6 @@ source_set("audio_core_lib") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-
-  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
 source_set("audio_core_main") {
@@ -160,9 +153,6 @@ source_set("audio_core_main") {
     "//src/lib/fsl",
     "//zircon/system/ulib/trace-provider",
   ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 cc_test_executable("unittest_bin") {
@@ -230,13 +220,6 @@ cc_test_executable("unittest_bin") {
     "//third_party/googletest:gmock",
     "//zircon/system/ulib/fzl",
   ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-
-  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
 fuchsia_unittest_package("audio_core_v1_unittests") {

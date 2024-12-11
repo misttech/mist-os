@@ -5,6 +5,13 @@ library fuchsia.hardware.display;
 
 using fuchsia.images2;
 using fuchsia.hardware.display.types;
+using fuchsia.math;
+
+/// Attributes for a [`Mode`].
+///
+/// This type allows for the future expansion of `Mode` with binary attributes,
+/// such as whether a display mode is interlaced.
+type ModeFlags = flexible bits : uint32 {};
 
 /// Describes an operational mode for a display device attached to the system.
 ///
@@ -13,32 +20,22 @@ using fuchsia.hardware.display.types;
 /// that can be changed quickly, such as brightness and contrast, do not belong
 /// in a mode description.
 type Mode = struct {
-    /// Number of pixels on a horizontal line of the displayed image.
+    /// The dimensions of the displayed image, in pixels.
     ///
     /// This describes the image data sent to the display, which is also called
     /// the "active area" or "active pixels" in raster scan terminology. Despite
     /// the name, some of the "active pixels" may not actually be shown to the
     /// user, for example due to corners or notches.
-    horizontal_resolution uint32;
+    active_area fuchsia.math.SizeU;
 
-    /// Number of horizontal lines that make up a displayed image.
+    /// Number of images transmitted to the display in 1,000 seconds.
     ///
-    /// This describes the image data sent to the display, which is also called
-    /// the "active area" or "active pixels" in raster scan terminology. Despite
-    /// the name, some of the "active pixels" may not actually be shown to the
-    /// user, for example due to corners or notches.
-    vertical_resolution uint32;
+    /// This quantity is also known as the display's frame rate, or the
+    /// display's vertical refresh rate. The rate is measured in millihertz
+    /// (mHz).
+    refresh_rate_millihertz uint32;
 
-    /// Number of images transmitted to the display in 100 seconds.
-    ///
-    /// This is the display's vertical refresh rate, in centihertz (0.01 Hz).
-    refresh_rate_e2 uint32;
-
-    /// Bit field of mode attributes.
-    ///
-    /// This field is currently unused. It will be used for binary attributes,
-    /// such as whether a display mode is interlaced.
-    flags uint32;
+    flags ModeFlags;
 };
 
 /// Description for a display device attached to the system.

@@ -283,8 +283,6 @@ vk-sys = "0.7.0"
 askama = { version = "0.12.1", default-features = false, features = ["config"] }
 async-executor = "1.5.0"
 async-fs = "1.6.0"
-async-io = "1.12.0"
-async-net = "1.7.0"
 cargo_metadata = "0.18.1"
 crossterm = "0.19"
 easy-parallel = "3.1"
@@ -379,7 +377,6 @@ windows-targets-0_52_0 = { package = "windows-targets", path = "empty/windows-ta
 
 ### Forks: vendored crates whose code doesn't match the upstream version
 askama_derive = { path = "forks/askama_derive" }
-async-io = { path = "forks/async-io" }
 fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
 hound = { path = "forks/hound" }
@@ -465,12 +462,6 @@ rustflags = [ "--cfg=feature=\\\"folded_multiply\\\"" ]
 rustflags = []
 
 [gn.package.async-fs."1.6.0"]
-rustflags = []
-
-[gn.package.async-io."1.12.0"]
-rustflags = []
-
-[gn.package.async-net."1.7.0"]
 rustflags = []
 
 [gn.package.async-trait."0.1.71"]
@@ -650,7 +641,6 @@ deps = [
 
 [gn.package.mock-omaha-server."0.3.3".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
-  "//third_party/rust_crates:async-net",
   "//third_party/rust_crates:tokio",
 ]
 
@@ -709,9 +699,6 @@ group_visibility = { import = "//third_party/rust_crates/visibility.gni", variab
 visibility = ["//src/lib/fuchsia-sync", "//third_party/rust_crates:*"]
 
 [gn.package.parking_lot_core."0.9.9"]
-rustflags = []
-
-[gn.package.polling."2.4.0"]
 rustflags = []
 
 # "--cfg=use_fallback" is required in order to avoid using the unstable

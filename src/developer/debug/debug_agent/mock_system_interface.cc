@@ -4,6 +4,9 @@
 
 #include "src/developer/debug/debug_agent/mock_system_interface.h"
 
+#include "src/developer/debug/debug_agent/mock_component_manager.h"
+#include "src/developer/debug/debug_agent/mock_job_handle.h"
+
 namespace debug_agent {
 
 std::unique_ptr<JobHandle> MockSystemInterface::GetRootJob() const {
@@ -14,6 +17,17 @@ std::unique_ptr<BinaryLauncher> MockSystemInterface::GetLauncher() const {
   // Unimplemented in this mock.
   FX_NOTREACHED();
   return nullptr;
+}
+
+std::unique_ptr<JobHandle> MockSystemInterface::AddJob(
+    zx_koid_t koid, std::optional<debug_ipc::ComponentInfo> component_info) {
+  root_job_.AddChildJob(MockJobHandle(koid));
+
+  if (component_info) {
+    mock_component_manager().AddComponentInfo(koid, *component_info);
+  }
+
+  return this->GetJob(koid);
 }
 
 std::unique_ptr<MockSystemInterface> MockSystemInterface::CreateWithData() {
@@ -104,36 +118,36 @@ std::unique_ptr<MockSystemInterface> MockSystemInterface::CreateWithData() {
 
   auto system_interface = std::make_unique<MockSystemInterface>(std::move(root));
 
-  system_interface->mock_component_manager().component_info().emplace(
+  system_interface->mock_component_manager().AddComponentInfo(
       job1.GetKoid(),
       debug_ipc::ComponentInfo{.moniker = "/moniker",
                                .url = "fuchsia-pkg://devhost/package#meta/component.cm"});
 
-  system_interface->mock_component_manager().component_info().emplace(
+  system_interface->mock_component_manager().AddComponentInfo(
       job2.GetKoid(),
       debug_ipc::ComponentInfo{.moniker = "/a/long/generated_to_here/fixed/moniker",
                                .url = "fuchsia-pkg://devhost/test_package#meta/component2.cm"});
 
-  system_interface->mock_component_manager().component_info().emplace(
+  system_interface->mock_component_manager().AddComponentInfo(
       job3.GetKoid(), debug_ipc::ComponentInfo{.moniker = "a/generated/moniker:1000",
                                                .url = "fuchsia-boot:///url#meta/cm0.base.cm"});
-  system_interface->mock_component_manager().component_info().emplace(
+  system_interface->mock_component_manager().AddComponentInfo(
       job3.GetKoid(), debug_ipc::ComponentInfo{.moniker = "a/generated/moniker:1001",
                                                .url = "fuchsia-boot:///url#meta/cm1.cm"});
-  system_interface->mock_component_manager().component_info().emplace(
+  system_interface->mock_component_manager().AddComponentInfo(
       job3.GetKoid(), debug_ipc::ComponentInfo{.moniker = "a/generated/moniker:1002",
                                                .url = "fuchsia-boot:///url#meta/cm2.cm"});
-  system_interface->mock_component_manager().component_info().emplace(
+  system_interface->mock_component_manager().AddComponentInfo(
       job3.GetKoid(), debug_ipc::ComponentInfo{.moniker = "bootstrap/hosts:host-1",
                                                .url = "fuchsia-boot:///url#meta/host.cm"});
-  system_interface->mock_component_manager().component_info().emplace(
+  system_interface->mock_component_manager().AddComponentInfo(
       job4.GetKoid(), debug_ipc::ComponentInfo{.moniker = "/moniker/generated/root:test/driver",
                                                .url = "#meta/child.cm"});
-  system_interface->mock_component_manager().component_info().emplace(
+  system_interface->mock_component_manager().AddComponentInfo(
       job5.GetKoid(),
       debug_ipc::ComponentInfo{.moniker = "/some/moniker",
                                .url = "fuchsia-pkg://devhost/package#meta/component3.cm"});
-  system_interface->mock_component_manager().component_info().emplace(
+  system_interface->mock_component_manager().AddComponentInfo(
       job51.GetKoid(),
       debug_ipc::ComponentInfo{.moniker = "/some/other/moniker",
                                .url = "fuchsia-pkg://devhost/package#meta/component4.cm"});

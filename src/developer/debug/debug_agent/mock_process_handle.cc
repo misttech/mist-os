@@ -31,8 +31,10 @@ debug::Status MockProcessHandle::Kill() { return kill_status_; }
 
 int64_t MockProcessHandle::GetReturnCode() const { return 0; }
 
-debug::Status MockProcessHandle::Attach(ProcessHandleObserver* observer) {
-  is_attached_ = true;
+debug::Status MockProcessHandle::Attach(ProcessHandleObserver* observer, AttachConfig config) {
+  if (config.claim_exception_channel) {
+    is_attached_ = true;
+  }
   return debug::Status();
 }
 

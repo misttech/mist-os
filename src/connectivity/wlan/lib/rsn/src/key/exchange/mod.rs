@@ -48,6 +48,7 @@ pub enum Method {
 }
 
 impl Method {
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_eapol_key_frame<B: SplitByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,
@@ -59,6 +60,7 @@ impl Method {
         }
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_rsna_response_timeout(&self) -> Result<(), Error> {
         match self {
             Method::FourWayHandshake(hs) => hs.on_rsna_response_timeout(),
@@ -81,6 +83,7 @@ pub enum Config {
     GroupKeyHandshake(group_key::Config),
 }
 
+#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 /// Computes and returns a serialized key frame's MIC.
 /// Fails if the AKM has no associated integrity algorithm or MIC size.
 pub fn compute_mic_from_buf(
@@ -95,6 +98,7 @@ pub fn compute_mic_from_buf(
     Ok(mic)
 }
 
+#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 /// Computes and returns a key frame's MIC.
 /// Fails if the AKM has no associated integrity algorithm or MIC size, the given Key Frame's MIC
 /// has a different size than the MIC length derived from the AKM or the Key Frame doesn't have its

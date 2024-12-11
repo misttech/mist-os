@@ -99,7 +99,7 @@ zx_status_t Interrupter::StartIrqThread() {
     // TODO(b/362759606): For now, release the lease after a timeout. In the future, this should be
     // passed up the USB stack in "baton-passing" manner.
     const zx::duration kLeaseTimeout = zx::msec(500);
-    wake_lease_->AcquireWakeLease(kLeaseTimeout);
+    wake_lease_->HandleInterrupt(kLeaseTimeout);
 
     if (event_ring_.HandleIRQ() != ZX_OK) {
       FDF_LOG(ERROR, "Error handling IRQ. Exiting async loop.");

@@ -1,0 +1,25 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+loadable_module("restricted-blob") {
+  testonly = true
+  sources = [ "$current_cpu.S" ]
+  configs += [ "//build/config/zircon:nolibc" ]
+  exclude_toolchain_tags = [ "instrumented" ]
+  deps = [ "//zircon/kernel/lib/arch" ]
+
+  metadata = {
+    # Place the test module in the package with the CPU-specific name.  The
+    # test will use the fuchsia.ldsvc (userboot in the standalone case) to
+    # acquire each as a VMO, which will look for them in lib/ (within the
+    # package namespace for the component test, otherwise under /boot).
+    distribution_entries = [
+      {
+        destination = "lib/test/$target_name.$current_cpu.so"
+        source = rebase_path("$root_out_dir/$target_name.so", root_build_dir)
+        label = get_label_info(":$target_name", "label_with_toolchain")
+      },
+    ]
+  }
+}

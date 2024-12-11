@@ -16,7 +16,7 @@
 #include "src/media/audio/examples/effects/rechannel_effect.h"
 #include "src/media/audio/examples/effects/swap_effect.h"
 #include "src/media/audio/lib/effects_loader/effects_loader_v1.h"
-#include "src/media/audio/lib/effects_loader/effects_processor_v1.h"
+// #include "src/media/audio/lib/effects_loader/effects_processor_v1.h"
 
 namespace media::audio_effects_example {
 
@@ -88,8 +88,9 @@ TEST_F(DelayEffectTest, GetParameters) {
   fuchsia_audio_effects_parameters effect_params;
 
   uint32_t frame_rate = 48000;
-  media::audio::EffectV1 effect = effects_loader_->CreateEffect(
-      Effect::Delay, "", frame_rate, kTestChans, kTestChans, kDelayEffectConfig);
+  media::audio::EffectV1 effect =
+      effects_loader_->CreateEffect(Effect::Delay, "", static_cast<int32_t>(frame_rate), kTestChans,
+                                    kTestChans, kDelayEffectConfig);
   ASSERT_TRUE(effect);
 
   EXPECT_EQ(effect.GetParameters(&effect_params), ZX_OK);
@@ -109,7 +110,7 @@ TEST_F(RechannelEffectTest, GetParameters) {
 
   uint32_t frame_rate = 48000;
   media::audio::EffectV1 effect = effects_loader_->CreateEffect(
-      Effect::Rechannel, "", frame_rate, RechannelEffect::kNumChannelsIn,
+      Effect::Rechannel, "", static_cast<int32_t>(frame_rate), RechannelEffect::kNumChannelsIn,
       RechannelEffect::kNumChannelsOut, {});
   ASSERT_TRUE(effect);
 
@@ -127,8 +128,8 @@ TEST_F(SwapEffectTest, GetParameters) {
   fuchsia_audio_effects_parameters effect_params;
 
   uint32_t frame_rate = 44100;
-  media::audio::EffectV1 effect =
-      effects_loader_->CreateEffect(Effect::Swap, "", frame_rate, kTestChans, kTestChans, {});
+  media::audio::EffectV1 effect = effects_loader_->CreateEffect(
+      Effect::Swap, "", static_cast<int32_t>(frame_rate), kTestChans, kTestChans, {});
   ASSERT_TRUE(effect);
 
   effect_params.frame_rate = 48000;  // should be overwritten
@@ -186,8 +187,8 @@ TEST_F(DelayEffectTest, UpdateConfiguration) {
 
 // Tests the process_inplace ABI, and that the effect behaves as expected.
 TEST_F(DelayEffectTest, ProcessInPlace) {
-  uint32_t num_samples = 12 * kTestChans;
-  uint32_t delay_samples = 6 * kTestChans;
+  constexpr uint32_t num_samples = 12 * kTestChans;
+  constexpr uint32_t delay_samples = 6 * kTestChans;
   float delay_buff_in_out[num_samples];
   float expect[num_samples];
 
@@ -304,7 +305,7 @@ TEST_F(SwapEffectTest, Process) {
 }
 
 // Tests the process_inplace ABI thru successive in-place calls.
-TEST_F(DelayEffectTest, ProcessInPlace_Chain) {
+TEST_F(DelayEffectTest, ProcessInPlaceChain) {
   constexpr uint32_t kNumFrames = 6;
 
   std::vector<float> buff_in_out = {1.0f,  -0.1f, -0.2f, 2.0f,  0.3f,  -3.0f,
@@ -370,7 +371,8 @@ void DelayEffectTest::TestDelayBounds(uint32_t frame_rate, uint32_t channels,
   std::vector<float> expect(num_samples);
 
   media::audio::EffectV1 effect = effects_loader_->CreateEffect(
-      Effect::Delay, "", frame_rate, channels, channels, kDelayEffectConfig);
+      Effect::Delay, "", static_cast<int32_t>(frame_rate), static_cast<int32_t>(channels),
+      static_cast<int32_t>(channels), kDelayEffectConfig);
   ASSERT_TRUE(effect);
 
   ASSERT_EQ(effect.UpdateConfiguration(fxl::StringPrintf("{\"delay_frames\": %u}", delay_frames)),
@@ -378,7 +380,7 @@ void DelayEffectTest::TestDelayBounds(uint32_t frame_rate, uint32_t channels,
 
   for (uint32_t pass = 0; pass < 2; ++pass) {
     for (uint32_t i = 0; i < num_samples; ++i) {
-      delay_buff_in_out[i] = static_cast<float>(i + pass * num_samples + 1);
+      delay_buff_in_out[i] = static_cast<float>(i + (pass * num_samples) + 1);
       expect[i] = fmax(delay_buff_in_out[i] - static_cast<float>(delay_samples), 0.0f);
     }
     ASSERT_EQ(effect.ProcessInPlace(num_frames, delay_buff_in_out.data()), ZX_OK);
@@ -388,7 +390,7 @@ void DelayEffectTest::TestDelayBounds(uint32_t frame_rate, uint32_t channels,
 }
 
 // Verifies DelayEffect at the outer allowed bounds (largest delays and buffers).
-TEST_F(DelayEffectTest, ProcessInPlace_Bounds) {
+TEST_F(DelayEffectTest, ProcessInPlaceBounds) {
   TestDelayBounds(192000, 2, DelayEffect::kMaxDelayFrames);
   TestDelayBounds(2000, FUCHSIA_AUDIO_EFFECTS_CHANNELS_MAX, DelayEffect::kMaxDelayFrames);
 }

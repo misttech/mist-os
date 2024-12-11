@@ -17,31 +17,6 @@ use crate::{ClassPermission as _, NullessByteStr};
 use std::collections::HashMap;
 use std::num::NonZeroU32;
 
-/// Helper used to check whether a given `path` is nested within another (`maybe_ancestor`).
-fn is_ancestor_path(maybe_ancestor: &[u8], path: &[u8]) -> bool {
-    // genfscon statements never have an empty path.
-    assert!(maybe_ancestor.len() >= 1);
-
-    // Note that a partial path "/a/b/foo/" does not match "/a/b/foo" but will match
-    // other descendents like "/a/b/foo/1".
-    if !path.starts_with(maybe_ancestor) {
-        return false;
-    }
-
-    // Checking for substring is not enough to confirm this is an ancestor path:
-    // E.g. in the case where "/abc/cd" will be considered, erroneously, an ancestor path of
-    // "abc/cdef". There are actually 3 cases:
-    // 1. The two paths are the same (i.e. the lengths are equal)
-    // 2. The path from maybe_ancestor ends in a '/' character: e.g. if "/abc/" is a prefix of
-    //    another path, we know it's also an ancestor.
-    // 3. The path being checked has a / as the first character that doesn't match. E.g. "/abc"
-    //    is an ancestor of any path starting with "/abc/..." no matter what the rest of the
-    //    path's bytes contain.
-    maybe_ancestor.len() == path.len()
-        || *maybe_ancestor.last().unwrap() == b'/'
-        || path[maybe_ancestor.len()] == b'/'
-}
-
 /// The [`SecurityContext`] and [`FsUseType`] derived from some `fs_use_*` line of the policy.
 pub struct FsUseLabelAndType {
     pub context: SecurityContext,
@@ -338,12 +313,16 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         //     genfscon foofs "/" label1
         //     genfscon foofs "/abc/" label2
         //     genfscon foofs "/abc/def" label3
+        //
         // The correct label for a file "/abc/def/g/h/i" is label3, as "/abc/def" is the closest parent
         // among those defined.
+        //
+        // Partial paths are prefix-matched, so that "/abc/default" would also be assigned label3.
+        //
         // TODO(372212126): Optimize the algorithm.
         let mut result: Option<&FsContext<PS>> = None;
         for fs_context in fs_contexts {
-            if is_ancestor_path(fs_context.partial_path(), node_path.as_bytes()) {
+            if node_path.0.starts_with(fs_context.partial_path()) {
                 if result.is_none()
                     || result.unwrap().partial_path().len() < fs_context.partial_path().len()
                 {

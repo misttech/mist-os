@@ -52,32 +52,105 @@ bool IsValidPath(std::string_view path) {
 
 LocalComponent::~LocalComponent() = default;
 
-LocalComponentImpl::~LocalComponentImpl() = default;
+// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
+LocalComponentImplBase::~LocalComponentImplBase() = default;
 
-fdio_ns_t* LocalComponentImpl::ns() {
+fdio_ns_t* LocalComponentImplBase::ns() {
   ZX_ASSERT_MSG(handles_,
-                "LocalComponentImpl::ns() cannot be called until RealmBuilder calls OnStart()");
+                "LocalComponentImplBase::ns() cannot be called until RealmBuilder calls OnStart()");
   return handles_->ns();
 }
 
-sys::OutgoingDirectory* LocalComponentImpl::outgoing() {
+sys::OutgoingDirectory* LocalComponentImplBase::outgoing() {
   ZX_ASSERT_MSG(
       handles_,
-      "LocalComponentImpl::outgoing() cannot be called until RealmBuilder calls OnStart()");
+      "LocalComponentImplBase::outgoing() cannot be called until RealmBuilder calls OnStart()");
   return handles_->outgoing();
 }
 
-sys::ServiceDirectory LocalComponentImpl::svc() {
-  ZX_ASSERT_MSG(handles_,
-                "LocalComponentImpl::svc() cannot be called until RealmBuilder calls OnStart()");
+sys::ServiceDirectory LocalComponentImplBase::svc() {
+  ZX_ASSERT_MSG(
+      handles_,
+      "LocalComponentImplBase::svc() cannot be called until RealmBuilder calls OnStart()");
   return handles_->svc();
 }
 
-void LocalComponentImpl::Exit(zx_status_t return_code) {
-  ZX_ASSERT_MSG(handles_,
-                "LocalComponentImpl::Exit() cannot be called until RealmBuilder calls OnStart()");
+void LocalComponentImplBase::Exit(zx_status_t return_code) {
+  ZX_ASSERT_MSG(
+      handles_,
+      "LocalComponentImplBase::Exit() cannot be called until RealmBuilder calls OnStart()");
   return handles_->Exit(return_code);
 }
+#else
+fdio_ns_t* LocalComponentImplBase::ns() {
+  ZX_ASSERT_MSG(
+      initialized_,
+      "LocalComponentImplBase::ns() cannot be called until RealmBuilder calls Initialize()");
+  return namespace_;
+}
+
+zx_status_t LocalComponentImplBase::Initialize(fdio_ns_t* ns, zx::channel outgoing_dir,
+                                               async_dispatcher_t* dispatcher,
+                                               fit::function<void(zx_status_t)> on_exit) {
+  namespace_ = ns;
+  on_exit_ = std::move(on_exit);
+  zx_status_t status = SetOutgoingDirectory(std::move(outgoing_dir), dispatcher);
+  if (status == ZX_OK) {
+    initialized_ = true;
+  }
+  return status;
+}
+
+sys::OutgoingDirectory* LocalHlcppComponent::outgoing() {
+  ZX_ASSERT_MSG(
+      initialized_,
+      "LocalHlcppComponent::outgoing() cannot be called until RealmBuilder calls Initialize()");
+  return &outgoing_dir_;
+}
+
+sys::ServiceDirectory LocalHlcppComponent::svc() {
+  ZX_ASSERT_MSG(
+      initialized_,
+      "LocalHlcppComponent::svc() cannot be called until RealmBuilder calls Initialize()");
+
+  zx::channel local;
+  zx::channel remote;
+  ZX_COMPONENT_ASSERT_STATUS_OK("zx::channel/create", zx::channel::create(0, &local, &remote));
+
+  auto status = fdio_ns_service_connect(namespace_, kSvcDirectoryPath, remote.release());
+  ZX_ASSERT_MSG(status == ZX_OK,
+                "fdio_ns_service_connect on LocalComponent's /svc directory failed: %s\nThis most"
+                "often occurs when a component has no FIDL protocols routed to it.",
+                zx_status_get_string(status));
+
+  return sys::ServiceDirectory(std::move(local));
+}
+
+component::OutgoingDirectory* LocalCppComponent::outgoing() {
+  ZX_ASSERT_MSG(
+      initialized_,
+      "LocalCppComponent::outgoing() cannot be called until RealmBuilder calls Initialize()");
+  return outgoing_dir_.get();
+}
+
+void LocalComponentImplBase::Exit(zx_status_t return_code) {
+  ZX_ASSERT_MSG(
+      initialized_,
+      "LocalComponentImplBase::Exit() cannot be called until RealmBuilder calls Initialize()");
+
+  if (on_exit_) {
+    on_exit_(return_code);
+  }
+}
+
+LocalComponentImplBase::~LocalComponentImplBase() {
+  if (namespace_) {
+    ZX_ASSERT(fdio_ns_destroy(namespace_) == ZX_OK);
+  }
+}
+
+#endif  // #if FUCHSIA_API_LEVEL_LESS_THAN(17)
 
 LocalComponentHandles::LocalComponentHandles(fdio_ns_t* ns, sys::OutgoingDirectory outgoing_dir)
     : namespace_(ns), outgoing_dir_(std::move(outgoing_dir)) {}

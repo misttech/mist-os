@@ -58,6 +58,7 @@ fuchsia_driver_component("aml-thermal") {
 
 fuchsia_driver_package("package") {
   package_name = "aml-thermal"
+  export_to_bazel = true
   driver_components = [ ":aml-thermal" ]
 }
 

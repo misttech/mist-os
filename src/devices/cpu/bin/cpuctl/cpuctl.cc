@@ -4,11 +4,21 @@
 
 #include <dirent.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
+#include <fidl/fuchsia.kernel/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/connect_service.h>
+#include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fit/defer.h>
+#include <lib/zx/resource.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <zircon/status.h>
+#include <zircon/syscalls-next.h>
+#include <zircon/syscalls.h>
+#include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
 #include <algorithm>
@@ -68,6 +78,8 @@ void usage(const char* cmd) {
   fprintf(stderr, "\t%s                          describes all domains if `domain` is omitted.\n",
           spaces);
 
+  fprintf(stderr, "\t%s kernel-config            List the power domains registered with the kernel.\n",
+          cmd);
   fprintf(stderr, "\t%s opp <domain> [opp]       Set the CPU's operating point to `opp`. \n",
           cmd);
   fprintf(stderr, "\t%s                          Returns the current opp if `opp` is omitted.\n",
@@ -168,6 +180,89 @@ zx::result<CpuPerformanceDomain> PerformanceDomainFromArgument(const char* argum
   });
 
   return result;
+}
+
+// Obtain a handle to `InfoResource` followed by obtaining the list of registered power domains,
+// and printing them. Or if there are no power domains registered, print that as well.
+int kernel_config() {
+  // This protocol has a single Get() method that will return the capability.
+  auto client_end = component::Connect<fuchsia_kernel::InfoResource>();
+  if (client_end.is_error()) {
+    std::cerr << " Failed to connect to "
+              << fidl::DiscoverableProtocolName<fuchsia_kernel::InfoResource> << std::endl;
+    return -1;
+  }
+
+  fidl::WireSyncClient client(std::move(client_end).value());
+  fidl::WireResult result = client->Get();
+  if (!result.ok()) {
+    std::cerr << " Failed to call fuchsia.kernel/InfoResource.Get\n";
+    return -2;
+  }
+
+  auto& response = result.value();
+  if (!response.resource.is_valid()) {
+    std::cerr << " Failed to obtain InfoResource\n";
+    return -3;
+  }
+
+  zx::resource info_rsrc(std::move(response.resource));
+  // Lets get the number of power domains.
+  size_t count = 0;
+  size_t total = 0;
+  if (zx_status_t res =
+          zx_object_get_info(info_rsrc.get(), ZX_INFO_POWER_DOMAINS, nullptr, 0, &count, &total);
+      res != ZX_OK) {
+    std::cerr << "Failed to query the number of registered power domains("
+              << zx_status_get_string(res) << ")\n";
+    return -4;
+  }
+
+  if (total == 0) {
+    std::cout << "No power domains registered with the kernel. RPPM is not active.\n";
+    return 0;
+  }
+
+  std::vector<zx_power_domain_info_t> domains;
+  domains.resize(total);
+  if (zx_status_t res =
+          zx_object_get_info(info_rsrc.get(), ZX_INFO_POWER_DOMAINS, domains.data(),
+                             domains.size() * sizeof(zx_power_domain_info_t), &count, &total);
+      res != ZX_OK) {
+    std::cerr << "Failed to query information about the registered power domains("
+              << zx_status_get_string(res) << ")\n";
+    return -5;
+  }
+
+  auto print_cpu_nums = []<size_t N>(uint64_t(&mask)[N]) {
+    for (size_t i = 0; i < N; ++i) {
+      if (mask[i] == 0) {
+        continue;
+      }
+      const size_t cpu_bucket_offset = i * ZX_CPU_SET_BITS_PER_WORD;
+      for (size_t j = 0; j < ZX_CPU_SET_BITS_PER_WORD; ++j) {
+        size_t cpu_num = j + cpu_bucket_offset;
+        if ((mask[i] & 1ull << j) != 0) {
+          std::cout << " " << cpu_num;
+        }
+      }
+    }
+  };
+
+  std::cout << "RPPM is active with " << total << " registered power domains:\n";
+  std::cout << "Displaying information for " << count << " power domains.\n";
+  for (size_t i = 0; i < count; ++i) {
+    std::cout << "  power_domain[" << i << "].id: " << domains[i].domain_id << "\n";
+    std::cout << "  power_domain[" << i << "].cpus: ";
+    print_cpu_nums(domains[i].cpus.mask);
+    std::cout << "\n";
+    std::cout << "  power_domain[" << i
+              << "].active_power_levels: " << domains[i].active_power_levels << "\n";
+    std::cout << "  power_domain[" << i << "].idle_power_levels: " << domains[i].idle_power_levels
+              << "\n";
+    std::cout << "\n";
+  }
+  return 0;
 }
 
 // Print each performance domain to stdout.
@@ -419,6 +514,10 @@ int main(int argc, char* argv[]) {
     }
     return describe_all() == ZX_OK ? 0 : -1;
   }
+  if (!strncmp(subcmd, "kernel-config", 9)) {
+    return kernel_config();
+  }
+
   if (!strncmp(subcmd, "opp", 6)) {
     if (argc == 4) {
       set_current_operating_point(argv[2], argv[3]);

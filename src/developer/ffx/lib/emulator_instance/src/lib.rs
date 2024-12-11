@@ -181,14 +181,6 @@ impl GuestConfig {
         }
     }
 
-    pub fn is_gpt(&self) -> bool {
-        if let Some(DiskImage::Gpt(_)) = self.disk_image {
-            true
-        } else {
-            false
-        }
-    }
-
     pub fn get_image_hashes(&self) -> Result<(u64, u64)> {
         // If there is an efi kernel, and no zbi, use the kernel to calculate the hash.
 

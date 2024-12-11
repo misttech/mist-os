@@ -53,16 +53,15 @@ impl std::fmt::Display for Revision {
 
 /// System assembly configuration for the ICU subsystem.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Clone, JsonSchema)]
+#[serde(default)]
 pub struct ICUConfig {
     /// The revision (corresponding to either one of the labels, or a git commit ID) of the ICU
     /// library to use in system assembly. This revision is constrained to the commit IDs available
     /// in the repos at `//third_party/icu/{default,latest}`,
-    #[serde(default)]
     pub revision: Revision,
 
     /// A list of packages that should receive ICU tzdata in their config directory.
     /// TODO(b/297214394): Remove this option once all components use tzdata_provider.
-    #[serde(default)]
     pub legacy_tzdata_packages: Vec<String>,
 }
 

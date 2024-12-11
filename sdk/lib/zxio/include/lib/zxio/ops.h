@@ -62,10 +62,6 @@ typedef struct zxio_ops {
   zx_status_t (*on_mapped)(zxio_t* io, void* ptr);
   zx_status_t (*get_read_buffer_available)(zxio_t* io, size_t* out_available);
   zx_status_t (*shutdown)(zxio_t* io, zxio_shutdown_options_t options, int16_t* out_code);
-  zx_status_t (*open)(zxio_t* io, uint32_t flags, const char* path, size_t path_len,
-                      zxio_storage_t* storage);
-  zx_status_t (*open_async)(zxio_t* io, uint32_t flags, const char* path, size_t path_len,
-                            zx_handle_t request);
   zx_status_t (*unlink)(zxio_t* io, const char* name, size_t name_len, int flags);
   zx_status_t (*token_get)(zxio_t* io, zx_handle_t* out_token);
   zx_status_t (*rename)(zxio_t* io, const char* old_path, size_t old_path_len,
@@ -117,9 +113,8 @@ typedef struct zxio_ops {
   zx_status_t (*xattr_set)(zxio_t* io, const uint8_t* name, size_t name_len, const uint8_t* value,
                            size_t value_len, zxio_xattr_set_mode_t mode);
   zx_status_t (*xattr_remove)(zxio_t* io, const uint8_t* name, size_t name_len);
-  zx_status_t (*open3)(zxio_t* directory, const char* path, size_t path_len,
-                       zxio_open_flags_t flags, const zxio_open_options_t* options,
-                       zxio_storage_t* storage);
+  zx_status_t (*open)(zxio_t* directory, const char* path, size_t path_len, zxio_open_flags_t flags,
+                      const zxio_open_options_t* options, zxio_storage_t* storage);
   zx_status_t (*allocate)(zxio_t* io, uint64_t offset, uint64_t len,
                           const zxio_allocate_mode_t mode);
   zx_status_t (*enable_verity)(zxio_t* io, const zxio_fsverity_descriptor_t* descriptor);

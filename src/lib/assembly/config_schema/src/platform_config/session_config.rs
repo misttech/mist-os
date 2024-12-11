@@ -7,31 +7,20 @@ use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the session.
 #[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct PlatformSessionConfig {
-    #[serde(default)]
     pub enabled: bool,
 
     /// If `autolaunch` is true (the default) and the `session.url` is set in
     /// the `ProductConfig`, the named session will be launched when the device
     /// boots up.
-    #[serde(default = "autolaunch_default")]
     pub autolaunch: bool,
 
-    #[serde(default)]
     pub include_element_manager: bool,
 }
 
 impl Default for PlatformSessionConfig {
     fn default() -> Self {
-        Self {
-            enabled: Default::default(),
-            autolaunch: autolaunch_default(),
-            include_element_manager: Default::default(),
-        }
+        Self { enabled: false, autolaunch: true, include_element_manager: false }
     }
-}
-
-fn autolaunch_default() -> bool {
-    true
 }

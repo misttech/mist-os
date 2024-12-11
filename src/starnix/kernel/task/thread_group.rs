@@ -1823,7 +1823,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                 task_state.notify_signal_waiters();
                 task_state.set_flags(TaskFlags::SIGNALS_AVAILABLE, true);
 
-                if !is_masked && action.must_interrupt(sigaction) && !has_interrupted_task {
+                if !is_masked && action.must_interrupt(Some(sigaction)) && !has_interrupted_task {
                     // Only interrupt one task, and only interrupt if the signal was actually queued
                     // and the action must interrupt.
                     drop(task_state);

@@ -4,9 +4,14 @@
 
 use anyhow::{Context, Error, Result};
 use diagnostics_reader::{ArchiveReader, Logs};
-use fidl_fuchsia_diagnostics::{self as fdiagnostics, ArchiveAccessorMarker, Interest, Severity};
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_diagnostics::{self as fdiagnostics, Interest, Severity};
+use fidl_fuchsia_diagnostics_host as fdiagnostics_host;
 use realm_proxy_client::RealmProxyClient;
 use selectors::{parse_component_selector, VerboseError};
+use std::borrow::Cow;
+
+pub const ALL_PIPELINE: &str = "all";
 
 /// Returns a snapshot of the realm's logs as a stream.
 ///
@@ -14,17 +19,47 @@ use selectors::{parse_component_selector, VerboseError};
 pub(crate) async fn snapshot_and_stream_logs(
     realm_proxy: &RealmProxyClient,
 ) -> impl crate::assert::LogStream {
-    let accessor = realm_proxy
-        .connect_to_protocol::<ArchiveAccessorMarker>()
-        .await
-        .expect("connect to archive accessor");
-
+    let accessor = connect_accessor(realm_proxy, ALL_PIPELINE).await;
     let subscription = ArchiveReader::new()
         .with_archive(accessor)
         .snapshot_then_subscribe::<Logs>()
         .expect("subscribe to logs");
     subscription.wait_for_ready().await;
     subscription
+}
+
+pub(crate) async fn connect_accessor(
+    realm_proxy: &RealmProxyClient,
+    pipeline_name: &str,
+) -> fdiagnostics::ArchiveAccessorProxy {
+    connect_accessor_protocol::<fdiagnostics::ArchiveAccessorMarker>(realm_proxy, pipeline_name)
+        .await
+}
+
+pub(crate) async fn connect_host_accessor(
+    realm_proxy: &RealmProxyClient,
+    pipeline_name: &str,
+) -> fdiagnostics_host::ArchiveAccessorProxy {
+    connect_accessor_protocol::<fdiagnostics_host::ArchiveAccessorMarker>(
+        realm_proxy,
+        pipeline_name,
+    )
+    .await
+}
+
+async fn connect_accessor_protocol<P: DiscoverableProtocolMarker>(
+    realm_proxy: &RealmProxyClient,
+    pipeline_name: &str,
+) -> P::Proxy {
+    let accessor_name = if pipeline_name == ALL_PIPELINE {
+        Cow::Borrowed(P::PROTOCOL_NAME)
+    } else {
+        Cow::Owned(format!("{}.{}", P::PROTOCOL_NAME, pipeline_name))
+    };
+    realm_proxy
+        .connect_to_named_protocol::<P>(&format!("diagnostics-accessors/{}", accessor_name))
+        .await
+        .expect("connect to archive accessor")
 }
 
 /// Extension methods on LogSettingsProxy.

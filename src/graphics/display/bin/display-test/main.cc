@@ -492,8 +492,8 @@ zx_status_t capture_setup(Display& display) {
   // TODO(https://fxbug.dev/332521780): Display clients will be required to
   // pass the captured display's mode information.
   fhdt::wire::ImageMetadata capture_metadata = {
-      .width = display.mode().horizontal_resolution,
-      .height = display.mode().vertical_resolution,
+      .width = display.mode().active_area.width,
+      .height = display.mode().active_area.height,
       .tiling_type = fhdt::wire::kImageTilingTypeCapture,
   };
   fidl::WireResult import_capture_result = dc->ImportImage(
@@ -1123,13 +1123,12 @@ int main(int argc, const char* argv[]) {
         capture = false;
         break;
       }
-      if (verify_capture &&
-          !CompareCapturedImage(
-              cpp20::span(reinterpret_cast<const uint8_t*>(layers[0]->GetCurrentImageBuf()),
-                          layers[0]->GetCurrentImageSize()),
-              /*input_image_pixel_format=*/displays[0].format(),
-              /*height=*/displays[0].mode().vertical_resolution,
-              /*width=*/displays[0].mode().horizontal_resolution)) {
+      if (verify_capture && !CompareCapturedImage(cpp20::span(reinterpret_cast<const uint8_t*>(
+                                                                  layers[0]->GetCurrentImageBuf()),
+                                                              layers[0]->GetCurrentImageSize()),
+                                                  /*input_image_pixel_format=*/displays[0].format(),
+                                                  /*height=*/displays[0].mode().active_area.height,
+                                                  /*width=*/displays[0].mode().active_area.width)) {
         capture_result = false;
         break;
       }

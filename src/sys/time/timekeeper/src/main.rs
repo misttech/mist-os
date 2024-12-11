@@ -6,6 +6,7 @@
 
 //! `timekeeper` is responsible for external time synchronization in Fuchsia.
 
+mod alarms;
 mod clock_manager;
 mod diagnostics;
 mod enums;
@@ -38,7 +39,10 @@ use std::sync::Arc;
 use time_metrics_registry::TimeMetricDimensionExperiment;
 use tracing::{debug, error, info, warn};
 use zx::BootTimeline;
-use {fidl_fuchsia_time as ftime, fidl_fuchsia_time_test as fftt, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_time as ftime, fidl_fuchsia_time_alarms as fta, fidl_fuchsia_time_test as fftt,
+    fuchsia_async as fasync,
+};
 
 type UtcTransform = time_util::Transform<BootTimeline, UtcTimeline>;
 
@@ -53,6 +57,9 @@ pub enum Command {
 pub enum Rpcs {
     /// Time test protocol commands.
     TimeTest(fftt::RtcRequestStream),
+
+    /// Client request for scheduling alarms.
+    Wake(fta::WakeRequestStream),
 }
 
 /// Timekeeper config, populated from build-time generated structured config.
@@ -62,8 +69,6 @@ pub struct Config {
 }
 
 const MILLION: u64 = 1_000_000;
-
-const MAX_CONCURRENT_HANDLERS: usize = 10;
 
 impl From<timekeeper_config::Config> for Config {
     fn from(source_config: timekeeper_config::Config) -> Self {
@@ -283,42 +288,72 @@ async fn main() -> Result<()> {
         fs.dir("svc").add_fidl_service(Rpcs::TimeTest);
         info!("serving test protocols: fuchsia.test.time/RTC");
     }
+    fs.dir("svc").add_fidl_service(Rpcs::Wake);
     fs.take_and_serve_directory_handle()?;
 
     // Ensures that only one handler of fuchsia.time.test/RPC is active at
     // any one time.
     let time_test_mutex: Rc<RefCell<()>> = Rc::new(RefCell::new(()));
 
-    let match_loop = |request: Rpcs| {
-        let time_test_mutex = time_test_mutex.clone();
-        let allow_update_rtc = allow_update_rtc.clone();
-        async move {
-            match request {
-                Rpcs::TimeTest(stream) => {
-                    // Accepts only one client for fuchsia.time.test/RPC at a time.
-                    // This is because conflicting instructions from different clients
-                    // can end up being confusing for the test fixture.
-                    if let Ok(_only_one_please) = time_test_mutex.try_borrow_mut() {
-                        rtc_testing::serve(allow_update_rtc, stream)
-                            .await
-                            .map_err(|e| {
-                                tracing::error!("while serving fuchsia.time.test/RPC: {:?}", e)
-                            })
-                            .unwrap_or(());
-                    } else {
-                        // Your request to connect was rejected.
-                        //
-                        // Not a bug in this code, but could be a bug in the
-                        // test fixture that calls into here.
-                        warn!("prevented a second client for fuchsia.time.test/RPC");
-                    }
-                }
-            };
-        }
-    };
+    // Instantiate connections to wake alarms. Allow graceful handling of failures,
+    // though we probably want to be loud about issues.
+    let timer_loop = Rc::new(
+        alarms::connect_to_hrtimer_async()
+            .map_err(|e| {
+                // This may not be a bug, if access to wake alarms is not used.
+                // Make this a warning, but attempted connections will be errors.
+                warn!("could not connect to fuchsia.time.alarms/Wake: {}", &e);
+                e
+            })
+            .map(|proxy| Rc::new(alarms::Loop::new(proxy))),
+    );
+
+    // Look for this text to know whether connections have succeeded.
+    info!("now starting to serve exported FIDL protocols");
+
+    // The `MAX_CONCURRENT_HANDLERS` must be one larger than the largest number
+    // of timer clients the system may have.
+    const MAX_CONCURRENT_HANDLERS: usize = 100;
 
     // fuchsia::main can only return () or Result<()>.
-    let result = fs.for_each_concurrent(MAX_CONCURRENT_HANDLERS, match_loop).await;
+    let result = fs
+        .for_each_concurrent(MAX_CONCURRENT_HANDLERS, |request: Rpcs| {
+            let time_test_mutex = time_test_mutex.clone();
+            let allow_update_rtc = allow_update_rtc.clone();
+            let timer_loop = timer_loop.clone();
+            async move {
+                match request {
+                    Rpcs::TimeTest(stream) => {
+                        // Accepts only one client for fuchsia.time.test/RPC at a time.
+                        // This is because conflicting instructions from different clients
+                        // can end up being confusing for the test fixture.
+                        if let Ok(_only_one_please) = time_test_mutex.try_borrow_mut() {
+                            rtc_testing::serve(allow_update_rtc, stream)
+                                .await
+                                .map_err(|e| {
+                                    tracing::error!("while serving fuchsia.time.test/RPC: {:?}", e)
+                                })
+                                .unwrap_or(());
+                        } else {
+                            // Your request to connect was rejected.
+                            //
+                            // Not a bug in this code, but could be a bug in the
+                            // test fixture that calls into here.
+                            warn!("prevented a second client for fuchsia.time.test/RPC");
+                        }
+                    }
+                    Rpcs::Wake(stream) => match *timer_loop {
+                        Ok(ref this_loop) => {
+                            alarms::serve(this_loop.clone(), stream).await;
+                        }
+                        Err(ref e) => {
+                            warn!("can not serve fuchsia.time.alarms/Wake: {}", e);
+                        }
+                    },
+                };
+            }
+        })
+        .await;
     Ok(result)
 }
 

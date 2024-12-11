@@ -1,9 +1,9 @@
 # buildifier: disable=bzl-visibility
 load(
-    "//fuchsia/private:fuchsia_prebuilt_lacewing_test.bzl",
+    "@{{rules_fuchsia}}//fuchsia/private:fuchsia_prebuilt_lacewing_test.bzl",
     "fuchsia_prebuilt_lacewing_test",
 )
-load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("@{{rules_fuchsia}}//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 fuchsia_prebuilt_lacewing_test(
     name = "{{name}}",

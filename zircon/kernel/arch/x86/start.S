@@ -32,7 +32,7 @@
 
 // Set a page table entry for the kernel module relocated 64-bit virtual
 // address in 32-bit code. Clobbers the %ecx register.
-.macro set_relocated_page_table_entry table, shift, value
+.macro set_relocated_page_table_entry table_reg, shift, value
     // Extract 32-bit chunk of kernel_relocated_base containing the index bits
     // for this page level shift.
     mov PHYS(kernel_relocated_base + SHIFT_OFFSET(\shift)), %ecx
@@ -43,7 +43,7 @@
 
     // Get the address on the page table of index * 8 and set the value
     shll $3, %ecx
-    addl $PHYS(\table), %ecx
+    addl \table_reg, %ecx
     movl \value, (%ecx)
 .endm
 
@@ -112,41 +112,40 @@ FUNCTION_LABEL(_start)
     // This is in .bss, so now it's safe to set it.
     mov %r15, PHYS(kernel_entry_ticks)
 
-.Lpaging_setup64:
-    /* initialize the default page tables */
-    /* Setting the First PML4E with a PDP table reference*/
-    movl $PHYS(pdp), %eax
-    orl  $X86_KERNEL_PD_FLAGS, %eax
-    movl %eax, PHYS(pml4)
+    // We modify the currently live address space below. Store the address of
+    // the root page table in %rdx.
+    mov $X86_CR3_BASE_MASK, %rax
+    mov %cr3, %rdx
+    andq %rax, %rdx
 
-    /* Setting the First PDPTE with a Page table reference*/
-    movl $PHYS(pte), %eax
-    orl  $X86_KERNEL_PD_FLAGS, %eax
-    movl %eax, PHYS(pdp)
-
-    /* point the pml4e at the second high PDP (for -2GB mapping) */
+    // Link the table called `pdp_high` as the last entry in the root, which
+    // covers [-512GiB, 0). %rdx still holds the address of the root table.
     movl $PHYS(pdp_high),   %eax
     orl  $X86_KERNEL_PD_FLAGS, %eax
-    set_relocated_page_table_entry pml4, PML4_SHIFT, %eax
+    set_relocated_page_table_entry %edx, PML4_SHIFT, %eax
 
-    /* point the second pdp at the same low level page table */
-    movl $PHYS(pte), %eax
+    // Now link the table called `id_map_lower_512gib_page_table_phys` as the
+    // first entry of the root: as named, it covers [0, 512GiB). %rdx still
+    // holds the address of the root table.
+    mov (%rdx), %rax
+    movabs $X86_PT_BASE_ADDRESS_MASK, %rbx
+    andl %ebx, %eax
+    mov %eax, PHYS(id_map_lower_512gib_page_table_phys)
+
+    // Now link the table called `id_map_lower_1gib_page_table_phys` as the
+    // first entry of the previous table: as named, it covers [0, 1GiB). %rdx
+    // still holds the address of the root table, and %rax the address of the
+    // parent.
+    mov (%rax), %rax
+    andl %ebx, %eax
+    mov %eax, PHYS(id_map_lower_1gib_page_table_phys)
+
+    // Further, link the table that defines the early 1GiB mapping as the
+    // fourth last entry in `pdp_high`, effectively mapping [-4GiB, -3GiB) to
+    // [0, 1GiB) and the kernel's image within it.
     orl  $X86_KERNEL_PD_FLAGS, %eax
-    set_relocated_page_table_entry pdp_high, PDP_SHIFT, %eax
-
-    /* map the first 1GB in this table */
-    movl $PHYS(pte), %esi
-    movl $512, %ecx
-    xor  %eax, %eax
-
-0:
-    mov  %eax, %ebx
-    shll $21, %ebx
-    orl  $X86_KERNEL_PD_LP_FLAGS, %ebx
-    movl %ebx, (%esi)
-    addl $8,%esi
-    inc  %eax
-    loop 0b
+    movl $PHYS(pdp_high), %ebx
+    set_relocated_page_table_entry %ebx, PDP_SHIFT, %eax
 
     /* set up a linear map of the first 64GB */
     movl $PHYS(linear_map_pdp), %esi
@@ -212,22 +211,6 @@ FUNCTION_LABEL(_start)
     movabs $PHYS(kasan_shadow_pd) + X86_KERNEL_KASAN_INITIAL_PD_FLAGS, %rax
     rep stosq
 #endif  // __has_feature(address_sanitizer)
-
-    // Disable global pages before installing the new root page table to ensure
-    // that any prior global TLB entries are flushed.
-    mov   %cr4, %rax
-    and   $(~X86_CR4_PGE), %rax
-    mov   %rax, %cr4
-
-    // Load the physical pointer to the root page table.
-    mov  $PHYS(pml4), %rax
-    mov  %rax, %cr3
-
-    // Now that we have installed the new root, re-enable global pages. Doing
-    // this before the installation could result in more stale TLB entries.
-    mov   %cr4, %rax
-    or    $(X86_CR4_PGE), %rax
-    mov   %rax, %cr4
 
     // Load our new GDT by physical pointer.
     // _temp_gdtr has it as a virtual pointer, so copy it and adjust.

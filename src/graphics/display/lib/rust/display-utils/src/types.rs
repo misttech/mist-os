@@ -202,9 +202,9 @@ impl fmt::Display for DisplayInfo {
                 f,
                 "\t\t{}:\t{:.2} Hz @ {}x{}",
                 i,
-                (mode.refresh_rate_e2 as f32) / 100.,
-                mode.horizontal_resolution,
-                mode.vertical_resolution
+                (mode.refresh_rate_millihertz as f32) / 1000.,
+                mode.active_area.width,
+                mode.active_area.height
             )?;
         }
 

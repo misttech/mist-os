@@ -551,7 +551,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn can_log_and_retrive_log() {
+    async fn can_log_and_retrieve_log() {
         let (directory, _proxy) = run_archivist().await;
         let mut recv_logs = start_listener(&directory);
 

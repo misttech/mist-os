@@ -189,23 +189,22 @@ void EngineDriverClient::ApplyConfiguration(const display_config_t* display_conf
   banjo_engine_.ApplyConfiguration(display_config_list, display_config_count, config_stamp);
 }
 
-void EngineDriverClient::RegisterDisplayEngineListener(
-    const display_engine_listener_protocol_t& protocol) {
+void EngineDriverClient::SetListener(const display_engine_listener_protocol_t& protocol) {
   if (use_engine_) {
     return;
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  banjo_engine_.RegisterDisplayEngineListener(protocol.ctx, protocol.ops);
+  banjo_engine_.SetListener(protocol.ctx, protocol.ops);
 }
 
-void EngineDriverClient::DeregisterDisplayEngineListener() {
+void EngineDriverClient::UnsetListener() {
   if (use_engine_) {
     return;
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  banjo_engine_.DeregisterDisplayEngineListener();
+  banjo_engine_.UnsetListener();
 }
 
 zx::result<display::DriverImageId> EngineDriverClient::ImportImage(

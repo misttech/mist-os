@@ -218,7 +218,7 @@ impl<BT: BindingsTypes, L> IgmpContextMarker for CoreCtx<'_, BT, L> {}
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     IgmpStateContext<BC> for CoreCtx<'_, BC, L>
 {
-    fn with_igmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<BC>>) -> O>(
+    fn with_igmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, BC>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -235,7 +235,7 @@ impl<BT: BindingsTypes, L> MldContextMarker for CoreCtx<'_, BT, L> {}
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
     MldStateContext<BC> for CoreCtx<'_, BC, L>
 {
-    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<BC>>) -> O>(
+    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BC>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,

@@ -77,9 +77,7 @@ impl DefineSubsystemConfiguration<PlatformSysmemConfig> for SysmemConfig {
                 protected_memory_size: platform_sysmem_config
                     .protected_memory_size
                     .or(settings.protected_memory_size),
-                contiguous_guard_pages_unused: platform_sysmem_config
-                    .contiguous_guard_pages_unused
-                    .or(settings.contiguous_guard_pages_unused),
+                contiguous_guard_pages_unused: platform_sysmem_config.contiguous_guard_pages_unused,
                 format_costs: settings.format_costs,
             }
         }
@@ -167,11 +165,7 @@ impl DefineSubsystemConfiguration<PlatformSysmemConfig> for SysmemConfig {
 
         builder.set_config_capability(
             CONTIGUOUS_GUARD_PAGES_UNUSED_CAPABILITY,
-            if let Some(contiguous_guard_pages_unused) = settings.contiguous_guard_pages_unused {
-                Config::new(ConfigValueType::Bool, contiguous_guard_pages_unused.into())
-            } else {
-                Config::new_void()
-            },
+            Config::new(ConfigValueType::Bool, settings.contiguous_guard_pages_unused.into()),
         )?;
 
         // Sysmem has a domain config with a config.sysmem_config_persistent_fidl file containing a
@@ -334,7 +328,7 @@ mod test {
         );
         assert_eq!(
             config.configuration_capabilities[CONTIGUOUS_GUARD_PAGES_UNUSED_CAPABILITY].value(),
-            Value::Null
+            Value::Bool(false)
         );
     }
 
@@ -376,7 +370,7 @@ mod test {
         );
         assert_eq!(
             config.configuration_capabilities[CONTIGUOUS_GUARD_PAGES_UNUSED_CAPABILITY].value(),
-            Value::Null
+            Value::Bool(false)
         );
     }
 
@@ -444,7 +438,7 @@ mod test {
                     sysmem_defaults: BoardSysmemConfig {
                         contiguous_memory_size: Some(MemorySize::Fixed(123)),
                         protected_memory_size: Some(MemorySize::Fixed(456)),
-                        contiguous_guard_pages_unused: Some(true),
+                        contiguous_guard_pages_unused: true,
                     },
                     ..Default::default()
                 },
@@ -457,7 +451,7 @@ mod test {
         let platform_sysmem_config = PlatformSysmemConfig {
             contiguous_memory_size: None,
             protected_memory_size: None,
-            contiguous_guard_pages_unused: None,
+            contiguous_guard_pages_unused: true,
             format_costs: Default::default(),
         };
         let mut builder: ConfigurationBuilderImpl = Default::default();
@@ -497,7 +491,7 @@ mod test {
                     sysmem_defaults: BoardSysmemConfig {
                         contiguous_memory_size: Some(MemorySize::Fixed(123)),
                         protected_memory_size: Some(MemorySize::Fixed(456)),
-                        contiguous_guard_pages_unused: Some(true),
+                        contiguous_guard_pages_unused: true,
                     },
                     ..Default::default()
                 },
@@ -510,7 +504,7 @@ mod test {
         let platform_sysmem_config = PlatformSysmemConfig {
             contiguous_memory_size: Some(MemorySize::Percent(12)),
             protected_memory_size: Some(MemorySize::Percent(34)),
-            contiguous_guard_pages_unused: Some(false),
+            contiguous_guard_pages_unused: false,
             format_costs: Default::default(),
         };
         let mut builder: ConfigurationBuilderImpl = Default::default();
@@ -550,7 +544,7 @@ mod test {
                     sysmem_defaults: BoardSysmemConfig {
                         contiguous_memory_size: None,
                         protected_memory_size: None,
-                        contiguous_guard_pages_unused: None,
+                        contiguous_guard_pages_unused: false,
                     },
                     ..Default::default()
                 },
@@ -563,7 +557,7 @@ mod test {
         let platform_sysmem_config = PlatformSysmemConfig {
             contiguous_memory_size: None,
             protected_memory_size: None,
-            contiguous_guard_pages_unused: None,
+            contiguous_guard_pages_unused: false,
             format_costs: Default::default(),
         };
         let mut builder: ConfigurationBuilderImpl = Default::default();
@@ -589,7 +583,7 @@ mod test {
         );
         assert_eq!(
             config.configuration_capabilities[CONTIGUOUS_GUARD_PAGES_UNUSED_CAPABILITY].value(),
-            Value::Null
+            Value::Bool(false)
         );
     }
 

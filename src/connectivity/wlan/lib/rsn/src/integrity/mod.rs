@@ -25,6 +25,7 @@ pub trait Algorithm {
             .unwrap_or(false)
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     fn compute(&self, key: &[u8], data: &[u8]) -> Result<Vec<u8>, Error>;
 }
 

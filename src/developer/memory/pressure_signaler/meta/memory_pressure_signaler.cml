@@ -21,7 +21,12 @@
             rights: [ "r*" ],
             path: "/config/data",
         },
-        { protocol: "fuchsia.kernel.RootJobForInspect" },
+        {
+            protocol: [
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.kernel.RootJobForInspect",
+            ],
+        },
     ],
     expose: [
         {

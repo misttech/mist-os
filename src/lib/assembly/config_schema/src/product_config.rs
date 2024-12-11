@@ -13,25 +13,21 @@ use serde::{Deserialize, Serialize};
 use crate::common::DriverDetails;
 
 /// The Product-provided configuration details.
-#[derive(Debug, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Default, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
+#[serde(default, deny_unknown_fields)]
 pub struct ProductConfig {
-    #[serde(default)]
     #[file_relative_paths]
     pub packages: ProductPackagesConfig,
 
     /// List of base drivers to include in the product.
-    #[serde(default)]
     pub base_drivers: Vec<DriverDetails>,
 
     /// Product-specific session information.
     ///
     /// Default to None which creates a "paused" config that launches nothing to start.
-    #[serde(default)]
     pub session: Option<ProductSessionConfig>,
 
     /// Generic product information.
-    #[serde(default)]
     pub info: Option<ProductInfoConfig>,
 
     /// The file paths to various build information.
@@ -40,16 +36,13 @@ pub struct ProductConfig {
 
     /// The policy given to component_manager that restricts where sensitive capabilities can be
     /// routed.
-    #[serde(default)]
     #[file_relative_paths]
     pub component_policy: ComponentPolicyConfig,
 
     /// Components which depend on trusted applications running in the TEE.
-    #[serde(default)]
     pub tee_clients: Vec<TeeClient>,
 
     /// Components which should run as trusted applications in Fuchsia.
-    #[serde(default)]
     pub trusted_apps: Vec<TrustedApp>,
 }
 
@@ -76,18 +69,16 @@ pub struct ProductConfig {
 /// ```
 ///
 #[derive(Debug, Default, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct ProductPackagesConfig {
     /// Paths to package manifests, or more detailed json entries for packages
     /// to add to the 'base' package set.
-    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[file_relative_paths]
     pub base: Vec<ProductPackageDetails>,
 
     /// Paths to package manifests, or more detailed json entries for packages
     /// to add to the 'cache' package set.
-    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[file_relative_paths]
     pub cache: Vec<ProductPackageDetails>,
@@ -163,23 +154,23 @@ pub struct BuildInfoConfig {
 
 /// Configuration options for the component policy.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct ComponentPolicyConfig {
     /// The file paths to a product-provided component policies.
-    #[serde(default)]
     #[file_relative_paths]
     pub product_policies: Vec<FileRelativePathBuf>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
+#[serde(default)]
 pub struct TeeClientFeatures {
     /// Whether this component needs /dev-class/securemem routed to it. If true, the securemem
     //// directory will be routed as dev-securemem.
-    pub securemem: Option<bool>,
+    pub securemem: bool,
     /// Whether this component requires persistent storage, routed as /data.
-    pub persistent_storage: Option<bool>,
+    pub persistent_storage: bool,
     /// Whether this component requires tmp storage, routed as /tmp.
-    pub tmp_storage: Option<bool>,
+    pub tmp_storage: bool,
 }
 
 /// A configuration for a component which depends on TEE-based protocols.
@@ -190,9 +181,11 @@ pub struct TeeClient {
     pub component_url: String,
     /// GUIDs which of the form fuchsia.tee.Application.{GUID} will match a
     /// protocol provided by the TEE.
+    #[serde(default)]
     pub guids: Vec<String>,
     /// Capabilities provided by this component which should be routed to the
     /// rest of the system.
+    #[serde(default)]
     pub capabilities: Vec<String>,
     /// Additional protocols which are required for this component to work, and
     /// which will be routed from 'parent'

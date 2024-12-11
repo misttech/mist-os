@@ -6,6 +6,7 @@
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_driver_component", "fuchsia_package", "get_component_manifests", "get_driver_component_manifests")
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+load("//fuchsia/packaging:common_utils.bzl", "failure_test", "no_repo_default_api_level_failure_test", "unknown_override_api_level_failure_test", "unknown_repo_default_api_level_failure_test")
 load("//test_utils:make_file.bzl", "make_fake_component_manifest", "make_file")
 
 ## Name Tests
@@ -200,12 +201,176 @@ def _test_package_deps():
         ],
     )
 
+def _noop_success_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    return analysistest.end(env)
+
+_no_repo_default_api_level_test = analysistest.make(
+    _noop_success_test_impl,
+    config_settings = {
+        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "",
+    },
+)
+
+_repo_default_unknown_api_level_test = analysistest.make(
+    _noop_success_test_impl,
+    config_settings = {
+        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "98765",
+    },
+)
+
+_repo_default_api_level_next_test = analysistest.make(
+    _noop_success_test_impl,
+    config_settings = {
+        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "NEXT",
+    },
+)
+
+_repo_default_unknown_and_override_next_api_level_test = analysistest.make(
+    _noop_success_test_impl,
+    config_settings = {
+        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "98765",
+        "@fuchsia_sdk//fuchsia:fuchsia_api_level": "NEXT",
+    },
+)
+
+def _test_api_levels():
+    fuchsia_package(
+        name = "pkg_at_next_api_level",
+        package_name = "pkg_at_next_api_level_for_test",
+        archive_name = "pkg_at_next_api_level_archive",
+        fuchsia_api_level = "NEXT",
+        components = [":component_1"],
+        tags = ["manual"],
+    )
+
+    name_test(
+        name = "next_api_level",
+        target_under_test = ":pkg_at_next_api_level",
+        package_name = "pkg_at_next_api_level_for_test",
+        archive_name = "pkg_at_next_api_level_archive.far",
+    )
+
+    # API level "21" is known to version_history.json but has been retired ("unsupported").
+    fuchsia_package(
+        name = "pkg_at_retired_api_level",
+        package_name = "pkg_at_retired_api_level_for_test",
+        fuchsia_api_level = "21",
+        components = [":component_1"],
+        tags = ["manual"],
+    )
+
+    failure_test(
+        name = "failure_test_retired_api_level",
+        expected_failure_message = 'ERROR: "21" is not an API level supported by this SDK. API level should be one of ["',
+        target_under_test = ":pkg_at_retired_api_level",
+        tags = ["manual"],
+    )
+
+    fuchsia_package(
+        name = "pkg_at_unknown_numerical_api_level",
+        package_name = "pkg_at_unknown_numerical_api_level_for_test",
+        fuchsia_api_level = "90000",
+        components = [":component_1"],
+        tags = ["manual"],
+    )
+
+    failure_test(
+        name = "failure_test_unknown_numerical_api_level",
+        expected_failure_message = 'ERROR: "90000" is not an API level supported by this SDK. API level should be one of ["',
+        target_under_test = ":pkg_at_unknown_numerical_api_level",
+        tags = ["manual"],
+    )
+
+    fuchsia_package(
+        name = "pkg_at_lowercase_next_api_level",
+        package_name = "pkg_at_lowercase_next_api_level_for_test",
+        fuchsia_api_level = "next",
+        components = [":component_1"],
+        tags = ["manual"],
+    )
+
+    failure_test(
+        name = "failure_test_lowercase_next_api_level",
+        expected_failure_message = 'ERROR: "next" is not an API level supported by this SDK. API level should be one of ["',
+        target_under_test = ":pkg_at_lowercase_next_api_level",
+        tags = ["manual"],
+    )
+
+    _no_repo_default_api_level_test(
+        name = "pkg_at_next_api_level_and_no_repo_default",
+        target_under_test = ":pkg_at_next_api_level",
+        tags = ["manual"],
+    )
+
+    _repo_default_unknown_api_level_test(
+        name = "pkg_at_next_api_level_and_unknown_repo_default",
+        target_under_test = ":pkg_at_next_api_level",
+        tags = ["manual"],
+    )
+
+    fuchsia_package(
+        name = "pkg_without_api_level",
+        package_name = "pkg_without_api_level_for_test",
+        archive_name = "pkg_without_api_level_archive",
+        components = [":component_1"],
+        tags = ["manual"],
+    )
+
+    _repo_default_unknown_and_override_next_api_level_test(
+        name = "override_api_level_overrides_unknown_repo_default",
+        target_under_test = ":pkg_without_api_level",
+        tags = ["manual"],
+    )
+
+    _repo_default_unknown_and_override_next_api_level_test(
+        name = "override_api_level_overrides_unknown_package_and_repo_default",
+        target_under_test = ":pkg_at_unknown_numerical_api_level",
+        tags = ["manual"],
+    )
+
+    # The test workspace has a default API level, which will be used.
+    name_test(
+        name = "pkg_without_api_level_and_some_supported_repo_default",
+        target_under_test = ":pkg_without_api_level",
+        package_name = "pkg_without_api_level_for_test",
+        archive_name = "pkg_without_api_level_archive.far",
+    )
+
+    _repo_default_api_level_next_test(
+        name = "pkg_without_api_level_and_repo_default_next",
+        target_under_test = ":pkg_without_api_level",
+        tags = ["manual"],
+    )
+
+    no_repo_default_api_level_failure_test(
+        name = "failure_test_pkg_without_api_level_and_no_repo_default",
+        expected_failure_message = '\'pkg_without_api_level_for_test\' does not have a valid API level set. Valid API levels are ["',
+        target_under_test = ":pkg_without_api_level",
+        tags = ["manual"],
+    )
+
+    unknown_repo_default_api_level_failure_test(
+        name = "failure_test_pkg_without_api_level_and_unknown_repo_default",
+        expected_failure_message = 'ERROR: "98765" is not an API level supported by this SDK. API level should be one of ["',
+        target_under_test = ":pkg_without_api_level",
+        tags = ["manual"],
+    )
+
+    unknown_override_api_level_failure_test(
+        name = "failure_test_pkg_at_next_api_level_with_unknown_override_api_level",
+        expected_failure_message = 'ERROR: "123456" is not an API level supported by this SDK. API level should be one of ["',
+        target_under_test = ":pkg_at_next_api_level",
+        tags = ["manual"],
+    )
+
 # Entry point from the BUILD file; macro for running each test case's macro and
 # declaring a test suite that wraps them together.
 def fuchsia_package_test_suite(name, **kwargs):
     # Call all test functions and wrap their targets in a suite.
     _test_package_and_archive_name()
     _test_package_deps()
+    _test_api_levels()
 
     native.test_suite(
         name = name,
@@ -215,6 +380,25 @@ def fuchsia_package_test_suite(name, **kwargs):
             ":dependencies_test_single_component",
             ":dependencies_test_single_driver",
             ":dependencies_test_composite",
+            ":next_api_level",
+
+            # The scenario in this test currently succeeds because the SDK ignores API level status.
+            # TODO(https://fxbug.dev/354047162): Enable once the SDK respects API level status.
+            # ":failure_test_retired_api_level",
+            ":failure_test_unknown_numerical_api_level",
+            ":failure_test_lowercase_next_api_level",
+
+            # This test fails as expected but during the transition, which avoids expect_failure.
+            # TODO(https://fxbug.dev/354047162): Enable once the error is not during the transition.
+            # ":failure_test_pkg_without_api_level_and_no_repo_default",
+            ":pkg_at_next_api_level_and_no_repo_default",
+            ":pkg_at_next_api_level_and_unknown_repo_default",
+            ":override_api_level_overrides_unknown_repo_default",
+            ":override_api_level_overrides_unknown_package_and_repo_default",
+            ":pkg_without_api_level_and_some_supported_repo_default",
+            ":pkg_without_api_level_and_repo_default_next",
+            ":failure_test_pkg_without_api_level_and_unknown_repo_default",
+            ":failure_test_pkg_at_next_api_level_with_unknown_override_api_level",
         ],
         **kwargs
     )

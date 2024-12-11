@@ -38,7 +38,7 @@
 //
 // TODO(https://fxbug.dev/issues/338300808): Remove this flag when the new attribution code (and
 // thus share counts) are the default.
-#define ENABLE_COW_SPLIT_BITS true
+#define ENABLE_COW_SPLIT_BITS false
 static_assert(ENABLE_LEGACY_ATTRIBUTION == ENABLE_COW_SPLIT_BITS);
 
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)

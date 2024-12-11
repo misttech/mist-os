@@ -25,6 +25,8 @@ use {fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fa
 // Used to create executable VMOs.
 const BOOTFS_VMEX_NAME: &str = "bootfs_vmex";
 
+const BOOTFS_VMO_NAME: &str = "bootfs";
+
 // If passed as a kernel handle, this gets relocated into a '/boot/log' directory.
 const KERNEL_CRASHLOG_NAME: &str = "crashlog";
 const LAST_PANIC_FILEPATH: &str = "log/last-panic.txt";
@@ -297,6 +299,10 @@ impl BootfsSvc {
                     vmo
                 }
             };
+            if matches!(vmo.get_name(), Ok(s) if s == "") {
+                // No name was preset on this vmo, attribute it generally to bootfs.
+                vmo.set_name(&zx::Name::new_lossy(BOOTFS_VMO_NAME)).map_err(BootfsError::Vmo)?;
+            }
 
             // TODO(https://fxbug.dev/353380758): this strategy of granting
             // exec rights may be overly liberal.
@@ -503,6 +509,7 @@ mod tests {
             // (i.e. it does not have a parent VMO).
             let vmo = file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
             assert_eq!(vmo.info().unwrap().parent_koid, zx::Koid::from_raw(0));
+            assert_eq!(vmo.info().unwrap().name, "bootfs");
         }
 
         // Confirm that the only committed bytes of the Bootfs VMO is up to the

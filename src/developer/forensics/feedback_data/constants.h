@@ -73,7 +73,7 @@ struct SnapshotVersion {
 };
 
 // The name of the protocol to use to read Feedback data from the Archive.
-constexpr char kArchiveAccessorName[] = "fuchsia.diagnostics.FeedbackArchiveAccessor";
+constexpr char kArchiveAccessorName[] = "fuchsia.diagnostics.ArchiveAccessor.feedback";
 
 }  // namespace feedback_data
 }  // namespace forensics

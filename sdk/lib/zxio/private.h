@@ -172,10 +172,6 @@ zx_status_t zxio_vmo_init(zxio_storage_t* file, zx::vmo vmo, zx::stream stream);
 // The file will be transferable to another process.
 zx_status_t zxio_transferable_init(zxio_storage_t* file, zx::channel channel);
 
-zx_status_t zxio_create_with_nodeinfo_deprecated(fidl::ClientEnd<fuchsia_io::Node> node,
-                                                 fuchsia_io::wire::NodeInfoDeprecated& node_info,
-                                                 zxio_storage_t* storage);
-
 zx_status_t zxio_create_with_representation(fidl::ClientEnd<fuchsia_io::Node> node,
                                             fuchsia_io::wire::Representation& representation,
                                             zxio_node_attributes_t* attr, zxio_storage_t* storage);

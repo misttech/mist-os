@@ -28,7 +28,8 @@ template("adb_e2e") {
     }
 
     host_test_data("adb_bin") {
-      sources = [ "//prebuilt/starnix/internal/android-image-amd64/adb" ]
+      # TODO: Add this back when the test is enabled and an adb prebuilt is available.
+      sources = [ "" ]
       outputs = [ "$target_out_dir/{{source_file_part}}" ]
     }
   } else {

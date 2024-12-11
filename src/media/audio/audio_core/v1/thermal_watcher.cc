@@ -8,6 +8,7 @@
 #include <lib/async/dispatcher.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <limits>
 #include <memory>
 
 #include <rapidjson/document.h>
@@ -127,7 +128,8 @@ void ThermalWatcher::SetThermalState(uint64_t state) {
 
   auto previous_state = thermal_state_;
   thermal_state_ = state;
-  Reporter::Singleton().SetThermalState(state);
+  FX_DCHECK(state <= std::numeric_limits<uint32_t>::max());
+  Reporter::Singleton().SetThermalState(static_cast<uint32_t>(state));
   if constexpr (kLogThermalStateChanges) {
     FX_LOGS(INFO) << "Thermal state change (from " << previous_state << " to " << thermal_state_
                   << ") has been posted";

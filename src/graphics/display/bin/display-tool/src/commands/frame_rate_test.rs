@@ -228,10 +228,14 @@ pub async fn run(
 
     // Obtain the display resolution based on the display's preferred mode.
     let (width, height, expected_frame_rate) = {
-        let mode = display.0.modes[0];
-        (mode.horizontal_resolution, mode.vertical_resolution, mode.refresh_rate_e2 as f32 / 100.0)
+        let mode = &display.0.modes[0];
+        (
+            mode.active_area.width,
+            mode.active_area.height,
+            mode.refresh_rate_millihertz as f32 / 1000.0,
+        )
     };
-    println!("Expected frame rate: {:.2} fps", expected_frame_rate);
+    println!("Expected frame rate: {:.3} fps", expected_frame_rate);
 
     let scene = FrameRateTestScene::new(size2(width, height), grid_width, grid_height);
     let mut double_buffered_fence_loop = DoubleBufferedFenceLoop::new(

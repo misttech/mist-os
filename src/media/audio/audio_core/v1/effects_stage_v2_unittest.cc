@@ -170,15 +170,47 @@ ConfigOptions DupConfigOptions(const ConfigOptions& options) {
   };
 }
 
-fuchsia_audio_effects::wire::ProcessorConfiguration MakeProcessorConfig(Arena& arena,
-                                                                        ConfigOptions options) {
-  fuchsia_audio_effects::wire::ProcessorConfiguration config(arena);
+// This is a destructive operation: it moves buffer() into the new buildable config it returns.
+fidl::WireTableBuilder<fuchsia_audio_effects::wire::InputConfiguration> MakeInputConfigBuilder(
+    Arena& arena, fuchsia_audio_effects::wire::InputConfiguration input) {
+  auto clone = fuchsia_audio_effects::wire::InputConfiguration::Builder(arena);
+  if (input.has_buffer()) {
+    clone.buffer(std::move(input.buffer()));
+  }
+  if (input.has_format()) {
+    clone.format(input.format());
+  }
+  return clone;
+}
+
+// This is a destructive operation: it moves buffer() into the new buildable config it returns.
+fidl::WireTableBuilder<fuchsia_audio_effects::wire::OutputConfiguration> MakeOutputConfigBuilder(
+    Arena& arena, fuchsia_audio_effects::wire::OutputConfiguration output) {
+  auto clone = fuchsia_audio_effects::wire::OutputConfiguration::Builder(arena);
+  if (output.has_buffer()) {
+    clone.buffer(std::move(output.buffer()));
+  }
+  if (output.has_format()) {
+    clone.format(output.format());
+  }
+  if (output.has_latency_frames()) {
+    clone.latency_frames(output.latency_frames());
+  }
+  if (output.has_ring_out_frames()) {
+    clone.ring_out_frames(output.ring_out_frames());
+  }
+  return clone;
+}
+
+fidl::WireTableBuilder<fuchsia_audio_effects::wire::ProcessorConfiguration> MakeProcessorConfig(
+    Arena& arena, ConfigOptions options) {
+  auto config = fuchsia_audio_effects::wire::ProcessorConfiguration::Builder(arena);
 
   if (options.max_frames_per_call) {
-    config.set_max_frames_per_call(arena, options.max_frames_per_call);
+    config.max_frames_per_call(options.max_frames_per_call);
   }
   if (options.block_size_frames) {
-    config.set_block_size_frames(arena, options.block_size_frames);
+    config.block_size_frames(options.block_size_frames);
   }
 
   if (auto& buffer = options.input_buffer; buffer.vmo.is_valid()) {
@@ -189,38 +221,41 @@ fuchsia_audio_effects::wire::ProcessorConfiguration MakeProcessorConfig(Arena& a
   }
 
   fidl::VectorView<fuchsia_audio_effects::wire::InputConfiguration> inputs(arena, 1);
-  inputs[0].Allocate(arena);
-  inputs[0].set_buffer(arena, std::move(options.input_buffer));
-  inputs[0].set_format(arena, std::move(options.input_format));
+  inputs[0] = fuchsia_audio_effects::wire::InputConfiguration::Builder(arena)
+                  .buffer(std::move(options.input_buffer))
+                  .format(options.input_format)
+                  .Build();
 
   fidl::VectorView<fuchsia_audio_effects::wire::OutputConfiguration> outputs(arena, 1);
-  outputs[0].Allocate(arena);
-  outputs[0].set_buffer(arena, std::move(options.output_buffer));
-  outputs[0].set_format(arena, std::move(options.output_format));
+  auto output = fuchsia_audio_effects::wire::OutputConfiguration::Builder(arena)
+                    .buffer(std::move(options.output_buffer))
+                    .format(options.output_format);
   if (options.latency_frames) {
-    outputs[0].set_latency_frames(arena, options.latency_frames);
+    output.latency_frames(options.latency_frames);
   }
   if (options.ring_out_frames) {
-    outputs[0].set_ring_out_frames(arena, options.ring_out_frames);
+    output.ring_out_frames(options.ring_out_frames);
   }
+  outputs[0] = output.Build();
 
-  config.set_inputs(fidl::ObjectView{arena, inputs});
-  config.set_outputs(fidl::ObjectView{arena, outputs});
+  config.inputs(fidl::ObjectView{arena, inputs});
+  config.outputs(fidl::ObjectView{arena, outputs});
   return config;
 }
 
 fidl::ServerEnd<fuchsia_audio_effects::Processor> AttachProcessorChannel(
-    fuchsia_audio_effects::wire::ProcessorConfiguration& config) {
+    fidl::WireTableBuilder<fuchsia_audio_effects::wire::ProcessorConfiguration>& config) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_audio_effects::Processor>();
   if (!endpoints.is_ok()) {
     FX_PLOGS(FATAL, endpoints.status_value()) << "failed to construct a zx::channel";
   }
 
-  config.set_processor(std::move(endpoints->client));
+  config.processor(std::move(endpoints->client));
   return std::move(endpoints->server);
 }
 
-fuchsia_audio_effects::wire::ProcessorConfiguration DefaultGoodProcessorConfig(Arena& arena) {
+fidl::WireTableBuilder<fuchsia_audio_effects::wire::ProcessorConfiguration>
+DefaultGoodProcessorConfig(Arena& arena) {
   constexpr auto kBytes = 480 * sizeof(float);
 
   ConfigOptions options;
@@ -288,7 +323,7 @@ class EffectsStageV2Test : public testing::ThreadingModelFixture {
     auto packet_factory = std::make_unique<testing::PacketFactory>(dispatcher(), source_format,
                                                                    zx_system_get_page_size());
     auto stream = MakePacketQueue(source_format);
-    auto effects_stage = EffectsStageV2::Create(std::move(config), stream).take_value();
+    auto effects_stage = EffectsStageV2::Create(config, stream).take_value();
     return std::make_tuple(std::move(packet_factory), std::move(stream), std::move(effects_stage));
   }
 
@@ -296,7 +331,7 @@ class EffectsStageV2Test : public testing::ThreadingModelFixture {
 
   // By default, the MakeProcessorWith*() functions create input and output buffers
   // that are large enough to process at most this many frames.
-  static constexpr auto kProcessingBufferMaxFrames = 1024;
+  static constexpr uint64_t kProcessingBufferMaxFrames = 1024;
 
   template <class ProcessorT>
   struct ProcessorInfo {
@@ -326,7 +361,7 @@ class EffectsStageV2Test : public testing::ThreadingModelFixture {
   //   2. ReadLock(packet_frames, packet_frames), which should return std::nullopt.
   //
   template <class T>
-  void TestAddOneWithSinglePacket(ProcessorInfo<T> info, int64_t packet_frames = 480,
+  void TestAddOneWithSinglePacket(const ProcessorInfo<T>& info, int64_t packet_frames = 480,
                                   int64_t read_lock_buffer_frames = 480);
 
  private:
@@ -348,7 +383,7 @@ EffectsStageV2Test::ProcessorInfo<T> EffectsStageV2Test::MakeProcessor(ConfigOpt
   return {
       .processor = T(options, std::move(server_end), fidl_dispatcher()),
       .in_place = options.in_place,
-      .config = std::move(config),
+      .config = std::move(config.Build()),
   };
 }
 
@@ -397,23 +432,25 @@ EffectsStageV2Test::ProcessorInfo<T> EffectsStageV2Test::MakeProcessorWithSameVm
   const auto kOutputBufferBytes = kProcessingBufferMaxFrames * kOutputChannels * sizeof(float);
   auto input_bytes = fbl::round_up(kInputBufferBytes, page_size);
   auto output_bytes = fbl::round_up(kOutputBufferBytes, page_size);
+  auto output_offset_bytes = input_bytes;
 
-  CreateSharedVmo(options, input_bytes + output_bytes,  // VMO size
-                  0, kInputBufferBytes,                 // input buffer offset & size
-                  input_bytes, kOutputBufferBytes);     // output buffer offset & size
+  CreateSharedVmo(options, input_bytes + output_bytes,       // VMO size
+                  0UL, kInputBufferBytes,                    // input buffer offset & size
+                  output_offset_bytes, kOutputBufferBytes);  // output buffer offset & size
 
   return MakeProcessor<T>(std::move(options));
 }
 
 // Generic test for a processor that adds one to each input sample.
 template <class T>
-void EffectsStageV2Test::TestAddOneWithSinglePacket(ProcessorInfo<T> info, int64_t packet_frames,
+void EffectsStageV2Test::TestAddOneWithSinglePacket(const ProcessorInfo<T>& info,
+                                                    int64_t packet_frames,
                                                     int64_t read_lock_buffer_frames) {
   const auto input_channels = info.config.inputs()[0].format().channel_count;
   const auto output_channels = info.config.outputs()[0].format().channel_count;
   const Format source_format = ToOldFormat(info.config.inputs()[0].format());
 
-  auto [packet_factory, stream, effects_stage] = MakeEffectsStage(std::move(info.config));
+  auto [packet_factory, stream, effects_stage] = MakeEffectsStage(info.config);
 
   // Enqueue one packet of the requested size.
   const auto packet_duration =
@@ -486,7 +523,7 @@ TEST_F(EffectsStageV2Test, AddOneWithOneChanDifferentVmos) {
       .input_format = DefaultFormatWithChannels(1),
       .output_format = DefaultFormatWithChannels(1),
   });
-  TestAddOneWithSinglePacket(std::move(processor_info));
+  TestAddOneWithSinglePacket(processor_info);
 }
 
 TEST_F(EffectsStageV2Test, AddOneWithTwoChanDifferentVmos) {
@@ -494,7 +531,7 @@ TEST_F(EffectsStageV2Test, AddOneWithTwoChanDifferentVmos) {
       .input_format = DefaultFormatWithChannels(2),
       .output_format = DefaultFormatWithChannels(2),
   });
-  TestAddOneWithSinglePacket(std::move(processor_info));
+  TestAddOneWithSinglePacket(processor_info);
 }
 
 TEST_F(EffectsStageV2Test, AddOneWithOneChanSameRange) {
@@ -502,7 +539,7 @@ TEST_F(EffectsStageV2Test, AddOneWithOneChanSameRange) {
       .input_format = DefaultFormatWithChannels(1),
       .output_format = DefaultFormatWithChannels(1),
   });
-  TestAddOneWithSinglePacket(std::move(processor_info));
+  TestAddOneWithSinglePacket(processor_info);
 }
 
 TEST_F(EffectsStageV2Test, AddOneWithOneChanSameVmoDifferentRanges) {
@@ -510,7 +547,7 @@ TEST_F(EffectsStageV2Test, AddOneWithOneChanSameVmoDifferentRanges) {
       .input_format = DefaultFormatWithChannels(1),
       .output_format = DefaultFormatWithChannels(1),
   });
-  TestAddOneWithSinglePacket(std::move(processor_info));
+  TestAddOneWithSinglePacket(processor_info);
 }
 
 TEST_F(EffectsStageV2Test, AddOneWithSourceOffset) {
@@ -531,7 +568,7 @@ TEST_F(EffectsStageV2Test, AddOneWithSourceOffset) {
         .output_format = DefaultFormatWithChannels(1),
     });
 
-    auto [packet_factory, stream, effects_stage] = MakeEffectsStage(std::move(info.config));
+    auto [packet_factory, stream, effects_stage] = MakeEffectsStage(info.config);
     packet_factory->SeekToFrame(source_offset);
     stream->PushPacket(packet_factory->CreatePacket(1.0, kPacketDuration));
 
@@ -571,7 +608,7 @@ TEST_F(EffectsStageV2Test, AddOneWithSourceOffset) {
 
     {
       // Read the next packet. This should be null, because there are no more packets.
-      auto buf = effects_stage->ReadLock(rlctx, Fixed(2 * kPacketFrames), kPacketFrames);
+      auto buf = effects_stage->ReadLock(rlctx, Fixed(2L * kPacketFrames), kPacketFrames);
       ASSERT_FALSE(buf);
     }
   }
@@ -586,7 +623,7 @@ TEST_F(EffectsStageV2Test, AddOneWithReadLockSmallerThanProcessingBuffer) {
   });
 
   // Queue one 10ms packet (480 frames).
-  auto [packet_factory, stream, effects_stage] = MakeEffectsStage(std::move(info.config));
+  auto [packet_factory, stream, effects_stage] = MakeEffectsStage(info.config);
   stream->PushPacket(packet_factory->CreatePacket(1.0, zx::msec(10)));
 
   {
@@ -634,7 +671,7 @@ TEST_F(EffectsStageV2Test, AddOneWithReadLockSmallerThanProcessingBufferAndSourc
   });
 
   // Queue one 10ms packet (480 frames) starting at frame 720.
-  auto [packet_factory, stream, effects_stage] = MakeEffectsStage(std::move(info.config));
+  auto [packet_factory, stream, effects_stage] = MakeEffectsStage(info.config);
   packet_factory->SeekToFrame(Fixed(720));
   stream->PushPacket(packet_factory->CreatePacket(1.0, zx::msec(10)));
 
@@ -764,7 +801,7 @@ TEST_F(EffectsStageV2Test, AddOneAndRemoveChannelWithDifferentVmos) {
       .input_format = DefaultFormatWithChannels(2),
       .output_format = DefaultFormatWithChannels(1),
   });
-  TestAddOneWithSinglePacket(std::move(processor_info));
+  TestAddOneWithSinglePacket(processor_info);
 }
 
 TEST_F(EffectsStageV2Test, AddOneAndRemoveChannelWithSameVmoDifferentRanges) {
@@ -772,7 +809,7 @@ TEST_F(EffectsStageV2Test, AddOneAndRemoveChannelWithSameVmoDifferentRanges) {
       .input_format = DefaultFormatWithChannels(2),
       .output_format = DefaultFormatWithChannels(1),
   });
-  TestAddOneWithSinglePacket(std::move(processor_info));
+  TestAddOneWithSinglePacket(processor_info);
 }
 
 //
@@ -798,8 +835,8 @@ class AddOneWithSizeLimitsProcessor : public BaseProcessor {
       FX_CHECK(num_frames <= MaxFramesPerCall)
           << "expected at most " << MaxFramesPerCall << " frames, got " << num_frames;
     }
-    if (BlockSizeFrames > 0) {
-      FX_CHECK(num_frames % BlockSizeFrames == 0)
+    if constexpr (BlockSizeFrames > 0) {
+      FX_CHECK((num_frames % BlockSizeFrames) == 0)
           << "expected multiple of " << BlockSizeFrames << " frames, got " << num_frames;
     }
 
@@ -820,7 +857,7 @@ TEST_F(EffectsStageV2Test, AddOneWithSizeLimitsMaxSizeWithoutBlockSize) {
       .max_frames_per_call = 31,
       .block_size_frames = 0,
   });
-  TestAddOneWithSinglePacket(std::move(processor_info), 480 /* = packet_frames */,
+  TestAddOneWithSinglePacket(processor_info, 480 /* = packet_frames */,
                              31 /* = read_lock_buffer_frames */);
 }
 
@@ -832,8 +869,7 @@ TEST_F(EffectsStageV2Test, AddOneWithSizeLimitsBlockSizeWithoutMax) {
       .max_frames_per_call = 0,
       .block_size_frames = 7,
   });
-  TestAddOneWithSinglePacket(std::move(processor_info),
-                             kProcessingBufferMaxFrames /* = packet_frames */,
+  TestAddOneWithSinglePacket(processor_info, kProcessingBufferMaxFrames /* = packet_frames */,
                              1022 /* = read_lock_buffer_frames */);
 }
 
@@ -845,7 +881,7 @@ TEST_F(EffectsStageV2Test, AddOneWithSizeLimitsBlockSizeEqualsMax) {
       .max_frames_per_call = 8,
       .block_size_frames = 8,
   });
-  TestAddOneWithSinglePacket(std::move(processor_info), 480 /* = packet_frames */,
+  TestAddOneWithSinglePacket(processor_info, 480 /* = packet_frames */,
                              8 /* = read_lock_buffer_frames */);
 }
 
@@ -857,7 +893,7 @@ TEST_F(EffectsStageV2Test, AddOneWithSizeLimitsBlockSizeLessThanMaxNotDivisible)
       .max_frames_per_call = 31,
       .block_size_frames = 8,
   });
-  TestAddOneWithSinglePacket(std::move(processor_info), 480 /* = packet_frames */,
+  TestAddOneWithSinglePacket(processor_info, 480 /* = packet_frames */,
                              24 /* = read_lock_buffer_frames */);
 }
 
@@ -869,7 +905,7 @@ TEST_F(EffectsStageV2Test, AddOneWithSizeLimitsBlockSizeLessThanMaxDivisible) {
       .max_frames_per_call = 32,
       .block_size_frames = 8,
   });
-  TestAddOneWithSinglePacket(std::move(processor_info), 480 /* = packet_frames */,
+  TestAddOneWithSinglePacket(processor_info, 480 /* = packet_frames */,
                              32 /* = read_lock_buffer_frames */);
 }
 
@@ -906,7 +942,7 @@ TEST_F(EffectsStageV2Test, PassOptions) {
   auto info = MakeProcessorWithDifferentVmos<CheckOptionsProcessor>({});
 
   // Enqueue one packet in the source packet queue.
-  auto [packet_factory, stream, effects_stage] = MakeEffectsStage(std::move(info.config));
+  auto [packet_factory, stream, effects_stage] = MakeEffectsStage(info.config);
   stream->PushPacket(packet_factory->CreatePacket(1.0, kPacketDuration));
 
   // Ensure that ULTRASOUND is removed.
@@ -947,18 +983,21 @@ class ReturnMetricsProcessor : public BaseProcessor {
 
 TEST_F(EffectsStageV2Test, Metrics) {
   std::vector<fuchsia_audio_effects::wire::ProcessMetrics> expected_metrics(3);
-  expected_metrics[0].Allocate(arena());
-  expected_metrics[0].set_name(arena(), "EffectsStageV2::Process");
-  expected_metrics[1].Allocate(arena());
-  expected_metrics[1].set_name(arena(), "stage1");
-  expected_metrics[1].set_wall_time(arena(), 100);
-  expected_metrics[1].set_cpu_time(arena(), 101);
-  expected_metrics[1].set_queue_time(arena(), 102);
-  expected_metrics[2].Allocate(arena());
-  expected_metrics[2].set_name(arena(), "stage2");
-  expected_metrics[2].set_wall_time(arena(), 200);
-  expected_metrics[2].set_cpu_time(arena(), 201);
-  expected_metrics[2].set_queue_time(arena(), 201);
+  expected_metrics[0] = fuchsia_audio_effects::wire::ProcessMetrics::Builder(arena())
+                            .name("EffectsStageV2::Process")
+                            .Build();
+  expected_metrics[1] = fuchsia_audio_effects::wire::ProcessMetrics::Builder(arena())
+                            .name("stage1")
+                            .wall_time(100)
+                            .cpu_time(101)
+                            .queue_time(102)
+                            .Build();
+  expected_metrics[2] = fuchsia_audio_effects::wire::ProcessMetrics::Builder(arena())
+                            .name("stage2")
+                            .wall_time(200)
+                            .cpu_time(201)
+                            .queue_time(201)
+                            .Build();
 
   constexpr auto kPacketFrames = 480;
   constexpr auto kPacketDuration = zx::msec(10);
@@ -966,7 +1005,7 @@ TEST_F(EffectsStageV2Test, Metrics) {
   info.processor.set_metrics(&expected_metrics);
 
   // Enqueue one packet in the source packet queue.
-  auto [packet_factory, stream, effects_stage] = MakeEffectsStage(std::move(info.config));
+  auto [packet_factory, stream, effects_stage] = MakeEffectsStage(info.config);
   stream->PushPacket(packet_factory->CreatePacket(1.0, kPacketDuration));
 
   // Call ReadLock and validate the metrics.
@@ -999,10 +1038,12 @@ TEST_F(EffectsStageV2Test, Metrics) {
 
 TEST_F(EffectsStageV2Test, LatencyAffectStreamTimelineAndLeadTime) {
   auto config = DefaultGoodProcessorConfig(arena());
-  config.outputs()[0].set_latency_frames(arena(), 13);
+  auto output = MakeOutputConfigBuilder(arena(), config.outputs()[0]);
+  output.latency_frames(13);
+  config.outputs()[0] = output.Build();
 
   // Create a source packet queue.
-  auto [packet_factory, stream, effects_stage] = MakeEffectsStage(std::move(config));
+  auto [packet_factory, stream, effects_stage] = MakeEffectsStage(config.Build());
 
   // Setup the timeline function so that time 0 aligns to frame 0 with a rate corresponding to the
   // streams format.
@@ -1041,7 +1082,7 @@ TEST_F(EffectsStageV2Test, LatencyAffectStreamTimelineAndLeadTime) {
 TEST_F(EffectsStageV2Test, CreateSuccess) {
   auto config = DefaultGoodProcessorConfig(arena());
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_TRUE(result.is_ok()) << "failed with status: " << result.error();
 }
 
@@ -1050,7 +1091,7 @@ TEST_F(EffectsStageV2Test, CreateFailsMissingProcessorHandle) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   config.clear_processor();
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1059,7 +1100,7 @@ TEST_F(EffectsStageV2Test, CreateFailsNoInputs) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   config.clear_inputs();
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1068,7 +1109,7 @@ TEST_F(EffectsStageV2Test, CreateFailsNoOutputs) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   config.clear_outputs();
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1081,7 +1122,7 @@ TEST_F(EffectsStageV2Test, CreateFailsTooManyInputs) {
   config.inputs() =
       fidl::VectorView<fuchsia_audio_effects::wire::InputConfiguration>::FromExternal(inputs);
 
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1094,7 +1135,7 @@ TEST_F(EffectsStageV2Test, CreateFailsTooManyOutputs) {
   config.outputs() =
       fidl::VectorView<fuchsia_audio_effects::wire::OutputConfiguration>::FromExternal(outputs);
 
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1102,8 +1143,10 @@ TEST_F(EffectsStageV2Test, CreateFailsInputMissingFormat) {
   auto config = DefaultGoodProcessorConfig(arena());
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
-  config.inputs()[0].clear_format();
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto input = MakeInputConfigBuilder(arena(), config.inputs()[0]);
+  input.clear_format();
+  config.inputs()[0] = input.Build();
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1111,8 +1154,10 @@ TEST_F(EffectsStageV2Test, CreateFailsOutputMissingFormat) {
   auto config = DefaultGoodProcessorConfig(arena());
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
-  config.outputs()[0].clear_format();
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto output = MakeOutputConfigBuilder(arena(), config.outputs()[0]);
+  output.clear_format();
+  config.outputs()[0] = output.Build();
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1121,7 +1166,7 @@ TEST_F(EffectsStageV2Test, CreateFailsInputFormatNotFloat) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   config.inputs()[0].format().sample_format = ASF::kUnsigned8;
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1130,7 +1175,7 @@ TEST_F(EffectsStageV2Test, CreateFailsOutputFormatNotFloat) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   config.outputs()[0].format().sample_format = ASF::kUnsigned8;
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1140,7 +1185,7 @@ TEST_F(EffectsStageV2Test, CreateFailsInputOutputFpsMismatch) {
 
   config.inputs()[0].format().frames_per_second = 48000;
   config.outputs()[0].format().frames_per_second = 44100;
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1148,8 +1193,10 @@ TEST_F(EffectsStageV2Test, CreateFailsInputMissingBuffer) {
   auto config = DefaultGoodProcessorConfig(arena());
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
-  config.inputs()[0].clear_buffer();
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto input = MakeInputConfigBuilder(arena(), config.inputs()[0]);
+  input.clear_buffer();
+  config.inputs()[0] = input.Build();
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1157,8 +1204,10 @@ TEST_F(EffectsStageV2Test, CreateFailsOutputMissingBuffer) {
   auto config = DefaultGoodProcessorConfig(arena());
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
-  config.outputs()[0].clear_buffer();
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto output = MakeOutputConfigBuilder(arena(), config.outputs()[0]);
+  output.clear_buffer();
+  config.outputs()[0] = output.Build();
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1167,7 +1216,7 @@ TEST_F(EffectsStageV2Test, CreateFailsInputBufferEmpty) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   config.inputs()[0].buffer().size = 0;
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1176,7 +1225,7 @@ TEST_F(EffectsStageV2Test, CreateFailsOutputBufferEmpty) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   config.outputs()[0].buffer().size = 0;
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1185,7 +1234,7 @@ TEST_F(EffectsStageV2Test, CreateFailsInputBufferVmoInvalid) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   config.inputs()[0].buffer().vmo = zx::vmo();
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1194,7 +1243,7 @@ TEST_F(EffectsStageV2Test, CreateFailsOutputBufferVmoInvalid) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   config.outputs()[0].buffer().vmo = zx::vmo();
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1204,7 +1253,7 @@ TEST_F(EffectsStageV2Test, CreateFailsInputBufferVmoMustBeMappable) {
 
   auto& buffer = config.inputs()[0].buffer();
   ASSERT_EQ(ZX_OK, buffer.vmo.replace(ZX_RIGHT_WRITE, &buffer.vmo));
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1214,7 +1263,7 @@ TEST_F(EffectsStageV2Test, CreateFailsOutputBufferVmoMustBeMappable) {
 
   auto& buffer = config.outputs()[0].buffer();
   ASSERT_EQ(ZX_OK, buffer.vmo.replace(ZX_RIGHT_READ, &buffer.vmo));
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1224,7 +1273,7 @@ TEST_F(EffectsStageV2Test, CreateFailsInputBufferVmoMustBeWritable) {
 
   auto& buffer = config.inputs()[0].buffer();
   ASSERT_EQ(ZX_OK, buffer.vmo.replace(ZX_RIGHT_MAP, &buffer.vmo));
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1234,7 +1283,7 @@ TEST_F(EffectsStageV2Test, CreateFailsOutputBufferVmoMustBeReadable) {
 
   auto& buffer = config.outputs()[0].buffer();
   ASSERT_EQ(ZX_OK, buffer.vmo.replace(ZX_RIGHT_MAP, &buffer.vmo));
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1247,7 +1296,7 @@ TEST_F(EffectsStageV2Test, CreateFailsInputBufferVmoTooSmall) {
   ASSERT_EQ(ZX_OK, buffer.vmo.get_size(&vmo_size));
   buffer.size = vmo_size + 1;
 
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());  // too large by 1 byte
 }
 
@@ -1260,7 +1309,7 @@ TEST_F(EffectsStageV2Test, CreateFailsOutputBufferVmoTooSmall) {
   ASSERT_EQ(ZX_OK, buffer.vmo.get_size(&vmo_size));
   buffer.size = vmo_size + 1;  // too large by 1 byte
 
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1273,7 +1322,7 @@ TEST_F(EffectsStageV2Test, CreateFailsInputBufferOffsetTooLarge) {
   ASSERT_EQ(ZX_OK, buffer.vmo.get_size(&vmo_size));
   buffer.offset = vmo_size - buffer.size + 1;  // too large by 1 byte
 
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1286,7 +1335,7 @@ TEST_F(EffectsStageV2Test, CreateFailsOutputBufferOffsetTooLarge) {
   ASSERT_EQ(ZX_OK, buffer.vmo.get_size(&vmo_size));
   buffer.offset = vmo_size - buffer.size + 1;  // too large by 1 byte
 
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1294,10 +1343,10 @@ TEST_F(EffectsStageV2Test, CreateFailsInputBufferTooSmall) {
   auto config = DefaultGoodProcessorConfig(arena());
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
-  config.set_max_frames_per_call(arena(), 10);
+  config.max_frames_per_call(10);
   config.inputs()[0].buffer().size = 9 * sizeof(float);
 
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1305,10 +1354,10 @@ TEST_F(EffectsStageV2Test, CreateFailsOutputBufferTooSmall) {
   auto config = DefaultGoodProcessorConfig(arena());
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
-  config.set_max_frames_per_call(arena(), 10);
+  config.max_frames_per_call(10);
   config.outputs()[0].buffer().size = 9 * sizeof(float);
 
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1325,7 +1374,7 @@ TEST_F(EffectsStageV2Test, CreateFailsOutputBufferPartiallyOverlapsInputBuffer) 
   output_buffer.offset = 255;
   output_buffer.size = 256;
 
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1334,8 +1383,8 @@ TEST_F(EffectsStageV2Test, CreateFailsBlockSizeTooBig) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   auto max_frames = config.inputs()[0].buffer().size / sizeof(float);
-  config.set_block_size_frames(arena(), max_frames + 1);
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  config.block_size_frames(max_frames + 1);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1344,8 +1393,8 @@ TEST_F(EffectsStageV2Test, CreateFailsMaxFramesPerCallTooBig) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   auto max_frames = config.inputs()[0].buffer().size / sizeof(float);
-  config.set_max_frames_per_call(arena(), max_frames + 1);
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  config.max_frames_per_call(max_frames + 1);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1354,7 +1403,7 @@ TEST_F(EffectsStageV2Test, CreateFailsInputSampleFormatDoesNotMatchSource) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   config.inputs()[0].format().sample_format = ASF::kUnsigned8;
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1363,7 +1412,7 @@ TEST_F(EffectsStageV2Test, CreateFailsInputChannelCountDoesNotMatchSource) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   config.inputs()[0].format().channel_count = 2;
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1372,7 +1421,7 @@ TEST_F(EffectsStageV2Test, CreateFailsInputFpsDoesNotMatchSource) {
   auto stream = MakePacketQueue(k48k1ChanFloatFormat);
 
   config.inputs()[0].format().frames_per_second = 44100;
-  auto result = EffectsStageV2::Create(std::move(config), stream);
+  auto result = EffectsStageV2::Create(config.Build(), stream);
   EXPECT_FALSE(result.is_ok());
 }
 
@@ -1441,7 +1490,7 @@ TEST(EffectsStageV2BuffersTest, CreateSharedOverlappingNonzeroOffsets) {
 
   ConfigOptions options;
   CreateSharedVmo(options,
-                  page_size * 2,          // vmo_size_bytes
+                  page_size * 2UL,        // vmo_size_bytes
                   page_size, page_size,   // input_offset_bytes, input_size_bytes
                   page_size, page_size);  // output_offset_bytes output_size_bytes
 
@@ -1471,7 +1520,7 @@ TEST(EffectsStageV2BuffersTest, CreateSharedNonOverlapping) {
 
   ConfigOptions options;
   CreateSharedVmo(options,
-                  page_size * 2,          // vmo_size_bytes
+                  page_size * 2UL,        // vmo_size_bytes
                   0, page_size,           // input_offset_bytes, input_size_bytes
                   page_size, page_size);  // output_offset_bytes output_size_bytes
 

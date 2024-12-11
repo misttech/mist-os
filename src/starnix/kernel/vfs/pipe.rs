@@ -956,10 +956,11 @@ impl PipeFileObject {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let available = UserBuffer::cap_buffers_to_max_rw_count(
-            current_task.maximum_valid_address(),
+            current_task.maximum_valid_address().ok_or_else(|| errno!(EINVAL))?,
             &mut iovec,
         )?;
-        let mappings = current_task.mm().get_mappings_for_vmsplice(&iovec)?;
+        let mappings =
+            current_task.mm().ok_or_else(|| errno!(EINVAL))?.get_mappings_for_vmsplice(&iovec)?;
 
         let mut pipe =
             self.lock_pipe_for_writing(locked, current_task, self_file, non_blocking, available)?;

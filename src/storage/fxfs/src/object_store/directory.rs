@@ -27,6 +27,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use zerocopy::IntoBytes;
 
 use super::FSCRYPT_KEY_ID;
 
@@ -71,12 +72,14 @@ impl MutableAttributesInternal {
 /// We use this as a prefix for EncryptedChild records. When looking up a casefolded
 /// filename in an encrypted directory, this lets us jump close to the correct encrypted
 /// child without having to enumerate the entire directory.
-fn get_encrypted_casefold_hash(name: &str) -> u32 {
+fn get_encrypted_casefold_hash(name: &str, key: &Key) -> u32 {
     let mut hasher = rustc_hash::FxHasher::default();
     for ch in fxfs_unicode::casefold(name.chars()) {
         ch.hash(&mut hasher);
     }
-    hasher.finish() as u32
+    let mut hash = hasher.finish() as u32;
+    key.encrypt(0, hash.as_mut_bytes()).unwrap();
+    hash
 }
 
 #[fxfs_trace::trace]
@@ -472,7 +475,7 @@ impl<S: HandleOwner> Directory<S> {
                     // the casefold hash prefix to seek close to the desired entry,
                     // reducing the amount of brute-force enumeration required to find a
                     // match.
-                    let hash = get_encrypted_casefold_hash(name);
+                    let hash = get_encrypted_casefold_hash(name, &fscrypt_key);
                     let key = ObjectKey::encrypted_child(self.object_id(), vec![], hash);
                     let layer_set = self.store().tree().layer_set();
                     let mut merger = layer_set.merger();
@@ -616,7 +619,12 @@ impl<S: HandleOwner> Directory<S> {
         .await?;
         if self.wrapping_key_id.lock().unwrap().is_some() {
             let encrypted_name = self.get_encrypted_name(name, true).await?;
-            let casefold_hash = if self.casefold() { get_encrypted_casefold_hash(name) } else { 0 };
+            let casefold_hash = if self.casefold() {
+                let fscrypt_key = self.get_fscrypt_key().await?.unwrap();
+                get_encrypted_casefold_hash(name, &fscrypt_key)
+            } else {
+                0
+            };
             transaction.add(
                 self.store().store_object_id(),
                 Mutation::replace_or_insert_object(
@@ -658,7 +666,12 @@ impl<S: HandleOwner> Directory<S> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         if self.wrapping_key_id.lock().unwrap().is_some() {
             let encrypted_name = self.get_encrypted_name(name, true).await?;
-            let casefold_hash = if self.casefold() { get_encrypted_casefold_hash(name) } else { 0 };
+            let casefold_hash = if self.casefold() {
+                let fscrypt_key = self.get_fscrypt_key().await?.unwrap();
+                get_encrypted_casefold_hash(name, &fscrypt_key)
+            } else {
+                0
+            };
             transaction.add(
                 self.store().store_object_id(),
                 Mutation::replace_or_insert_object(
@@ -1246,8 +1259,12 @@ pub async fn replace_child<'a, S: HandleOwner>(
                 // Renames only work on unlocked encrypted directories. Fail rename if src is
                 // locked.
                 let encrypted_src_name = src_dir.get_encrypted_name(src_name, true).await?;
-                let src_casefold_hash =
-                    if src_dir.casefold() { get_encrypted_casefold_hash(src_name) } else { 0 };
+                let src_casefold_hash = if src_dir.casefold() {
+                    let fscrypt_key = src_dir.get_fscrypt_key().await?.unwrap();
+                    get_encrypted_casefold_hash(src_name, &fscrypt_key)
+                } else {
+                    0
+                };
                 transaction.add(
                     store_id,
                     Mutation::replace_or_insert_object(
@@ -1358,8 +1375,12 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
             .get_encrypted_name(dst.1, !matches!(new_value, ObjectValue::None))
             .await
             .context("Failed to get encrypted name")?;
-        let dst_casefold_hash =
-            if dst.0.casefold() { get_encrypted_casefold_hash(dst.1) } else { 0 };
+        let dst_casefold_hash = if dst.0.casefold() {
+            let fscrypt_key = dst.0.get_fscrypt_key().await?.unwrap();
+            get_encrypted_casefold_hash(dst.1, &fscrypt_key)
+        } else {
+            0
+        };
         transaction.add(
             store_id,
             Mutation::replace_or_insert_object(
@@ -1397,7 +1418,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
 
 #[cfg(test)]
 mod tests {
-    use super::replace_child_with_object;
+    use super::{get_encrypted_casefold_hash, replace_child_with_object};
     use crate::errors::FxfsError;
     use crate::filesystem::{FxFilesystem, JournalingObject, SyncOptions};
     use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
@@ -3601,6 +3622,12 @@ mod tests {
             // Check that we can lookup via a case insensitive name.
             assert!(dir.lookup("BAR").await.expect("casefold lookup failed").is_some());
 
+            // This is a rather brittle test but it is here to check that the hash values
+            // generated are stable across releases.
+            let key = dir.get_fscrypt_key().await.expect("key").unwrap();
+            assert_eq!(get_encrypted_casefold_hash("bar", &key), 3080479075);
+            assert_eq!(get_encrypted_casefold_hash("BaR", &key), 3080479075);
+
             // We can't easily check iteration from here as we only get encrypted entries so
             // we just count instead.
             let mut count = 0;
@@ -3625,7 +3652,8 @@ mod tests {
         {
             let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
             let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
-            let store = root_volume.volume("vol", Some(crypt)).await.expect("volume failed");
+            let store =
+                root_volume.volume("vol", Some(crypt.clone())).await.expect("volume failed");
             let dir = Directory::open(&store, object_id).await.expect("open failed");
             assert!(dir.casefold());
 
@@ -3646,6 +3674,11 @@ mod tests {
                 iter.advance().await.expect("advance");
             }
             assert_eq!(1, count, "unexpected number of entries.");
+
+            crate::fsck::fsck(fs.clone()).await.unwrap();
+            crate::fsck::fsck_volume(fs.as_ref(), store.store_object_id(), Some(crypt.clone()))
+                .await
+                .unwrap();
 
             fs.close().await.expect("Close failed");
         }

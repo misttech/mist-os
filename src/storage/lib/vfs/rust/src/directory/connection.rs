@@ -81,6 +81,12 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         request: fio::DirectoryRequest,
     ) -> Result<ConnectionState, Error> {
         match request {
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::DeprecatedClone { flags, object, control_handle: _ } => {
+                trace::duration!(c"storage", c"Directory::DeprecatedClone");
+                self.handle_clone(flags, object);
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::Clone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"Directory::Clone");
                 self.handle_clone(flags, object);
@@ -251,6 +257,14 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // Since open typically spawns a task, yield to the executor now to give that task a
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
+            }
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            fio::DirectoryRequest::GetFlags2 { responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            }
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            fio::DirectoryRequest::SetFlags2 { flags: _, responder } => {
+                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::_UnknownMethod { .. } => (),
         }

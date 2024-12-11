@@ -35,7 +35,6 @@ static_library("fidl_codec") {
   ]
 
   sources = [
-    "builtin_semantic.cc",
     "display_handle.cc",
     "encoder.cc",
     "library_loader.cc",

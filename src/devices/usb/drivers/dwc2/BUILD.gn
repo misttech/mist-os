@@ -79,6 +79,7 @@ fuchsia_structured_config_values("dwc2-values") {
 
 fuchsia_driver_package("package") {
   package_name = "dwc2"
+  export_to_bazel = true
   driver_components = [ ":dwc2" ]
   deps = [ ":dwc2-values" ]
 }

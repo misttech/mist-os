@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 
 #include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
+#include "lib/magma/magma_common_defs.h"
 
 #if defined(__Fuchsia__)
 #include <lib/magma/platform/zircon/zircon_platform_connection_client.h>  // nogncheck
@@ -112,12 +113,12 @@ struct SharedData {
   std::unique_ptr<magma::PlatformSemaphore> test_semaphore;
   std::vector<magma_exec_resource> test_resources = {{.buffer_id = 10, .offset = 11, .length = 12},
                                                      {.buffer_id = 13, .offset = 14, .length = 15}};
-  std::vector<uint64_t> test_semaphores = {{1000, 1001, 1010, 1011, 1012}};
-  magma_command_buffer test_command_buffer = {
-      .resource_count = 2,
-      .wait_semaphore_count = 2,
-      .signal_semaphore_count = 3,
-  };
+  std::vector<uint64_t> test_wait_semaphores = {{1000, 1001}};
+  std::vector<uint64_t> test_signal_semaphores = {{1010, 1011, 1012}};
+  std::vector<magma_exec_command_buffer> test_command_buffers = {{
+      .resource_index = 2,
+      .start_offset = 4,
+  }};
   zx::handle test_access_token;
   bool can_access_performance_counters;
   uint64_t pool_id = UINT64_MAX;
@@ -553,19 +554,27 @@ class TestDelegate : public msd::internal::PrimaryFidlServer::Delegate {
     return MAGMA_STATUS_OK;
   }
 
-  magma::Status ExecuteCommandBufferWithResources(
-      uint32_t context_id, std::unique_ptr<magma_command_buffer> command_buffer,
-      std::vector<magma_exec_resource> resources, std::vector<uint64_t> semaphores) override {
+  magma::Status ExecuteCommandBuffers(uint32_t context_id,
+                                      std::vector<magma_exec_command_buffer>& command_buffers,
+                                      std::vector<magma_exec_resource>& resources,
+                                      std::vector<uint64_t>& wait_semaphore_ids,
+                                      std::vector<uint64_t>& signal_semaphore_ids,
+                                      uint64_t flags) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
+
     EXPECT_EQ(context_id, shared_data_->test_context_id);
-    EXPECT_EQ(0, memcmp(command_buffer.get(), &shared_data_->test_command_buffer,
-                        sizeof(magma_command_buffer)));
+    EXPECT_EQ(0, memcmp(command_buffers.data(), shared_data_->test_command_buffers.data(),
+                        shared_data_->test_command_buffers.size() *
+                            sizeof(shared_data_->test_command_buffers[0])));
     EXPECT_EQ(
         0, memcmp(resources.data(), shared_data_->test_resources.data(),
                   shared_data_->test_resources.size() * sizeof(shared_data_->test_resources[0])));
-    EXPECT_EQ(
-        0, memcmp(semaphores.data(), shared_data_->test_semaphores.data(),
-                  shared_data_->test_semaphores.size() * sizeof(shared_data_->test_semaphores[0])));
+    EXPECT_EQ(0, memcmp(wait_semaphore_ids.data(), shared_data_->test_wait_semaphores.data(),
+                        shared_data_->test_wait_semaphores.size() *
+                            sizeof(shared_data_->test_wait_semaphores[0])));
+    EXPECT_EQ(0, memcmp(signal_semaphore_ids.data(), shared_data_->test_signal_semaphores.data(),
+                        shared_data_->test_signal_semaphores.size() *
+                            sizeof(shared_data_->test_signal_semaphores[0])));
     shared_data_->test_complete = true;
     return MAGMA_STATUS_OK;
   }

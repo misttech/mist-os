@@ -63,9 +63,11 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
     virtual magma::Status CreateContext(uint32_t context_id) = 0;
     virtual magma::Status DestroyContext(uint32_t context_id) = 0;
 
-    virtual magma::Status ExecuteCommandBufferWithResources(
-        uint32_t context_id, std::unique_ptr<magma_command_buffer> command_buffer,
-        std::vector<magma_exec_resource> resources, std::vector<uint64_t> semaphores) = 0;
+    virtual magma::Status ExecuteCommandBuffers(
+        uint32_t context_id, std::vector<magma_exec_command_buffer>& command_buffers,
+        std::vector<magma_exec_resource>& resources, std::vector<uint64_t>& wait_semaphores,
+        std::vector<uint64_t>& signal_semaphores, uint64_t flags) = 0;
+
     virtual magma::Status MapBuffer(uint64_t buffer_id, uint64_t gpu_va, uint64_t offset,
                                     uint64_t length, uint64_t flags) = 0;
     virtual magma::Status UnmapBuffer(uint64_t buffer_id, uint64_t gpu_va) = 0;

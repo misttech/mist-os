@@ -41,6 +41,7 @@ fn fidl_security_from_sme_protection(
     }
 }
 
+#[allow(clippy::ptr_arg, reason = "mass allow for https://fxbug.dev/381896734")]
 pub fn scan_result_to_policy_scan_result(
     internal_results: &Vec<types::ScanResult>,
     wpa3_supported: bool,

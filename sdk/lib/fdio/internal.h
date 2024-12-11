@@ -121,9 +121,6 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
   static zx::result<fdio_ptr> create(zx::handle handle);
   static zx::result<fdio_ptr> create(fidl::ClientEnd<fuchsia_io::Node> node,
                                      fuchsia_io::wire::Representation representation);
-
-  virtual zx::result<fdio_ptr> open_deprecated(std::string_view path,
-                                               fuchsia_io::wire::OpenFlags flags);
   virtual zx::result<fdio_ptr> open(std::string_view path, fuchsia_io::Flags flags);
   virtual zx_status_t clone(zx_handle_t* out_handle) = 0;
 

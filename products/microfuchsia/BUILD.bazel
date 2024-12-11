@@ -4,7 +4,7 @@
 
 load("@fuchsia_build_info//:args.bzl", "authorized_ssh_keys_label")
 load(
-    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "@rules_fuchsia//fuchsia:assembly.bzl",
     "ARCH",
     "BUILD_TYPES",
     "fuchsia_product",

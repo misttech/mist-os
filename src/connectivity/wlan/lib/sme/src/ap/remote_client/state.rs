@@ -140,6 +140,7 @@ impl Authenticated {
     ///   negotiate an EAPoL controlled port.
     ///
     /// If unsuccessful, the resulting error will indicate the MLME result code.
+    #[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
     fn handle_assoc_ind(
         &self,
         r_sta: &mut RemoteClient,
@@ -388,9 +389,9 @@ impl RsnaLinkState {
                     r_sta.send_eapol_req(ctx, frame.clone());
                     self.last_key_frame = Some(frame.clone());
                 }
-                SecAssocUpdate::Key(key) => r_sta.send_key(ctx, &key),
-                SecAssocUpdate::Status(status) => match status {
-                    SecAssocStatus::EssSaEstablished => {
+                SecAssocUpdate::Key(key) => r_sta.send_key(ctx, key),
+                SecAssocUpdate::Status(status) => {
+                    if *status == SecAssocStatus::EssSaEstablished {
                         r_sta.send_set_controlled_port_req(
                             ctx,
                             fidl_mlme::ControlledPortState::Open,
@@ -402,8 +403,7 @@ impl RsnaLinkState {
                         self.request_timeout_event_id = None;
                         self.negotiation_timeout_event_id = None;
                     }
-                    _ => (),
-                },
+                }
                 update => error!("Unhandled association update: {:?}", update),
             }
         }
@@ -490,9 +490,7 @@ impl Associated {
     ) -> Result<(), anyhow::Error> {
         match self.rsna_link_state.as_mut() {
             Some(rsna_link_state) => rsna_link_state.handle_eapol_frame(r_sta, ctx, data),
-            None => {
-                return Err(format_err!("received EAPoL indication without RSNA link state"));
-            }
+            None => Err(format_err!("received EAPoL indication without RSNA link state")),
         }
     }
 
@@ -506,9 +504,7 @@ impl Associated {
     ) -> Result<(), anyhow::Error> {
         match self.rsna_link_state.as_mut() {
             Some(rsna_link_state) => rsna_link_state.handle_eapol_conf(r_sta, ctx, result),
-            None => {
-                return Err(format_err!("received EAPoL confirm without RSNA link state"));
-            }
+            None => Err(format_err!("received EAPoL confirm without RSNA link state")),
         }
     }
 
@@ -564,10 +560,7 @@ impl States {
 
     /// Returns if the client is (at least) authenticated (i.e. authenticated or associated).
     pub fn authenticated(&self) -> bool {
-        match self {
-            States::Authenticating(..) => false,
-            _ => true,
-        }
+        !matches!(self, States::Authenticating(..))
     }
 
     /// Handles an incoming MLME-AUTHENTICATE.indication.
@@ -584,25 +577,17 @@ impl States {
         auth_type: fidl_mlme::AuthenticationTypes,
     ) -> States {
         match self {
-            States::Authenticating(state) => {
-                match state.handle_auth_ind(r_sta, ctx, auth_type).into() {
-                    Ok(timeout_event_id) => {
-                        r_sta.send_authenticate_resp(
-                            ctx,
-                            fidl_mlme::AuthenticateResultCode::Success,
-                        );
-                        state.transition_to(Authenticated { timeout_event_id }).into()
-                    }
-                    Err(e) => {
-                        error!("client {:02X?} MLME-AUTHENTICATE.indication: {}", r_sta.addr, e);
-                        r_sta.send_authenticate_resp(
-                            ctx,
-                            fidl_mlme::AuthenticateResultCode::Refused,
-                        );
-                        state.into()
-                    }
+            States::Authenticating(state) => match state.handle_auth_ind(r_sta, ctx, auth_type) {
+                Ok(timeout_event_id) => {
+                    r_sta.send_authenticate_resp(ctx, fidl_mlme::AuthenticateResultCode::Success);
+                    state.transition_to(Authenticated { timeout_event_id }).into()
                 }
-            }
+                Err(e) => {
+                    error!("client {:02X?} MLME-AUTHENTICATE.indication: {}", r_sta.addr, e);
+                    r_sta.send_authenticate_resp(ctx, fidl_mlme::AuthenticateResultCode::Refused);
+                    state.into()
+                }
+            },
             _ => {
                 r_sta.send_authenticate_resp(ctx, fidl_mlme::AuthenticateResultCode::Refused);
                 self
@@ -618,6 +603,7 @@ impl States {
     /// Otherwise, sends an unsuccessful MLME-ASSOCIATE.response AND a MLME-DEAUTHENTICATE-request,
     /// and transitions the client to Authenticating. The caller should forget this client from its
     /// internal state.
+    #[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn handle_assoc_ind(
         self,
         r_sta: &mut RemoteClient,
@@ -1297,7 +1283,7 @@ mod tests {
             State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
 
         let mut aid_map = aid::Map::default();
-        while let Ok(_) = aid_map.assign_aid() {
+        while aid_map.assign_aid().is_ok() {
             // Keep assigning AIDs until we run out of them.
         }
 
@@ -1361,7 +1347,7 @@ mod tests {
             &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &None,
-            Some(s_rsne_vec.into()),
+            Some(s_rsne_vec),
         );
 
         let (_, Authenticating) = match state {
@@ -1426,7 +1412,7 @@ mod tests {
             &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &Some(rsn_cfg),
-            Some(s_rsne_vec.into()),
+            Some(s_rsne_vec),
         );
 
         let (_, Authenticating) = match state {
@@ -1479,7 +1465,7 @@ mod tests {
             &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &Some(rsn_cfg),
-            Some(s_rsne_vec.into()),
+            Some(s_rsne_vec),
         );
 
         let (_, Associated { rsna_link_state, aid }) = match state {
@@ -1535,7 +1521,7 @@ mod tests {
             &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &Some(rsn_cfg),
-            Some(s_rsne_vec.into()),
+            Some(s_rsne_vec),
         );
 
         let (_, Associated { rsna_link_state, aid }) = match state {
@@ -1975,7 +1961,7 @@ mod tests {
         let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
         assert_variant!(mlme_event, MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest { keylist }) => {
             assert_eq!(keylist.len(), 1);
-            let k = keylist.get(0).expect("expect key descriptor");
+            let k = keylist.first().expect("expect key descriptor");
             assert_eq!(k.key, vec![0xCCu8; test_utils::cipher().tk_bytes().unwrap() as usize]);
             assert_eq!(k.key_id, 0);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Pairwise);

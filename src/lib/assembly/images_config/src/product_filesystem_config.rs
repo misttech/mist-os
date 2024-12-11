@@ -107,13 +107,13 @@ pub enum VolumeConfig {
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FvmVolumeConfig {
-    /// If specified, a data filesystem will be built for this product.
+    /// Configures the data filesystem which will be used for this product.
     #[serde(default)]
-    pub data: Option<DataFvmVolumeConfig>,
+    pub data: DataFvmVolumeConfig,
 
-    /// If specified, a blob filesystem will be built for this product.
+    /// Configures the blob filesystem which is built for this product.
     #[serde(default)]
-    pub blob: Option<BlobFvmVolumeConfig>,
+    pub blob: BlobFvmVolumeConfig,
 
     /// If specified, bytes will be reserved in the fvm for this product.
     #[serde(default)]

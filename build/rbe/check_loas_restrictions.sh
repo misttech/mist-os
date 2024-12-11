@@ -55,7 +55,7 @@ which gcertstatus > /dev/null || fatal "gcertstatus not found."
 
 # Renew certificate if needed (interactive).
 # To force re-auth for a fresh certificate, run 'loas_destroy' first.
-gcertstatus > /dev/null || gcert || {
+gcertstatus -check_ssh=false > /dev/null || gcert || {
   error "Failed to renew LOAS2 certificate."
   echo "restricted"
   exit 0

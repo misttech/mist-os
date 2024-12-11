@@ -332,8 +332,7 @@ auto status = DdkAddCompositeNodeSpec("ft3x27_touch", spec);
 ```
 
 For instructions on how to add a composite node spec in DFv2,
-see the [Driver Framework v2 (DFv2)][composite-nodes] section in
-the _Composite nodes_ guide.
+see the [Create a composite node][composite-nodes] guide.
 
 ### device_get_protocol()
 
@@ -584,7 +583,7 @@ _Write a minimal DFv2 driver_ guide.
 [dfv1-simple-driver]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/simple/dfv1/simple_driver.cc
 [driver-export]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/component/cpp/driver_export.h
 [add-a-child-node]: /docs/development/drivers/developer_guide/write-a-minimal-dfv2-driver.md#add-a-child-node
-[composite-nodes]: /docs/development/drivers/developer_guide/composite-node.md#driver_framework_v2_dfv2
+[composite-nodes]: /docs/development/drivers/developer_guide/create-a-composite-node.md
 [banjo-client]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/include/lib/driver/compat/cpp/banjo_client.h
 [driver-namespace]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/incoming/cpp/namespace.h
 [dfv1-driver-transport-zircon]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/transport/zircon/v1/child-driver.cc

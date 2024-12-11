@@ -22,14 +22,11 @@ struct GblEfiFastbootProtocol {
   struct gbl_efi_fastboot_protocol protocol;
 };
 
-// Maxmimum string length for variable name and value.
-constexpr size_t kMaxVarStringLength = 256;
-
 // Contains information such as variable name and value.
 constexpr struct Variable {
-  const char var_name[kMaxVarStringLength];
+  const char* var_name;
   // For now we only consider constant variable.
-  const char var_impl[kMaxVarStringLength];
+  const char* var_impl;
 
   /// Gets the name as a string_view.
   std::string_view name() const { return std::string_view(var_name); }
@@ -37,32 +34,23 @@ constexpr struct Variable {
   /// Gets the value as a string_view.
   std::string_view impl() const { return std::string_view(var_impl); }
 } kVariables[] = {
-    {{"hw-revision\0"}, {BOARD_NAME "\0"}},
+    {"hw-revision", BOARD_NAME},
 };
 
 /// Gets the list of variables
 cpp20::span<const Variable> variables() { return cpp20::span<const Variable>(kVariables); }
 
-// Converts `gbl_efi_fastboot_arg` to `std::string_view`.
-std::string_view FbArgToStr(const gbl_efi_fastboot_arg* arg) {
-  return std::string_view(reinterpret_cast<const char*>(arg->str_utf8), arg->len);
-}
-
-EFIAPI efi_status GetVar(struct gbl_efi_fastboot_protocol* self, const gbl_efi_fastboot_arg* args,
-                         size_t num_args, uint8_t* buf, size_t* bufsize,
-                         gbl_efi_fastboot_token hint) {
-  cpp20::span<const gbl_efi_fastboot_arg> args_span{args, num_args};
+EFIAPI efi_status GetVar(struct gbl_efi_fastboot_protocol* self, const char* const* args,
+                         size_t num_args, uint8_t* buf, size_t* bufsize) {
+  const cpp20::span<const char* const> args_span{args, num_args};
   if (args_span.empty() || !bufsize) {
     return EFI_INVALID_PARAMETER;
   }
 
   cpp20::span<uint8_t> out{buf, *bufsize};
-  // For this implementation, `hint` is interpreted as index for `variables()`.
-  size_t start = reinterpret_cast<size_t>(hint);
   for (size_t i = 0; i < variables().size(); i++) {
-    size_t idx = (start + i) % variables().size();
-    const Variable& var = variables()[idx];
-    if (FbArgToStr(&args_span[0]) != var.name()) {
+    const Variable& var = variables()[i];
+    if (std::string_view(args_span[0]) != var.name()) {
       continue;
     }
 
@@ -77,27 +65,12 @@ EFIAPI efi_status GetVar(struct gbl_efi_fastboot_protocol* self, const gbl_efi_f
   return EFI_NOT_FOUND;
 }
 
-EFIAPI efi_status StartVarIterator(struct gbl_efi_fastboot_protocol* self,
-                                   gbl_efi_fastboot_token* token) {
-  *reinterpret_cast<size_t*>(token) = 0;
-  return EFI_SUCCESS;
-}
-
-EFIAPI efi_status GetNextVarArgs(struct gbl_efi_fastboot_protocol* self, gbl_efi_fastboot_arg* args,
-                                 size_t* num_args, gbl_efi_fastboot_token* token) {
-  size_t* idx = reinterpret_cast<size_t*>(token);
-  if (*idx > variables().size() || *num_args == 0) {
-    return EFI_INVALID_PARAMETER;
-  } else if (*idx == variables().size()) {
-    *num_args = 0;
-    return EFI_SUCCESS;
+EFIAPI efi_status GetVarAll(struct gbl_efi_fastboot_protocol* self, void* ctx,
+                            get_var_callback cb) {
+  for (size_t i = 0; i < variables().size(); i++) {
+    std::array args{variables()[i].name().data()};
+    cb(ctx, args.data(), args.size(), variables()[i].impl().data());
   }
-
-  cpp20::span<gbl_efi_fastboot_arg> args_span{args, *num_args};
-  args_span[0].str_utf8 = reinterpret_cast<const uint8_t*>(variables()[*idx].name().data());
-  args_span[0].len = variables()[*idx].name().size();
-  *num_args = 1;
-  (*idx)++;
   return EFI_SUCCESS;
 }
 
@@ -130,8 +103,7 @@ EFIAPI efi_status WipeUserData(struct gbl_efi_fastboot_protocol* self) { return 
 GblEfiFastbootProtocol protocol = {
     .protocol = {.version = 0x01,
                  .get_var = GetVar,
-                 .start_var_iterator = StartVarIterator,
-                 .get_next_var_args = GetNextVarArgs,
+                 .get_var_all = GetVarAll,
                  .run_oem_function = RunOemFunction,
                  .get_policy = GetPolicy,
                  .set_lock = SetLock,

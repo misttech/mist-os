@@ -324,8 +324,12 @@ common_permission_enum! {
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     CommonFilePermission {
         // keep-sorted start
+        /// Permission to append to a file.
+        Append("append"),
         /// Permission to create a file.
         Create("create"),
+        /// Permission to execute a file with domain transition.
+        Execute("execute"),
         /// Permission to query attributes, including uid, gid and extended attributes.
         GetAttr("getattr"),
         /// Permission to execute ioctls on the file.
@@ -349,6 +353,8 @@ common_permission_enum! {
         SetAttr("setattr"),
         /// Permission to delete a file or remove a hard link.
         Unlink("unlink"),
+        /// Permission to write or append file contents.
+        Write("write"),
         // keep-sorted end
     }
 }

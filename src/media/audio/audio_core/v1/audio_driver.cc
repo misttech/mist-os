@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <iomanip>
+#include <limits>
 #include <sstream>
 
 #include <audio-proto-utils/format-utils.h>
@@ -304,13 +305,13 @@ zx_status_t AudioDriver::Configure(const Format& format, zx::duration min_ring_b
   uint32_t frames_per_second = format.frames_per_second();
   fuchsia::media::AudioSampleFormat sample_format = format.sample_format();
 
-  // Sanity check arguments.
-  if (channels > std::numeric_limits<uint16_t>::max()) {
+  // Rough-check some arguments.
+  if (channels > std::numeric_limits<uint8_t>::max()) {
     FX_LOGS(ERROR) << "Bad channel count: " << channels;
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // TODO(https://fxbug.dev/42086294): sanity check the min_ring_buffer_duration.
+  // TODO(https://fxbug.dev/42086294): rough-check the min_ring_buffer_duration.
 
   // Check our known format list for compatibility.
   if (!IsFormatInSupported(format.stream_type(), formats_)) {
@@ -403,9 +404,12 @@ zx_status_t AudioDriver::Configure(const Format& format, zx::duration min_ring_b
 
   fuchsia::hardware::audio::Format fidl_format = {};
   fuchsia::hardware::audio::PcmFormat pcm = {};
-  pcm.number_of_channels = channels;
-  pcm.bytes_per_sample = format.bytes_per_frame() / channels;
-  pcm.valid_bits_per_sample = format.valid_bits_per_channel();
+  FX_DCHECK(channels <= std::numeric_limits<uint8_t>::max());
+  pcm.number_of_channels = static_cast<uint8_t>(channels);
+  FX_DCHECK(format.bytes_per_frame() / channels <= std::numeric_limits<uint8_t>::max());
+  pcm.bytes_per_sample = static_cast<uint8_t>(format.bytes_per_frame() / channels);
+  FX_DCHECK(format.valid_bits_per_channel() <= std::numeric_limits<uint8_t>::max());
+  pcm.valid_bits_per_sample = static_cast<uint8_t>(format.valid_bits_per_channel());
   pcm.frame_rate = frames_per_second;
   pcm.sample_format = driver_format.sample_format;
   fidl_format.set_pcm_format(pcm);
@@ -523,27 +527,30 @@ void AudioDriver::RequestDelayInfo() {
         uint32_t frames_per_second = format->frames_per_second();
         // Ceiling up to the next complete frame, if needed (the client's "safe write/read" zone
         // cannot extend partially into a frame).
-        driver_transfer_frames_ = (driver_transfer_bytes_ + bytes_per_frame - 1) / bytes_per_frame;
+        uint32_t driver_transfer_frames =
+            (driver_transfer_bytes_ + bytes_per_frame - 1) / bytes_per_frame;
         // This delay is used in the calculation of the client's minimum lead time. We ceiling up to
         // the next nsec, just to be cautious.
         driver_transfer_delay_ = zx::nsec(format->frames_per_ns().Inverse().Scale(
-            *driver_transfer_frames_, TimelineRate::RoundingMode::Ceiling));
+            driver_transfer_frames, TimelineRate::RoundingMode::Ceiling));
 
         // Figure out how many frames we need in our ring buffer.
         int64_t min_bytes_64 = format->frames_per_ns().Scale(min_ring_buffer_duration_.to_nsecs(),
                                                              TimelineRate::RoundingMode::Ceiling) *
                                bytes_per_frame;
-        bool overflow = ((min_bytes_64 == TimelineRate::kOverflow) ||
-                         (min_bytes_64 > (std::numeric_limits<int64_t>::max() -
-                                          (*driver_transfer_frames_ * bytes_per_frame))));
+        bool overflow =
+            ((min_bytes_64 == TimelineRate::kOverflow) ||
+             (min_bytes_64 > (std::numeric_limits<int64_t>::max() -
+                              (static_cast<int64_t>(driver_transfer_frames) * bytes_per_frame))));
 
         int64_t min_frames_64;
         if (!overflow) {
           min_frames_64 = min_bytes_64 / bytes_per_frame;
-          min_frames_64 += *driver_transfer_frames_;
+          min_frames_64 += driver_transfer_frames;
           overflow = min_frames_64 > std::numeric_limits<uint32_t>::max();
         }
 
+        driver_transfer_frames_ = driver_transfer_frames;
         if (overflow) {
           FX_LOGS(ERROR) << "Overflow while attempting to compute ring buffer size in frames.";
           FX_LOGS(ERROR) << "duration              : " << min_ring_buffer_duration_.get();
@@ -608,7 +615,8 @@ void AudioDriver::RequestRingBufferVmo(int64_t min_frames_64) {
           }
           FX_DCHECK(!versioned_ref_time_to_frac_presentation_frame_->get().first.invertible());
 
-          ring_buffer_size_bytes_ = format->bytes_per_frame() * result.response().num_frames;
+          ring_buffer_size_bytes_ =
+              static_cast<uint64_t>(format->bytes_per_frame()) * result.response().num_frames;
           running_pos_bytes_ = 0;
           frac_frames_per_byte_ = TimelineRate(Fixed(1).raw_value(), format->bytes_per_frame());
         }
@@ -672,7 +680,9 @@ void AudioDriver::ClockRecoveryUpdate(fuchsia::hardware::audio::RingBufferPositi
   }
 
   FX_CHECK(recovered_clock_);
-  auto predicted_mono_time = recovered_clock_->Update(actual_mono_time, running_pos_bytes_);
+  FX_DCHECK(running_pos_bytes_ <= std::numeric_limits<int64_t>::max());
+  auto predicted_mono_time =
+      recovered_clock_->Update(actual_mono_time, static_cast<int64_t>(running_pos_bytes_));
 
   if constexpr (kDriverPositionNotificationDisplayInterval > 0) {
     if (position_notification_count_ % kDriverPositionNotificationDisplayInterval == 0) {

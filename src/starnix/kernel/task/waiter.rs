@@ -122,6 +122,7 @@ pub struct ManyZxHandleSignalHandler {
 }
 
 pub enum SignalHandlerInner {
+    None,
     Zxio(ZxioSignalHandler),
     ZxHandle(fn(zx::Signals) -> FdEvents),
     ManyZxHandle(ManyZxHandleSignalHandler),
@@ -130,12 +131,14 @@ pub enum SignalHandlerInner {
 pub struct SignalHandler {
     pub inner: SignalHandlerInner,
     pub event_handler: EventHandler,
+    pub err_code: Option<Errno>,
 }
 
 impl SignalHandler {
-    fn handle(self, signals: zx::Signals) {
-        let SignalHandler { inner, event_handler } = self;
+    fn handle(self, signals: zx::Signals) -> Option<Errno> {
+        let SignalHandler { inner, event_handler, err_code } = self;
         let events = match inner {
+            SignalHandlerInner::None => None,
             SignalHandlerInner::Zxio(ZxioSignalHandler { zxio, get_events_from_zxio_signals }) => {
                 Some(get_events_from_zxio_signals(zxio.wait_end(signals)))
             }
@@ -159,6 +162,7 @@ impl SignalHandler {
         if let Some(events) = events {
             event_handler.handle(events)
         }
+        err_code
     }
 }
 
@@ -450,7 +454,9 @@ impl PortWaiter {
                 if let Some(callback) = self.remove_callback(&WaitKey { raw: key }) {
                     match callback {
                         WaitCallback::SignalHandler(handler) => {
-                            handler.handle(observed);
+                            if let Some(errno) = handler.handle(observed) {
+                                return Err(errno);
+                            }
                         }
                         WaitCallback::EventHandler(_) => {
                             panic!("wrong type of handler called")
@@ -535,7 +541,8 @@ impl PortWaiter {
     }
 
     /// Establish an asynchronous wait for the signals on the given Zircon handle (not to be
-    /// confused with POSIX signals), optionally running a FnOnce.
+    /// confused with POSIX signals), optionally running a FnOnce. Wait operations will return
+    /// the error code present in the provided SignalHandler.
     ///
     /// Returns a `HandleWaitCanceler` that can be used to cancel the wait.
     fn wake_on_zircon_signals(
@@ -594,6 +601,10 @@ impl PortWaiter {
                 panic!("wrong type of handler called")
             }
         }
+    }
+
+    fn notify(&self) {
+        self.port.notify(NotifyKind::Regular);
     }
 
     fn interrupt(&self) {
@@ -717,6 +728,11 @@ impl Waiter {
     /// eventually.
     pub fn fake_wait(&self) -> WaitCanceler {
         WaitCanceler::new_noop()
+    }
+
+    // Notify the waiter to wake it up without signalling any events.
+    pub fn notify(&self) {
+        self.inner.notify();
     }
 
     /// Interrupt the waiter to deliver a signal. The wait operation will return EINTR, and a

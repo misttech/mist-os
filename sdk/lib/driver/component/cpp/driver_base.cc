@@ -43,7 +43,7 @@ DriverBase::DriverBase(std::string_view name, DriverStartArgs start_args,
   ZX_ASSERT(outgoing_request.has_value());
   InitializeAndServe(std::move(incoming), std::move(outgoing_request.value()));
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(19)
+#if FUCHSIA_API_LEVEL_AT_LEAST(19) && FUCHSIA_API_LEVEL_AT_MOST(NEXT)
   const auto& node_properties = start_args_.node_properties();
   if (node_properties.has_value()) {
     for (const auto& entry : node_properties.value()) {
@@ -106,6 +106,7 @@ void DriverBase::InitInspectorExactlyOnce(inspect::Inspector inspector) {
   });
 }
 
+#if FUCHSIA_API_LEVEL_AT_MOST(NEXT)
 cpp20::span<const fuchsia_driver_framework::NodeProperty> DriverBase::node_properties(
     const std::string& parent_node_name) const {
   auto it = node_properties_.find(parent_node_name);
@@ -114,6 +115,7 @@ cpp20::span<const fuchsia_driver_framework::NodeProperty> DriverBase::node_prope
   }
   return {it->second};
 }
+#endif
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
 

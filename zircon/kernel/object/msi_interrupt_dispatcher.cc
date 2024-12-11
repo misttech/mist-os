@@ -59,21 +59,16 @@ zx_status_t MsiInterruptDispatcher::Create(fbl::RefPtr<MsiAllocation> alloc, uin
     return ZX_ERR_INVALID_ARGS;
   }
 
-  uint32_t base_irq_id = 0;
-  {
-    Guard<SpinLock, IrqSave> guard{&alloc->lock()};
-    if (msi_id >= alloc->block().num_irq) {
-      LTRACEF("msi_id %u is out of range for the block (num_irqs: %u)\n", msi_id,
-              alloc->block().num_irq);
-      return ZX_ERR_INVALID_ARGS;
-    }
-    base_irq_id = alloc->block().base_irq_id;
+  if (msi_id >= alloc->block().num_irq) {
+    LTRACEF("msi_id %u is out of range for the block (num_irqs: %u)\n", msi_id,
+            alloc->block().num_irq);
+    return ZX_ERR_INVALID_ARGS;
   }
+  uint32_t base_irq_id = alloc->block().base_irq_id;
 
-  zx_status_t st = alloc->ReserveId(msi_id);
-  if (st != ZX_OK) {
-    LTRACEF("failed to reserve msi_id %u: %d\n", msi_id, st);
-    return st;
+  if (zx_status_t status = alloc->ReserveId(msi_id); status != ZX_OK) {
+    LTRACEF("failed to reserve msi_id %u: %d\n", msi_id, status);
+    return status;
   }
   auto cleanup = fit::defer([alloc, msi_id]() { alloc->ReleaseId(msi_id); });
 
@@ -95,10 +90,9 @@ zx_status_t MsiInterruptDispatcher::Create(fbl::RefPtr<MsiAllocation> alloc, uin
   }
   fbl::RefPtr<VmMapping> mapping = ktl::move(mapping_result->mapping);
 
-  st = mapping->MapRange(0, vmo->size(), true);
-  if (st != ZX_OK) {
-    LTRACEF("Falled to MapRange for the mapping: %d\n", st);
-    return st;
+  if (zx_status_t status = mapping->MapRange(0, vmo->size(), true); status != ZX_OK) {
+    LTRACEF("Falled to MapRange for the mapping: %d\n", status);
+    return status;
   }
 
   LTRACEF("Mapping mapped at %#lx, size %zx, vmo size %lx, vmo_offset = %#lx\n",
@@ -154,13 +148,12 @@ zx_status_t MsiInterruptDispatcher::Create(fbl::RefPtr<MsiAllocation> alloc, uin
   // the id if necessary.
   cleanup.cancel();
 
-  disp->UnmaskInterrupt();
-  st = disp->RegisterInterruptHandler();
-  if (st != ZX_OK) {
+  if (zx_status_t status = disp->RegisterInterruptHandler(); status != ZX_OK) {
     LTRACEF("Failed to register interrupt handler for msi id %u (vector %u): %d\n", msi_id, vector,
-            st);
-    return st;
+            status);
+    return status;
   }
+  disp->UnmaskInterrupt();
 
   *out_rights = default_rights();
   out_interrupt->reset(ktl::move(disp));
@@ -239,12 +232,12 @@ void MsiInterruptDispatcherImpl::MaskInterrupt() {
 void MsiInterruptDispatcherImpl::UnmaskInterrupt() {
   kcounter_add(dispatcher_msi_unmask_count, 1);
 
-  Guard<SpinLock, IrqSave> guard{&allocation()->lock()};
   if (has_platform_pvm_) {
     msi_mask_unmask(&allocation()->block(), msi_id(), false);
   }
 
   if (has_cap_pvm_) {
+    Guard<SpinLock, IrqSave> guard{&allocation()->lock()};
     const uint32_t mask = ~(1 << msi_id());
     if (has_64bit_) {
       capability_->mask_bits_64 = capability_->mask_bits_64 & mask;

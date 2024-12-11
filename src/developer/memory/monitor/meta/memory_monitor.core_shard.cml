@@ -16,11 +16,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.feedback.CrashReporter",
-            from: "#feedback",
-            to: "#memory_monitor",
-        },
-        {
             protocol: "fuchsia.metrics.MetricEventLoggerFactory",
             from: "#cobalt",
             to: "#memory_monitor",

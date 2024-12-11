@@ -18,11 +18,16 @@ sdk_source_set("cpp") {
     "protocol.cc",
     "protocol.h",
     "service.h",
+    "service_watcher.cc",
+    "service_watcher.h",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.unknown:fuchsia.unknown_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/zx",
   ]

@@ -641,7 +641,7 @@ impl Zxio {
         };
 
         let status = unsafe {
-            zxio::zxio_open3(
+            zxio::zxio_open(
                 self.as_ptr(),
                 path.as_ptr() as *const c_char,
                 path.len(),
@@ -686,7 +686,7 @@ impl Zxio {
         let zxio = Zxio::default();
 
         let status = unsafe {
-            zxio::zxio_open3(
+            zxio::zxio_open(
                 self.as_ptr(),
                 path.as_ptr() as *const c_char,
                 path.len(),

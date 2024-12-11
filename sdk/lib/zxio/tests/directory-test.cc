@@ -36,51 +36,6 @@ class TestDirectoryServer : public zxio_tests::TestDirectoryServerBase {
     completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
   }
 
-  void Open(OpenRequestView request, OpenCompleter::Sync& completer) final {
-    constexpr fio::OpenFlags kExpectedFlags =
-        fio::OpenFlags::kRightReadable | fio::OpenFlags::kDescribe;
-    if (request->flags != kExpectedFlags) {
-      ADD_FAILURE() << "unexpected flags for Open request: " << std::showbase << std::hex
-                    << static_cast<uint32_t>(request->flags) << " vs " << std::showbase << std::hex
-                    << static_cast<uint32_t>(kExpectedFlags);
-      completer.Close(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-    constexpr fio::wire::ModeType kExpectedMode = {};
-    if (request->mode != kExpectedMode) {
-      ADD_FAILURE() << "unexpected mode for Open request: " << std::showbase << std::hex
-                    << static_cast<uint32_t>(request->mode) << " vs " << std::showbase << std::hex
-                    << static_cast<uint32_t>(kExpectedMode);
-      completer.Close(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-    if (request->path.get() != kTestPath) {
-      ADD_FAILURE() << "unexpected path for Open request: \"" << request->path.get() << "\" vs \""
-                    << kTestPath << "\"";
-      completer.Close(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-    if (open_calls_ != 0) {
-      ADD_FAILURE() << "unexpected number of open calls: " << open_calls_;
-      completer.Close(ZX_ERR_BAD_STATE);
-      return;
-    }
-    open_calls_++;
-    // Request looks good - generate an OnOpen event and bind to a File server.
-    fidl::ServerEnd<fio::File> file_server(request->object.TakeChannel());
-
-    zx::event file_event;
-    ASSERT_OK(zx::event::create(0u, &file_event));
-
-    fio::wire::FileObject file = {
-        .event = std::move(file_event),
-    };
-    ASSERT_OK(fidl::WireSendEvent(file_server)
-                  ->OnOpen(ZX_OK, fio::wire::NodeInfoDeprecated::WithFile(
-                                      fidl::ObjectView<decltype(file)>::FromExternal(&file))));
-    fidl::BindServer(dispatcher_, std::move(file_server), &file_);
-  }
-
   void Open3(Open3RequestView request, Open3Completer::Sync& completer) final {
     constexpr fio::Flags kExpectedFlags =
         fio::Flags::kPermRead | fio::Flags::kFlagSendRepresentation;
@@ -230,35 +185,14 @@ TEST_F(Directory, Attr) {
   EXPECT_EQ(ZXIO_OBJECT_TYPE_DIR, attr.object_type);
 }
 
-TEST_F(Directory, Open) {
-  fio::OpenFlags flags = fio::OpenFlags::kRightReadable;
-  zxio_storage_t file_storage;
-  ASSERT_OK(zxio_open(directory(), static_cast<uint32_t>(flags), kTestPath.data(),
-                      kTestPath.length(), &file_storage));
-  zxio_t* file = &file_storage.io;
-
-  ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
-
-  // Verify the zxio_t object by reading some test data from the server.
-  char buffer[sizeof(zxio_tests::TestReadFileServer::kTestData)];
-  size_t actual = 0u;
-
-  ASSERT_OK(zxio_read(file, buffer, sizeof(buffer), 0u, &actual));
-
-  EXPECT_EQ(sizeof(buffer), actual);
-  EXPECT_BYTES_EQ(buffer, zxio_tests::TestReadFileServer::kTestData, sizeof(buffer));
-
-  ASSERT_OK(zxio_close(file, /*should_wait=*/true));
-}
-
 TEST_F(Directory, Open3) {
   fio::Flags flags = fio::Flags::kPermRead;
   zxio_node_attributes_t attrs = {};
   attrs.has.protocols = true;
   const zxio_open_options_t options{.inout_attr = &attrs};
   zxio_storage_t file_storage;
-  ASSERT_OK(zxio_open3(directory(), kTestPath.data(), kTestPath.length(),
-                       static_cast<zxio_open_flags_t>(flags), &options, &file_storage));
+  ASSERT_OK(zxio_open(directory(), kTestPath.data(), kTestPath.length(),
+                      static_cast<zxio_open_flags_t>(flags), &options, &file_storage));
   ASSERT_TRUE(attrs.has.protocols);
   ASSERT_EQ(attrs.protocols, ZXIO_NODE_PROTOCOL_FILE);
   zxio_t* file = &file_storage.io;
@@ -284,8 +218,8 @@ TEST_F(Directory, Open3CreateAttrs) {
   attrs.has.modification_time = true;
   const zxio_open_options_t options{.create_attr = &attrs};
   zxio_storage_t file_storage;
-  ASSERT_OK(zxio_open3(directory(), kTestPath.data(), kTestPath.length(),
-                       static_cast<zxio_open_flags_t>(flags), &options, &file_storage));
+  ASSERT_OK(zxio_open(directory(), kTestPath.data(), kTestPath.length(),
+                      static_cast<zxio_open_flags_t>(flags), &options, &file_storage));
   zxio_t* file = &file_storage.io;
   ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
   ASSERT_OK(zxio_close(file, /*should_wait=*/true));
@@ -295,8 +229,8 @@ TEST_F(Directory, Open3NoOptions) {
   // Should succeed to call zxio_open3 with options not provided.
   fio::Flags flags = fio::Flags::kPermRead;
   zxio_storage_t file_storage;
-  ASSERT_OK(zxio_open3(directory(), kTestPath.data(), kTestPath.length(),
-                       static_cast<zxio_open_flags_t>(flags), nullptr, &file_storage));
+  ASSERT_OK(zxio_open(directory(), kTestPath.data(), kTestPath.length(),
+                      static_cast<zxio_open_flags_t>(flags), nullptr, &file_storage));
   ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
   ASSERT_OK(zxio_close(&file_storage.io, /*should_wait=*/true));
 }

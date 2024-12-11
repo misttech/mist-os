@@ -372,8 +372,10 @@ impl<'a, M> std::fmt::Debug for UserBuffersOutputBuffer<'a, M> {
 
 impl<'a, M: TaskMemoryAccessor> UserBuffersOutputBuffer<'a, M> {
     fn new_inner(mm: &'a M, mut buffers: UserBuffers) -> Result<Self, Errno> {
-        let available =
-            UserBuffer::cap_buffers_to_max_rw_count(mm.maximum_valid_address(), &mut buffers)?;
+        let available = UserBuffer::cap_buffers_to_max_rw_count(
+            mm.maximum_valid_address().ok_or_else(|| errno!(EINVAL))?,
+            &mut buffers,
+        )?;
         // Reverse the buffers as the element will be removed as they are handled.
         buffers.reverse();
         Ok(Self { mm, buffers, available, bytes_written: 0 })
@@ -556,8 +558,10 @@ impl<'a, M> std::fmt::Debug for UserBuffersInputBuffer<'a, M> {
 
 impl<'a, M: TaskMemoryAccessor> UserBuffersInputBuffer<'a, M> {
     fn new_inner(mm: &'a M, mut buffers: UserBuffers) -> Result<Self, Errno> {
-        let available =
-            UserBuffer::cap_buffers_to_max_rw_count(mm.maximum_valid_address(), &mut buffers)?;
+        let available = UserBuffer::cap_buffers_to_max_rw_count(
+            mm.maximum_valid_address().ok_or_else(|| errno!(EINVAL))?,
+            &mut buffers,
+        )?;
         // Reverse the buffers as the element will be removed as they are handled.
         buffers.reverse();
         Ok(Self { mm, buffers, available, bytes_read: 0 })

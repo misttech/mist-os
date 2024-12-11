@@ -28,14 +28,42 @@ const TEST_COMPONENT_URL: &str = "fuchsia-pkg://fuchsia.com/iquery-tests#meta/te
 const ARCHIVIST_URL: &str =
     "fuchsia-pkg://fuchsia.com/iquery-tests#meta/archivist-for-embedding.cm";
 
-pub struct TestBuilder {
+pub async fn new_test(components: &[TestComponent]) -> TestInExecution {
+    let mut builder = TestBuilder::new().await;
+    for component in components {
+        builder.add_child(component.name(), component.url()).await;
+    }
+    builder.start().await
+}
+
+pub enum TestComponent {
+    Basic(&'static str),
+    Regular(&'static str),
+}
+
+impl TestComponent {
+    fn url(&self) -> &str {
+        match self {
+            Self::Basic(_) => BASIC_COMPONENT_URL,
+            Self::Regular(_) => TEST_COMPONENT_URL,
+        }
+    }
+
+    fn name(&self) -> &str {
+        match self {
+            Self::Basic(name) | Self::Regular(name) => name,
+        }
+    }
+}
+
+struct TestBuilder {
     builder: RealmBuilder,
     test_realm: SubRealmBuilder,
     archivist_ref: ChildRef,
 }
 
 impl TestBuilder {
-    pub async fn new() -> Self {
+    async fn new() -> Self {
         let builder = RealmBuilder::new().await.expect("Created realm builder");
         let test_realm = builder
             .add_child_realm("test", ChildOptions::new().eager())
@@ -102,20 +130,11 @@ impl TestBuilder {
             )
             .await
             .expect("Can route realm query to parent");
+
         Self { builder, test_realm, archivist_ref: archivist }
     }
 
-    pub async fn add_basic_component(mut self, name: &str) -> Self {
-        self.add_child(name, BASIC_COMPONENT_URL).await;
-        self
-    }
-
-    pub async fn add_test_component(mut self, name: &str) -> Self {
-        self.add_child(name, TEST_COMPONENT_URL).await;
-        self
-    }
-
-    pub async fn start(self) -> TestInExecution {
+    async fn start(self) -> TestInExecution {
         let instance = self.builder.build().await.expect("create instance");
         // Ensure archivist has been resolved.
         let lifecycle = instance
@@ -130,7 +149,7 @@ impl TestBuilder {
         TestInExecution { instance }
     }
 
-    async fn add_child(&mut self, name: &str, url: &str) -> &mut Self {
+    async fn add_child(&mut self, name: &str, url: &str) {
         let child_ref =
             self.test_realm.add_child(name, url, ChildOptions::new().eager()).await.unwrap();
         self.test_realm
@@ -151,7 +170,6 @@ impl TestBuilder {
             )
             .await
             .unwrap();
-        self
     }
 }
 

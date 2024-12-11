@@ -19,19 +19,17 @@ void Allocation::Init(ktl::span<memalloc::Range> mem_ranges,
   // which fails in the phys environment.
   static fbl::NoDestructor<memalloc::Pool> pool;
 
+  constexpr uint64_t kMin = kArchAllocationMinAddr.value_or(memalloc::Pool::kDefaultMinAddr);
+  constexpr uint64_t kMax = kArchAllocationMaxAddr.value_or(memalloc::Pool::kDefaultMaxAddr);
   ktl::array ranges{mem_ranges, special_ranges};
-  // kArchAllocationMinAddr is defined in arch-allocation.h.
-  if (kArchAllocationMinAddr) {
-    ZX_ASSERT(pool->Init(ranges, *kArchAllocationMinAddr).is_ok());
+  ZX_ASSERT(pool->Init(ranges, kMin, kMax).is_ok());
 
+  if (kArchAllocationMinAddr) {
     // While the pool will now prevent allocation in
     // [0, *kArchAllocationMinAddr), it can be strictly enforced by allocating
     // all such RAM now. Plus, it is convenient to distinguish this memory at
     // hand-off time.
-    ZX_ASSERT(
-        pool->UpdateRamSubranges(memalloc::Type::kReservedLow, 0, *kArchAllocationMinAddr).is_ok());
-  } else {
-    ZX_ASSERT(pool->Init(ranges).is_ok());
+    ZX_ASSERT(pool->UpdateRamSubranges(memalloc::Type::kReservedLow, 0, kMin).is_ok());
   }
 
   // Install the pool for GetPool.

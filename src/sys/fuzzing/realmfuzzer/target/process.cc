@@ -15,6 +15,7 @@
 #include "src/lib/debug/backtrace-request.h"
 #include "src/sys/fuzzing/common/module.h"
 #include "src/sys/fuzzing/common/options.h"
+#include "src/sys/fuzzing/common/sancov.h"
 #include "src/sys/fuzzing/realmfuzzer/target/weak-symbols.h"
 
 namespace fuzzing {
@@ -42,12 +43,16 @@ struct {
 } gContext;
 
 // Hook functions that simply forward to the singleton.
+NO_SANITIZE_ALL
 void MallocHook(const volatile void* ptr, size_t size) { gContext.process->OnMalloc(ptr, size); }
 
+NO_SANITIZE_ALL
 void FreeHook(const volatile void* ptr) { gContext.process->OnFree(ptr); }
 
+NO_SANITIZE_ALL
 void DeathHook() { gContext.process->OnDeath(); }
 
+NO_SANITIZE_ALL
 void ExitHook() { gContext.process->OnExit(); }
 
 }  // namespace
@@ -56,6 +61,8 @@ void ExitHook() { gContext.process->OnExit(); }
 extern "C" {
 
 // NOLINTNEXTLINE(readability-non-const-parameter)
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_8bit_counters_init(uint8_t* start, uint8_t* stop) {
   if (start >= stop) {
     return;
@@ -75,6 +82,8 @@ void __sanitizer_cov_8bit_counters_init(uint8_t* start, uint8_t* stop) {
   }
 }
 
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_pcs_init(const uintptr_t* start, const uintptr_t* stop) {
   if (start >= stop) {
     return;
@@ -95,24 +104,63 @@ void __sanitizer_cov_pcs_init(const uintptr_t* start, const uintptr_t* stop) {
 }
 
 // TODO(https://fxbug.dev/42166193): Add value-profile support.
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_pc_indir(uintptr_t Callee) {}
+
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_const_cmp1(uint8_t Arg1, uint8_t Arg2) {}
+
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_const_cmp2(uint16_t Arg1, uint16_t Arg2) {}
+
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_const_cmp4(uint32_t Arg1, uint32_t Arg2) {}
+
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_const_cmp8(uint64_t Arg1, uint64_t Arg2) {}
+
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_cmp1(uint8_t Arg1, uint8_t Arg2) {}
+
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_cmp2(uint16_t Arg1, uint16_t Arg2) {}
+
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_cmp4(uint32_t Arg1, uint32_t Arg2) {}
+
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_cmp8(uint64_t Arg1, uint64_t Arg2) {}
+
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_switch(uint64_t Val, uint64_t* Cases) {}
+
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_div4(uint32_t Val) {}
+
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_div8(uint64_t Val) {}
+
+__EXPORT
+NO_SANITIZE_ALL
 void __sanitizer_cov_trace_gep(uintptr_t Idx) {}
 
 }  // extern "C"
 
 namespace fuzzing {
 
+NO_SANITIZE_ALL
 Process::Process(ExecutorPtr executor)
     : executor_(executor),
       eventpair_(executor),
@@ -131,6 +179,7 @@ Process::Process(ExecutorPtr executor)
   gContext.process = this;
 }
 
+NO_SANITIZE_ALL
 void Process::AddCounters(CountersInfo counters) {
   // Ensure the AsyncDeque is only accessed from the dispatcher thread.
   auto task =
@@ -146,6 +195,7 @@ void Process::AddCounters(CountersInfo counters) {
   executor_->schedule_task(std::move(task));
 }
 
+NO_SANITIZE_ALL
 void Process::AddPCs(PCsInfo pcs) {
   // Ensure the AsyncDeque is only accessed from the dispatcher thread.
   auto task = fpromise::make_promise([this, pcs = std::move(pcs)]() mutable -> ZxResult<> {
@@ -161,18 +211,22 @@ void Process::AddPCs(PCsInfo pcs) {
   executor_->schedule_task(std::move(task));
 }
 
+NO_SANITIZE_ALL
 void Process::OnMalloc(const volatile void* ptr, size_t size) {
   ++num_mallocs_;
-  if (size > malloc_limit_ && AcquireCrashState()) {
+  if (malloc_limit_ != 0 && size > malloc_limit_ && AcquireCrashState()) {
     backtrace_request_all_threads();
     _Exit(options_.malloc_exitcode());
   }
 }
 
+NO_SANITIZE_ALL
 void Process::OnFree(const volatile void* ptr) { ++num_frees_; }
 
+NO_SANITIZE_ALL
 void Process::OnDeath() { _Exit(options_.death_exitcode()); }
 
+NO_SANITIZE_ALL
 void Process::OnExit() {
   // Exits may not be fatal, e.g. if detect_exits=false. Make sure the process publishes all its
   // coverage before it ends as the engine will keep fuzzing.
@@ -181,6 +235,7 @@ void Process::OnExit() {
   }
 }
 
+NO_SANITIZE_ALL
 void Process::InstallHooks() {
   // This method can only be called once.
   static bool first = true;
@@ -205,6 +260,7 @@ void Process::InstallHooks() {
   std::atexit([]() { ExitHook(); });
 }
 
+NO_SANITIZE_ALL
 ZxPromise<> Process::Connect(fidl::InterfaceHandle<CoverageDataCollector> collector,
                              zx::eventpair eventpair) {
   Bridge<Options> bridge;
@@ -260,6 +316,7 @@ ZxPromise<> Process::Connect(fidl::InterfaceHandle<CoverageDataCollector> collec
       .wrap_with(scope_);
 }
 
+NO_SANITIZE_ALL
 void Process::Configure(Options options) {
   SetOptions(&options_, options);
 
@@ -302,6 +359,7 @@ void Process::Configure(Options options) {
   malloc_limit_ = malloc_limit ? malloc_limit : std::numeric_limits<size_t>::max();
 }
 
+NO_SANITIZE_ALL
 ZxPromise<> Process::AddModules(zx::eventpair eventpair) {
   return fpromise::make_promise([this, eventpair = std::move(eventpair), num_modules = 0ULL,
                                  add_module =
@@ -328,6 +386,7 @@ ZxPromise<> Process::AddModules(zx::eventpair eventpair) {
   });
 }
 
+NO_SANITIZE_ALL
 ZxPromise<> Process::AddModule() {
   Bridge<> bridge;
   return fpromise::make_promise([recv = Future<CountersInfo>(counters_receiver_.Receive())](
@@ -387,6 +446,7 @@ ZxPromise<> Process::AddModule() {
       });
 }
 
+NO_SANITIZE_ALL
 ZxPromise<> Process::Run() {
   return fpromise::make_promise(
              [this, wait = ZxFuture<zx_signals_t>()](Context& context) mutable -> ZxResult<> {
@@ -444,6 +504,7 @@ ZxPromise<> Process::Run() {
       });
 }
 
+NO_SANITIZE_ALL
 void Process::ConfigureLeakDetection() {
   if (can_detect_leaks_ && !detecting_leaks_) {
     detecting_leaks_ = true;
@@ -451,6 +512,7 @@ void Process::ConfigureLeakDetection() {
   }
 }
 
+NO_SANITIZE_ALL
 bool Process::DetectLeak() {
   // As described in the header, full leak detection is expensive. Realmfuzzer imitates libfuzzer
   // and performs a two-pass process:
@@ -483,6 +545,7 @@ bool Process::DetectLeak() {
   return has_leak;
 }
 
+NO_SANITIZE_ALL
 bool Process::AcquireCrashState() {
   return __sanitizer_acquire_crash_state && __sanitizer_acquire_crash_state();
 }

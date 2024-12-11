@@ -252,42 +252,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-io"
-version = "1.12.0"
-dependencies = [
- "async-lock",
- "autocfg 1.1.0",
- "concurrent-queue",
- "futures-lite",
- "libc",
- "log",
- "parking",
- "polling",
- "slab",
- "socket2 0.4.4",
- "waker-fn",
- "windows-sys 0.42.0",
-]
-
-[[package]]
 name = "async-lock"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8101efe8695a6c17e02911402145357e718ac92d3ff88ae8419e84b1707b685"
 dependencies = [
  "event-listener 2.5.1",
- "futures-lite",
-]
-
-[[package]]
-name = "async-net"
-version = "1.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4051e67316bc7eff608fe723df5d32ed639946adcd69e07df41fd42a7b411f1f"
-dependencies = [
- "async-io",
- "autocfg 1.1.0",
- "blocking",
  "futures-lite",
 ]
 
@@ -1352,9 +1322,7 @@ dependencies = [
  "async-channel",
  "async-executor",
  "async-fs",
- "async-io",
  "async-lock",
- "async-net",
  "async-ringbuf",
  "async-stream",
  "async-trait",
@@ -1539,7 +1507,7 @@ dependencies = [
  "siphasher 0.3.10",
  "slab",
  "smallvec",
- "socket2 0.5.5",
+ "socket2",
  "splines",
  "static_assertions",
  "strsim 0.10.0",
@@ -3026,20 +2994,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "780fb4b6698bbf9cf2444ea5d22411cef2953f0824b98f33cf454ec5615645bd"
 
 [[package]]
-name = "polling"
-version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab4609a838d88b73d8238967b60dd115cc08d38e2bbaf51ee1e4b695f89122e2"
-dependencies = [
- "autocfg 1.1.0",
- "cfg-if 1.0.0",
- "libc",
- "log",
- "wepoll-ffi",
- "winapi",
-]
-
-[[package]]
 name = "polyval"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4284,16 +4238,6 @@ checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
 
 [[package]]
 name = "socket2"
-version = "0.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66d72b759436ae32898a2af0a14218dbf55efde3feeb170eb623637db85ee1e0"
-dependencies = [
- "libc",
- "winapi",
-]
-
-[[package]]
-name = "socket2"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b5fac59a5cb5dd637972e5fca70daf0523c9067fcdc4842f053dae04a18f8e9"
@@ -5145,10 +5089,6 @@ name = "web-sys"
 version = "0.3.40"
 
 [[package]]
-name = "wepoll-ffi"
-version = "0.1.2"
-
-[[package]]
 name = "which"
 version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5173,10 +5113,6 @@ version = "0.48.0"
 [[package]]
 name = "windows-core"
 version = "0.52.0"
-
-[[package]]
-name = "windows-sys"
-version = "0.42.0"
 
 [[package]]
 name = "windows-sys"
@@ -5294,3 +5230,11 @@ version = "2.0.1+zstd.1.5.2"
 dependencies = [
  "libc",
 ]
+
+[[patch.unused]]
+name = "wepoll-ffi"
+version = "0.1.2"
+
+[[patch.unused]]
+name = "windows-sys"
+version = "0.42.0"

@@ -6,7 +6,7 @@ pub mod kernels;
 
 use anyhow::{anyhow, Error};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd};
-use fidl::HandleBased;
+use fidl::{HandleBased, Peered};
 use fuchsia_component::client as fclient;
 use fuchsia_sync::Mutex;
 use futures::{FutureExt, TryStreamExt};
@@ -42,6 +42,12 @@ const RUNNER_SIGNAL: zx::Signals = zx::Signals::USER_0;
 
 /// The signal that the kernel raises to indicate that a message has been handled.
 const KERNEL_SIGNAL: zx::Signals = zx::Signals::USER_1;
+
+/// The signal that the kernel raises to indicate that it's awake.
+const AWAKE_SIGNAL: zx::Signals = zx::Signals::USER_0;
+
+/// The signal that the kernel raises to indicate that it's suspended.
+const ASLEEP_SIGNAL: zx::Signals = zx::Signals::USER_1;
 
 #[allow(dead_code)]
 pub struct StarnixKernel {
@@ -193,6 +199,7 @@ pub struct ResumeEvents {
 pub struct SuspendContext {
     suspended_processes: Arc<Mutex<Vec<zx::Handle>>>,
     resume_events: Arc<Mutex<ResumeEvents>>,
+    wake_watchers: Arc<Mutex<Vec<zx::EventPair>>>,
 }
 
 /// Generate a random name for the kernel.
@@ -283,6 +290,13 @@ async fn suspend_container(
         };
     }
 
+    {
+        let watchers = suspend_context.wake_watchers.lock();
+        for event in watchers.iter() {
+            let (clear_mask, set_mask) = (AWAKE_SIGNAL, ASLEEP_SIGNAL);
+            event.signal_peer(clear_mask, set_mask)?;
+        }
+    }
     kernels.drop_wake_lease(&container_job)?;
 
     let resume_events = suspend_context.resume_events.lock();
@@ -301,12 +315,14 @@ async fn suspend_container(
     // would also allow us to unblock this thread.
     {
         fuchsia_trace::duration!(c"power", c"starnix-runner:waiting-on-container-wake");
-        match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
-            Ok(_) => (),
-            Err(e) => {
-                warn!("error waiting for wake event {:?}", e);
-            }
-        };
+        if wait_items.len() > 0 {
+            match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
+                Ok(_) => (),
+                Err(e) => {
+                    warn!("error waiting for wake event {:?}", e);
+                }
+            };
+        }
     }
 
     for wait_item in &wait_items {
@@ -319,6 +335,12 @@ async fn suspend_container(
     }
 
     kernels.acquire_wake_lease(&container_job).await?;
+
+    let watchers = suspend_context.wake_watchers.lock();
+    for event in watchers.iter() {
+        let (clear_mask, set_mask) = (ASLEEP_SIGNAL, AWAKE_SIGNAL);
+        event.signal_peer(clear_mask, set_mask)?;
+    }
 
     Ok(Ok(fstarnixrunner::ManagerSuspendContainerResponse {
         suspend_time: Some((zx::BootInstant::get() - suspend_start).into_nanos()),
@@ -383,6 +405,18 @@ pub async fn serve_starnix_manager(
             }
             fstarnixrunner::ManagerRequest::Resume { .. } => {
                 resume_kernels(&suspend_context.suspended_processes)
+            }
+
+            fstarnixrunner::ManagerRequest::RegisterWakeWatcher { payload, responder } => {
+                if let Some(watcher) = payload.watcher {
+                    let (clear_mask, set_mask) = (ASLEEP_SIGNAL, AWAKE_SIGNAL);
+                    watcher.signal_peer(clear_mask, set_mask)?;
+
+                    suspend_context.wake_watchers.lock().push(watcher);
+                }
+                if let Err(e) = responder.send() {
+                    warn!("error registering power watcher: {e}");
+                }
             }
             _ => {}
         }

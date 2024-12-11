@@ -1,0 +1,123 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// See the top level API summary in `doc.fidl`.
+library fuchsia.time.alarms;
+
+using zx;
+using fuchsia.power.system;
+
+alias AlarmId = string:128;
+
+// The main protocol to look at in this file is `Wake` below.
+
+/// [Wake] provides setting up platform-wide wake alarms.
+///
+/// An alarm is a promise made by the system to the caller of the API to notify
+/// the caller that AT LEAST a certain amount of time has expired. The alarm
+/// may fire later than the requested amount of time at the discretion of the
+/// server implementing this API.
+///
+/// When this notification happens, we say that the wake alarm has "fired".
+///
+/// A "wake" alarm firing also ensures that the system comes back from a reduced
+/// power state if needed, so that it can notify the caller.
+///
+/// The general shape of a wake alarm API has three parts:
+/// * A specification of when a wake alarm is supposed to fire,
+/// * A way to notify the caller of an alarm that fired, and
+/// * A way to keep the system awake until both the caller and the callee have
+///   completed work associated with the alarm.
+@discoverable
+open protocol Wake {
+    // Protocol fragment with an initial approach to scheduling wake alarms.
+    compose ClientSideBatonManagement;
+};
+
+protocol ClientSideBatonManagement {
+    /// Sets a wake alarm with the provided parameters, and waits for the alarm
+    /// to fire.
+    ///
+    /// The caller MAY request multiple alarms open concurrently. However,
+    /// the callee is _not_ required to support any specific number of open
+    /// alarms.
+    ///
+    /// The call to SetAndWait will hang until the alarm fires, or an error
+    /// occurs.
+    ///
+    /// In the event that the caller requests more open alarms than the
+    /// callee is willing to provide, the callee SHOULD reject the new
+    /// request, but honor previous requests.
+    ///
+    /// ## Return value
+    ///
+    /// * `keep_alive`: a handle which prevents system suspend so long as
+    ///   it is held alive.
+    ///
+    /// This method will return when the alarm set in the call fires.
+    ///
+    /// ## Protocol Errors
+    ///
+    /// * [DROPPED] if the alarm has been canceled by using
+    ///   [Cancel].
+    /// * [UNSPECIFIED] a new error mode has occurred, please
+    ///   report this for investigatin.
+    /// * [INTERNAL] is a bug: an internal fallible call (which is expected
+    ///   to be unlikely to fail) has failed somehow. Please report this for
+    ///   investigation.
+    SetAndWait(@generated_name("SetAndWaitArgs") resource struct {
+        /// The deadline at which the timer is supposed to fire.
+        deadline zx.InstantBoot;
+
+        /// Used by the callee to ensure that the system does not suspend
+        /// before the alarm is properly scheduled.  The callee may deactivate
+        /// the lease once the alarm is scheduled.
+        keep_alive fuchsia.power.system.LeaseToken;
+
+        /// Set to a nonempty value to identify the alarm. A unique value
+        /// of [AlarmId] must be picked per each unique alarm within a
+        /// single FIDL connection's scope.
+        ///
+        /// Supplying an alarm_id for an already scheduled alarm will reschedule
+        /// that alarm.
+        alarm_id AlarmId;
+    }) -> (resource struct {
+        /// Used by the caller to ensure a minimum time slice for useful work,
+        /// before the system may suspend again.
+        keep_alive fuchsia.power.system.LeaseToken;
+    }) error WakeError;
+
+    /// Cancels the alarm specified by `alarm_id`.
+    ///
+    /// Providing an `alarm_id` of an alarm that is not scheduled quietly
+    /// succeeds.
+    Cancel(struct {
+        /// The unique identifier of the alarm to cancel.
+        ///
+        /// The alarm identified by `alarm_id` is canceled, and will no
+        /// longer be expected to fire. The respective `SetAndWait` will
+        /// return [WakeError::DROPPED].
+        ///
+        /// A race condition is possible where the alarm fires while
+        /// the Cancel call is being processed, or even slightly later.
+        /// The caller must handle such an event gracefully.
+        alarm_id AlarmId;
+    }) -> () error WakeError;
+};
+
+/// WakeError describes the error code that can be returned from wake
+/// alarm API calls.
+type WakeError = flexible enum {
+    /// A catch all error can be used for any error during the execution
+    /// of any FIDL calls above.  Add new enum values for finer-grained
+    /// error reports.
+    UNSPECIFIED = 1;
+    /// This alarm was dropped. There will be no wakes resulting from
+    /// this alarm.
+    DROPPED = 2;
+    /// The server end encountered an error internal to its code, which should
+    /// not ever happen in normal operation. Receiving this error means that the
+    /// server end of the connection has a bug that must be fixed.
+    INTERNAL = 3;
+};

@@ -50,6 +50,9 @@ size_t AllocateAndOverwriteFreeMemory() {
       allocation_size /= 2;
       continue;
     }
+    if (!result.get()) {
+      break;
+    }
 
     bytes_allocated += allocation_size;
 

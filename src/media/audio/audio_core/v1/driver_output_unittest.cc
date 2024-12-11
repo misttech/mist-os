@@ -14,12 +14,10 @@
 
 #include "src/media/audio/audio_core/shared/loudness_transform.h"
 #include "src/media/audio/audio_core/v1/audio_device_manager.h"
-#include "src/media/audio/audio_core/v1/audio_driver.h"
 #include "src/media/audio/audio_core/v1/testing/fake_audio_driver.h"
 #include "src/media/audio/audio_core/v1/testing/fake_audio_renderer.h"
 #include "src/media/audio/audio_core/v1/testing/threading_model_fixture.h"
 #include "src/media/audio/lib/effects_loader/testing/test_effects_v1.h"
-#include "src/media/audio/lib/format/driver_format.h"
 #include "src/media/audio/lib/processing/gain.h"
 
 using testing::Each;
@@ -31,7 +29,7 @@ namespace {
 
 constexpr zx::duration kBeyondSubmittedPackets = zx::sec(1);
 
-int64_t RingBufferSizeBytes() { return 8 * zx_system_get_page_size(); }
+int64_t RingBufferSizeBytes() { return 8L * zx_system_get_page_size(); }
 
 class DriverOutputTest : public testing::ThreadingModelFixture {
  protected:
@@ -73,8 +71,8 @@ class DriverOutputTest : public testing::ThreadingModelFixture {
                 .Build()),
         expected_mix_interval_(context().process_config().mix_profile_config().period) {}
 
-  void AddChannelSet(fuchsia::hardware::audio::PcmSupportedFormats& formats,
-                     size_t number_of_channels) {
+  static void AddChannelSet(fuchsia::hardware::audio::PcmSupportedFormats& formats,
+                            size_t number_of_channels) {
     fuchsia::hardware::audio::ChannelSet channel_set = {};
     std::vector<fuchsia::hardware::audio::ChannelAttributes> attributes(number_of_channels);
     channel_set.set_attributes(std::move(attributes));
@@ -211,7 +209,7 @@ TEST_F(DriverOutputTest, RendererOutput) {
   renderer->EnqueueAudioPacket(-0.5, zx::msec(5));
   // Only the first two packets will be mixed; we'll stop before mixing the third.
   bool packet3_released = false;
-  renderer->EnqueueAudioPacket(0.8765, zx::msec(5),
+  renderer->EnqueueAudioPacket(0.8765f, zx::msec(5),
                                [&packet3_released] { packet3_released = true; });
 
   // Run the loop for just before we expect the mix to occur to validate we're mixing on the correct
@@ -387,7 +385,7 @@ TEST_F(DriverOutputTest, DISABLED_WriteSilenceToRingWhenMuted) {
   size_t first_silent_frame = (supportedSampleFormat.frame_rate *
                                (output_->presentation_delay() - kExternalDelay).to_nsecs()) /
                               1'000'000'000;
-  size_t num_silent_frames = kMixWindowFrames * 2;
+  size_t num_silent_frames = kMixWindowFrames * 2UL;
 
   // Run loop to consume all the frames from the renderer.
   RunLoopFor(expected_mix_interval_);
@@ -424,7 +422,7 @@ TEST_F(DriverOutputTest, SelectRateAndChannelizationFromDeviceConfig) {
 
   AddChannelSet(formats, kRequestedDeviceChannels / 2);
   AddChannelSet(formats, kRequestedDeviceChannels);
-  AddChannelSet(formats, kRequestedDeviceChannels * 2);
+  AddChannelSet(formats, kRequestedDeviceChannels * 2UL);
 
   formats.mutable_frame_rates()->push_back(kRequestedDeviceRate / 2);
   formats.mutable_frame_rates()->push_back(kRequestedDeviceRate);

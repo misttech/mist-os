@@ -759,7 +759,8 @@ impl<'a, I> Inserter<I> for SocketMapAddrInserter<'a, I> {
 impl<I: Debug + Eq> SocketMapAddrStateSpec for AddrState<I> {
     type Id = I;
     type SharingState = Sharing;
-    type Inserter<'a> = SocketMapAddrInserter<'a, I>
+    type Inserter<'a>
+        = SocketMapAddrInserter<'a, I>
     where
         I: 'a;
 

@@ -2,50 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-.weak zx_restricted_enter
+#include <lib/arch/asm.h>
 
-// do something to all the registers so we can read the state on the way out
-.macro twiddle_registers
-  add x0, x0, #1
-  add x1, x1, #1
-  add x2, x2, #1
-  add x3, x3, #1
-  add x4, x4, #1
-  add x5, x5, #1
-  add x6, x6, #1
-  add x7, x7, #1
-  add x8, x8, #1
-  add x9, x9, #1
-  add x10, x10, #1
-  add x11, x11, #1
-  add x12, x12, #1
-  add x13, x13, #1
-  add x14, x14, #1
-  add x15, x15, #1
-  add x16, x16, #1
-  add x17, x17, #1
-  add x18, x18, #1
-  add x19, x19, #1
-  add x20, x20, #1
-  add x21, x21, #1
-  add x22, x22, #1
-  add x23, x23, #1
-  add x24, x24, #1
-  add x25, x25, #1
-  add x26, x26, #1
-  add x27, x27, #1
-  add x28, x28, #1
-  add x29, x29, #1
-  add x30, x30, #1
-  add sp, sp, #1
+#include "../needs-next.h"
 
-  // Save the contents of x16 to TLS prior to running a syscall.
-  mrs x0, tpidr_el0
-  str x16, [x0]
-.endm
+NEEDS_NEXT_SYSCALL(zx_restricted_enter)
 
-.globl vectab
-vectab:
+.function restricted_exit, global
   // Back from restricted mode
   // x0 holds the context, which is the stack pointer
   // x1 holds the reason code
@@ -73,32 +36,9 @@ vectab:
   // Make it appear as if the wrapper had returned ZX_OK
   mov  x0, xzr
   ret
+.end_function
 
-.globl syscall_bounce
-syscall_bounce:
-  // do something to all the registers so we can read
-  // the state on the way out
-  twiddle_registers
-0:
-  mov x16, xzr
-  add x16, x16, #64
-  svc #0
-.globl syscall_bounce_post_syscall
-syscall_bounce_post_syscall:
-  bl syscall_bounce
-
-.globl exception_bounce
-exception_bounce:
-  // do something to all the registers so we can read
-  // the state on the way out
-  twiddle_registers
-.globl exception_bounce_exception_address
-exception_bounce_exception_address:
-  udf #0
-  b exception_bounce_exception_address
-
-.globl restricted_enter_wrapper
-restricted_enter_wrapper:
+.function restricted_enter_wrapper, global
   // Args 0 - 1 are already in place in X0 and X1.
 
   // Save the reason code pointer and shadow call stack pointer on the stack.
@@ -123,33 +63,10 @@ restricted_enter_wrapper:
   // if we got here it must have failed
   add  sp, sp, #(14*8) // pop the previous state on the stack
   ret
-
-
-// Stores 1 to *x0 in a loop.
-.globl store_one
-store_one:
-  add     x1, x1, #1
-  mov     w8, #1
-.store_one_loop:
-  str     w8, [x0]
-  b       .store_one_loop
-
-// Atomically adds 1 to *x0, then loops until *x1 is nonzero and then issues a syscall.
-.globl wait_then_syscall
-wait_then_syscall:
-  ldaxr   w8, [x0]
-  add     w8, w8, #1
-  stlxr   w9, w8, [x0]
-  cbnz    w9, wait_then_syscall
-.wait_then_syscall_loop:
-  ldar    w8, [x1]
-  cbz     w8, .wait_then_syscall_loop
-  svc     #0
-  brk     #0x1
+.end_function
 
 // Load the contents of the array in *x0 to the FPU.
-.globl load_fpu_registers
-load_fpu_registers:
+.function load_fpu_registers, global
   ldp q0, q1, [x0]
   ldp q2, q3, [x0, #32]
   ldp q4, q5, [x0, #64]
@@ -167,10 +84,10 @@ load_fpu_registers:
   ldp q28, q29, [x0, #448]
   ldp q30, q31, [x0, #480]
   ret
+.end_function
 
 // Store the contents of the FPU into the array in *x0.
-.globl store_fpu_registers
-store_fpu_registers:
+.function store_fpu_registers, global
   stp q0, q1, [x0]
   stp q2, q3, [x0, #32]
   stp q4, q5, [x0, #64]
@@ -188,3 +105,4 @@ store_fpu_registers:
   stp q28, q29, [x0, #448]
   stp q30, q31, [x0, #480]
   ret
+.end_function

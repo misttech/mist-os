@@ -256,7 +256,7 @@ zx_status_t CaptureMaker::GetCapture(Capture* capture, CaptureLevel level,
         return s == ZX_ERR_BAD_STATE ? ZX_OK : s;
       });
 
-  auto result = strategy.Finalize(*os_);
+  auto result = StarnixCaptureStrategy::Finalize(*os_, std::move(strategy));
   if (result.is_error()) {
     return result.error_value();
   }

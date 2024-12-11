@@ -64,6 +64,7 @@ template("brcmfmac_driver") {
   # Driver package for the brcmfmac driver.
   fuchsia_driver_package(orig_target_name) {
     deps = _deps
+    export_to_bazel = true
     driver_components = [ ":fuchsia_driver" ]
     visibility = [ "*" ]
   }

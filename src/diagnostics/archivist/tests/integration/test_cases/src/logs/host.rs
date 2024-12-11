@@ -3,13 +3,10 @@
 // found in the LICENSE file.
 
 use crate::puppet::PuppetProxyExt;
-use crate::test_topology;
+use crate::{test_topology, utils};
 use diagnostics_data::{LogsData, Severity};
 use futures::AsyncReadExt;
-use {
-    fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics,
-    fidl_fuchsia_diagnostics_host as fdiagnostics_host,
-};
+use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
 
 const PUPPET_NAME: &str = "puppet";
 
@@ -29,10 +26,7 @@ async fn can_read_using_the_host_accessor() {
     let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME).await.unwrap();
     puppet.log_messages(messages.clone()).await;
 
-    let accessor = realm_proxy
-        .connect_to_protocol::<fdiagnostics_host::ArchiveAccessorMarker>()
-        .await
-        .unwrap();
+    let accessor = utils::connect_host_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     let (local, remote) = zx::Socket::create_stream();
     let mut reader = fuchsia_async::Socket::from_socket(local);
     accessor

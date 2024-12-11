@@ -1325,16 +1325,14 @@ where
     impl_packet_builder! {}
 }
 
-impl<'a, Item> IpPacketBuilder<Ipv6>
-    for Ipv6PacketBuilderWithHbhOptions<'a, core::slice::Iter<'a, Item>>
+impl<'a, I> IpPacketBuilder<Ipv6> for Ipv6PacketBuilderWithHbhOptions<'a, I>
 where
-    Item: Debug,
-    &'a Item: Borrow<HopByHopOption<'a>>,
+    I: Iterator<Item: Borrow<HopByHopOption<'a>>> + Debug + Default + Clone,
 {
     fn new(src_ip: Ipv6Addr, dst_ip: Ipv6Addr, ttl: u8, proto: Ipv6Proto) -> Self {
         Ipv6PacketBuilderWithHbhOptions::new(
             Ipv6PacketBuilder::new(src_ip, dst_ip, ttl, proto),
-            [].iter(),
+            I::default(),
         )
         .expect("packet builder with no options should be valid")
     }

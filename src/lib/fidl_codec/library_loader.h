@@ -492,7 +492,7 @@ class LibraryLoader {
   // Adds a method ordinal to the ordinal map.
   void AddMethod(ProtocolMethod* method);
 
-  void ParseBuiltinSemantic();
+  void ParseBuiltinSemantics();
 
   // Returns a pointer to a set of methods that have this ordinal.  There may be
   // more than one if the method was composed into multiple protocols.  For

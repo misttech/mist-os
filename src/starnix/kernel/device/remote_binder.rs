@@ -635,6 +635,13 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         drop(baton);
                     }
                 }
+                fbinder::ContainerPowerControllerRequest::RegisterWakeWatcher {
+                    payload, ..
+                } => {
+                    if let Some(watcher) = payload.watcher {
+                        crate::power::create_watcher_for_wake_events(watcher);
+                    }
+                }
                 unknown => log_warn!("Unknown ContainerPowerController request: {:#?}", unknown),
             };
             crate::power::clear_wake_proxy_signal(proxy_event);
@@ -1203,7 +1210,9 @@ mod tests {
                 )
                 .expect("Task")
                 .into();
-                task.mm().initialize_mmap_layout_for_test(ArchWidth::Arch64);
+                task.mm()
+                    .ok_or_else(|| errno!(EINVAL))?
+                    .initialize_mmap_layout_for_test(ArchWidth::Arch64);
 
                 let remote_binder_handle =
                     RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task);

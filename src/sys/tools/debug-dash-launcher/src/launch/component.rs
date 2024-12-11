@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{layout, socket};
-use fidl::endpoints::{create_proxy, ClientEnd, ServerEnd};
+use fidl::endpoints::{create_proxy, ClientEnd};
 use fidl_fuchsia_dash::LauncherError;
 use fuchsia_component::client::connect_to_protocol;
 use moniker::Moniker;
@@ -92,23 +92,13 @@ async fn open_outgoing_dir(
     moniker: &str,
 ) -> Result<Option<fio::DirectoryProxy>, LauncherError> {
     let (dir, server_end) = create_proxy::<fio::DirectoryMarker>();
-    let server_end = ServerEnd::new(server_end.into_channel());
     let result = query
-        .open(
-            &moniker,
-            fsys::OpenDirType::OutgoingDir,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            fio::ModeType::empty(),
-            ".",
-            server_end,
-        )
+        .open_directory(&moniker, fsys::OpenDirType::OutgoingDir, server_end)
         .await
         .map_err(|error| {
-            warn!(%moniker, %error, "FIDL call failed to open outgoing dir");
-            LauncherError::RealmQuery
-        })?;
+        warn!(%moniker, %error, "FIDL call failed to open outgoing dir");
+        LauncherError::RealmQuery
+    })?;
     match result {
         Ok(()) => Ok(Some(dir)),
         Err(fsys::OpenError::InstanceNotRunning) | Err(fsys::OpenError::NoSuchDir) => Ok(None),
@@ -127,16 +117,8 @@ async fn open_runtime_dir(
     moniker: &str,
 ) -> Result<Option<fio::DirectoryProxy>, LauncherError> {
     let (dir, server_end) = create_proxy::<fio::DirectoryMarker>();
-    let server_end = ServerEnd::new(server_end.into_channel());
     let result = query
-        .open(
-            &moniker,
-            fsys::OpenDirType::RuntimeDir,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            fio::ModeType::empty(),
-            ".",
-            server_end,
-        )
+        .open_directory(&moniker, fsys::OpenDirType::RuntimeDir, server_end)
         .await
         .map_err(|error| {
             warn!(%moniker, %error, "FIDL call failed to open runtime dir");
@@ -160,18 +142,8 @@ async fn open_exposed_dir(
     moniker: &str,
 ) -> Result<fio::DirectoryProxy, LauncherError> {
     let (dir, server_end) = create_proxy::<fio::DirectoryMarker>();
-    let server_end = ServerEnd::new(server_end.into_channel());
     let result = query
-        .open(
-            &moniker,
-            fsys::OpenDirType::ExposedDir,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            fio::ModeType::empty(),
-            ".",
-            server_end,
-        )
+        .open_directory(&moniker, fsys::OpenDirType::ExposedDir, server_end)
         .await
         .map_err(|error| {
             warn!(%moniker, %error, "FIDL call failed to open exposed dir");
@@ -214,13 +186,15 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::StreamExt;
 
-    fn serve_realm_query(result: fsys::RealmQueryOpenResult) -> fsys::RealmQueryProxy {
+    fn serve_realm_query(result: fsys::RealmQueryOpenDirectoryResult) -> fsys::RealmQueryProxy {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>();
         fasync::Task::spawn(async move {
             let mut stream = server_end.into_stream();
             let request = stream.next().await.unwrap().unwrap();
             let (moniker, responder) = match request {
-                fsys::RealmQueryRequest::Open { moniker, responder, .. } => (moniker, responder),
+                fsys::RealmQueryRequest::OpenDirectory { moniker, responder, .. } => {
+                    (moniker, responder)
+                }
                 _ => panic!("Unexpected RealmQueryRequest"),
             };
             assert_eq!(moniker, ".");

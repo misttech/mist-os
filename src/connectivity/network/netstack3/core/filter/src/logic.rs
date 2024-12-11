@@ -9,7 +9,7 @@ use core::ops::RangeInclusive;
 
 use log::error;
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
-use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer};
+use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer, IpDeviceAddressIdContext};
 use packet_formats::ip::IpExt;
 
 use crate::conntrack::{Connection, FinalizeConnectionError, GetConnectionError};
@@ -64,6 +64,7 @@ impl ProofOfEgressCheck {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct Interfaces<'a, D> {
     pub ingress: Option<&'a D>,
     pub egress: Option<&'a D>,
@@ -249,7 +250,7 @@ where
 /// An implementation of packet filtering logic, providing entry points at
 /// various stages of packet processing.
 pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
-    DeviceIdContext<AnyDevice, DeviceId: InterfaceProperties<BC::DeviceClass>>
+    IpDeviceAddressIdContext<I, DeviceId: InterfaceProperties<BC::DeviceClass>>
 {
     /// The ingress hook intercepts incoming traffic before a routing decision
     /// has been made.
@@ -262,7 +263,7 @@ pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
     ) -> IngressVerdict<I>
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>;
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>;
 
     /// The local ingress hook intercepts incoming traffic that is destined for
     /// the local host.
@@ -275,7 +276,7 @@ pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
     ) -> Verdict
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>;
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>;
 
     /// The forwarding hook intercepts incoming traffic that is destined for
     /// another host.
@@ -288,7 +289,7 @@ pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
     ) -> Verdict
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>;
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>;
 
     /// The local egress hook intercepts locally-generated traffic before a
     /// routing decision has been made.
@@ -301,7 +302,7 @@ pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
     ) -> Verdict
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>;
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>;
 
     /// The egress hook intercepts all outgoing traffic after a routing decision
     /// has been made.
@@ -314,7 +315,7 @@ pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
     ) -> (Verdict, ProofOfEgressCheck)
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>;
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>;
 }
 
 /// The "production" implementation of packet filtering.
@@ -326,6 +327,15 @@ pub struct FilterImpl<'a, CC>(pub &'a mut CC);
 impl<CC: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice> for FilterImpl<'_, CC> {
     type DeviceId = CC::DeviceId;
     type WeakDeviceId = CC::WeakDeviceId;
+}
+
+impl<I, CC> IpDeviceAddressIdContext<I> for FilterImpl<'_, CC>
+where
+    I: IpExt,
+    CC: IpDeviceAddressIdContext<I>,
+{
+    type AddressId = CC::AddressId;
+    type WeakAddressId = CC::WeakAddressId;
 }
 
 impl<I, BC, CC> FilterHandler<I, BC> for FilterImpl<'_, CC>
@@ -343,22 +353,22 @@ where
     ) -> IngressVerdict<I>
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>,
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
     {
         let Self(this) = self;
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
             // There usually isn't going to be an existing connection in the metadata before
             // this hook, but it's possible in the case of looped-back packets, so check for
             // one first before looking in the conntrack table.
-            let conn = match metadata.take_conntrack_connection() {
-                Some(c) => Some(c),
+            let conn = match metadata.take_connection_and_direction() {
+                Some((c, d)) => Some((c, d)),
                 None => {
                     match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
                     {
-                        Ok(c) => c,
+                        Ok(result) => result,
                         // TODO(https://fxbug.dev/328064909): Support configurable dropping of
                         // invalid packets.
-                        Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                        Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
                     }
                 }
             };
@@ -373,7 +383,7 @@ where
                 | v @ IngressVerdict::TransparentLocalDelivery { .. } => v,
             };
 
-            if let Some(mut conn) = conn {
+            if let Some((mut conn, direction)) = conn {
                 // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
                 // post-NAT, but in the same hook. Currently all filter routines are run before
                 // all NAT routines in the same hook.
@@ -383,6 +393,7 @@ where
                     state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
+                    direction,
                     &state.installed_routines.get().nat.ingress,
                     packet,
                     Interfaces { ingress: Some(interface), egress: None },
@@ -397,7 +408,7 @@ where
                     }
                 }
 
-                let res = metadata.replace_conntrack_connection(conn);
+                let res = metadata.replace_connection_and_direction(conn, direction);
                 debug_assert!(res.is_none());
             }
 
@@ -414,22 +425,22 @@ where
     ) -> Verdict
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>,
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
     {
         let Self(this) = self;
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
-            let conn = match metadata.take_conntrack_connection() {
-                Some(c) => Some(c),
+            let conn = match metadata.take_connection_and_direction() {
+                Some((c, d)) => Some((c, d)),
                 // It's possible that there won't be a connection in the metadata by this point;
                 // this could be, for example, because the packet is for a protocol not tracked
                 // by conntrack.
                 None => {
                     match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
                     {
-                        Ok(c) => c,
+                        Ok(result) => result,
                         // TODO(https://fxbug.dev/328064909): Support configurable dropping of
                         // invalid packets.
-                        Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                        Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
                     }
                 }
             };
@@ -443,7 +454,7 @@ where
                 Verdict::Accept(()) => Verdict::Accept(()),
             };
 
-            if let Some(mut conn) = conn {
+            if let Some((mut conn, direction)) = conn {
                 // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
                 // post-NAT, but in the same hook. Currently all filter routines are run before
                 // all NAT routines in the same hook.
@@ -453,6 +464,7 @@ where
                     state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
+                    direction,
                     &state.installed_routines.get().nat.local_ingress,
                     packet,
                     Interfaces { ingress: Some(interface), egress: None },
@@ -484,7 +496,7 @@ where
     ) -> Verdict
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>,
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
@@ -505,7 +517,7 @@ where
     ) -> Verdict
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>,
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
     {
         let Self(this) = self;
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
@@ -513,10 +525,10 @@ where
             // before this hook, so we don't have to look.
             let conn =
                 match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet) {
-                    Ok(c) => c,
+                    Ok(result) => result,
                     // TODO(https://fxbug.dev/328064909): Support configurable dropping of invalid
                     // packets.
-                    Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                    Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
                 };
 
             let verdict = match check_routines_for_hook(
@@ -528,7 +540,7 @@ where
                 Verdict::Accept(()) => Verdict::Accept(()),
             };
 
-            if let Some(mut conn) = conn {
+            if let Some((mut conn, direction)) = conn {
                 // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
                 // post-NAT, but in the same hook. Currently all filter routines are run before
                 // all NAT routines in the same hook.
@@ -538,6 +550,7 @@ where
                     state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
+                    direction,
                     &state.installed_routines.get().nat.local_egress,
                     packet,
                     Interfaces { ingress: None, egress: Some(interface) },
@@ -546,7 +559,7 @@ where
                     Verdict::Accept(()) => {}
                 }
 
-                let res = metadata.replace_conntrack_connection(conn);
+                let res = metadata.replace_connection_and_direction(conn, direction);
                 debug_assert!(res.is_none());
             }
 
@@ -563,22 +576,22 @@ where
     ) -> (Verdict, ProofOfEgressCheck)
     where
         P: IpPacket<I>,
-        M: FilterIpMetadata<I, BC>,
+        M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
     {
         let Self(this) = self;
         let verdict = this.with_filter_state_and_nat_ctx(|state, core_ctx| {
-            let conn = match metadata.take_conntrack_connection() {
-                Some(c) => Some(c),
+            let conn = match metadata.take_connection_and_direction() {
+                Some((c, d)) => Some((c, d)),
                 // It's possible that there won't be a connection in the metadata by this point;
                 // this could be, for example, because the packet is for a protocol not tracked
                 // by conntrack.
                 None => {
                     match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
                     {
-                        Ok(c) => c,
+                        Ok(result) => result,
                         // TODO(https://fxbug.dev/328064909): Support configurable dropping of
                         // invalid packets.
-                        Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                        Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
                     }
                 }
             };
@@ -592,7 +605,7 @@ where
                 Verdict::Accept(()) => Verdict::Accept(()),
             };
 
-            if let Some(mut conn) = conn {
+            if let Some((mut conn, direction)) = conn {
                 // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
                 // post-NAT, but in the same hook. Currently all filter routines are run before
                 // all NAT routines in the same hook.
@@ -602,6 +615,7 @@ where
                     state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
+                    direction,
                     &state.installed_routines.get().nat.egress,
                     packet,
                     Interfaces { ingress: None, egress: Some(interface) },
@@ -613,8 +627,10 @@ where
                 match state.conntrack.finalize_connection(bindings_ctx, conn) {
                     Ok((_inserted, conn)) => {
                         if let Some(conn) = conn {
-                            let res =
-                                metadata.replace_conntrack_connection(Connection::Shared(conn));
+                            let res = metadata.replace_connection_and_direction(
+                                Connection::Shared(conn),
+                                direction,
+                            );
                             debug_assert!(res.is_none());
                         }
                     }
@@ -655,11 +671,13 @@ impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> Handleable
     }
 }
 
-#[cfg(feature = "testutils")]
+#[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     use core::marker::PhantomData;
 
-    use netstack3_base::testutil::{FakeStrongDeviceId, FakeWeakDeviceId};
+    use net_types::ip::AddrSubnet;
+    use netstack3_base::testutil::{FakeStrongDeviceId, FakeWeakAddressId, FakeWeakDeviceId};
+    use netstack3_base::AssignedAddrIpExt;
 
     use super::*;
 
@@ -682,9 +700,16 @@ pub mod testutil {
         type WeakDeviceId = FakeWeakDeviceId<DeviceId>;
     }
 
+    impl<I: AssignedAddrIpExt, DeviceId: FakeStrongDeviceId> IpDeviceAddressIdContext<I>
+        for NoopImpl<DeviceId>
+    {
+        type AddressId = AddrSubnet<I::Addr, I::AssignedWitness>;
+        type WeakAddressId = FakeWeakAddressId<Self::AddressId>;
+    }
+
     impl<I, BC, DeviceId> FilterHandler<I, BC> for NoopImpl<DeviceId>
     where
-        I: IpExt,
+        I: IpExt + AssignedAddrIpExt,
         BC: FilterBindingsContext,
         DeviceId: FakeStrongDeviceId + InterfaceProperties<BC::DeviceClass>,
     {
@@ -697,7 +722,7 @@ pub mod testutil {
         ) -> IngressVerdict<I>
         where
             P: IpPacket<I>,
-            M: FilterIpMetadata<I, BC>,
+            M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
         {
             Verdict::Accept(()).into()
         }
@@ -711,7 +736,7 @@ pub mod testutil {
         ) -> Verdict
         where
             P: IpPacket<I>,
-            M: FilterIpMetadata<I, BC>,
+            M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
         {
             Verdict::Accept(())
         }
@@ -725,7 +750,7 @@ pub mod testutil {
         ) -> Verdict
         where
             P: IpPacket<I>,
-            M: FilterIpMetadata<I, BC>,
+            M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
         {
             Verdict::Accept(())
         }
@@ -739,7 +764,7 @@ pub mod testutil {
         ) -> Verdict
         where
             P: IpPacket<I>,
-            M: FilterIpMetadata<I, BC>,
+            M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
         {
             Verdict::Accept(())
         }
@@ -753,7 +778,7 @@ pub mod testutil {
         ) -> (Verdict, ProofOfEgressCheck)
         where
             P: IpPacket<I>,
-            M: FilterIpMetadata<I, BC>,
+            M: FilterIpMetadata<I, Self::WeakAddressId, BC>,
         {
             (Verdict::Accept(()), ProofOfEgressCheck::forge_proof_for_test())
         }
@@ -778,12 +803,12 @@ mod tests {
     use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
     use ip_test_macro::ip_test;
-    use net_types::ip::Ipv4;
-    use netstack3_base::{IpDeviceAddr, SegmentHeader};
+    use net_types::ip::{AddrSubnet, Ipv4, Ipv4Addr, Ipv6Addr};
+    use netstack3_base::{AssignedAddrIpExt, SegmentHeader};
     use test_case::test_case;
 
     use super::*;
-    use crate::conntrack::{self, Tuple};
+    use crate::conntrack::{self, ConnectionDirection, Tuple};
     use crate::context::testutil::{FakeBindingsCtx, FakeCtx, FakeDeviceClass};
     use crate::logic::nat::NatConfig;
     use crate::matchers::testutil::{ethernet_interface, wlan_interface, FakeDeviceId};
@@ -792,9 +817,10 @@ mod tests {
         TransportProtocolMatcher,
     };
     use crate::packets::testutil::internal::{
-        ArbitraryValue, FakeIpPacket, FakeTcpSegment, FakeUdpPacket, TestIpExt, TransportPacketExt,
+        ArbitraryValue, FakeIpPacket, FakeTcpSegment, FakeUdpPacket, TransportPacketExt,
     };
     use crate::state::{IpRoutines, NatRoutines, UninstalledRoutine};
+    use crate::testutil::TestIpExt;
 
     impl<I: IpExt> Rule<I, FakeDeviceClass, ()> {
         pub(crate) fn new(
@@ -839,35 +865,45 @@ mod tests {
 
     struct NullMetadata {}
 
-    impl<I: IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, BT> for NullMetadata {
-        fn take_conntrack_connection(&mut self) -> Option<Connection<I, BT, NatConfig>> {
+    impl<I: IpExt, A, BT: FilterBindingsTypes> FilterIpMetadata<I, A, BT> for NullMetadata {
+        fn take_connection_and_direction(
+            &mut self,
+        ) -> Option<(Connection<I, NatConfig<I, A>, BT>, ConnectionDirection)> {
             None
         }
 
-        fn replace_conntrack_connection(
+        fn replace_connection_and_direction(
             &mut self,
-            _conn: Connection<I, BT, NatConfig>,
-        ) -> Option<Connection<I, BT, NatConfig>> {
+            _conn: Connection<I, NatConfig<I, A>, BT>,
+            _direction: ConnectionDirection,
+        ) -> Option<Connection<I, NatConfig<I, A>, BT>> {
             None
         }
     }
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
-    struct PacketMetadata<I: IpExt, BT: FilterBindingsTypes>(Option<Connection<I, BT, NatConfig>>);
+    struct PacketMetadata<I: IpExt + AssignedAddrIpExt, A, BT: FilterBindingsTypes>(
+        Option<(Connection<I, NatConfig<I, A>, BT>, ConnectionDirection)>,
+    );
 
-    impl<I: IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, BT> for PacketMetadata<I, BT> {
-        fn take_conntrack_connection(&mut self) -> Option<Connection<I, BT, NatConfig>> {
+    impl<I: TestIpExt, A, BT: FilterBindingsTypes> FilterIpMetadata<I, A, BT>
+        for PacketMetadata<I, A, BT>
+    {
+        fn take_connection_and_direction(
+            &mut self,
+        ) -> Option<(Connection<I, NatConfig<I, A>, BT>, ConnectionDirection)> {
             let Self(inner) = self;
             inner.take()
         }
 
-        fn replace_conntrack_connection(
+        fn replace_connection_and_direction(
             &mut self,
-            conn: Connection<I, BT, NatConfig>,
-        ) -> Option<Connection<I, BT, NatConfig>> {
+            conn: Connection<I, NatConfig<I, A>, BT>,
+            direction: ConnectionDirection,
+        ) -> Option<Connection<I, NatConfig<I, A>, BT>> {
             let Self(inner) = self;
-            inner.replace(conn)
+            inner.replace((conn, direction)).map(|(conn, _dir)| conn)
         }
     }
 
@@ -1026,7 +1062,10 @@ mod tests {
                 &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
-            IngressVerdict::TransparentLocalDelivery { addr: Ipv4::DST_IP, port: TPROXY_PORT }
+            IngressVerdict::TransparentLocalDelivery {
+                addr: <Ipv4 as crate::packets::testutil::internal::TestIpExt>::DST_IP,
+                port: TPROXY_PORT
+            }
         );
     }
 
@@ -1381,8 +1420,8 @@ mod tests {
         assert_eq!(verdict, Verdict::Accept(()));
 
         // The stashed reference should point to the connection that is in the table.
-        let stashed =
-            metadata.take_conntrack_connection().expect("metadata should include connection");
+        let (stashed, _dir) =
+            metadata.take_connection_and_direction().expect("metadata should include connection");
         let tuple = Tuple::from_packet(&packet).expect("packet should be trackable");
         let table = core_ctx
             .conntrack()
@@ -1407,8 +1446,8 @@ mod tests {
 
         // As a result, rather than there being a new connection in the packet metadata,
         // it should contain the same connection that is still in the table.
-        let after_ingress =
-            metadata.take_conntrack_connection().expect("metadata should include connection");
+        let (after_ingress, _dir) =
+            metadata.take_connection_and_direction().expect("metadata should include connection");
         let table = core_ctx
             .conntrack()
             .get_connection(&tuple)
@@ -1426,13 +1465,34 @@ mod tests {
         let mut bindings_ctx = FakeBindingsCtx::new();
         let mut ctx = FakeCtx::new(&mut bindings_ctx);
 
-        for i in 0..u16::try_from(conntrack::MAXIMUM_CONNECTIONS).unwrap() {
+        for i in 0..conntrack::MAXIMUM_ENTRIES {
+            // This ensures that, no matter how big index is (under 2^32, at least),
+            // we'll always have unique src and dst ports, and thus unique
+            // connections.
+            assert!(i < u32::MAX as usize);
+            let port = (i % (u16::MAX as usize)) as u16;
+            let ip_index = (i / (u16::MAX as usize)) as u16;
+
+            let ip: I::Addr = I::map_ip(
+                (I::SRC_IP, ip_index),
+                |(base_ip, i)| {
+                    let start = u32::from_be_bytes(base_ip.ipv4_bytes());
+                    let bytes = (start + u32::try_from(i).unwrap()).to_be_bytes();
+                    Ipv4Addr::new(bytes)
+                },
+                |(base_ip, i)| {
+                    let start = u128::from_be_bytes(base_ip.ipv6_bytes());
+                    let bytes = (start + u128::try_from(i).unwrap()).to_be_bytes();
+                    Ipv6Addr::from_bytes(bytes)
+                },
+            );
+
             // Create a self-connected flow so it's automatically considered established
             // after the first packet.
             let mut packet = FakeIpPacket {
-                src_ip: I::SRC_IP,
-                dst_ip: I::SRC_IP,
-                body: FakeUdpPacket { src_port: i, dst_port: i },
+                src_ip: ip,
+                dst_ip: ip,
+                body: FakeUdpPacket { src_port: port, dst_port: port },
             };
             let (verdict, _proof) = FilterImpl(&mut ctx).egress_hook(
                 &mut bindings_ctx,
@@ -1477,7 +1537,10 @@ mod tests {
                 },
                 ..Default::default()
             },
-            HashMap::from([(ethernet_interface(), IpDeviceAddr::new(I::SRC_IP).unwrap())]),
+            HashMap::from([(
+                ethernet_interface(),
+                AddrSubnet::new(I::SRC_IP, I::SUBNET.prefix()).unwrap(),
+            )]),
         );
 
         // Simulate a forwarded packet, originally from I::SRC_IP_2, that is masqueraded
@@ -1561,13 +1624,70 @@ mod tests {
         assert_eq!(second_packet.body.src_port, first_packet.body.src_port);
         assert_eq!(verdict, Verdict::Accept(()));
 
-        let first_conn = first_metadata.take_conntrack_connection().unwrap();
-        let second_conn = second_metadata.take_conntrack_connection().unwrap();
+        let (first_conn, _dir) = first_metadata.take_connection_and_direction().unwrap();
+        let (second_conn, _dir) = second_metadata.take_connection_and_direction().unwrap();
         assert_matches!(
             (first_conn, second_conn),
             (Connection::Shared(first), Connection::Shared(second)) => {
                 assert!(Arc::ptr_eq(&first, &second));
             }
         );
+    }
+
+    #[ip_test(I)]
+    fn both_source_and_destination_nat_configured<I: TestIpExt>() {
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        // Install NAT rules to perform both DNAT (in LOCAL_EGRESS) and SNAT (in
+        // EGRESS).
+        let mut core_ctx = FakeCtx::with_nat_routines_and_device_addrs(
+            &mut bindings_ctx,
+            NatRoutines {
+                local_egress: Hook {
+                    routines: vec![Routine {
+                        rules: vec![Rule::new(
+                            PacketMatcher::default(),
+                            Action::Redirect { dst_port: None },
+                        )],
+                    }],
+                },
+                egress: Hook {
+                    routines: vec![Routine {
+                        rules: vec![Rule::new(
+                            PacketMatcher::default(),
+                            Action::Masquerade { src_port: None },
+                        )],
+                    }],
+                },
+                ..Default::default()
+            },
+            HashMap::from([(
+                ethernet_interface(),
+                AddrSubnet::new(I::SRC_IP_2, I::SUBNET.prefix()).unwrap(),
+            )]),
+        );
+
+        // Even though the packet is modified after the first hook, where DNAT is
+        // configured...
+        let mut packet = FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value();
+        let mut metadata = PacketMetadata::default();
+        let verdict = FilterImpl(&mut core_ctx).local_egress_hook(
+            &mut bindings_ctx,
+            &mut packet,
+            &ethernet_interface(),
+            &mut metadata,
+        );
+        assert_eq!(verdict, Verdict::Accept(()));
+        assert_eq!(packet.dst_ip, *I::LOOPBACK_ADDRESS);
+
+        // ...SNAT is also successfully configured for the packet, because the packet's
+        // [`ConnectionDirection`] is cached in the metadata.
+        let (verdict, _proof) = FilterImpl(&mut core_ctx).egress_hook(
+            &mut bindings_ctx,
+            &mut packet,
+            &ethernet_interface(),
+            &mut metadata,
+        );
+        assert_eq!(verdict, Verdict::Accept(()));
+        assert_eq!(packet.src_ip, I::SRC_IP_2);
     }
 }

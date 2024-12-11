@@ -67,9 +67,6 @@ struct pipe : public zxio {
 struct remote : public zxio {
   static zx::result<fdio_ptr> create(fidl::ClientEnd<fuchsia_io::Node> node);
   static zx::result<fdio_ptr> create(zx::vmo vmo, zx::stream stream);
-
-  zx::result<fdio_ptr> open_deprecated(std::string_view path,
-                                       fuchsia_io::wire::OpenFlags flags) override;
   zx::result<fdio_ptr> open(std::string_view path, fuchsia_io::Flags flags) override;
   void wait_begin(uint32_t events, zx_handle_t* handle, zx_signals_t* signals) override;
   void wait_end(zx_signals_t signals, uint32_t* events) override;
@@ -81,12 +78,6 @@ struct remote : public zxio {
   remote() = default;
   ~remote() override = default;
 };
-
-zx::result<fdio_ptr> open_async_deprecated(zxio_t* directory, std::string_view path,
-                                           fuchsia_io::wire::OpenFlags legacy_flags);
-
-zx::result<fdio_ptr> open_async(zxio_t* directory, std::string_view path, fuchsia_io::Flags flags);
-
 }  // namespace fdio_internal
 
 #endif  // LIB_FDIO_ZXIO_H_

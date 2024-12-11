@@ -48,6 +48,9 @@ pub trait WeakIpAddressId<A: IpAddress>: Clone + Eq + Debug + Hash + Send + Sync
     ///
     /// Upgrading fails if this is no longer a valid assigned IP address.
     fn upgrade(&self) -> Option<Self::Strong>;
+
+    /// Returns whether this address is still assigned.
+    fn is_assigned(&self) -> bool;
 }
 
 /// An IP address ID.
@@ -210,6 +213,10 @@ pub mod testutil {
         fn upgrade(&self) -> Option<Self::Strong> {
             let Self(inner) = self;
             Some(inner.clone())
+        }
+
+        fn is_assigned(&self) -> bool {
+            true
         }
     }
 

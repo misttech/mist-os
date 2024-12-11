@@ -37,6 +37,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-sync",
     "//src/lib/mapped-vmo",
+    "//src/lib/trace/rust:trace",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",

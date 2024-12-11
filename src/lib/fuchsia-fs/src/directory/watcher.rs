@@ -22,7 +22,7 @@ use zx::MessageBuf;
 #[cfg(not(target_os = "fuchsia"))]
 use fasync::emulated_handle::MessageBuf;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 #[allow(missing_docs)]
 pub enum WatcherCreateError {
     #[error("while sending watch request: {0}")]

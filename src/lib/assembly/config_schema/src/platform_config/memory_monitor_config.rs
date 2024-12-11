@@ -24,7 +24,7 @@ pub enum MemoryMonitorVersion {
 
 /// Platform configuration options for the memory monitor area.
 #[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct PlatformMemoryMonitorConfig {
     pub memory_monitor_versions: Vec<MemoryMonitorVersion>,
 }

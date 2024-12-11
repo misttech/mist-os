@@ -22,10 +22,7 @@ fn main() -> std::process::ExitCode {
             netcfg_basic::main();
             std::process::ExitCode::SUCCESS
         }
-        "netstack_proxy" => {
-            netstack_proxy::main();
-            std::process::ExitCode::SUCCESS
-        }
+        "netstack_proxy" => netstack_proxy::main(),
         "netstack3" => {
             netstack3::main();
             std::process::ExitCode::SUCCESS

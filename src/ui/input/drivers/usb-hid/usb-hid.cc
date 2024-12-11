@@ -41,6 +41,12 @@ void UsbHidbus::HandleInterrupt(fendpoint::Completion completion) {
   ZX_ASSERT(completion.status().has_value());
   ZX_ASSERT(completion.transfer_size().has_value());
 
+  if (completion.wake_lease()) {
+    const zx::duration kLeaseTimeout = zx::msec(500);
+    wake_lease_.DepositWakeLease(std::move(completion.wake_lease().value()),
+                                 zx::deadline_after(kLeaseTimeout));
+  }
+
   // TODO use usb request copyfrom instead of mmap
   usb::FidlRequest req(std::move(completion.request().value()));
   std::vector<uint8_t> buffer(*completion.transfer_size());

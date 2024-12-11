@@ -7,7 +7,7 @@ pub(super) mod superblock;
 pub(super) mod task;
 pub(super) mod testing;
 
-use super::FsNodeSecurityXattr;
+use super::{FsNodeSecurityXattr, PermissionFlags};
 use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
@@ -100,8 +100,7 @@ where
         // fs_use_xattr-labelling defers to the security attribute on the file node, with fall-back
         // behaviours for missing and invalid labels.
         FileSystemLabelingScheme::FsUse { fs_use_type, def_sid, root_sid, .. } => {
-            let is_root_node = dir_entry.parent().is_none();
-            let maybe_sid = match fs_use_type {
+            match fs_use_type {
                 FsUseType::Xattr => {
                     // Determine the SID from the "security.selinux" attribute.
                     let attr = fs_node.ops().get_xattr(
@@ -111,7 +110,7 @@ where
                         XATTR_NAME_SELINUX.to_bytes().into(),
                         SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
                     );
-                    match attr {
+                    let maybe_sid = match attr {
                         Ok(ValueOrSize::Value(security_context)) => Some(
                             security_server
                                 .security_context_to_sid((&security_context).into())
@@ -119,7 +118,7 @@ where
                         ),
                         Ok(ValueOrSize::Size(_)) => None,
                         Err(err) => {
-                            if err.code == ENODATA && is_root_node {
+                            if err.code == ENODATA && dir_entry.parent().is_none() {
                                 // The root node of xattr-labeled filesystems should be labeled at
                                 // creation in principle. Distinguishing creation of the root of the
                                 // filesystem from re-instantiation of the `FsNode` representing an
@@ -142,43 +141,63 @@ where
                                 None
                             }
                         }
-                    }
+                    };
+                    maybe_sid.unwrap_or_else(||{
+                        // The node does not have a label, so apply the filesystem's default SID.
+                        if fs.name() == "remotefs" {
+                            track_stub!(TODO("https://fxbug.dev/378688761"), "RemoteFS node missing security label. Perhaps your device needs re-flashing?");
+                        } else {
+                            log_warn!(
+                                "Unlabeled node {:?} in {} ({:?}-labeled) filesystem",
+                                dir_entry,
+                                fs.name(),
+                                fs_use_type
+                            );
+                        };
+                        def_sid
+                    })
                 }
                 _ => {
-                    if is_root_node {
-                        Some(root_sid)
+                    if let Some(parent) = dir_entry.parent() {
+                        // Ephemeral nodes are then labeled by applying SID computation between their
+                        // SID of the task that created them, and their parent file node's label.
+                        // TODO: https://fxbug.dev/381275592 - Use the SID from the creating task, rather than current_task!
+                        return fs_node_init_on_create(
+                            security_server,
+                            current_task,
+                            fs_node,
+                            &parent.node,
+                        )
+                        .map(|_| ());
                     } else {
-                        None
+                        // Ephemeral filesystems' root nodes use the root SID, which will typically
+                        // be the same as that of the filesystem itself.
+                        root_sid
                     }
                 }
-            };
-            maybe_sid.unwrap_or_else(|| {
-                // The node does not have a label, so apply the filesystem's default SID.
-                    if fs.name() == "remotefs" {
-                        track_stub!(TODO("https://fxbug.dev/378688761"), "RemoteFS node missing security label. Perhaps your device needs re-flashing?");
-                    } else {
-                        log_warn!(
-                            "Unlabeled node in {} ({:?}-labeled) filesystem",
-                            fs.name(),
-                            fs_use_type
-                        );
-                    }
-                    def_sid
-            })
+            }
         }
         FileSystemLabelingScheme::GenFsCon => {
             let fs_type = fs_node.fs().name();
+            let fs_node_class = file_class_from_file_mode(fs_node.info().mode)?;
+
             // This will give us the path of the node from the root node of the filesystem,
             // excluding the path of the filesystem's mount point. For example, assuming that
             // filesystem "proc" is mounted in "/proc" and if the actual full path to the
             // fs_node is "/proc/bootconfig" then, get_fs_relative_path will return
             // "/bootconfig". This matches the path definitions in the genfscon statements.
-            let sub_path = get_fs_relative_path(dir_entry);
+            let sub_path = if fs_node_class == FileClass::Link {
+                // Investigation for https://fxbug.dev/378863048 suggests that symlinks' paths are
+                // ignored, so that they use the filesystem's root label.
+                "/".into()
+            } else {
+                get_fs_relative_path(dir_entry)
+            };
+
             let class_id = security_server
-                .class_id_by_name(
-                    ObjectClass::from(file_class_from_file_mode(fs_node.info().mode)?).name(),
-                )
+                .class_id_by_name(ObjectClass::from(fs_node_class).name())
                 .map_err(|_| errno!(EINVAL))?;
+
             security_server
                 .genfscon_label_for_fs_and_path(
                     fs_type.into(),
@@ -654,13 +673,86 @@ pub(super) fn check_fs_node_read_link_access(
     let current_sid = current_task.security_state.lock().current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
-    todo_check_permission!(
-        TODO("https://fxbug.dev/378863048", "Check read permission on links."),
+    check_permission(
         &security_server.as_permission_check(),
         current_sid,
         file_sid,
         CommonFilePermission::Read.for_class(file_class),
     )
+}
+
+/// Validates that the `current_task` has the permissions to access `fs_node`.
+pub fn fs_node_permission(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    permission_flags: PermissionFlags,
+) -> Result<(), Errno> {
+    let current_sid = current_task.security_state.lock().current_sid;
+    let file_sid = fs_node_effective_sid(fs_node);
+    let file_class = file_class_from_file_mode(fs_node.info().mode)?;
+    if permission_flags.contains(PermissionFlags::READ) {
+        todo_check_permission!(
+            TODO(
+                "https://fxbug.dev/380855359",
+                "Check read permission when calling fs_node_permission."
+            ),
+            &security_server.as_permission_check(),
+            current_sid,
+            file_sid,
+            CommonFilePermission::Read.for_class(file_class),
+        )?;
+    }
+
+    if permission_flags.contains(PermissionFlags::WRITE) {
+        todo_check_permission!(
+            TODO(
+                "https://fxbug.dev/380855359",
+                "Check write permission when calling fs_node_permission."
+            ),
+            &security_server.as_permission_check(),
+            current_sid,
+            file_sid,
+            CommonFilePermission::Write.for_class(file_class),
+        )?;
+    }
+
+    if permission_flags.contains(PermissionFlags::APPEND) {
+        check_permission(
+            &security_server.as_permission_check(),
+            current_sid,
+            file_sid,
+            CommonFilePermission::Append.for_class(file_class),
+        )?;
+    }
+
+    if permission_flags.contains(PermissionFlags::EXEC) {
+        if file_class == FileClass::Dir {
+            todo_check_permission!(
+                TODO(
+                    "https://fxbug.dev/380855359",
+                    "Check search permission when calling fs_node_permission."
+                ),
+                &security_server.as_permission_check(),
+                current_sid,
+                file_sid,
+                DirPermission::Search,
+            )?;
+        } else {
+            todo_check_permission!(
+                TODO(
+                    "https://fxbug.dev/380855359",
+                    "Check execute permission when calling fs_node_permission."
+                ),
+                &security_server.as_permission_check(),
+                current_sid,
+                file_sid,
+                CommonFilePermission::Execute.for_class(file_class),
+            )?;
+        }
+    }
+
+    Ok(())
 }
 
 pub(super) fn check_fs_node_setxattr_access(
@@ -745,12 +837,11 @@ pub(super) fn check_file_ioctl_access(
     let file_sid = fs_node_effective_sid(file.node());
     let mode = file.node().info().mode;
     let file_class = file_class_from_file_mode(mode)?;
-    todo_check_permission!(
-        TODO("https://fxbug.dev/364569179", "ioctl fd use check"),
+    check_permission(
         &permission_check,
         current_sid,
-        file_sid,
-        FdPermission::Use
+        file.security_state.state.sid,
+        FdPermission::Use,
     )?;
 
     todo_check_permission!(
@@ -869,8 +960,7 @@ where
         let file_class = file_class_from_file_mode(fs_node.info().mode)?;
         let permission_check = security_server.as_permission_check();
         if old_sid == SecurityId::initial(InitialSid::File) {
-            todo_check_permission!(
-                TODO("https://fxbug.dev/381275592", "relabelfrom unlabeled file"),
+            check_permission(
                 &permission_check,
                 task_sid,
                 old_sid,
@@ -1284,9 +1374,13 @@ pub(super) fn fs_node_set_label_with_task(fs_node: &FsNode, task: WeakRef<Task>)
 pub(super) fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
     match fs_node.security_state.lock().label.clone() {
         FsNodeLabel::SecurityId { sid } => Some(sid),
-        FsNodeLabel::FromTask { weak_task } => {
-            weak_task.upgrade().map(|t| t.security_state.lock().current_sid)
-        }
+        FsNodeLabel::FromTask { weak_task } => Some(
+            weak_task
+                .upgrade()
+                .map(|t| t.security_state.lock().current_sid)
+                // If `upgrade()` fails then the `Task` has exited, so return a placeholder SID.
+                .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled)),
+        ),
         FsNodeLabel::Uninitialized => None,
     }
 }

@@ -8,7 +8,6 @@ use discovery::query::TargetInfoQuery;
 use discovery::{
     DiscoverySources, FastbootConnectionState, TargetEvent, TargetHandle, TargetState,
 };
-use errors::FfxError;
 use ffx_config::EnvironmentContext;
 use fidl_fuchsia_developer_ffx::{self as ffx};
 use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy};
@@ -24,6 +23,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
+use target_errors::FfxTargetError;
 
 use crate::connection::Connection;
 use crate::ssh_connector::SshConnector;
@@ -139,7 +139,7 @@ trait QueryResolverT {
             ));
         }
         if handles.len() > 1 {
-            return Err(FfxError::DaemonError {
+            return Err(FfxTargetError::DaemonError {
                 err: ffx::DaemonError::TargetAmbiguous,
                 target: target_spec.clone(),
             }

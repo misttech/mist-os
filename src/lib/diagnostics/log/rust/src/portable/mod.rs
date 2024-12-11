@@ -6,16 +6,14 @@ use fidl_fuchsia_diagnostics::Interest;
 use std::collections::HashSet;
 use std::fmt;
 use std::marker::PhantomData;
-use std::sync::Once;
+use std::sync::{Arc, Once, RwLock};
 use thiserror::Error;
-use tracing::level_filters::LevelFilter;
-use tracing::{Event, Level, Subscriber};
+use tracing::{span, Event, Level, Metadata, Subscriber};
 use tracing_log::{LogTracer, NormalizeEvent};
-use tracing_subscriber::fmt::format::{DefaultFields, Writer};
+use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::time::{FormatTime, SystemTime};
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields, FormattedFields, MakeWriter};
 use tracing_subscriber::registry::LookupSpan;
-use tracing_subscriber::FmtSubscriber;
 
 /// Tag derived from metadata.
 ///
@@ -64,28 +62,108 @@ pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
     Ok(())
 }
 
-type HostSubscriber<W> = FmtSubscriber<DefaultFields, HostFormatter, LevelFilter, W>;
+pub(crate) struct HostLogger {
+    // Log severity
+    min_severity: Arc<RwLock<Severity>>,
+    // Actual logger impl
+    logger: Box<dyn Subscriber + Send + Sync>,
+}
 
-fn create_subscriber<W>(opts: &PublishOptions<'_>, w: W) -> Result<HostSubscriber<W>, PublishError>
+impl HostLogger {
+    /// Constructs a new `InterestFilter` and a future which should be polled to listen
+    /// to changes in the LogSink's interest.
+    pub fn new(logger: Box<dyn Subscriber + Send + Sync>, min_severity: Severity) -> Self {
+        Self { min_severity: Arc::new(RwLock::new(min_severity)), logger }
+    }
+
+    /// Sets the minimum severity.
+    pub fn set_minimum_severity(&self, severity: Severity) {
+        let mut min_severity = self.min_severity.write().unwrap();
+        *min_severity = severity;
+    }
+}
+
+// Convert a Level to a Severity
+fn level_to_severity(level: Level) -> Severity {
+    match level {
+        Level::ERROR => Severity::Error,
+        Level::WARN => Severity::Warn,
+        Level::INFO => Severity::Info,
+        Level::DEBUG => Severity::Debug,
+        Level::TRACE => Severity::Trace,
+    }
+}
+
+impl Subscriber for HostLogger {
+    /// Always returns `sometimes` so that we can later change the filter on the fly.
+    fn register_callsite(
+        &self,
+        _metadata: &'static Metadata<'static>,
+    ) -> tracing::subscriber::Interest {
+        tracing::subscriber::Interest::sometimes()
+    }
+
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        let min_severity = self.min_severity.read().unwrap();
+
+        // Needed because Ord is broken for comparing to Level instances
+        level_to_severity(*metadata.level()) >= *min_severity
+    }
+
+    fn new_span(&self, span: &span::Attributes<'_>) -> span::Id {
+        self.logger.new_span(span)
+    }
+
+    fn record(&self, span: &span::Id, values: &span::Record<'_>) {
+        self.logger.record(span, values)
+    }
+
+    fn record_follows_from(&self, span: &span::Id, follows: &span::Id) {
+        self.logger.record_follows_from(span, follows)
+    }
+
+    fn event(&self, event: &Event<'_>) {
+        self.logger.event(event)
+    }
+
+    fn enter(&self, span: &span::Id) {
+        self.logger.enter(span)
+    }
+
+    fn exit(&self, span: &span::Id) {
+        self.logger.exit(span)
+    }
+}
+
+/// Sets the global minimum log severity.
+/// IMPORTANT: this function can panic if `initialize` wasn't called before.
+pub fn set_minimum_severity(severity: impl Into<Severity>) {
+    let severity: Severity = severity.into();
+    tracing::dispatcher::get_default(move |dispatcher| {
+        let publisher: &HostLogger = dispatcher.downcast_ref().unwrap();
+        publisher.set_minimum_severity(severity);
+    });
+}
+
+fn create_subscriber<W>(
+    opts: &PublishOptions<'_>,
+    w: W,
+) -> Result<impl Subscriber + Send + Sync + 'static, PublishError>
 where
     W: for<'writer> MakeWriter<'writer> + 'static + Send + Sync,
 {
-    let level = opts
-        .publisher
-        .interest
-        .min_severity
-        .map(|s| Level::from(Severity::from(s)))
-        .unwrap_or(Level::INFO);
     let builder = tracing_subscriber::fmt()
         .with_ansi(false)
         .event_format(HostFormatter {
             tags: opts.publisher.tags.iter().map(|s| s.to_string()).collect(),
             display_module_path: opts.publisher.metatags.contains(&Metatag::Target),
         })
-        .with_writer(w)
-        .with_max_level(level);
+        .with_writer(w);
     let subscriber = builder.finish();
-    Ok(subscriber)
+    Ok(HostLogger::new(
+        Box::new(subscriber),
+        opts.publisher.interest.min_severity.unwrap_or_else(|| Severity::Info.into()).into(),
+    ))
 }
 
 /// Errors arising while forwarding a diagnostics stream to the environment.

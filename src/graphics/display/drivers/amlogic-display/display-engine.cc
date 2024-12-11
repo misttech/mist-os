@@ -205,7 +205,7 @@ zx::result<> DisplayEngine::ResetDisplayEngine() {
   return zx::ok();
 }
 
-void DisplayEngine::DisplayEngineRegisterDisplayEngineListener(
+void DisplayEngine::DisplayEngineSetListener(
     const display_engine_listener_protocol_t* engine_listener) {
   fbl::AutoLock display_lock(&display_mutex_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
@@ -217,7 +217,7 @@ void DisplayEngine::DisplayEngineRegisterDisplayEngineListener(
   }
 }
 
-void DisplayEngine::DisplayEngineDeregisterDisplayEngineListener() {
+void DisplayEngine::DisplayEngineUnsetListener() {
   fbl::AutoLock lock(&display_mutex_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }

@@ -26,10 +26,10 @@ std::ostream& ParserErrors::AddError() {
 std::ostream& ParserErrors::AddError(const Location& location) {
   ++error_count_;
   // Computes the line and column in the buffer of the error.
-  std::string::const_iterator start_line = location.buffer().begin();
+  std::string_view::const_iterator start_line = location.buffer().begin();
   int line = 1;
   int column = 1;
-  std::string::const_iterator current = start_line;
+  std::string_view::const_iterator current = start_line;
   while (current != location.location()) {
     if (*current == '\n') {
       start_line = ++current;
@@ -478,7 +478,7 @@ std::unique_ptr<Expression> SemanticParser::ParseHandleDescription() {
 }
 
 void SemanticParser::LexerIdentifier() {
-  std::string::const_iterator start = next_;
+  std::string_view::const_iterator start = next_;
   while (isalnum(*next_) || (*next_ == '_') || ((*next_ == '.') && allow_dots_in_identifiers_)) {
     ++next_;
   }
@@ -487,13 +487,13 @@ void SemanticParser::LexerIdentifier() {
 }
 
 void SemanticParser::LexerString() {
-  std::string::const_iterator start = ++next_;
+  std::string_view::const_iterator start = ++next_;
   while (*next_ != '\'') {
     if (*next_ == '\0') {
       AddError() << "Unterminated string.\n";
       current_lexical_token_ = LexicalToken::kString;
       next_ = start;
-      current_string_ = std::string_view(&*start, 0);
+      current_string_ = std::string_view();
       return;
     }
     if (*next_ == '\\') {
@@ -502,7 +502,7 @@ void SemanticParser::LexerString() {
         AddError() << "Unterminated string.\n";
         current_lexical_token_ = LexicalToken::kString;
         next_ = start;
-        current_string_ = std::string_view(&*start, 0);
+        current_string_ = std::string_view();
         return;
       }
     }

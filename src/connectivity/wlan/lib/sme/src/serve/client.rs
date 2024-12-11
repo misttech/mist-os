@@ -26,6 +26,7 @@ use {
 pub type Endpoint = ServerEnd<fidl_sme::ClientSmeMarker>;
 type Sme = client_sme::ClientSme;
 
+#[allow(clippy::too_many_arguments, reason = "mass allow for https://fxbug.dev/381896734")]
 pub fn serve(
     cfg: crate::Config,
     device_info: fidl_mlme::DeviceInfo,
@@ -77,6 +78,7 @@ async fn handle_fidl_request(
     sme: &Mutex<Sme>,
     request: fidl_sme::ClientSmeRequest,
 ) -> Result<(), fidl::Error> {
+    #[allow(clippy::unit_arg, reason = "mass allow for https://fxbug.dev/381896734")]
     match request {
         ClientSmeRequest::Scan { req, responder } => Ok(scan(sme, req, |result| match result {
             Ok(scan_results) => responder.send(Ok(write_vmo(scan_results)?)).map_err(|e| e.into()),
@@ -191,6 +193,7 @@ async fn connect(
     txn: Option<ServerEnd<fidl_sme::ConnectTransactionMarker>>,
     req: fidl_sme::ConnectRequest,
 ) -> Result<(), anyhow::Error> {
+    #[allow(clippy::manual_map, reason = "mass allow for https://fxbug.dev/381896734")]
     let handle = match txn {
         None => None,
         Some(txn) => Some(txn.into_stream().control_handle()),
@@ -288,6 +291,7 @@ fn convert_roam_result(result: &RoamResult) -> fidl_sme::RoamResult {
             }
         }
         RoamResult::Failed(failure) => {
+            #[allow(clippy::manual_map, reason = "mass allow for https://fxbug.dev/381896734")]
             fidl_sme::RoamResult {
                 bssid: failure.selected_bssid.to_array(),
                 status_code: failure.status_code,
@@ -523,7 +527,7 @@ mod tests {
             }),
         };
         sme_proxy
-            .unbounded_send(ConnectTransactionEvent::OnDisconnect { info: input_info.clone() })
+            .unbounded_send(ConnectTransactionEvent::OnDisconnect { info: input_info })
             .expect("expect sending ConnectTransactionEvent to succeed");
         assert_variant!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let event = assert_variant!(poll_stream_fut(&mut exec, &mut fidl_client_fut), Poll::Ready(Some(Ok(event))) => event);
@@ -534,7 +538,7 @@ mod tests {
         // Test sending OnSignalReport
         let input_ind = fidl_internal::SignalReportIndication { rssi_dbm: -40, snr_db: 30 };
         sme_proxy
-            .unbounded_send(ConnectTransactionEvent::OnSignalReport { ind: input_ind.clone() })
+            .unbounded_send(ConnectTransactionEvent::OnSignalReport { ind: input_ind })
             .expect("expect sending ConnectTransactionEvent to succeed");
         assert_variant!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let event = assert_variant!(poll_stream_fut(&mut exec, &mut fidl_client_fut), Poll::Ready(Some(Ok(event))) => event);
@@ -545,7 +549,7 @@ mod tests {
         // Test sending OnChannelSwitched
         let input_info = fidl_internal::ChannelSwitchInfo { new_channel: 8 };
         sme_proxy
-            .unbounded_send(ConnectTransactionEvent::OnChannelSwitched { info: input_info.clone() })
+            .unbounded_send(ConnectTransactionEvent::OnChannelSwitched { info: input_info })
             .expect("expect sending ConnectTransactionEvent to succeed");
         assert_variant!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let event = assert_variant!(poll_stream_fut(&mut exec, &mut fidl_client_fut), Poll::Ready(Some(Ok(event))) => event);

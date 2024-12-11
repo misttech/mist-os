@@ -20,11 +20,12 @@ mod state;
 use logic::nat::NatConfig;
 
 /// A connection as tracked by conntrack.
-pub type ConntrackConnection<I, BT> = conntrack::Connection<I, BT, NatConfig>;
+pub type ConntrackConnection<I, A, BT> = conntrack::Connection<I, NatConfig<I, A>, BT>;
 
 pub use api::FilterApi;
 pub use conntrack::{
-    Table, TransportProtocol, Tuple, WeakConnection as WeakConntrackConnection, WeakConnectionError,
+    ConnectionDirection, Table, TransportProtocol, Tuple,
+    WeakConnection as WeakConntrackConnection, WeakConnectionError,
 };
 pub use context::{
     FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext, NatContext,
@@ -47,7 +48,19 @@ pub use state::{
 };
 
 /// Testing-related utilities for use by other crates.
-#[cfg(feature = "testutils")]
+#[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     pub use crate::logic::testutil::NoopImpl;
+
+    #[cfg(test)]
+    pub(crate) trait TestIpExt:
+        crate::context::testutil::TestIpExt + crate::packets::testutil::internal::TestIpExt
+    {
+    }
+
+    #[cfg(test)]
+    impl<I> TestIpExt for I where
+        I: crate::context::testutil::TestIpExt + crate::packets::testutil::internal::TestIpExt
+    {
+    }
 }

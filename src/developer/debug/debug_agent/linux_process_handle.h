@@ -34,7 +34,7 @@ class LinuxProcessHandle final : public ProcessHandle, public LinuxTaskObserver 
   zx_koid_t GetJobKoid() const override { return 0; }
   debug::Status Kill() override;
   int64_t GetReturnCode() const override { return task_->exit_code(); }
-  debug::Status Attach(ProcessHandleObserver* observer) override;
+  debug::Status Attach(ProcessHandleObserver* observer, AttachConfig config) override;
   bool IsAttached() const override;
   void Detach() override;
   uint64_t GetLoaderBreakpointAddress() override;

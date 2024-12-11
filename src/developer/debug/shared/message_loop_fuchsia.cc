@@ -199,6 +199,7 @@ zx_status_t MessageLoopFuchsia::WatchProcessExceptions(WatchProcessConfig config
   info.exception_watcher = config.watcher;
   info.task_koid = config.process_koid;
   info.task_handle = config.process_handle;
+  info.uses_exception_channel = config.claim_exception_channel;
 
   int watch_id;
   {
@@ -208,14 +209,17 @@ zx_status_t MessageLoopFuchsia::WatchProcessExceptions(WatchProcessConfig config
     next_watch_id_++;
   }
 
-  // Watch all exceptions for the process.
   zx_status_t status;
-  status = AddChannelExceptionHandler(watch_id, config.process_handle,
-                                      ZX_EXCEPTION_CHANNEL_DEBUGGER, &info);
-  if (status != ZX_OK)
-    return status;
 
-  // Watch for the process terminated signal.
+  // Watch all exceptions for the process, if we're configured to take the exception channel.
+  if (info.uses_exception_channel) {
+    status = AddChannelExceptionHandler(watch_id, config.process_handle,
+                                        ZX_EXCEPTION_CHANNEL_DEBUGGER, &info);
+    if (status != ZX_OK)
+      return status;
+  }
+
+  // Always watch for the process terminated signal.
   status = AddSignalHandler(watch_id, config.process_handle, ZX_PROCESS_TERMINATED, &info);
   if (status != ZX_OK)
     return status;
@@ -352,7 +356,9 @@ void MessageLoopFuchsia::StopWatching(int id) {
 
   switch (info.type) {
     case WatchType::kProcessExceptions: {
-      RemoveChannelExceptionHandler(&info);
+      if (info.uses_exception_channel) {
+        RemoveChannelExceptionHandler(&info);
+      }
       RemoveSignalHandler(&info);
       break;
     }

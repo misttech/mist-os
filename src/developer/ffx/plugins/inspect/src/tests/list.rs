@@ -27,7 +27,7 @@ async fn test_list_empty() {
     let expected_responses = Rc::new(vec![]);
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
-    let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
+    let cmd = ListCommand { component: None, manifest: None, with_url: false, accessor: None };
     run_command(
         setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
@@ -58,7 +58,7 @@ async fn test_list_with_data() {
     let expected_responses = Rc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
-    let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
+    let cmd = ListCommand { component: None, manifest: None, with_url: false, accessor: None };
     run_command(
         setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
@@ -92,7 +92,7 @@ async fn test_list_with_data_with_url() {
     let expected_responses = Rc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
-    let cmd = ListCommand { manifest: None, with_url: true, accessor: None };
+    let cmd = ListCommand { component: None, manifest: None, with_url: true, accessor: None };
     run_command(
         setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![FakeAccessorData::new(

@@ -6,13 +6,13 @@
 
 #include <lib/media/codec_impl/codec_port.h>
 #include <lib/media/codec_impl/log.h>
+#include <netinet/in.h>
 
 #include <unordered_set>
 
 #include <safemath/safe_math.h>
 
 #include "codec_adapter_sw.h"
-#include "zircon/third_party/ulib/musl/include/netinet/in.h"
 
 namespace {
 
@@ -180,7 +180,8 @@ std::optional<int> GetNBytes(const std::vector<uint8_t>& raw_bytes) {
   uint16_t value = ntohs(*reinterpret_cast<const uint16_t*>(raw_bytes.data()));
 
   if (value < kMinExternalByteCount || value > kMaxExternalByteCount) {
-    LOG(DEBUG, "Invalid Octets_Per_Codec_Frame %u. Acceptable values are between [20 .. 400].", value);
+    LOG(DEBUG, "Invalid Octets_Per_Codec_Frame %u. Acceptable values are between [20 .. 400].",
+        value);
     return std::nullopt;
   }
   return static_cast<int>(value);
@@ -351,7 +352,8 @@ CodecAdapterLc3Decoder::InputLoopStatus CodecAdapterLc3Decoder::ProcessFormatDet
       }
       default:
         // Don't care about other parameters.
-        LOG(DEBUG, "Received Codec_Specific_Configuration LTV param with key %u. Will be ignored.", p.first);
+        LOG(DEBUG, "Received Codec_Specific_Configuration LTV param with key %u. Will be ignored.",
+            p.first);
         break;
     }
     idx += len;

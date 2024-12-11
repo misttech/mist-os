@@ -6,7 +6,7 @@ your component using the language-specific libraries and review the data using
 [`ffx inspect`][ffx-inspect].
 
 For a more detailed walkthrough of Inspect concepts, see the
-[Inspect codelab](codelab/codelab.md).
+[Inspect codelab](codelab.md).
 
 ## Project setup
 

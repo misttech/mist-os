@@ -5,13 +5,10 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_H_
 
-#include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
-#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
-#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/virtio/backends/backend.h>
+#include <lib/zx/bti.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
@@ -36,6 +33,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
 namespace virtio_display {
@@ -73,10 +71,9 @@ class DisplayEngine final : public DisplayEngineInterface {
   zx::result<display::DriverCaptureImageId> ImportImageForCapture(
       display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override;
   void ReleaseImage(display::DriverImageId image_id) override;
-  config_check_result_t CheckConfiguration(
+  bool CheckConfiguration(
       display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<layer_composition_operations_t> out_layer_composition_operations,
-      size_t* out_layer_composition_operations_actual) override;
+      cpp20::span<display::LayerCompositionOperations> layer_composition_operations) override;
   void ApplyConfiguration(display::DisplayId display_id,
                           cpp20::span<const display::DriverLayer> layers,
                           display::ConfigStamp config_stamp) override;

@@ -106,8 +106,8 @@ async fn create_and_import_event(
 }
 
 fn size_from_info(info: &fidl_fuchsia_hardware_display::Info, mode_idx: usize) -> IntSize {
-    let mode = info.modes[mode_idx];
-    size2(mode.horizontal_resolution, mode.vertical_resolution).to_i32()
+    let mode = &info.modes[mode_idx];
+    size2(mode.active_area.width, mode.active_area.height).to_i32()
 }
 
 #[derive(Debug, Clone)]
@@ -200,7 +200,7 @@ impl DisplayDirectViewStrategy {
             .modes
             .iter()
             .position(|mode| {
-                let size = size2(mode.horizontal_resolution, mode.vertical_resolution).to_i32();
+                let size = size2(mode.active_area.width, mode.active_area.height).to_i32();
                 size == preferred_size
             })
             .unwrap_or(0);
@@ -705,7 +705,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
             } => {
                 duration!(c"gfx", c"DisplayDirectViewStrategy::OnVsync");
                 let vsync_interval = MonotonicDuration::from_nanos(
-                    100_000_000_000 / self.display.info.modes[0].refresh_rate_e2 as i64,
+                    1_000_000_000_000 / self.display.info.modes[0].refresh_rate_millihertz as i64,
                 );
                 self.handle_vsync_parameters_changed(
                     MonotonicInstant::from_nanos(timestamp as i64),

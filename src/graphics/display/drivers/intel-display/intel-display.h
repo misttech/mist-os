@@ -105,9 +105,8 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
                                          fdf::PrepareStopCompleter completer);
 
   // display controller protocol ops
-  void DisplayEngineRegisterDisplayEngineListener(
-      const display_engine_listener_protocol* engine_listener);
-  void DisplayEngineDeregisterDisplayEngineListener();
+  void DisplayEngineSetListener(const display_engine_listener_protocol* engine_listener);
+  void DisplayEngineUnsetListener();
   zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
                                                   zx::channel collection_token);
   zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);

@@ -4,42 +4,63 @@
 
 starlark_doc_extract(
     name = "licenses",
-    src = "@fuchsia_sdk//fuchsia:licenses.bzl",
-    deps = ["@fuchsia_sdk//fuchsia:bzl_srcs"],
+    src = "@rules_fuchsia//fuchsia:licenses.bzl",
+    deps = [
+        "@fuchsia_sdk//:api_version.bzl",
+        "@rules_fuchsia//fuchsia:bzl_srcs",
+    ],
 )
 
 starlark_doc_extract(
     name = "clang",
-    src = "@fuchsia_sdk//fuchsia:clang.bzl",
-    deps = ["@fuchsia_sdk//fuchsia:bzl_srcs"],
+    src = "@rules_fuchsia//fuchsia:clang.bzl",
+    deps = [
+        "@fuchsia_sdk//:api_version.bzl",
+        "@rules_fuchsia//fuchsia:bzl_srcs",
+    ],
 )
 
 starlark_doc_extract(
     name = "assembly",
-    src = "@fuchsia_sdk//fuchsia:assembly.bzl",
-    deps = ["@fuchsia_sdk//fuchsia:bzl_srcs"],
+    src = "@rules_fuchsia//fuchsia:assembly.bzl",
+    deps = [
+        "@fuchsia_sdk//:api_version.bzl",
+        "@rules_fuchsia//fuchsia:bzl_srcs",
+    ],
 )
 
 starlark_doc_extract(
     name = "deps",
-    src = "@fuchsia_sdk//fuchsia:deps.bzl",
-    deps = ["@fuchsia_sdk//fuchsia:bzl_srcs"],
+    src = "@rules_fuchsia//fuchsia:deps.bzl",
+    deps = [
+        "@fuchsia_sdk//:api_version.bzl",
+        "@rules_fuchsia//fuchsia:bzl_srcs",
+    ],
 )
 
 starlark_doc_extract(
     name = "defs",
-    src = "@fuchsia_sdk//fuchsia:defs.bzl",
-    deps = ["@fuchsia_sdk//fuchsia:bzl_srcs"],
+    src = "@rules_fuchsia//fuchsia:defs.bzl",
+    deps = [
+        "@fuchsia_sdk//:api_version.bzl",
+        "@rules_fuchsia//fuchsia:bzl_srcs",
+    ],
 )
 
 starlark_doc_extract(
     name = "products",
-    src = "@fuchsia_sdk//fuchsia:products.bzl",
-    deps = ["@fuchsia_sdk//fuchsia:bzl_srcs"],
+    src = "@rules_fuchsia//fuchsia:products.bzl",
+    deps = [
+        "@fuchsia_sdk//:api_version.bzl",
+        "@rules_fuchsia//fuchsia:bzl_srcs",
+    ],
 )
 
 starlark_doc_extract(
     name = "workflows",
-    src = "@fuchsia_sdk//fuchsia:workflows.bzl",
-    deps = ["@fuchsia_sdk//fuchsia:bzl_srcs"],
+    src = "@rules_fuchsia//fuchsia:workflows.bzl",
+    deps = [
+        "@fuchsia_sdk//:api_version.bzl",
+        "@rules_fuchsia//fuchsia:bzl_srcs",
+    ],
 )

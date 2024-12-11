@@ -53,6 +53,7 @@ fuchsia_driver_component("nand") {
 
 fuchsia_driver_package("package") {
   package_name = "nand"
+  export_to_bazel = true
   driver_components = [ ":nand" ]
 }
 

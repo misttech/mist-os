@@ -71,6 +71,7 @@ pub fn new(cfg: Config, pmk: Vec<u8>) -> State {
 }
 
 impl State {
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// If [`self`] is in [`State::Idle`], then this function will push a
     /// [`SecAssocUpdate::TxEapolKeyFrame`] into [`update_sink`] and result [`self`]. Otherwise,
     /// [`self`] is dropped and an [`Error`] is returned.
@@ -156,6 +157,7 @@ impl State {
         }
     }
 
+    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     pub fn on_rsna_response_timeout(&self) -> Result<(), Error> {
         match self {
             State::AwaitingMsg2 { .. } => Err(Error::EapolHandshakeIncomplete(

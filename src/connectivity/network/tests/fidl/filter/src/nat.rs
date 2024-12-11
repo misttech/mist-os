@@ -12,6 +12,7 @@ use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _};
 use fidl_fuchsia_net_filter_ext::{
     Action, AddressMatcher, AddressMatcherType, InterfaceMatcher, Matchers, NatHook, PortRange,
 };
+use fidl_fuchsia_net_routes as fnet_routes;
 use heck::SnakeCase as _;
 use net_types::ip::IpAddress as _;
 use net_types::Witness as _;
@@ -150,6 +151,107 @@ async fn masquerade_egress_no_assigned_address<I: TestIpExt, S: SocketType>(
             },
         )
         .await;
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn masquerade_remove_and_add_address<I: RouterTestIpExt>(name: &str) {
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
+        .expect("initialize logging");
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+
+    // Set up a network with two hosts (client and server) and a router. The client
+    // and server are both link-layer neighbors with the router but on isolated L2
+    // networks.
+    let mut net =
+        TestRouterNet::<I>::new(&sandbox, &name, None /* ip_hook */, Some(NatHook::Egress)).await;
+
+    // Install a rule on the egress hook of the router that masquerades outgoing
+    // traffic behind its IP address.
+    net.install_nat_rule(
+        Matchers {
+            out_interface: Some(InterfaceMatcher::Id(
+                NonZeroU64::new(net.router_server_interface.id()).unwrap(),
+            )),
+            ..Default::default()
+        },
+        Action::Masquerade { src_port: None },
+    )
+    .await;
+
+    // The traffic should look to the server like it is originating from the router,
+    // and the NATing should be transparent to the client.
+    let (BoundSockets { client, mut server }, sock_addrs) =
+        UdpSocket::bind_sockets(net.realms(), TestRouterNet::<I>::addrs()).await;
+    let fnet_ext::IpAddress(router_addr) = I::ROUTER_SERVER_ADDR_WITH_PREFIX.addr.into();
+    let sock_addrs = SockAddrs {
+        client: std::net::SocketAddr::new(router_addr, sock_addrs.client.port()),
+        server: sock_addrs.server,
+    };
+    let mut client_and_server =
+        UdpSocket::connect(client, &mut server, sock_addrs, ExpectedConnectivity::TwoWay, None)
+            .await
+            .expect("connect client to server");
+    UdpSocket::send_and_recv::<I>(
+        net.realms(),
+        client_and_server.as_mut(),
+        sock_addrs,
+        ExpectedConnectivity::TwoWay,
+    )
+    .await;
+
+    // Remove the router's assigned address (but *not* its subnet route -- we want
+    // the traffic to still be routable but to be dropped by the filtering engine
+    // when it attempts to masquerade and sees that the address it was using is no
+    // longer valid).
+    //
+    // The traffic from the client to the server should now be dropped by the router
+    // because there is no address that can be used to masquerade the forwarded
+    // traffic.
+    let removed = net
+        .router_server_interface
+        .del_address_and_subnet_route(I::ROUTER_SERVER_ADDR_WITH_PREFIX)
+        .await
+        .expect("remove address");
+    assert!(removed);
+    let added = net
+        .router_server_interface
+        .add_route_either(
+            fnet_ext::apply_subnet_mask(I::ROUTER_SERVER_ADDR_WITH_PREFIX),
+            None, /* gateway */
+            fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
+        )
+        .await
+        .expect("re-add subnet route");
+    assert!(added);
+    UdpSocket::send_and_recv::<I>(
+        net.realms(),
+        client_and_server.as_mut(),
+        sock_addrs,
+        ExpectedConnectivity::None,
+    )
+    .await;
+
+    // But if we re-add the address, the masqueraded traffic should observe that the
+    // original address used to masquerade the flow was re-acquired and successfully
+    // resume masquerading.
+    //
+    // NB: we only exercise UDP here because TCP implements reliable delivery, so
+    // the client will attempt to retransmit the message that was dropped by NAT
+    // when the address was removed. It's easier to test this behavior if a packet
+    // being dropped actually means it will never reach its destination.
+    net.router_server_interface
+        .add_address_and_subnet_route(I::ROUTER_SERVER_ADDR_WITH_PREFIX)
+        .await
+        .expect("re-add address");
+    UdpSocket::send_and_recv::<I>(
+        net.realms(),
+        client_and_server.as_mut(),
+        sock_addrs,
+        ExpectedConnectivity::TwoWay,
+    )
+    .await;
 }
 
 fn different_ephemeral_port(port: u16) -> u16 {

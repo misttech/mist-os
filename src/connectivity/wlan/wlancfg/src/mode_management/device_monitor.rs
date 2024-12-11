@@ -32,31 +32,16 @@ pub async fn handle_event(listener: &Listener, evt: DeviceWatcherEvent) {
             phy_manager.remove_phy(phy_id);
         }
         DeviceWatcherEvent::OnIfaceAdded { iface_id } => {
-            // TODO(https://fxbug.dev/42134286): When the legacy shim is removed, adding the interface to the PhyManager
-            // should be handled inside of iface_manager.handle_added_iface.
-            let mut phy_manager = listener.phy_manager.lock().await;
-            match phy_manager.on_iface_added(iface_id).await {
-                Ok(()) => match on_iface_added_legacy(listener, iface_id).await {
-                    Ok(()) => {}
-                    Err(e) => info!("error adding new iface {}: {}", iface_id, e),
-                },
-                Err(e) => {
-                    info!("error adding new iface {}: {}", iface_id, e);
-
-                    // If the PhyManager had issues attempting to register the new interface, then
-                    // the IfaceManager will not be able to use the interface.  Return as there is
-                    // no more useful work to be done.
-                    return;
-                }
-            }
-
-            // Drop the PhyManager lock after using it.  The IfaceManager will need to lock the
-            // resource as part of the connect operation.
-            drop(phy_manager);
-
+            // Ensure the new interface is usable by the policy internals before providing it to the
+            // legacy shim.
             let mut iface_manager = listener.iface_manager.lock().await;
             if let Err(e) = iface_manager.handle_added_iface(iface_id).await {
-                error!("Failed to add interface to IfaceManager: {}", e);
+                error!("Failed to add interface {} to IfaceManager: {}", iface_id, e);
+                return;
+            }
+
+            if let Err(e) = on_iface_added_legacy(listener, iface_id).await {
+                error!("error adding new iface {}: {}", iface_id, e)
             }
         }
         DeviceWatcherEvent::OnIfaceRemoved { iface_id } => {
@@ -648,14 +633,11 @@ mod tests {
         // The future should not run to completion
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
-        // Verify that the PhyManager and IfaceManager have been notified of the new interface.
+        // Verify that the IfaceManager has been notified of the new interface.
         {
-            let phy_manager = test_values.phy_manager.clone();
             let iface_manager = test_values.iface_manager.clone();
             let verify_fut = async move {
-                let phy_manager = phy_manager.lock().await;
                 let iface_manager = iface_manager.lock().await;
-                assert_eq!(phy_manager.ifaces, vec![0]);
                 assert_eq!(iface_manager.ifaces, vec![0]);
             };
             let mut verify_fut = pin!(verify_fut);
@@ -664,42 +646,6 @@ mod tests {
 
         // The IfaceRef should have also been updated.
         assert!(listener.legacy_shim.get().is_ok());
-    }
-
-    #[fuchsia::test]
-    fn test_handle_iface_added_fails_due_to_phy_manager() {
-        let mut exec = fasync::TestExecutor::new();
-        let test_values = test_setup(false, false);
-
-        let listener = Listener::new(
-            test_values.monitor_proxy,
-            IfaceRef::new(),
-            test_values.phy_manager.clone(),
-            test_values.iface_manager.clone(),
-        );
-
-        let fut = handle_event(&listener, DeviceWatcherEvent::OnIfaceAdded { iface_id: 0 });
-        let mut fut = pin!(fut);
-
-        // The future should complete immediately without attempting to populate the IfaceRef.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
-
-        // The PhyManager and IfaceManager should have no reference to the interface.
-        {
-            let phy_manager = test_values.phy_manager.clone();
-            let iface_manager = test_values.iface_manager.clone();
-            let verify_fut = async move {
-                let phy_manager = phy_manager.lock().await;
-                let iface_manager = iface_manager.lock().await;
-                assert!(phy_manager.ifaces.is_empty());
-                assert!(iface_manager.ifaces.is_empty());
-            };
-            let mut verify_fut = pin!(verify_fut);
-            assert_variant!(exec.run_until_stalled(&mut verify_fut), Poll::Ready(()));
-        }
-
-        // The IfaceRef should have also be empty.
-        assert!(listener.legacy_shim.get().is_err());
     }
 
     #[fuchsia::test]
@@ -723,14 +669,11 @@ mod tests {
         let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
-        // Verify that the PhyManager and IfaceManager are updated.
+        // Verify that the IfaceManager is updated.
         {
-            let phy_manager = test_values.phy_manager.clone();
             let iface_manager = test_values.iface_manager.clone();
             let verify_fut = async move {
-                let phy_manager = phy_manager.lock().await;
                 let iface_manager = iface_manager.lock().await;
-                assert_eq!(phy_manager.ifaces, vec![0]);
                 assert_eq!(iface_manager.ifaces, vec![0]);
             };
             let mut verify_fut = pin!(verify_fut);

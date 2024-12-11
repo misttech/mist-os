@@ -752,10 +752,10 @@ fn map_in_vmar(
     profile_duration!("MapInVmar");
     let mut profile = ProfileDuration::enter("MapInVmarArgs");
 
-    let base_addr = UserAddress::from_ptr(vmar_info.base);
-    let (vmar_offset, vmar_extra_flags) = match addr {
-        SelectedAddress::Fixed(addr) => (addr - base_addr, zx::VmarFlags::SPECIFIC),
-        SelectedAddress::FixedOverwrite(addr) => (addr - base_addr, ZX_VM_SPECIFIC_OVERWRITE),
+    let vmar_offset = addr.addr().checked_sub(vmar_info.base).ok_or_else(|| errno!(ENOMEM))?;
+    let vmar_extra_flags = match addr {
+        SelectedAddress::Fixed(_) => zx::VmarFlags::SPECIFIC,
+        SelectedAddress::FixedOverwrite(_) => ZX_VM_SPECIFIC_OVERWRITE,
     };
 
     if populate {
@@ -784,7 +784,7 @@ fn map_in_vmar(
         | vmar_maybe_map_range;
 
     profile.pivot("VmarMapSyscall");
-    let map_result = memory.map_in_vmar(vmar, vmar_offset, memory_offset, length, vmar_flags);
+    let map_result = memory.map_in_vmar(vmar, vmar_offset.ptr(), memory_offset, length, vmar_flags);
     let mapped_addr = map_result.map_err(MemoryManager::get_errno_for_map_err)?;
 
     Ok(UserAddress::from_ptr(mapped_addr))
@@ -915,9 +915,14 @@ impl MemoryManagerState {
         }
     }
 
-    // Accept the hint if the range is unused and does not wrap around.
+    // Accept the hint if the range is unused and within the range available for mapping.
     fn is_hint_acceptable(&self, hint_addr: UserAddress, length: usize) -> bool {
         let Some(hint_end) = hint_addr.checked_add(length) else {
+            return false;
+        };
+        if !RESTRICTED_ASPACE_RANGE.contains(&hint_addr.ptr())
+            || !RESTRICTED_ASPACE_RANGE.contains(&hint_end.ptr())
+        {
             return false;
         };
         self.get_occupied_address_ranges(&(hint_addr..hint_end)).next().is_none()
@@ -1140,10 +1145,10 @@ impl MemoryManagerState {
             return error!(EINVAL);
         }
 
-        // MREMAP_DONTUNMAP is always a move to a specific address,
-        // which requires MREMAP_FIXED. There is no resizing allowed either.
+        // MREMAP_DONTUNMAP is always a move, so it requires MREMAP_MAYMOVE.
+        // There is no resizing allowed either.
         if flags.contains(MremapFlags::DONTUNMAP)
-            && (!flags.contains(MremapFlags::FIXED) || old_length != new_length)
+            && (!flags.contains(MremapFlags::MAYMOVE) || old_length != new_length)
         {
             return error!(EINVAL);
         }
@@ -1151,11 +1156,6 @@ impl MemoryManagerState {
         // In-place copies are invalid.
         if !flags.contains(MremapFlags::MAYMOVE) && old_length == 0 {
             return error!(ENOMEM);
-        }
-
-        if flags.contains(MremapFlags::DONTUNMAP) {
-            track_stub!(TODO("https://fxbug.dev/297372077"), "MREMAP_DONTUNMAP");
-            return error!(EOPNOTSUPP);
         }
 
         if new_length == 0 {
@@ -1178,7 +1178,10 @@ impl MemoryManagerState {
             return error!(EINVAL);
         }
 
-        if !flags.contains(MremapFlags::FIXED) && old_length != 0 {
+        if !flags.contains(MremapFlags::DONTUNMAP)
+            && !flags.contains(MremapFlags::FIXED)
+            && old_length != 0
+        {
             // We are not requested to remap to a specific address, so first we see if we can remap
             // in-place. In-place copies (old_length == 0) are not allowed.
             if let Some(new_addr) =
@@ -1192,7 +1195,15 @@ impl MemoryManagerState {
         if flags.contains(MremapFlags::MAYMOVE) {
             let dst_address =
                 if flags.contains(MremapFlags::FIXED) { Some(new_addr) } else { None };
-            self.remap_move(mm, old_addr, old_length, dst_address, new_length, released_mappings)
+            self.remap_move(
+                mm,
+                old_addr,
+                old_length,
+                dst_address,
+                new_length,
+                flags.contains(MremapFlags::DONTUNMAP),
+                released_mappings,
+            )
         } else {
             error!(ENOMEM)
         }
@@ -1310,6 +1321,7 @@ impl MemoryManagerState {
         src_length: usize,
         dst_addr: Option<UserAddress>,
         dst_length: usize,
+        keep_source: bool,
         released_mappings: &mut Vec<Mapping>,
     ) -> Result<UserAddress, Errno> {
         let src_range = src_addr..src_addr.checked_add(src_length).ok_or_else(|| errno!(EINVAL))?;
@@ -1456,15 +1468,31 @@ impl MemoryManagerState {
             src_mapping.flags,
             src_mapping.max_access,
             false,
-            src_mapping.name,
+            src_mapping.name.clone(),
             src_mapping.file_write_guard,
             released_mappings,
         )?;
 
-        if src_length != 0 {
-            // Only unmap the source range if this is not a copy. It was checked earlier that
+        if src_length != 0 && !keep_source {
+            // Only unmap the source range if this is not a copy and if there was not a specific
+            // request to not unmap. It was checked earlier that in case of src_length == 0
             // this mapping is MAP_SHARED.
             self.unmap(mm, src_addr, src_length, released_mappings)?;
+        }
+        if keep_source && private_anonymous {
+            // For MREMAP_DONTUNMAP case, replace the old range with a new one with the same flags
+            // This is done so that any new access would be a pagefault and would be
+            // zero-initialized.
+            // TODO(https://fxbug.dev/381098290): Handle the case of private file-backed memory.
+            self.map_anonymous(
+                mm,
+                DesiredAddress::FixedOverwrite(src_addr),
+                src_length,
+                src_mapping.flags.access_flags(),
+                MappingOptions::ANONYMOUS,
+                src_mapping.name.clone(),
+                released_mappings,
+            )?;
         }
 
         Ok(new_address)
@@ -2366,7 +2394,7 @@ pub trait MemoryAccessor {
 
 pub trait TaskMemoryAccessor: MemoryAccessor {
     /// Returns the maximum valid address for this memory accessor.
-    fn maximum_valid_address(&self) -> UserAddress;
+    fn maximum_valid_address(&self) -> Option<UserAddress>;
 }
 
 /// A memory manager for another thread.
@@ -2424,8 +2452,8 @@ impl MemoryAccessor for RemoteMemoryManager {
 }
 
 impl TaskMemoryAccessor for RemoteMemoryManager {
-    fn maximum_valid_address(&self) -> UserAddress {
-        self.mm.maximum_valid_user_address
+    fn maximum_valid_address(&self) -> Option<UserAddress> {
+        Some(self.mm.maximum_valid_user_address)
     }
 }
 
@@ -2884,7 +2912,7 @@ impl MemoryManager {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        debug_assert!(self.has_same_address_space(current_task.mm()));
+        debug_assert!(self.has_same_address_space(current_task.mm().unwrap()));
 
         if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyRead");
@@ -2913,7 +2941,7 @@ impl MemoryManager {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        debug_assert!(self.has_same_address_space(current_task.mm()));
+        debug_assert!(self.has_same_address_space(current_task.mm().unwrap()));
 
         if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyReadPartialUntilNull");
@@ -2942,7 +2970,7 @@ impl MemoryManager {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        debug_assert!(self.has_same_address_space(current_task.mm()));
+        debug_assert!(self.has_same_address_space(current_task.mm().unwrap()));
 
         if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyReadPartial");
@@ -2971,7 +2999,7 @@ impl MemoryManager {
         addr: UserAddress,
         bytes: &[u8],
     ) -> Result<usize, Errno> {
-        debug_assert!(self.has_same_address_space(current_task.mm()));
+        debug_assert!(self.has_same_address_space(current_task.mm().unwrap()));
 
         if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyWrite");
@@ -2999,7 +3027,7 @@ impl MemoryManager {
         addr: UserAddress,
         bytes: &[u8],
     ) -> Result<usize, Errno> {
-        debug_assert!(self.has_same_address_space(current_task.mm()));
+        debug_assert!(self.has_same_address_space(current_task.mm().unwrap()));
 
         if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyWritePartial");
@@ -3028,7 +3056,7 @@ impl MemoryManager {
         addr: UserAddress,
         length: usize,
     ) -> Result<usize, Errno> {
-        debug_assert!(self.has_same_address_space(current_task.mm()));
+        debug_assert!(self.has_same_address_space(current_task.mm().unwrap()));
 
         {
             let page_size = *PAGE_SIZE as usize;
@@ -3117,12 +3145,6 @@ impl MemoryManager {
         debug_assert_eq!(RESTRICTED_ASPACE_SIZE, user_vmar_info.len);
 
         Ok(Self::from_vmar(root_vmar, user_vmar, user_vmar_info))
-    }
-
-    pub fn new_empty() -> Self {
-        let root_vmar = zx::Vmar::from(zx::Handle::invalid());
-        let user_vmar = zx::Vmar::from(zx::Handle::invalid());
-        Self::from_vmar(root_vmar, user_vmar, Default::default())
     }
 
     fn from_vmar(root_vmar: zx::Vmar, user_vmar: zx::Vmar, user_vmar_info: zx::VmarInfo) -> Self {
@@ -4180,7 +4202,6 @@ enum SelectedAddress {
 }
 
 impl SelectedAddress {
-    #[cfg(feature = "alternate_anon_allocs")]
     fn addr(&self) -> UserAddress {
         match self {
             SelectedAddress::Fixed(addr) => *addr,
@@ -4311,7 +4332,10 @@ impl SequenceFileSource for ProcMapsFile {
         sink: &mut DynamicFileBuf,
     ) -> Result<Option<UserAddress>, Errno> {
         let task = Task::from_weak(&self.0)?;
-        let state = task.mm().state.read();
+        let Some(mm) = task.mm() else {
+            return Ok(None);
+        };
+        let state = mm.state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
         if let Some((range, map)) = iter.next() {
             write_map(&task, sink, range, map)?;
@@ -4339,7 +4363,11 @@ impl SequenceFileSource for ProcSmapsFile {
     ) -> Result<Option<UserAddress>, Errno> {
         let page_size_kb = *PAGE_SIZE / 1024;
         let task = Task::from_weak(&self.0)?;
-        let state = task.mm().state.read();
+        // /proc/<pid>/smaps is empty for kthreads
+        let Some(mm) = task.mm() else {
+            return Ok(None);
+        };
+        let state = mm.state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
         if let Some((range, map)) = iter.next() {
             write_map(&task, sink, range, map)?;
@@ -4464,7 +4492,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_brk() {
         let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         // Look up the given addr in the mappings table.
         let get_range = |addr: UserAddress| {
@@ -4527,7 +4555,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_mm_exec() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let has = |addr: &UserAddress| -> bool {
             let state = mm.state.read();
@@ -4564,7 +4592,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_get_contiguous_mappings_at() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         // Create four one-page mappings with a hole between the third one and the fourth one.
         let page_size = *PAGE_SIZE as usize;
@@ -4734,7 +4762,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_write_crossing_mappings() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
         let ma = current_task.deref();
 
         // Map two contiguous pages at fixed addresses, but backed by distinct mappings.
@@ -4791,7 +4819,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_c_string_to_vec_large() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
         let ma = current_task.deref();
 
         let page_size = *PAGE_SIZE;
@@ -4821,7 +4849,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_c_string_to_vec() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
         let ma = current_task.deref();
 
         let page_size = *PAGE_SIZE;
@@ -4929,7 +4957,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_c_string() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
         let ma = current_task.deref();
 
         let page_size = *PAGE_SIZE;
@@ -4977,7 +5005,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_find_next_unused_range() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let mmap_top = mm.state.read().find_next_unused_range(0).unwrap().ptr();
         let page_size = *PAGE_SIZE as usize;
@@ -5022,7 +5050,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_count_placements() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         // ten-page range
         let page_size = *PAGE_SIZE as usize;
@@ -5065,7 +5093,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_pick_placement() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let page_size = *PAGE_SIZE as usize;
         let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
@@ -5095,7 +5123,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_find_random_unused_range() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         // ten-page range
         let page_size = *PAGE_SIZE as usize;
@@ -5116,7 +5144,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grows_down_near_aspace_base() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let page_count = 10;
 
@@ -5140,7 +5168,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_unmap_returned_mappings() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
@@ -5154,7 +5182,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_unmap_returns_multiple_mappings() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let addr = mm.state.read().find_next_unused_range(3 * *PAGE_SIZE as usize).unwrap();
         let addr = map_memory(&mut locked, &current_task, addr, *PAGE_SIZE);
@@ -5172,7 +5200,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_unmap_beginning() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
@@ -5226,7 +5254,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_unmap_end() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
@@ -5280,7 +5308,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_map_two_unmap_one() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         // reserve memory for both pages
         let addr_reserve =
@@ -5351,7 +5379,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_unmap_middle() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
 
@@ -5497,7 +5525,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_partial_read() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
         let ma = current_task.deref();
 
         let addr = mm.state.read().find_next_unused_range(2 * *PAGE_SIZE as usize).unwrap();
@@ -5536,7 +5564,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_mapping_empty_mm() {
         let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let addr = UserAddress::from(0x100000);
 
@@ -5546,7 +5574,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_inside_mapping() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
@@ -5556,7 +5584,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_write_fault_inside_read_only_mapping() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let addr = do_mmap(
             &mut locked,
@@ -5577,7 +5605,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_fault_inside_prot_none_mapping() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let addr = do_mmap(
             &mut locked,
@@ -5598,7 +5626,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_below_mapping() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let addr = map_memory_growsdown(&mut locked, &current_task, *PAGE_SIZE) - *PAGE_SIZE;
 
@@ -5611,7 +5639,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_above_mapping() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let addr = map_memory_growsdown(&mut locked, &current_task, *PAGE_SIZE) + *PAGE_SIZE;
 
@@ -5621,7 +5649,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_write_fault_below_read_only_mapping() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
 
         let mapped_addr = map_memory_growsdown(&mut locked, &current_task, *PAGE_SIZE);
 
@@ -5640,7 +5668,7 @@ mod tests {
         use zx::sys::zx_page_request_command_t::ZX_PAGER_VMO_READ;
 
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
+        let mm = current_task.mm().unwrap();
         let ma = current_task.deref();
 
         let port = Arc::new(zx::Port::create());
@@ -5697,7 +5725,7 @@ mod tests {
             .expect("map failed");
 
         let target = create_task(&mut locked, &kernel, "another-task");
-        mm.snapshot_to(&mut locked, target.mm()).expect("snapshot_to failed");
+        mm.snapshot_to(&mut locked, target.mm().unwrap()).expect("snapshot_to failed");
 
         // Make sure it has what we wrote.
         let buf = target.read_memory_to_vec(addr, 3).expect("read_memory failed");
@@ -5744,7 +5772,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(current_task.mm().get_mapping_name(mapping_addr).unwrap().unwrap(), vma_name);
+        assert_eq!(
+            current_task.mm().unwrap().get_mapping_name(mapping_addr).unwrap().unwrap(),
+            vma_name
+        );
     }
 
     #[::fuchsia::test]
@@ -5780,7 +5811,7 @@ mod tests {
         .unwrap();
 
         {
-            let state = current_task.mm().state.read();
+            let state = current_task.mm().unwrap().state.read();
 
             // The name should apply to both mappings.
             let (_, mapping) = state.mappings.get(&first_mapping_addr).unwrap();
@@ -5804,7 +5835,7 @@ mod tests {
             map_memory(&mut locked, &current_task, UserAddress::default(), 2 * *PAGE_SIZE);
 
         let second_page = mapping_addr + *PAGE_SIZE;
-        current_task.mm().unmap(second_page, *PAGE_SIZE as usize).unwrap();
+        current_task.mm().unwrap().unmap(second_page, *PAGE_SIZE as usize).unwrap();
 
         // This should fail with ENOMEM since it extends past the end of the mapping into unmapped memory.
         assert_eq!(
@@ -5822,7 +5853,7 @@ mod tests {
 
         // Despite returning an error, the prctl should still assign a name to the region at the start of the region.
         {
-            let state = current_task.mm().state.read();
+            let state = current_task.mm().unwrap().state.read();
 
             let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::Vma("foo".into()));
@@ -5842,7 +5873,7 @@ mod tests {
             map_memory(&mut locked, &current_task, UserAddress::default(), 2 * *PAGE_SIZE);
 
         let second_page = mapping_addr + *PAGE_SIZE;
-        current_task.mm().unmap(mapping_addr, *PAGE_SIZE as usize).unwrap();
+        current_task.mm().unwrap().unmap(mapping_addr, *PAGE_SIZE as usize).unwrap();
 
         // This should fail with ENOMEM since the start of the range is in unmapped memory.
         assert_eq!(
@@ -5861,7 +5892,7 @@ mod tests {
         // Unlike a range which starts within a mapping and extends past the end, this should not assign
         // a name to any mappings.
         {
-            let state = current_task.mm().state.read();
+            let state = current_task.mm().unwrap().state.read();
 
             let (_, mapping) = state.mappings.get(&second_page).unwrap();
             assert_eq!(mapping.name, MappingName::None);
@@ -5895,7 +5926,7 @@ mod tests {
 
         // This should split the mapping into 3 pieces with the second piece having the name "foo"
         {
-            let state = current_task.mm().state.read();
+            let state = current_task.mm().unwrap().state.read();
 
             let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::None);
@@ -5934,10 +5965,14 @@ mod tests {
         );
 
         let target = create_task(&mut locked, &kernel, "another-task");
-        current_task.mm().snapshot_to(&mut locked, target.mm()).expect("snapshot_to failed");
+        current_task
+            .mm()
+            .unwrap()
+            .snapshot_to(&mut locked, target.mm().unwrap())
+            .expect("snapshot_to failed");
 
         {
-            let state = target.mm().state.read();
+            let state = target.mm().unwrap().state.read();
 
             let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::Vma("foo".into()));

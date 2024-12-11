@@ -181,86 +181,19 @@ function fx-is-bringup {
   grep '^[^#]*import("//products/bringup.gni")' "${FUCHSIA_BUILD_DIR}/args.gn" >/dev/null 2>&1
 }
 
-function _symlink_relative {
-  source="$1"
-  link="$2"
-  if [ -d "$link" ]; then
-    # Support ln's behavior passing a directory and reusing the source filename.
-    link_dir="$link"
-  else
-    link_dir="$(dirname "$link")"
-  fi
-  source_rel="${source#"$link_dir/"}"
-  ln -sf "$source_rel" "$link"
-}
-
-function _directory_symlink_relative {
-  source="$1"
-  link="$2"
-  # Do _not_ support ln's behavior, remove any existing link if it exists.
-  # otherwise a new link will be created into the target directory instead.
-  if [ -e "$link" ]; then
-    rm "$link"
-  fi
-  link_dir="$(dirname "$link")"
-  source_rel="${source#"$link_dir/"}"
-  ln -sf "$source_rel" "$link"
-}
-
-function _link_gen_artifacts {
-  # These artifacts need to be in the root directory.
-  local -r linked_artifacts=("compile_commands.json" "rust-project.json")
-  for artifact in "${linked_artifacts[@]}" ; do
-    if [[ -f "${FUCHSIA_BUILD_DIR}/$artifact" ]]; then
-      _symlink_relative "${FUCHSIA_BUILD_DIR}/$artifact" "${FUCHSIA_DIR}/$artifact"
-    fi
-  done
-
-  # Create Bazel convenience symlinks. See //build/bazel/README.md
-  _directory_symlink_relative \
-      "${FUCHSIA_BUILD_DIR}/gen/build/bazel/workspace" \
-      "${FUCHSIA_DIR}/bazel-workspace"
-
-  _directory_symlink_relative \
-      "${FUCHSIA_BUILD_DIR}/gen/build/bazel/workspace/bazel-bin" \
-      "${FUCHSIA_DIR}/bazel-bin"
-
-  _directory_symlink_relative \
-      "${FUCHSIA_BUILD_DIR}/gen/build/bazel/workspace/bazel-out" \
-      "${FUCHSIA_DIR}/bazel-out"
-
-  _directory_symlink_relative \
-      "${FUCHSIA_BUILD_DIR}/gen/build/bazel/output_base/external" \
-      "${FUCHSIA_DIR}/bazel-repos"
-}
-
-function fx-gen-internal {
-  # which of `gn gen` and `gn args` we're doing
-  local -r subcommand="$1"
-  shift
-
-  # If a user executes gen from a symlinked directory that is not a
-  # subdirectory $FUCHSIA_DIR then dotgn search may fail, so execute
-  # the gen from the $FUCHSIA_DIR.
-  (
-    cd "${FUCHSIA_DIR}" && \
-    fx-gn "${subcommand}" \
-        --fail-on-unused-args \
-        --check=system \
-        --export-rust-project \
-        --ninja-executable="${PREBUILT_NINJA}" \
-        --ninja-outputs-file="ninja_outputs.json" \
-        "${FUCHSIA_BUILD_DIR}" "$@"
-  ) || return $?
-  _link_gen_artifacts
+function fx-regenerator {
+  "${FUCHSIA_DIR}/build/regenerator" \
+    --fuchsia-dir="${FUCHSIA_DIR}" \
+    --fuchsia-build-dir="${FUCHSIA_BUILD_DIR}" \
+    "$@"
 }
 
 function fx-gen {
-  fx-gen-internal gen "$@"
+  fx-regenerator "$@"
 }
 
 function fx-gn-args {
-  fx-gen-internal args "$@"
+  fx-regenerator --update-args "$@"
 }
 
 function fx-build-config-load {
@@ -360,8 +293,7 @@ function fx-change-build-dir {
   # the change.
   fx-config-read
 
-  _link_gen_artifacts
-
+  fx-regenerator "--symlinks-only"
 }
 
 function ffx-default-repository-name {

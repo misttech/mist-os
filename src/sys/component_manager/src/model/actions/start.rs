@@ -8,6 +8,7 @@ use crate::model::actions::{Action, ActionKey};
 use crate::model::component::instance::{InstanceState, StartedInstanceState};
 use crate::model::component::{ComponentInstance, IncomingCapabilities, StartReason};
 use crate::model::namespace::create_namespace;
+use crate::model::routing::service::update_dictionary_for_service;
 use crate::runner::RemoteRunner;
 use ::namespace::Entry as NamespaceEntry;
 use ::routing::component_instance::ComponentInstanceInterface;
@@ -24,6 +25,8 @@ use errors::{ActionError, CreateNamespaceError, StartActionError, StructuredConf
 use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
 use fidl::{endpoints, Vmo};
 use futures::channel::oneshot;
+use futures::stream::FuturesUnordered;
+use futures::{FutureExt, StreamExt};
 use hooks::{EventPayload, RuntimeInfo};
 use moniker::Moniker;
 use router_error::RouterError;
@@ -39,7 +42,7 @@ use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
-    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, fuchsia_async as fasync, zx,
 };
 
 /// Starts a component instance.
@@ -357,12 +360,56 @@ async fn start_component(
             None
         };
 
+        // Create the tasks which will keep the dictionaries updated for any services this
+        // component provides. This happens here because we only want these tasks to be running
+        // while the component is also running.
+        let mut service_instance_dictionaries_updaters = None;
+        if program.is_some() {
+            let outgoing_dir_entry = component.get_outgoing();
+            let resolved_state =
+                state.get_resolved_state_mut().expect("can't start unresolved component");
+            let service_capability_decls = resolved_state
+                .decl()
+                .capabilities
+                .iter()
+                .filter_map(|capability_decl| match capability_decl {
+                    cm_rust::CapabilityDecl::Service(decl) => Some(decl.clone()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            let mut futs = FuturesUnordered::new();
+            for decl in service_capability_decls {
+                let path = decl.source_path.as_ref().expect("must have path");
+                let (service_dictionary, ref mut initialization_waiter) = resolved_state
+                    .service_instance_dictionaries
+                    .get_mut(&decl.name)
+                    .expect("missing dictionary for declared service");
+                let (sender, receiver) = oneshot::channel();
+                *initialization_waiter = receiver.shared();
+                futs.push(update_dictionary_for_service(
+                    component.moniker.clone(),
+                    decl.name.clone(),
+                    outgoing_dir_entry.clone(),
+                    component.execution_scope.clone(),
+                    path.clone(),
+                    service_dictionary.clone(),
+                    sender,
+                ));
+            }
+            service_instance_dictionaries_updaters = Some(fasync::Task::spawn(async move {
+                while let Some(()) = futs.next().await {
+                    ()
+                }
+            }));
+        }
+
         let started = StartedInstanceState::new(
             program,
             component.as_weak(),
             start_reason,
             execution_controller_task,
             logger,
+            service_instance_dictionaries_updaters,
         );
         timestamp = started.timestamp;
         let timestamp_monotonic = started.timestamp_monotonic;
@@ -1015,6 +1062,7 @@ mod tests {
                 None,
                 WeakComponentInstance::invalid(),
                 StartReason::Debug,
+                None,
                 None,
                 None,
             );

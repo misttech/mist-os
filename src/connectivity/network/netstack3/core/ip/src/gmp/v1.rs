@@ -18,7 +18,7 @@ use rand::Rng;
 
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpContext, GmpContextInner, GmpGroupState, GmpMode, GmpStateRef,
-    GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt, NotAMemberErr,
+    GroupJoinResult, GroupLeaveResult, IpExt, NotAMemberErr, QueryTarget,
 };
 
 /// Timers installed by GMP v1.
@@ -220,14 +220,14 @@ fn member_query_received<R: Rng, I: Instant, C: ProtocolConfig>(
         ),
         Some(max_resp_time) => {
             let max_resp_time = max_resp_time.get();
-            let new_deadline = now.checked_add(max_resp_time).unwrap();
+            let new_deadline = now.saturating_add(max_resp_time);
 
             let (timer_expiration, action) = match timer_expiration {
                 Some(old) if new_deadline >= old => (old, None),
                 None | Some(_) => {
                     let delay = gmp::random_report_timeout(rng, max_resp_time);
                     (
-                        now.checked_add(delay).unwrap(),
+                        now.saturating_add(delay),
                         Some(QueryReceivedGenericAction::ScheduleTimer(delay)),
                     )
                 }
@@ -490,17 +490,16 @@ impl<I: Instant> GmpStateMachine<I> {
     }
 }
 
-pub(super) fn handle_timer<I, CC, BC, T>(
-    core_ctx: &mut CC,
+pub(super) fn handle_timer<I, CC, BC>(
+    core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, T, BC>,
+    state: GmpStateRef<'_, I, CC, BC>,
     timer: DelayedReportTimerId<I>,
 ) where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
-    T: GmpTypeLayout<I, BC>,
 {
     let GmpStateRef { enabled: _, groups, gmp, config: _ } = state;
     debug_assert!(gmp.mode.is_v1());
@@ -559,23 +558,26 @@ where
     })
 }
 
-/// The group targeted in a query message.
-pub(super) enum QueryTarget<A> {
-    Unspecified,
-    Specified(MulticastAddr<A>),
+/// A trait abstracting GMP v1 query messages.
+pub(super) trait QueryMessage<I: Ip> {
+    /// Returns the group address in the query.
+    fn group_addr(&self) -> I::Addr;
+
+    /// Returns tha maximum response time for the query.
+    fn max_response_time(&self) -> Duration;
 }
 
-pub(super) fn handle_query_message<I, BC, CC>(
+pub(super) fn handle_query_message<I, CC, BC, Q>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    target: QueryTarget<I::Addr>,
-    max_response_time: Duration,
+    query: &Q,
 ) -> Result<(), NotAMemberErr<I>>
 where
     BC: GmpBindingsContext,
     CC: GmpContext<I, BC>,
     I: IpExt,
+    Q: QueryMessage<I>,
 {
     core_ctx.with_gmp_state_mut_and_ctx(device, |mut core_ctx, mut state| {
         // Always enter v1 compatibility mode if we see a v1 message.
@@ -602,66 +604,85 @@ where
         if state.gmp.mode.is_v1_compat() {
             gmp::schedule_v1_compat(bindings_ctx, state.as_mut())
         }
-
-        let GmpStateRef { enabled: _, groups, gmp, config } = state;
-
-        let now = bindings_ctx.now();
-
-        let iter = match target {
-            QueryTarget::Unspecified => {
-                either::Either::Left(groups.iter_mut().map(|(addr, state)| (*addr, state)))
-            }
-            QueryTarget::Specified(group_addr) => either::Either::Right(core::iter::once((
-                group_addr,
-                groups.get_mut(&group_addr).ok_or_else(|| NotAMemberErr(*group_addr))?,
-            ))),
-        };
-
-        for (group_addr, state) in iter {
-            let QueryReceivedActions { generic, protocol_specific } = state
-                .v1_mut()
-                .query_received(&mut bindings_ctx.rng(), max_response_time, now, config);
-            let send_msg = generic.and_then(|generic| match generic {
-                QueryReceivedGenericAction::ScheduleTimer(delay) => {
-                    let _: Option<(BC::Instant, ())> = gmp.timers.schedule_after(
-                        bindings_ctx,
-                        DelayedReportTimerId(group_addr).into(),
-                        (),
-                        delay,
-                    );
-                    None
-                }
-                QueryReceivedGenericAction::StopTimerAndSendReport => {
-                    let _: Option<(BC::Instant, ())> =
-                        gmp.timers.cancel(bindings_ctx, &DelayedReportTimerId(group_addr).into());
-                    Some(GmpMessageType::Report)
-                }
-            });
-
-            // NB: Run actions before sending messages, which allows IGMP to
-            // understand it should be operating in v1 compatibility mode.
-            if let Some(ps_actions) = protocol_specific {
-                core_ctx.run_actions(bindings_ctx, device, ps_actions);
-            }
-            if let Some(msg) = send_msg {
-                core_ctx.send_message_v1(bindings_ctx, device, group_addr, msg);
-            }
-        }
-
-        Ok(())
+        handle_query_message_inner(&mut core_ctx, bindings_ctx, device, state, query)
     })
 }
 
-pub(super) fn handle_enabled<I, CC, BC, T>(
-    core_ctx: &mut CC,
+pub(super) fn handle_query_message_inner<I, CC, BC, Q>(
+    core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, T, BC>,
+    state: GmpStateRef<'_, I, CC, BC>,
+    query: &Q,
+) -> Result<(), NotAMemberErr<I>>
+where
+    BC: GmpBindingsContext,
+    CC: GmpContext<I, BC>,
+    I: IpExt,
+    Q: QueryMessage<I>,
+{
+    let GmpStateRef { enabled: _, groups, gmp, config } = state;
+
+    let now = bindings_ctx.now();
+
+    let target = query.group_addr();
+    let target = QueryTarget::new(target).ok_or_else(|| NotAMemberErr(target))?;
+    let iter = match target {
+        QueryTarget::Unspecified => {
+            either::Either::Left(groups.iter_mut().map(|(addr, state)| (*addr, state)))
+        }
+        QueryTarget::Specified(group_addr) => either::Either::Right(core::iter::once((
+            group_addr,
+            groups.get_mut(&group_addr).ok_or_else(|| NotAMemberErr(*group_addr))?,
+        ))),
+    };
+
+    for (group_addr, state) in iter {
+        let QueryReceivedActions { generic, protocol_specific } = state.v1_mut().query_received(
+            &mut bindings_ctx.rng(),
+            query.max_response_time(),
+            now,
+            config,
+        );
+        let send_msg = generic.and_then(|generic| match generic {
+            QueryReceivedGenericAction::ScheduleTimer(delay) => {
+                let _: Option<(BC::Instant, ())> = gmp.timers.schedule_after(
+                    bindings_ctx,
+                    DelayedReportTimerId(group_addr).into(),
+                    (),
+                    delay,
+                );
+                None
+            }
+            QueryReceivedGenericAction::StopTimerAndSendReport => {
+                let _: Option<(BC::Instant, ())> =
+                    gmp.timers.cancel(bindings_ctx, &DelayedReportTimerId(group_addr).into());
+                Some(GmpMessageType::Report)
+            }
+        });
+
+        // NB: Run actions before sending messages, which allows IGMP to
+        // understand it should be operating in v1 compatibility mode.
+        if let Some(ps_actions) = protocol_specific {
+            core_ctx.run_actions(bindings_ctx, device, ps_actions);
+        }
+        if let Some(msg) = send_msg {
+            core_ctx.send_message_v1(bindings_ctx, device, group_addr, msg);
+        }
+    }
+
+    Ok(())
+}
+
+pub(super) fn handle_enabled<I, CC, BC>(
+    core_ctx: &mut CC::Inner<'_>,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    state: GmpStateRef<'_, I, CC, BC>,
 ) where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
-    T: GmpTypeLayout<I, BC>,
 {
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
     debug_assert!(gmp.mode.is_v1());
@@ -692,16 +713,15 @@ pub(super) fn handle_enabled<I, CC, BC, T>(
     }
 }
 
-pub(super) fn handle_disabled<I, CC, BC, T>(
-    core_ctx: &mut CC,
+pub(super) fn handle_disabled<I, CC, BC>(
+    core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, T, BC>,
+    state: GmpStateRef<'_, I, CC, BC>,
 ) where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
-    T: GmpTypeLayout<I, BC>,
 {
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
     debug_assert!(gmp.mode.is_v1());
@@ -720,18 +740,17 @@ pub(super) fn handle_disabled<I, CC, BC, T>(
     }
 }
 
-pub(super) fn join_group<I, CC, BC, T>(
-    core_ctx: &mut CC,
+pub(super) fn join_group<I, CC, BC>(
+    core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     group_addr: MulticastAddr<I::Addr>,
-    state: GmpStateRef<'_, I, T, BC>,
+    state: GmpStateRef<'_, I, CC, BC>,
 ) -> GroupJoinResult
 where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
-    T: GmpTypeLayout<I, BC>,
 {
     let GmpStateRef { enabled, groups, gmp, config } = state;
     debug_assert!(gmp.mode.is_v1());
@@ -760,18 +779,17 @@ where
     })
 }
 
-pub(super) fn leave_group<I, CC, BC, T>(
-    core_ctx: &mut CC,
+pub(super) fn leave_group<I, CC, BC>(
+    core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     group_addr: MulticastAddr<I::Addr>,
-    state: GmpStateRef<'_, I, T, BC>,
+    state: GmpStateRef<'_, I, CC, BC>,
 ) -> GroupLeaveResult
 where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC>,
+    CC: GmpContext<I, BC>,
     I: IpExt,
-    T: GmpTypeLayout<I, BC>,
 {
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
     debug_assert!(gmp.mode.is_v1());
@@ -797,6 +815,7 @@ mod test {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::{new_rng, FakeDeviceId, FakeInstant};
+    use test_util::assert_lt;
 
     use super::*;
 
@@ -875,17 +894,24 @@ mod test {
 
     #[test]
     fn test_gmp_state_delay_reset_timer() {
-        let mut rng = new_rng(0);
+        let mut rng = new_rng(10);
         let cfg = FakeConfig::default();
-        let (mut s, _actions) =
+        let (mut s, JoinGroupActions { send_report_and_schedule_timer }) =
             FakeGmpStateMachine::join_group(&mut rng, FakeInstant::default(), false, &cfg);
-        assert_eq!(
-            s.query_received(&mut rng, Duration::from_millis(1), FakeInstant::default(), &cfg),
-            QueryReceivedActions {
-                generic: Some(QueryReceivedGenericAction::ScheduleTimer(Duration::from_micros(1))),
-                protocol_specific: None
-            }
+        let first_duration = send_report_and_schedule_timer.expect("starts delaying member");
+        let actions = s.query_received(
+            &mut rng,
+            first_duration.checked_sub(Duration::from_micros(1)).unwrap(),
+            FakeInstant::default(),
+            &cfg,
         );
+        let new_duration = assert_matches!(actions,
+            QueryReceivedActions {
+                generic: Some(QueryReceivedGenericAction::ScheduleTimer(d)),
+                protocol_specific: None
+            } => d
+        );
+        assert_lt!(new_duration, first_duration);
     }
 
     #[test]

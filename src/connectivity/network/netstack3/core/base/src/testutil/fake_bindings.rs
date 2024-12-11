@@ -71,7 +71,10 @@ impl<TimerId, Event: Debug, State, FrameMeta> FakeBindingsCtx<TimerId, Event, St
 impl<TimerId, Event: Debug, State, FrameMeta> RngContext
     for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
 {
-    type Rng<'a> = FakeCryptoRng where Self: 'a;
+    type Rng<'a>
+        = FakeCryptoRng
+    where
+        Self: 'a;
 
     fn rng(&mut self) -> Self::Rng<'_> {
         self.rng.clone()

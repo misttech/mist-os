@@ -4,9 +4,10 @@
 
 #include "sdhci.h"
 
+#include <lib/async/default.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/fake-bti/cpp/fake-bti.h>
 #include <lib/driver/testing/cpp/driver_test.h>
-#include <lib/fake-bti/bti.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/sync/completion.h>
 
@@ -145,50 +146,74 @@ class TestSdhci : public Sdhci {
 
 fdf::MmioBuffer* TestSdhci::mmio_;
 
-class SdhciBanjoServer : public ddk::SdhciProtocol<SdhciBanjoServer> {
+class FakeSdhci : public fdf::WireServer<fuchsia_hardware_sdhci::Device> {
  public:
-  compat::DeviceServer::BanjoConfig GetBanjoConfig() {
-    compat::DeviceServer::BanjoConfig config{ZX_PROTOCOL_SDHCI};
-    config.callbacks[ZX_PROTOCOL_SDHCI] = banjo_server_.callback();
-    return config;
-  }
-
-  zx_status_t SdhciGetInterrupt(zx::interrupt* interrupt_out) { return ZX_OK; }
-
-  zx_status_t SdhciGetMmio(zx::vmo* out, zx_off_t* out_offset) { return ZX_ERR_NOT_SUPPORTED; }
-
-  zx_status_t SdhciGetBti(uint32_t index, zx::bti* out_bti) {
-    if (index != 0) {
-      return ZX_ERR_NOT_SUPPORTED;
-    }
-
-    zx_status_t status = fake_bti_create_with_paddrs(dma_paddrs_.data(), dma_paddrs_.size(),
-                                                     out_bti->reset_and_get_address());
+  // fuchsia.hardware.sdhci/Device protocol implementation
+  void GetInterrupt(fdf::Arena& arena, GetInterruptCompleter::Sync& completer) override {
+    zx::interrupt interrupt;
+    zx_status_t status =
+        zx::interrupt::create(zx::resource(ZX_HANDLE_INVALID), 0, ZX_INTERRUPT_VIRTUAL, &interrupt);
     if (status != ZX_OK) {
-      return status;
+      completer.buffer(arena).ReplyError(status);
+      return;
     }
 
-    unowned_bti_ = out_bti->borrow();
-    return ZX_OK;
+    completer.buffer(arena).ReplySuccess(std::move(interrupt));
   }
 
-  uint32_t SdhciGetBaseClock() { return base_clock_; }
-
-  uint64_t SdhciGetQuirks(uint64_t* out_dma_boundary_alignment) {
-    *out_dma_boundary_alignment = dma_boundary_alignment_;
-    return quirks_;
+  void GetMmio(fdf::Arena& arena, GetMmioCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void SdhciHwReset() { hw_reset_invoked_ = true; }
+  void GetBti(GetBtiRequestView request, fdf::Arena& arena,
+              GetBtiCompleter::Sync& completer) override {
+    if (request->index != 0) {
+      completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+      return;
+    }
+    zx::result bti = fake_bti::CreateFakeBtiWithPaddrs(dma_paddrs_);
+    if (bti.is_error()) {
+      completer.buffer(arena).ReplyError(bti.status_value());
+      return;
+    }
+    unowned_bti_ = bti.value().borrow();
 
-  zx_status_t SdhciVendorSetBusClock(uint32_t frequency_hz) {
-    return supports_set_bus_clock_ ? ZX_OK : ZX_ERR_STOP;
+    completer.buffer(arena).ReplySuccess(std::move(bti.value()));
+  }
+
+  void GetBaseClock(fdf::Arena& arena, GetBaseClockCompleter::Sync& completer) override {
+    completer.buffer(arena).Reply(base_clock_);
+  }
+
+  void GetQuirks(fdf::Arena& arena, GetQuirksCompleter::Sync& completer) override {
+    completer.buffer(arena).Reply(quirks_, dma_boundary_alignment_);
+  }
+
+  void HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) override {
+    hw_reset_invoked_ = true;
+    completer.buffer(arena).Reply();
+  }
+
+  void VendorSetBusClock(VendorSetBusClockRequestView request, fdf::Arena& arena,
+                         VendorSetBusClockCompleter::Sync& completer) override {
+    if (!supports_set_bus_clock_) {
+      completer.buffer(arena).ReplyError(ZX_ERR_STOP);
+      return;
+    }
+    completer.buffer(arena).ReplySuccess();
+  }
+
+  fuchsia_hardware_sdhci::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_sdhci::Service::InstanceHandler({
+        .device = binding_group_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
+                                               fidl::kIgnoreBindingClosure),
+    });
   }
 
   void set_dma_paddrs(std::vector<zx_paddr_t> dma_paddrs) { dma_paddrs_ = std::move(dma_paddrs); }
   zx::unowned_bti& unowned_bti() { return unowned_bti_; }
   void set_base_clock(uint32_t base_clock) { base_clock_ = base_clock; }
-  void set_quirks(uint64_t quirks) { quirks_ = quirks; }
+  void set_quirks(fuchsia_hardware_sdhci::Quirk quirks) { quirks_ = quirks; }
   void set_dma_boundary_alignment(uint64_t dma_boundary_alignment) {
     dma_boundary_alignment_ = dma_boundary_alignment;
   }
@@ -199,30 +224,32 @@ class SdhciBanjoServer : public ddk::SdhciProtocol<SdhciBanjoServer> {
   std::vector<zx_paddr_t> dma_paddrs_;
   zx::unowned_bti unowned_bti_;
   uint32_t base_clock_ = 100'000'000;
-  uint64_t quirks_ = 0;
+  fuchsia_hardware_sdhci::Quirk quirks_;
   uint64_t dma_boundary_alignment_ = 0;
   bool hw_reset_invoked_ = false;
   bool supports_set_bus_clock_ = false;
 
-  compat::BanjoServer banjo_server_{ZX_PROTOCOL_SDHCI, this, &sdhci_protocol_ops_};
+  fdf::ServerBindingGroup<fuchsia_hardware_sdhci::Device> binding_group_;
 };
 
 class Environment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    device_server_.Initialize(component::kDefaultInstance, std::nullopt,
-                              sdhci_banjo_server_.GetBanjoConfig());
-    return zx::make_result(
-        device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
+    zx::result result =
+        to_driver_vfs.AddService<fuchsia_hardware_sdhci::Service>(sdhci_.GetInstanceHandler());
+    if (result.is_error()) {
+      return result.take_error();
+    }
+
+    return zx::ok();
   }
 
   fdf::MmioBuffer& mmio() { return mmio_; }
-  SdhciBanjoServer& sdhci() { return sdhci_banjo_server_; }
+  FakeSdhci& sdhci() { return sdhci_; }
 
  private:
   fdf::MmioBuffer mmio_ = fdf_testing::CreateMmioBuffer(kRegisterSetSize);
-  SdhciBanjoServer sdhci_banjo_server_;
-  compat::DeviceServer device_server_;
+  FakeSdhci sdhci_;
 };
 
 class TestConfig final {
@@ -233,7 +260,8 @@ class TestConfig final {
 
 class SdhciTest : public ::testing::Test {
  protected:
-  zx::result<> StartDriver(std::vector<zx_paddr_t> dma_paddrs, uint64_t quirks = 0,
+  zx::result<> StartDriver(std::vector<zx_paddr_t> dma_paddrs,
+                           fuchsia_hardware_sdhci::Quirk quirks = {},
                            uint64_t dma_boundary_alignment = 0) {
     driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
       TestSdhci::mmio_ = &env.mmio();
@@ -245,7 +273,8 @@ class SdhciTest : public ::testing::Test {
     return driver_test().StartDriver();
   }
 
-  zx::result<> StartDriver(uint64_t quirks = 0, uint64_t dma_boundary_alignment = 0) {
+  zx::result<> StartDriver(fuchsia_hardware_sdhci::Quirk quirks = {},
+                           uint64_t dma_boundary_alignment = 0) {
     return StartDriver({}, quirks, dma_boundary_alignment);
   }
 
@@ -342,7 +371,7 @@ TEST_F(SdhciTest, HostInfoNoDma) {
         .WriteTo(&env.mmio());
   });
 
-  ASSERT_OK(StartDriver(SDHCI_QUIRK_NO_DMA));
+  ASSERT_OK(StartDriver(fuchsia_hardware_sdhci::Quirk::kNoDma));
 
   sdmmc_host_info_t host_info = {};
   EXPECT_OK(driver_test().driver()->SdmmcHostInfo(&host_info));
@@ -359,7 +388,7 @@ TEST_F(SdhciTest, HostInfoNoTuning) {
     Capabilities0::Get().FromValue(0).set_base_clock_frequency(1).WriteTo(&env.mmio());
   });
 
-  ASSERT_OK(StartDriver(SDHCI_QUIRK_NON_STANDARD_TUNING));
+  ASSERT_OK(StartDriver(fuchsia_hardware_sdhci::Quirk::kNonStandardTuning));
 
   sdmmc_host_info_t host_info = {};
   EXPECT_OK(driver_test().driver()->SdmmcHostInfo(&host_info));
@@ -955,7 +984,7 @@ TEST_F(SdhciTest, DmaSplitOneBoundary) {
           kStartAddress + (zx_system_get_page_size() * 2),
           0xb000'0000,
       },
-      SDHCI_QUIRK_USE_DMA_BOUNDARY_ALIGNMENT, 0x0800'0000));
+      fuchsia_hardware_sdhci::Quirk::kUseDmaBoundaryAlignment, 0x0800'0000));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size() * 4, 0, &vmo));
@@ -1024,7 +1053,7 @@ TEST_F(SdhciTest, DmaSplitManyBoundaries) {
           kDescriptorAddress,
           0xabcd'0000,
       },
-      SDHCI_QUIRK_USE_DMA_BOUNDARY_ALIGNMENT, 0x100));
+      fuchsia_hardware_sdhci::Quirk::kUseDmaBoundaryAlignment, 0x100));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
@@ -1159,7 +1188,7 @@ TEST_F(SdhciTest, CommandSettingsMultiBlock) {
         .WriteTo(&env.mmio());
   });
 
-  ASSERT_OK(StartDriver(SDHCI_QUIRK_STRIP_RESPONSE_CRC_PRESERVE_ORDER));
+  ASSERT_OK(StartDriver(fuchsia_hardware_sdhci::Quirk::kStripResponseCrcPreserveOrder));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
@@ -1231,7 +1260,7 @@ TEST_F(SdhciTest, CommandSettingsSingleBlock) {
         .WriteTo(&env.mmio());
   });
 
-  ASSERT_OK(StartDriver(SDHCI_QUIRK_STRIP_RESPONSE_CRC_PRESERVE_ORDER));
+  ASSERT_OK(StartDriver(fuchsia_hardware_sdhci::Quirk::kStripResponseCrcPreserveOrder));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
@@ -1303,7 +1332,7 @@ TEST_F(SdhciTest, CommandSettingsBusyResponse) {
         .WriteTo(&env.mmio());
   });
 
-  ASSERT_OK(StartDriver(SDHCI_QUIRK_STRIP_RESPONSE_CRC_PRESERVE_ORDER));
+  ASSERT_OK(StartDriver(fuchsia_hardware_sdhci::Quirk::kStripResponseCrcPreserveOrder));
 
   const sdmmc_req_t request = {
       .cmd_idx = 55,
@@ -2122,7 +2151,8 @@ TEST_F(SdhciTest, DmaSplitSizeAndAligntmentBoundaries) {
     paddrs.push_back(p);
   }
 
-  ASSERT_OK(StartDriver(std::move(paddrs), SDHCI_QUIRK_USE_DMA_BOUNDARY_ALIGNMENT, 0x2'0000));
+  ASSERT_OK(StartDriver(std::move(paddrs), fuchsia_hardware_sdhci::Quirk::kUseDmaBoundaryAlignment,
+                        0x2'0000));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(1024, 0, &vmo));
@@ -2184,7 +2214,7 @@ TEST_F(SdhciTest, DmaSplitSizeAndAligntmentBoundaries) {
 }
 
 TEST_F(SdhciTest, BufferedRead) {
-  ASSERT_OK(StartDriver(SDHCI_QUIRK_NO_DMA));
+  ASSERT_OK(StartDriver(fuchsia_hardware_sdhci::Quirk::kNoDma));
 
   constexpr uint32_t kTestWord = 0x1234'5678;
   BufferData::Get().FromValue(kTestWord).WriteTo(driver_test().driver()->mmio_);
@@ -2233,7 +2263,7 @@ TEST_F(SdhciTest, BufferedRead) {
 }
 
 TEST_F(SdhciTest, BufferedWrite) {
-  ASSERT_OK(StartDriver(SDHCI_QUIRK_NO_DMA));
+  ASSERT_OK(StartDriver(fuchsia_hardware_sdhci::Quirk::kNoDma));
 
   constexpr uint32_t kTestWord = 0x1234'5678;
 

@@ -45,7 +45,7 @@ impl AioContext {
         let context = Arc::new(AioContext { inner: AioContextInner::new(max_operations) });
         context.inner.spawn_worker(&current_task.kernel().kthreads, WorkerType::Read);
         context.inner.spawn_worker(&current_task.kernel().kthreads, WorkerType::Write);
-        let context_addr = current_task.mm().map_anonymous(
+        let context_addr = current_task.mm().ok_or_else(|| errno!(EINVAL))?.map_anonymous(
             DesiredAddress::Any,
             AIO_RING_SIZE,
             ProtectionFlags::READ | ProtectionFlags::WRITE,
@@ -281,7 +281,7 @@ impl IoOperation {
 
         // Validate the user buffers and offset synchronously.
         let buffer_length = UserBuffer::cap_buffers_to_max_rw_count(
-            current_task.maximum_valid_address(),
+            current_task.maximum_valid_address().ok_or_else(|| errno!(EINVAL))?,
             &mut buffers,
         )?;
         checked_add_offset_and_length(offset, buffer_length)?;
@@ -300,7 +300,7 @@ impl IoOperation {
         Ok(IoOperation {
             op_type,
             file: Arc::downgrade(&file),
-            mm: current_task.mm().as_remote(),
+            mm: current_task.mm().ok_or_else(|| errno!(EINVAL))?.as_remote(),
             buffers,
             offset,
             id: control_block.aio_data,

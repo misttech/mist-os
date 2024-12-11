@@ -2,8 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//zircon/vdso/vdso.gni")
-
 # This file is used to describe the sysroot entries contributed by the
 # C library. For historical reasons, it currently includes some Zircon
 # headers as well.
@@ -14,11 +12,7 @@ import("//zircon/vdso/vdso.gni")
 # script.
 
 import("//zircon/system/ulib/c/libc_toolchain.gni")
-
-_rebased_libc_stripped = rebase_path(sysroot_libc_stripped, root_build_dir)
-_rebased_libc_unstripped = rebase_path(sysroot_libc_unstripped, root_build_dir)
-
-sysroot_libc_deps = [ sysroot_libc_target ]
+import("//zircon/vdso/vdso.gni")
 
 # This describes the sysroot entries contributed by the C library
 # built without any binaries that may be affected by instrumentation.
@@ -29,19 +23,6 @@ sysroot_libc_deps = [ sysroot_libc_target ]
 #
 # For historical reason, this includes Zircon headers as well.
 sysroot_uninstrumented_libc_entries = [
-  {
-    libc = _rebased_libc_unstripped
-  },
-  {
-    libc_dist = _rebased_libc_stripped
-  },
-  {
-    include_dirs = [
-      "//src/zircon/lib/zircon/include",
-      "//zircon/system/public",
-      "//zircon/third_party/ulib/musl/include",
-    ]
-  },
   {
     sdk = {
       include_dir = "//zircon/system/public"
@@ -280,7 +261,7 @@ sysroot_uninstrumented_libc_entries = [
       # linker stubs.  For now, just use the unstripped library to link
       # against.  This matches what library() gives the SDK via
       # zircon_library().
-      source = _rebased_libc_unstripped
+      source = rebase_path(sysroot_libc_unstripped, root_build_dir)
       link = "lib/libc.so"
       deps = [ sysroot_libc_target ]
     }
@@ -364,10 +345,9 @@ foreach(variant, sysroot_variants) {
 # The C runtime startup object file (a.k.a. 'crt1', or 'Scrt1.o').
 sysroot_crt1_entries = [
   {
-    crt1 = rebase_path(sysroot_crt1_obj, root_build_dir)
     sdk = {
-      source = crt1
       link = "lib/Scrt1.o"
+      source = rebase_path(sysroot_crt1_obj, root_build_dir)
       deps = [ sysroot_crt1_target ]
     }
   },

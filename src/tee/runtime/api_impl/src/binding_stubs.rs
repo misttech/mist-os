@@ -1436,7 +1436,8 @@ extern "C" fn TEE_GenerateRandom(
     randomBuffer: *mut ::std::os::raw::c_void,
     randomBufferLen: usize,
 ) {
-    unimplemented!()
+    let dest_slice = slice_from_raw_parts_mut(randomBuffer, randomBufferLen);
+    zx::cprng_draw(dest_slice);
 }
 
 #[no_mangle]

@@ -19,6 +19,8 @@ class TestLoopBase : public loop_fixture::RealLoop {
 
   test_sagcontrol::SystemActivityGovernorState GetBootCompleteState();
 
+  bool SetBootComplete();
+
   zx_status_t AwaitSystemSuspend();
   zx_status_t StartSystemResume();
 

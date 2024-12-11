@@ -75,6 +75,7 @@ fuchsia_driver_component("aml-g12-tdm") {
 
 fuchsia_driver_package("aml-g12-tdm-package") {
   package_name = "aml-g12-tdm"
+  export_to_bazel = true
   driver_components = [ ":aml-g12-tdm" ]
 }
 
@@ -137,6 +138,7 @@ fuchsia_driver_component("aml-g12-tdm-dai") {
 
 fuchsia_driver_package("aml-g12-tdm-dai-package") {
   package_name = "aml-g12-tdm-dai"
+  export_to_bazel = true
   driver_components = [ ":aml-g12-tdm-dai" ]
 }
 

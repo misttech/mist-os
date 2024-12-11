@@ -4,7 +4,9 @@
 
 use std::collections::HashMap;
 
+use fuchsia_trace::duration;
 use futures::AsyncWriteExt;
+use traces::CATEGORY_MEMORY_CAPTURE;
 use {fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memory_attribution_plugin as fplugin};
 
 use crate::attribution_client::{
@@ -48,6 +50,7 @@ impl AttributionSnapshot {
         memory_stats: fkernel::MemoryStats,
         compression_stats: fkernel::MemoryStatsCompression,
     ) -> AttributionSnapshot {
+        duration!(CATEGORY_MEMORY_CAPTURE, c"AttributionSnapshot::new");
         // Compute the capacity needed for |principals| and |attributions| to avoid reallocations
         // as we fill these vectors.
         let (num_principals, num_attributions) = attribution_state
@@ -135,9 +138,13 @@ impl AttributionSnapshot {
     }
 
     pub async fn serve(self, socket: zx::Socket) {
+        duration!(CATEGORY_MEMORY_CAPTURE, c"AttributionSnapshot::serve");
         let mut asocket = fidl::AsyncSocket::from_socket(socket);
 
-        let data = fidl::persist(&self.0).unwrap();
+        let data = {
+            duration!(CATEGORY_MEMORY_CAPTURE, c"AttributionSnapshot::serve persist");
+            fidl::persist(&self.0).unwrap()
+        };
         asocket.write_all(&data).await.unwrap();
     }
 }

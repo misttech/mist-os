@@ -2185,6 +2185,7 @@ impl StatsLogger {
         let c = self.last_7d_stats.lock().windowed_stat(None);
         let connected_dur_in_day = c.connected_duration.into_seconds() as f64 / (24 * 3600) as f64;
         let dpdc_ratio = c.disconnect_count as f64 / connected_dur_in_day;
+        #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
         if dpdc_ratio.is_finite() {
             let mut metric_events = vec![];
             metric_events.push(MetricEvent {
@@ -3788,6 +3789,7 @@ impl StatsLogger {
         ));
     }
 
+    #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
     async fn log_bss_selection_metrics(
         &mut self,
         reason: client::types::ConnectReason,
@@ -4225,6 +4227,7 @@ fn is_roam_disconnect(reason: fidl_sme::UserDisconnectReason) -> bool {
     }
 }
 
+#[allow(clippy::enum_variant_names, reason = "mass allow for https://fxbug.dev/381896734")]
 enum StatOp {
     AddTotalDuration(zx::MonotonicDuration),
     AddConnectedDuration(zx::MonotonicDuration),
@@ -4748,6 +4751,7 @@ mod tests {
         });
     }
 
+    #[allow(clippy::regex_creation_in_loops, reason = "mass allow for https://fxbug.dev/381896734")]
     #[fuchsia::test]
     fn test_log_disconnect_event_correct_shape() {
         let (mut test_helper, mut test_fut) = setup_test();

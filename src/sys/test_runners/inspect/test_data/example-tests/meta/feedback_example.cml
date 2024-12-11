@@ -4,7 +4,7 @@
 {
     include: [ "//src/sys/test_runners/inspect/default.shard.cml" ],
     program: {
-        // Read from the FeedbackArchiveAccessor
+        // Read from the fuchsia.diagnostics.ArchiveAccessor.feedback
         accessor: "FEEDBACK",
         timeout_seconds: "5",
         cases: [

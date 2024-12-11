@@ -64,7 +64,7 @@ async fn run_test(url: &str, expected_result: &str) {
     let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>();
     let server_end = server_end.into_channel().into();
     realm_query
-        .open(
+        .deprecated_open(
             ".",
             fsys::OpenDirType::ExposedDir,
             fio::OpenFlags::empty(),
@@ -224,7 +224,7 @@ async fn route_directories_from_component_manager_namespace() {
     let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>();
     let server_end = server_end.into_channel().into();
     realm_query
-        .open(
+        .deprecated_open(
             ".",
             fsys::OpenDirType::ExposedDir,
             fio::OpenFlags::empty(),

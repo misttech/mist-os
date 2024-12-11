@@ -22,7 +22,6 @@ use std::sync::Arc;
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
 use fidl_fuchsia_net_routes_ext::rules::{
     InstalledRule, RuleAction, RuleEvent, RuleIndex, RuleSetPriority, DEFAULT_RULE_SET_PRIORITY,
@@ -30,13 +29,14 @@ use fidl_fuchsia_net_routes_ext::rules::{
 use futures::channel::{mpsc, oneshot};
 use futures::{stream, Future, FutureExt as _, StreamExt as _};
 use log::{debug, error, info, warn};
-use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv6, Subnet};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6, Subnet};
 use net_types::SpecifiedAddr;
 use netstack3_core::routes::AddableMetric;
 use zx::AsHandleRef as _;
+use {fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin};
 
 use crate::bindings::util::{
-    EntryAndTableId, RemoveResourceResultExt as _, TryIntoFidlWithContext,
+    EntryAndTableId, RemoveResourceResultExt as _, ResultExt as _, TryIntoFidlWithContext,
 };
 use crate::bindings::{BindingsCtx, Ctx, IpExt};
 
@@ -49,7 +49,7 @@ use rules_admin::{NewRuleSet, RuleOp, RuleTable, RuleWorkItem, SetPriorityConfli
 pub(crate) mod state;
 pub(crate) mod watcher;
 mod witness;
-pub(crate) use witness::{main_table_id, TableId};
+pub(crate) use witness::{main_table_id, TableId, TableIdEither};
 
 type WeakDeviceId = netstack3_core::device::WeakDeviceId<crate::bindings::BindingsCtx>;
 type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsCtx>;
@@ -70,8 +70,31 @@ pub(crate) enum RouteOp<A: IpAddress> {
 
 #[derive(GenericOverIp, Debug)]
 #[generic_over_ip(I, Ip)]
-pub(crate) enum TableOp<I: Ip> {
-    AddTable(IpVersionMarker<I>),
+struct AddTableOutcome<I: Ip> {
+    table_id: TableId<I>,
+    route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
+    token: Arc<zx::Event>,
+}
+
+#[derive(GenericOverIp, Debug)]
+#[generic_over_ip(I, Ip)]
+struct AddTableOp<I: Ip> {
+    name: Option<String>,
+    responder: oneshot::Sender<Result<AddTableOutcome<I>, TableIdOverflowsError>>,
+}
+
+#[derive(Debug, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+struct GetRouteTableNameOp<I: Ip> {
+    table_id: TableId<I>,
+    responder: fnet_routes::StateGetRouteTableNameResponder,
+}
+
+#[derive(GenericOverIp, Debug)]
+#[generic_over_ip(I, Ip)]
+enum TableOp<I: Ip> {
+    AddTable(AddTableOp<I>),
+    GetRouteTableName(GetRouteTableNameOp<I>),
 }
 
 #[derive(GenericOverIp, Derivative)]
@@ -131,18 +154,8 @@ pub(crate) struct RouteWorkItem<I: Ip> {
     pub(crate) responder: Option<oneshot::Sender<Result<ChangeOutcome, ChangeError>>>,
 }
 
-#[derive(Debug)]
-enum TableOpOutcome<I: Ip> {
-    Added {
-        table_id: TableId<I>,
-        route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
-        token: Arc<zx::Event>,
-    },
-}
-
-struct NewTable<I: Ip> {
+struct TableWorkItem<I: Ip> {
     op: TableOp<I>,
-    responder: oneshot::Sender<Result<TableOpOutcome<I>, TableIdOverflowsError>>,
 }
 
 /// The routing table from the perspective of bindings.
@@ -162,6 +175,8 @@ struct Table<I: Ip> {
     token: Arc<zx::Event>,
     /// The table id that we can use to update the routing tables in Core.
     core_id: CoreId<I>,
+    /// The optional name given to the table for debugging purposes.
+    name: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
@@ -184,9 +199,13 @@ enum CoreId<I: Ip> {
 }
 
 impl<I: Ip> Table<I> {
-    fn new(initial_generation: netstack3_core::routes::Generation, core_id: CoreId<I>) -> Self {
+    fn new(
+        initial_generation: netstack3_core::routes::Generation,
+        core_id: CoreId<I>,
+        name: Option<String>,
+    ) -> Self {
         let token = Arc::new(zx::Event::create());
-        Self { inner: HashMap::new(), next_generation: initial_generation, token, core_id }
+        Self { inner: HashMap::new(), next_generation: initial_generation, token, core_id, name }
     }
 
     fn insert(
@@ -197,7 +216,7 @@ impl<I: Ip> Table<I> {
         netstack3_core::routes::AddableEntry<I::Addr, DeviceId>,
         netstack3_core::routes::Generation,
     )> {
-        let Self { inner, next_generation, token: _, core_id: _ } = self;
+        let Self { inner, next_generation, token: _, core_id, name: _ } = self;
         let (entry, new_to_table) = match inner.entry(route.clone()) {
             std::collections::hash_map::Entry::Occupied(occupied_entry) => {
                 (occupied_entry.into_mut(), false)
@@ -219,9 +238,7 @@ impl<I: Ip> Table<I> {
         } else {
             TableModifyResult::NoChange
         };
-        info!(
-            "insert operation of route {route:?} into table with set {set:?} had result {result:?}",
-        );
+        info!("insert route {route:?} (table={core_id:?}) (set={set:?}) had result {result:?}");
         result
     }
 
@@ -243,7 +260,7 @@ impl<I: Ip> Table<I> {
             netstack3_core::routes::Generation,
         )>,
     > {
-        let Self { inner, next_generation: _, token: _, core_id: _ } = self;
+        let Self { inner, next_generation: _, token: _, core_id, name: _ } = self;
 
         let mut removed_any_from_set = false;
         let mut removed_from_table = Vec::new();
@@ -287,23 +304,23 @@ impl<I: Ip> Table<I> {
         let result = {
             if !removed_from_table.is_empty() {
                 info!(
-                    "remove operation on routing table resulted in removal of \
+                    "remove operation on routing table (table={core_id:?}) resulted in removal of \
                      {} routes from the table:",
                     removed_from_table.len()
                 );
                 for (route, generation) in &removed_from_table {
-                    info!("  removed route {route:?} (generation {generation:?})");
+                    info!("-- removed route {route:?} (generation={generation:?})");
                 }
                 TableModifyResult::TableChanged(removed_from_table)
             } else if removed_any_from_set {
                 info!(
-                    "remove operation on routing table removed routes from set \
+                    "remove operation on routing table (table={core_id:?}) removed routes from set \
                     {set:?}, but not the overall table"
                 );
                 TableModifyResult::SetChanged
             } else {
                 info!(
-                    "remove operation on routing table from set {set:?} \
+                    "remove operation on routing table (table={core_id:?}) from set {set:?} \
                      resulted in no change"
                 );
                 TableModifyResult::NoChange
@@ -319,7 +336,7 @@ impl<I: Ip> Table<I> {
         netstack3_core::routes::AddableEntry<I::Addr, DeviceId>,
         netstack3_core::routes::Generation,
     )> {
-        let Self { inner, next_generation: _, token: _, core_id: _ } = self;
+        let Self { inner, next_generation: _, token: _, core_id, name: _ } = self;
         let set = SetMembership::User(set);
         let mut removed_from_table = Vec::new();
         inner.retain(|route, data| {
@@ -331,10 +348,13 @@ impl<I: Ip> Table<I> {
             }
         });
 
-        info!("route set removal ({set:?}) removed {} routes:", removed_from_table.len());
+        info!(
+            "route set removal ({set:?}) removed {} routes from table ({core_id:?}):",
+            removed_from_table.len()
+        );
 
         for (route, generation) in &removed_from_table {
-            info!("  removed route {route:?} (generation {generation:?})");
+            info!("-- removed route {route:?} (generation={generation:?})");
         }
 
         removed_from_table
@@ -414,7 +434,7 @@ type RouteWorkReceivers<I> =
 
 pub(crate) struct State<I: Ip> {
     last_table_id: TableId<I>,
-    new_table_receiver: mpsc::UnboundedReceiver<NewTable<I>>,
+    table_work_receiver: mpsc::UnboundedReceiver<TableWorkItem<I>>,
     route_work_receivers: RouteWorkReceivers<I>,
     new_rule_set_receiver: mpsc::UnboundedReceiver<NewRuleSet<I>>,
     tables: HashMap<TableId<I>, Table<I>>,
@@ -425,7 +445,7 @@ pub(crate) struct State<I: Ip> {
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
 pub(crate) struct Changes<I: Ip> {
-    new_table_sink: mpsc::UnboundedSender<NewTable<I>>,
+    table_work_sink: mpsc::UnboundedSender<TableWorkItem<I>>,
     main_table_route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
     main_table_token: Arc<zx::Event>,
     new_rule_set_sink: mpsc::UnboundedSender<NewRuleSet<I>>,
@@ -434,12 +454,12 @@ pub(crate) struct Changes<I: Ip> {
 impl<I: Ip> Changes<I> {
     fn close_senders(&self) {
         let Self {
-            new_table_sink,
+            table_work_sink,
             main_table_route_work_sink,
             new_rule_set_sink,
             main_table_token: _,
         } = self;
-        new_table_sink.close_channel();
+        table_work_sink.close_channel();
         main_table_route_work_sink.close_channel();
         new_rule_set_sink.close_channel();
     }
@@ -452,7 +472,7 @@ where
 {
     pub(crate) async fn run_changes(&mut self, mut ctx: Ctx) {
         let State {
-            new_table_receiver,
+            table_work_receiver,
             route_work_receivers,
             new_rule_set_receiver,
             tables,
@@ -500,6 +520,7 @@ where
                             .expect("invalid table ID");
                         let core_id = assert_matches!(core_id,
                             CoreId::User(core_id) => core_id, "cannot remove main table");
+                        info!("Removing Route Table: {core_id:?}");
                         let weak = core_id.downgrade();
                         ctx.api().routes()
                             .remove_table(core_id)
@@ -526,15 +547,15 @@ where
                         route_work_receivers.push(rest.into_future());
                     }
                 },
-                new_table = new_table_receiver.next() => {
-                    let Some(new_table) = new_table else {
+                table_work = table_work_receiver.next() => {
+                    let Some(table_work) = table_work else {
                         continue;
                     };
                     Self::handle_table_op(
                         &mut ctx,
                         last_table_id,
                         tables,
-                        new_table,
+                        table_work,
                         route_work_receivers
                     )
                 },
@@ -630,11 +651,11 @@ where
         ctx: &mut Ctx,
         last_table_id: &mut TableId<I>,
         tables: &mut HashMap<TableId<I>, Table<I>>,
-        NewTable { op, responder }: NewTable<I>,
+        TableWorkItem { op }: TableWorkItem<I>,
         route_work_receivers: &mut RouteWorkReceivers<I>,
     ) {
         match op {
-            TableOp::AddTable(_marker) => {
+            TableOp::AddTable(AddTableOp { name, responder }) => {
                 let result = {
                     match last_table_id.next() {
                         // Never reuse table IDs, so the table IDs can only be
@@ -642,20 +663,41 @@ where
                         None => Err(TableIdOverflowsError),
                         Some(table_id) => {
                             let core_id = ctx.api().routes().new_table();
+                            let core_id = CoreId::User(core_id);
+                            info!("Adding Route Table: name={name:?} ({core_id:?})");
                             let new_table = Table::new(
                                 netstack3_core::routes::Generation::initial(),
-                                CoreId::User(core_id),
+                                core_id,
+                                name,
                             );
                             let token = new_table.token.clone();
                             assert_matches!(tables.insert(table_id, new_table), None);
                             *last_table_id = table_id;
                             let (route_work_sink, route_work_receiver) = mpsc::unbounded();
                             route_work_receivers.push(route_work_receiver.into_future());
-                            Ok(TableOpOutcome::Added { table_id, route_work_sink, token })
+                            Ok(AddTableOutcome { table_id, route_work_sink, token })
                         }
                     }
                 };
                 responder.send(result).expect("the receiver should still be alive");
+            }
+            TableOp::GetRouteTableName(GetRouteTableNameOp { table_id, responder }) => {
+                enum Outcome<'a> {
+                    Set(&'a String),
+                    Unset,
+                    NoTable,
+                }
+
+                let outcome = tables.get(&table_id).map_or(Outcome::NoTable, |table| {
+                    table.name.as_ref().map_or(Outcome::Unset, Outcome::Set)
+                });
+                responder
+                    .send(match outcome {
+                        Outcome::Set(name) => Ok(name),
+                        Outcome::Unset => Ok(""),
+                        Outcome::NoTable => Err(fnet_routes::StateGetRouteTableNameError::NoTable),
+                    })
+                    .unwrap_or_log("failed to respond");
             }
         }
     }
@@ -675,12 +717,15 @@ where
                 }
                 RuleOp::Add { priority, index, matcher, action } => {
                     rule_table.add_rule(priority, index, matcher.clone(), action)?;
+                    info!("Added PBR rule: {priority:?}, {index:?}, {matcher:?}, {action:?}");
                     itertools::Either::Right(std::iter::once(watcher::Update::Added(
                         InstalledRule { priority, index, matcher: matcher.into(), action },
                     )))
                 }
                 RuleOp::Remove { priority, index } => {
                     let removed = rule_table.remove_rule(priority, index)?;
+                    let InstalledRule { priority, index, matcher, action } = &removed;
+                    info!("Removed PBR rule: {priority:?}, {index:?}, {matcher:?}, {action:?}");
                     itertools::Either::Right(std::iter::once(watcher::Update::Removed(removed)))
                 }
             };
@@ -1059,11 +1104,21 @@ impl ChangeRunner {
 
 pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
     fn create<I: FidlRouteAdminIpExt>() -> (Changes<I>, State<I>) {
-        let (new_table_sink, new_table_receiver) = mpsc::unbounded();
+        let (table_work_sink, table_work_receiver) = mpsc::unbounded();
         let mut tables = HashMap::new();
         let main_table_id = main_table_id::<I>();
 
-        let main_table = Table::new(netstack3_core::routes::Generation::initial(), CoreId::Main);
+        let main_table = Table::new(
+            netstack3_core::routes::Generation::initial(),
+            CoreId::Main,
+            Some(format!(
+                "main_{}",
+                match I::VERSION {
+                    IpVersion::V4 => "v4",
+                    IpVersion::V6 => "v6",
+                }
+            )),
+        );
         let main_table_token = main_table.token.clone();
         assert_matches!(tables.insert(main_table_id, main_table), None);
 
@@ -1073,7 +1128,7 @@ pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
         let (new_rule_set_sink, new_rule_set_receiver) = mpsc::unbounded();
 
         let state = State {
-            new_table_receiver,
+            table_work_receiver,
             tables,
             rules: Default::default(),
             route_work_receivers,
@@ -1083,7 +1138,7 @@ pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
         };
         (
             Changes {
-                new_table_sink,
+                table_work_sink,
                 main_table_route_work_sink,
                 main_table_token,
                 new_rule_set_sink,
@@ -1135,24 +1190,20 @@ impl ChangeSink {
 
     pub(crate) async fn add_table<I: Ip>(
         &self,
+        name: Option<String>,
     ) -> Result<
         (TableId<I>, mpsc::UnboundedSender<RouteWorkItem<I>>, Arc<zx::Event>),
         TableIdOverflowsError,
     > {
-        let sender = &self.changes::<I>().new_table_sink;
+        let sender = &self.changes::<I>().table_work_sink;
         let (responder, receiver) = oneshot::channel();
-        let item = NewTable { op: TableOp::AddTable(IpVersionMarker::new()), responder };
+        let item = TableWorkItem { op: TableOp::AddTable(AddTableOp { name, responder }) };
         sender.unbounded_send(item).expect("change runner shut down before services are shut down");
-        receiver.map(|r| r.expect("responder should not be dropped")).await.map(|outcome| {
-            assert_matches!(
-                outcome,
-                TableOpOutcome::Added{
-                    table_id,
-                    route_work_sink,
-                    token,
-                } => (table_id, route_work_sink, token)
-            )
-        })
+        receiver.map(|r| r.expect("responder should not be dropped")).await.map(
+            |AddTableOutcome { table_id, route_work_sink, token }| {
+                (table_id, route_work_sink, token)
+            },
+        )
     }
 
     async fn new_rule_set<I: Ip>(
@@ -1196,6 +1247,19 @@ impl ChangeSink {
             })
             .expect("failed to send work item");
         receiver.await.expect("responder dropped").expect("failed to add the default rule");
+    }
+
+    pub(crate) fn get_route_table_name<I: Ip>(
+        &self,
+        table_id: TableId<I>,
+        responder: fnet_routes::StateGetRouteTableNameResponder,
+    ) {
+        self.changes::<I>()
+            .table_work_sink
+            .unbounded_send(TableWorkItem {
+                op: TableOp::GetRouteTableName(GetRouteTableNameOp { table_id, responder }),
+            })
+            .expect("failed to send work item");
     }
 
     fn changes<I: Ip>(&self) -> &Changes<I> {
@@ -1244,8 +1308,12 @@ mod tests {
         let if_id = test_stack.get_endpoint_id(1);
 
         let mut ctx = test_stack.ctx();
-        let (table_id, work_sink, _token) =
-            ctx.bindings_ctx().routes.add_table::<I>().await.expect("failed to add a new table");
+        let (table_id, work_sink, _token) = ctx
+            .bindings_ctx()
+            .routes
+            .add_table::<I>(None)
+            .await
+            .expect("failed to add a new table");
         let subnet = I::map_ip_out(
             (),
             |()| net_subnet_v4!("192.168.0.0/24"),
