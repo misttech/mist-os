@@ -355,7 +355,38 @@ fit::result<Errno> sys_fchmodat(const CurrentTask& current_task, FdNumber dir_fd
 
 fit::result<Errno, size_t> sys_getcwd(const CurrentTask& current_task,
                                       starnix_uapi::UserAddress buf, size_t size) {
-  return fit::error(errno(ENOTSUP));
+  auto root = current_task->fs()->root();
+  auto cwd = current_task->fs()->cwd();
+
+  auto user_cwd = [&]() -> BString {
+    auto path_result = cwd.path_from_root(root);
+    return ktl::visit(PathWithReachability::overloaded{
+                          [](const Reachable& r) { return r.path; },
+                          [](const Unreachable& u) {
+                            FsString combined;
+                            // combined.append("(unreachable)", 12);
+                            // combined.append(u.path);
+                            return combined;
+                          },
+                      },
+                      path_result.variant_);
+  }();
+
+  fbl::AllocChecker ac;
+  user_cwd.push('\0', &ac);
+  if (!ac.check()) {
+    return fit::error(errno(ENOMEM));
+  }
+
+  if (user_cwd.size() > size) {
+    return fit::error(errno(ERANGE));
+  }
+
+  _EP(current_task->write_memory(
+      buf, ktl::span<const uint8_t>(reinterpret_cast<const uint8_t*>(user_cwd.data()),
+                                    user_cwd.size())));
+
+  return fit::ok(user_cwd.size());
 }
 
 fit::result<Errno, FdNumber> sys_dup(const CurrentTask& current_task, FdNumber oldfd) {

@@ -59,6 +59,7 @@ enum class CheckAccessReason : uint8_t { Access, Chdir, Chroot, InternalPermissi
 class PathWithReachability {
  public:
   using Variant = ktl::variant<Reachable, Unreachable>;
+  Variant variant_;
 
   static PathWithReachability Reachable(FsString path) {
     struct Reachable r = {.path = ktl::move(path)};
@@ -78,7 +79,6 @@ class PathWithReachability {
                       variant_);
   }
 
- private:
   // Helpers from the reference documentation for std::visit<>, to allow
   // visit-by-overload of the std::variant<> returned by GetLastReference():
   template <class... Ts>
@@ -89,9 +89,8 @@ class PathWithReachability {
   template <class... Ts>
   overloaded(Ts...) -> overloaded<Ts...>;
 
+ private:
   explicit PathWithReachability(Variant variant) : variant_(ktl::move(variant)) {}
-
-  Variant variant_;
 };
 
 class ActiveNamespaceNode;
