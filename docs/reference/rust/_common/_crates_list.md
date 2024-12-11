@@ -117,7 +117,7 @@
     conforming to the Inspect API. This crate is the core library for writing
     inspect data in Rust components. For a comprehensive guide on how to start
     using `inspect`, please refer to the
-    [codelab](/docs//development/diagnostics/inspect/codelab/README.md).
+    [codelab](/docs//development/diagnostics/inspect/codelab.md).
 
 * [fuchsia_inspect_contrib](https://fuchsia-docs.firebaseapp.com/rust/fuchsia_inspect_contrib/index.html)
 

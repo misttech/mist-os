@@ -1,6 +1,77 @@
-# Inspect codelab
+# Codelab: Using Inspect
 
-This document contains the codelab for Inspect in C++ and Rust.
+In this codelab, you will learn to use the Inspect (Rust and C++) to publish
+diagnostic information from your programs, and use Inspect information to debug
+your programs.
+
+In this codelab, you're going to modify programs to output Inspect data.
+You will learn:
+
+* How to include the Inspect libraries.
+
+* How to initialize Inspect in your components.
+
+* How to solve real bugs by writing and reading Inspect data.
+
+* How to read Inspect data to verify that your program is doing what you want.
+
+## What is Inspect?
+
+Inspect allows Fuchsia Components to expose structured, hierarchical
+information about their current state.
+
+Learn more about Inspect in the
+[Fuchsia Component Inspection](/docs/development/diagnostics/inspect/README.md)
+documentation.
+
+### What benefits does Inspect provide?
+
+Component Inspection supports many use cases, including:
+
+* Debugging
+
+  View Inspect data from your running component to identify
+  problems. For example, you can learn if your component is currently
+  connected to a dependency.
+
+* Monitoring system health
+
+  Inspect data provides insight into overall system state. For example,
+  you can learn why your system is not connected to the internet.
+
+* Gathering usage or performance statistics
+
+  You can read Inspect data from multiple components at the same time
+  to understand system performance. For example, you can see the list
+  of incoming connections to your component along with your component's
+  memory usage.
+
+### What kind of information can I store in Inspect?
+
+You determine the structure and content of the data you expose in
+Inspect. Some examples include:
+
+* The number of open WiFi connections.
+* The number of requests that the program has served.
+* The number of errors that a parser has encountered.
+* The contents of a data structure.
+
+### API Reference
+
+* {C++}
+
+   [Inspect library documentation](/sdk/lib/inspect/component/cpp/component.h)
+
+* {Rust}
+
+   [fuchsia-inspect crate documentation](https://fuchsia-docs.firebaseapp.com/rust/fuchsia_inspect/index.html)
+
+## What you’ll need
+
+* Basic knowledge of Rust, or C++.
+* Access to a Fuchsia source tree you can execute build commands in.
+
+## Source code
 
 The code is available at:
 
@@ -14,9 +85,10 @@ and the code for each part contains the solution for the previous parts.
 * [C++ Part 1][cpp-part1]
 * [Rust Part 1][rust-part1]
 
-Note: For Rust we also have an ergonomic library with a higher level API:
-[fuchsia-inspect-derive][fuchsia-inspect-derive]. However, it's recommended to understand the
-concepts explained in this codelab before using that other library.
+Note: For Rust, there is also an ergonomic library with a higher level API:
+[fuchsia-inspect-derive][fuchsia-inspect-derive]. However, it's recommended to
+understand the concepts explained in this codelab before using that other
+library.
 
 When working on this codelab, you may continue adding your solutions to
 "part\_1", or you may skip around by building on the existing solutions.
@@ -38,7 +110,7 @@ to your `fx set` invocation:
 
    Note: Replace `core.x64` with your preferred product and board configuration.
 
-   ```
+   ```posix-terminal
    fx set core.x64 \
    --with //examples/diagnostics/inspect/codelab/cpp \
    --with //examples/diagnostics/inspect/codelab/cpp:tests
@@ -48,7 +120,7 @@ to your `fx set` invocation:
 
    Note: Replace `core.x64` with your preferred product and board configuration.
 
-   ```
+   ```posix-terminal
    fx set core.x64 \
    --with //examples/diagnostics/inspect/codelab/rust \
    --with //examples/diagnostics/inspect/codelab/rust:tests
@@ -83,13 +155,13 @@ command line arguments as strings to Reverse:
 
    * {C++}
 
-      ```
+      ```posix-terminal
       ffx component run /core/ffx-laboratory:client_part_2 fuchsia-pkg://fuchsia.com/inspect_cpp_codelab#meta/client_part_2.cm
       ```
 
    * {Rust}
 
-      ```
+      ```posix-terminal
       ffx component run /core/ffx-laboratory:client_part_2 fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/client_part_2.cm
       ```
 
@@ -101,13 +173,13 @@ command line arguments as strings to Reverse:
 
    * {C++}
 
-      ```
+      ```posix-terminal
       ffx component run /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_cpp_codelab#meta/client_part_1.cm
       ```
 
       To see the command output take a look at the logs:
 
-      ```
+      ```posix-terminal
       ffx log --tags inspect_cpp_codelab
       ```
 
@@ -115,13 +187,13 @@ command line arguments as strings to Reverse:
 
    * {Rust}
 
-      ```
+      ```posix-terminal
       ffx component run /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/client_part_1.cm
       ```
 
       To see the command output take a look at the logs:
 
-      ```
+      ```posix-terminal
       ffx log --tags inspect_rust_codelab
       ```
 
@@ -150,13 +222,13 @@ command line arguments as strings to Reverse:
 
    * {C++}
 
-      ```
+      ```posix-terminal
       ffx component run --recreate /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_cpp_codelab#meta/client_part_1.cm
       ```
 
    * {Rust}
 
-      ```
+      ```posix-terminal
       ffx component run --recreate /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/client_part_1.cm
       ```
 
@@ -389,7 +461,7 @@ Now that you have added Inspect to your component, you can read what it says:
 
 1. Rebuild and update the target system
 
-   ```
+   ```posix-terminal
    fx build && fx ota
    ```
 
@@ -397,21 +469,23 @@ Now that you have added Inspect to your component, you can read what it says:
 
    * {C++}
 
-      ```
+      ```posix-terminal
       ffx component run --recreate /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_cpp_codelab#meta/client_part_1.cm
+
       ffx log --tags inspect_cpp_codelab
       ```
 
    * {Rust}
 
-      ```
+      ```posix-terminal
       ffx component run --recreate /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/client_part_1.cm
+
       ffx log --tags inspect_rust_codelab
       ```
 
 3. Use `ffx inspect` to view your output:
 
-   ```
+   ```posix-terminal
    ffx inspect show
    ```
 
@@ -421,8 +495,8 @@ Now that you have added Inspect to your component, you can read what it says:
 
    * {C++}
 
-      ```
-      $ ffx inspect show 'core/ffx-laboratory\:client_part_1/reverser'
+      ```posix-terminal
+      ffx inspect show 'core/ffx-laboratory\:client_part_1/reverser'
       # or `ffx inspect show --component inspect_cpp_codelab`
       metadata:
         filename = fuchsia.inspect.Tree
@@ -435,8 +509,8 @@ Now that you have added Inspect to your component, you can read what it says:
 
    * {Rust}
 
-      ```
-      $ ffx inspect show 'core/ffx-laboratory\:client_part_1/reverser'
+      ```posix-terminal
+      ffx inspect show 'core/ffx-laboratory\:client_part_1/reverser'
       # or `ffx inspect show --component inspect_rust_codelab`
       metadata:
         filename = fuchsia.inspect.Tree
@@ -451,8 +525,13 @@ Now that you have added Inspect to your component, you can read what it says:
 
    * {C++}
 
+      ```posix-terminal
+      ffx --machine json-pretty inspect show 'core/ffx-laboratory\:client_part_1/reverser'
       ```
-      $ ffx --machine json-pretty inspect show 'core/ffx-laboratory\:client_part_1/reverser'
+
+      You should see an output like:
+
+      ```json5 {:.devsite-disable-click-to-copy}
       [
         {
           "data_source": "Inspect",
@@ -474,8 +553,13 @@ Now that you have added Inspect to your component, you can read what it says:
 
    * {Rust}
 
+      ```posix-terminal
+      ffx --machine json-pretty inspect show 'core/ffx-laboratory\:client_part_1/reverser'
       ```
-      $ ffx --machine json-pretty inspect show 'core/ffx-laboratory\:client_part_1/reverser'
+
+      You should see an output like:
+
+      ```json5 {:.devsite-disable-click-to-copy}
       [
         {
           "data_source": "Inspect",
@@ -579,19 +663,19 @@ is even being handled by your component.
 
    * {C++}
 
-      ```
-      $ ffx --machine json-pretty inspect show --component inspect_cpp_codelab
+      ```posix-terminal
+      ffx --machine json-pretty inspect show --component inspect_cpp_codelab
       ```
 
    * {Rust}
 
-      ```
-      $ ffx --machine json-pretty inspect show --component inspect_rust_codelab
+      ```posix-terminal
+      ffx --machine json-pretty inspect show --component inspect_rust_codelab
       ```
 
    You should now see:
 
-   ```
+   ```json5 {:.devsite-disable-click-to-copy}
    ...
    "payload": {
      "root": {
@@ -654,9 +738,10 @@ connections? The Reverser objects must share some state. You may find
 it helpful to refactor arguments to Reverser into a separate struct
 (See solution in [part 2](#part-2) for this approach).
 
-After completing this exercise and running `ffx inspect`, you should see something like this:
+After completing this exercise and running `ffx inspect`, you should see
+something like:
 
-```
+```json5 {:.devsite-disable-click-to-copy}
 ...
 "payload": {
   "root": {
@@ -703,8 +788,13 @@ The output above shows that the connection is still open and it received one req
 
    * {C++}
 
-      ```
+      ```posix-terminal
       ffx component run --recreate /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_cpp_codelab#meta/client_part_1.cm
+      ```
+
+      You should see an output like:
+
+      ```none {:.devsite-disable-click-to-copy}
       Creating component instance: client_part_1
 
       ffx log --tags inspect_cpp_codelab
@@ -717,8 +807,13 @@ The output above shows that the connection is still open and it received one req
 
    * {Rust}
 
-      ```
+      ```posix-terminal
       ffx component run --recreate /core/ffx-laboratory:client_part_1 fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/client_part_1.cm
+      ```
+
+      You should see an output like:
+
+      ```none {:.devsite-disable-click-to-copy}
       Creating component instance: client_part_1
 
       ffx log --tags inspect_rust_codelab
@@ -732,9 +827,9 @@ The output above shows that the connection is still open and it received one req
 The component continues to run until you execute `ffx component stop`. As long as the component runs
 you can run `ffx inspect` and observe your output.
 
-This concludes part 1. You may commit your changes so far:
+This concludes part 1. Optionally, you may commit your changes:
 
-```
+```posix-terminal
 git commit -am "solution to part 1"
 ```
 
@@ -765,13 +860,13 @@ If you see the logs, you will see that this log is never printed.
 
 * {C++}
 
-   ```cpp
+   ```posix-terminal
    ffx log --tags inspect_cpp_codelab
    ```
 
 * {Rust}
 
-   ```rust
+   ```posix-terminal
    ffx log --tags inspect_rust_codelab
    ```
 
@@ -785,21 +880,21 @@ You will need to diagnose and solve this problem.
 
    * {C++}
 
-      ```
+      ```posix-terminal
       ffx component run /core/ffx-laboratory:client_part_2 fuchsia-pkg://fuchsia.com/inspect_cpp_codelab#meta/client_part_2.cm
       ```
 
    * {Rust}
 
-      ```
+      ```posix-terminal
       ffx component run /core/ffx-laboratory:client_part_2 fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/client_part_2.cm
       ```
 
    Fortunately the FizzBuzz team instrumented their component using Inspect.
 
-2. Read the FizzBuzz Inspect data using `ffx inspect` as before, you get:
+2. Read the FizzBuzz Inspect data using `ffx inspect` as before, you should see:
 
-   ```
+   ```json5 {:.devsite-disable-click-to-copy}
    "payload": {
        "root": {
            "fizzbuzz_service": {
@@ -902,8 +997,13 @@ look at the logs:
 
 * {C++}
 
+   ```posix-terminal
+   ffx log --filter FizzBuzz
    ```
-   $ ffx log --filter FizzBuzz
+
+   You should see an output like:
+
+   ```none {:.devsite-disable-click-to-copy}
    ...
    ...  No capability available at path /svc/fuchsia.examples.inspect.FizzBuzz
    for component /core/ffx-laboratory:client_part_2/reverser, verify the
@@ -912,8 +1012,13 @@ look at the logs:
 
 * {Rust}
 
+   ```posix-terminal
+   ffx log --filter FizzBuzz
    ```
-   $ ffx log --filter FizzBuzz
+
+   You should see an output like:
+
+   ```none {:.devsite-disable-click-to-copy}
    ...
    ... No capability available at path /svc/fuchsia.examples.inspect.FizzBuzz
    for component /core/ffx-laboratory:client_part_2/reverser, verify the
@@ -931,8 +1036,9 @@ Looking at part2 meta, you can see it is missing the service:
 
 * {C++}
 
-    Add a `use` entry for `Fizzbuzz` to [part_2/meta][cpp-part2-meta]
-    ```
+    Add a `use` entry for `Fizzbuzz` to [part_2/meta][cpp-part2-meta]:
+
+    ```json5
     use: [
         { protocol: "fuchsia.examples.inspect.FizzBuzz" },
     ],
@@ -940,8 +1046,9 @@ Looking at part2 meta, you can see it is missing the service:
 
 * {Rust}
 
-    Add a `use` entry for `Fizzbuzz` to [part_2/meta][rust-part2-meta]
-    ```
+    Add a `use` entry for `Fizzbuzz` to [part_2/meta][rust-part2-meta]:
+
+    ```json5
     use: [
         { protocol: "fuchsia.examples.inspect.FizzBuzz" },
     ],
@@ -952,8 +1059,13 @@ and run again. You should now see FizzBuzz in the logs and an OK status:
 
 * {C++}
 
+   ```posix-terminal
+   ffx log --tags inspect_cpp_codelab
    ```
-   $ ffx log --tags inspect_cpp_codelab
+
+   You should see an output like:
+
+   ```none {:.devsite-disable-click-to-copy}
    [inspect_cpp_codelab, part2] INFO: main.cc(57): Got FizzBuzz: 1 2 Fizz
    4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz 16 17 Fizz 19 Buzz Fizz
    22 23 Fizz Buzz 26 Fizz 28 29 FizzBuzz
@@ -961,8 +1073,13 @@ and run again. You should now see FizzBuzz in the logs and an OK status:
 
 * {Rust}
 
+   ```posix-terminal
+   ffx log --tags inspect_rust_codelab
    ```
-   $ ffx log --tags inspect_rust_codelab
+
+   You should see an output like:
+
+   ```none {:.devsite-disable-click-to-copy}
    [inspect_rust_codelab, part2] INFO: main.rs(52): Got FizzBuzz: 1 2 Fizz
    4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz 16 17 Fizz 19 Buzz Fizz
    22 23 Fizz Buzz 26 Fizz 28 29 FizzBuzz
@@ -970,9 +1087,9 @@ and run again. You should now see FizzBuzz in the logs and an OK status:
 
 This concludes Part 2.
 
-You can now commit your solution:
+Optionally, you can now commit your solution:
 
-```
+```posix-terminal
 git commit -am "solution for part 2"
 ```
 
@@ -993,7 +1110,7 @@ Reverser has a basic unit test. Run it:
 
    The unit tests is located in [reverser\_unittests.cc][cpp-part3-unittest].
 
-   ```
+   ```posix-terminal
    fx test inspect_cpp_codelab_unittests
    ```
 
@@ -1001,7 +1118,7 @@ Reverser has a basic unit test. Run it:
 
    The unit test is located in [reverser.rs > mod tests][rust-part3-unittest].
 
-   ```
+   ```posix-terminal
    fx test inspect_rust_codelab_unittests
    ```
 
@@ -1106,12 +1223,11 @@ containing Inspect data and parses it into a readable hierarchy.
 
 This concludes Part 3.
 
-You may commit your changes:
+Optionally, you may commit your changes:
 
-```
+```posix-terminal
 git commit -am "solution to part 3"
 ```
-
 
 ## Part 4: Integration Testing for Inspect
 
@@ -1129,17 +1245,17 @@ You can run the integration tests for the codelab as follows:
 
 * {C++}
 
-   ```
-   $ fx test inspect_cpp_codelab_integration_tests
+   ```posix-terminal
+   fx test inspect_cpp_codelab_integration_tests
    ```
 
 * {Rust}
 
-   ```
-   $ fx test inspect_rust_codelab_integration_tests
+   ```posix-terminal
+   fx test inspect_rust_codelab_integration_tests
    ```
 
-Note: This runs integration tests for all parts of this codelab.
+This runs integration tests for all parts of this codelab.
 
 ### View the code
 
@@ -1155,19 +1271,20 @@ Look at how the integration test is setup:
 
      Find the component manifest (cml) in [part_4/meta][rust-part4-integration-meta]
 
+   You should see:
 
-```json5
-{
-   ...
-   use: [
-       { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
-   ]
-}
-```
+   ```json5
+   {
+      ...
+      use: [
+         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
+      ]
+   }
+   ```
 
-This file uses the protocol `fuchsia.diagnostics.ArchiveAccessor` from parent. This protocol
-is available to all tests to enable to read diagnostics about all components under the test
-realm.
+   This file uses the protocol `fuchsia.diagnostics.ArchiveAccessor` from
+   parent. This protocol is available to all tests to enable to read diagnostics
+   about all components under the test realm.
 
 2. Look at the integration test itself. The individual test cases are fairly straightforward:
 
@@ -1251,9 +1368,9 @@ Your integration test will now ensure your inspect output is correct.
 
 This concludes Part 4.
 
-You may commit your solution:
+Optionally, you may commit your solution:
 
-```
+```posix-terminal
 git commit -am "solution to part 4"
 ```
 
@@ -1267,7 +1384,6 @@ This section is under construction.
 
 [fidl-fizzbuzz]: /examples/diagnostics/inspect/codelab/fidl/fizzbuzz.test.fidl
 [fidl-reverser]: /examples/diagnostics/inspect/codelab/fidl/reverser.test.fidl
-
 [inspect-cpp-codelab]: /examples/diagnostics/inspect/codelab/cpp
 [cpp-common-cml]: /examples/diagnostics/inspect/codelab/cpp/client/meta/common.shard.cml
 [cpp-part1]: /examples/diagnostics/inspect/codelab/cpp/part_1
@@ -1280,7 +1396,6 @@ This section is under construction.
 [cpp-part3-unittest]: /examples/diagnostics/inspect/codelab/cpp/part_3/reverser_unittests.cc
 [cpp-part4-integration]: /examples/diagnostics/inspect/codelab/cpp/part_4/tests/integration_test.cc
 [cpp-part4-integration-meta]: /examples/diagnostics/inspect/codelab/cpp/part_4/meta/integration_test.cml
-
 [inspect-rust-codelab]: /examples/diagnostics/inspect/codelab/rust
 [rust-common-cml]: /examples/diagnostics/inspect/codelab/rust/client/meta/common.shard.cml
 [rust-part1]: /examples/diagnostics/inspect/codelab/rust/part_1
@@ -1292,5 +1407,4 @@ This section is under construction.
 [rust-part3-unittest]: /examples/diagnostics/inspect/codelab/rust/part_3/src/reverser.rs#99
 [rust-part4-integration]: /examples/diagnostics/inspect/codelab/rust/part_4/tests/integration_test.rs
 [rust-part4-integration-meta]: /examples/diagnostics/inspect/codelab/rust/part_4/meta/integration_test.cml
-
 [fuchsia-inspect-derive]: /docs/development/languages/rust/ergonomic_inspect.md

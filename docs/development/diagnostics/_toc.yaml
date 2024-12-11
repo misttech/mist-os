@@ -25,14 +25,10 @@ toc:
     path: /docs/development/diagnostics/inspect/health.md
   - title: "Rust libraries"
     path: /docs/development/diagnostics/inspect/rust.md
-  - title: "Inspect codelab"
-    section:
-    - title: "Overview"
-      path: /docs/development/diagnostics/inspect/codelab/README.md
-    - title: "Codelab"
-      path: /docs/development/diagnostics/inspect/codelab/codelab.md
   - title: "Using Inspect for drivers"
     path: /docs/development/drivers/diagnostics/inspect.md
+  - title: "Codelab: Using Inspect"
+    path: /docs/development/diagnostics/inspect/codelab.md
 - title: "Log"
   section:
   - title: "Overview"
