@@ -7,7 +7,7 @@ pub(super) mod superblock;
 pub(super) mod task;
 pub(super) mod testing;
 
-use super::FsNodeSecurityXattr;
+use super::{FsNodeSecurityXattr, PermissionFlags};
 use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
@@ -679,6 +679,80 @@ pub(super) fn check_fs_node_read_link_access(
         file_sid,
         CommonFilePermission::Read.for_class(file_class),
     )
+}
+
+/// Validates that the `current_task` has the permissions to access `fs_node`.
+pub fn fs_node_permission(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    permission_flags: PermissionFlags,
+) -> Result<(), Errno> {
+    let current_sid = current_task.security_state.lock().current_sid;
+    let file_sid = fs_node_effective_sid(fs_node);
+    let file_class = file_class_from_file_mode(fs_node.info().mode)?;
+    if permission_flags.contains(PermissionFlags::READ) {
+        todo_check_permission!(
+            TODO(
+                "https://fxbug.dev/380855359",
+                "Check read permission when calling fs_node_permission."
+            ),
+            &security_server.as_permission_check(),
+            current_sid,
+            file_sid,
+            CommonFilePermission::Read.for_class(file_class),
+        )?;
+    }
+
+    if permission_flags.contains(PermissionFlags::WRITE) {
+        todo_check_permission!(
+            TODO(
+                "https://fxbug.dev/380855359",
+                "Check write permission when calling fs_node_permission."
+            ),
+            &security_server.as_permission_check(),
+            current_sid,
+            file_sid,
+            CommonFilePermission::Write.for_class(file_class),
+        )?;
+    }
+
+    if permission_flags.contains(PermissionFlags::APPEND) {
+        check_permission(
+            &security_server.as_permission_check(),
+            current_sid,
+            file_sid,
+            CommonFilePermission::Append.for_class(file_class),
+        )?;
+    }
+
+    if permission_flags.contains(PermissionFlags::EXEC) {
+        if file_class == FileClass::Dir {
+            todo_check_permission!(
+                TODO(
+                    "https://fxbug.dev/380855359",
+                    "Check search permission when calling fs_node_permission."
+                ),
+                &security_server.as_permission_check(),
+                current_sid,
+                file_sid,
+                DirPermission::Search,
+            )?;
+        } else {
+            todo_check_permission!(
+                TODO(
+                    "https://fxbug.dev/380855359",
+                    "Check execute permission when calling fs_node_permission."
+                ),
+                &security_server.as_permission_check(),
+                current_sid,
+                file_sid,
+                CommonFilePermission::Execute.for_class(file_class),
+            )?;
+        }
+    }
+
+    Ok(())
 }
 
 pub(super) fn check_fs_node_setxattr_access(

@@ -5,6 +5,7 @@
 use crate::device::DeviceMode;
 use crate::mm::PAGE_SIZE;
 use crate::security;
+use crate::security::PermissionFlags;
 use crate::signals::{send_standard_signal, SignalInfo};
 use crate::task::{CurrentTask, EncryptionKeyId, Kernel, WaitQueue, Waiter};
 use crate::time::utc;
@@ -1382,6 +1383,16 @@ impl FsNode {
             let info = self.info();
             (info.mode, info.rdev)
         };
+
+        // `flags` doesn't contain any information about the EXEC permission. Instead the syscalls
+        // used to execute a file (`sys_execve` and `sys_execveat`) call `open()` with the EXEC
+        // permission request in `access`.
+        let permission_flags = if flags.contains(OpenFlags::APPEND) {
+            PermissionFlags::APPEND
+        } else {
+            PermissionFlags::empty()
+        };
+        security::fs_node_permission(current_task, self, permission_flags | access.into())?;
 
         match mode & FileMode::IFMT {
             FileMode::IFCHR => {
