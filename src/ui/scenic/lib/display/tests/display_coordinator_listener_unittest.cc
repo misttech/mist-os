@@ -82,7 +82,7 @@ TEST_F(DisplayCoordinatorListenerTest, OnDisplaysChanged) {
   fuchsia_hardware_display::Mode test_mode = {{
       .horizontal_resolution = 1024,
       .vertical_resolution = 800,
-      .refresh_rate_e2 = 60,
+      .refresh_rate_millihertz = 60'000,
       .flags = 0,
   }};
   fuchsia_hardware_display::Info test_display = {{

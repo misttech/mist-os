@@ -54,9 +54,9 @@ void Display::Dump() {
 
   printf("\n\tSupported display modes:\n");
   for (unsigned i = 0; i < modes_.size(); i++) {
-    printf("\t\t%d\t: %dx%d\t%d.%02d\n", i, modes_[i].horizontal_resolution,
-           modes_[i].vertical_resolution, modes_[i].refresh_rate_e2 / 100,
-           modes_[i].refresh_rate_e2 % 100);
+    printf("\t\t%d\t: %dx%d\t%d.%03d\n", i, modes_[i].horizontal_resolution,
+           modes_[i].vertical_resolution, modes_[i].refresh_rate_millihertz / 1000,
+           modes_[i].refresh_rate_millihertz % 1000);
   }
 
   printf("\n\t%s Physical dimension in millimeters:\n",

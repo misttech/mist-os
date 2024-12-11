@@ -404,24 +404,23 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   auto display_timing_it = std::find_if(
       display_timings.begin(), display_timings.end(),
       [&mode = request->mode](const display::DisplayTiming& timing) {
-        const int vertical_field_refresh_rate_centihertz =
-            (timing.vertical_field_refresh_rate_millihertz() + 5) / 10;
         if (timing.horizontal_active_px != static_cast<int32_t>(mode.horizontal_resolution)) {
           return false;
         }
         if (timing.vertical_active_lines != static_cast<int32_t>(mode.vertical_resolution)) {
           return false;
         }
-        if (vertical_field_refresh_rate_centihertz != static_cast<int32_t>(mode.refresh_rate_e2)) {
+        if (timing.vertical_field_refresh_rate_millihertz() !=
+            static_cast<int32_t>(mode.refresh_rate_millihertz)) {
           return false;
         }
         return true;
       });
 
   if (display_timing_it == display_timings.end()) {
-    FDF_LOG(ERROR, "Display mode not found: (%" PRIu32 " x %" PRIu32 ") @ %" PRIu32 " centihertz",
+    FDF_LOG(ERROR, "Display mode not found: (%" PRIu32 " x %" PRIu32 ") @ %" PRIu32 " millihertz",
             request->mode.horizontal_resolution, request->mode.vertical_resolution,
-            request->mode.refresh_rate_e2);
+            request->mode.refresh_rate_millihertz);
     return;
   }
 
@@ -1346,8 +1345,8 @@ void Client::OnDisplaysChanged(cpp20::span<const display::DisplayId> added_displ
       modes.emplace_back(fhd::wire::Mode{
           .horizontal_resolution = static_cast<uint32_t>(timing.horizontal_active_px),
           .vertical_resolution = static_cast<uint32_t>(timing.vertical_active_lines),
-          .refresh_rate_e2 =
-              static_cast<uint32_t>((timing.vertical_field_refresh_rate_millihertz() + 5) / 10),
+          .refresh_rate_millihertz =
+              static_cast<uint32_t>(timing.vertical_field_refresh_rate_millihertz()),
       });
     }
     modes_vector.emplace_back(std::move(modes));

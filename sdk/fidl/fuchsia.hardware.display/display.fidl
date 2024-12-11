@@ -29,10 +29,12 @@ type Mode = struct {
     /// user, for example due to corners or notches.
     vertical_resolution uint32;
 
-    /// Number of images transmitted to the display in 100 seconds.
+    /// Number of images transmitted to the display in 1,000 seconds.
     ///
-    /// This is the display's vertical refresh rate, in centihertz (0.01 Hz).
-    refresh_rate_e2 uint32;
+    /// This quantity is also known as the display's frame rate, or the
+    /// display's vertical refresh rate. The rate is measured in millihertz
+    /// (mHz).
+    refresh_rate_millihertz uint32;
 
     /// Bit field of mode attributes.
     ///

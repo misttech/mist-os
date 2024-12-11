@@ -705,7 +705,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
             } => {
                 duration!(c"gfx", c"DisplayDirectViewStrategy::OnVsync");
                 let vsync_interval = MonotonicDuration::from_nanos(
-                    100_000_000_000 / self.display.info.modes[0].refresh_rate_e2 as i64,
+                    1_000_000_000_000 / self.display.info.modes[0].refresh_rate_millihertz as i64,
                 );
                 self.handle_vsync_parameters_changed(
                     MonotonicInstant::from_nanos(timestamp as i64),

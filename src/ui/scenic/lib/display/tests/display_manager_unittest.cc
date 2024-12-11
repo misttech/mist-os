@@ -130,7 +130,7 @@ TEST_F(DisplayManagerMockTest, OnDisplayAdded) {
               fuchsia_hardware_display::Mode{{
                   .horizontal_resolution = kDisplayWidth,
                   .vertical_resolution = kDisplayHeight,
-                  .refresh_rate_e2 = kDisplayRefreshRateHz * 100,
+                  .refresh_rate_millihertz = kDisplayRefreshRateHz * 1'000,
               }},
           },
       .pixel_format = kSupportedPixelFormats,
@@ -161,12 +161,12 @@ TEST_F(DisplayManagerMockTest, SelectPreferredMode) {
   static const fuchsia_hardware_display::Mode kPreferredMode = {{
       .horizontal_resolution = 1024,
       .vertical_resolution = 768,
-      .refresh_rate_e2 = 60'00,
+      .refresh_rate_millihertz = 60'000,
   }};
   static const fuchsia_hardware_display::Mode kNonPreferredMode = {{
       .horizontal_resolution = 800,
       .vertical_resolution = 600,
-      .refresh_rate_e2 = 30'00,
+      .refresh_rate_millihertz = 30'000,
   }};
   static const std::vector<fuchsia_images2::PixelFormat> kSupportedPixelFormats = {
       fuchsia_images2::PixelFormat::kR8G8B8A8,
@@ -207,7 +207,7 @@ TEST_F(DisplayManagerMockTest, SelectPreferredMode) {
   EXPECT_EQ(default_display->width_in_px(), kPreferredMode.horizontal_resolution());
   EXPECT_EQ(default_display->height_in_px(), kPreferredMode.vertical_resolution());
   EXPECT_EQ(default_display->maximum_refresh_rate_in_millihertz(),
-            kPreferredMode.refresh_rate_e2() * 10);
+            kPreferredMode.refresh_rate_millihertz());
 }
 
 TEST(DisplayManager, ICanHazDisplayMode) {
@@ -215,12 +215,12 @@ TEST(DisplayManager, ICanHazDisplayMode) {
   static const fuchsia_hardware_display::Mode kPreferredMode = {{
       .horizontal_resolution = 1024,
       .vertical_resolution = 768,
-      .refresh_rate_e2 = 60'00,
+      .refresh_rate_millihertz = 60'000,
   }};
   static const fuchsia_hardware_display::Mode kNonPreferredButSelectedMode = {{
       .horizontal_resolution = 800,
       .vertical_resolution = 600,
-      .refresh_rate_e2 = 30'00,
+      .refresh_rate_millihertz = 30'000,
   }};
   static const std::vector<fuchsia_images2::PixelFormat> kSupportedPixelFormats = {
       fuchsia_images2::PixelFormat::kR8G8B8A8,
@@ -269,7 +269,7 @@ TEST(DisplayManager, ICanHazDisplayMode) {
   EXPECT_EQ(default_display->width_in_px(), kNonPreferredButSelectedMode.horizontal_resolution());
   EXPECT_EQ(default_display->height_in_px(), kNonPreferredButSelectedMode.vertical_resolution());
   EXPECT_EQ(default_display->maximum_refresh_rate_in_millihertz(),
-            kNonPreferredButSelectedMode.refresh_rate_e2() * 10);
+            kNonPreferredButSelectedMode.refresh_rate_millihertz());
 }
 
 TEST(DisplayManager, DisplayModeConstraintsHorizontalResolution) {
@@ -281,12 +281,12 @@ TEST(DisplayManager, DisplayModeConstraintsHorizontalResolution) {
   static const fuchsia_hardware_display::Mode kModeNotSatisfyingConstraints = {{
       .horizontal_resolution = 1024,
       .vertical_resolution = 768,
-      .refresh_rate_e2 = 60'00,
+      .refresh_rate_millihertz = 60'000,
   }};
   static const fuchsia_hardware_display::Mode kModeSatisfyingConstraints = {{
       .horizontal_resolution = 800,
       .vertical_resolution = 600,
-      .refresh_rate_e2 = 30'00,
+      .refresh_rate_millihertz = 30'000,
   }};
   static const std::vector<fuchsia_images2::PixelFormat> kSupportedPixelFormats = {
       fuchsia_images2::PixelFormat::kR8G8B8A8,
@@ -336,7 +336,7 @@ TEST(DisplayManager, DisplayModeConstraintsHorizontalResolution) {
   EXPECT_EQ(default_display->width_in_px(), kModeSatisfyingConstraints.horizontal_resolution());
   EXPECT_EQ(default_display->height_in_px(), kModeSatisfyingConstraints.vertical_resolution());
   EXPECT_EQ(default_display->maximum_refresh_rate_in_millihertz(),
-            kModeSatisfyingConstraints.refresh_rate_e2() * 10);
+            kModeSatisfyingConstraints.refresh_rate_millihertz());
 }
 
 TEST(DisplayManager, DisplayModeConstraintsVerticalResolution) {
@@ -348,12 +348,12 @@ TEST(DisplayManager, DisplayModeConstraintsVerticalResolution) {
   static const fuchsia_hardware_display::Mode kModeNotSatisfyingConstraints = {{
       .horizontal_resolution = 1024,
       .vertical_resolution = 768,
-      .refresh_rate_e2 = 60'00,
+      .refresh_rate_millihertz = 60'000,
   }};
   static const fuchsia_hardware_display::Mode kModeSatisfyingConstraints = {{
       .horizontal_resolution = 800,
       .vertical_resolution = 600,
-      .refresh_rate_e2 = 30'00,
+      .refresh_rate_millihertz = 30'000,
   }};
   static const std::vector<fuchsia_images2::PixelFormat> kSupportedPixelFormats = {
       fuchsia_images2::PixelFormat::kR8G8B8A8,
@@ -403,7 +403,7 @@ TEST(DisplayManager, DisplayModeConstraintsVerticalResolution) {
   EXPECT_EQ(default_display->width_in_px(), kModeSatisfyingConstraints.horizontal_resolution());
   EXPECT_EQ(default_display->height_in_px(), kModeSatisfyingConstraints.vertical_resolution());
   EXPECT_EQ(default_display->maximum_refresh_rate_in_millihertz(),
-            kModeSatisfyingConstraints.refresh_rate_e2() * 10);
+            kModeSatisfyingConstraints.refresh_rate_millihertz());
 }
 
 TEST(DisplayManager, DisplayModeConstraintsRefreshRateLimit) {
@@ -415,12 +415,12 @@ TEST(DisplayManager, DisplayModeConstraintsRefreshRateLimit) {
   static const fuchsia_hardware_display::Mode kModeNotSatisfyingConstraints = {{
       .horizontal_resolution = 1024,
       .vertical_resolution = 768,
-      .refresh_rate_e2 = 60'00,
+      .refresh_rate_millihertz = 60'000,
   }};
   static const fuchsia_hardware_display::Mode kModeSatisfyingConstraints = {{
       .horizontal_resolution = 800,
       .vertical_resolution = 600,
-      .refresh_rate_e2 = 30'00,
+      .refresh_rate_millihertz = 30'000,
   }};
   static const std::vector<fuchsia_images2::PixelFormat> kSupportedPixelFormats = {
       fuchsia_images2::PixelFormat::kR8G8B8A8,
@@ -470,7 +470,7 @@ TEST(DisplayManager, DisplayModeConstraintsRefreshRateLimit) {
   EXPECT_EQ(default_display->width_in_px(), kModeSatisfyingConstraints.horizontal_resolution());
   EXPECT_EQ(default_display->height_in_px(), kModeSatisfyingConstraints.vertical_resolution());
   EXPECT_EQ(default_display->maximum_refresh_rate_in_millihertz(),
-            kModeSatisfyingConstraints.refresh_rate_e2() * 10);
+            kModeSatisfyingConstraints.refresh_rate_millihertz());
 }
 
 TEST(DisplayManager, DisplayModeConstraintsOverriddenByModeIndex) {
@@ -482,17 +482,17 @@ TEST(DisplayManager, DisplayModeConstraintsOverriddenByModeIndex) {
   static const fuchsia_hardware_display::Mode kModeNotSatisfyingConstraints = {{
       .horizontal_resolution = 1024,
       .vertical_resolution = 768,
-      .refresh_rate_e2 = 60'00,
+      .refresh_rate_millihertz = 60'000,
   }};
   static const fuchsia_hardware_display::Mode kModeSatisfyingConstraints = {{
       .horizontal_resolution = 800,
       .vertical_resolution = 600,
-      .refresh_rate_e2 = 30'00,
+      .refresh_rate_millihertz = 30'000,
   }};
   static const fuchsia_hardware_display::Mode kModeOverridden = {{
       .horizontal_resolution = 1280,
       .vertical_resolution = 960,
-      .refresh_rate_e2 = 30'00,
+      .refresh_rate_millihertz = 30'000,
   }};
   static const std::vector<fuchsia_images2::PixelFormat> kSupportedPixelFormats = {
       fuchsia_images2::PixelFormat::kR8G8B8A8,
@@ -543,7 +543,7 @@ TEST(DisplayManager, DisplayModeConstraintsOverriddenByModeIndex) {
   EXPECT_EQ(default_display->width_in_px(), kModeOverridden.horizontal_resolution());
   EXPECT_EQ(default_display->height_in_px(), kModeOverridden.vertical_resolution());
   EXPECT_EQ(default_display->maximum_refresh_rate_in_millihertz(),
-            kModeOverridden.refresh_rate_e2() * 10);
+            kModeOverridden.refresh_rate_millihertz());
 }
 
 }  // namespace
