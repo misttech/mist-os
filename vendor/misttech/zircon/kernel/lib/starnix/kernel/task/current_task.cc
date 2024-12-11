@@ -604,7 +604,7 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
     self.notify_robust_list();
   */
 
-  auto exec_result = (*this)->mm()->exec(resolved_elf.file->name_);
+  auto exec_result = (*this)->mm()->exec(resolved_elf.file->name_.to_passive());
   if (exec_result.is_error()) {
     fit::error(errno(from_status_like_fdio(exec_result.error_value())));
   }
@@ -686,7 +686,13 @@ mtl::WeakPtr<Task> CurrentTask::weak_task() const {
   return task_->weak_factory_.GetWeakPtr();
 }
 
-void CurrentTask::set_creds(Credentials creds) const {}
+void CurrentTask::set_creds(Credentials creds) const {
+  task_->persistent_info_->Lock()->creds_mut() = creds;
+  // The /proc/pid directory's ownership is updated when the task's euid
+  // or egid changes. See proc(5).
+  // auto state = task_->proc_pid_directory_cache_.Lock();
+  // TaskDirectory::maybe_force_chown(this, &state, &task_->persistent_info_->Lock()->creds());
+}
 
 void CurrentTask::release() {
   LTRACE_ENTRY_OBJ;
@@ -759,7 +765,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
     //
     // See https://man7.org/linux/man-pages/man2/open.2.html
     auto result = task_->files_.get_allowing_opath(dir_fd) _EP(result);
-    return fit::ok(result.value()->name_);
+    return fit::ok(result.value()->name_.to_passive());
   }() _EP(dir_result);
   auto dir = dir_result.value();
 
@@ -767,7 +773,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
     if (!dir.entry_->node_->is_dir()) {
       return fit::error(errno(ENOTDIR));
     }
-    _EP(dir.check_access(*this, Access(Access::EnumType::EXEC)));
+    _EP(dir.check_access(*this, Access(AccessEnum::EXEC), CheckAccessReason::InternalPermissionChecks));
   }
 
   return fit::ok(ktl::pair(dir, path));
@@ -970,7 +976,7 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
       return name.create_tmpfile(*this, mode.with_type(FileMode::IFREG), local_flags);
     }
 
-    auto local_mode = name.entry_->node_->info()->mode;
+    auto local_mode = name.entry_->node_->info()->mode_;
 
     // These checks are not needed in the `O_TMPFILE` case because `mode` refers to the
     // file we are opening. With `O_TMPFILE`, that file is the regular file we just

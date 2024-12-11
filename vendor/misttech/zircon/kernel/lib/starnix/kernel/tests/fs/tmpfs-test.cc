@@ -156,9 +156,9 @@ bool test_data() {
   EXPECT_TRUE(fs.is_ok(), "new_fs");
 
   auto info = fs.value()->root()->node_->info();
-  ASSERT_TRUE(FILE_MODE(IFDIR, 0123) == info->mode);
-  ASSERT_TRUE(42 == info->uid);
-  ASSERT_TRUE(84 == info->gid);
+  ASSERT_TRUE(FILE_MODE(IFDIR, 0123) == info->mode_);
+  ASSERT_TRUE(42 == info->uid_);
+  ASSERT_TRUE(84 == info->gid_);
 
   END_TEST;
 }

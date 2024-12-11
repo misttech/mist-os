@@ -7,6 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/arch/x86_64.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/arch/x64/registers.h>
 #include <lib/mistos/starnix/kernel/execution/executor.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
@@ -23,7 +24,6 @@
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/num.h>
-#include <lib/mistos/memory/weak_ptr.h>
 #include <trace.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -43,8 +43,6 @@
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
-using namespace starnix_syscalls;
-
 namespace {
 
 using starnix_uapi::UserAddress;
@@ -52,7 +50,7 @@ using starnix_uapi::UserCString;
 using starnix_uapi::UserRef;
 
 mtl::WeakPtr<starnix::Task> get_task_or_current(const starnix::CurrentTask& current_task,
-                                                 pid_t pid) {
+                                                pid_t pid) {
   if (pid == 0) {
     return current_task.weak_task();
   }
@@ -80,7 +78,7 @@ fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args 
 
   // Store the register state in the current task.
   ::zx_thread_state_general_regs_t regs;
-  arch_get_general_regs_mistos(Thread::Current().Get(), &regs);
+  arch_get_general_regs_mistos(Thread::Current::Get(), &regs);
   current_task.thread_state().registers = RegisterState::From(regs);
 
   auto task_builder = current_task.clone_task(
@@ -153,9 +151,8 @@ fit::result<Errno, ktl::pair<fbl::Vector<FsString>, size_t>> read_c_string_vecto
       auto e = string.error_value();
       if (e == errno(ENAMETOOLONG)) {
         return fit::error(errno(E2BIG));
-      } else {
-        return fit::error(e);
       }
+      return fit::error(e);
     }
     // Plus one to consider the null terminated
     auto add_value = mtl::checked_add(vec_size, string->size() + 1);
@@ -279,14 +276,10 @@ fit::result<Errno> sys_execveat(CurrentTask& current_task, FdNumber dir_fd, User
       //
       // See https://man7.org/linux/man-pages/man3/fexecve.3.html#DESCRIPTION
       // file->name()
-      return file->name_.open(current_task,
-                              starnix_uapi::OpenFlags(starnix_uapi::OpenFlagsEnum::RDONLY),
-                              /* AccessCheck::check_for(Access::EXEC)*/ true);
-    } else {
-      return current_task.open_file_at(
-          dir_fd, *path, open_flags, FileMode(),
-          ResolveFlags::empty() /*, AccessCheck::check_for(Access::EXEC)*/);
+      return file->name_->open(current_task,
+                               starnix_uapi::OpenFlags(starnix_uapi::OpenFlagsEnum::RDONLY), true);
     }
+    return current_task.open_file_at(dir_fd, *path, open_flags, FileMode(), ResolveFlags::empty());
   }() _EP(executable);
 
   // This path can affect script resolution (the path is appended to the script args)
@@ -296,28 +289,26 @@ fit::result<Errno> sys_execveat(CurrentTask& current_task, FdNumber dir_fd, User
       // The file descriptor is CWD, so the path is exactly
       // what the user specified.
       return path.value();
-    } else {
-      // The path is `/dev/fd/N/P` where N is the file descriptor
-      // number and P is the user-provided path (if relative and non-empty).
-      //
-      // See https://man7.org/linux/man-pages/man2/execveat.2.html#NOTES
-      if (path->empty()) {
-        // User-provided path is empty
-        // None => format!("/dev/fd/{}", dir_fd.raw()).into_bytes(),
+    }
+    // The path is `/dev/fd/N/P` where N is the file descriptor
+    // number and P is the user-provided path (if relative and non-empty).
+    //
+    // See https://man7.org/linux/man-pages/man2/execveat.2.html#NOTES
+    if (path->empty()) {
+      // User-provided path is empty
+      return mtl::format("/dev/fd/%d", dir_fd.raw());
+    }
+    switch (path.value()[0]) {
+      case '/': {
+        // The user-provided path is absolute, so dir_fd is ignored.
+        return path.value();
       }
-      switch (path.value()[0]) {
-        case '/': {
-          // The user-provided path is absolute, so dir_fd is ignored.
-          return path.value();
-        }
-        default: {
-          // User-provided path is relative, append it.
-          // let mut new_path = format!("/dev/fd/{}/", dir_fd.raw()).into_bytes();
-          // new_path.append(&mut path.to_vec());
-          // new_path
-        }
+      default: {
+        // User-provided path is relative, append it.
+        auto str = path.value();
+        return mtl::format("/dev/fd/%d/%.*s", dir_fd.raw(), static_cast<int>(str.size()),
+                           str.data());
       }
-      return BString();
     }
   }();
 
@@ -353,19 +344,19 @@ fit::result<Errno, pid_t> sys_getpgid(const CurrentTask& current_task, pid_t pid
 }
 
 fit::result<Errno, uid_t> sys_getuid(const CurrentTask& current_task) {
-  return fit::ok(current_task->creds().uid);
+  return fit::ok(current_task->creds().uid_);
 }
 
 fit::result<Errno, uid_t> sys_getgid(const CurrentTask& current_task) {
-  return fit::ok(current_task->creds().gid);
+  return fit::ok(current_task->creds().gid_);
 }
 
 fit::result<Errno, uid_t> sys_geteuid(const CurrentTask& current_task) {
-  return fit::ok(current_task->creds().euid);
+  return fit::ok(current_task->creds().euid_);
 }
 
 fit::result<Errno, uid_t> sys_getegid(const CurrentTask& current_task) {
-  return fit::ok(current_task->creds().egid);
+  return fit::ok(current_task->creds().egid_);
 }
 
 fit::result<Errno> sys_exit(const CurrentTask& current_task, uint32_t code) {
@@ -383,9 +374,10 @@ fit::result<Errno> sys_exit_group(CurrentTask& current_task, uint32_t code) {
   __UNREACHABLE;
 }
 
-fit::result<Errno, SyscallResult> sys_prctl(const CurrentTask& current_task, int option,
-                                            uint64_t arg2, uint64_t arg3, uint64_t arg4,
-                                            uint64_t arg5) {
+fit::result<Errno, starnix_syscalls::SyscallResult> sys_prctl(const CurrentTask& current_task,
+                                                              int option, uint64_t arg2,
+                                                              uint64_t arg3, uint64_t arg4,
+                                                              uint64_t arg5) {
   switch (option) {
     case PR_SET_VMA: {
       if (arg2 != PR_SET_VMA_ANON_NAME) {
@@ -403,12 +395,9 @@ fit::result<Errno, SyscallResult> sys_prctl(const CurrentTask& current_task, int
           // An overly long name produces EINVAL and not ENAMETOOLONG in Linux 5.15.
           if (e == errno(ENAMETOOLONG)) {
             return errno(EINVAL);
-          } else {
-            return e;
           }
-        });
-        if (name_or_error.is_error())
-          return name_or_error.take_error();
+          return e;
+        }) _EP(name_or_error);
 
         auto fname = name_or_error.value();
         if (ktl::any_of(fname.begin(), fname.end(), [](uint8_t b) {
@@ -419,9 +408,7 @@ fit::result<Errno, SyscallResult> sys_prctl(const CurrentTask& current_task, int
         }
         name = fname;
       }
-      auto result = current_task->mm()->set_mapping_name(addr, length, name);
-      if (result.is_error())
-        return result.take_error();
+      _EP(current_task->mm()->set_mapping_name(addr, length, name));
       return fit::ok(starnix_syscalls::SUCCESS);
     }
     // case PR_SET_NAME:

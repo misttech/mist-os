@@ -4,18 +4,27 @@
 // found in the LICENSE file.
 
 #include <lib/mistos/starnix_uapi/file_mode.h>
+#include <lib/unittest/unittest.h>
 
-#include <zxtest/zxtest.h>
-
-using namespace starnix_uapi;
-
+namespace unit_testing {
 namespace {
 
-TEST(FileMode, test_file_mode_from_string) {
-  ASSERT_EQ(FileMode(0123), FileMode::from_string("0123").value());
+using starnix_uapi::FileMode;
+
+bool test_file_mode_from_string() {
+  BEGIN_TEST;
+
+  ASSERT_EQ(FileMode(0123).bits(), FileMode::from_string("0123").value().bits());
   ASSERT_TRUE(FileMode::from_string("123").is_error());
   ASSERT_TRUE(FileMode::from_string("\x80").is_error());
   ASSERT_TRUE(FileMode::from_string("0999").is_error());
+
+  END_TEST;
 }
 
 }  // namespace
+}  // namespace unit_testing
+
+UNITTEST_START_TESTCASE(starnix_uapi_filemode)
+UNITTEST("test file mode from string", unit_testing::test_file_mode_from_string)
+UNITTEST_END_TESTCASE(starnix_uapi_filemode, "starnix_uapi_filemode", "Tests File Mode")

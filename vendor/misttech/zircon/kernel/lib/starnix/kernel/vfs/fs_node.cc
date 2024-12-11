@@ -28,6 +28,13 @@
 
 #include "../kernel_priv.h"
 
+namespace ktl {
+
+using std::addressof;
+using std::destroy_at;
+
+}  // namespace ktl
+
 #include <ktl/enforce.h>
 
 #include <linux/errno.h>
@@ -35,6 +42,9 @@
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
+
+using starnix_uapi::Access;
+using starnix_uapi::AccessEnum;
 
 FsNode* FsNode::new_root(FsNodeOps* ops) {
   return FsNode::new_root_with_properties(ops, [](FsNodeInfo& info) {});
@@ -135,7 +145,7 @@ fit::result<Errno, ktl::unique_ptr<FileOps>> FsNode::open(const CurrentTask& cur
 
   auto [mode, rdev] = [&]() -> auto {
     auto info = this->info();
-    return ktl::pair(info->mode, info->rdev);
+    return ktl::pair(info->mode_, info->rdev_);
   }();
 
   auto fmt_mode = (mode & FileMode::IFMT);
@@ -194,6 +204,30 @@ fit::result<Errno, SymlinkTarget> FsNode::readlink(const CurrentTask& current_ta
   return ops_->readlink(*this, current_task);
 }
 
+fit::result<Errno> FsNode::default_check_access_impl(
+    const CurrentTask& current_task, Access access,
+    starnix_sync::RwLockGuard<FsNodeInfo, BrwLockPi::Reader> info) {
+  auto [node_uid, node_gid, mode] = ktl::tuple(info->uid_, info->gid_, info->mode_);
+  ktl::destroy_at(ktl::addressof(info));
+  return current_task->creds().check_access(access, node_uid, node_gid, mode);
+}
+
+/// Check whether the node can be accessed in the current context with the specified access
+/// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
+/// owner or is in the file's group.
+fit::result<Errno> FsNode::check_access(const CurrentTask& current_task, const MountInfo& mount,
+                                        Access access, CheckAccessReason reason) const {
+  if (access.contains(AccessEnum::WRITE)) {
+    _EP(mount.check_readonly_filesystem());
+  }
+
+  if (access.contains(AccessEnum::EXEC) && !is_dir()) {
+    _EP(mount.check_noexec_filesystem());
+  }
+
+  return ops_->check_access(*this, current_task, access, info_, reason);
+}
+
 fit::result<Errno, struct stat> FsNode::stat(const CurrentTask& current_task) const {
   auto result = fetch_and_refresh_info(current_task) _EP(result);
   auto info = result.value();
@@ -213,15 +247,15 @@ fit::result<Errno, struct stat> FsNode::stat(const CurrentTask& current_task) co
 
   return fit::ok<struct stat>({
       //.st_dev =
-      .st_ino = info.ino,
-      .st_nlink = static_cast<__kernel_ulong_t>(info.link_count),
-      .st_mode = info.mode.bits(),
-      .st_uid = info.uid,
-      .st_gid = info.gid,
-      .st_rdev = info.rdev.bits(),
-      .st_size = static_cast<__kernel_long_t>(info.size),
-      .st_blksize = static_cast<__kernel_long_t>(info.blksize),
-      .st_blocks = static_cast<__kernel_long_t>(info.blocks),
+      .st_ino = info.ino_,
+      .st_nlink = static_cast<__kernel_ulong_t>(info.link_count_),
+      .st_mode = info.mode_.bits(),
+      .st_uid = info.uid_,
+      .st_gid = info.gid_,
+      .st_rdev = info.rdev_.bits(),
+      .st_size = static_cast<__kernel_long_t>(info.size_),
+      .st_blksize = static_cast<__kernel_long_t>(info.blksize_),
+      .st_blocks = static_cast<__kernel_long_t>(info.blocks_),
   });
 }
 

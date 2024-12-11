@@ -15,6 +15,22 @@
 
 #define LOCAL_TRACE MISTOS_SYSCALLS_GLOBAL_TRACE(0)
 
+int64_t sys_a0080_chdir(user_in_ptr<const char> filename) {
+  LTRACEF_LEVEL(2, "filename=%p\n", filename.get());
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(
+      starnix::sys_chdir, current_task,
+      starnix_uapi::UserCString::New(UserAddress::from_ptr((zx_vaddr_t)filename.get())));
+}
+
+int64_t sys_a0161_chroot(user_in_ptr<const char> filename) {
+  LTRACEF_LEVEL(2, "filename=%p\n", filename.get());
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(
+      starnix::sys_chroot, current_task,
+      starnix_uapi::UserCString::New(UserAddress::from_ptr((zx_vaddr_t)filename.get())));
+}
+
 int64_t sys_a0257_openat(int32_t dfd, user_in_ptr<const char> filename, int32_t flags,
                          uint16_t mode) {
   LTRACEF_LEVEL(2, "dfd=%d path=%p flags=%x mode=%x\n", dfd, filename.get(), flags, mode);

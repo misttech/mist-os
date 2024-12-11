@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_FILE_MODE_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_FILE_MODE_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_FILE_MODE_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_FILE_MODE_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
@@ -31,6 +31,22 @@ class FileMode {
   static const FileMode IFBLK;
   static const FileMode IFIFO;
   static const FileMode IFSOCK;
+
+  static const FileMode ISUID;
+  static const FileMode ISGID;
+  static const FileMode ISVTX;
+  static const FileMode IRWXU;
+  static const FileMode IRUSR;
+  static const FileMode IWUSR;
+  static const FileMode IXUSR;
+  static const FileMode IRWXG;
+  static const FileMode IRGRP;
+  static const FileMode IWGRP;
+  static const FileMode IXGRP;
+  static const FileMode IRWXO;
+  static const FileMode IROTH;
+  static const FileMode IWOTH;
+  static const FileMode IXOTH;
 
   static const FileMode IFMT;
 
@@ -86,8 +102,12 @@ class FileMode {
   bool operator==(const FileMode& other) const { return mode_ == other.mode_; }
 
   FileMode operator&(const FileMode& other) const { return mode_ & other.mode_; }
+  FileMode& operator&=(const FileMode& other) {
+    mode_ &= other.mode_;
+    return *this;
+  }
   FileMode operator|(const FileMode& other) const { return mode_ | other.mode_; }
-  FileMode operator!() const { return ~mode_; }
+  FileMode operator~() const { return ~mode_; }
 
  private:
   uint32_t mode_;
@@ -100,7 +120,6 @@ enum class AccessEnum : uint32_t {
   EXEC = 1,
   WRITE = 2,
   READ = 4,
-  NOATIME = 8,
 
   // Access mask is the part of access related to the file access mode. It is
   // exec/write/read.
@@ -113,30 +132,36 @@ class Access : public AccessFlags {
  public:
   explicit Access(AccessFlags flag) : AccessFlags(flag) {}
   explicit Access(AccessEnum value) : AccessFlags(value) {}
-#if 0
+
   static Access from_open_flags(OpenFlags flags) {
-    switch(flags & OpenFlags::EnumType::ACCESS_MASK){
+    auto access_mask = flags & OpenFlagsEnum::ACCESS_MASK;
+    if (access_mask.to_enum() == OpenFlagsEnum::RDONLY) {
+      return Access(AccessEnum::READ);
+    } else if (access_mask.to_enum() == OpenFlagsEnum::WRONLY) {
+      return Access(AccessEnum::WRITE);
+    } else if (access_mask.to_enum() == OpenFlagsEnum::RDWR) {
+      return Access(Access(AccessEnum::READ) | Access(AccessEnum::WRITE));
 
+    } else {
+      // Nonstandard access modes can be opened but will fail to read or write
+      return Access(AccessEnum::EXIST);
     }
-    /*
-    let base_flags = match flags & OpenFlags::ACCESS_MASK {
-                OpenFlags::RDONLY => Self::READ,
-                OpenFlags::WRONLY => Self::WRITE,
-                OpenFlags::RDWR => Self::READ | Self::WRITE,
-                _ => Self::EXIST, // Nonstandard access modes can be opened but will fail to read or write.
-            };
-            let noatime =
-                if flags.contains(OpenFlags::NOATIME) { Access::NOATIME } else { Access::empty() };
-
-            base_flags | noatime
-    */
   }
-#endif
+
+  // impl Access
+  static Access rwx() {
+    return Access(Access(AccessEnum::EXEC) | Access(AccessEnum::WRITE) | Access(AccessEnum::READ));
+  }
+
+  bool is_nontrivial() const { return *this != Access(AccessEnum::EXIST); }
+
+  uint32_t rwx_bits() const { return bits() & Access(AccessEnum::ACCESS_MASK).bits(); }
 };
 
 }  // namespace inner_access
 
 using Access = inner_access::Access;
+using AccessEnum = inner_access::AccessEnum;
 
 }  // namespace starnix_uapi
 
@@ -147,7 +172,6 @@ constexpr Flag<starnix_uapi::inner_access::AccessEnum>
         {starnix_uapi::inner_access::AccessEnum::EXEC},
         {starnix_uapi::inner_access::AccessEnum::WRITE},
         {starnix_uapi::inner_access::AccessEnum::READ},
-        {starnix_uapi::inner_access::AccessEnum::NOATIME},
 };
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_FILE_MODE_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_FILE_MODE_H_

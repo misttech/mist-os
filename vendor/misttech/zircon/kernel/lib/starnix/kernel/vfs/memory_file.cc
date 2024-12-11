@@ -61,7 +61,7 @@ MemoryFileNode* MemoryFileNode::from_memory(fbl::RefPtr<MemoryObject> memory) {
 }
 
 void MemoryFileNode::initial_info(FsNodeInfo& info) const {
-  info.size = memory_->get_content_size();
+  info.size_ = memory_->get_content_size();
 }
 
 fit::result<Errno, ktl::unique_ptr<FileOps>> MemoryFileNode::create_file_ops(
@@ -114,7 +114,7 @@ fit::result<Errno, size_t> MemoryFileObject::read(const MemoryObject& memory,
                                                   OutputBuffer* data) {
   size_t actual = 0;
   auto info = file.node()->info();
-  auto file_length = info->size;
+  auto file_length = info->size_;
   auto want_read = data->available();
   if (offset < file_length) {
     auto to_read = (file_length < (offset + want_read)) ? (file_length - offset) : (want_read);
@@ -151,7 +151,7 @@ fit::result<Errno, size_t> MemoryFileObject::write(const MemoryObject& memory,
         }
 
         // Writing past the file size
-        if (write_end > info.size) {
+        if (write_end > info.size_) {
           // The grow seal check failed.
           /*
             if let Err(e) = state.check_no_seal(SealFlags::GROW) {
@@ -196,7 +196,7 @@ fit::result<Errno, size_t> MemoryFileObject::write(const MemoryObject& memory,
           want_write = write_end - offset;
         }
 
-        if (write_end > info.size) {
+        if (write_end > info.size_) {
           if (write_end > info.storage_size()) {
             _EP(update_memory_file_size(memory, info, write_end));
           }
@@ -209,7 +209,7 @@ fit::result<Errno, size_t> MemoryFileObject::write(const MemoryObject& memory,
         }
 
         if (update_content_size) {
-          info.size = write_end;
+          info.size_ = write_end;
         }
 
         _EP(data->advance(want_write));
@@ -282,7 +282,7 @@ fit::result<Errno, size_t> update_memory_file_size(const MemoryObject& memory,
         impossible_error(status.error_value());
     }
   }
-  node_info.blocks = size.value() / node_info.blksize;
+  node_info.blocks_ = size.value() / node_info.blksize_;
   return fit::ok(size.value());
 }
 

@@ -13,6 +13,13 @@ namespace starnix {
 
 FsNodeOps::~FsNodeOps() = default;
 
+fit::result<Errno> FsNodeOps::check_access(const FsNode& node, const CurrentTask& current_task,
+                                           starnix_uapi::Access access,
+                                           starnix_sync::RwLock<FsNodeInfo>& info,
+                                           CheckAccessReason _reason) const {
+  return starnix::FsNode::default_check_access_impl(current_task, access, info.Read());
+}
+
 fit::result<Errno, FsNodeHandle> FsNodeOps::lookup(const FsNode& node,
                                                    const CurrentTask& current_task,
                                                    const FsStr& name) const {

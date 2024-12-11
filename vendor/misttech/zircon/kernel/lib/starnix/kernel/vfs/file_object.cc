@@ -48,7 +48,7 @@ fit::result<Errno, SyscallResult> default_ioctl(const FileObject&, const Current
   return fit::error(errno(ENOTSUP));
 }
 
-FileObject::FileObject(WeakFileHandle weak_handle, FileObjectId id, NamespaceNode name,
+FileObject::FileObject(WeakFileHandle weak_handle, FileObjectId id, ActiveNamespaceNode name,
                        FileSystemHandle fs, ktl::unique_ptr<FileOps> ops, OpenFlags flags)
     : weak_handle_(ktl::move(weak_handle)),
       id_(id),
@@ -85,8 +85,8 @@ fit::result<Errno, FileHandle> FileObject::New(ktl::unique_ptr<FileOps> ops, Nam
   }
   auto id = FileObjectId{kernel->next_file_object_id_.next()};
   fbl::AllocChecker ac;
-  auto file =
-      fbl::AdoptRef(new (&ac) FileObject(WeakFileHandle(), id, name, fs, ktl::move(ops), flags));
+  auto file = fbl::AdoptRef(
+      new (&ac) FileObject(WeakFileHandle(), id, name.into_active(), fs, ktl::move(ops), flags));
   if (!ac.check()) {
     return fit::error(errno(ENOMEM));
   }
@@ -95,7 +95,7 @@ fit::result<Errno, FileHandle> FileObject::New(ktl::unique_ptr<FileOps> ops, Nam
   return fit::ok(file);
 }
 
-FsNodeHandle FileObject::node() const { return name_.entry_->node_; }
+FsNodeHandle FileObject::node() const { return name_->entry_->node_; }
 
 fit::result<Errno, pid_t> FileObject::as_pid() const { return ops().as_pid(*this); }
 

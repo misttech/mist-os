@@ -31,10 +31,13 @@ struct MountInfo {
   static MountInfo detached();
 
   /// The mount flags of the represented mount.
-  MountFlags flags();
+  MountFlags flags() const;
 
   /// Checks whether this `MountInfo` represents a writable file system mounted.
-  fit::result<Errno> check_readonly_filesystem();
+  fit::result<Errno> check_readonly_filesystem() const;
+
+  /// Checks whether this `MountInfo` represents an executable file system mount.
+  fit::result<Errno> check_noexec_filesystem() const;
 
   // C++
   ktl::optional<MountHandle> operator*() const;

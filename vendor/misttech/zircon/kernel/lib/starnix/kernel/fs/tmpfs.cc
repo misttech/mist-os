@@ -113,8 +113,8 @@ fit::result<Errno, FileSystemHandle> TmpFs::new_fs_with_options(const fbl::RefPt
   auto root_node = FsNode::new_root_with_properties(TmpfsDirectory::New(),
                                                     [&mode, &uid, &gid](FsNodeInfo& info) -> void {
                                                       info.chmod(mode);
-                                                      info.uid = uid;
-                                                      info.gid = gid;
+                                                      info.uid_ = uid;
+                                                      info.gid_ = gid;
                                                     });
   fs->set_root_node(root_node);
 
@@ -164,7 +164,7 @@ fit::result<Errno, FsNodeHandle> TmpfsDirectory::mkdir(const FsNode& node,
                                                        const CurrentTask& current_task,
                                                        const FsStr& name, FileMode mode,
                                                        FsCred owner) const {
-  node.update_info<void>([](FsNodeInfo& info) { info.link_count += 1; });
+  node.update_info<void>([](FsNodeInfo& info) { info.link_count_ += 1; });
   *child_count_.Lock() += 1;
   return fit::ok(node.fs()->create_node(current_task,
                                         ktl::unique_ptr<FsNodeOps>(TmpfsDirectory::New()),
@@ -222,9 +222,9 @@ fit::result<Errno, FsNodeHandle> create_child_node(const CurrentTask& current_ta
   auto child = parent.fs()->create_node(current_task, ktl::move(ops),
                                         [mode, owner, dev](ino_t id) -> FsNodeInfo {
                                           auto info = FsNodeInfo::New(id, mode, owner);
-                                          info.rdev = dev;
+                                          info.rdev_ = dev;
                                           // blksize is PAGE_SIZE for in memory node.
-                                          info.blksize = PAGE_SIZE;
+                                          info.blksize_ = PAGE_SIZE;
                                           return info;
                                         });
 

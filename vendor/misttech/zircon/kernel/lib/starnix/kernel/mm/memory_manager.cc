@@ -955,7 +955,7 @@ Mapping Mapping::with_name(UserAddress base, fbl::RefPtr<MemoryObject> memory,
                            uint64_t memory_offset, MappingFlagsImpl flags, MappingName name) {
   LTRACEF("base 0x%lx memory %p memory_offset %lu flags 0x%x\n", base.ptr(), memory.get(),
           memory_offset, flags.bits());
-  return Mapping(base, ktl::move(memory), memory_offset, flags, name);
+  return Mapping(base, ktl::move(memory), memory_offset, flags, ktl::move(name));
 }
 
 Mapping::Mapping(UserAddress base, fbl::RefPtr<MemoryObject> memory, uint64_t memory_offset,

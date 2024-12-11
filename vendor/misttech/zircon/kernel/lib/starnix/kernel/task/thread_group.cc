@@ -48,7 +48,7 @@ fbl::RefPtr<ZombieProcess> ZombieProcess::New(const ThreadGroupMutableState& thr
   fbl::AllocChecker ac;
   auto zp = fbl::AdoptRef(new (&ac) ZombieProcess(thread_group.base_->leader_,
                                                   thread_group.process_group_->leader_,
-                                                  credentials.uid, exit_info, true));
+                                                  credentials.uid_, exit_info, true));
   ZX_ASSERT(ac.check());
   return zp;
 }
@@ -296,7 +296,7 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
 
         auto info = (*child.tasks_.begin()).info();
         return WaitResult{.pid = child.base_->leader_,
-                          .uid = info->creds().uid,
+                          .uid = info->creds().uid_,
                           .exit_info = {.status = exit_status, .exit_signal = info->exit_signal()},
                           .time_stats = {}};
       };

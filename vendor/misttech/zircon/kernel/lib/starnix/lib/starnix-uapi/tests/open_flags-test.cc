@@ -7,7 +7,6 @@
 #include <lib/unittest/unittest.h>
 
 namespace unit_testing {
-
 namespace {
 
 using starnix_uapi::OpenFlagsImpl;

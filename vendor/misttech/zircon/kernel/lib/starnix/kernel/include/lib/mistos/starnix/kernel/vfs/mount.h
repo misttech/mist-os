@@ -223,7 +223,7 @@ class Mount : public fbl::WAVLTreeContainable<fbl::RefPtr<Mount>>,
   uint64_t id_;
 
   /// A count of the number of active clients.
-  // active_client_counter: MountClientMarker,
+  MountClientMarker active_client_counter_;
 
   // Lock ordering: mount -> submount
   mutable starnix_sync::RwLock<MountState> state_;
@@ -277,11 +277,12 @@ class Mount : public fbl::WAVLTreeContainable<fbl::RefPtr<Mount>>,
   ~Mount();
 
  private:
-  friend struct MountInfo;
+  friend class ActiveNamespaceNode;
   friend class MountState;
   friend class Namespace;
   friend class NamespaceNode;
   friend class Submount;
+  friend struct MountInfo;
 
   Mount(uint64_t id, MountFlags flags, DirEntryHandle root, FileSystemHandle fs);
 

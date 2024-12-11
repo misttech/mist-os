@@ -14,6 +14,7 @@
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/unmount_flags.h>
 
+#include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
 #include <ktl/variant.h>
@@ -52,6 +53,8 @@ struct Unreachable {
   FsString path;
 };
 
+enum class CheckAccessReason : uint8_t { Access, Chdir, Chroot, InternalPermissionChecks };
+
 class PathWithReachability {
  public:
   using Variant = ktl::variant<Reachable, Unreachable>;
@@ -89,6 +92,8 @@ class PathWithReachability {
 
   Variant variant_;
 };
+
+class ActiveNamespaceNode;
 
 /// A node in a mount namespace.
 ///
@@ -134,6 +139,9 @@ class NamespaceNode {
   fit::result<Errno, NamespaceNode> open_create_node(const CurrentTask& current_task,
                                                      const FsStr& name, FileMode mode,
                                                      DeviceType dev, OpenFlags flags) const;
+
+  /// Convert this namespace node into an active namespace node.
+  ActiveNamespaceNode into_active() const;
 
   /// Create a node in the file system.
   ///
@@ -211,7 +219,8 @@ class NamespaceNode {
   /// Check whether the node can be accessed in the current context with the specified access
   /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
   /// owner or is in the file's group.
-  fit::result<Errno> check_access(const CurrentTask& current_task, Access access) const;
+  fit::result<Errno> check_access(const CurrentTask& current_task, Access access,
+                                  CheckAccessReason reason) const;
 
   fit::result<Errno> truncate(const CurrentTask& current_task, uint64_t length) const;
 
@@ -224,6 +233,45 @@ class NamespaceNode {
   bool operator==(const NamespaceNode& other) const;
 
   ~NamespaceNode();
+};
+
+/// An empty struct that we use to track the number of active clients for a mount.
+///
+/// Each active client takes a reference to this object. The unmount operation fails
+/// if there are any active clients of the mount.
+struct Marker : public fbl::RefCounted<Marker> {};
+using MountClientMarker = fbl::RefPtr<Marker>;
+
+/// A namespace node that keeps the underlying mount busy.
+class ActiveNamespaceNode {
+ private:
+  /// The underlying namespace node.
+  NamespaceNode name_;
+
+  /// Adds a reference to the mount client marker to prevent the mount from
+  /// being removed while the NamespaceNode is active. Is None iff mount is
+  /// None.
+  ktl::optional<MountClientMarker> marker_;
+
+ public:
+  /// Create an ActiveNamespaceNode from a NamespaceNode
+  static ActiveNamespaceNode New(NamespaceNode name);
+
+  /// Get the underlying passive NamespaceNode
+  NamespaceNode to_passive() const;
+
+  ~ActiveNamespaceNode();
+
+  // Dereference operators to access the underlying NamespaceNode
+  const NamespaceNode& operator*() const;
+  const NamespaceNode* operator->() const;
+  NamespaceNode& operator*();
+  NamespaceNode* operator->();
+
+  bool operator==(const ActiveNamespaceNode& other) const;
+
+ private:
+  explicit ActiveNamespaceNode(NamespaceNode name, ktl::optional<MountClientMarker> marker);
 };
 
 class SymlinkTarget {
