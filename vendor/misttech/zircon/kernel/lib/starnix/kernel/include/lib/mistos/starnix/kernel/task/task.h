@@ -40,7 +40,8 @@ class TaskBuilder;
 struct ThreadState;
 
 namespace testing {
-TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsContext> fs);
+TaskBuilder create_test_init_task(const fbl::RefPtr<Kernel>& kernel,
+                                  const fbl::RefPtr<FsContext>& fs);
 }
 
 enum class TaskFlagsEnum : uint8_t {
@@ -605,8 +606,8 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   friend class ThreadGroup;
   friend class TaskContainer;
 
-  friend TaskBuilder testing::create_test_init_task(fbl::RefPtr<Kernel> kernel,
-                                                    fbl::RefPtr<FsContext> fs);
+  friend TaskBuilder testing::create_test_init_task(const fbl::RefPtr<Kernel>& kernel,
+                                                    const fbl::RefPtr<FsContext>& fs);
 
   class ThreadSignalObserver final : public SignalObserver {
    public:

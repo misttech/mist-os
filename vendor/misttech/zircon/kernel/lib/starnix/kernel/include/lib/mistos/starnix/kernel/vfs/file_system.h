@@ -54,7 +54,7 @@ struct CacheConfig {
   size_t capacity = DEFAULT_LRU_CAPACITY;
 };
 
-enum class CacheModeType {
+enum class CacheModeType : uint8_t {
   /// Entries are pemanent, instead of a cache of the backing storage. An example is tmpfs: the
   /// DirEntry tree *is* the backing storage, as opposed to ext4, which uses the DirEntry tree as
   /// a cache and removes unused nodes from it.

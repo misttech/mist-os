@@ -24,6 +24,48 @@ namespace starnix {
 class FileSystem;
 using FileSystemHandle = fbl::RefPtr<FileSystem>;
 
+/// Features that can be enabled for a kernel instance.
+struct KernelFeatures {
+  /// Whether BPF v2 is enabled.
+  // bool bpf_v2 = false;
+
+  /// Whether the kernel supports the S_ISUID and S_ISGID bits.
+  ///
+  /// For example, these bits are used by `sudo`.
+  ///
+  /// Enabling this feature is potentially a security risk because they allow privilege
+  /// escalation.
+  bool enable_suid = false;
+
+  /// Whether io_uring is enabled.
+  ///
+  /// TODO(https://fxbug.dev/297431387): Enabled by default once the feature is completed.
+  bool io_uring = false;
+
+  /// Whether the kernel should return an error to userspace, rather than panicking, if `reboot()`
+  /// is requested but cannot be enacted because the kernel lacks the relevant capabilities.
+  bool error_on_failed_reboot = false;
+
+  /// This controls whether or not the default framebuffer background is black or colorful, to
+  /// aid debugging.
+  // bool enable_visual_debugging = false;
+
+  /// The default seclabel that is applied to components that are run in this kernel.
+  ///
+  /// Components can override this by setting the `seclabel` field in their program block.
+  ktl::optional<ktl::string_view> default_seclabel;
+
+  /// The default fsseclabel that is applied to components that are run in this kernel.
+  ///
+  /// Components can override this by setting the `fsseclabel` field in their program block.
+  ktl::optional<ktl::string_view> default_fsseclabel;
+
+  /// The default uid that is applied to components that are run in this kernel.
+  ///
+  /// Components can override this by setting the `uid` field in their program block.
+  uint32_t default_uid = 0;
+};
+
 /// The shared, mutable state for the entire Starnix kernel.
 ///
 /// The `Kernel` object holds all kernel threads, userspace tasks, and file system resources for a
@@ -39,7 +81,7 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   KernelThreads kthreads_;
 
   /// The feaures enabled for this kernel.
-  // pub features: KernelFeatures,
+  KernelFeatures features_;
 
   // The processes and threads running in this kernel, organized by pid_t.
   starnix_sync::RwLock<PidTable> pids_;
@@ -61,7 +103,7 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   // pub default_abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
 
   // The kernel command line. Shows up in /proc/cmdline.
-  ktl::string_view cmdline_;
+  BString cmdline_;
 
   // Owned by anon_node.rs
   // pub anon_fs: OnceCell<FileSystemHandle>,
@@ -205,22 +247,22 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   /// All mounts.
   Mounts mounts_;
 
- public:
   /// impl Kernel
-  static fit::result<zx_status_t, fbl::RefPtr<Kernel>> New(const ktl::string_view& cmdline);
+  static fit::result<zx_status_t, fbl::RefPtr<Kernel>> New(BString cmdline,
+                                                           KernelFeatures features);
 
   /// impl Kernel (namespace.rs)
-  uint64_t get_next_mount_id() { return next_mount_id_.next(); }
+  uint64_t get_next_mount_id() const { return next_mount_id_.next(); }
 
-  uint64_t get_next_peer_group_id() { return next_peer_group_id_.next(); }
+  uint64_t get_next_peer_group_id() const { return next_peer_group_id_.next(); }
 
-  uint64_t get_next_namespace_id() { return next_namespace_id_.next(); }
+  uint64_t get_next_namespace_id() const { return next_namespace_id_.next(); }
 
   // C++
   ~Kernel();
 
  private:
-  Kernel(const ktl::string_view& cmdline);
+  Kernel(BString cmdline, KernelFeatures features);
 
  public:
   mtl::WeakPtrFactory<Kernel> weak_factory_;  // must be last

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_NAMESPACENODE_H_
-#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_NAMESPACENODE_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_NAMESPACE_NODE_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_NAMESPACE_NODE_H_
 
 #include <lib/mistos/starnix/kernel/vfs/mount_info.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
@@ -28,6 +28,7 @@ using starnix_uapi::FileMode;
 using starnix_uapi::FsCred;
 using starnix_uapi::OpenFlags;
 using starnix_uapi::UnmountFlags;
+using starnix_uapi::UserAndOrGroupId;
 
 class CurrentTask;
 class DirEntry;
@@ -58,6 +59,7 @@ enum class CheckAccessReason : uint8_t { Access, Chdir, Chroot, InternalPermissi
 class PathWithReachability {
  public:
   using Variant = ktl::variant<Reachable, Unreachable>;
+  Variant variant_;
 
   static PathWithReachability Reachable(FsString path) {
     struct Reachable r = {.path = ktl::move(path)};
@@ -77,7 +79,6 @@ class PathWithReachability {
                       variant_);
   }
 
- private:
   // Helpers from the reference documentation for std::visit<>, to allow
   // visit-by-overload of the std::variant<> returned by GetLastReference():
   template <class... Ts>
@@ -88,9 +89,8 @@ class PathWithReachability {
   template <class... Ts>
   overloaded(Ts...) -> overloaded<Ts...>;
 
+ private:
   explicit PathWithReachability(Variant variant) : variant_(ktl::move(variant)) {}
-
-  Variant variant_;
 };
 
 class ActiveNamespaceNode;
@@ -214,6 +214,8 @@ class NamespaceNode {
 
   NamespaceNode with_new_entry(DirEntryHandle entry) const;
 
+  fit::result<Errno, UserAndOrGroupId> suid_and_sgid(const CurrentTask& current_task) const;
+
   fit::result<Errno, SymlinkTarget> readlink(const CurrentTask& current_task) const;
 
   /// Check whether the node can be accessed in the current context with the specified access
@@ -302,4 +304,4 @@ class SymlinkTarget {
 
 }  // namespace starnix
 
-#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_NAMESPACENODE_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_NAMESPACE_NODE_H_
