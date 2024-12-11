@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include <fbl/auto_lock.h>
+#include <usb/request-fidl.h>
 #include <usb/usb-request.h>
 
 #include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-bus.h"
