@@ -154,7 +154,7 @@ readonly reproxy="$reclient_bindir"/reproxy
 # Generate unique dirs per invocation.
 readonly date="$(date +%Y%m%d-%H%M%S)"
 # Default location, when log/tmp dirs are unspecified.
-readonly build_subdir=out/_unknown
+readonly default_build_subdir=out/_unknown
 
 [[ -n "$reproxy_logdir" ]] || {
   # 'mktemp -p' still yields to TMPDIR in the environment (bug?),
@@ -163,7 +163,11 @@ readonly build_subdir=out/_unknown
 }
 readonly _log_base="${reproxy_logdir##*/}"  # basename
 [[ -n "$reproxy_tmpdir" ]] || {
-  reproxy_tmpdir="$project_root/$build_subdir"/.reproxy_tmpdirs/"$_log_base"
+  # reproxy wants temporary space on the same device where
+  # the build happens.  The default $TMPDIR is not guaranteed to
+  # be on the same physical device.
+  # Re-use the randomly generated dir name in a custom tempdir.
+  reproxy_tmpdir="$project_root/$default_build_subdir"/.reproxy_tmpdirs/"$_log_base"
 }
 
 readonly _fake_tmpdir="$(mktemp -u)"
@@ -303,11 +307,6 @@ else
   fi
 fi
 
-# reproxy wants temporary space on the same device where
-# the build happens.  The default $TMPDIR is not guaranteed to
-# be on the same physical device.
-# Re-use the randomly generated dir name in a custom tempdir.
-reproxy_tmpdir="$project_root/$build_subdir"/.reproxy_tmpdirs/"$_log_base"
 mkdir -p "$reproxy_tmpdir"
 
 function cleanup() {
