@@ -53,7 +53,8 @@ create_kernel_task_and_unlocked_with_fs(CreateFsFn&& create_fs) {
 
 }  // namespace
 
-TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsContext> fs) {
+TaskBuilder create_test_init_task(const fbl::RefPtr<Kernel>& kernel,
+                                  const fbl::RefPtr<FsContext>& fs) {
   auto init_pid = kernel->pids_.Write()->allocate_pid();
   ASSERT(init_pid == 1);
   fbl::Array<ktl::pair<starnix_uapi::Resource, uint64_t>> rlimits;
