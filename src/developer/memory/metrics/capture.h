@@ -215,22 +215,6 @@ class OS {
 // Returns an OS implementation querying Zircon Kernel.
 std::unique_ptr<OS> CreateDefaultOS();
 
-// Extracts VMO information out of a process tree.
-// TODO(b/366157407): Remove CaptureStrategy abstraction.
-class CaptureStrategy {
- public:
-  virtual ~CaptureStrategy() {}
-
-  // For a given capture, |OnNewProcess| is called first for all processes on the system, before
-  // the call to |Finalize|.
-  virtual zx_status_t OnNewProcess(OS& os, Process process, zx::handle process_handle) = 0;
-
-  // Finalize is called once after all calls to |OnNewProcess| are done.
-  virtual zx::result<
-      std::tuple<std::unordered_map<zx_koid_t, Process>, std::unordered_map<zx_koid_t, Vmo>>>
-  Finalize(OS& os) = 0;
-};
-
 class Capture {
  public:
   static const std::vector<std::string> kDefaultRootedVmoNames;
