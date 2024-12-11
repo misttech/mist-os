@@ -2121,6 +2121,177 @@ mod tests {
         assert_eq!(protocols, &vec![]);
     }
 
+    /// When a capability is offered to a dictionary, its route should be checked.
+    #[fuchsia::test]
+    async fn offer_to_dictionary() {
+        let protocol_decl = CapabilityBuilder::protocol().name("protocol_exists").build();
+        let offer_protocol_decl1 = OfferBuilder::protocol()
+            .name("protocol_exists")
+            .source(OfferSource::Self_)
+            .target_static_child("b")
+            .build();
+        let offer_protocol_decl2 = OfferBuilder::protocol()
+            .name("protocol_exists")
+            .source(OfferSource::Parent)
+            .target(OfferTarget::Capability("dict".parse().unwrap()))
+            .build();
+        let offer_protocol_decl3 = OfferBuilder::protocol()
+            .name("protocol_not_exists")
+            .source(OfferSource::Parent)
+            .target(OfferTarget::Capability("dict".parse().unwrap()))
+            .build();
+
+        let components = vec![
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .capability(protocol_decl.clone())
+                    .child_default("b")
+                    .offer(offer_protocol_decl1.clone())
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .dictionary_default("dict")
+                    .offer(offer_protocol_decl2.clone())
+                    .offer(offer_protocol_decl3.clone())
+                    .build(),
+            ),
+        ];
+
+        let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
+        let b_component = test.look_up_instance(&"b".parse().unwrap()).await.unwrap();
+
+        let route_maps = test
+            .model
+            .check_routes_for_instance(
+                &b_component,
+                &HashSet::from_iter(vec![CapabilityTypeName::Protocol].into_iter()),
+            )
+            .await;
+        assert_eq!(route_maps.len(), 1);
+        let dictionaries = route_maps.get(&CapabilityTypeName::Protocol).unwrap();
+        assert_eq!(
+            dictionaries,
+            &vec![
+                VerifyRouteResult {
+                    using_node: "b".parse().unwrap(),
+                    target_decl: TargetDecl::Offer(offer_protocol_decl2.clone()),
+                    capability: Some("protocol_exists".parse().unwrap()),
+                    error: None,
+                    route: vec![],
+                    source: Some(CapabilitySource::Component(ComponentSource {
+                        capability: ComponentCapability::Protocol(match protocol_decl {
+                            CapabilityDecl::Protocol(decl) => decl,
+                            _ => panic!(),
+                        }),
+                        moniker: Moniker::root(),
+                    })),
+                },
+                VerifyRouteResult {
+                    using_node: "b".parse().unwrap(),
+                    target_decl: TargetDecl::Offer(offer_protocol_decl3.clone()),
+                    capability: Some("protocol_not_exists".parse().unwrap()),
+                    error: Some(AnalyzerModelError::RoutingError(
+                        RoutingError::OfferFromParentNotFound {
+                            moniker: "b".parse().unwrap(),
+                            capability_id: "protocol_not_exists".to_string(),
+                        }
+                    )),
+                    route: vec![],
+                    source: None,
+                },
+            ]
+        );
+    }
+
+    /// If a dictionary is offered and never used, cm_fidl_analyzer should still verify that route.
+    #[fuchsia::test]
+    async fn offer_dictionary_without_use() {
+        let dictionary_decl = CapabilityBuilder::dictionary().name("dict_exists").build();
+        let offer_dictionary_decl1 = OfferBuilder::dictionary()
+            .name("dict_exists")
+            .source(OfferSource::Self_)
+            .target_static_child("b")
+            .build();
+        let offer_dictionary_decl2 = OfferBuilder::dictionary()
+            .name("dict_exists")
+            .source(OfferSource::Parent)
+            .target_static_child("c")
+            .build();
+        let offer_dictionary_decl3 = OfferBuilder::dictionary()
+            .name("dict_not_exists")
+            .source(OfferSource::Parent)
+            .target_static_child("c")
+            .build();
+
+        let components = vec![
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .capability(dictionary_decl.clone())
+                    .child_default("b")
+                    .offer(offer_dictionary_decl1.clone())
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .child_default("c")
+                    .offer(offer_dictionary_decl2.clone())
+                    .offer(offer_dictionary_decl3.clone())
+                    .build(),
+            ),
+            ("c", ComponentDeclBuilder::new().build()),
+        ];
+
+        let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
+        let b_component = test.look_up_instance(&"b".parse().unwrap()).await.unwrap();
+
+        let route_maps = test
+            .model
+            .check_routes_for_instance(
+                &b_component,
+                &HashSet::from_iter(vec![CapabilityTypeName::Dictionary].into_iter()),
+            )
+            .await;
+        assert_eq!(route_maps.len(), 1);
+        let dictionaries = route_maps.get(&CapabilityTypeName::Dictionary).unwrap();
+        assert_eq!(
+            dictionaries,
+            &vec![
+                VerifyRouteResult {
+                    using_node: "b".parse().unwrap(),
+                    target_decl: TargetDecl::Offer(offer_dictionary_decl2.clone()),
+                    capability: Some("dict_exists".parse().unwrap()),
+                    error: None,
+                    route: vec![],
+                    source: Some(CapabilitySource::Component(ComponentSource {
+                        capability: ComponentCapability::Dictionary(match dictionary_decl {
+                            CapabilityDecl::Dictionary(decl) => decl,
+                            _ => panic!(),
+                        }),
+                        moniker: Moniker::root(),
+                    })),
+                },
+                VerifyRouteResult {
+                    using_node: "b".parse().unwrap(),
+                    target_decl: TargetDecl::Offer(offer_dictionary_decl3.clone()),
+                    capability: Some("dict_not_exists".parse().unwrap()),
+                    error: Some(AnalyzerModelError::RoutingError(
+                        RoutingError::OfferFromParentNotFound {
+                            moniker: "b".parse().unwrap(),
+                            capability_id: "dict_not_exists".to_string(),
+                        }
+                    )),
+                    route: vec![],
+                    source: None,
+                },
+            ]
+        );
+    }
+
     ///    a
     ///   /  \
     ///  b    c
