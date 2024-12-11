@@ -8,7 +8,7 @@ use fuchsia_sync::Mutex;
 use std::sync::Arc;
 use tracing::{error, warn};
 use windowed_stats::experimental::clock::Timed;
-use windowed_stats::experimental::series::interpolation::LastAggregation;
+use windowed_stats::experimental::series::interpolation::LastSample;
 use windowed_stats::experimental::series::statistic::LatchMax;
 use windowed_stats::experimental::series::{SamplingProfile, TimeMatrix};
 use windowed_stats::experimental::serve::{InspectedTimeMatrix, TimeMatrixClient};
@@ -116,30 +116,30 @@ impl IfaceCountersTimeSeries {
     pub fn new(client: &TimeMatrixClient) -> Self {
         let rx_unicast_total = client.inspect_time_matrix(
             "rx_unicast_total",
-            TimeMatrix::<LatchMax<u64>, LastAggregation>::new(
+            TimeMatrix::<LatchMax<u64>, LastSample>::new(
                 SamplingProfile::balanced(),
-                LastAggregation::or(0),
+                LastSample::or(0),
             ),
         );
         let rx_unicast_drop = client.inspect_time_matrix(
             "rx_unicast_drop",
-            TimeMatrix::<LatchMax<u64>, LastAggregation>::new(
+            TimeMatrix::<LatchMax<u64>, LastSample>::new(
                 SamplingProfile::balanced(),
-                LastAggregation::or(0),
+                LastSample::or(0),
             ),
         );
         let tx_total = client.inspect_time_matrix(
             "tx_total",
-            TimeMatrix::<LatchMax<u64>, LastAggregation>::new(
+            TimeMatrix::<LatchMax<u64>, LastSample>::new(
                 SamplingProfile::balanced(),
-                LastAggregation::or(0),
+                LastSample::or(0),
             ),
         );
         let tx_drop = client.inspect_time_matrix(
             "tx_drop",
-            TimeMatrix::<LatchMax<u64>, LastAggregation>::new(
+            TimeMatrix::<LatchMax<u64>, LastSample>::new(
                 SamplingProfile::balanced(),
-                LastAggregation::or(0),
+                LastSample::or(0),
             ),
         );
         Self { rx_unicast_total, rx_unicast_drop, tx_total, tx_drop }
