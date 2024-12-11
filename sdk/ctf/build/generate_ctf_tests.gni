@@ -106,13 +106,21 @@ template("pre_packaged_test_with_names") {
 
 template("generate_archivist_integration_test_cases") {
   forward_variables_from(invoker, [ "test_info" ])
-  fuchsia_package_with_test(target_name) {
-    test_component = "//src/diagnostics/archivist/tests/integration:test_root"
-    test_component_name = "test_root.cm"
-    subpackages = [
-      test_info.target_label,
-      "//src/diagnostics/archivist/tests/integration/realm_factory:pkg",
-    ]
+
+  # TODO(https://fxbug.dev/383560524): This is disabled until we fix an error in the test.
+  if (defined(invoker.api_level) && invoker.api_level == "25") {
+    not_needed([ "test_info " ])
+    group(target_name) {
+    }
+  } else {
+    fuchsia_package_with_test(target_name) {
+      test_component = "//src/diagnostics/archivist/tests/integration:test_root"
+      test_component_name = "test_root.cm"
+      subpackages = [
+        test_info.target_label,
+        "//src/diagnostics/archivist/tests/integration/realm_factory:pkg",
+      ]
+    }
   }
 }
 
