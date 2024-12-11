@@ -24,6 +24,48 @@ namespace starnix {
 class FileSystem;
 using FileSystemHandle = fbl::RefPtr<FileSystem>;
 
+/// Features that can be enabled for a kernel instance.
+struct KernelFeatures {
+  /// Whether BPF v2 is enabled.
+  // bool bpf_v2 = false;
+
+  /// Whether the kernel supports the S_ISUID and S_ISGID bits.
+  ///
+  /// For example, these bits are used by `sudo`.
+  ///
+  /// Enabling this feature is potentially a security risk because they allow privilege
+  /// escalation.
+  bool enable_suid = false;
+
+  /// Whether io_uring is enabled.
+  ///
+  /// TODO(https://fxbug.dev/297431387): Enabled by default once the feature is completed.
+  bool io_uring = false;
+
+  /// Whether the kernel should return an error to userspace, rather than panicking, if `reboot()`
+  /// is requested but cannot be enacted because the kernel lacks the relevant capabilities.
+  bool error_on_failed_reboot = false;
+
+  /// This controls whether or not the default framebuffer background is black or colorful, to
+  /// aid debugging.
+  // bool enable_visual_debugging = false;
+
+  /// The default seclabel that is applied to components that are run in this kernel.
+  ///
+  /// Components can override this by setting the `seclabel` field in their program block.
+  ktl::optional<ktl::string_view> default_seclabel;
+
+  /// The default fsseclabel that is applied to components that are run in this kernel.
+  ///
+  /// Components can override this by setting the `fsseclabel` field in their program block.
+  ktl::optional<ktl::string_view> default_fsseclabel;
+
+  /// The default uid that is applied to components that are run in this kernel.
+  ///
+  /// Components can override this by setting the `uid` field in their program block.
+  uint32_t default_uid = 0;
+};
+
 /// The shared, mutable state for the entire Starnix kernel.
 ///
 /// The `Kernel` object holds all kernel threads, userspace tasks, and file system resources for a
