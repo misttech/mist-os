@@ -60,7 +60,7 @@
 /// dependent power elements will power down first. Ideally, this forces the
 /// entire system into a configuration with a lower power consumption as the
 /// power level of `ExecutionState` decreases.
-@available(added=HEAD)
+@available(added=NEXT)
 library fuchsia.power.system;
 
 using fuchsia.power.broker;
@@ -68,7 +68,20 @@ using zx;
 
 // TODO(https://fxbug.dev/339474151): Update this when EventPair is the standard
 // token for leases in Power Broker.
-alias LeaseToken = zx.Handle:EVENTPAIR;
+@available(added=NEXT)
+alias LeaseToken = zx.Handle:<EVENTPAIR, zx.Rights.TRANSFER | zx.Rights.DUPLICATE | zx.Rights.WAIT>;
+
+@available(added=NEXT)
+const MAX_ELEMENT_NAME_LEN uint8 = 64;
+
+/// Errors returned by `ActivityGovernor/AcquireWakeLease`.
+@available(added=NEXT)
+type AcquireWakeLeaseError = flexible enum : uint32 {
+    /// The service encountered an error while attempting to issue a wake lease.
+    INTERNAL = 1;
+    /// The name for the wake lease is empty or invalid.
+    INVALID_NAME = 2;
+};
 
 /// Holds a token to the execution state power element.
 ///
@@ -78,6 +91,7 @@ alias LeaseToken = zx.Handle:EVENTPAIR;
 /// dependencies.
 ///
 /// [`fuchsia.power.system/ExecutionStateLevel`] defines the power levels supported by this power element.
+@available(added=HEAD)
 type ExecutionState = resource table {
     1: opportunistic_dependency_token fuchsia.power.broker.DependencyToken;
 };
@@ -93,6 +107,7 @@ type ExecutionState = resource table {
 /// request a persistent lease on this state to ensure that their element's
 /// power level is always activated when the system comes out of a suspend
 /// state.
+@available(added=HEAD)
 type ExecutionStateLevel = flexible enum : uint8 {
     INACTIVE = 0;
     SUSPENDING = 1;
@@ -102,6 +117,7 @@ type ExecutionStateLevel = flexible enum : uint8 {
 /// Holds tokens to the CPU power element.
 ///
 /// [`fuchsia.power.system/CpuLevel`] defines the power levels supported by this power element.
+@available(added=HEAD)
 type Cpu = resource table {
     1: assertive_dependency_token fuchsia.power.broker.DependencyToken;
 };
@@ -110,6 +126,7 @@ type Cpu = resource table {
 ///
 /// Elements should take an assertive dependency on `CpuLevel::ACTIVE`
 /// to ensure that the element will be suspended before the CPU suspends.
+@available(added=HEAD)
 type CpuLevel = flexible enum : uint8 {
     INACTIVE = 0;
     ACTIVE = 1;
@@ -118,6 +135,7 @@ type CpuLevel = flexible enum : uint8 {
 /// Holds tokens to the application activity power element.
 ///
 /// [`fuchsia.power.system/ApplicationActivityLevel`] defines the power levels supported by this power element.
+@available(added=HEAD)
 type ApplicationActivity = resource table {
     1: assertive_dependency_token fuchsia.power.broker.DependencyToken;
 };
@@ -128,12 +146,14 @@ type ApplicationActivity = resource table {
 /// dependency on `ApplicationActivityLevel::ACTIVE`. When these components are
 /// performing work, they should request a lease to ensure the system remains
 /// active, and drop the lease when they are done.
+@available(added=HEAD)
 type ApplicationActivityLevel = flexible enum : uint8 {
     INACTIVE = 0;
     ACTIVE = 1;
 };
 
 /// A collection of power elements that are managed by the activity governor.
+@available(added=HEAD)
 type PowerElements = resource table {
     1: execution_state ExecutionState;
     3: application_activity ApplicationActivity;
@@ -141,6 +161,7 @@ type PowerElements = resource table {
 
 /// Error codes for responses from `AddExecutionStateDependency` in
 /// [`fuchsia.power.system/CpuElementManager`].
+@available(added=HEAD)
 type AddExecutionStateDependencyError = flexible enum {
     /// Required arguments are either not given or are not valid.
     INVALID_ARGS = 1;
@@ -149,6 +170,7 @@ type AddExecutionStateDependencyError = flexible enum {
 };
 
 /// A listener for activity governor events.
+@available(added=HEAD)
 open protocol ActivityGovernorListener {
     /// Called when the activity governor detects a system resume.
     ///
@@ -180,6 +202,7 @@ open protocol ActivityGovernorListener {
 /// execute code on the device. This typically includes the CPU, memory,
 /// operating system, and other components required for these components to
 /// function (clock trees, power domains, etc.).
+@available(added=NEXT)
 @discoverable
 open protocol ActivityGovernor {
     // TODO(b/315994898): Provide tokens more granularly once client usage
@@ -191,6 +214,7 @@ open protocol ActivityGovernor {
     /// the power broker or an error occurs while creating a token for a power
     /// element, then the channel to `ActivityGovernor` will be closed by the
     /// server and no response will be returned.
+    @available(added=HEAD)
     flexible GetPowerElements() -> (PowerElements);
 
     /// Creates a lease that blocks suspension of the hardware platform.
@@ -201,6 +225,8 @@ open protocol ActivityGovernor {
     /// If an error occurs while creating a token for the wake lease, then the
     /// channel to `ActivityGovernor` will be closed by the server and no
     /// response will be returned.
+    @deprecated("Use AcquireWakeLease instead")
+    @available(added=HEAD)
     flexible TakeWakeLease(struct {
         /// The name of the lease.
         ///
@@ -211,6 +237,21 @@ open protocol ActivityGovernor {
         token LeaseToken;
     });
 
+    /// Creates a lease that blocks suspension of the hardware platform.
+    ///
+    /// The hardware platform will not suspend as long as a valid
+    /// [`LeaseToken`] exists.
+    @available(added=NEXT)
+    flexible AcquireWakeLease(struct {
+        /// The name of the lease.
+        ///
+        /// The name cannot be empty but is not required to be globally unique.
+        name string:MAX_ELEMENT_NAME_LEN;
+    }) -> (resource struct {
+        /// The token that blocks hardware platform suspension.
+        token LeaseToken;
+    }) error AcquireWakeLeaseError;
+
     /// Creates a lease that blocks the system from dropping below the Application
     /// Activity 'Active' state. In particular, this blocks suspension of the
     /// hardware platform.
@@ -218,6 +259,7 @@ open protocol ActivityGovernor {
     /// If an error occurs while creating a token for the activity lease, then the
     /// channel to `ActivityGovernor` will be closed by the server and no
     /// response will be returned.
+    @available(added=HEAD)
     flexible TakeApplicationActivityLease(struct {
         /// The name of the lease.
         ///
@@ -236,6 +278,7 @@ open protocol ActivityGovernor {
     /// is sent.
     ///
     /// To unregister, close the `ActivityGovernorListener` channel.
+    @available(added=HEAD)
     flexible RegisterListener(resource table {
         /// The client end of the service that receives activity governor events.
         ///
@@ -254,6 +297,7 @@ open protocol BootControl {
 };
 
 /// A service that provides access to CPU-related power elements.
+@available(added=HEAD)
 @discoverable
 open protocol CpuElementManager {
     /// Gets the assertive dependency token for the CPU power element.

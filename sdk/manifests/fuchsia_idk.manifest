@@ -338,7 +338,7 @@ fidl_library://fidl/fuchsia.net.stackmigrationdeprecated
 fidl_library://fidl/fuchsia.power.broker (unstable)
 fidl_library://fidl/fuchsia.power.clientlevel
 fidl_library://fidl/fuchsia.power.profile
-fidl_library://fidl/fuchsia.power.system (unstable)
+fidl_library://fidl/fuchsia.power.system
 fidl_library://fidl/fuchsia.power.systemmode
 fidl_library://fidl/fuchsia.process
 fidl_library://fidl/fuchsia.process.lifecycle

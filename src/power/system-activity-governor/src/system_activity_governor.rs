@@ -698,6 +698,44 @@ impl SystemActivityGovernor {
                         );
                     }
                 }
+                Ok(fsystem::ActivityGovernorRequest::AcquireWakeLease { responder, name }) => {
+                    let client_token_res = if name.is_empty() {
+                        tracing::warn!("Received invalid name while acquiring wake lease");
+                        Err(fsystem::AcquireWakeLeaseError::InvalidName)
+                    } else {
+                        self.lease_manager
+                            .create_wake_lease(name)
+                            .await
+                            .and_then(|client_token| {
+                                client_token
+                                    .replace_handle(
+                                        zx::Rights::TRANSFER
+                                            | zx::Rights::DUPLICATE
+                                            | zx::Rights::WAIT,
+                                    )
+                                    .map_err(|status| {
+                                        anyhow::anyhow!(
+                                            "Failed to replace client token handle: {status}"
+                                        )
+                                    })
+                            })
+                            .or_else(|error| {
+                                tracing::warn!(
+                                    ?error,
+                                    "Encountered error while registering wake lease"
+                                );
+
+                                Err(fsystem::AcquireWakeLeaseError::Internal)
+                            })
+                    };
+
+                    if let Err(error) = responder.send(client_token_res) {
+                        tracing::warn!(
+                            ?error,
+                            "Encountered error while responding to AcquireWakeLease request"
+                        );
+                    }
+                }
                 Ok(fsystem::ActivityGovernorRequest::RegisterListener { responder, payload }) => {
                     match payload.listener {
                         Some(listener) => {
