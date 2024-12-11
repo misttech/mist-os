@@ -115,6 +115,7 @@ where
 /// Download a single file from `gcs_url` to an in-ram string.
 ///
 /// `gcs_url` is the full GCS url, e.g. "gs://bucket/path/to/file".
+
 pub(crate) async fn string_from_gcs<F, I>(
     gcs_url: &str,
     auth_flow: &AuthFlowChoice,
@@ -234,18 +235,4 @@ where
     credentials.oauth2.refresh_token = refresh_token.to_string();
     credentials.save().await.context("writing refresh token")?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO(https://fxbug.dev/42174484): This test requires mocks for interactivity and
-    // https. The test is currently disabled.
-    #[ignore]
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_update_refresh_token() {
-        let ui = structured_ui::MockUi::new();
-        update_refresh_token(&AuthFlowChoice::Default, &ui).await.expect("set refresh token");
-    }
 }

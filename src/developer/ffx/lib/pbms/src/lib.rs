@@ -20,7 +20,7 @@
 //! a product bundle is also the name of the product bundle metadata entry.
 
 use crate::gcs::string_from_gcs;
-use crate::pbms::{local_path_helper, path_from_file_url, GS_SCHEME};
+use crate::pbms::{path_from_file_url, GS_SCHEME};
 use ::gcs::client::{Client, FileProgress, ProgressResult};
 use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -29,14 +29,16 @@ use hyper::{Body, Method, Request};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-pub use crate::gcs::{handle_new_access_token, list_from_gcs};
-pub use crate::pbms::{get_product_dir, get_storage_dir};
-pub use crate::transfer_manifest::transfer_download;
+// Re-export for convenience.
 pub use sdk_metadata::{LoadedProductBundle, ProductBundle};
 
 mod gcs;
 mod pbms;
-pub mod transfer_manifest;
+mod transfer_manifest;
+
+pub use crate::gcs::{handle_new_access_token, list_from_gcs};
+pub use crate::transfer_manifest::transfer_download;
+
 /// Select an Oauth2 authorization flow.
 #[derive(PartialEq, Debug, Clone)]
 pub enum AuthFlowChoice {
@@ -74,14 +76,6 @@ impl FromStr for AuthFlowChoice {
             }
         }
     }
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum ListingMode {
-    AllBundles,
-    GetableBundles,
-    ReadyBundlesOnly,
-    RemovableBundles,
 }
 
 pub fn is_local_product_bundle<P: AsRef<Path>>(product_bundle: P) -> bool {
@@ -128,69 +122,6 @@ pub async fn load_product_bundle(product_bundle: &Option<String>) -> Result<Load
         }
     }
     anyhow::bail!("Could not find product bundle in {bundle_path:?}");
-}
-
-/// Determine if a product bundle url refers to a locally-built bundle.
-///
-/// Note that this is a heuristic for PBv1 only. It assumes that only a locally-built bundle
-/// will be have a source URL with a "file" scheme. The implementation will likely change with
-/// PBv2.
-pub fn is_locally_built(product_url: &url::Url) -> bool {
-    product_url.scheme() == "file"
-}
-pub async fn select_product_bundle(
-    _sdk: &ffx_config::Sdk,
-    _looking_for: &Option<String>,
-    _mode: ListingMode,
-    _should_print: bool,
-) -> Result<url::Url> {
-    panic!("product bundle v1 support not compiled in this build. Rebuild with  build_pb_v1=true")
-}
-
-/// Determine whether the data for `product_url` is downloaded and ready to be
-/// used.
-pub async fn is_pb_ready(product_url: &url::Url, sdk_root: &Path) -> Result<bool> {
-    assert!(product_url.as_str().contains("#"));
-    Ok(get_images_dir(product_url, sdk_root).await.context("getting images dir")?.is_dir())
-}
-
-/// Determine the path to the product images data.
-pub async fn get_images_dir(product_url: &url::Url, sdk_root: &Path) -> Result<PathBuf> {
-    assert!(!product_url.as_str().is_empty());
-    let name = product_url.fragment().expect("a URI fragment is required");
-    assert!(!name.is_empty());
-    assert!(!name.contains("/"));
-    local_path_helper(product_url, &format!("{}/images", name), /*dir=*/ true, sdk_root).await
-}
-
-/// Determine the path to the product packages data.
-pub async fn get_packages_dir(product_url: &url::Url, sdk_root: &Path) -> Result<PathBuf> {
-    assert!(!product_url.as_str().is_empty());
-    let name = product_url.fragment().expect("a URI fragment is required");
-    assert!(!name.is_empty());
-    assert!(!name.contains("/"));
-    local_path_helper(product_url, &format!("{}/packages", name), /*dir=*/ true, sdk_root).await
-}
-
-/// Determine the path to the local product metadata directory.
-pub async fn get_metadata_dir(product_url: &url::Url, sdk_root: &Path) -> Result<PathBuf> {
-    assert!(!product_url.as_str().is_empty());
-    assert!(!product_url.fragment().is_none());
-    Ok(get_metadata_glob(product_url, sdk_root)
-        .await
-        .context("getting metadata")?
-        .parent()
-        .expect("Metadata files should have a parent")
-        .to_path_buf())
-}
-
-/// Determine the glob path to the product metadata.
-///
-/// A glob path may have wildcards, such as "file://foo/*.json".
-pub async fn get_metadata_glob(product_url: &url::Url, sdk_root: &Path) -> Result<PathBuf> {
-    assert!(!product_url.as_str().is_empty());
-    assert!(!product_url.fragment().is_none());
-    local_path_helper(product_url, "product_bundles.json", /*dir=*/ false, sdk_root).await
 }
 
 /// Remove prior output directory, if necessary.
@@ -293,7 +224,7 @@ mod tests {
     use std::fs::File;
     use tempfile::TempDir;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_load_product_bundle_intree_errors() {
         let test_dir = TempDir::new().expect("output directory");
         let build_dir =
@@ -343,7 +274,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_load_product_bundle_no_build_dir() {
         let _env = ffx_config::test_init().await.unwrap();
 
@@ -364,7 +295,7 @@ mod tests {
         assert!(!is_local_product_bundle("gs://fuchsia/test_fake.tgz"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_make_way_for_output() {
         let test_dir = tempfile::TempDir::new().expect("temp dir");
 
@@ -408,7 +339,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_load_product_bundle_v2_valid() {
         let tmp = TempDir::new().unwrap();
         let pb_dir = make_pb_v2_in!(tmp, "fake.x64");
@@ -431,7 +362,7 @@ mod tests {
         assert_eq!(pb.loaded_from_path(), pb_dir);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_load_product_bundle_v2_invalid() {
         let tmp = TempDir::new().unwrap();
         let pb_dir = Utf8Path::from_path(tmp.path()).unwrap();

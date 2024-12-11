@@ -1,10 +1,5 @@
 {
     "pbms": {
-        "storage": {
-            "path": [
-                "$DATA/pbms"
-            ]
-        },
         "metadata": [
             "gs://fuchsia/development/{version}/sdk/product_bundles.json",
             "{sdk.root}/*.json"
