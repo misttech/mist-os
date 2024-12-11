@@ -13,16 +13,15 @@ use serde::ser::{Error as _, SerializeSeq};
 use serde::{Serialize, Serializer};
 use std::fmt;
 
-/// Lists all available full selectors (component selector + tree selector).
-/// If a selector is provided, it’ll only print selectors for that component.
-/// If a full selector (component + tree) is provided, it lists all selectors under the given node.
+/// Lists all available selectors for the given input of component queries or partial selectors.
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "selectors")]
 pub struct SelectorsCommand {
     #[argh(positional)]
-    /// selectors for which the selectors should be queried. Minimum: 1 unless `--component` is set.
-    /// When `--component` is provided then the selectors should be tree selectors, otherwise
-    /// they can be component selectors or full selectors.
+    /// component query, component selector, or component and tree selector. Minimum: 1 unless
+    /// `--component` is set. When `--component` is provided then the selectors should be tree
+    /// selectors, otherwise they can be component selectors or component and tree selectors.
+    /// Full selectors (including a property segment) are allowed but not informative.
     pub selectors: Vec<String>,
 
     #[argh(option)]
@@ -52,7 +51,9 @@ impl Command for SelectorsCommand {
         }
 
         if self.selectors.is_empty() && self.component.is_none() && self.manifest.is_none() {
-            return Err(Error::invalid_arguments("Expected 1 or more selectors. Got zero."));
+            return Err(Error::invalid_arguments(
+                "Expected 1 or more component queries or tree selectors. Got zero.",
+            ));
         }
 
         let mut selectors = if let Some(component) = self.component {
