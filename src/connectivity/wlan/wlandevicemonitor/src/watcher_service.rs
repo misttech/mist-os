@@ -61,17 +61,21 @@ impl<P, I> WatcherService<P, I> {
     pub fn add_watcher(
         &self,
         endpoint: ServerEnd<fidl_svc::DeviceWatcherMarker>,
-    ) -> Result<(), fidl::Error> {
+    ) -> Result<(), anyhow::Error> {
         let stream = endpoint.into_stream();
         let handle = stream.control_handle();
         let mut guard = self.inner.lock();
         let inner = &mut *guard;
+        // Apply backpressure if the watcher limit is reached to avoid resource exhaustion.
+        if inner.watchers.len() >= WATCHER_LIMIT {
+            return Err(format_err!("too many watchers"));
+        }
         self.reaper_queue
             .unbounded_send(ReaperTask {
                 watcher_channel: stream,
                 watcher_id: inner.next_watcher_id,
             })
-            .expect("failed to submit a task to the watcher reaper: {}");
+            .map_err(|e| format_err!("failed to submit a task to the reaper: {}", e))?;
         inner.watchers.insert(
             inner.next_watcher_id,
             Watcher { handle, sent_phy_snapshot: false, sent_iface_snapshot: false },
@@ -83,6 +87,8 @@ impl<P, I> WatcherService<P, I> {
     }
 }
 
+// Arbitrarily high limit to prevent unbounded number of watchers.
+const WATCHER_LIMIT: usize = 10000;
 struct Inner<P, I> {
     watchers: HashMap<u64, Watcher>,
     next_watcher_id: u64,
@@ -201,9 +207,8 @@ async fn reap_watchers<P, I>(
     inner: &Mutex<Inner<P, I>>,
     watchers: UnboundedReceiver<ReaperTask>,
 ) -> Result<Infallible, anyhow::Error> {
-    const REAP_CONCURRENT_LIMIT: usize = 10000;
     watchers
-        .for_each_concurrent(REAP_CONCURRENT_LIMIT, move |w| {
+        .for_each_concurrent(None, move |w| {
             // Wait for the other side to close the channel (or an error to occur)
             // and remove the watcher from the maps
             async move {
@@ -221,6 +226,7 @@ mod tests {
     use fidl_fuchsia_wlan_device_service::DeviceWatcherEvent;
     use fuchsia_async::TestExecutor;
     use futures::task::Poll;
+    use rand::Rng;
     use std::mem;
     use std::pin::pin;
 
@@ -248,6 +254,61 @@ mod tests {
             panic!("future returned an error (1): {:?}", e);
         }
         assert_eq!(0, helper.service.inner.lock().watchers.len());
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn reaper_can_handle_many_active_watchers() {
+        let (helper, future) = setup();
+        let mut future = pin!(future);
+        let mut rng = rand::thread_rng();
+        assert_eq!(0, helper.service.inner.lock().watchers.len());
+
+        // Add lots of watchers and randomly remove some at uneven intervals.
+        let mut active_clients = Vec::with_capacity(2000);
+        for _ in 0..2000 {
+            let (client_end, server_end) = fidl::endpoints::create_endpoints();
+            helper.service.add_watcher(server_end).expect("add_watcher failed");
+            active_clients.push(client_end);
+            assert_eq!(active_clients.len(), helper.service.inner.lock().watchers.len());
+
+            // Run the reaper and make sure the watcher is still there
+            if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
+                panic!("future returned an error (1): {:?}", e);
+            }
+            assert_eq!(active_clients.len(), helper.service.inner.lock().watchers.len());
+
+            // Remove some of the watchers every ~100 iterations
+            if rng.gen_bool(0.01) {
+                active_clients.retain(|_| rng.gen_bool(0.9));
+
+                if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
+                    panic!("future returned an error (1): {:?}", e);
+                }
+                assert_eq!(active_clients.len(), helper.service.inner.lock().watchers.len());
+            }
+        }
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn active_watchers_limited_at_watcher_limit() {
+        let (helper, future) = setup();
+        let mut future = pin!(future);
+
+        // Add lots of watchers and randomly remove some at uneven intervals.
+        let mut active_clients = Vec::with_capacity(2000);
+        for _ in 0..WATCHER_LIMIT {
+            let (client_end, server_end) = fidl::endpoints::create_endpoints();
+            helper.service.add_watcher(server_end).expect("add_watcher failed");
+            active_clients.push(client_end);
+            if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
+                panic!("future returned an error (1): {:?}", e);
+            }
+        }
+
+        let (_, server_end) = fidl::endpoints::create_endpoints();
+
+        // Add a watcher and check that it was added to the map
+        helper.service.add_watcher(server_end).expect_err("added a watcher beyond WATCHER_LIMIT");
     }
 
     #[fuchsia::test]
