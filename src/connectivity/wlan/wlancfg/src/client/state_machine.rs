@@ -794,11 +794,14 @@ async fn connected_state(
                 });
             }
             roam_request = options.roam_receiver.select_next_some() => {
-                // TODO(nmccracken) Roam to this network once we have decided proactive roaming is ready to enable.
-                debug!(
-                    "Roam request to candidate {:?} received, not yet implemented.",
-                    roam_request.to_string_without_pii()
-                );
+                let _ = common_options
+                .proxy
+                .roam(&fidl_sme::RoamRequest {
+                    bss_description: Sequestered::release(roam_request.bss.bss_description)
+                })
+                .inspect_err(|e| {
+                    error!("Error sending sme roam request: {}", e);
+                });
             }
         }
     }
@@ -1116,8 +1119,9 @@ mod tests {
     use crate::util::listener;
     use crate::util::state_machine::{status_publisher_and_reader, StateMachineStatusReader};
     use crate::util::testing::{
-        generate_connect_selection, generate_disconnect_info, poll_sme_req, random_connection_data,
-        ConnectResultRecord, ConnectionRecord, FakeSavedNetworksManager,
+        generate_connect_selection, generate_disconnect_info, generate_random_scanned_candidate,
+        poll_sme_req, random_connection_data, ConnectResultRecord, ConnectionRecord,
+        FakeSavedNetworksManager,
     };
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fidl::prelude::*;
@@ -3085,6 +3089,64 @@ mod tests {
                 assert_eq!(info.ap_state.tracked.channel.primary, 10);
             });
         });
+    }
+
+    #[fuchsia::test]
+    fn connected_state_on_roam_request() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+
+        let mut test_values = test_setup();
+        let sme_fut = test_values.sme_req_stream.into_future();
+        let mut sme_fut = pin!(sme_fut);
+
+        // Set up the state machine, starting at the connected state.
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+        let (connect_txn_proxy, _connect_txn_stream) =
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
+        let initial_state = connected_state(test_values.common_options, options);
+        let fut = run_state_machine(initial_state);
+        let mut fut = pin!(fut);
+
+        // Run the state machine.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        let mut roam_request_sender;
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { roam_sender, .. } => {
+                roam_request_sender = roam_sender;
+            });
+        });
+
+        // Send a roam request to state machine.
+        let roam_candidate = generate_random_scanned_candidate();
+        roam_request_sender.try_send(roam_candidate.clone()).unwrap();
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify state machine issues a roam to SME.
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ClientSmeRequest::Roam{ req, ..}) => {
+                assert_eq!(req.bss_description, Sequestered::release(roam_candidate.bss.bss_description));
+            }
+        );
     }
 
     #[fuchsia::test]
