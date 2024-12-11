@@ -97,6 +97,7 @@ zx_library("starnix_kernel_runner") {
   sources = [
     "debugcommands.cc",
     "runner/container.cc",
+    "runner/features.cc",
     "runner/mounts.cc",
   ]
 
