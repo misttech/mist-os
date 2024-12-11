@@ -101,7 +101,7 @@ config("compiler") {
 
     # Which libc++ to link:
     _libcxx_dir =
-        "${rebased_clang_prefix}/../lib/${current_target_tuple}${_multilib_dir}"
+        "${rebased_clang_dir}/lib/${current_target_tuple}${_multilib_dir}"
 
     rustflags = [
       "-L",
