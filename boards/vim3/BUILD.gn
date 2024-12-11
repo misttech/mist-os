@@ -15,6 +15,7 @@ common_board_configuration = {
   name = "vim3"
 
   provided_features = [
+    "fuchsia::aml-hrtimer",
     "fuchsia::bt_transport_uart",
     "fuchsia::bus_pci",
     "fuchsia::fake_battery",
