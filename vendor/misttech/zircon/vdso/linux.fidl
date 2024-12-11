@@ -414,11 +414,18 @@ closed protocol Linux {
         bufsiz int32;
     }) -> () error int64;
 
-    // STUB 90
-    strict A0090Chmod() -> () error int64;
+    // #90, SYSCALL_DEFINE2(chmod, const char __user *, filename, umode_t, mode)
+    strict A0090Chmod(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+        mode uint16;
+    }) -> () error int64;
 
-    // STUB 91
-    strict A0091Fchmod() -> () error int64;
+    // #91, SYSCALL_DEFINE2(fchmod, unsigned int, fd, umode_t, mode)
+    strict A0091Fchmod(resource struct {
+        fd uint32;
+        mode uint16;
+    }) -> () error int64;
 
     // STUB 92
     strict A0092Chown() -> () error int64;
@@ -983,8 +990,13 @@ closed protocol Linux {
         bufsiz int32;
     }) -> () error int64;
 
-    // STUB 268
-    strict A0268Fchmodat() -> () error int64;
+    // #268, SYSCALL_DEFINE3(fchmodat, int, dfd, const char __user *, filename, umode_t, mode)
+    strict A0268Fchmodat(resource struct {
+        dfd int64;
+        @in
+        filename experimental_pointer<uchar>;
+        mode uint16;
+    }) -> () error int64;
 
     // STUB 269
     strict A0269Faccessat() -> () error int64;
@@ -1565,8 +1577,14 @@ closed protocol Linux {
     // STUB 451
     strict A0451Cachestat() -> () error int64;
 
-    // STUB 452
-    strict A0452Fchmodat2() -> () error int64;
+    // #452, SYSCALL_DEFINE4(fchmodat2, int, dfd, const char __user *, filename, umode_t, mode, unsigned int, flags)
+    strict A0452Fchmodat2(resource struct {
+        dfd int32;
+        @in
+        filename experimental_pointer<uchar>;
+        mode uint16;
+        flags uint32;
+    }) -> () error int64;
 
     // STUB 453
     strict A0453MapShadowStack() -> () error int64;
