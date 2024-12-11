@@ -5,11 +5,10 @@
 use anyhow::format_err;
 use fidl::endpoints::ServerEnd;
 use fidl::prelude::*;
-use fidl_fuchsia_wlan_device_service::{
-    self as fidl_svc, DeviceWatcherControlHandle, DeviceWatcherRequestStream,
-};
+use fidl_fuchsia_wlan_device_service::{self as fidl_svc, DeviceWatcherControlHandle};
+use fuchsia_async::Task;
 use fuchsia_sync::Mutex;
-use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::UnboundedReceiver;
 use futures::prelude::*;
 use futures::try_join;
 use std::collections::HashMap;
@@ -26,38 +25,36 @@ pub fn serve_watchers<P, I>(
     ifaces: Arc<WatchableMap<u16, I>>,
     phy_events: UnboundedReceiver<MapEvent<u16, P>>,
     iface_events: UnboundedReceiver<MapEvent<u16, I>>,
-) -> (WatcherService<P, I>, impl Future<Output = Result<Infallible, anyhow::Error>>)
-where
-    P: 'static,
-    I: 'static,
-{
+) -> (WatcherService<P, I>, impl Future<Output = Result<Infallible, anyhow::Error>>) {
     let inner =
         Arc::new(Mutex::new(Inner { watchers: HashMap::new(), next_watcher_id: 0, phys, ifaces }));
-    let (reaper_sender, reaper_receiver) = mpsc::unbounded();
-    let s = WatcherService { inner: Arc::clone(&inner), reaper_queue: reaper_sender };
+    let s = WatcherService { inner: Arc::clone(&inner) };
 
     let fut = async move {
         let phy_fut = notify_phy_watchers(phy_events, &inner);
         let iface_fut = notify_iface_watchers(iface_events, &inner);
-        let reaper_fut = reap_watchers(&inner, reaper_receiver);
-        try_join!(phy_fut, iface_fut, reaper_fut).map(|x: (Infallible, Infallible, Infallible)| x.0)
+        try_join!(phy_fut, iface_fut).map(|x: (Infallible, Infallible)| x.0)
     };
     (s, fut)
 }
 
 pub struct WatcherService<P, I> {
     inner: Arc<Mutex<Inner<P, I>>>,
-    reaper_queue: UnboundedSender<ReaperTask>,
 }
 
 // Manual clone impl since #derive uses incorrect trait bounds
 impl<P, I> Clone for WatcherService<P, I> {
     fn clone(&self) -> Self {
-        WatcherService { inner: self.inner.clone(), reaper_queue: self.reaper_queue.clone() }
+        WatcherService { inner: self.inner.clone() }
     }
 }
 
-impl<P, I> WatcherService<P, I> {
+// P and I must have static lifetime because add_watcher spawns a task for each watcher
+// that may drop a device when its watcher closes the channel. The task itself exists
+// independent of the lifetime of the values in each WatchableMap.
+impl<P: 'static, I: 'static> WatcherService<P, I> {
+    // This function will panic if not called in the context of a
+    // running fuchsia_async executor.
     pub fn add_watcher(
         &self,
         endpoint: ServerEnd<fidl_svc::DeviceWatcherMarker>,
@@ -70,19 +67,30 @@ impl<P, I> WatcherService<P, I> {
         if inner.watchers.len() >= WATCHER_LIMIT {
             return Err(format_err!("too many watchers"));
         }
-        self.reaper_queue
-            .unbounded_send(ReaperTask {
-                watcher_channel: stream,
-                watcher_id: inner.next_watcher_id,
-            })
-            .map_err(|e| format_err!("failed to submit a task to the reaper: {}", e))?;
+
+        let watcher_id = inner.next_watcher_id;
+        inner.next_watcher_id += 1;
+
+        // Spawn a task that removes watchers from device maps when their FIDL channels
+        // close. Otherwise, watchers will not be removed until a notification fails
+        // to be sent.
+        Task::local({
+            // Wait for the other side to close the channel (or an error to occur)
+            // and remove the watcher from the maps
+
+            let inner = self.inner.clone();
+            async move {
+                stream.map(|_| ()).collect::<()>().await;
+                inner.lock().watchers.remove(&watcher_id);
+            }
+        })
+        .detach();
         inner.watchers.insert(
-            inner.next_watcher_id,
+            watcher_id,
             Watcher { handle, sent_phy_snapshot: false, sent_iface_snapshot: false },
         );
         inner.phys.request_snapshot();
         inner.ifaces.request_snapshot();
-        inner.next_watcher_id += 1;
         Ok(())
     }
 }
@@ -194,32 +202,6 @@ async fn notify_iface_watchers<P, I>(
     Err(format_err!("stream of events from the iface device map has ended unexpectedly"))
 }
 
-struct ReaperTask {
-    watcher_channel: DeviceWatcherRequestStream,
-    watcher_id: u64,
-}
-
-/// A future that removes watchers from device maps when their FIDL channels get
-/// closed. Performing this clean up solely when notification fails is not
-/// sufficient: in the scenario where devices are not being added or removed,
-/// but new clients come and go, the watcher list could grow without bound.
-async fn reap_watchers<P, I>(
-    inner: &Mutex<Inner<P, I>>,
-    watchers: UnboundedReceiver<ReaperTask>,
-) -> Result<Infallible, anyhow::Error> {
-    watchers
-        .for_each_concurrent(None, move |w| {
-            // Wait for the other side to close the channel (or an error to occur)
-            // and remove the watcher from the maps
-            async move {
-                w.watcher_channel.map(|_| ()).collect::<()>().await;
-                inner.lock().watchers.remove(&w.watcher_id);
-            }
-        })
-        .await;
-    Err(format_err!("stream of watcher channels has ended unexpectedly"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,9 +212,8 @@ mod tests {
     use std::mem;
     use std::pin::pin;
 
-    #[fuchsia::test]
-    fn reaper_destroys_watcher_after_losing_connection() {
-        let exec = &mut TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn reaper_destroys_watcher_after_losing_connection() {
         let (helper, future) = setup();
         let mut future = pin!(future);
         assert_eq!(0, helper.service.inner.lock().watchers.len());
@@ -243,14 +224,14 @@ mod tests {
         assert_eq!(1, helper.service.inner.lock().watchers.len());
 
         // Run the reaper and make sure the watcher is still there
-        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+        if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
             panic!("future returned an error (1): {:?}", e);
         }
         assert_eq!(1, helper.service.inner.lock().watchers.len());
 
         // Drop the client end of the channel and run the reaper again
         mem::drop(client_end);
-        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+        if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
             panic!("future returned an error (1): {:?}", e);
         }
         assert_eq!(0, helper.service.inner.lock().watchers.len());
@@ -311,9 +292,8 @@ mod tests {
         helper.service.add_watcher(server_end).expect_err("added a watcher beyond WATCHER_LIMIT");
     }
 
-    #[fuchsia::test]
-    fn client_receives_one_to_one_in_order_phy_events() {
-        let exec = &mut TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_receives_one_to_one_in_order_phy_events() {
         let (helper, future) = setup();
         let mut future = pin!(future);
         let (proxy, server_end) = fidl::endpoints::create_proxy();
@@ -324,11 +304,11 @@ mod tests {
         helper.phys.remove(&20);
 
         // Run the server future to propagate the events to FIDL clients
-        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+        if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
             panic!("server future returned an error: {:?}", e);
         }
 
-        let events = consume_events_until_stalled(exec, proxy.take_event_stream());
+        let events = consume_events_until_stalled(proxy.take_event_stream()).await;
         assert_eq!(3, events.len());
         // Sadly, generated Event struct doesn't implement PartialEq
         match &events[0] {
@@ -345,9 +325,8 @@ mod tests {
         }
     }
 
-    #[fuchsia::test]
-    fn client_receives_one_to_one_in_order_iface_events() {
-        let exec = &mut TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_receives_one_to_one_in_order_iface_events() {
         let (helper, future) = setup();
         let mut future = pin!(future);
         let (proxy, server_end) = fidl::endpoints::create_proxy();
@@ -357,11 +336,11 @@ mod tests {
         helper.ifaces.remove(&50);
 
         // Run the server future to propagate the events to FIDL clients
-        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+        if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
             panic!("server future returned an error: {:?}", e);
         }
 
-        let events = consume_events_until_stalled(exec, proxy.take_event_stream());
+        let events = consume_events_until_stalled(proxy.take_event_stream()).await;
         assert_eq!(2, events.len());
         match &events[0] {
             &DeviceWatcherEvent::OnIfaceAdded { iface_id: 50 } => {}
@@ -373,9 +352,8 @@ mod tests {
         }
     }
 
-    #[fuchsia::test]
-    fn initial_snapshot_events_only_contain_present_phys() {
-        let exec = &mut TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn initial_snapshot_events_only_contain_present_phys() {
         let (helper, future) = setup();
         let mut future = pin!(future);
 
@@ -387,12 +365,12 @@ mod tests {
         // Now add the watcher and pump the events
         let (proxy, server_end) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end).expect("add_watcher failed");
-        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+        if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
             panic!("server future returned an error: {:?}", e);
         }
 
         // The watcher should only see phy #30 being "added"
-        let events = consume_events_until_stalled(exec, proxy.take_event_stream());
+        let events = consume_events_until_stalled(proxy.take_event_stream()).await;
         assert_eq!(1, events.len());
         match &events[0] {
             &DeviceWatcherEvent::OnPhyAdded { phy_id: 30 } => {}
@@ -400,9 +378,8 @@ mod tests {
         }
     }
 
-    #[fuchsia::test]
-    fn initial_snapshot_events_only_contain_present_ifaces() {
-        let exec = &mut TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn initial_snapshot_events_only_contain_present_ifaces() {
         let (helper, future) = setup();
         let mut future = pin!(future);
 
@@ -414,12 +391,12 @@ mod tests {
         // Now add the watcher and pump the events
         let (proxy, server_end) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end).expect("add_watcher failed");
-        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+        if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
             panic!("server future returned an error: {:?}", e);
         }
 
         // The watcher should only see iface #30 being "added"
-        let events = consume_events_until_stalled(exec, proxy.take_event_stream());
+        let events = consume_events_until_stalled(proxy.take_event_stream()).await;
         assert_eq!(1, events.len());
         match &events[0] {
             &DeviceWatcherEvent::OnIfaceAdded { iface_id: 30 } => {}
@@ -427,9 +404,8 @@ mod tests {
         }
     }
 
-    #[fuchsia::test]
-    fn initial_updates_for_multiple_watchers_are_identical() {
-        let exec = &mut TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn initial_updates_for_multiple_watchers_are_identical() {
         let (helper, future) = setup();
         let mut future = pin!(future);
 
@@ -442,18 +418,17 @@ mod tests {
         helper.service.add_watcher(server_end_one).expect("add_watcher failed (1)");
         let (proxy_two, server_end_two) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end_two).expect("add_watcher failed (2)");
-        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+        if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
             panic!("server future returned an error: {:?}", e);
         }
-        let events_one = consume_events_until_stalled(exec, proxy_one.take_event_stream());
+        let events_one = consume_events_until_stalled(proxy_one.take_event_stream()).await;
         assert_eq!(3, events_one.len());
-        let events_two = consume_events_until_stalled(exec, proxy_two.take_event_stream());
+        let events_two = consume_events_until_stalled(proxy_two.take_event_stream()).await;
         expect_lists_are_identical(events_one, events_two);
     }
 
-    #[fuchsia::test]
-    fn adding_watchers_does_not_retrigger_snapshots() {
-        let exec = &mut TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn adding_watchers_does_not_retrigger_snapshots() {
         let (helper, future) = setup();
         let mut future = pin!(future);
 
@@ -463,29 +438,28 @@ mod tests {
         // Add first watcher
         let (proxy_one, server_end_one) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end_one).expect("add_watcher failed (1)");
-        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+        if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
             panic!("server future returned an error: {:?}", e);
         }
         // Consume events from snapshot upon adding the first watcher
-        let events_one = consume_events_until_stalled(exec, proxy_one.take_event_stream());
+        let events_one = consume_events_until_stalled(proxy_one.take_event_stream()).await;
         assert_eq!(2, events_one.len());
 
         // Add second watcher
         let (proxy_two, server_end_two) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end_two).expect("add_watcher failed (2)");
-        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+        if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
             panic!("server future returned an error: {:?}", e);
         }
         // Check that the first watcher did not retrigger a snapshot.
-        assert_eq!(consume_events_until_stalled(exec, proxy_one.take_event_stream()).len(), 0);
+        assert_eq!(consume_events_until_stalled(proxy_one.take_event_stream()).await.len(), 0);
         // Consume events from snapshot upon adding the second watcher
-        let events_two = consume_events_until_stalled(exec, proxy_two.take_event_stream());
+        let events_two = consume_events_until_stalled(proxy_two.take_event_stream()).await;
         expect_lists_are_identical(events_one, events_two);
     }
 
-    #[fuchsia::test]
-    fn error_sending_an_update_destroys_the_watcher() {
-        let exec = &mut TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn error_sending_an_update_destroys_the_watcher() {
         let (helper, future) = setup();
         let mut future = pin!(future);
 
@@ -496,7 +470,7 @@ mod tests {
             server_handle.replace(zx::Rights::READ | zx::Rights::WAIT).unwrap().into();
 
         helper.service.add_watcher(ServerEnd::new(reduced_chan)).expect("add_watcher failed");
-        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+        if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
             panic!("future returned an error (1): {:?}", e);
         }
         assert_eq!(1, helper.service.inner.lock().watchers.len());
@@ -505,7 +479,7 @@ mod tests {
         helper.phys.insert(20, 2000);
 
         // The watcher should be now removed since sending the event fails
-        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+        if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
             panic!("future returned an error (1): {:?}", e);
         }
         assert_eq!(0, helper.service.inner.lock().watchers.len());
@@ -532,13 +506,12 @@ mod tests {
         (helper, future)
     }
 
-    fn consume_events_until_stalled(
-        exec: &mut TestExecutor,
+    async fn consume_events_until_stalled(
         mut stream: fidl_svc::DeviceWatcherEventStream,
     ) -> Vec<DeviceWatcherEvent> {
         let mut events = vec![];
         loop {
-            match exec.run_until_stalled(&mut stream.try_next()) {
+            match TestExecutor::poll_until_stalled(&mut stream.try_next()).await {
                 Poll::Ready(Err(e)) => panic!("event stream future returned an error: {:?}", e),
                 Poll::Pending | Poll::Ready(Ok(None)) => break events,
                 Poll::Ready(Ok(Some(event))) => events.push(event),
