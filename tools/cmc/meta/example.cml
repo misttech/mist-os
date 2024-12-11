@@ -7,15 +7,7 @@
         // See: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=99631#c16
         "//sdk/lib/sys/testing/coverage.shard.cml",
         "inspect/offer.shard.cml",
-
-        // Explicit shards are needed because we assert
-        // on specific CML declarations. This test would
-        // break if we switched the default shards to dictionary,
-        // so for now this uses the SDK shards.
-        // This will be updated to no longer be special-cased
-        // prior to switching the SDK to use dictionaries.
-        "syslog/shards/offer.shard.cml",
-        "syslog/shards/use.shard.cml",
+        "syslog/client.shard.cml",
     ],
     program: {
         runner: "elf",

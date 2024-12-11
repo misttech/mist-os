@@ -52,6 +52,7 @@
             from: "parent",
             to: [
                 "#archivist",
+                "#elf_runner",
                 "#reader",
             ],
         },

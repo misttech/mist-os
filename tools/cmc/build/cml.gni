@@ -134,7 +134,7 @@ template("cm") {
       # This behavior will eventually be the default everywhere: https://fxbug.dev/42175121
       required_offers = {
         protocol = [ "fuchsia.logger.LogSink" ]
-        dictionary = []
+        dictionary = [ "diagnostics" ]
       }
     }
 

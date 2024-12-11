@@ -4,7 +4,7 @@
 {
     include: [
         "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
+        "syslog/shards/client.shard.cml",
         "trace/client.shard.cml",
     ],
     program: {

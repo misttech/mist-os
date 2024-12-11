@@ -17,6 +17,12 @@
             to: "#test_root",
             availability: "optional",
         },
+        {
+            dictionary: "diagnostics",
+            from: "void",
+            to: "#test_root",
+            availability: "optional",
+        },
     ],
     expose: [
         {

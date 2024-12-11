@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/sys/component_manager/tests/meta/elf_runner_and_environment_custom_logsink.shard.cml" ],
+    include: [
+        "//src/sys/component_manager/tests/meta/elf_runner_and_environment_custom_logsink.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
             name: "test_component_01",
@@ -14,15 +17,6 @@
     offer: [
         {
             protocol: "fidl.examples.routing.echo.Echo",
-            from: "parent",
-            to: "all",
-        },
-
-        // LogSink must be manually routed here because this is running in a custom
-        // environment where only protocols (not dictionaries) can be routed to the inner
-        // component manager used by the tests.
-        {
-            protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: "all",
         },
