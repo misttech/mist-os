@@ -5,6 +5,7 @@
 
 import("//build/compiled_action.gni")
 import("//build/config/build_api_module.gni")
+import("//build/config/compiler.gni")
 import("//build/rust/config.gni")
 import("//build/testing/validated_test_types_group.gni")
 import("//build/toolchain/zircon/clang.gni")
@@ -175,6 +176,10 @@ build_api_module("tests") {
   data_keys = [ "tests" ]
   walk_keys = [ "tests_barrier" ]
   deps = [
+    # Pull in tests from host_labels.  This is deprecated, and tests should be
+    # in //:host_tests instead.
+    "//:host",
+
     # Pull in tests from the non-device type-specific test groups.
     "//:host_tests",
   ]
