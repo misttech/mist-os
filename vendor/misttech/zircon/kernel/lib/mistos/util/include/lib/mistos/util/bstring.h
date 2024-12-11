@@ -52,6 +52,9 @@ class BString {
   // Allocates heap memory only if |str.length()| is non-zero.
   BString(ktl::string_view str) : BString(str.data(), str.length()) {}
 
+  // Appends an element to the back of a collection.
+  void push(char value, fbl::AllocChecker* ac) { data_.push_back(value, ac); }
+
   // Returns a pointer to the null-terminated contents of the string.
   const char* data() const { return data_.data(); }
   const char* c_str() const { return data(); }
