@@ -109,7 +109,7 @@ template("generate_archivist_integration_test_cases") {
 
   # TODO(https://fxbug.dev/383560524): This is disabled until we fix an error in the test.
   if (defined(invoker.api_level) && invoker.api_level == "25") {
-    not_needed([ "test_info " ])
+    not_needed([ "test_info" ])
     group(target_name) {
     }
   } else {
