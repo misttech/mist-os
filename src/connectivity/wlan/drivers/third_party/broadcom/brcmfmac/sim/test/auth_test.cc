@@ -90,7 +90,7 @@ class AuthInterface : public SimInterface {
   }
   void SaeHandshakeInd(SaeHandshakeIndRequestView request,
                        SaeHandshakeIndCompleter::Sync& completer) override {
-    on_sae_handshake_ind_(&request->ind);
+    on_sae_handshake_ind_(request);
     completer.Reply();
   }
   void SaeFrameRx(SaeFrameRxRequestView request, SaeFrameRxCompleter::Sync& completer) override {
@@ -102,7 +102,8 @@ class AuthInterface : public SimInterface {
       on_scan_result_;
   std::function<void(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest*)>
       on_connect_confirm_;
-  std::function<void(const wlan_fullmac_wire::WlanFullmacSaeHandshakeInd*)> on_sae_handshake_ind_;
+  std::function<void(const wlan_fullmac_wire::WlanFullmacImplIfcSaeHandshakeIndRequest*)>
+      on_sae_handshake_ind_;
   std::function<void(const wlan_fullmac_wire::SaeFrame*)> on_sae_frame_;
 };
 
@@ -152,7 +153,7 @@ class AuthTest : public SimTest {
   // Event handlers
   void OnScanResult(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest* result);
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp);
-  void OnSaeHandshakeInd(const wlan_fullmac_wire::WlanFullmacSaeHandshakeInd* ind);
+  void OnSaeHandshakeInd(const wlan_fullmac_wire::WlanFullmacImplIfcSaeHandshakeIndRequest* ind);
   void OnSaeFrameRx(const wlan_fullmac_wire::SaeFrame* frame);
 
   // This is the interface we will use for our single client interface
@@ -501,8 +502,9 @@ void AuthTest::OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectC
   }
 }
 
-void AuthTest::OnSaeHandshakeInd(const wlan_fullmac_wire::WlanFullmacSaeHandshakeInd* ind) {
-  common::MacAddr peer_sta_addr(ind->peer_sta_address.data());
+void AuthTest::OnSaeHandshakeInd(
+    const wlan_fullmac_wire::WlanFullmacImplIfcSaeHandshakeIndRequest* ind) {
+  common::MacAddr peer_sta_addr(ind->peer_sta_address().data());
   ASSERT_EQ(peer_sta_addr, kDefaultBssid);
 
   // Send the error injected commit frame instead if it exists.

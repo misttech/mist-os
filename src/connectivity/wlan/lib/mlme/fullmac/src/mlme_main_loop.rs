@@ -1835,8 +1835,10 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let sae_handshake_ind =
-            fidl_fullmac::WlanFullmacSaeHandshakeInd { peer_sta_address: [1u8; 6] };
+        let sae_handshake_ind = fidl_fullmac::WlanFullmacImplIfcSaeHandshakeIndRequest {
+            peer_sta_address: Some([1u8; 6]),
+            ..Default::default()
+        };
         assert_variant!(
             h.exec
                 .run_until_stalled(&mut h.fullmac_ifc_proxy.sae_handshake_ind(&sae_handshake_ind)),

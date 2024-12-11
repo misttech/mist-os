@@ -493,9 +493,11 @@ pub fn convert_pmk_info(
     })
 }
 pub fn convert_sae_handshake_indication(
-    ind: fidl_fullmac::WlanFullmacSaeHandshakeInd,
-) -> fidl_mlme::SaeHandshakeIndication {
-    fidl_mlme::SaeHandshakeIndication { peer_sta_address: ind.peer_sta_address }
+    ind: fidl_fullmac::WlanFullmacImplIfcSaeHandshakeIndRequest,
+) -> Result<fidl_mlme::SaeHandshakeIndication> {
+    Ok(fidl_mlme::SaeHandshakeIndication {
+        peer_sta_address: ind.peer_sta_address.context("missing peer_sta_address")?,
+    })
 }
 pub fn convert_sae_frame(frame: fidl_fullmac::SaeFrame) -> Result<fidl_mlme::SaeFrame> {
     Ok(fidl_mlme::SaeFrame {

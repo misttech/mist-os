@@ -667,8 +667,9 @@ async fn test_wpa3_connect_success() {
         // Kick off SAE handshake by sending SaeHandshakeInd
         fullmac_driver
             .ifc_proxy
-            .sae_handshake_ind(&fidl_fullmac::WlanFullmacSaeHandshakeInd {
-                peer_sta_address: COMPATIBLE_WPA3_BSS.bssid.to_array(),
+            .sae_handshake_ind(&fidl_fullmac::WlanFullmacImplIfcSaeHandshakeIndRequest {
+                peer_sta_address: Some(COMPATIBLE_WPA3_BSS.bssid.to_array()),
+                ..Default::default()
             })
             .await
             .expect("Could not send SaeHandshakeInd");

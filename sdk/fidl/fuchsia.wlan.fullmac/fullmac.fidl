@@ -105,10 +105,6 @@ type WlanFullmacSignalReportIndication = struct {
     snr_db int8;
 };
 
-type WlanFullmacSaeHandshakeInd = struct {
-    peer_sta_address ieee80211.MacAddr;
-};
-
 type WlanFullmacBandCapability = struct {
     /// The values of this struct apply to the band indicated in this field.
     band ieee80211.WlanBand;
@@ -487,8 +483,8 @@ closed protocol WlanFullmacImplIfc {
         /// The PMK IDs. Required.
         2: pmkid vector<uint8>:MAX;
     }) -> ();
-    strict SaeHandshakeInd(struct {
-        ind WlanFullmacSaeHandshakeInd;
+    strict SaeHandshakeInd(table {
+        1: peer_sta_address ieee80211.MacAddr;
     }) -> ();
     /// Receive an SAE authentication frame.
     strict SaeFrameRx(struct {
