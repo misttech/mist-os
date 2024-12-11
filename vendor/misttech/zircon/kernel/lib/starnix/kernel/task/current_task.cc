@@ -546,27 +546,20 @@ fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const ktl::st
   LTRACEF_LEVEL(2, "path=[%.*s]\n", static_cast<int>(path.size()), path.data());
 
   // Executable must be a regular file
-  /*
-  if !executable.name.entry.node.is_reg() {
-      return error!(EACCES);
+  if (!executable->name_->entry_->node_->is_reg()) {
+    return fit::error(errno(EACCES));
   }
-  */
 
   // File node must have EXEC mode permissions.
   // Note that the ability to execute a file is unrelated to the flags
   // used in the `open` call.
+  _EP(executable->name_->check_access(*this, Access(AccessEnum::EXEC),
+                                      CheckAccessReason::InternalPermissionChecks));
   /*
-  executable.name.check_access(self, Access::EXEC)?;
-
   let elf_selinux_state = selinux_hooks::check_exec_access(self)?;
   */
 
-  auto resolved_elf =
-      resolve_executable(*this, executable, path, argv, environ /*,elf_selinux_state*/);
-  if (resolved_elf.is_error()) {
-    TRACEF("error in resolve_executable: %u\n", resolved_elf.error_value().error_code());
-    return resolved_elf.take_error();
-  }
+  auto resolved_elf = resolve_executable(*this, executable, path, argv, environ) _EP(resolved_elf);
 
   if (task_->thread_group_->Read()->tasks_count() > 1) {
     // track_stub !(TODO("https://fxbug.dev/297434895"), "exec on multithread process");

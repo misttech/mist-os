@@ -20,8 +20,6 @@
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <trace.h>
 
-#include <utility>
-
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
 
@@ -358,7 +356,7 @@ fit::result<Errno, SymlinkTarget> NamespaceNode::readlink(const CurrentTask& cur
 
 fit::result<Errno> NamespaceNode::check_access(const CurrentTask& current_task, Access access,
                                                CheckAccessReason reason) const {
-  return fit::ok();
+  return entry_->node_->check_access(current_task, mount_, access, reason);
 }
 
 fit::result<Errno> NamespaceNode::truncate(const CurrentTask& current_task, uint64_t length) const {
@@ -385,7 +383,7 @@ ActiveNamespaceNode ActiveNamespaceNode::New(NamespaceNode name) {
       name.mount_.handle_.has_value()
           ? ktl::optional<MountClientMarker>{(*name.mount_.handle_)->active_client_counter_}
           : ktl::nullopt;
-  return ActiveNamespaceNode(ktl::move(name), ktl::move(marker));
+  return ActiveNamespaceNode(name, ktl::move(marker));
 }
 
 NamespaceNode ActiveNamespaceNode::to_passive() const {
