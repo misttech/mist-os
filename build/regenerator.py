@@ -40,6 +40,11 @@ def main() -> int:
         help=f"Fuchsia host tag (default {_DEFAULT_HOST_TAG})",
     )
     parser.add_argument(
+        "--update-args",
+        action="store_true",
+        help="Update args.gn before regeneration.",
+    )
+    parser.add_argument(
         "--symlinks-only",
         action="store_true",
         help="Only create convenience symlinks, do not regenerate build plan.",
@@ -96,7 +101,7 @@ def main() -> int:
 
         gn_cmd_args = [
             prebuilt_gn_subpath,
-            "gen",
+            "args" if args.update_args else "gen",
             "--fail-on-unused-args",
             "--check=system",
             "--export-rust-project",

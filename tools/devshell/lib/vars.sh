@@ -193,7 +193,7 @@ function fx-gen {
 }
 
 function fx-gn-args {
-  fx-regenerator "$@"
+  fx-regenerator --update-args "$@"
 }
 
 function fx-build-config-load {
