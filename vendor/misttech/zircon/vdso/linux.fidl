@@ -372,8 +372,12 @@ closed protocol Linux {
     // STUB 78
     strict A0078Getdents() -> () error int64;
 
-    // STUB 79
-    strict A0079Getcwd() -> () error int64;
+    // #79, SYSCALL_DEFINE2(getcwd, char __user *, buf, unsigned long, size)
+    strict A0079Getcwd(resource struct {
+        @out
+        filename experimental_pointer<uchar>;
+        size uint64;
+    }) -> () error int64;
 
     // #80, SYSCALL_DEFINE1(chdir, const char __user *, filename)
     strict A0080Chdir(resource struct {
