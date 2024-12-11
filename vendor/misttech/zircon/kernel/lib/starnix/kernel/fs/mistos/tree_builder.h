@@ -88,11 +88,8 @@ class TreeBuilder {
                 auto entry = d.entries_.find(name);
                 if (entry == d.entries_.end()) {
                   auto child = TreeBuilder(ktl::move(Directory()));
-                  auto result = child.add_path(full_path, ktl::move(traversed), next_component,
-                                               rest, inserter);
-                  if (result.is_error()) {
-                    return result.take_error();
-                  }
+                  _EP(child.add_path(full_path, ktl::move(traversed), next_component, rest,
+                                     inserter));
                   auto [_it, inserted] = d.entries_.emplace(name, ktl::move(child));
                   ZX_ASSERT(inserted);
                   return fit::ok();
@@ -119,11 +116,11 @@ class TreeBuilder {
                           [&](Directory& d) -> SimpleDirectory* {
                             fbl::AllocChecker ac;
                             auto res = new (&ac) SimpleDirectory();
-                            ASSERT(ac.check());
+                            ZX_ASSERT(ac.check());
 
                             for (auto& [name, child] : d.entries_) {
                               auto result = res->add_entry(name, child.build_dyn(fs, name, fn));
-                              ZX_DEBUG_ASSERT_MSG(
+                              ZX_ASSERT_MSG(
                                   result.is_ok(),
                                   "Internal error.  We have already checked all the entry names. \
                              There should be no collisions, nor overly long names.");
@@ -141,29 +138,31 @@ class TreeBuilder {
   template <typename InodeGenFn>
   FsNodeHandle build_dyn(FileSystemHandle fs, ktl::string_view dir, InodeGenFn&& gen_id) {
     auto id = gen_id();
-    return ktl::visit(
-        TreeBuilder::overloaded{
-            [&](Directory& d) -> FsNodeHandle {
-              fbl::AllocChecker ac;
-              auto res = ktl::make_unique<SimpleDirectory>(&ac);
-              ASSERT(ac.check());
+    return ktl::visit(TreeBuilder::overloaded{
+                          [&](Directory& d) -> FsNodeHandle {
+                            fbl::AllocChecker ac;
+                            auto res = ktl::make_unique<SimpleDirectory>(&ac);
+                            ZX_ASSERT(ac.check());
 
-              for (auto& [name, child] : d.entries_) {
-                auto result = res->add_entry(name, child.build_dyn(fs, name, gen_id));
-                ZX_DEBUG_ASSERT_MSG(result.is_ok(),
-                                    "Internal error.  We have already checked all the entry names. \
+                            for (auto& [name, child] : d.entries_) {
+                              auto result = res->add_entry(name, child.build_dyn(fs, name, gen_id));
+                              ZX_ASSERT_MSG(
+                                  result.is_ok(),
+                                  "Internal error.  We have already checked all the entry names. \
                              There should be no collisions, nor overly long names.");
-              }
-              return fs->create_node_with_id_and_creds(ktl::move(res), id,
-                                                       FsNodeInfo::new_factory(mode_, creds_)(id),
-                                                       Credentials::root());
-            },
-            [&](Leaf& l) -> FsNodeHandle {
-              return fs->create_node_with_id_and_creds(
-                  ktl::move(l.entry_), id, FsNodeInfo::new_factory(mode_, entry_creds_)(id),
-                  Credentials::root());
-            }},
-        variant_);
+                            }
+                            return fs->create_node_with_id_and_creds(
+                                ktl::move(res), id,
+                                FsNodeInfo::new_factory(FILE_MODE(IFDIR, 0555), FsCred::root())(id),
+                                Credentials::root());
+                          },
+                          [&](Leaf& l) -> FsNodeHandle {
+                            return fs->create_node_with_id_and_creds(
+                                ktl::move(l.entry_), id,
+                                FsNodeInfo::new_factory(FILE_MODE(IFREG, 0555), FsCred::root())(id),
+                                Credentials::root());
+                          }},
+                      variant_);
   }
 
  private:
@@ -182,10 +181,6 @@ class TreeBuilder {
   overloaded(Ts...) -> overloaded<Ts...>;
 
   ktl::variant<Directory, Leaf> variant_;
-
-  FileMode mode_ = FILE_MODE(IFDIR, 0755);
-  FsCred creds_;
-  FsCred entry_creds_;
 };
 
 }  // namespace starnix
