@@ -17,21 +17,6 @@ type ImageTilingType = strict enum : uint32 {
     CAPTURE = 10;
 };
 
-/// A structure containing information about an image.
-type Image = struct {
-    /// The width and height of the image in pixels.
-    width uint32;
-    height uint32;
-
-    /// The type conveys information about what is providing the pixel data. If this is not
-    /// IMAGE_TILING_TYPE_LINEAR, it is up to the driver and buffer producer to agree on the meaning
-    /// of the value through some mechanism outside the scope of this API.
-    tiling_type uint32;
-
-    /// A driver-defined handle to the image. Each handle must be unique.
-    handle uint64;
-};
-
 /// The intended usage for a sysmem BufferCollection holding image buffers.
 ///
 /// Each buffer in the collection will store a single image, which is intended
