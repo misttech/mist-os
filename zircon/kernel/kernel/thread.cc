@@ -2375,6 +2375,10 @@ ScopedMemoryStall::ScopedMemoryStall() {
 
   AutoPreemptDisabler preempt_disable;
 
+  if (current_thread->memory_stall_state() == ThreadStallState::IgnoredKernelOnly) {
+    return;
+  }
+
   DEBUG_ASSERT(current_thread->memory_stall_state() == ThreadStallState::Progressing);
   current_thread->set_memory_stall_state(ThreadStallState::Stalling);
   percpu::GetCurrent().memory_stall_accumulator.Update(-1, +1);
@@ -2384,6 +2388,10 @@ ScopedMemoryStall::~ScopedMemoryStall() {
   Thread* const current_thread = Thread::Current::Get();
 
   AutoPreemptDisabler preempt_disable;
+
+  if (current_thread->memory_stall_state() == ThreadStallState::IgnoredKernelOnly) {
+    return;
+  }
 
   DEBUG_ASSERT(current_thread->memory_stall_state() == ThreadStallState::Stalling);
   current_thread->set_memory_stall_state(ThreadStallState::Progressing);
