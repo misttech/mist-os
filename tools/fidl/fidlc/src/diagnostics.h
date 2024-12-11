@@ -441,6 +441,14 @@ constexpr ErrorDef<219> ErrCannotChangeMethodStrictness(
 constexpr ErrorDef<220, std::string_view, const Library *, VersionRange,
                    std::vector<std::pair<VersionRange, SourceSpan>>>
     ErrNameNotFoundInVersionRange("cannot find '{0}' in {1} {2}; did find it {3}");
+constexpr ErrorDef<221> ErrResourceForbiddenHere(
+    "'resource' appears in declaration annotated '@no_resource'");
+constexpr ErrorDef<222> ErrExperimentalNoResource(
+    "'@no_resource' is an experimental attribute that must be enabled "
+    "with --experimental no_resource_attribute");
+constexpr ErrorDef<223, std::string_view, std::string_view> ErrNoResourceForbidsCompose(
+    "'{0}' has the '@no_resource` attribute, and thus "
+    "cannot compose '{1}' unless it is also has the '@no_resource' attribute");
 
 // To add a new error:
 //
@@ -674,6 +682,9 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0218 */ &ErrInvalidModifierAvailableArgument,
     /* fi-0219 */ &ErrCannotChangeMethodStrictness,
     /* fi-0220 */ &ErrNameNotFoundInVersionRange,
+    /* fi-0221 */ &ErrResourceForbiddenHere,
+    /* fi-0222 */ &ErrExperimentalNoResource,
+    /* fi-0223 */ &ErrNoResourceForbidsCompose,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

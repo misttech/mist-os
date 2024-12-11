@@ -401,6 +401,16 @@ static bool TransportConstraint(Reporter* reporter, ExperimentalFlagSet flags,
   return true;
 }
 
+static bool NoResourceConstraint(Reporter* reporter, ExperimentalFlagSet flags,
+                                 const Attribute* attribute, const Element* element) {
+  ZX_ASSERT(element);
+  ZX_ASSERT(element->kind == Element::Kind::kProtocol);
+  if (!flags.IsEnabled(ExperimentalFlag::kNoResourceAttribute)) {
+    return reporter->Fail(ErrExperimentalNoResource, attribute->span);
+  }
+  return true;
+}
+
 // static
 AttributeSchemaMap AttributeSchema::OfficialAttributes() {
   AttributeSchemaMap map;
@@ -461,6 +471,7 @@ AttributeSchemaMap AttributeSchema::OfficialAttributes() {
       .AddArg("note", AttributeArgSchema(ConstantValue::Kind::kString,
                                          AttributeArgSchema::Optionality::kOptional))
       .CompileEarly();
+  map["no_resource"].RestrictTo({Element::Kind::kProtocol}).Constrain(NoResourceConstraint);
   return map;
 }
 

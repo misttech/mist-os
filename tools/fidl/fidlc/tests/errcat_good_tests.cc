@@ -1491,5 +1491,25 @@ TEST(ErrcatGoodTests, Good0220) {
   ASSERT_COMPILED(library);
 }
 
+TEST(ErrcatGoodTests, Good0221) {
+  TestLibrary library;
+  library.experimental_flags().Enable(ExperimentalFlag::kNoResourceAttribute);
+  library.AddFile("good/fi-0221.test.fidl");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0222) {
+  TestLibrary library;
+  library.AddFile("good/fi-0222.test.fidl");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0223) {
+  TestLibrary library;
+  library.experimental_flags().Enable(ExperimentalFlag::kNoResourceAttribute);
+  library.AddFile("good/fi-0223.test.fidl");
+  ASSERT_COMPILED(library);
+}
+
 }  // namespace
 }  // namespace fidlc

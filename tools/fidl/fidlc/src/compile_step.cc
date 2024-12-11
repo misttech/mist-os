@@ -91,6 +91,11 @@ void CompileStep::CompileDecl(Decl* decl) {
   }
   decl->state = Decl::State::kCompiling;
   decl_stack_.push_back(decl);
+  bool no_resource = false;
+  if (auto attr = decl->attributes->Get("no_resource")) {
+    no_resource_count_++;
+    no_resource = true;
+  }
   switch (decl->kind) {
     case Decl::Kind::kBuiltin:
       // Nothing to do.
@@ -134,6 +139,9 @@ void CompileStep::CompileDecl(Decl* decl) {
   }  // switch
   decl->state = Decl::State::kCompiled;
   decl_stack_.pop_back();
+  if (no_resource) {
+    no_resource_count_--;
+  }
   library()->declaration_order.push_back(decl);
 }
 
@@ -598,7 +606,13 @@ void CompileStep::CompileModifierList(ModifierList* modifiers, OutModifiers out)
     CompileAttributeList(modifier->attributes.get());
     std::visit(overloaded{
                    [&](Strictness strictness) { *out.strictness = strictness; },
-                   [&](Resourceness resourceness) { *out.resourceness = resourceness; },
+                   [&](Resourceness resourceness) {
+                     *out.resourceness = resourceness;
+
+                     if (resourceness == Resourceness::kResource && no_resource_count_) {
+                       reporter()->Fail(ErrResourceForbiddenHere, modifier->name);
+                     }
+                   },
                    [&](Openness openness) { *out.openness = openness; },
                },
                modifier->value);
@@ -1024,6 +1038,10 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
     }
     auto composed_protocol = static_cast<Protocol*>(target);
     CompileDecl(composed_protocol);
+    if (no_resource_count_ && !composed_protocol->attributes->Get("no_resource")) {
+      reporter()->Fail(ErrNoResourceForbidsCompose, composed.reference.span(),
+                       protocol_declaration->name.decl_name(), composed.GetName());
+    }
     if (openness < composed_protocol->openness) {
       reporter()->Fail(ErrComposedProtocolTooOpen, composed.reference.span(), openness,
                        protocol_declaration->name, composed_protocol->openness.value(),
