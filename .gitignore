@@ -198,7 +198,8 @@ tables_generator_tests_*.txt
 /third_party/Vulkan-ValidationLayers/src
 
 /tmp/
-/vendor/
+/vendor/*
+!/vendor/misttech
 /build/secondary/third_party/ffmpeg
 /build/secondary/third_party/protobuf
 
