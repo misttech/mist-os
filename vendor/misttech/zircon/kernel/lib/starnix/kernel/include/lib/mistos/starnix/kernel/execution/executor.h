@@ -62,9 +62,7 @@ fit::result<zx_status_t, KernelHandle<ThreadDispatcher>> create_thread(
 fit::result<zx_status_t> run_task(CurrentTask current_task);
 
 template <typename PreRunFn, typename TaskCompleteFn>
-void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run,
-                                     TaskCompleteFn&& task_complete/*,
-                  std::optional<PtraceCoreState> ptrace_state*/){
+void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run, TaskCompleteFn&& task_complete) {
   auto weak_task = task_builder.task()->weak_factory_.GetWeakPtr();
   auto ref_task = weak_task.Lock();
 
@@ -81,7 +79,7 @@ void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run,
   auto current_task = CurrentTask::From(ktl::move(task_builder));
   auto pre_run_result = pre_run(current_task);
   if (pre_run_result.is_error()) {
-    TRACEF("Pre run failed from %d. The task will not be run.",
+    TRACEF("Pre run failed from %d. The task will not be run.\n",
            pre_run_result.error_value().error_code());
   } else {
     // Spawn the process' thread.
