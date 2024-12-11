@@ -328,7 +328,7 @@ mod tests {
             panic!("server future returned an error: {:?}", e);
         }
 
-        let events = fetch_events(exec, proxy.take_event_stream());
+        let events = consume_events_until_stalled(exec, proxy.take_event_stream());
         assert_eq!(3, events.len());
         // Sadly, generated Event struct doesn't implement PartialEq
         match &events[0] {
@@ -361,7 +361,7 @@ mod tests {
             panic!("server future returned an error: {:?}", e);
         }
 
-        let events = fetch_events(exec, proxy.take_event_stream());
+        let events = consume_events_until_stalled(exec, proxy.take_event_stream());
         assert_eq!(2, events.len());
         match &events[0] {
             &DeviceWatcherEvent::OnIfaceAdded { iface_id: 50 } => {}
@@ -392,7 +392,7 @@ mod tests {
         }
 
         // The watcher should only see phy #30 being "added"
-        let events = fetch_events(exec, proxy.take_event_stream());
+        let events = consume_events_until_stalled(exec, proxy.take_event_stream());
         assert_eq!(1, events.len());
         match &events[0] {
             &DeviceWatcherEvent::OnPhyAdded { phy_id: 30 } => {}
@@ -419,7 +419,7 @@ mod tests {
         }
 
         // The watcher should only see iface #30 being "added"
-        let events = fetch_events(exec, proxy.take_event_stream());
+        let events = consume_events_until_stalled(exec, proxy.take_event_stream());
         assert_eq!(1, events.len());
         match &events[0] {
             &DeviceWatcherEvent::OnIfaceAdded { iface_id: 30 } => {}
@@ -433,27 +433,54 @@ mod tests {
         let (helper, future) = setup();
         let mut future = pin!(future);
 
+        helper.phys.insert(10, 1000);
+        helper.ifaces.insert(20, 2000);
+        helper.ifaces.insert(30, 3000);
+
+        // Add watchers
+        let (proxy_one, server_end_one) = fidl::endpoints::create_proxy();
+        helper.service.add_watcher(server_end_one).expect("add_watcher failed (1)");
+        let (proxy_two, server_end_two) = fidl::endpoints::create_proxy();
+        helper.service.add_watcher(server_end_two).expect("add_watcher failed (2)");
+        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+            panic!("server future returned an error: {:?}", e);
+        }
+        let events_one = consume_events_until_stalled(exec, proxy_one.take_event_stream());
+        assert_eq!(3, events_one.len());
+        let events_two = consume_events_until_stalled(exec, proxy_two.take_event_stream());
+        expect_lists_are_identical(events_one, events_two);
+    }
+
+    #[fuchsia::test]
+    fn adding_watchers_does_not_retrigger_snapshots() {
+        let exec = &mut TestExecutor::new();
+        let (helper, future) = setup();
+        let mut future = pin!(future);
+
+        helper.phys.insert(10, 1000);
         helper.ifaces.insert(20, 2000);
 
         // Add first watcher
         let (proxy_one, server_end_one) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end_one).expect("add_watcher failed (1)");
+        if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
+            panic!("server future returned an error: {:?}", e);
+        }
+        // Consume events from snapshot upon adding the first watcher
+        let events_one = consume_events_until_stalled(exec, proxy_one.take_event_stream());
+        assert_eq!(2, events_one.len());
 
         // Add second watcher
         let (proxy_two, server_end_two) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end_two).expect("add_watcher failed (2)");
-
-        // Deliver events
         if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
             panic!("server future returned an error: {:?}", e);
         }
-
-        // Each should only receive a single snapshot, despite two snapshots being
-        // requested
-        let events_one = fetch_events(exec, proxy_one.take_event_stream());
-        assert_eq!(1, events_one.len());
-        let events_two = fetch_events(exec, proxy_two.take_event_stream());
-        assert_eq!(1, events_two.len());
+        // Check that the first watcher did not retrigger a snapshot.
+        assert_eq!(consume_events_until_stalled(exec, proxy_one.take_event_stream()).len(), 0);
+        // Consume events from snapshot upon adding the second watcher
+        let events_two = consume_events_until_stalled(exec, proxy_two.take_event_stream());
+        expect_lists_are_identical(events_one, events_two);
     }
 
     #[fuchsia::test]
@@ -505,7 +532,7 @@ mod tests {
         (helper, future)
     }
 
-    fn fetch_events(
+    fn consume_events_until_stalled(
         exec: &mut TestExecutor,
         mut stream: fidl_svc::DeviceWatcherEventStream,
     ) -> Vec<DeviceWatcherEvent> {
@@ -517,5 +544,39 @@ mod tests {
                 Poll::Ready(Ok(Some(event))) => events.push(event),
             }
         }
+    }
+
+    // Simple comparator for DeviceWatcherEvent since it does not implement PartialEq.
+    fn events_are_identical(a: &DeviceWatcherEvent, b: &DeviceWatcherEvent) -> bool {
+        match (a, b) {
+            (
+                DeviceWatcherEvent::OnPhyAdded { phy_id: x },
+                DeviceWatcherEvent::OnPhyAdded { phy_id: y },
+            )
+            | (
+                DeviceWatcherEvent::OnPhyRemoved { phy_id: x },
+                DeviceWatcherEvent::OnPhyRemoved { phy_id: y },
+            )
+            | (
+                DeviceWatcherEvent::OnIfaceAdded { iface_id: x },
+                DeviceWatcherEvent::OnIfaceAdded { iface_id: y },
+            )
+            | (
+                DeviceWatcherEvent::OnIfaceRemoved { iface_id: x },
+                DeviceWatcherEvent::OnIfaceRemoved { iface_id: y },
+            ) => x == y,
+            _ => false,
+        }
+    }
+
+    fn expect_lists_are_identical(a: Vec<DeviceWatcherEvent>, b: Vec<DeviceWatcherEvent>) {
+        if a.len() != b.len() {
+            panic!("event lists have different lengths: {:?} != {:?}", a, b);
+        }
+        a.iter().zip(b.iter()).for_each(|(x, y)| {
+            if !events_are_identical(x, y) {
+                panic!("event lists are not identical: {:?} != {:?}", a, b);
+            }
+        });
     }
 }
