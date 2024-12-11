@@ -4,6 +4,8 @@
 
 #include <lib/console.h>
 #include <lib/mistos/starnix/kernel/runner/container.h>
+#include <lib/mistos/starnix/kernel/task/kernel.h>
+#include <lib/mistos/starnix_uapi/errors.h>
 #include <zircon/assert.h>
 
 #include <ktl/enforce.h>
@@ -53,7 +55,12 @@ int starnix_main(int argc, const cmd_args* argv, uint32_t flags) {
     config.mounts.push_back("/tmp:tmpfs", &ac);
     ZX_ASSERT(ac.check());
 
-    auto container = starnix_kernel_runner::create_container(config);
+    auto container =
+        starnix_uapi::make_source_context(starnix_kernel_runner::create_container(config))
+            .with_source_context([&config]() {
+              return mtl::format("creating container: \"%.*s\"",
+                                 static_cast<int>(config.name.size()), config.name.data());
+            });
     if (container.is_error()) {
       auto& error = container.error_value();
       error.print([](auto&&... args) {

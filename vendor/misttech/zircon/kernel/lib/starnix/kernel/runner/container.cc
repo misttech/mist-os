@@ -9,6 +9,7 @@
 #include <lib/mistos/starnix/kernel/execution/executor.h>
 #include <lib/mistos/starnix/kernel/fs/mistos/bootfs.h>
 #include <lib/mistos/starnix/kernel/fs/mistos/syslog.h>
+#include <lib/mistos/starnix/kernel/runner/features.h>
 #include <lib/mistos/starnix/kernel/runner/mounts.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
@@ -97,11 +98,16 @@ fit::result<Error> mount_filesystems(const CurrentTask& system_task, const Confi
 fit::result<Error, Container> create_container(const Config& config) {
   const ktl::string_view DEFAULT_INIT("/container/init");
 
-  auto kernel = starnix_uapi::make_source_context(Kernel::New(config.kernel_cmdline))
-                    .with_source_context([&config]() {
-                      return mtl::format("creating Kernel: %.*s",
-                                         static_cast<int>(config.name.size()), config.name.data());
-                    }) _EP(kernel);
+  auto features = parse_features(config) _EP(features);
+
+  auto kernel_cmdline = BString(config.kernel_cmdline);
+
+  auto kernel =
+      starnix_uapi::make_source_context(Kernel::New(config.kernel_cmdline, features->kernel_))
+          .with_source_context([&config]() {
+            return mtl::format("creating Kernel: %.*s", static_cast<int>(config.name.size()),
+                               config.name.data());
+          }) _EP(kernel);
 
   auto fs_context = starnix_uapi::make_source_context(create_fs_context(kernel.value(), config))
                         .source_context("creating FsContext") _EP(fs_context);

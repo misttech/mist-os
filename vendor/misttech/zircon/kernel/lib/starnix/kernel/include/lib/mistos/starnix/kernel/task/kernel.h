@@ -81,7 +81,7 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   KernelThreads kthreads_;
 
   /// The feaures enabled for this kernel.
-  // pub features: KernelFeatures,
+  KernelFeatures features_;
 
   // The processes and threads running in this kernel, organized by pid_t.
   starnix_sync::RwLock<PidTable> pids_;
@@ -103,7 +103,7 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   // pub default_abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
 
   // The kernel command line. Shows up in /proc/cmdline.
-  ktl::string_view cmdline_;
+  BString cmdline_;
 
   // Owned by anon_node.rs
   // pub anon_fs: OnceCell<FileSystemHandle>,
@@ -249,7 +249,8 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
 
  public:
   /// impl Kernel
-  static fit::result<zx_status_t, fbl::RefPtr<Kernel>> New(const ktl::string_view& cmdline);
+  static fit::result<zx_status_t, fbl::RefPtr<Kernel>> New(BString cmdline,
+                                                           KernelFeatures features);
 
   /// impl Kernel (namespace.rs)
   uint64_t get_next_mount_id() { return next_mount_id_.next(); }
@@ -262,7 +263,7 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   ~Kernel();
 
  private:
-  Kernel(const ktl::string_view& cmdline);
+  Kernel(BString cmdline, KernelFeatures features);
 
  public:
   mtl::WeakPtrFactory<Kernel> weak_factory_;  // must be last

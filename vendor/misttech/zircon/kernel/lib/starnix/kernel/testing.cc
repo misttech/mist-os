@@ -30,7 +30,7 @@
 namespace starnix::testing {
 namespace {
 
-fbl::RefPtr<Kernel> create_test_kernel() { return Kernel::New("").value(); }
+fbl::RefPtr<Kernel> create_test_kernel() { return Kernel::New("", KernelFeatures()).value(); }
 
 template <typename CreateFsFn>
 fbl::RefPtr<FsContext> create_test_fs_context(const fbl::RefPtr<Kernel>& kernel,

@@ -21,20 +21,22 @@
 
 namespace starnix {
 
-Kernel::Kernel(const ktl::string_view& cmdline)
+Kernel::Kernel(BString cmdline, KernelFeatures features)
     : kthreads_(KernelThreads::New()),
-      cmdline_{cmdline},
+      features_(features),
+      cmdline_{ktl::move(cmdline)},
       device_registry_(DeviceRegistry::Default()),
       weak_factory_(this) {
   LTRACE_ENTRY_OBJ;
   kthreads_.set_kernel(weak_factory_.GetWeakPtr());
 }
 
-Kernel::~Kernel() { LTRACE_ENTRY_OBJ; }
+Kernel::~Kernel() { LTRACE_EXIT_OBJ; }
 
-fit::result<zx_status_t, fbl::RefPtr<Kernel>> Kernel::New(const ktl::string_view& cmdline) {
+fit::result<zx_status_t, fbl::RefPtr<Kernel>> Kernel::New(BString cmdline,
+                                                          KernelFeatures features) {
   fbl::AllocChecker ac;
-  fbl::RefPtr<Kernel> kernel = fbl::AdoptRef(new (&ac) Kernel(cmdline));
+  fbl::RefPtr<Kernel> kernel = fbl::AdoptRef(new (&ac) Kernel(ktl::move(cmdline), features));
   if (!ac.check()) {
     return fit::error(ZX_ERR_NO_MEMORY);
   }
