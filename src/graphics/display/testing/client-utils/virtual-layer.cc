@@ -81,8 +81,8 @@ static uint32_t interpolate_scaling(uint32_t x, uint32_t frame_num) {
 
 VirtualLayer::VirtualLayer(Display* display) {
   displays_.push_back(display);
-  width_ = display->mode().horizontal_resolution;
-  height_ = display->mode().vertical_resolution;
+  width_ = display->mode().active_area.width;
+  height_ = display->mode().active_area.height;
 }
 
 VirtualLayer::VirtualLayer(const fbl::Vector<Display>& displays, bool tiled) {
@@ -94,11 +94,11 @@ VirtualLayer::VirtualLayer(const fbl::Vector<Display>& displays, bool tiled) {
   height_ = 0;
   for (auto* d : displays_) {
     if (tiled) {
-      width_ += d->mode().horizontal_resolution;
+      width_ += d->mode().active_area.width;
     } else {
-      width_ = std::max(width_, d->mode().horizontal_resolution);
+      width_ = std::max(width_, d->mode().active_area.width);
     }
-    height_ = std::max(height_, d->mode().vertical_resolution);
+    height_ = std::max(height_, d->mode().active_area.height);
   }
 }
 
@@ -253,8 +253,8 @@ void PrimaryLayer::StepLayout(int32_t frame_num) {
 
   fuchsia_math::wire::RectU display = {};
   for (unsigned i = 0; i < displays_.size(); i++) {
-    display.height = displays_[i]->mode().vertical_resolution;
-    display.width = displays_[i]->mode().horizontal_resolution;
+    display.width = displays_[i]->mode().active_area.width;
+    display.height = displays_[i]->mode().active_area.height;
 
     if (mirrors_) {
       layers_[i].src.x = 0;

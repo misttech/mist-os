@@ -257,9 +257,9 @@ impl<'a> DisplayDirectAppStrategy<'a> {
             let preferred_size = self
                 .primary_display
                 .get_or_insert_with(|| {
-                    let mode = info.modes[0];
+                    let mode = &info.modes[0];
                     DisplayInfo {
-                        preferred_size: size2(mode.horizontal_resolution, mode.vertical_resolution)
+                        preferred_size: size2(mode.active_area.width, mode.active_area.height)
                             .to_i32(),
                         info: info.clone(),
                     }

@@ -33,10 +33,10 @@ std::optional<size_t> PickFirstDisplayModeSatisfyingConstraints(
 
 bool DisplayModeConstraints::ModeSatisfiesConstraints(
     const fuchsia_hardware_display::Mode& mode) const {
-  if (!width_px_range.Contains(static_cast<int>(mode.horizontal_resolution()))) {
+  if (!width_px_range.Contains(static_cast<int>(mode.active_area().width()))) {
     return false;
   }
-  if (!height_px_range.Contains(static_cast<int>(mode.vertical_resolution()))) {
+  if (!height_px_range.Contains(static_cast<int>(mode.active_area().height()))) {
     return false;
   }
   if (!refresh_rate_millihertz_range.Contains(static_cast<int>(mode.refresh_rate_millihertz()))) {
@@ -126,7 +126,7 @@ void DisplayManager::OnDisplaysChanged(
 
       const fuchsia_hardware_display::Mode& mode = display.modes()[mode_index];
       default_display_ = std::make_unique<Display>(
-          display.id(), mode.horizontal_resolution(), mode.vertical_resolution(),
+          display.id(), mode.active_area().width(), mode.active_area().height(),
           display.horizontal_size_mm(), display.vertical_size_mm(), display.pixel_format(),
           mode.refresh_rate_millihertz());
       OnClientOwnershipChange(owns_display_coordinator_);

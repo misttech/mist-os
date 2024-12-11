@@ -404,10 +404,10 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   auto display_timing_it = std::find_if(
       display_timings.begin(), display_timings.end(),
       [&mode = request->mode](const display::DisplayTiming& timing) {
-        if (timing.horizontal_active_px != static_cast<int32_t>(mode.horizontal_resolution)) {
+        if (timing.horizontal_active_px != static_cast<int32_t>(mode.active_area.width)) {
           return false;
         }
-        if (timing.vertical_active_lines != static_cast<int32_t>(mode.vertical_resolution)) {
+        if (timing.vertical_active_lines != static_cast<int32_t>(mode.active_area.height)) {
           return false;
         }
         if (timing.vertical_field_refresh_rate_millihertz() !=
@@ -419,7 +419,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
 
   if (display_timing_it == display_timings.end()) {
     FDF_LOG(ERROR, "Display mode not found: (%" PRIu32 " x %" PRIu32 ") @ %" PRIu32 " millihertz",
-            request->mode.horizontal_resolution, request->mode.vertical_resolution,
+            request->mode.active_area.width, request->mode.active_area.height,
             request->mode.refresh_rate_millihertz);
     return;
   }
@@ -1343,8 +1343,11 @@ void Client::OnDisplaysChanged(cpp20::span<const display::DisplayId> added_displ
     modes.reserve(display_timings.size());
     for (const display::DisplayTiming& timing : display_timings) {
       modes.emplace_back(fhd::wire::Mode{
-          .horizontal_resolution = static_cast<uint32_t>(timing.horizontal_active_px),
-          .vertical_resolution = static_cast<uint32_t>(timing.vertical_active_lines),
+          .active_area =
+              {
+                  .width = static_cast<uint32_t>(timing.horizontal_active_px),
+                  .height = static_cast<uint32_t>(timing.vertical_active_lines),
+              },
           .refresh_rate_millihertz =
               static_cast<uint32_t>(timing.vertical_field_refresh_rate_millihertz()),
       });

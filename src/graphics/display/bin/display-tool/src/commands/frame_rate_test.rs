@@ -228,10 +228,10 @@ pub async fn run(
 
     // Obtain the display resolution based on the display's preferred mode.
     let (width, height, expected_frame_rate) = {
-        let mode = display.0.modes[0];
+        let mode = &display.0.modes[0];
         (
-            mode.horizontal_resolution,
-            mode.vertical_resolution,
+            mode.active_area.width,
+            mode.active_area.height,
             mode.refresh_rate_millihertz as f32 / 1000.0,
         )
     };

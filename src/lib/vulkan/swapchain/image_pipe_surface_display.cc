@@ -187,8 +187,8 @@ void ImagePipeSurfaceDisplay::ControllerOnDisplaysChanged(
 
   const fuchsia_hardware_display::Info& info = infos[0];
 
-  width_ = info.modes()[0].horizontal_resolution();
-  height_ = info.modes()[0].vertical_resolution();
+  width_ = info.modes()[0].active_area().width();
+  height_ = info.modes()[0].active_area().height();
   display_id_ = info.id();
   std::deque<VkSurfaceFormatKHR> formats;
 

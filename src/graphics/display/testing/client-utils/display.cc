@@ -54,8 +54,8 @@ void Display::Dump() {
 
   printf("\n\tSupported display modes:\n");
   for (unsigned i = 0; i < modes_.size(); i++) {
-    printf("\t\t%d\t: %dx%d\t%d.%03d\n", i, modes_[i].horizontal_resolution,
-           modes_[i].vertical_resolution, modes_[i].refresh_rate_millihertz / 1000,
+    printf("\t\t%d\t: %dx%d\t%d.%03d\n", i, modes_[i].active_area.width,
+           modes_[i].active_area.height, modes_[i].refresh_rate_millihertz / 1000,
            modes_[i].refresh_rate_millihertz % 1000);
   }
 
