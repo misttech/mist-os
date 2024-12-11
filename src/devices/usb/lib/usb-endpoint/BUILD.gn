@@ -59,6 +59,20 @@ source_set("usb-endpoint-server") {
   public_configs = [ ":includes" ]
 }
 
+source_set("usb-endpoint-server-sdk") {
+  public = [ "include/usb-endpoint/sdk/usb-endpoint-server.h" ]
+  sources = [ "usb-endpoint-server-sdk.cc" ]
+  public_deps = [
+    "//src/devices/lib/dma-buffer",
+    "//src/devices/usb/lib/usb:usb-fidl-sdk",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
+    "//zircon/system/ulib/fbl",
+  ]
+  public_configs = [ ":includes" ]
+}
+
 source_set("usb-endpoint-server-dfv2-compat-logging") {
   public = [ "include/usb-endpoint/usb-endpoint-server.h" ]
   sources = [ "usb-endpoint-server.cc" ]

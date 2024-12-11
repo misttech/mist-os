@@ -25,9 +25,9 @@
 #include <memory>
 #include <mutex>
 
-#include <usb-endpoint/usb-endpoint-server.h>
+#include <usb-endpoint/sdk/usb-endpoint-server.h>
 #include <usb/descriptors.h>
-#include <usb/request-fidl.h>
+#include <usb/sdk/request-fidl.h>
 
 #include "src/devices/usb/drivers/dwc3/dwc3-types.h"
 
