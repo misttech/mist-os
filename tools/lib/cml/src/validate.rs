@@ -13,6 +13,7 @@ use crate::{
 };
 use cm_types::IterablePath;
 use directed_graph::DirectedGraph;
+use itertools::Either;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
 use std::path::Path;
@@ -20,7 +21,7 @@ use std::{fmt, iter};
 
 #[derive(Default, Clone)]
 pub struct CapabilityRequirements<'a> {
-    pub must_offer: &'a [MustOfferRequirement<'a>],
+    pub must_offer: &'a [OfferToAllCapability<'a>],
     pub must_use: &'a [MustUseRequirement<'a>],
 }
 
@@ -37,25 +38,48 @@ impl<'a> MustUseRequirement<'a> {
     }
 }
 
-#[derive(PartialEq)]
-pub enum MustOfferRequirement<'a> {
+#[derive(PartialEq, Clone)]
+pub enum OfferToAllCapability<'a> {
     Dictionary(&'a str),
     Protocol(&'a str),
 }
 
-impl<'a> MustOfferRequirement<'a> {
-    fn name(&self) -> &str {
+impl<'a> OfferToAllCapability<'a> {
+    pub fn name(&self) -> &'a str {
         match self {
-            MustOfferRequirement::Dictionary(name) => name,
-            MustOfferRequirement::Protocol(name) => name,
+            OfferToAllCapability::Dictionary(name) => name,
+            OfferToAllCapability::Protocol(name) => name,
         }
     }
 
-    fn offer_type(&self) -> &'static str {
+    pub fn offer_type(&self) -> &'static str {
         match self {
-            MustOfferRequirement::Dictionary(_) => "Dictionary",
-            MustOfferRequirement::Protocol(_) => "Protocol",
+            OfferToAllCapability::Dictionary(_) => "Dictionary",
+            OfferToAllCapability::Protocol(_) => "Protocol",
         }
+    }
+
+    pub fn offer_type_plural(&self) -> &'static str {
+        match self {
+            OfferToAllCapability::Dictionary(_) => "dictionaries",
+            OfferToAllCapability::Protocol(_) => "protocols",
+        }
+    }
+}
+
+pub fn offer_to_all_from_offer(value: &Offer) -> impl Iterator<Item = OfferToAllCapability<'_>> {
+    if let Some(protocol) = &value.protocol {
+        Either::Left(
+            protocol.iter().map(|protocol| OfferToAllCapability::Protocol(protocol.as_str())),
+        )
+    } else if let Some(dictionary) = &value.dictionary {
+        Either::Right(
+            dictionary
+                .iter()
+                .map(|dictionary| OfferToAllCapability::Dictionary(dictionary.as_str())),
+        )
+    } else {
+        panic!("Expected a dictionary or a protocol");
     }
 }
 
@@ -74,6 +98,31 @@ pub(crate) fn validate_cml(
         }
     }
     res
+}
+
+fn duplicate_capability_check<'a>(
+    duplicate_check: &mut HashSet<CapabilityId<'a>>,
+    capability_string: &str,
+    offered_to_all: &Vec<&'a Offer>,
+    filter: impl Fn(&&&Offer) -> bool,
+) -> Result<(), Error> {
+    let problem_capabilities = offered_to_all
+        .iter()
+        .filter(filter)
+        .map(|o| CapabilityId::from_offer_expose(*o))
+        .collect::<Result<Vec<Vec<CapabilityId<'a>>>, _>>()?
+        .into_iter()
+        .flatten()
+        .filter(|cap_id| !duplicate_check.insert((*cap_id).clone()))
+        .collect::<Vec<_>>();
+    if !problem_capabilities.is_empty() {
+        return Err(Error::validate(format!(
+            r#"{} {:?} offered to "all" multiple times"#,
+            capability_string,
+            problem_capabilities.iter().map(|p| format!("{p}")).collect::<Vec<_>>()
+        )));
+    }
+    Ok(())
 }
 
 fn offer_can_have_dependency(offer: &Offer) -> bool {
@@ -232,30 +281,23 @@ impl<'a> ValidationContext<'a> {
             let offered_to_all = offers
                 .iter()
                 .filter(|o| matches!(o.to, OneOrMany::One(OfferToRef::All)))
-                .filter(|o| o.protocol.is_some())
+                .filter(|o| o.protocol.is_some() || o.dictionary.is_some())
                 .collect::<Vec<&Offer>>();
 
             let mut duplicate_check: HashSet<CapabilityId<'a>> = HashSet::new();
-            let problem_protocols = offered_to_all
-                .iter()
-                .map(|o| CapabilityId::from_offer_expose(*o))
-                .collect::<Result<Vec<Vec<CapabilityId<'a>>>, _>>()?
-                .into_iter()
-                .flatten()
-                .filter(|cap_id| !duplicate_check.insert((*cap_id).clone()))
-                .collect::<Vec<_>>();
-            if !problem_protocols.is_empty() {
-                return Err(Error::validate(format!(
-                    r#"Protocol(s) {:?} offered to "all" multiple times"#,
-                    problem_protocols
-                        .iter()
-                        .map(|p| match p {
-                            CapabilityId::Protocol(name) => name.as_str(),
-                            _ => unreachable!(),
-                        })
-                        .collect::<Vec<_>>()
-                )));
-            }
+
+            duplicate_capability_check(
+                &mut duplicate_check,
+                "Protocol(s)",
+                &offered_to_all,
+                |o| o.protocol.is_some(),
+            )?;
+            duplicate_capability_check(
+                &mut duplicate_check,
+                "Dictionary(s)",
+                &offered_to_all,
+                |o| o.dictionary.is_some(),
+            )?;
 
             for offer in offers.iter() {
                 self.validate_offer(&offer, &mut used_ids, &offered_to_all)?;
@@ -1042,8 +1084,8 @@ which is almost certainly a mistake: {}",
                         OfferToRef::OwnDictionary(_) => false,
                     });
                     let capability_names = match required_offer {
-                        MustOfferRequirement::Dictionary(_) => offer.dictionary.as_ref(),
-                        MustOfferRequirement::Protocol(_) => offer.protocol.as_ref(),
+                        OfferToAllCapability::Dictionary(_) => offer.dictionary.as_ref(),
+                        OfferToAllCapability::Protocol(_) => offer.protocol.as_ref(),
                     };
                     let names_this_capability = match capability_names.as_ref() {
                         Some(c) => {
@@ -1070,8 +1112,8 @@ which is almost certainly a mistake: {}",
                         OfferToRef::OwnDictionary(_) => false,
                     });
                     let capability_names = match required_offer {
-                        MustOfferRequirement::Dictionary(_) => offer.dictionary.as_ref(),
-                        MustOfferRequirement::Protocol(_) => offer.protocol.as_ref(),
+                        OfferToAllCapability::Dictionary(_) => offer.dictionary.as_ref(),
+                        OfferToAllCapability::Protocol(_) => offer.protocol.as_ref(),
                     };
                     let names_this_capability = match capability_names {
                         Some(c) => c.iter().any(|capability_list| {
@@ -1874,7 +1916,7 @@ mod tests {
     use super::*;
     use crate::error::Location;
     use crate::{
-        offer_to_all_and_component_diff_protocols_message,
+        offer_to_all_and_component_diff_capabilities_message,
         offer_to_all_and_component_diff_sources_message,
     };
     use assert_matches::assert_matches;
@@ -1940,11 +1982,11 @@ mod tests {
             &CapabilityRequirements {
                 must_offer: &required_offers
                     .iter()
-                    .map(|value| MustOfferRequirement::Protocol(value))
+                    .map(|value| OfferToAllCapability::Protocol(value))
                     .chain(
                         required_dictionary_offers
                             .iter()
-                            .map(|value| MustOfferRequirement::Dictionary(value)),
+                            .map(|value| OfferToAllCapability::Dictionary(value)),
                     )
                     .collect::<Vec<_>>(),
                 must_use: &required_uses
@@ -2299,7 +2341,7 @@ mod tests {
             Err(Error::Validate { err, filename }) => {
                 assert_eq!(
                     err,
-                    offer_to_all_and_component_diff_protocols_message(&["fuchsia.logger.LogSink"], "something"),
+                    offer_to_all_and_component_diff_capabilities_message([OfferToAllCapability::Protocol("fuchsia.logger.LogSink")].into_iter(), "something"),
                 );
                 assert!(filename.is_some(), "Expected there to be a filename in error message");
             }
@@ -2344,7 +2386,138 @@ mod tests {
             Err(Error::Validate { err, filename }) => {
                 assert_eq!(
                     err,
-                    offer_to_all_and_component_diff_sources_message(&["fuchsia.logger.LogSink"], "something"),
+                    offer_to_all_and_component_diff_sources_message([OfferToAllCapability::Protocol("fuchsia.logger.LogSink")].into_iter(), "something"),
+                );
+                assert!(filename.is_some(), "Expected there to be a filename in error message");
+            }
+        );
+    }
+
+    #[test]
+    fn offer_to_all_and_manual_for_dictionary() {
+        let input = r##"{
+            children: [
+                {
+                    name: "logger",
+                    url: "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
+                },
+                {
+                    name: "something",
+                    url: "fuchsia-pkg://fuchsia.com/something#meta/something.cm",
+                },
+            ],
+            offer: [
+                {
+                    dictionary: "diagnostics",
+                    from: "parent",
+                    to: "all"
+                },
+                {
+                    dictionary: "diagnostics",
+                    from: "parent",
+                    to: "#something"
+                },
+            ]
+        }"##;
+
+        let result = validate_with_features_for_test(
+            "test.cml",
+            input.as_bytes(),
+            &FeatureSet::empty(),
+            &vec![],
+            &Vec::new(),
+            &["diagnostics".into()],
+        );
+
+        // exact duplication is allowed
+        assert!(result.is_ok(), "{:#?}", result);
+
+        let input = r##"{
+            children: [
+                {
+                    name: "logger",
+                    url: "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
+                },
+                {
+                    name: "something",
+                    url: "fuchsia-pkg://fuchsia.com/something#meta/something.cm",
+                },
+            ],
+            offer: [
+                {
+                    dictionary: "diagnostics",
+                    from: "parent",
+                    to: "all"
+                },
+                {
+                    dictionary: "FakDictionary",
+                    from: "parent",
+                    as: "diagnostics",
+                    to: "#something"
+                },
+            ]
+        }"##;
+
+        let result = validate_with_features_for_test(
+            "test.cml",
+            input.as_bytes(),
+            &FeatureSet::empty(),
+            &vec![],
+            &Vec::new(),
+            &["diagnostics".into()],
+        );
+
+        // aliased duplications are forbidden
+        assert_matches!(result,
+            Err(Error::Validate { err, filename }) => {
+                assert_eq!(
+                    err,
+                    offer_to_all_and_component_diff_capabilities_message([OfferToAllCapability::Dictionary("diagnostics")].into_iter(), "something"),
+                );
+                assert!(filename.is_some(), "Expected there to be a filename in error message");
+            }
+        );
+
+        let input = r##"{
+            children: [
+                {
+                    name: "logger",
+                    url: "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
+                },
+                {
+                    name: "something",
+                    url: "fuchsia-pkg://fuchsia.com/something#meta/something.cm",
+                },
+            ],
+            offer: [
+                {
+                    dictionary: "diagnostics",
+                    from: "parent",
+                    to: "all"
+                },
+                {
+                    dictionary: "diagnostics",
+                    from: "framework",
+                    to: "#something"
+                },
+            ]
+        }"##;
+
+        let result = validate_with_features_for_test(
+            "test.cml",
+            input.as_bytes(),
+            &FeatureSet::empty(),
+            &vec![],
+            &Vec::new(),
+            &["diagnostics".into()],
+        );
+
+        // offering the same dictionary without an alias from different sources is forbidden
+        assert_matches!(result,
+            Err(Error::Validate { err, filename }) => {
+                assert_eq!(
+                    err,
+                    offer_to_all_and_component_diff_sources_message([OfferToAllCapability::Dictionary("diagnostics")].into_iter(), "something"),
                 );
                 assert!(filename.is_some(), "Expected there to be a filename in error message");
             }

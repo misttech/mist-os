@@ -28,10 +28,12 @@ use reference_doc::ReferenceDoc;
 use serde::{de, ser, Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Write;
 use std::hash::Hash;
 use std::num::NonZeroU32;
 use std::str::FromStr;
 use std::{cmp, fmt, path};
+use validate::offer_to_all_from_offer;
 
 pub use cm_types::{
     AllowedOffers, Availability, DeliveryType, DependencyType, Durability, Name, NamespacePath,
@@ -41,7 +43,7 @@ use error::Location;
 
 pub use crate::one_or_many::OneOrMany;
 pub use crate::translate::{compile, CompileOptions};
-pub use crate::validate::{CapabilityRequirements, MustOfferRequirement, MustUseRequirement};
+pub use crate::validate::{CapabilityRequirements, MustUseRequirement, OfferToAllCapability};
 
 lazy_static! {
     static ref DEFAULT_EVENT_STREAM_NAME: Name = "EventStream".parse().unwrap();
@@ -4261,24 +4263,44 @@ pub fn format_cml(buffer: &str, file: Option<&std::path::Path>) -> Result<Vec<u8
         .map_err(|e| Error::json5(e, file))
 }
 
-pub fn offer_to_all_and_component_diff_sources_message(
-    protocol: &[&str],
+pub fn offer_to_all_and_component_diff_sources_message<'a>(
+    capability: impl Iterator<Item = OfferToAllCapability<'a>>,
     component: &str,
 ) -> String {
-    format!(
-        r#"Protocol {:?} is offered to both "all" and "{}" with different sources"#,
-        protocol, component
-    )
+    let mut output = String::new();
+    let mut capability = capability.peekable();
+    write!(&mut output, "{} ", capability.peek().unwrap().offer_type()).unwrap();
+    for (i, capability) in capability.enumerate() {
+        if i > 0 {
+            write!(&mut output, ", ").unwrap();
+        }
+        write!(&mut output, "{}", capability.offer_type()).unwrap();
+    }
+    write!(&mut output, r#"is offered to both "all" and "{}" with different sources"#, component)
+        .unwrap();
+    output
 }
 
-pub fn offer_to_all_and_component_diff_protocols_message(
-    protocol: &[&str],
+pub fn offer_to_all_and_component_diff_capabilities_message<'a>(
+    capability: impl Iterator<Item = OfferToAllCapability<'a>>,
     component: &str,
 ) -> String {
-    format!(
-        r#"Protocol {:?} is aliased to "{}" with the same name as an offer to "all", but from different source protocols"#,
-        protocol, component
-    )
+    let mut output = String::new();
+    let mut capability_peek = capability.peekable();
+
+    // Clone is needed so the iterator can be moved forward.
+    // This doesn't actually allocate memory or copy a string, as only the reference
+    // held by the OfferToAllCapability<'a> is copied.
+    let first_offer_to_all = capability_peek.peek().unwrap().clone();
+    write!(&mut output, "{} ", first_offer_to_all.offer_type()).unwrap();
+    for (i, capability) in capability_peek.enumerate() {
+        if i > 0 {
+            write!(&mut output, ", ").unwrap();
+        }
+        write!(&mut output, "{}", capability.offer_type()).unwrap();
+    }
+    write!(&mut output, r#"is aliased to "{}" with the same name as an offer to "all", but from different source {}"#, component, first_offer_to_all.offer_type_plural()).unwrap();
+    output
 }
 
 /// Returns `Ok(true)` if desugaring the `offer_to_all` using `name` duplicates
@@ -4317,36 +4339,18 @@ pub fn offer_to_all_would_duplicate(
 
     if offer_to_all.from != specific_offer.from {
         return Err(Error::validate(offer_to_all_and_component_diff_sources_message(
-            offer_to_all
-                .protocol
-                .as_ref()
-                .unwrap()
-                .iter()
-                .map(Name::as_str)
-                .collect::<Vec<_>>()
-                .as_ref(),
+            offer_to_all_from_offer(offer_to_all),
             target.as_str(),
         )));
     }
 
     // Since the capability ID's match, the underlying protocol must also match
-    if offer_to_all.protocol.as_ref().unwrap().iter().all(|to_all_protocol| {
-        specific_offer
-            .protocol
-            .as_ref()
-            .unwrap()
-            .iter()
+    if offer_to_all_from_offer(offer_to_all).all(|to_all_protocol| {
+        offer_to_all_from_offer(specific_offer)
             .all(|to_specific_protocol| to_all_protocol != to_specific_protocol)
     }) {
-        return Err(Error::validate(offer_to_all_and_component_diff_protocols_message(
-            offer_to_all
-                .protocol
-                .as_ref()
-                .unwrap()
-                .iter()
-                .map(Name::as_str)
-                .collect::<Vec<_>>()
-                .as_ref(),
+        return Err(Error::validate(offer_to_all_and_component_diff_capabilities_message(
+            offer_to_all_from_offer(offer_to_all),
             target.as_str(),
         )));
     }

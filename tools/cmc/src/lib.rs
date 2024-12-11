@@ -5,7 +5,7 @@
 //! `cmc` is the Component Manifest Compiler.
 
 use anyhow::{ensure, Error};
-use cml::{error, features, Document, MustOfferRequirement};
+use cml::{error, features, Document, OfferToAllCapability};
 use reference_doc::MarkdownReferenceDocGenerator;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
@@ -35,7 +35,7 @@ pub fn run_cmc(opt: opts::Opt) -> Result<(), Error> {
                         cml::CapabilityRequirements {
                             must_offer: &must_offer_protocol
                                 .iter()
-                                .map(|value| cml::MustOfferRequirement::Protocol(value))
+                                .map(|value| cml::OfferToAllCapability::Protocol(value))
                                 .collect::<Vec<_>>(),
                             must_use: &must_use_protocol
                                 .iter()
@@ -137,11 +137,11 @@ pub fn run_cmc(opt: opts::Opt) -> Result<(), Error> {
                 cml::CapabilityRequirements {
                     must_offer: &must_offer_protocol
                         .iter()
-                        .map(|value| cml::MustOfferRequirement::Protocol(value))
+                        .map(|value| cml::OfferToAllCapability::Protocol(value))
                         .chain(
                             must_offer_dictionary
                                 .iter()
-                                .map(|value| MustOfferRequirement::Dictionary(value)),
+                                .map(|value| OfferToAllCapability::Dictionary(value)),
                         )
                         .collect::<Vec<_>>(),
                     must_use: &must_use_protocol

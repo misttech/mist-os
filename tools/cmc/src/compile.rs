@@ -85,7 +85,7 @@ mod tests {
     use super::*;
     use crate::features::Feature;
     use assert_matches::assert_matches;
-    use cml::MustOfferRequirement;
+    use cml::OfferToAllCapability;
     use difference::Changeset;
     use fidl::unpersist;
     use serde_json::json;
@@ -149,11 +149,11 @@ mod tests {
             cml::CapabilityRequirements {
                 must_offer: &must_offer_protocol
                     .iter()
-                    .map(|value| cml::MustOfferRequirement::Protocol(value))
+                    .map(|value| cml::OfferToAllCapability::Protocol(value))
                     .chain(
                         must_offer_dictionary
                             .iter()
-                            .map(|value| MustOfferRequirement::Dictionary(value)),
+                            .map(|value| OfferToAllCapability::Dictionary(value)),
                     )
                     .collect::<Vec<_>>(),
                 must_use: &must_use_protocol
