@@ -110,11 +110,26 @@ pub(crate) async fn wait_for_start(
     let mgr = PkgServerInstances::new(instance_root);
 
     let repo_base_name = get_repo_base_name(&cmd.repository, &context)?;
+    tracing::debug!("waiting up to {time_to_wait:?} for {repo_base_name} to start.");
     timeout::timeout(time_to_wait, async move {
         loop {
-            let running_instances = mgr.list_instances()?;
-            if running_instances.iter().any(|instance| instance.name.starts_with(&repo_base_name)) {
-                return Ok(());
+            match mgr.list_instances() {
+                Ok(running_instances) => {
+                    if running_instances
+                        .iter()
+                        .any(|instance| instance.name.starts_with(&repo_base_name))
+                    {
+                        return Ok(());
+                    }
+                    tracing::debug!(
+                        "waiting for {repo_base_name} to start. Got: {running_instances:?}"
+                    );
+                }
+                Err(e) => {
+                    tracing::debug!(
+                        "list_instances returned {e} wait for {repo_base_name} to start."
+                    );
+                }
             }
             fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await;
         }

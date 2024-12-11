@@ -122,15 +122,34 @@ impl FfxMain for ServerStartTool {
                 args.extend(server::to_argv(&self.cmd));
 
                 if let Some(log_basename) = new_logname {
+                    let wait_for_start_timeout: u64 =
+                        match self.context.get::<u64, _>("repository.background_startup_timeout") {
+                            Ok(v) => v.into(),
+                            Err(e) => {
+                                tracing::warn!("Error reading startup timeout: {e}");
+                                60
+                            }
+                        };
+
                     daemonize(&args, log_basename, self.context.clone(), true)
                         .await
                         .map_err(|e| bug!(e))?;
-                    return server::wait_for_start(
+                    return match server::wait_for_start(
                         self.context.clone(),
                         self.cmd,
-                        Duration::from_secs(30),
+                        Duration::from_secs(wait_for_start_timeout),
                     )
-                    .await;
+                    .await
+                    {
+                        Ok(_) => {
+                            tracing::debug!("Daemonized server started successfully");
+                            Ok(())
+                        }
+                        core::result::Result::Err(e) => {
+                            tracing::warn!("Daemonized server did not start successfully: {e}");
+                            Err(e)
+                        }
+                    };
                 } else {
                     return_bug!("Cannot daemonize repository server without a log file basename");
                 }

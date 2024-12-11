@@ -1,6 +1,7 @@
 {
     "repository": {
         "process_dir": "$SHARED_DATA/repos/server_info",
+        "background_startup_timeout": 60,
         "server": {
             "enabled": false,
             "listen": "[::]:8083",
