@@ -33,7 +33,7 @@ FUNCTION_LABEL(x86_acpi_transition_s_state)
     mov %r15, 112(%rdi)
     mov %rsp, 120(%rdi)
 
-    // Set up our return IP, in case the S-state needs it (jumped to by _x86_suspend_wakeup())
+    // Set up our return IP, in case the S-state needs it
     leaq .Lafter_sleep(%rip), %rax
     movq %rax, 128(%rdi)
 
