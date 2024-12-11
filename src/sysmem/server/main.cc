@@ -20,5 +20,8 @@ int main(int argc, const char** argv) {
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
   App app(loop.dispatcher());
   loop.Run();
-  return 0;
+  // sysmem should never exit (it should continue serving its out dir forever) unless it aborts
+  // or crashes, so return -1 to indicate an error has occurred and trigger the
+  // `on_terminate: "reboot"` component setting.
+  return -1;
 }
