@@ -219,14 +219,14 @@ async fn reap_watchers<P, I>(
 mod tests {
     use super::*;
     use fidl_fuchsia_wlan_device_service::DeviceWatcherEvent;
-    use fuchsia_async as fasync;
+    use fuchsia_async::TestExecutor;
     use futures::task::Poll;
     use std::mem;
     use std::pin::pin;
 
     #[fuchsia::test]
-    fn reap_watchers() {
-        let exec = &mut fasync::TestExecutor::new();
+    fn reaper_destroys_watcher_after_losing_connection() {
+        let exec = &mut TestExecutor::new();
         let (helper, future) = setup();
         let mut future = pin!(future);
         assert_eq!(0, helper.service.inner.lock().watchers.len());
@@ -251,8 +251,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn add_remove_phys() {
-        let exec = &mut fasync::TestExecutor::new();
+    fn client_receives_one_to_one_in_order_phy_events() {
+        let exec = &mut TestExecutor::new();
         let (helper, future) = setup();
         let mut future = pin!(future);
         let (proxy, server_end) = fidl::endpoints::create_proxy();
@@ -285,8 +285,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn add_remove_ifaces() {
-        let exec = &mut fasync::TestExecutor::new();
+    fn client_receives_one_to_one_in_order_iface_events() {
+        let exec = &mut TestExecutor::new();
         let (helper, future) = setup();
         let mut future = pin!(future);
         let (proxy, server_end) = fidl::endpoints::create_proxy();
@@ -313,8 +313,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn snapshot_phys() {
-        let exec = &mut fasync::TestExecutor::new();
+    fn initial_snapshot_events_only_contain_present_phys() {
+        let exec = &mut TestExecutor::new();
         let (helper, future) = setup();
         let mut future = pin!(future);
 
@@ -340,8 +340,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn snapshot_ifaces() {
-        let exec = &mut fasync::TestExecutor::new();
+    fn initial_snapshot_events_only_contain_present_ifaces() {
+        let exec = &mut TestExecutor::new();
         let (helper, future) = setup();
         let mut future = pin!(future);
 
@@ -367,8 +367,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn two_watchers() {
-        let exec = &mut fasync::TestExecutor::new();
+    fn initial_updates_for_multiple_watchers_are_identical() {
+        let exec = &mut TestExecutor::new();
         let (helper, future) = setup();
         let mut future = pin!(future);
 
@@ -396,8 +396,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn remove_watcher_on_send_error() {
-        let exec = &mut fasync::TestExecutor::new();
+    fn error_sending_an_update_destroys_the_watcher() {
+        let exec = &mut TestExecutor::new();
         let (helper, future) = setup();
         let mut future = pin!(future);
 
@@ -445,7 +445,7 @@ mod tests {
     }
 
     fn fetch_events(
-        exec: &mut fasync::TestExecutor,
+        exec: &mut TestExecutor,
         mut stream: fidl_svc::DeviceWatcherEventStream,
     ) -> Vec<DeviceWatcherEvent> {
         let mut events = vec![];
