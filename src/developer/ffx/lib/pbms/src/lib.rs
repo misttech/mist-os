@@ -252,7 +252,7 @@ where
     F: Fn(FileProgress<'_>) -> ProgressResult,
     I: structured_ui::Interface,
 {
-    tracing::debug!("string_from_url {:?}", product_url);
+    tracing::debug!("string_from_url {}", product_url);
     Ok(match product_url.scheme() {
         "http" | "https" => {
             let https_client = fuchsia_hyper::new_https_client();

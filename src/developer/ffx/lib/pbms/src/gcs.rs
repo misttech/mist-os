@@ -131,15 +131,11 @@ where
     let mut result = Vec::new();
     loop {
         tracing::debug!("gcs_bucket {:?}, gcs_path {:?}", gcs_bucket, gcs_path);
-        match client
-            .write(gcs_bucket, gcs_path, &mut result, progress)
-            .await
-            .context("writing to string")
-        {
+        match client.write(gcs_bucket, gcs_path, &mut result, progress).await {
             Ok(ProgressResponse::Continue) => break,
             Ok(ProgressResponse::Cancel) => {
                 tracing::info!("ProgressResponse requesting cancel, exiting");
-                std::process::exit(1);
+                bail!("ProgressResponse requesting cancel, exiting")
             }
             Err(e) => match e.downcast_ref::<GcsError>() {
                 Some(GcsError::NeedNewAccessToken) => {
@@ -160,12 +156,7 @@ where
                     e,
                     gcs_err,
                 ),
-                None => bail!(
-                    "Cannot get data from gs://{}/{} to string (Non-GcsError), error {:?}",
-                    gcs_bucket,
-                    gcs_path,
-                    e,
-                ),
+                None => return Err(e),
             },
         }
     }

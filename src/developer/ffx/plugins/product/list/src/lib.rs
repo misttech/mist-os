@@ -145,8 +145,11 @@ where
         context.get(CONFIG_BASE_URLS).context("get config CONFIG_BASE_URLS")?;
     for base_url in base_urls {
         let (bucket, _) = split_gs_url(&base_url).context("Splitting gs URL.")?;
-        let version = get_latest_version(bucket, &prefix, auth, ui, &client).await?;
-        result.push(format!("{}/{}", base_url, version));
+        if let Some(version) = get_latest_version(bucket, &prefix, auth, ui, &client).await? {
+            result.push(format!("{}/{}", base_url, version));
+        } else {
+            tracing::debug!("No version found for {base_url}");
+        }
     }
 
     Ok(result)
@@ -158,7 +161,7 @@ pub async fn get_latest_version<I>(
     auth: &AuthFlowChoice,
     ui: &I,
     client: &Client,
-) -> Result<String>
+) -> Result<Option<String>>
 where
     I: structured_ui::Interface,
 {
@@ -177,7 +180,7 @@ where
         })
         .collect::<Vec<_>>();
     filtered_list.sort();
-    Ok(filtered_list.last().expect("Filtered list is empty").to_string())
+    Ok(filtered_list.last().map(|v| v.to_string()))
 }
 
 pub async fn pb_list_impl<I>(
@@ -223,7 +226,11 @@ where
         });
         products.extend(prods);
     }
-    products.dedup_by_key(|i| i.name.clone());
+    products.sort_by(|a, b| {
+        format!("{}@{}", a.name, a.product_version)
+            .cmp(&format!("{}@{}", b.name, b.product_version))
+    });
+    products.dedup_by_key(|i| format!("{}@{}", i.name, i.product_version));
     products.sort_by_key(|i| i.product_version.clone());
     products.reverse();
     Ok(products)
