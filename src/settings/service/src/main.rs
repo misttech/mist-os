@@ -126,5 +126,10 @@ fn main() -> Result<(), Error> {
         .storage_dir(storage_dir)
         .store_proxy(store_proxy)
         .spawn(executor, fs)
-        .context("Failed to spawn environment for setui")
+        .context("Failed to spawn environment for setui")?;
+    // setui_service should never exit. EnvironmentBuilder::spawn should never return because it
+    // serves the component out dir to which CM will never close the client connection. Return error
+    // to indicate that an assumption has been broken and to trigger the component's
+    // `on_terminate: "reboot"` behavior.
+    Err(anyhow::anyhow!("setui_service stopped"))
 }
