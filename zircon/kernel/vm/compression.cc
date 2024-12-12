@@ -9,6 +9,7 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/counters.h>
 
+#include <kernel/thread.h>
 #include <ktl/algorithm.h>
 #include <vm/lz4_compressor.h>
 #include <vm/physmap.h>
@@ -129,6 +130,8 @@ VmCompression::CompressResult VmCompression::Compress(const void* page_src, zx_t
 
 void VmCompression::Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest,
                                zx_ticks_t now) {
+  ScopedMemoryStall memory_stall;
+
   if (unlikely(IsTempReference(ref))) {
     DecompressTempReference(ref, page_dest, metadata_dest);
     return;
