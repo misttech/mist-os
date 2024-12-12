@@ -66,7 +66,7 @@ def _gen_android_starnix_container_impl(ctx):
 
     if ctx.attr.skip_subpackages:
         _args += [
-            "--skip_subpackages",
+            "--skip-subpackages",
         ]
 
     ctx.actions.run(
