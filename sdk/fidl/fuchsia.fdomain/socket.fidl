@@ -23,6 +23,7 @@ type SocketType = flexible enum {
 };
 
 // FDomain operations on sockets
+@no_resource
 open protocol Socket {
     // Create a new socket in this FDomain and return both its ends.
     flexible CreateSocket(struct {

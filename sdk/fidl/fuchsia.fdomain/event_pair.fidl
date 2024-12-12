@@ -4,6 +4,7 @@
 library fuchsia.fdomain;
 
 // FDomain operations on EventPairs.
+@no_resource
 open protocol EventPair {
     // Create a new event pair in this FDomain and return both its ends.
     flexible CreateEventPair(struct {

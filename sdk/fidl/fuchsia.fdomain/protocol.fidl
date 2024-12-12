@@ -130,9 +130,7 @@ type HandleDisposition = struct {
 //
 // This protocol is designed to be used over a network or other non-channel
 // transport.
-//
-// TODO: DO NOT LAND IN NEXT until this has some kind of annotation preventing
-// it from being used with channels. Possibly an @transport annotation.
+@no_resource
 open protocol FDomain {
     compose Channel;
     compose Event;

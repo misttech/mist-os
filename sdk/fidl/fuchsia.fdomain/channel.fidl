@@ -16,6 +16,7 @@ type ChannelMessage = struct {
 };
 
 // FDomain operations on Channels.
+@no_resource
 open protocol Channel {
     // Create a new channel in this FDomain and return both its ends.
     flexible CreateChannel(struct {
