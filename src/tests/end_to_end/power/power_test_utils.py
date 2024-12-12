@@ -567,6 +567,15 @@ def _append_power_data(
         merged_trace.write(fake_thread_koid.to_bytes(8, "little"))
         merged_trace.write(thread_name.data)
 
+        # Initialization record sets the expected ticks per second.
+        init_record_type = 1
+        init_record_size = 2
+        init_record_header = (init_record_size << 4) | init_record_type
+        merged_trace.write(init_record_header.to_bytes(8, "little"))
+        merged_trace.write(
+            int(TICKS_PER_NS * 1000 * 1000 * 1000).to_bytes(8, "little")
+        )
+
         def counter_event_header(
             name_id: int,
             category_id: int,
