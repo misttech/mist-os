@@ -2113,12 +2113,7 @@ group("developer_host_tools") {
 # instead (e.g. see the definition of `bazel_action()`).
 #
 group("bazel_workspace") {
-  deps = [
-    "//build/bazel:generate_main_workspace",
-
-    # For the @fuchsia_sdk Bazel repository content.
-    "//sdk:core",
-  ]
+  deps = [ "//build/bazel:generate_main_workspace" ]
 }
 
 # IMPORTANT: Nothing should depend on this target. It is here

@@ -861,10 +861,9 @@ if (current_toolchain == default_toolchain) {
   # architecture, and the HEAD API level.
   #
   idk("bazel_in_tree_idk") {
-    visibility += [
-      "//build/bazel:*",
-      "//build/bazel/bazel_sdk:*",
-    ]
+    # All bazel_action() targets depend on this now, which forces public visibility.
+    visibility = []
+    visibility = [ "*" ]
     output_name = "bazel_in_tree_idk"
     sdk_collection_label = "//sdk:core"
 
@@ -972,7 +971,9 @@ if (current_toolchain == default_toolchain) {
   # @internal_sdk repository of the platform build's Bazel workspace.
   # TODO(https://fxbug.dev/333907192): Remove this.
   idk("bazel_internal_only_idk") {
-    visibility += [ "//build/bazel/*" ]
+    # All bazel_action() targets depend on this now, which forces public visibility.
+    visibility = []
+    visibility = [ "*" ]
     output_name = "bazel_internal_only_idk"
     sdk_collection_label = ":bazel_internal_only"
     idk_subbuilds_label = ":internal_only_idk_subbuilds"

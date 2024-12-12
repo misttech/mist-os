@@ -20,7 +20,9 @@ assert(
     current_toolchain == default_toolchain,
     "This BUILD.gn file should only be parsed in the default toolchain, to prevent generating Bazel workspace multiple times.")
 
-action("generate_main_workspace") {
+# Generate the main Bazel workspace, but do not build the Ninja IDK artifacts.
+# This will be used later to implement the `no_sdk` argument in bazel_action().
+action("generate_main_workspace_no_idk") {
   script = "//build/bazel/scripts/update_workspace.py"
 
   # The update script tracks the file and directory entries of FUCHSIA_DIR
@@ -69,14 +71,6 @@ action("generate_main_workspace") {
     reproxy_config_file,
   ]
 
-  # This dependency is needed to properly populate the @fuchsia_sdk repository.
-  deps = [ "//sdk:bazel_in_tree_idk" ]
-
-  # This dependency is needed to properly populate the @internal_sdk repository.
-  # (see https://fxbug.dev/42063353).
-  # TODO(https://fxbug.dev/333907192): Remove this.
-  deps += [ "//sdk:bazel_internal_only_idk" ]
-
   depfile = "${target_gen_dir}/${target_name}.d"
 
   outputs = [
@@ -124,6 +118,11 @@ action("generate_main_workspace") {
   # directory, which will be read by Bazel repository rules during workspace
   # setup.
   no_output_dir_leaks = false
+}
+
+# Generate the Bazel workspace, including all IDK Ninja artifacts.
+group("generate_main_workspace") {
+  deps = [ ":generate_main_workspace_no_idk" ] + bazel_workspace_idk_deps
 }
 
 # Generate a symlink to the @fuchsia_sdk repository, after ensuring it was
