@@ -32,7 +32,7 @@ class IsolatedDevMgrTestDriver : public DeviceType {
 
 void IsolatedDevMgrTestDriver::GetMetadata(GetMetadataRequestView request,
                                            GetMetadataCompleter::Sync& completer) {
-  fidl::WireResult result = pdev_->GetMetadata2(request->id);
+  fidl::WireResult result = pdev_->GetMetadata(request->id);
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to send GetMetadata request: %s", result.status_string());
     completer.Close(result.status());

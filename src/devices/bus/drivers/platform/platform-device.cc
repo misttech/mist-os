@@ -742,13 +742,12 @@ void PlatformDevice::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
 
 void PlatformDevice::GetMetadata(GetMetadataRequestView request,
                                  GetMetadataCompleter::Sync& completer) {
-  auto id = std::to_string(request->type);
-  auto metadata = metadata_.find(id);
-  if (metadata == metadata_.end()) {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
+  if (auto metadata = metadata_.find(request->id.get()); metadata != metadata_.end()) {
+    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
     return;
   }
-  completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
+
+  completer.ReplyError(ZX_ERR_NOT_FOUND);
 }
 
 void PlatformDevice::GetMetadata2(GetMetadata2RequestView request,

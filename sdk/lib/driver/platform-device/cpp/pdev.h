@@ -40,8 +40,8 @@ class PDev {
     static_assert(!fidl::IsResource<FidlType>::value,
                   "|FidlType| cannot be a resource type. Resources cannot be persisted.");
 
-    fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMetadata2> encoded_metadata =
-        pdev_->GetMetadata2(fidl::StringView::FromExternal(metadata_id));
+    fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMetadata> encoded_metadata =
+        pdev_->GetMetadata(fidl::StringView::FromExternal(metadata_id));
     if (!encoded_metadata.ok()) {
       return zx::error(encoded_metadata.status());
     }
