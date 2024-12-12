@@ -93,6 +93,7 @@ zx_koid_t GetCurrentProcessKoid() {
 
 void FramebufferDisplay::DisplayEngineSetListener(
     const display_engine_listener_protocol_t* engine_listener) {
+  fbl::AutoLock lock(&engine_listener_mutex_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
 
   const int64_t pixel_clock_hz =
@@ -135,6 +136,7 @@ void FramebufferDisplay::DisplayEngineSetListener(
 }
 
 void FramebufferDisplay::DisplayEngineUnsetListener() {
+  fbl::AutoLock lock(&engine_listener_mutex_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
 
@@ -585,12 +587,21 @@ void FramebufferDisplay::OnPeriodicVSync(async_dispatcher_t* dispatcher, async::
     return;
   }
 
-  if (engine_listener_.is_valid()) {
+  config_stamp_t banjo_config_stamp = {};
+  {
     fbl::AutoLock lock(&mtx_);
-    const uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
-    const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp_);
-    engine_listener_.OnDisplayVsync(banjo_display_id, next_vsync_time_.get(), &banjo_config_stamp);
+    banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp_);
   }
+
+  {
+    fbl::AutoLock lock(&engine_listener_mutex_);
+    if (engine_listener_.is_valid()) {
+      const uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
+      engine_listener_.OnDisplayVsync(banjo_display_id, next_vsync_time_.get(),
+                                      &banjo_config_stamp);
+    }
+  }
+
   next_vsync_time_ += kVSyncInterval;
   zx_status_t post_status = vsync_task_.PostForTime(&dispatcher_, next_vsync_time_);
   if (post_status != ZX_OK) {

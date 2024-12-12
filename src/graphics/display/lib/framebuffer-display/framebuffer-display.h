@@ -131,7 +131,9 @@ class FramebufferDisplay : public HeapServer,
 
   // Only used on the vsync thread.
   zx::time next_vsync_time_;
-  ddk::DisplayEngineListenerProtocolClient engine_listener_;
+
+  fbl::Mutex engine_listener_mutex_;
+  ddk::DisplayEngineListenerProtocolClient engine_listener_ TA_GUARDED(engine_listener_mutex_);
 };
 
 }  // namespace framebuffer_display
