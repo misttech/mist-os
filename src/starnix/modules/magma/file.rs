@@ -743,7 +743,7 @@ impl FileOps for MagmaFile {
                 // Use VMO semaphores for compatibility with sync files, which need timestamps.
                 if let Ok(vmo) = zx::Vmo::create(/*size=*/ 1) {
                     let flags: u64 = 0;
-                    set_zx_name(&vmo, b"magma semaphore");
+                    set_zx_name(&vmo, b"starnix:magma_semaphore");
                     let semaphore;
                     let semaphore_id;
                     (status, semaphore, semaphore_id) = import_semaphore2(&connection, vmo, flags);

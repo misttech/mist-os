@@ -266,7 +266,8 @@ impl RemoteBlockDeviceRegistry {
             return Ok(());
         }
 
-        let backing_memory = MemoryObject::from(zx::Vmo::create(initial_size)?);
+        let backing_memory = MemoryObject::from(zx::Vmo::create(initial_size)?)
+            .with_zx_name(b"starnix:remote_block_device");
         let minor = self.next_minor.fetch_add(1, Ordering::Relaxed);
         let device = RemoteBlockDevice::new(locked, current_task, minor, name, backing_memory);
         if let Some(callback) = self.device_added_fn.get() {

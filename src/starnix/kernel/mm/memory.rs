@@ -174,6 +174,11 @@ impl MemoryObject {
         }
     }
 
+    pub fn with_zx_name(self, name: &[u8]) -> Self {
+        self.set_zx_name(name);
+        self
+    }
+
     pub fn op_range(
         &self,
         op: zx::VmoOp,

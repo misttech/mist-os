@@ -145,9 +145,12 @@ impl Vdso {
 
 fn create_vvar_and_handles() -> (Arc<MemoryMappedVvar>, Arc<MemoryObject>) {
     // Creating a vvar memory which has a handle which is writeable.
-    let vvar_memory_writeable = Arc::new(MemoryObject::from(
-        zx::Vmo::create(*VVAR_SIZE as u64).expect("Couldn't create vvar memory"),
-    ));
+    let vvar_memory_writeable = Arc::new(
+        MemoryObject::from(
+            zx::Vmo::create(*VVAR_SIZE as u64).expect("Couldn't create vvar memory"),
+        )
+        .with_zx_name(b"starnix:vsdo"),
+    );
     // Map the writeable vvar_memory to a region of Starnix kernel VMAR and write initial vvar_data
     let vvar_memory_mapped =
         Arc::new(MemoryMappedVvar::new(&vvar_memory_writeable).expect("couldn't map vvar memory"));

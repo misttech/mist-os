@@ -37,7 +37,7 @@ impl MemoryFileNode {
         let vmo =
             zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).map_err(|_| errno!(ENOMEM))?;
         Ok(Self {
-            memory: Arc::new(MemoryObject::from(vmo)),
+            memory: Arc::new(MemoryObject::from(vmo).with_zx_name(b"starnix:vfs")),
             xattrs: MemoryXattrStorage::default(),
         })
     }

@@ -12,7 +12,7 @@ use dense_map::DenseMap;
 use ebpf::MapSchema;
 
 use starnix_lifecycle::AtomicU32Counter;
-use starnix_logging::track_stub;
+use starnix_logging::{track_stub, with_zx_name};
 use starnix_sync::{BpfMapEntries, LockBefore, Locked, OrderedMutex};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
@@ -645,8 +645,10 @@ impl RingBufferStorage {
                     | zx::VmarFlags::CAN_MAP_WRITE,
             )?
         };
-        let technical_vmo =
-            zx::Vmo::create(page_size as u64).map_err(|e| from_status_like_fdio!(e))?;
+        let technical_vmo = with_zx_name(
+            zx::Vmo::create(page_size as u64).map_err(|e| from_status_like_fdio!(e))?,
+            b"starnix:bpf",
+        );
         vmar.map(
             0,
             &technical_vmo,
@@ -656,7 +658,10 @@ impl RingBufferStorage {
         )
         .map_err(|e| from_status_like_fdio!(e))?;
 
-        let vmo = zx::Vmo::create(vmo_size as u64).map_err(|e| from_status_like_fdio!(e))?;
+        let vmo = with_zx_name(
+            zx::Vmo::create(vmo_size as u64).map_err(|e| from_status_like_fdio!(e))?,
+            b"starnix:bpf",
+        );
         vmar.map(
             page_size,
             &vmo,

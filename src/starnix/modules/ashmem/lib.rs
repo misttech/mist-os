@@ -195,7 +195,7 @@ impl FileOps for Ashmem {
                 }
                 // Round up to page boundary
                 let vmo = zx::Vmo::create(size_paged_aligned as u64).map_err(|_| errno!(ENOMEM))?;
-                let memory = MemoryObject::from(vmo);
+                let memory = MemoryObject::from(vmo).with_zx_name(b"starnix:ashmem");
                 Ok(Arc::new(memory))
             })?
             .clone();

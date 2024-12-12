@@ -644,7 +644,11 @@ struct PrivateAnonymousMemoryManager {
 impl PrivateAnonymousMemoryManager {
     fn new(backing_size: u64) -> Self {
         let backing = Arc::new(MemoryObject::from(
-            zx::Vmo::create(backing_size).unwrap().replace_as_executable(&VMEX_RESOURCE).unwrap(),
+            zx::Vmo::create(backing_size)
+                .unwrap()
+                .replace_as_executable(&VMEX_RESOURCE)
+                .unwrap()
+                .with_zx_name("starnix:memory_manager"),
         ));
         Self { backing }
     }
@@ -2040,13 +2044,15 @@ impl MemoryManagerState {
             .ptr()
             .checked_sub(low_addr.ptr())
             .ok_or_else(|| anyhow!("Invalid growth range"))?;
-        let memory =
-            Arc::new(MemoryObject::from(zx::Vmo::create(length as u64).map_err(|s| match s {
+        let memory = Arc::new(
+            MemoryObject::from(zx::Vmo::create(length as u64).map_err(|s| match s {
                 zx::Status::NO_MEMORY | zx::Status::OUT_OF_RANGE => {
                     anyhow!("Could not allocate VMO for mapping growth")
                 }
                 _ => anyhow!("Unexpected error creating VMO: {s}"),
-            })?));
+            })?)
+            .with_zx_name(b"starnix:memory_manager"),
+        );
         let vmar_flags =
             mapping_to_grow.flags.access_flags().to_vmar_flags() | zx::VmarFlags::SPECIFIC;
         let mapping = Mapping::new(
@@ -3194,11 +3200,6 @@ impl MemoryManager {
 
         let brk = match state.brk.clone() {
             None => {
-                let memory = Arc::new(MemoryObject::from(
-                    zx::Vmo::create(PROGRAM_BREAK_LIMIT).map_err(|_| errno!(ENOMEM))?,
-                ));
-                memory.set_zx_name(b"starnix-brk");
-
                 let brk = ProgramBreak { base: state.brk_origin, current: state.brk_origin };
                 state.brk = Some(brk.clone());
                 brk
@@ -4432,7 +4433,8 @@ pub fn create_anonymous_mapping_memory(size: u64) -> Result<Arc<MemoryObject>, E
             zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
             _ => impossible_error(s),
         })?,
-    );
+    )
+    .with_zx_name(b"starnix:memory_manager");
 
     profile.pivot("SetAnonVmoName");
     memory.set_zx_name(b"starnix-anon");

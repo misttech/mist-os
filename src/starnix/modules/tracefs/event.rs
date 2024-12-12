@@ -305,6 +305,7 @@ impl<'a> TraceEventQueue {
         let ring_buffer: MemoryObject = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0)
             .map_err(|_| errno!(ENOMEM))?
             .into();
+        let ring_buffer = ring_buffer.with_zx_name(b"starnix:tracefs");
         Ok(Self { metadata: Mutex::new(metadata), ring_buffer, tracefs_node })
     }
 
