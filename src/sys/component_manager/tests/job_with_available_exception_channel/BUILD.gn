@@ -21,4 +21,7 @@ executable("bin") {
 fuchsia_unittest_package("job-with-available-exception-channel-test") {
   manifest = "meta/job-with-available-exception-channel-test.cml"
   deps = [ ":bin" ]
+  test_specs = {
+    create_no_exception_channel = true
+  }
 }
