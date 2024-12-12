@@ -108,7 +108,7 @@ To better understand how this works, take a look at the Archivist's CML file:
 
 Note: The highlighted code shows how the various capabilities are requested.
 
-```json
+```
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/diagnostics/archivist/meta/common.shard.cml" highlight="25-36" %}
 ```
 
