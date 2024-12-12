@@ -4,7 +4,9 @@
 
 #include "fake-dma-handler.h"
 
+#include <lib/fit/defer.h>
 #include <lib/zx/vmar.h>
+
 namespace ufs {
 namespace ufs_mock_device {
 
@@ -40,7 +42,15 @@ zx::result<zx_vaddr_t> FakeDmaHandler::PhysToVirt(zx_paddr_t paddr) {
     return zx::error(status);
   }
 
-  for (uint32_t vmo_info_index = 0; vmo_info_index < vmo_info_num; ++vmo_info_index) {
+  uint32_t vmo_info_index;
+  auto defer = fit::defer([&]() {
+    // Close all remaining handles
+    for (++vmo_info_index; vmo_info_index < vmo_info_num; ++vmo_info_index) {
+      zx_handle_close(vmo_infos[vmo_info_index].vmo);
+    }
+  });
+
+  for (vmo_info_index = 0; vmo_info_index < vmo_info_num; ++vmo_info_index) {
     auto vmo = zx::vmo(vmo_infos[vmo_info_index].vmo);
     size_t num_paddrs;
     std::vector<zx_paddr_t> paddrs(kFakeBtiAddrsCount);
@@ -65,6 +75,8 @@ zx::result<zx_vaddr_t> FakeDmaHandler::PhysToVirt(zx_paddr_t paddr) {
       }
     }
   }
+
+  defer.cancel();
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
