@@ -161,6 +161,9 @@ _internal_source_sets_list_testonly = [
   "//sdk/lib/driver/devicetree/visitors:registry",
   "//sdk/lib/driver_test_realm/realm_builder/cpp:cpp",
 
+  # TODO(https://fxbug.dev/349834645): Promote fake-mmio-reg to "partner".
+  "//sdk/lib/driver/fake-mmio-reg/cpp:cpp",
+
   # TODO(https://fxbug.dev/373899421): Promote mock-mmio-range to "partner".
   "//sdk/lib/driver/mock-mmio-range/cpp:cpp",
 
