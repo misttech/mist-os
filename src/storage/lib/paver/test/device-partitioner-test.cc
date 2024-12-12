@@ -1103,7 +1103,8 @@ TEST_F(MoonflowerPartitionerTests, FindPartition) {
       CreateDiskWithGpt(&gpt_dev, kBlockCount * block_size_,
                         {
                             {GUID_ABR_META_NAME, Uuid(kAbrMetaType), 0x10400, 0x10000},
-                            {"boot", Uuid(kDummyType), 0x30400, 0x20000},
+                            {"dtbo_a", Uuid(kDummyType), 0x30400, 0x10000},
+                            {"dtbo_b", Uuid(kDummyType), 0x40400, 0x10000},
                             {"boot_a", Uuid(kZirconAType), 0x50400, 0x10000},
                             {"boot_b", Uuid(kZirconBType), 0x60400, 0x10000},
                             {"system_a", Uuid(kDummyType), 0x70400, 0x10000},
@@ -1122,6 +1123,8 @@ TEST_F(MoonflowerPartitionerTests, FindPartition) {
   std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
 
   // Make sure we can find the important partitions.
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderA, "dtbo")));
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderB, "dtbo")));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconA)));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconB)));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kFuchsiaVolumeManager)));
@@ -1135,6 +1138,10 @@ TEST_F(MoonflowerPartitionerTests, SupportsPartition) {
   ASSERT_OK(status);
   std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
 
+  EXPECT_TRUE(
+      partitioner->SupportsPartition(PartitionSpec(paver::Partition::kBootloaderA, "dtbo")));
+  EXPECT_TRUE(
+      partitioner->SupportsPartition(PartitionSpec(paver::Partition::kBootloaderB, "dtbo")));
   EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconA)));
   EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconB)));
   EXPECT_TRUE(
