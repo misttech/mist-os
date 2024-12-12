@@ -30,7 +30,7 @@ CPU_MAP = {
     fuchsia_platforms.riscv64: "riscv64",
 }
 
-_REPO_DEFAULT_API_LEVEL_TARGET_NAME = "//fuchsia:repository_default_fuchsia_api_level"
+_REPO_DEFAULT_API_LEVEL_TARGET_NAME = "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level"
 
 def _fuchsia_api_level_in_effect(settings, attr):
     # The logic for determining what API level to use.
