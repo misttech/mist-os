@@ -9,6 +9,11 @@ import("//build/bazel/bazel_build_action.gni")
 #
 # Parameters
 #
+#  board_name (optional)
+#    Name of the board.
+#    Type: string
+#    Default: $target_name
+#
 #  bazel_board_configuration_target (required)
 #    The Bazel board configuration target to build.
 #    Type: label (from BUILD.bazel)
@@ -21,6 +26,11 @@ import("//build/bazel/bazel_build_action.gni")
 template("bazel_board_configuration") {
   assert(defined(invoker.bazel_board_configuration_target),
          "bazel_board_configuration_target is required")
+
+  board_name = target_name
+  if (defined(invoker.board_name)) {
+    board_name = invoker.board_name
+  }
 
   board_configuration_target = target_name
   board_configuration_out = "${target_out_dir}/${board_configuration_target}"
@@ -56,6 +66,7 @@ template("bazel_board_configuration") {
         {
           label = get_label_info(":${board_configuration_target}",
                                  "label_with_toolchain")
+          name = board_name
           outdir = rebase_path(board_configuration_out, root_build_dir)
         },
       ]
