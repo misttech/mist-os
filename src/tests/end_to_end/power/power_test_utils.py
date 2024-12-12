@@ -1090,3 +1090,26 @@ def merge_gonk_data(
 
     # Insert gonk samples with the modified timestamp into the existing trace.
     _append_power_data(fxt_path, power_samples_for_trace, starting_ticks=0)
+
+
+def merge_gonk_data_without_gpio(
+    gonk_samples: Iterable[GonkSample],
+    fxt_path: str,
+    rail_names: list[str],
+) -> None:
+    power_samples_for_trace = []
+    for s in gonk_samples:
+        n_rails = len(s.voltages)
+        for i in range(n_rails):
+            power_samples_for_trace.append(
+                Sample(
+                    s.gonk_time.to_epoch_delta().to_nanoseconds(),
+                    s.currents[i],
+                    s.voltages[i],
+                    aux_current=None,
+                    power=s.powers[i],
+                    rail_id=(i + 1),
+                    rail_name=rail_names[i],
+                )
+            )
+    _append_power_data(fxt_path, power_samples_for_trace, starting_ticks=0)

@@ -25,6 +25,7 @@ def merge_trace(
     power: str = "",
     power_format: PowerFileFormat = PowerFileFormat.monsoon,
     output: str = "",
+    gpio: bool = True,
 ) -> None:
     trace_json_path: str = trace_importing.convert_trace_file_to_json(
         # trace2json will be placed in the same output directory as this tool
@@ -40,9 +41,14 @@ def merge_trace(
     if power_format == PowerFileFormat.gonk:
         rail_names = power_test_utils.read_gonk_header(power)
         gonk_samples = power_test_utils.read_gonk_samples(power)
-        power_test_utils.merge_gonk_data(
-            model, gonk_samples, output, rail_names
-        )
+        if gpio:
+            power_test_utils.merge_gonk_data(
+                model, gonk_samples, output, rail_names
+            )
+        else:
+            power_test_utils.merge_gonk_data_without_gpio(
+                gonk_samples, output, rail_names
+            )
     else:
         samples = power_test_utils.read_power_samples(power)
         power_test_utils.merge_power_data(model, samples, output)
@@ -80,6 +86,12 @@ def main() -> None:
         type=str,
         default="trace_with_power.fxt",
         help=".fxt file to output to",
+    )
+    parser.add_argument(
+        "--gpio",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Synchronize based on GPIO toggle signals",
     )
     args = parser.parse_args()
     if not args:
