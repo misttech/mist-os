@@ -16,4 +16,10 @@ if [[ "$INCLUDE_DIRS" != "--" ]]; then
   done
 fi
 
-exec $DTC_PATH $@ $DTC_ARGS
+# Treat DTS warnings as build failures.
+DTC_OUTPUT=$($DTC_PATH $@ $DTC_ARGS 2>&1)
+echo -e "$DTC_OUTPUT"
+if [[ "$DTC_OUTPUT" == *"Warning"* ]]; then
+  echo "$0: Returning failure due to warnings in dts compilation."
+  exit 1
+fi

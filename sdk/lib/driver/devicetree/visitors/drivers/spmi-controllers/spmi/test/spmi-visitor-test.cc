@@ -376,19 +376,6 @@ TEST(SpmiVisitorTest, RegisterType) {
   }
 }
 
-TEST(SpmiVisitorTest, DuplicateTargetId) {
-  fdf_devicetree::VisitorRegistry visitors;
-  ASSERT_TRUE(
-      visitors.RegisterVisitor(std::make_unique<fdf_devicetree::BindPropertyVisitor>()).is_ok());
-  ASSERT_TRUE(visitors.RegisterVisitor(std::make_unique<fdf_devicetree::MmioVisitor>()).is_ok());
-
-  SpmiVisitorTester* const spmi_tester =
-      new SpmiVisitorTester("/pkg/test-data/spmi-duplicate-target-id.dtb");
-  ASSERT_TRUE(visitors.RegisterVisitor(std::unique_ptr<SpmiVisitorTester>{spmi_tester}).is_ok());
-
-  EXPECT_FALSE(spmi_tester->manager()->Walk(visitors).is_ok());
-}
-
 TEST(SpmiVisitorTest, SubTargetSpmiAddressOutOfRange) {
   fdf_devicetree::VisitorRegistry visitors;
   ASSERT_TRUE(
