@@ -16,6 +16,7 @@
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>
 #include <zircon/syscalls.h>
+#include <zircon/threads.h>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/designware/platform/cpp/bind.h>

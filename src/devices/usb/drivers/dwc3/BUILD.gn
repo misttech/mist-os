@@ -51,7 +51,6 @@ source_set("dwc3-common") {
     "//src/devices/usb/lib/usb:descriptors",
     "//src/devices/usb/lib/usb:usb-fidl-sdk",
     "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server-sdk",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",

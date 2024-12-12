@@ -19,6 +19,7 @@
 #include <lib/zx/result.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
+#include <zircon/threads.h>
 
 #include <cstdint>
 #include <deque>
