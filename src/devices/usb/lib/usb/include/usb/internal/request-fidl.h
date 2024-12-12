@@ -31,13 +31,11 @@
 
 #include <functional>
 #include <map>
+#include <mutex>
 #include <optional>
 #include <queue>
 #include <utility>
 #include <vector>
-
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 
 #include "src/devices/usb/lib/usb/align.h"
 
@@ -70,8 +68,6 @@ class FidlRequest {
   using get_mapped_func_t = std::function<zx::result<std::optional<MappedVmo>>(
       const fuchsia_hardware_usb_request::Buffer& buffer)>;
 
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(FidlRequest);
-
   FidlRequest() = default;
   explicit FidlRequest(EndpointType ep_type) {
     switch (ep_type) {
@@ -93,7 +89,13 @@ class FidlRequest {
   }
   explicit FidlRequest(fuchsia_hardware_usb_request::Request request)
       : request_(std::move(request)) {}
+
+  // Disallow copy and assign, allow move.
   FidlRequest(FidlRequest&& request) = default;
+  FidlRequest& operator=(FidlRequest&& request) = delete;
+  FidlRequest(const FidlRequest&) = delete;
+  FidlRequest& operator=(const FidlRequest&) = delete;
+
   ~FidlRequest() { Unpin(); }
 
   FidlRequest& set_control(fuchsia_hardware_usb_descriptor::UsbSetup setup = {}) {
@@ -486,7 +488,7 @@ class FidlRequestPool {
   }
 
   std::optional<RequestType> Get() {
-    fbl::AutoLock _(&mutex_);
+    std::lock_guard<std::mutex> _(mutex_);
     if (free_reqs_.empty()) {
       return std::nullopt;
     }
@@ -498,22 +500,22 @@ class FidlRequestPool {
 
   // Put: called when a request (originally obtained from `get`) is returned to the pool.
   void Put(RequestType&& request) {
-    fbl::AutoLock _(&mutex_);
+    std::lock_guard<std::mutex> _(mutex_);
     free_reqs_.emplace(std::move(request));
     ZX_DEBUG_ASSERT(free_reqs_.size() <= size_);
   }
 
   bool Full() {
-    fbl::AutoLock _(&mutex_);
+    std::lock_guard<std::mutex> _(mutex_);
     return free_reqs_.size() == size_;
   }
   bool Empty() {
-    fbl::AutoLock _(&mutex_);
+    std::lock_guard<std::mutex> _(mutex_);
     return free_reqs_.empty();
   }
 
  private:
-  fbl::Mutex mutex_;
+  std::mutex mutex_;
   std::queue<RequestType> free_reqs_ __TA_GUARDED(mutex_);
 
   std::atomic_uint32_t size_ = 0;

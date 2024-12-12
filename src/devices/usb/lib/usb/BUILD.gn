@@ -113,7 +113,6 @@ source_set("usb-fidl") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_cpp",
     "//src/lib/ddk",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
   public_configs = [
@@ -133,7 +132,6 @@ source_set("usb-fidl-dfv2-compat-logging") {
     "//sdk/fidl/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//src/devices/lib/io-buffer",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
   public_configs = [
@@ -153,7 +151,6 @@ source_set("usb-fidl-sdk") {
     "//sdk/fidl/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_cpp",
     "//sdk/lib/driver/logging/cpp",
     "//src/devices/lib/dma-buffer",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
   public_configs = [ ":includes" ]
