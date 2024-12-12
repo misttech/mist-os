@@ -364,15 +364,13 @@ impl RcsKnocker for LocalRcsKnockerImpl {
         target_spec: Option<String>,
         env: &EnvironmentContext,
     ) -> Result<(), KnockError> {
-        knock_target_daemonless(&target_spec, env, Some(DEFAULT_RCS_KNOCK_TIMEOUT)).await.map(
-            |compat| {
-                let msg = match compat {
-                    Some(c) => format!("Received compat info: {c:?}"),
-                    None => format!("No compat info received"),
-                };
-                tracing::debug!("Knocked target. {msg}");
-            },
-        )
+        knock_target_daemonless(&target_spec, env, None).await.map(|compat| {
+            let msg = match compat {
+                Some(c) => format!("Received compat info: {c:?}"),
+                None => format!("No compat info received"),
+            };
+            tracing::debug!("Knocked target. {msg}");
+        })
     }
 }
 
