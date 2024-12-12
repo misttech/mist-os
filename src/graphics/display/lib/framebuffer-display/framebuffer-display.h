@@ -21,9 +21,7 @@
 #include <zircon/errors.h>
 
 #include <atomic>
-#include <memory>
-
-#include <fbl/mutex.h>
+#include <mutex>
 
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
@@ -112,7 +110,7 @@ class FramebufferDisplay : public HeapServer,
   async::TaskMethod<FramebufferDisplay, &FramebufferDisplay::OnPeriodicVSync> vsync_task_{this};
 
   // protects only framebuffer_key_
-  fbl::Mutex framebuffer_key_mtx_;
+  std::mutex framebuffer_key_mtx_;
   std::optional<BufferKey> framebuffer_key_ TA_GUARDED(framebuffer_key_mtx_);
 
   static_assert(std::atomic<bool>::is_always_lock_free);
@@ -120,7 +118,7 @@ class FramebufferDisplay : public HeapServer,
 
   // A lock is required to ensure the atomicity when setting |config_stamp| in
   // |ApplyConfiguration()| and passing |&config_stamp_| to |OnDisplayVsync()|.
-  fbl::Mutex mtx_;
+  std::mutex mtx_;
   display::ConfigStamp config_stamp_ TA_GUARDED(mtx_) = display::kInvalidConfigStamp;
 
   const fdf::MmioBuffer framebuffer_mmio_;
@@ -132,7 +130,7 @@ class FramebufferDisplay : public HeapServer,
   // Only used on the vsync thread.
   zx::time next_vsync_time_;
 
-  fbl::Mutex engine_listener_mutex_;
+  std::mutex engine_listener_mutex_;
   ddk::DisplayEngineListenerProtocolClient engine_listener_ TA_GUARDED(engine_listener_mutex_);
 };
 
