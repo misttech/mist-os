@@ -47,9 +47,6 @@ exec_script_whitelist = [
   "//build/toolchain/default_concurrent_jobs.gni",
   "//build/toolchain/zircon/zircon_toolchain.gni",
   "//zircon/kernel/arch/x86/phys/BUILD.gn",
-
-  # TODO(https://fxbug.dev/383347626): This is temporary to perform soft-migration.
-  "//zircon/system/ulib/c/string/file_exists_check.gni",
 ]
 
 check_system_includes = true
