@@ -245,9 +245,15 @@ void Client::ImportEvent(ImportEventRequestView request,
   const display::EventId event_id = display::ToEventId(request->id);
   if (event_id == display::kInvalidEventId) {
     FDF_LOG(ERROR, "Cannot import events with an invalid ID #%" PRIu64, event_id.value());
-    TearDown();
-  } else if (fences_.ImportEvent(std::move(request->event), event_id) != ZX_OK) {
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  if (zx_status_t status = fences_.ImportEvent(std::move(request->event), event_id);
+      status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to import event: %s", zx_status_get_string(status));
+    TearDown(status);
+    return;
   }
 }
 
@@ -368,12 +374,12 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     FDF_LOG(ERROR, "Tried to destroy invalid layer %" PRIu64, layer_id.value());
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
   if (layer->in_use()) {
     FDF_LOG(ERROR, "Destroyed layer %" PRIu64 " which was in use", layer_id.value());
-    TearDown();
+    TearDown(ZX_ERR_BAD_STATE);
     return;
   }
 
@@ -388,7 +394,9 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
     return;
   }
 
-  fit::deferred_action tear_down_on_error = fit::defer([this] { TearDown(); });
+  zx_status_t tear_down_status = ZX_OK;
+  fit::deferred_action tear_down_on_error =
+      fit::defer([this, &tear_down_status] { TearDown(tear_down_status); });
 
   fbl::AutoLock lock(controller_->mtx());
   zx::result<cpp20::span<const display::DisplayTiming>> display_timings_result =
@@ -396,6 +404,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   if (display_timings_result.is_error()) {
     FDF_LOG(ERROR, "Failed to get display timings for display #%" PRIu64 ": %s", display_id.value(),
             display_timings_result.status_string());
+    tear_down_status = display_timings_result.status_value();
     return;
   }
 
@@ -421,6 +430,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
     FDF_LOG(ERROR, "Display mode not found: (%" PRIu32 " x %" PRIu32 ") @ %" PRIu32 " millihertz",
             request->mode.active_area.width, request->mode.active_area.height,
             request->mode.refresh_rate_millihertz);
+    tear_down_status = ZX_ERR_NOT_FOUND;
     return;
   }
 
@@ -475,6 +485,7 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto config = configs_.find(display_id);
   if (!config.IsValid()) {
+    FDF_LOG(WARNING, "SetDisplayLayers on display layer %lu", display_id.value());
     return;
   }
 
@@ -489,14 +500,14 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
     display::DriverLayerId driver_layer_id(layer_id.value());
     auto layer = layers_.find(driver_layer_id);
     if (!layer.IsValid()) {
-      FDF_LOG(ERROR, "Unknown layer %lu", request->layer_ids[i].value);
-      TearDown();
+      FDF_LOG(ERROR, "SetDisplayLayers: unknown layer %lu", request->layer_ids[i].value);
+      TearDown(ZX_ERR_INVALID_ARGS);
       return;
     }
 
     if (!layer->AppendToConfig(&config->pending_layers_)) {
       FDF_LOG(ERROR, "Tried to reuse an in-use layer");
-      TearDown();
+      TearDown(ZX_ERR_BAD_STATE);
       return;
     }
   }
@@ -514,7 +525,7 @@ void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     FDF_LOG(ERROR, "SetLayerPrimaryConfig on invalid layer");
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
 
@@ -533,13 +544,13 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     FDF_LOG(ERROR, "SetLayerPrimaryPosition on invalid layer");
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
   if (request->image_source_transformation > fhdt::wire::CoordinateTransformation::kRotateCcw270) {
     FDF_LOG(ERROR, "Invalid transform %" PRIu8,
             static_cast<uint8_t>(request->image_source_transformation));
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
   layer->SetPrimaryPosition(request->image_source_transformation, request->image_source,
@@ -558,14 +569,14 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     FDF_LOG(ERROR, "SetLayerPrimaryAlpha on invalid layer");
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
 
   if (request->mode > fhdt::wire::AlphaMode::kHwMultiply ||
       (!isnan(request->val) && (request->val < 0 || request->val > 1))) {
     FDF_LOG(ERROR, "Invalid args %hhu %f", static_cast<uint8_t>(request->mode), request->val);
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
   layer->SetPrimaryAlpha(request->mode, request->val);
@@ -591,7 +602,7 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
       /*pixel_format_modifier_param=*/fuchsia_images2::wire::PixelFormatModifier::kLinear));
   if (request->color.bytes.size() < bytes_per_pixel) {
     FDF_LOG(ERROR, "SetLayerColorConfig with invalid pixel format");
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
 
@@ -614,21 +625,21 @@ void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     FDF_LOG(ERROR, "SetLayerImage with invalid layer ID: %" PRIu64, layer_id.value());
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
 
   auto image_it = images_.find(image_id);
   if (!image_it.IsValid()) {
     FDF_LOG(ERROR, "SetLayerImage with invalid image ID: %" PRIu64, image_id.value());
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
 
   Image& image = *image_it;
   if (!image.Acquire()) {
     FDF_LOG(ERROR, "SetLayerImage with image that is already in use");
-    TearDown();
+    TearDown(ZX_ERR_BAD_STATE);
     return;
   }
 
@@ -651,7 +662,7 @@ void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image
   if (image.metadata() != display::ImageMetadata(layer->pending_image_metadata())) {
     FDF_LOG(ERROR, "SetLayerImage with mismatching layer and image metadata");
     image.DiscardAcquire();
-    TearDown();
+    TearDown(ZX_ERR_BAD_STATE);
     return;
   }
 
@@ -681,7 +692,7 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
 void Client::ApplyConfig3(ApplyConfig3RequestView request, ApplyConfigCompleter::Sync& _completer) {
   if (!request->has_stamp()) {
     FDF_LOG(ERROR, "ApplyConfig3: stamp is required; none was provided");
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
   ApplyConfigFromFidl(display::ConfigStamp(request->stamp().value));
@@ -703,7 +714,7 @@ void Client::ApplyConfigFromFidl(display::ConfigStamp new_config_stamp) {
             "Config stamp must be monotonically increasing.  Previous stamp: %" PRIu64
             " New stamp: %" PRIu64,
             latest_config_stamp_.value(), new_config_stamp.value());
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
   latest_config_stamp_ = new_config_stamp;
@@ -730,13 +741,13 @@ void Client::ApplyConfigFromFidl(display::ConfigStamp new_config_stamp) {
       if (!layer_node.layer->ResolvePendingLayerProperties()) {
         FDF_LOG(ERROR, "Failed to resolve pending layer properties for layer %" PRIu64,
                 layer_node.layer->id.value());
-        TearDown();
+        TearDown(ZX_ERR_BAD_STATE);
         return;
       }
       if (!layer_node.layer->ResolvePendingImage(&fences_, latest_config_stamp_)) {
         FDF_LOG(ERROR, "Failed to resolve pending images for layer %" PRIu64,
                 layer_node.layer->id.value());
-        TearDown();
+        TearDown(ZX_ERR_BAD_STATE);
         return;
       }
     }
@@ -802,7 +813,7 @@ void Client::SetVirtconMode(SetVirtconModeRequestView request,
   if (priority_ != ClientPriority::kVirtcon) {
     FDF_LOG(ERROR, "SetVirtconMode() called by %s client",
             DebugStringFromClientPriority(priority_));
-    TearDown();
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
   controller_->SetVirtconMode(request->mode);
@@ -1443,21 +1454,37 @@ void Client::CaptureCompleted() {
   current_capture_image_id_ = display::kInvalidImageId;
 }
 
-void Client::TearDown() {
+void Client::TearDown(zx_status_t epitaph) {
   ZX_DEBUG_ASSERT(controller_->IsRunningOnClientDispatcher());
   pending_config_valid_ = false;
+
+  // See `fuchsia.hardware.display/Coordinator` protocol documentation in `coordinator.fidl`,
+  // which describes the epitaph values that will be set when the channel closes.
+  switch (epitaph) {
+    case ZX_ERR_INVALID_ARGS:
+    case ZX_ERR_BAD_STATE:
+    case ZX_ERR_NO_MEMORY:
+      FDF_LOG(INFO, "TearDown() called with epitaph %s", zx_status_get_string(epitaph));
+      break;
+    default:
+      FDF_LOG(INFO, "TearDown() called with epitaph %s; using catchall ZX_ERR_INTERNAL instead",
+              zx_status_get_string(epitaph));
+      epitaph = ZX_ERR_INTERNAL;
+  }
 
   // Teardown stops events from the channel, but not from the ddk, so we
   // need to make sure we don't try to teardown multiple times.
   if (!IsValid()) {
     return;
   }
+  valid_ = false;
 
-  // make sure we stop vsync messages from this client since the server end has already been closed
-  // by the fidl server.
+  // Break FIDL connections. First stop Vsync messages from the controller since there will be no
+  // FIDL connections to forward the messages over.
   proxy_->EnableVsync(false);
-
-  running_ = false;
+  binding_->Close(epitaph);
+  binding_.reset();
+  coordinator_listener_.AsyncTeardown();
 
   CleanUpAllImages();
   FDF_LOG(INFO, "Releasing %zu capture images cur=%" PRIu64 ", pending=%" PRIu64,
@@ -1487,7 +1514,7 @@ void Client::TearDown() {
   ApplyConfig();
 }
 
-void Client::TearDownTest() { running_ = false; }
+void Client::TearDownTest() { valid_ = false; }
 
 bool Client::CleanUpAllImages() {
   // Clean up all image fences.
@@ -1594,14 +1621,14 @@ zx_koid_t GetKoid(zx_handle_t handle) {
   return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
 }
 
-fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Client::Bind(
+void Client::Bind(
     fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server_end,
     fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_client_end,
     fidl::OnUnboundFn<Client> unbound_callback) {
-  ZX_DEBUG_ASSERT(!running_);
+  ZX_DEBUG_ASSERT(!valid_);
   ZX_DEBUG_ASSERT(coordinator_server_end.is_valid());
   ZX_DEBUG_ASSERT(coordinator_listener_client_end.is_valid());
-  running_ = true;
+  valid_ = true;
 
   // Keep a copy of fidl binding so we can safely unbind from it during shutdown
   binding_ = fidl::BindServer(controller_->client_dispatcher()->async_dispatcher(),
@@ -1609,8 +1636,6 @@ fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Client::Bind(
 
   coordinator_listener_.Bind(std::move(coordinator_listener_client_end),
                              controller_->client_dispatcher()->async_dispatcher());
-
-  return *binding_;
 }
 
 Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priority,
@@ -1626,7 +1651,7 @@ Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priori
   ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
 }
 
-Client::~Client() { ZX_DEBUG_ASSERT(!running_); }
+Client::~Client() { ZX_DEBUG_ASSERT(!valid_); }
 
 void ClientProxy::SetOwnership(bool is_owner) {
   fbl::AllocChecker ac;
@@ -1855,7 +1880,8 @@ void ClientProxy::CloseOnControllerLoop() {
   [[maybe_unused]] zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
       *controller_->client_dispatcher()->async_dispatcher(),
       // Client::TearDown() must be called even if the task fails to post.
-      [_ = display::CallFromDestructor([this]() { handler_.TearDown(); })]() {});
+      [_ = display::CallFromDestructor(
+           [this]() { handler_.TearDown(ZX_ERR_CONNECTION_ABORTED); })]() {});
 }
 
 zx_status_t ClientProxy::Init(
@@ -1876,15 +1902,14 @@ zx_status_t ClientProxy::Init(
              fidl::ServerEnd<fuchsia_hardware_display::Coordinator> ch) {
         sync_completion_signal(client->fidl_unbound());
         // Make sure we TearDown() so that no further tasks are scheduled on the controller loop.
-        client->TearDown();
+        client->TearDown(ZX_OK);
 
         // The client has died so tell the Proxy which will free the classes.
         OnClientDead();
       };
 
-  [[maybe_unused]] fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> binding =
-      handler_.Bind(std::move(coordinator_server_end), std::move(coordinator_listener_client_end),
-                    std::move(unbound_callback));
+  handler_.Bind(std::move(coordinator_server_end), std::move(coordinator_listener_client_end),
+                std::move(unbound_callback));
   return ZX_OK;
 }
 
@@ -1897,9 +1922,8 @@ zx::result<> ClientProxy::InitForTesting(
   // so we replace it with a no-op unbound callback instead.
   fidl::OnUnboundFn<Client> unbound_callback =
       [](Client*, fidl::UnbindInfo, fidl::ServerEnd<fuchsia_hardware_display::Coordinator>) {};
-  [[maybe_unused]] fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> binding =
-      handler_.Bind(std::move(coordinator_server_end), std::move(coordinator_listener_client_end),
-                    std::move(unbound_callback));
+  handler_.Bind(std::move(coordinator_server_end), std::move(coordinator_listener_client_end),
+                std::move(unbound_callback));
   return zx::ok();
 }
 

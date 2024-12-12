@@ -76,7 +76,14 @@ open protocol CoordinatorListener {
 /// possible.
 ///
 /// Performing illegal actions on the interface will result in the interface
-/// being closed.
+/// being closed.  The channel closure epitaph will return one of 4 values:
+/// - ZX_ERR_INVALID_ARGS: for trivially-verifiable client errors, such as providing an ID for a
+///       nonexistent image/layer/event, or a non-monotonically-increasing config stamp to
+///       ApplyConfig, etc.
+/// - ZX_ERR_BAD_STATE: indicates that the client has violated other API invariants, such as reusing
+///       an event that hasn't been signaled yet.
+/// - ZX_ERR_NO_MEMORY: memory could not be allocated to satisfy the requested operation.
+/// - ZX_ERR_INTERNAL: catch-all used for any error that is not listed above.
 closed protocol Coordinator {
     /// Event fired when displays are added or removed. This event will be fired
     /// when the callback is registered if there are any connected displays.
