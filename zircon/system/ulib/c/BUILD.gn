@@ -11,6 +11,7 @@ import("//build/toolchain/ifs_shared_library.gni")
 import("//build/zircon/migrated_targets.gni")
 import("libc.gni")
 import("libc_toolchain.gni")
+import("string/file_exists_check.gni")
 
 assert(libc == get_path_info(get_path_info(".", "abspath"), "dir"),
        get_path_info(get_path_info(".", "abspath"), "dir"))
@@ -34,8 +35,14 @@ libc_testonly_components = []
 
 if (use_llvm_libc_string_functions) {
   libc_components += [ "string" ]
+  if (!file_exists_in_string) {
+    libc_components += [ "strings" ]
+  }
 } else {
   libc_testonly_components += [ "string" ]
+  if (!file_exists_in_string) {
+    libc_testonly_components += [ "strings" ]
+  }
 }
 
 group("components") {
