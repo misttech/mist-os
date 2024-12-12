@@ -119,6 +119,10 @@ fuchsia_board_configuration(
         },
     },
     post_processing_script = ":post_processing_script",
+    tee_trusted_app_guids = [
+        "ta_1",
+        "ta_2",
+    ],
 )
 
 fuchsia_post_processing_script(

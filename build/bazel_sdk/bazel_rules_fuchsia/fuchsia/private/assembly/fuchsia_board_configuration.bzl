@@ -86,6 +86,9 @@ def _fuchsia_board_configuration_impl(ctx):
     if hardware_info != {}:
         board_config["hardware_info"] = hardware_info
 
+    if ctx.attr.tee_trusted_app_guids:
+        board_config["tee_trusted_app_guids"] = ctx.attr.tee_trusted_app_guids
+
     # Files from board_input_bundles have paths that are relative to root,
     # prefix "../"s to make them relative to the output board config.
     board_config_relative_to_root = "../" * board_config_file.path.count("/")
@@ -206,6 +209,10 @@ _fuchsia_board_configuration = rule(
         "kernel": attr.string(
             doc = "The kernel related configuration provided by the board.",
             default = "{}",
+        ),
+        "tee_trusted_app_guids": attr.string_list(
+            doc = "GUIDs for the TAs provided by this board's TEE driver.",
+            default = [],
         ),
         "_establish_board_config_dir": attr.label(
             default = "//fuchsia/tools:establish_board_config_dir",
