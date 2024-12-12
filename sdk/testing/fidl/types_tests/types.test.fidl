@@ -252,6 +252,17 @@ type StructWithDefault = struct {
     defaulted int32 = SOME_DEFAULT_VALUE;
 };
 
+@serializable
+type SerializableStruct = struct {};
+
+@serializable
+type SerializableTable = table {};
+
+@serializable
+type SerializableUnion = strict union {
+    1: unused bool;
+};
+
 const SOME_DEFAULT_VALUE int32 = 100;
 
 service TypesTestService {

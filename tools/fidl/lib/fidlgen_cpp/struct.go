@@ -32,6 +32,7 @@ type Struct struct {
 
 	isEmptyStruct                bool
 	isAnonymousRequestOrResponse bool
+	Serializable                 fidlgen.Serializable
 }
 
 func (*Struct) Kind() declKind {
@@ -169,8 +170,9 @@ func (c *compiler) compileStruct(val fidlgen.Struct) *Struct {
 		BackingBufferTypeV2: computeAllocation(
 			TypeShape{val.TypeShapeV2}.MaxTotalSize(), TypeShape{val.TypeShapeV2}.MaxHandles, boundednessBounded).
 			BackingBufferType(),
-		IsInResult: false,
-		PaddingV2:  val.BuildPaddingMarkers(fidlgen.PaddingConfig{}),
+		IsInResult:   false,
+		PaddingV2:    val.BuildPaddingMarkers(fidlgen.PaddingConfig{}),
+		Serializable: val.GetSerializable(),
 	}
 
 	for _, v := range val.Members {

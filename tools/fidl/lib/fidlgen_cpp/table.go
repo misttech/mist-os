@@ -66,7 +66,8 @@ type Table struct {
 	WireTableBuilder         name
 	WireTableExternalBuilder name
 	// FrameItems stores the members in ordinal order; "null" for reserved.
-	FrameItems []TableFrameItem
+	FrameItems   []TableFrameItem
+	Serializable fidlgen.Serializable
 }
 
 var _ Kinded = (*Table)(nil)
@@ -137,6 +138,7 @@ func (c *compiler) compileTable(val fidlgen.Table) *Table {
 		WireTableFrame:           WireTableFrame.template(name.Wire),
 		WireTableBuilder:         WireTableBuilder.template(name.Wire),
 		WireTableExternalBuilder: WireTableExternalBuilder.template(name.Wire),
+		Serializable:             val.GetSerializable(),
 	}
 
 	for i, v := range val.Members {

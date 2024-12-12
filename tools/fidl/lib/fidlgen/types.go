@@ -991,6 +991,15 @@ type TypeShape struct {
 	HasFlexibleEnvelope bool `json:"has_flexible_envelope"`
 }
 
+// Contains properties related to the serialization of a FIDL union, struct, or table.
+type Serializable struct {
+	// Whether or not the FIDL type is serializable
+	IsSerializable bool
+
+	// Identifies the FIDL type being serialized.
+	Name string
+}
+
 // FieldShape represents the shape of the field on the wire.
 // See JSON IR schema, e.g. fidlc --json-schema
 type FieldShape struct {
@@ -1055,6 +1064,21 @@ type decl struct {
 	Location   `json:"location"`
 	Deprecated bool                      `json:"deprecated"`
 	Name       EncodedCompoundIdentifier `json:"name"`
+}
+
+func (d decl) GetSerializable() Serializable {
+	ci := d.Name.Parse()
+	var parts []string
+	for _, i := range ci.Library {
+		parts = append(parts, string(i))
+	}
+	parts = append(parts, string(ci.Name))
+	var name = strings.Join(parts, ".")
+
+	return Serializable{
+		IsSerializable: d.HasAttribute("serializable"),
+		Name:           name,
+	}
 }
 
 func (d decl) GetAttributes() Attributes {

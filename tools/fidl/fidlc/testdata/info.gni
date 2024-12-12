@@ -540,6 +540,10 @@ fidl_testdata_info = [
     target = "//tools/fidl/fidlc/testdata:test.vectors"
   },
   {
+    name = "serializable"
+    target = "//tools/fidl/fidlc/testdata:test.serializable"
+  },
+  {
     name = "versions"
     target = "//tools/fidl/fidlc/testdata:test.versions"
     host_build_denylist = [
