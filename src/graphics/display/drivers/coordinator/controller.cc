@@ -921,30 +921,32 @@ zx::result<> Controller::Initialize() {
 void Controller::PrepareStop() {
   FDF_LOG(INFO, "Controller::PrepareStop");
 
-  fbl::AutoLock lock(mtx());
-  unbinding_ = true;
-  // Tell each client to start releasing. We know `clients_` will not be
-  // modified here because we are holding the lock.
-  for (auto& client : clients_) {
-    client->CloseOnControllerLoop();
-  }
+  {
+    fbl::AutoLock lock(mtx());
+    unbinding_ = true;
+    // Tell each client to start releasing. We know `clients_` will not be
+    // modified here because we are holding the lock.
+    for (auto& client : clients_) {
+      client->CloseOnControllerLoop();
+    }
 
-  vsync_monitor_.Deinitialize();
+    vsync_monitor_.Deinitialize();
 
-  // Set an empty config so that the display driver releases resources.
-  display_config_t empty_config;
-  ++controller_stamp_;
-  const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
-  engine_driver_client_->ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
+    // Set an empty config so that the display driver releases resources.
+    display_config_t empty_config;
+    ++controller_stamp_;
+    const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
+    engine_driver_client_->ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
 
-  // It's possible that the Vsync with the null configuration is never
-  // triggered when drivers are shut down. We should proactively retire
-  // all images on all displays.
-  for (DisplayInfo& display : displays_) {
-    while (fbl::RefPtr<Image> image = display.images.pop_front()) {
-      AssertMtxAliasHeld(*image->mtx());
-      image->StartRetire();
-      image->OnRetire();
+    // It's possible that the Vsync with the null configuration is never
+    // triggered when drivers are shut down. We should proactively retire
+    // all images on all displays.
+    for (DisplayInfo& display : displays_) {
+      while (fbl::RefPtr<Image> image = display.images.pop_front()) {
+        AssertMtxAliasHeld(*image->mtx());
+        image->StartRetire();
+        image->OnRetire();
+      }
     }
   }
 
