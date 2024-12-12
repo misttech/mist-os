@@ -346,13 +346,20 @@ s! {
         pub sin_addr: ::in_addr,
         pub sin_zero: [u8; 8],
     }
-
     pub struct sockaddr_in6 {
         pub sin6_family: sa_family_t,
         pub sin6_port: ::in_port_t,
         pub sin6_flowinfo: u32,
         pub sin6_addr: ::in6_addr,
         pub sin6_scope_id: u32,
+    }
+
+    pub struct sockaddr_vm {
+        pub svm_family: sa_family_t,
+        pub svm_reserved: u16,
+        pub svm_port: crate::in_port_t,
+        pub svm_cid: u32,
+        pub svm_zero: [u8; 4],
     }
 
     pub struct addrinfo {

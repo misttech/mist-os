@@ -3505,8 +3505,8 @@ rust_library("core-foundation-v0_9_2") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":core-foundation-sys-v0_8_3" ]
   deps += [ ":libc-v0_2_158" ]
+  deps += [ ":core-foundation-sys-v0_8_3" ]
 
   rustenv = []
 
@@ -3675,12 +3675,12 @@ rust_library("criterion-v0_2_11") {
   deps = []
   deps += [ ":csv-v1_2_1" ]
   deps += [ ":walkdir-v2_3_1" ]
+  deps += [ ":libc-v0_2_158" ]
   deps += [ ":atty-v0_2_11" ]
   deps += [ ":cast-v0_2_2" ]
   deps += [ ":clap-v2_34_0" ]
   deps += [ ":itertools-v0_8_0" ]
   deps += [ ":lazy_static-v1_4_0" ]
-  deps += [ ":libc-v0_2_158" ]
   deps += [ ":num-traits-v0_2_18" ]
   deps += [ ":rand_core-v0_3_1" ]
   deps += [ ":rand_os-v0_1_2" ]
@@ -5534,9 +5534,9 @@ rust_library("flate2-v1_0_14") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":libc-v0_2_158" ]
   deps += [ ":cfg-if-v0_1_10" ]
   deps += [ ":crc32fast-v1_2_0" ]
-  deps += [ ":libc-v0_2_158" ]
   deps += [ ":miniz_oxide-v0_3_6" ]
   if (current_cpu == "wasm32" && !false) {
     deps += [ ":miniz_oxide-v0_3_6" ]
@@ -5832,13 +5832,13 @@ rust_library("fuse3-v0_6_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":libc-v0_2_158" ]
   deps += [ ":async-trait-v0_1_71($host_toolchain)" ]
   deps += [ ":bincode-v1_3_3" ]
   deps += [ ":bytes-v1_6_0" ]
   deps += [ ":cstr-v0_2_11($host_toolchain)" ]
   deps += [ ":futures-channel-v0_3_30" ]
   deps += [ ":futures-util-v0_3_30" ]
-  deps += [ ":libc-v0_2_158" ]
   deps += [ ":nix-v0_26_2" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":slab-v0_4_7" ]
@@ -7481,9 +7481,9 @@ rust_library("inotify-v0_9_3") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":libc-v0_2_158" ]
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":inotify-sys-v0_1_5" ]
-  deps += [ ":libc-v0_2_158" ]
 
   rustenv = []
 
@@ -7869,8 +7869,8 @@ rust_library("kqueue-v1_0_7") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":kqueue-sys-v1_0_3" ]
   deps += [ ":libc-v0_2_158" ]
+  deps += [ ":kqueue-sys-v1_0_3" ]
 
   rustenv = []
 
@@ -7899,8 +7899,8 @@ rust_library("kqueue-sys-v1_0_3") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":libc-v0_2_158" ]
+  deps += [ ":bitflags-v1_3_2" ]
 
   rustenv = []
 
@@ -7949,14 +7949,14 @@ rust_library("lazy_static-v1_4_0") {
 license("libc-v0_2_158.license") {
   public_package_name = "libc"
   license_files = [
-    "//third_party/rust_crates/vendor/libc-0.2.158/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/libc-0.2.158/LICENSE-MIT",
+    "//third_party/rust_crates/forks/libc-0.2.158/LICENSE-APACHE",
+    "//third_party/rust_crates/forks/libc-0.2.158/LICENSE-MIT",
   ]
 }
 
 rust_library("libc-v0_2_158") {
   crate_name = "libc"
-  crate_root = "//third_party/rust_crates/vendor/libc-0.2.158/src/lib.rs"
+  crate_root = "//third_party/rust_crates/forks/libc-0.2.158/src/lib.rs"
   output_name = "libc-61b076da7ec586f8"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
@@ -8975,9 +8975,9 @@ rust_library("nix-v0_26_2") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":libc-v0_2_158" ]
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":libc-v0_2_158" ]
   deps += [ ":pin-utils-v0_1_0" ]
   deps += [ ":static_assertions-v1_1_0" ]
   if (!false) {
@@ -9047,9 +9047,9 @@ rust_library("nix-v0_27_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":libc-v0_2_158" ]
   deps += [ ":bitflags-v2_4_1" ]
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":libc-v0_2_158" ]
   deps += [ ":memoffset-v0_9_1" ]
 
   rustenv = []
@@ -9182,9 +9182,9 @@ rust_library("notify-v5_2_0") {
 
   deps = []
   deps += [ ":walkdir-v2_3_1" ]
+  deps += [ ":libc-v0_2_158" ]
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":filetime-v0_2_14" ]
-  deps += [ ":libc-v0_2_158" ]
   if (false || false || false || false) {
     deps += [ ":kqueue-v1_0_7" ]
     deps += [ ":mio-v0_8_9" ]
@@ -13521,8 +13521,8 @@ rust_library("rutabaga_gfx-v0_1_3") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":libc-v0_2_158" ]
+  deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":log-v0_4_22" ]
   deps += [ ":remain-v0_2_14($host_toolchain)" ]
   deps += [ ":thiserror-v1_0_57" ]
@@ -13980,10 +13980,10 @@ rust_library("security-framework-v2_3_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":libc-v0_2_158" ]
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":core-foundation-sys-v0_8_3" ]
   deps += [ ":core-foundation-v0_9_2" ]
-  deps += [ ":libc-v0_2_158" ]
   deps += [ ":security-framework-sys-v2_4_2" ]
 
   rustenv = []
@@ -14017,8 +14017,8 @@ rust_library("security-framework-sys-v2_4_2") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":core-foundation-sys-v0_8_3" ]
   deps += [ ":libc-v0_2_158" ]
+  deps += [ ":core-foundation-sys-v0_8_3" ]
 
   rustenv = []
 
@@ -18767,8 +18767,8 @@ rust_library("zstd-safe-v5_0_2+zstd_1_5_2") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":zstd-sys-v2_0_1+zstd_1_5_2" ]
   deps += [ ":libc-v0_2_158" ]
+  deps += [ ":zstd-sys-v2_0_1+zstd_1_5_2" ]
 
   rustenv = []
 

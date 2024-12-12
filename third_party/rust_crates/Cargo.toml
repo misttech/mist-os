@@ -132,7 +132,7 @@ itertools = "0.10"
 itoa = "0.4"
 json5format = "0.2.6"
 lazy_static = "1.4"
-libc = { version = "0.2.158", features = ["extra_traits"] }
+libc = "0.2.158"
 libm = "0.2.1"
 linked-hash-map = "0.5.3"
 lock_api = "0.4.11"
@@ -380,6 +380,7 @@ askama_derive = { path = "forks/askama_derive" }
 fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
 hound = { path = "forks/hound" }
+libc = { features = ["extra_traits"], path = "forks/libc-0.2.158" }
 libm = { path = "forks/libm" }
 nom = { path = "forks/nom" }
 notify = { path = "forks/notify" }
