@@ -210,12 +210,18 @@ pub trait GmpHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
     /// state. Should be called anytime a configuration change occurs which
     /// results in GMP potentially being enabled. E.g. when IP or GMP
     /// transitions to being enabled.
+    ///
+    /// This method is idempotent, once into the enabled state future calls are
+    /// no-ops.
     fn gmp_handle_maybe_enabled(&mut self, bindings_ctx: &mut BC, device: &Self::DeviceId);
 
     /// Handles GMP being disabled.
     ///
     /// All joined groups will transition to the non-member state but still
     /// remain locally joined.
+    ///
+    /// This method is idempotent, once into the disabled state future calls are
+    /// no-ops.
     fn gmp_handle_disabled(&mut self, bindings_ctx: &mut BC, device: &Self::DeviceId);
 
     /// Joins the given multicast group.
@@ -251,12 +257,24 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
             if !state.enabled {
                 return;
             }
+            // Update enablement state tracking.
+            match core::mem::replace(
+                &mut state.gmp.enablement_idempotency_guard,
+                LastState::Enabled,
+            ) {
+                LastState::Disabled => {}
+                LastState::Enabled => {
+                    // Do nothing if we were already enabled.
+                    return;
+                }
+            }
+
             match &state.gmp.mode {
                 GmpMode::V1 { compat: _ } => {
                     v1::handle_enabled(&mut core_ctx, bindings_ctx, device, state);
                 }
                 GmpMode::V2 => {
-                    todo!("https://fxbug.dev/42071006 handle GMPv2 enabled")
+                    v2::handle_enabled(bindings_ctx, state);
                 }
             }
         })
@@ -264,6 +282,19 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
 
     fn gmp_handle_disabled(&mut self, bindings_ctx: &mut BC, device: &Self::DeviceId) {
         self.with_gmp_state_mut_and_ctx(device, |mut core_ctx, mut state| {
+            assert!(!state.enabled, "handle_disabled called with enabled GMP state");
+            // Update enablement state tracking.
+            match core::mem::replace(
+                &mut state.gmp.enablement_idempotency_guard,
+                LastState::Disabled,
+            ) {
+                LastState::Enabled => {}
+                LastState::Disabled => {
+                    // Do nothing if we were already disabled.
+                    return;
+                }
+            }
+
             match state.gmp.mode {
                 GmpMode::V1 { compat } => {
                     v1::handle_disabled(&mut core_ctx, bindings_ctx, device, state.as_mut());
@@ -278,12 +309,14 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
                     }
                 }
                 GmpMode::V2 => {
-                    todo!("https://fxbug.dev/42071006 handle GMPv2 disabled")
+                    v2::handle_disabled(&mut core_ctx, bindings_ctx, device, state.as_mut());
                 }
             }
             // Always reset v2 protocol state when disabled, regardless of which
             // mode we're in.
             state.gmp.v2_proto = Default::default();
+            // Always clear all timers on disable.
+            state.gmp.timers.clear(bindings_ctx);
         })
     }
 
@@ -392,6 +425,39 @@ pub struct GmpState<I: Ip, BT: GmpBindingsTypes> {
     timers: LocalTimerHeap<TimerIdInner<I>, (), BT>,
     mode: GmpMode,
     v2_proto: v2::ProtocolState<I>,
+    /// Keeps track of interface-wide enablement state.
+    ///
+    /// In [`v1`] each group keeps track of whether it's tracked by GMP or not,
+    /// but in [`v2`] we need to keep track of an interface-wide enabled state
+    /// to be able to handle `disable` only once. This is necessary because the
+    /// IP layer may call [`GmpHandler::gmp_handle_disabled`] multiple times
+    /// (since the interface-wide enabled state is an `and` of IP enabled and
+    /// GMP enabled) and we should avoid sending leave messages on
+    /// [`v2::handle_disabled`] multiple times.
+    ///
+    /// Note that no assumptions can be made between this flag and
+    /// [`GmpStateRef::enabled`], since part of that state is held in a
+    /// different lock. This exists _only_ to allow idempotency in
+    /// [`GmpHandler::gmp_handle_maybe_enabled`] and
+    /// [`GmpHandler::gmp_handle_disabled`].
+    enablement_idempotency_guard: LastState,
+}
+
+/// Supports [`GmpState::enablement_idempotency_guard`].
+#[cfg_attr(test, derive(Debug))]
+enum LastState {
+    Disabled,
+    Enabled,
+}
+
+impl LastState {
+    fn from_enabled(enabled: bool) -> Self {
+        if enabled {
+            Self::Enabled
+        } else {
+            Self::Disabled
+        }
+    }
 }
 
 // NB: This block is not bound on GmpBindingsContext because we don't need
@@ -402,6 +468,21 @@ impl<I: Ip, BC: GmpBindingsTypes + TimerContext> GmpState<I, BC> {
         bindings_ctx: &mut BC,
         device: D,
     ) -> Self {
+        Self::new_with_enabled::<D, CC>(bindings_ctx, device, false)
+    }
+
+    /// Constructs a new `GmpState` for `device` assuming initial enabled state
+    /// `enabled`.
+    ///
+    /// This is meant to be called directly only in test scenarios (besides
+    /// helping implement [`GmpState::new`] that is) where to decrease test
+    /// verbosity `GmpState` can be created in a state that assumes
+    /// [`GmpHandler::gmp_handle_maybe_enabled`] was called.
+    fn new_with_enabled<D: WeakDeviceIdentifier, CC: CoreTimerContext<GmpTimerId<I, D>, BC>>(
+        bindings_ctx: &mut BC,
+        device: D,
+        enabled: bool,
+    ) -> Self {
         Self {
             timers: LocalTimerHeap::new_with_context::<_, CC>(
                 bindings_ctx,
@@ -409,6 +490,7 @@ impl<I: Ip, BC: GmpBindingsTypes + TimerContext> GmpState<I, BC> {
             ),
             mode: Default::default(),
             v2_proto: Default::default(),
+            enablement_idempotency_guard: LastState::from_enabled(enabled),
         }
     }
 }
@@ -698,6 +780,9 @@ fn handle_timer<I, BC, CC>(
         let Some((timer_id, ())) = state.gmp.timers.pop(bindings_ctx) else {
             return;
         };
+        // No timers should be firing if the state is disabled.
+        assert!(state.enabled, "{timer_id:?} fired in GMP disabled state");
+
         match (timer_id, &state.gmp.mode) {
             (TimerIdInner::V1(v1), GmpMode::V1 { .. }) => {
                 v1::handle_timer(&mut core_ctx, bindings_ctx, &device, state, v1);
@@ -732,7 +817,8 @@ fn enter_mode<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
     state: GmpStateRef<'_, I, CC, BC>,
     new_mode: GmpMode,
 ) {
-    match (&mut state.gmp.mode, &new_mode) {
+    let GmpStateRef { enabled: _, gmp, groups, config: _ } = state;
+    match (&mut gmp.mode, &new_mode) {
         (GmpMode::V1 { compat }, GmpMode::V1 { compat: new_compat }) => {
             // While in v1 mode, we only allow exiting compat mode, not entering
             // it again. This allows the logic handling v1 queries to always
@@ -742,7 +828,7 @@ fn enter_mode<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
                 *compat = *new_compat;
                 // Deschedule the compatibility mode exit timer.
                 assert_matches!(
-                    state.gmp.timers.cancel(bindings_ctx, &TimerIdInner::V1Compat),
+                    gmp.timers.cancel(bindings_ctx, &TimerIdInner::V1Compat),
                     Some((_, ()))
                 );
             }
@@ -758,7 +844,7 @@ fn enter_mode<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
             // Update the group state in each group to a default value which
             // will not trigger any unsolicited reports and is ready to respond
             // to incoming queries.
-            for (_, GmpGroupState { version_specific }) in state.groups.iter_mut() {
+            for (_, GmpGroupState { version_specific }) in groups.iter_mut() {
                 *version_specific =
                     GmpGroupStateByVersion::V2(v2::GroupState::new_for_mode_transition())
             }
@@ -769,14 +855,14 @@ fn enter_mode<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
             // Update the state machine in each group to the appropriate idle
             // definition in GMPv1. This is a state with no timers that just
             // waits to respond to queries.
-            for (_, GmpGroupState { version_specific }) in state.groups.iter_mut() {
+            for (_, GmpGroupState { version_specific }) in groups.iter_mut() {
                 *version_specific =
                     GmpGroupStateByVersion::V1(v1::GmpStateMachine::new_for_mode_transition())
             }
         }
     };
-    state.gmp.timers.clear(bindings_ctx);
-    state.gmp.mode = new_mode;
+    gmp.timers.clear(bindings_ctx);
+    gmp.mode = new_mode;
     core_ctx.handle_mode_change(bindings_ctx, device, new_mode);
 }
 
@@ -930,12 +1016,14 @@ mod tests {
         // Disabling in compat mode returns to v2.
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
             testutil::new_context_with_mode::<I>(GmpMode::V1 { compat: true });
+        core_ctx.enabled = false;
         core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
         assert_eq!(core_ctx.gmp.mode, GmpMode::V2);
 
         // Same is not true for not compat v1.
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
             testutil::new_context_with_mode::<I>(GmpMode::V1 { compat: false });
+        core_ctx.enabled = false;
         core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
         assert_eq!(core_ctx.gmp.mode, GmpMode::V1 { compat: false });
     }
@@ -949,6 +1037,7 @@ mod tests {
         *robustness_variable = robustness_variable.checked_add(1).unwrap();
         *query_interval = *query_interval + Duration::from_secs(20);
         *left_groups = [(I::GROUP_ADDR1, NonZeroU8::new(1).unwrap())].into_iter().collect();
+        core_ctx.enabled = false;
         core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
         assert_eq!(core_ctx.gmp.v2_proto, v2::ProtocolState::default());
     }

@@ -524,7 +524,8 @@ where
     CC: GmpContext<I, BC>,
     I: IpExt,
 {
-    core_ctx.with_gmp_state_mut(device, |GmpStateRef { enabled: _, groups, gmp, config: _ }| {
+    core_ctx.with_gmp_state_mut(device, |state| {
+        let GmpStateRef { enabled: _, groups, gmp, config: _ } = state;
         // Ignore reports if we're not in v1 mode. We're acting as an
         // IGMPv3/MLDv2 host only. From RFCs:
         //

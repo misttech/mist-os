@@ -342,13 +342,25 @@ pub(crate) enum MldError {
     #[error("the host has not already been a member of the address: {}", addr)]
     NotAMember { addr: Ipv6Addr },
     /// Failed to send an IGMP packet.
-    #[error("failed to send out an IGMP packet to address: {}", addr)]
+    #[error("failed to send out an MLD packet to address: {}", addr)]
     SendFailure { addr: Ipv6Addr },
+    /// MLD is disabled
+    #[error("MLD is disabled on interface")]
+    Disabled,
 }
 
 impl From<NotAMemberErr<Ipv6>> for MldError {
     fn from(NotAMemberErr(addr): NotAMemberErr<Ipv6>) -> Self {
         Self::NotAMember { addr }
+    }
+}
+
+impl From<gmp::v2::QueryError<Ipv6>> for MldError {
+    fn from(err: gmp::v2::QueryError<Ipv6>) -> Self {
+        match err {
+            gmp::v2::QueryError::NotAMember(addr) => Self::NotAMember { addr },
+            gmp::v2::QueryError::Disabled => Self::Disabled,
+        }
     }
 }
 
@@ -605,16 +617,19 @@ mod tests {
 
     fn new_context() -> FakeCtxImpl {
         FakeCtxImpl::with_default_bindings_ctx(|bindings_ctx| {
+            // We start with enabled true to make tests easier to write.
+            let mld_enabled = true;
             FakeCoreCtxImpl::with_state(FakeMldCtx {
                 shared: Rc::new(RefCell::new(Shared {
                     groups: MulticastGroupSet::default(),
-                    gmp_state: GmpState::new::<_, IntoCoreTimerCtx>(
+                    gmp_state: GmpState::new_with_enabled::<_, IntoCoreTimerCtx>(
                         bindings_ctx,
                         FakeWeakDeviceId(FakeDeviceId),
+                        mld_enabled,
                     ),
                     config: Default::default(),
                 })),
-                mld_enabled: true,
+                mld_enabled,
                 ipv6_link_local: None,
             })
         })
@@ -1226,6 +1241,7 @@ mod tests {
             // device.
             let mut ctx = new_ctx();
             ctx.core_ctx.state.mld_enabled = false;
+            ctx.core_ctx.gmp_handle_disabled(&mut ctx.bindings_ctx, &FakeDeviceId);
             test(ctx, GROUP_ADDR);
         });
     }
@@ -1342,6 +1358,7 @@ mod tests {
             assert_eq!(core_ctx.take_frames(), []);
 
             // Should send done message.
+            core_ctx.state.mld_enabled = false;
             core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
             assert_gmp_state!(core_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
             assert_gmp_state!(core_ctx, &GROUP_ADDR, NonMember);
@@ -1366,6 +1383,7 @@ mod tests {
             assert_eq!(core_ctx.take_frames(), []);
 
             // Should send report message.
+            core_ctx.state.mld_enabled = true;
             core_ctx.gmp_handle_maybe_enabled(&mut bindings_ctx, &FakeDeviceId);
             assert_gmp_state!(core_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);

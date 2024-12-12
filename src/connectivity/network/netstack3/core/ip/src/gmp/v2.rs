@@ -242,6 +242,18 @@ pub(super) trait QueryMessage<I: Ip> {
     fn sources(&self) -> impl Iterator<Item = I::Addr> + '_;
 }
 
+#[derive(Eq, PartialEq, Debug)]
+pub(super) enum QueryError<I: Ip> {
+    NotAMember(I::Addr),
+    Disabled,
+}
+
+impl<I: Ip> From<NotAMemberErr<I>> for QueryError<I> {
+    fn from(NotAMemberErr(addr): NotAMemberErr<I>) -> Self {
+        Self::NotAMember(addr)
+    }
+}
+
 /// Handles a query message from the network.
 ///
 /// The RFC algorithm is specified on [RFC 3376 section 5.2] and [RFC 3810
@@ -261,8 +273,12 @@ pub(super) fn handle_query_message<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     query: &Q,
-) -> Result<(), NotAMemberErr<I>> {
+) -> Result<(), QueryError<I>> {
     core_ctx.with_gmp_state_mut_and_ctx(device, |mut core_ctx, state| {
+        // Ignore queries if we're not in enabled state.
+        if !state.enabled {
+            return Err(QueryError::Disabled);
+        }
         match &state.gmp.mode {
             GmpMode::V1 { .. } => {
                 return gmp::v1::handle_query_message_inner(
@@ -271,7 +287,8 @@ pub(super) fn handle_query_message<
                     device,
                     state,
                     &query.as_v1(),
-                );
+                )
+                .map_err(Into::into);
             }
             GmpMode::V2 => {}
         }
@@ -285,7 +302,7 @@ pub(super) fn handle_query_message<
         }
 
         let target = query.group_address();
-        let target = QueryTarget::new(target).ok_or_else(|| NotAMemberErr(target))?;
+        let target = QueryTarget::new(target).ok_or_else(|| QueryError::NotAMember(target))?;
 
         // Common early bailout.
         let target = match target {
@@ -314,7 +331,7 @@ pub(super) fn handle_query_message<
 
                 let group = groups
                     .get_mut(&multicast_addr)
-                    .ok_or_else(|| NotAMemberErr(multicast_addr.get()))?;
+                    .ok_or_else(|| QueryError::NotAMember(multicast_addr.get()))?;
 
                 // `Some` target marks a specific query.
                 Some((group.v2_mut(), multicast_addr))
@@ -735,6 +752,77 @@ fn handle_state_change_timer<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsCon
     }
 }
 
+/// Takes GMP actions when GMP becomes enabled.
+///
+/// This happens whenever the GMP switches to on or IP is enabled on an
+/// interface (i.e. interface up). The side-effects here are not _quite_ covered
+/// by the RFC, but the interpretation is that enablement is equivalent to all
+/// the tracked groups becoming newly joined and we want to inform routers on
+/// the network about it.
+pub(super) fn handle_enabled<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
+    bindings_ctx: &mut BC,
+    state: GmpStateRef<'_, I, CC, BC>,
+) {
+    let GmpStateRef { enabled: _, groups, gmp, config: _ } = state;
+
+    let needs_report = groups.iter_mut().fold(false, |needs_report, (multicast_addr, state)| {
+        if !I::should_perform_gmp(*multicast_addr) {
+            return needs_report;
+        }
+        let GroupState { filter_mode_retransmission_counter, recorded_sources: _ } = state.v2_mut();
+        *filter_mode_retransmission_counter = gmp.v2_proto.robustness_variable.get();
+        true
+    });
+    if needs_report {
+        trigger_state_change_report(bindings_ctx, &mut gmp.timers);
+    }
+}
+
+/// Takes GMP actions when GMP becomes disabled.
+///
+/// This happens whenever the GMP switches to off or IP is disabled on an
+/// interface (i.e. interface down). The side-effects here are not _quite_
+/// covered by the RFC, but the interpretation is that disablement is equivalent
+/// to all the tracked groups being left and we want to inform routers on the
+/// network about it.
+///
+/// Unlike [`handle_enabled`], however, given this may be a last-ditch effort to
+/// notify a router that an admin is turning off an interface, we immediately
+/// send a _single_ report saying we've left all our groups. Given the interface
+/// is possibly about to go off, we can't schedule any timers.
+pub(super) fn handle_disabled<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
+    core_ctx: &mut CC::Inner<'_>,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    state: GmpStateRef<'_, I, CC, BC>,
+) {
+    let GmpStateRef { enabled: _, groups, gmp, config: _ } = state;
+    // Clear all group retransmission state and cancel all timers.
+    for (_, state) in groups.iter_mut() {
+        *state.v2_mut() = GroupState {
+            filter_mode_retransmission_counter: 0,
+            recorded_sources: Default::default(),
+        };
+    }
+
+    let member_groups = groups.iter().filter_map(|(multicast_addr, _)| {
+        I::should_perform_gmp(*multicast_addr).then_some(multicast_addr)
+    });
+    // Also include any non-member groups that might've been waiting
+    // retransmissions.
+    let non_member_groups = gmp.v2_proto.left_groups.keys();
+
+    let mut report = member_groups
+        .chain(non_member_groups)
+        .map(|addr| (*addr, GroupRecordType::ChangeToIncludeMode, core::iter::empty::<I::Addr>()))
+        .peekable();
+    if report.peek().is_none() {
+        // Nothing to report.
+        return;
+    }
+    core_ctx.send_report_v2(bindings_ctx, device, report);
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::vec;
@@ -832,7 +920,7 @@ mod tests {
         let query = FakeV2Query { group_addr: I::LOOPBACK_ADDRESS.get(), ..Default::default() };
         assert_eq!(
             handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query,),
-            Err(NotAMemberErr(query.group_addr))
+            Err(QueryError::NotAMember(query.group_addr))
         );
     }
 
@@ -887,7 +975,7 @@ mod tests {
         let query = FakeV2Query { group_addr: I::GROUP_ADDR1.get(), ..Default::default() };
         assert_eq!(
             handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query),
-            Err(NotAMemberErr(query.group_addr))
+            Err(QueryError::NotAMember(query.group_addr))
         );
     }
 
@@ -1318,5 +1406,106 @@ mod tests {
         assert_eq!(core_ctx.inner.v2_messages, expected_messages);
         core_ctx.gmp.timers.assert_timers([]);
         assert_eq!(core_ctx.gmp.v2_proto.left_groups, HashMap::new());
+    }
+
+    #[ip_test(I)]
+    fn enable_disable<I: TestIpExt>() {
+        let mut ctx = testutil::new_context_with_mode::<I>(GmpMode::V2);
+        join_and_ignore_unsolicited(&mut ctx, [I::GROUP_ADDR1, I::GROUP_ADDR2]);
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+
+        // We call maybe enable again, but if we're already enabled there
+        // are no side-effects.
+        core_ctx.gmp_handle_maybe_enabled(bindings_ctx, &FakeDeviceId);
+        core_ctx.gmp.timers.assert_timers([]);
+        assert_eq!(core_ctx.inner.v2_messages, Vec::<Vec<_>>::new());
+
+        // Disable and observe a single leave report and no timers.
+        core_ctx.enabled = false;
+        core_ctx.gmp_handle_disabled(bindings_ctx, &FakeDeviceId);
+        core_ctx.gmp.timers.assert_timers([]);
+        assert_eq!(
+            core::mem::take(&mut core_ctx.inner.v2_messages),
+            vec![vec![
+                (I::GROUP_ADDR1, GroupRecordType::ChangeToIncludeMode, vec![],),
+                (I::GROUP_ADDR2, GroupRecordType::ChangeToIncludeMode, vec![],),
+            ]]
+        );
+
+        // Disable again no side-effects.
+        core_ctx.gmp_handle_disabled(bindings_ctx, &FakeDeviceId);
+        core_ctx.gmp.timers.assert_timers([]);
+        assert_eq!(core_ctx.inner.v2_messages, Vec::<Vec<_>>::new());
+
+        // Re-enable and observe robustness_variable state changes.
+        core_ctx.enabled = true;
+        core_ctx.gmp_handle_maybe_enabled(bindings_ctx, &FakeDeviceId);
+        let now = bindings_ctx.now();
+        core_ctx.gmp.timers.assert_range([(
+            &TimerId::StateChange.into(),
+            now..=now.panicking_add(STATE_CHANGE_REPORT_DELAY),
+        )]);
+        // No messages yet, this behaves exactly like joining many groups all
+        // at once.
+        assert_eq!(core_ctx.inner.v2_messages, Vec::<Vec<_>>::new());
+
+        while let Some(timer) = bindings_ctx.trigger_next_timer(core_ctx) {
+            assert_eq!(timer, GmpTimerId::new(FakeWeakDeviceId(FakeDeviceId)));
+        }
+        let expect_messages = core::iter::repeat_with(|| {
+            vec![
+                (I::GROUP_ADDR1, GroupRecordType::ChangeToExcludeMode, vec![]),
+                (I::GROUP_ADDR2, GroupRecordType::ChangeToExcludeMode, vec![]),
+            ]
+        })
+        .take(core_ctx.gmp.v2_proto.robustness_variable.get().into())
+        .collect::<Vec<_>>();
+        assert_eq!(core::mem::take(&mut core_ctx.inner.v2_messages), expect_messages);
+
+        // Disable one more time while we're in the process of leaving one of
+        // the groups to show that we allow it to piggyback on the last report
+        // once.
+        assert_eq!(
+            core_ctx.gmp_leave_group(bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
+            GroupLeaveResult::Left(())
+        );
+        assert_eq!(
+            core_ctx.gmp.v2_proto.left_groups.get(&I::GROUP_ADDR1),
+            Some(&core_ctx.gmp.v2_proto.robustness_variable)
+        );
+        // Disable and observe a single leave report INCLUDING the already left
+        // group and no timers.
+        core_ctx.enabled = false;
+        core_ctx.gmp_handle_disabled(bindings_ctx, &FakeDeviceId);
+        core_ctx.gmp.timers.assert_timers([]);
+        assert_eq!(
+            core::mem::take(&mut core_ctx.inner.v2_messages),
+            vec![vec![
+                (I::GROUP_ADDR1, GroupRecordType::ChangeToIncludeMode, vec![],),
+                (I::GROUP_ADDR2, GroupRecordType::ChangeToIncludeMode, vec![],),
+            ]]
+        );
+    }
+
+    #[ip_test(I)]
+    fn ignore_query_if_disabled<I: TestIpExt>() {
+        let mut ctx = testutil::new_context_with_mode::<I>(GmpMode::V2);
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        core_ctx.enabled = false;
+        core_ctx.gmp_handle_disabled(bindings_ctx, &FakeDeviceId);
+
+        assert_eq!(
+            core_ctx.gmp_join_group(bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
+            GroupJoinResult::Joined(())
+        );
+
+        // Receive a general query.
+        assert_eq!(
+            handle_query_message(core_ctx, bindings_ctx, &FakeDeviceId, &FakeV2Query::default()),
+            Err(QueryError::Disabled)
+        );
+        // No side-effects.
+        core_ctx.gmp.timers.assert_timers([]);
+        assert_eq!(core_ctx.inner.v2_messages, Vec::<Vec<_>>::new());
     }
 }

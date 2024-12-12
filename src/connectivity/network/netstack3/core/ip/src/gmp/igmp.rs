@@ -36,7 +36,7 @@ use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpDeviceMtuContext, IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
-    self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpGroupState,
+    self, v2, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpGroupState,
     GmpMode, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
     NotAMemberErr,
 };
@@ -449,11 +449,23 @@ pub(crate) enum IgmpError {
     /// Failed to send an IGMP packet.
     #[error("failed to send out an IGMP packet to address: {}", addr)]
     SendFailure { addr: Ipv4Addr },
+    /// IGMP is disabled
+    #[error("IGMP is disabled on interface")]
+    Disabled,
 }
 
 impl From<NotAMemberErr<Ipv4>> for IgmpError {
     fn from(NotAMemberErr(addr): NotAMemberErr<Ipv4>) -> Self {
         Self::NotAMember { addr }
+    }
+}
+
+impl From<v2::QueryError<Ipv4>> for IgmpError {
+    fn from(err: v2::QueryError<Ipv4>) -> Self {
+        match err {
+            v2::QueryError::NotAMember(addr) => Self::NotAMember { addr },
+            v2::QueryError::Disabled => Self::Disabled,
+        }
     }
 }
 
@@ -968,12 +980,15 @@ mod tests {
         a: Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>>,
     ) -> FakeCtx {
         let mut ctx = FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
+            // We start with enabled true to make tests easier to write.
+            let igmp_enabled = true;
             FakeCoreCtx::with_state(FakeIgmpCtx {
                 shared: Rc::new(RefCell::new(Shared {
                     groups: MulticastGroupSet::default(),
-                    gmp_state: GmpState::new::<_, IntoCoreTimerCtx>(
+                    gmp_state: GmpState::new_with_enabled::<_, IntoCoreTimerCtx>(
                         bindings_ctx,
                         FakeWeakDeviceId(FakeDeviceId),
+                        igmp_enabled,
                     ),
                     igmp_state: IgmpState::new::<_, IntoCoreTimerCtx>(
                         bindings_ctx,
@@ -981,7 +996,7 @@ mod tests {
                     ),
                     config: Default::default(),
                 })),
-                igmp_enabled: true,
+                igmp_enabled,
                 addr_subnet: None,
             })
         });
@@ -1342,7 +1357,9 @@ mod tests {
 
             let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
             bindings_ctx.seed_rng(seed);
+            // Test environment is created in enabled state.
             core_ctx.state.igmp_enabled = false;
+            core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
 
             // Assert that no observable effects have taken place.
             let assert_no_effect = |core_ctx: &FakeCoreCtx, bindings_ctx: &FakeBindingsCtx| {
@@ -1472,6 +1489,7 @@ mod tests {
             assert_eq!(core_ctx.take_frames(), []);
 
             // Should send done message.
+            core_ctx.state.igmp_enabled = false;
             core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
             assert_gmp_state!(core_ctx, &GROUP_ADDR, NonMember);
             {
@@ -1499,6 +1517,7 @@ mod tests {
             assert_eq!(core_ctx.take_frames(), []);
 
             // Should send report message.
+            core_ctx.state.igmp_enabled = true;
             core_ctx.gmp_handle_maybe_enabled(&mut bindings_ctx, &FakeDeviceId);
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             {
