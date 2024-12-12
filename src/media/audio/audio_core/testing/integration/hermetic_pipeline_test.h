@@ -28,9 +28,8 @@ class HermeticPipelineTest : public HermeticAudioTest {
   // The three render paths present in common effects configurations.
   enum class RenderPath {
     Communication = 0,
-    Communications = 1,
-    Media = 2,
-    Ultrasound = 3,
+    Media = 1,
+    Ultrasound = 2,
   };
 
   struct PipelineConstants {
