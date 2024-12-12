@@ -30,6 +30,7 @@ fuchsia_toolchain_info(
     }),
     cmc_manifest = ":empty",  # "//tools:{{HOST_CPU}}/cmc-meta.json",
     configc = ":empty",  # "//tools:{{HOST_CPU}}/configc",
+    default_target_api = "HEAD",  # str(DEFAULT_TARGET_API),
     elf_test_runner_shard = "sys/testing/elf_test_runner.shard.cml",
     exec_cpu = "x64",  # "{{HOST_CPU}}",
     far = ":empty",  # "//tools:{{HOST_CPU}}/far",

@@ -753,10 +753,6 @@ template("bazel_action") {
 
     args += [ "--" ]
 
-    if (!defined(deps)) {
-      deps = []
-    }
-
     # Ensure that the default platform is set correctly when this build action
     # is invoked from a Fuchsia or host toolchain. For other ones. Other toolchains
     # will inherit the 'default' platforms which may be set to
@@ -765,9 +761,6 @@ template("bazel_action") {
     if (is_host || is_fuchsia) {
       args +=
           [ "--platforms=//build/bazel/platforms:${current_os}_${current_cpu}" ]
-
-      # Ensure the Ninja IDK artifacts are built before invoking Bazel.
-      deps += bazel_workspace_idk_deps
     }
 
     _filter_bazel_info_logs = true
@@ -892,12 +885,15 @@ template("bazel_action") {
       ]
     }
 
+    if (!defined(deps)) {
+      deps = []
+    }
     deps += [
       ":${_all_licenses_spdx_target}",
       ":${_gn_targets_repository_target}",
       ":${_ninja_inputs_target}",
       "//build/bazel:bazel_action_allowlist",
-      "//build/bazel:generate_main_workspace_no_idk($default_toolchain)",
+      "//build/bazel:generate_main_workspace($default_toolchain)",
     ]
 
     # Using the console pool prevents concurrent bazel build actions to run
