@@ -204,6 +204,14 @@ struct MemoryMapping {
   std::string pathname;
 };
 
+struct MemoryMappingExt : public MemoryMapping {
+  size_t rss;
+  std::vector<std::string> vm_flags;
+
+ public:
+  MemoryMappingExt(const MemoryMapping &mapping) : MemoryMapping(mapping) {}
+};
+
 // Encoder for serializing netlink messages
 class NetlinkEncoder {
  public:
@@ -356,6 +364,12 @@ std::optional<MemoryMapping> find_memory_mapping(std::function<bool(const Memory
                                                  std::string_view maps);
 
 std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_view maps);
+
+// Same as above, but with info from smaps
+std::optional<MemoryMappingExt> find_memory_mapping_ext(
+    std::function<bool(const MemoryMappingExt &)> match, std::string_view maps);
+
+std::optional<MemoryMappingExt> find_memory_mapping_ext(uintptr_t addr, std::string_view maps);
 
 // Returns a random hex string of the given length.
 std::string RandomHexString(size_t length);
