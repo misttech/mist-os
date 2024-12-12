@@ -2,54 +2,57 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/ui/composition/cpp/fidl.h>
-#include <fuchsia/ui/composition/cpp/fidl_test_base.h>
-#include <lib/sys/cpp/testing/component_context_provider.h>
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/test_base.h>
+#include <lib/async/default.h>
+#include <lib/component/incoming/cpp/constants.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/fdio/directory.h>
+#include <lib/ui/scenic/cpp/view_creation_tokens.h>
+#include <lib/zx/time.h>
 
 #include <gtest/gtest.h>
-#include <src/lib/vulkan/flatland_view/flatland_view.h>
 
-#include "lib/zx/time.h"
-#include "sdk/lib/ui/scenic/cpp/view_creation_tokens.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/lib/testing/predicates/status.h"
+#include "src/lib/vulkan/flatland_view/flatland_view.h"
 
 namespace {
 
-static const uint32_t kWidth = 100;
-static const uint32_t kHeight = 50;
+constexpr uint32_t kWidth = 100;
+constexpr uint32_t kHeight = 50;
 
-class FakeFlatland : public fuchsia::ui::composition::testing::Flatland_TestBase,
-                     public fuchsia::ui::composition::testing::ParentViewportWatcher_TestBase {
+class FakeFlatland : public fidl::testing::TestBase<fuchsia_ui_composition::Flatland>,
+                     public fidl::testing::TestBase<fuchsia_ui_composition::ParentViewportWatcher> {
  public:
-  void NotImplemented_(const std::string& name) override {}
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {}
 
-  fidl::InterfaceRequestHandler<fuchsia::ui::composition::Flatland> GetHandler(
-      async_dispatcher_t* dispatcher = nullptr) {
-    return [this, dispatcher](fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request) {
-      flatland_bindings_.AddBinding(this, std::move(request), dispatcher);
+  fidl::ProtocolHandler<fuchsia_ui_composition::Flatland> GetHandler(
+      async_dispatcher_t* dispatcher) {
+    return [this, dispatcher](fidl::ServerEnd<fuchsia_ui_composition::Flatland> request) {
+      flatland_bindings_.AddBinding(dispatcher, std::move(request), this,
+                                    fidl::kIgnoreBindingClosure);
     };
   }
 
-  // |fuchsia::ui::composition::Flatland|
-  void CreateView2(fuchsia::ui::views::ViewCreationToken token,
-                   fuchsia::ui::views::ViewIdentityOnCreation view_identity,
-                   fuchsia::ui::composition::ViewBoundProtocols view_protocols,
-                   fidl::InterfaceRequest<fuchsia::ui::composition::ParentViewportWatcher>
-                       parent_viewport_watcher) override {
-    parent_viewport_watcher_bindings_.AddBinding(this, std::move(parent_viewport_watcher));
+  // `fuchsia_ui_composition::Flatland`:
+  void CreateView2(CreateView2Request& request, CreateView2Completer::Sync& completer) override {
+    parent_viewport_watcher_bindings_.AddBinding(async_get_default_dispatcher(),
+                                                 std::move(request.parent_viewport_watcher()), this,
+                                                 fidl::kIgnoreBindingClosure);
   }
 
-  // |fuchsia::ui::composition::ParentViewportWatcher|
-  void GetLayout(GetLayoutCallback callback) override {
-    fuchsia::ui::composition::LayoutInfo info;
-    info.mutable_logical_size()->width = kWidth;
-    info.mutable_logical_size()->height = kHeight;
-    callback(std::move(info));
+  // `fuchsia_ui_composition::ParentViewportWatcher`:
+  void GetLayout(GetLayoutCompleter::Sync& completer) override {
+    fuchsia_ui_composition::LayoutInfo info = {{
+        .logical_size = fuchsia_math::SizeU{{.width = kWidth, .height = kHeight}},
+    }};
+    completer.Reply({{.info = std::move(info)}});
   }
 
  private:
-  fidl::BindingSet<fuchsia::ui::composition::Flatland> flatland_bindings_;
-  fidl::BindingSet<fuchsia::ui::composition::ParentViewportWatcher>
+  fidl::ServerBindingGroup<fuchsia_ui_composition::Flatland> flatland_bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_composition::ParentViewportWatcher>
       parent_viewport_watcher_bindings_;
 };
 
@@ -60,10 +63,28 @@ class FlatlandViewTest : public gtest::TestLoopFixture {
   void SetUp() override {
     TestLoopFixture::SetUp();
     fake_flatland_ = std::make_unique<FakeFlatland>();
-    provider_.service_directory_provider()->AddService(fake_flatland_->GetHandler());
+
+    zx::result<> add_protocol_result =
+        flatland_outgoing_.AddUnmanagedProtocol<fuchsia_ui_composition::Flatland>(
+            fake_flatland_->GetHandler(dispatcher()));
+    ASSERT_OK(add_protocol_result);
+
+    auto [root_dir_client, root_dir_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    zx::result<> serve_result = flatland_outgoing_.Serve(std::move(root_dir_server));
+    ASSERT_OK(serve_result);
+
+    auto [svc_dir_client, svc_dir_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    zx_status_t open_status = fdio_open3_at(
+        /*directory=*/root_dir_client.channel().get(), /*path=*/component::kServiceDirectory,
+        /*flags=*/uint64_t{fuchsia_io::Flags::kProtocolDirectory},
+        /*request=*/std::move(svc_dir_server).TakeChannel().release());
+    ASSERT_OK(open_status);
+
+    view_incoming_ = std::move(svc_dir_client);
   }
 
-  sys::testing::ComponentContextProvider provider_;
+  component::OutgoingDirectory flatland_outgoing_{dispatcher()};
+  fidl::ClientEnd<fuchsia_io::Directory> view_incoming_;
   std::unique_ptr<FakeFlatland> fake_flatland_;
   std::unique_ptr<FlatlandView> view_;
   uint32_t width_ = 0;
@@ -80,9 +101,9 @@ TEST_F(FlatlandViewTest, Initialize) {
   zx::eventpair view_token_0, view_token_1;
   EXPECT_EQ(ZX_OK, zx::eventpair::create(0, &view_token_0, &view_token_1));
 
-  auto [view_token, viewport_token] = scenic::ViewCreationTokenPair::New();
-  auto view =
-      FlatlandView::Create(provider_.context(), std::move(view_token), std::move(resize_callback));
+  auto [view_token, viewport_token] = scenic::cpp::ViewCreationTokenPair::New();
+  auto view = FlatlandView::Create(view_incoming_.borrow(), std::move(view_token),
+                                   std::move(resize_callback));
   ASSERT_TRUE(view);
 
   EXPECT_EQ(0.0, width_);
