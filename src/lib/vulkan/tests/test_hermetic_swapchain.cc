@@ -690,6 +690,13 @@ TEST_P(SwapchainFidlTest, PresentAndAcquireNoSemaphore) {
 }
 
 TEST_P(SwapchainFidlTest, ForceQuit) {
+  // TODO(https://fxbug.dev/383660387): This test case is flaky and may cause
+  // a host crash on emulators with SwiftShader. Thus, we disable it on
+  // emulators.
+  if (GetVkPhysicalDeviceType(test_->vk_physical_device_) == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU) {
+    GTEST_SKIP();
+  }
+
   VkImagePipeSurfaceCreateInfoFUCHSIA create_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGEPIPE_SURFACE_CREATE_INFO_FUCHSIA,
       .pNext = nullptr,
@@ -744,6 +751,13 @@ TEST_P(SwapchainFidlTest, ForceQuit) {
 }
 
 TEST_P(SwapchainFidlTest, AcquireZeroTimeout) {
+  // TODO(https://fxbug.dev/383660387): This test case is flaky and may cause
+  // a host crash on emulators with SwiftShader. Thus, we disable it on
+  // emulators.
+  if (GetVkPhysicalDeviceType(test_->vk_physical_device_) == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU) {
+    GTEST_SKIP();
+  }
+
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   VkImagePipeSurfaceCreateInfoFUCHSIA create_info = {
