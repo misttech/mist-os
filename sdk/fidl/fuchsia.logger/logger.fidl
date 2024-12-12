@@ -133,6 +133,7 @@ closed protocol LogSink {
     ///
     /// See [wire_format.h](https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/ulib/syslog/include/lib/syslog/wire_format.h)
     /// for what is expected to be received over the socket.
+    @available(removed=NEXT)
     strict Connect(resource struct {
         socket zx.Handle:SOCKET;
     });
