@@ -10,7 +10,9 @@ use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use netstack3_base::{AnyDevice, DeviceIdContext, DeviceIdentifier};
 
 use crate::internal::device::slaac::SlaacConfigurationUpdate;
-use crate::internal::device::state::{IpDeviceFlags, Ipv4DeviceConfiguration};
+use crate::internal::device::state::{
+    IpDeviceConfiguration, IpDeviceFlags, Ipv4DeviceConfiguration,
+};
 use crate::internal::device::{
     self, IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
     Ipv6DeviceConfigurationContext, WithIpDeviceConfigurationMutInner as _,
@@ -381,4 +383,31 @@ fn handle_change_and_get_prev<T: PartialEq>(
 
 fn dont_handle_change_and_get_prev<T: PartialEq>(delta: Option<Delta<T>>) -> Option<T> {
     handle_change_and_get_prev(delta, |_: T| {})
+}
+
+/// The device configurations and flags.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct IpDeviceConfigurationAndFlags<I: IpDeviceIpExt> {
+    /// The device configuration.
+    pub config: I::Configuration,
+    /// The device flags.
+    pub flags: IpDeviceFlags,
+}
+
+impl<I: IpDeviceIpExt> AsRef<IpDeviceConfiguration> for IpDeviceConfigurationAndFlags<I> {
+    fn as_ref(&self) -> &IpDeviceConfiguration {
+        self.config.as_ref()
+    }
+}
+
+impl<I: IpDeviceIpExt> AsMut<IpDeviceConfiguration> for IpDeviceConfigurationAndFlags<I> {
+    fn as_mut(&mut self) -> &mut IpDeviceConfiguration {
+        self.config.as_mut()
+    }
+}
+
+impl<I: IpDeviceIpExt> AsRef<IpDeviceFlags> for IpDeviceConfigurationAndFlags<I> {
+    fn as_ref(&self) -> &IpDeviceFlags {
+        &self.flags
+    }
 }

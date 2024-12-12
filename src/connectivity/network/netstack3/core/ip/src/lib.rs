@@ -41,8 +41,8 @@ pub mod device {
         SetIpAddressPropertiesError,
     };
     pub use crate::internal::device::config::{
-        IpDeviceConfigurationHandler, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-        Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,
+        IpDeviceConfigurationAndFlags, IpDeviceConfigurationHandler, IpDeviceConfigurationUpdate,
+        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,
     };
     pub use crate::internal::device::dad::{
         DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadHandler, DadStateRef,
@@ -67,10 +67,9 @@ pub mod device {
         AddressId, AddressIdIter, AssignedAddressState, CommonAddressProperties, DefaultHopLimit,
         DualStackIpDeviceState, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceFlags,
         IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv4AddrConfig,
-        Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration,
-        Ipv4DeviceConfigurationAndFlags, Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddrSlaacConfig,
-        Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState,
-        Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags, Ipv6NetworkLearnedParameters,
+        Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig,
+        Ipv6AddrManualConfig, Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags,
+        Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6NetworkLearnedParameters,
         Lifetime, PreferredLifetime, PrimaryAddressId, SlaacConfig, TemporarySlaacConfig,
         WeakAddressId,
     };

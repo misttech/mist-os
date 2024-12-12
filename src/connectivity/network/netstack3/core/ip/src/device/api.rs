@@ -21,7 +21,8 @@ use netstack3_base::{
 use thiserror::Error;
 
 use crate::internal::device::config::{
-    IpDeviceConfigurationHandler, PendingIpDeviceConfigurationUpdate, UpdateIpConfigurationError,
+    IpDeviceConfigurationAndFlags, IpDeviceConfigurationHandler,
+    PendingIpDeviceConfigurationUpdate, UpdateIpConfigurationError,
 };
 use crate::internal::device::state::{
     CommonAddressProperties, IpDeviceConfiguration, Ipv4AddrConfig, Ipv4AddressState,
@@ -186,12 +187,13 @@ where
     pub fn get_configuration(
         &mut self,
         device_id: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
-    ) -> I::ConfigurationAndFlags {
-        self.core_ctx()
-            .with_ip_device_configuration(device_id, |config, mut core_ctx| {
-                (config.clone(), core_ctx.with_ip_device_flags(device_id, |flags| flags.clone()))
-            })
-            .into()
+    ) -> IpDeviceConfigurationAndFlags<I> {
+        self.core_ctx().with_ip_device_configuration(device_id, |config, mut core_ctx| {
+            IpDeviceConfigurationAndFlags {
+                config: config.clone(),
+                flags: core_ctx.with_ip_device_flags(device_id, |flags| flags.clone()),
+            }
+        })
     }
 
     /// Gets the routing metric for the device.

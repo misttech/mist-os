@@ -53,11 +53,10 @@ use netstack3_core::device::{
 };
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, CommonAddressProperties,
-    IpDeviceConfiguration, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
-    Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfiguration,
-    Ipv6DeviceConfigurationAndFlags, Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime,
-    SetIpAddressPropertiesError, SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration,
-    UpdateIpConfigurationError,
+    IpDeviceConfiguration, IpDeviceConfigurationAndFlags, IpDeviceConfigurationUpdate,
+    Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfiguration,
+    Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime, SetIpAddressPropertiesError,
+    SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
 };
 use zx::{self as zx, HandleBased, Rights};
 
@@ -1094,7 +1093,7 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
         __source_breaking: fidl::marker::SourceBreaking,
     });
 
-    let Ipv6DeviceConfigurationAndFlags {
+    let IpDeviceConfigurationAndFlags {
         config:
             Ipv6DeviceConfiguration {
                 dad_transmits,
