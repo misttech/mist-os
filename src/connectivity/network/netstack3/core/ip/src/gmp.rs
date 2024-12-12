@@ -859,6 +859,7 @@ fn enter_mode<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
                 *version_specific =
                     GmpGroupStateByVersion::V1(v1::GmpStateMachine::new_for_mode_transition())
             }
+            gmp.v2_proto.on_enter_v1();
         }
     };
     gmp.timers.clear(bindings_ctx);

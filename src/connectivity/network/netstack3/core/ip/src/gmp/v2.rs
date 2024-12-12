@@ -180,6 +180,20 @@ impl<I: Ip> ProtocolState<I> {
             .saturating_mul(self.robustness_variable.into())
             .saturating_add(config.query_response_interval().into())
     }
+
+    /// Updates [`ProtocolState`] due to a GMP mode change out of v2 mode.
+    ///
+    /// `ProtocolState` discards any protocol-specific state but *maintains*
+    /// network-learned parameters on mode changes.
+    pub(super) fn on_enter_v1(&mut self) {
+        let Self { robustness_variable: _, query_interval: _, left_groups } = self;
+        // left_groups are effectively pending responses and, from RFC 3810
+        // section 8.2.1:
+        //
+        // Whenever a host changes its compatibility mode, it cancels all its
+        // pending responses and retransmission timers.
+        *left_groups = HashMap::new();
+    }
 }
 
 /// V2 protocol-specific configuration.
@@ -1507,5 +1521,48 @@ mod tests {
         // No side-effects.
         core_ctx.gmp.timers.assert_timers([]);
         assert_eq!(core_ctx.inner.v2_messages, Vec::<Vec<_>>::new());
+    }
+
+    #[ip_test(I)]
+    fn clears_v2_proto_state_on_mode_change<I: TestIpExt>() {
+        let mut ctx = testutil::new_context_with_mode::<I>(GmpMode::V2);
+        join_and_ignore_unsolicited(&mut ctx, [I::GROUP_ADDR1]);
+
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let query = FakeV2Query {
+            robustness_variable: DEFAULT_ROBUSTNESS_VARIABLE.get() + 1,
+            query_interval: DEFAULT_QUERY_INTERVAL.get() + Duration::from_secs(1),
+            ..Default::default()
+        };
+        handle_query_message(core_ctx, bindings_ctx, &FakeDeviceId, &query).expect("handle query");
+        assert_eq!(
+            core_ctx.gmp_leave_group(bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
+            GroupLeaveResult::Left(())
+        );
+        let robustness_variable = NonZeroU8::new(query.robustness_variable).unwrap();
+        let query_interval = NonZeroDuration::new(query.query_interval).unwrap();
+        assert_eq!(
+            core_ctx.gmp.v2_proto,
+            ProtocolState {
+                robustness_variable,
+                query_interval,
+                left_groups: [(I::GROUP_ADDR1, robustness_variable)].into_iter().collect()
+            }
+        );
+
+        core_ctx.with_gmp_state_mut_and_ctx(&FakeDeviceId, |mut core_ctx, state| {
+            gmp::enter_mode(
+                &mut core_ctx,
+                bindings_ctx,
+                &FakeDeviceId,
+                state,
+                GmpMode::V1 { compat: false },
+            );
+        });
+
+        assert_eq!(
+            core_ctx.gmp.v2_proto,
+            ProtocolState { robustness_variable, query_interval, left_groups: HashMap::new() }
+        );
     }
 }
