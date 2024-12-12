@@ -188,6 +188,8 @@ function test_bazel_rbe() {
       ../bazel shutdown && \
       ../bazel --nohome_rc \
           test \
+          --nouse_action_cache \
+          --nocache_test_results \
           --config=remote \
           --config=resultstore \
           "${auth_config[@]}" \
