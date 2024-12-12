@@ -117,4 +117,5 @@ fuchsia_prebuilt_package(
     drivers = [
         "meta/aml-sdmmc.cm",
     ],
+    visibility = ["//visibility:public"],
 )
