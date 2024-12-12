@@ -39,7 +39,7 @@ use zerocopy::SplitByteSlice;
 use crate::internal::base::{IpDeviceMtuContext, IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpEnabledGroup,
-    GmpGroupState, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt,
+    GmpGroupState, GmpState, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt,
     MulticastGroupSet, NotAMemberErr,
 };
 
@@ -322,17 +322,20 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         }
     }
 
-    fn run_actions(&mut self, _bindings_ctx: &mut BC, _device: &CC::DeviceId, actions: Never) {
+    fn run_actions(
+        &mut self,
+        _bindings_ctx: &mut BC,
+        _device: &CC::DeviceId,
+        actions: Never,
+        _gmp_state: &GmpState<Ipv6, BC>,
+        _config: &Self::Config,
+    ) {
         match actions {}
     }
 
-    fn handle_mode_change(
-        &mut self,
-        _bindings_ctx: &mut BC,
-        _device: &Self::DeviceId,
-        _new_mode: gmp::GmpMode,
-    ) {
-    }
+    fn handle_mode_change(&mut self, _new_mode: gmp::GmpMode) {}
+
+    fn handle_disabled(&mut self) {}
 }
 
 #[derive(Debug, Error)]
@@ -427,7 +430,7 @@ impl<D: WeakDeviceIdentifier> MldTimerId<D> {
 
     /// Creates a new [`MldTimerId`] for a GMP delayed report on `device`.
     #[cfg(any(test, feature = "testutils"))]
-    pub fn new_delayed_report(device: D) -> Self {
+    pub fn new(device: D) -> Self {
         Self(GmpTimerId { device, _marker: Default::default() })
     }
 }
@@ -753,10 +756,7 @@ mod tests {
                 gmp::v1::GmpStateMachine::join_group(&mut rng, FakeInstant::default(), false, &cfg);
             assert_eq!(
                 s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default(), &cfg),
-                gmp::v1::QueryReceivedActions {
-                    generic: Some(gmp::v1::QueryReceivedGenericAction::StopTimerAndSendReport),
-                    protocol_specific: None
-                }
+                gmp::v1::QueryReceivedActions::StopTimerAndSendReport,
             );
         });
     }

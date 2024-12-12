@@ -72,21 +72,12 @@ impl ReportReceivedActions {
     const NOOP: Self = Self { stop_timer: false };
 }
 
-#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-pub(super) enum QueryReceivedGenericAction {
-    ScheduleTimer(Duration),
-    StopTimerAndSendReport,
-}
-
 /// Actions to take as a consequence of receiving a query message.
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-pub(super) struct QueryReceivedActions<A> {
-    pub(super) generic: Option<QueryReceivedGenericAction>,
-    pub(super) protocol_specific: Option<A>,
-}
-
-impl<A> QueryReceivedActions<A> {
-    const NOOP: Self = Self { generic: None, protocol_specific: None };
+pub(super) enum QueryReceivedActions {
+    ScheduleTimer(Duration),
+    StopTimerAndSendReport,
+    None,
 }
 
 /// Actions to take as a consequence of a report timer expiring.
@@ -217,26 +208,18 @@ fn member_query_received<R: Rng, I: Instant, C: ProtocolConfig>(
     max_resp_time: Duration,
     now: I,
     cfg: &C,
-) -> (MemberState<I>, QueryReceivedActions<C::QuerySpecificActions>) {
-    let ps_actions = cfg.do_query_received_specific(max_resp_time);
-
-    let (transition, generic_actions) = match cfg.get_max_resp_time(max_resp_time) {
-        None => (
-            IdleMember { last_reporter }.into(),
-            Some(QueryReceivedGenericAction::StopTimerAndSendReport),
-        ),
+) -> (MemberState<I>, QueryReceivedActions) {
+    let (transition, actions) = match cfg.get_max_resp_time(max_resp_time) {
+        None => (IdleMember { last_reporter }.into(), QueryReceivedActions::StopTimerAndSendReport),
         Some(max_resp_time) => {
             let max_resp_time = max_resp_time.get();
             let new_deadline = now.saturating_add(max_resp_time);
 
             let (timer_expiration, action) = match timer_expiration {
-                Some(old) if new_deadline >= old => (old, None),
+                Some(old) if new_deadline >= old => (old, QueryReceivedActions::None),
                 None | Some(_) => {
                     let delay = gmp::random_report_timeout(rng, max_resp_time);
-                    (
-                        now.saturating_add(delay),
-                        Some(QueryReceivedGenericAction::ScheduleTimer(delay)),
-                    )
+                    (now.saturating_add(delay), QueryReceivedActions::ScheduleTimer(delay))
                 }
             };
 
@@ -244,7 +227,7 @@ fn member_query_received<R: Rng, I: Instant, C: ProtocolConfig>(
         }
     };
 
-    (transition, QueryReceivedActions { generic: generic_actions, protocol_specific: ps_actions })
+    (transition, actions)
 }
 
 impl NonMember {
@@ -278,7 +261,7 @@ impl<I: Instant> DelayingMember<I> {
         max_resp_time: Duration,
         now: I,
         cfg: &C,
-    ) -> (MemberState<I>, QueryReceivedActions<C::QuerySpecificActions>) {
+    ) -> (MemberState<I>, QueryReceivedActions) {
         let DelayingMember { last_reporter, timer_expiration } = self;
         member_query_received(rng, last_reporter, Some(timer_expiration), max_resp_time, now, cfg)
     }
@@ -307,7 +290,7 @@ impl IdleMember {
         max_resp_time: Duration,
         now: I,
         cfg: &C,
-    ) -> (MemberState<I>, QueryReceivedActions<C::QuerySpecificActions>) {
+    ) -> (MemberState<I>, QueryReceivedActions) {
         let IdleMember { last_reporter } = self;
         member_query_received(rng, last_reporter, None, max_resp_time, now, cfg)
     }
@@ -358,9 +341,9 @@ impl<I: Instant> MemberState<I> {
         max_resp_time: Duration,
         now: I,
         cfg: &C,
-    ) -> (MemberState<I>, QueryReceivedActions<C::QuerySpecificActions>) {
+    ) -> (MemberState<I>, QueryReceivedActions) {
         match self {
-            state @ MemberState::NonMember(_) => (state, QueryReceivedActions::NOOP),
+            state @ MemberState::NonMember(_) => (state, QueryReceivedActions::None),
             MemberState::Delaying(state) => state.query_received(rng, max_resp_time, now, cfg),
             MemberState::Idle(state) => state.query_received(rng, max_resp_time, now, cfg),
         }
@@ -455,7 +438,7 @@ impl<I: Instant> GmpStateMachine<I> {
         max_resp_time: Duration,
         now: I,
         cfg: &C,
-    ) -> QueryReceivedActions<C::QuerySpecificActions> {
+    ) -> QueryReceivedActions {
         self.update(|s| s.query_received(rng, max_resp_time, now, cfg))
     }
 
@@ -603,13 +586,7 @@ where
         //   Membership Query is received.  IGMPv2 Querier Present is set to
         //   Older Version Querier Present Timeout seconds whenever an IGMPv2
         //   General Query is received.
-        gmp::enter_mode(
-            &mut core_ctx,
-            bindings_ctx,
-            device,
-            state.as_mut(),
-            GmpMode::V1 { compat: true },
-        );
+        gmp::enter_mode(&mut core_ctx, bindings_ctx, state.as_mut(), GmpMode::V1 { compat: true });
         // Schedule the compat timer if we're in compat mode.
         if state.gmp.mode.is_v1_compat() {
             gmp::schedule_v1_compat(bindings_ctx, state.as_mut())
@@ -653,15 +630,22 @@ where
         }
     };
 
+    // NB: Run actions before sending messages, which allows IGMP to
+    // understand it should be operating in IGMPv1 compatibility mode.
+    if let Some(ps_actions) = config.do_query_received_specific(query.max_response_time()) {
+        core_ctx.run_actions(bindings_ctx, device, ps_actions, gmp, config);
+    }
+
     for (group_addr, state) in iter {
-        let QueryReceivedActions { generic, protocol_specific } = state.v1_mut().query_received(
+        let actions = state.v1_mut().query_received(
             &mut bindings_ctx.rng(),
             query.max_response_time(),
             now,
             config,
         );
-        let send_msg = generic.and_then(|generic| match generic {
-            QueryReceivedGenericAction::ScheduleTimer(delay) => {
+        let send_msg = match actions {
+            QueryReceivedActions::None => None,
+            QueryReceivedActions::ScheduleTimer(delay) => {
                 let _: Option<(BC::Instant, ())> = gmp.timers.schedule_after(
                     bindings_ctx,
                     DelayedReportTimerId(group_addr).into(),
@@ -670,18 +654,13 @@ where
                 );
                 None
             }
-            QueryReceivedGenericAction::StopTimerAndSendReport => {
+            QueryReceivedActions::StopTimerAndSendReport => {
                 let _: Option<(BC::Instant, ())> =
                     gmp.timers.cancel(bindings_ctx, &DelayedReportTimerId(group_addr).into());
                 Some(GmpMessageType::Report)
             }
-        });
+        };
 
-        // NB: Run actions before sending messages, which allows IGMP to
-        // understand it should be operating in v1 compatibility mode.
-        if let Some(ps_actions) = protocol_specific {
-            core_ctx.run_actions(bindings_ctx, device, ps_actions);
-        }
         if let Some(msg) = send_msg {
             core_ctx.send_message_v1(bindings_ctx, device, group_addr, msg);
         }
@@ -922,7 +901,7 @@ mod test {
                 FakeInstant::default(),
                 &cfg
             ),
-            QueryReceivedActions { generic: None, protocol_specific: None }
+            QueryReceivedActions::None,
         );
     }
 
@@ -940,10 +919,7 @@ mod test {
             &cfg,
         );
         let new_duration = assert_matches!(actions,
-            QueryReceivedActions {
-                generic: Some(QueryReceivedGenericAction::ScheduleTimer(d)),
-                protocol_specific: None
-            } => d
+            QueryReceivedActions::ScheduleTimer(d) => d
         );
         assert_lt!(new_duration, first_duration);
     }
@@ -1020,10 +996,7 @@ mod test {
         assert_eq!(s.report_received(), ReportReceivedActions { stop_timer: true });
         assert_eq!(
             s.query_received(&mut rng, Duration::from_secs(1), FakeInstant::default(), &cfg),
-            QueryReceivedActions {
-                generic: Some(QueryReceivedGenericAction::ScheduleTimer(Duration::from_micros(1))),
-                protocol_specific: None
-            }
+            QueryReceivedActions::ScheduleTimer(Duration::from_micros(1))
         );
     }
 

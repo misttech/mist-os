@@ -298,13 +298,7 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
                 GmpMode::V1 { compat } => {
                     v1::handle_disabled(&mut core_ctx, bindings_ctx, device, state.as_mut());
                     if compat {
-                        enter_mode(
-                            &mut core_ctx,
-                            bindings_ctx,
-                            device,
-                            state.as_mut(),
-                            GmpMode::V2,
-                        );
+                        enter_mode(&mut core_ctx, bindings_ctx, state.as_mut(), GmpMode::V2);
                     }
                 }
                 GmpMode::V2 => {
@@ -316,6 +310,8 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
             state.gmp.v2_proto = Default::default();
             // Always clear all timers on disable.
             state.gmp.timers.clear(bindings_ctx);
+            // Notify protocol we're disabled.
+            core_ctx.handle_disabled();
         })
     }
 
@@ -378,8 +374,8 @@ impl<I: Ip, D: WeakDeviceIdentifier> GmpTimerId<I, D> {
         device
     }
 
-    fn new(device: D) -> Self {
-        Self { device, _marker: Default::default() }
+    const fn new(device: D) -> Self {
+        Self { device, _marker: IpVersionMarker::new() }
     }
 }
 
@@ -744,6 +740,8 @@ trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         actions: Self::Actions,
+        gmp_state: &GmpState<I, BC>,
+        config: &Self::Config,
     );
 
     /// Called whenever the GMP mode changes.
@@ -754,12 +752,13 @@ trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
     /// (all GMP timers are cleared, GMP state knows about `new_mode`).
     /// Implementers are expected to only take protocol-specific actions here.
     /// Notably, IGMP should reset its own IGMPv1 compatibility mode knowledge.
-    fn handle_mode_change(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device: &Self::DeviceId,
-        new_mode: GmpMode,
-    );
+    fn handle_mode_change(&mut self, new_mode: GmpMode);
+
+    /// Called whenever GMP goes into disabled mode.
+    ///
+    /// This is called to notify protocols of the protocol entering disabled
+    /// mode. Protocols should clear any network-learned parameters.
+    fn handle_disabled(&mut self);
 }
 
 fn handle_timer<I, BC, CC>(
@@ -787,7 +786,7 @@ fn handle_timer<I, BC, CC>(
                 v1::handle_timer(&mut core_ctx, bindings_ctx, &device, state, v1);
             }
             (TimerIdInner::V1Compat, GmpMode::V1 { compat: true }) => {
-                enter_mode(&mut core_ctx, bindings_ctx, &device, state, GmpMode::V2);
+                enter_mode(&mut core_ctx, bindings_ctx, state, GmpMode::V2);
             }
             (TimerIdInner::V2(timer), GmpMode::V2) => {
                 v2::handle_timer(&mut core_ctx, bindings_ctx, &device, timer, state);
@@ -812,7 +811,6 @@ fn handle_timer<I, BC, CC>(
 fn enter_mode<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
     core_ctx: &mut CC::Inner<'_>,
     bindings_ctx: &mut BC,
-    device: &CC::DeviceId,
     state: GmpStateRef<'_, I, CC, BC>,
     new_mode: GmpMode,
 ) {
@@ -863,7 +861,7 @@ fn enter_mode<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
     };
     gmp.timers.clear(bindings_ctx);
     gmp.mode = new_mode;
-    core_ctx.handle_mode_change(bindings_ctx, device, new_mode);
+    core_ctx.handle_mode_change(new_mode);
 }
 
 fn schedule_v1_compat<I: IpExt, CC: GmpTypeLayout<I, BC>, BC: GmpBindingsContext>(
@@ -975,13 +973,7 @@ mod tests {
         );
 
         core_ctx.with_gmp_state_mut_and_ctx(&FakeDeviceId, |mut core_ctx, mut state| {
-            enter_mode(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &FakeDeviceId,
-                state.as_mut(),
-                GmpMode::V2,
-            );
+            enter_mode(&mut core_ctx, &mut bindings_ctx, state.as_mut(), GmpMode::V2);
             assert_eq!(state.gmp.mode, GmpMode::V2);
         });
         // Timers were removed and state is now v2.
@@ -996,7 +988,6 @@ mod tests {
             enter_mode(
                 &mut core_ctx,
                 &mut bindings_ctx,
-                &FakeDeviceId,
                 state.as_mut(),
                 GmpMode::V1 { compat: false },
             );
@@ -1021,7 +1012,6 @@ mod tests {
             enter_mode(
                 &mut core_ctx,
                 &mut bindings_ctx,
-                &FakeDeviceId,
                 state.as_mut(),
                 GmpMode::V1 { compat: true },
             );
@@ -1046,7 +1036,6 @@ mod tests {
             enter_mode(
                 &mut core_ctx,
                 &mut bindings_ctx,
-                &FakeDeviceId,
                 state.as_mut(),
                 GmpMode::V1 { compat: false },
             );

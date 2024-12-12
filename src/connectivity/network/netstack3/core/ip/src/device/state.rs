@@ -59,21 +59,11 @@ pub trait IpDeviceStateIpExt: BroadcastIpExt {
     type AssignedAddressState<BT: IpDeviceStateBindingsTypes>: AssignedAddressState<Self::Addr>
         + Debug;
     /// The GMP protocol-specific state.
-    type GmpProtoState<BT: IpDeviceStateBindingsTypes>;
+    type GmpProtoState<BT: IpDeviceStateBindingsTypes>: Default;
     /// The GMP protocol-specific configuration.
     type GmpProtoConfig: Default;
     /// The timer id for GMP timers.
     type GmpTimerId<D: WeakDeviceIdentifier>: From<GmpTimerId<Self, D>>;
-
-    /// Creates a new [`Self::GmpProtoState`].
-    fn new_gmp_state<
-        D: WeakDeviceIdentifier,
-        CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
-        BC: IpDeviceStateBindingsTypes + TimerContext,
-    >(
-        bindings_ctx: &mut BC,
-        device_id: D,
-    ) -> Self::GmpProtoState<BC>;
 }
 
 impl IpDeviceStateIpExt for Ipv4 {
@@ -81,17 +71,6 @@ impl IpDeviceStateIpExt for Ipv4 {
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = IgmpState<BT>;
     type GmpTimerId<D: WeakDeviceIdentifier> = IgmpTimerId<D>;
     type GmpProtoConfig = IgmpConfig;
-
-    fn new_gmp_state<
-        D: WeakDeviceIdentifier,
-        CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
-        BC: IpDeviceStateBindingsTypes + TimerContext,
-    >(
-        bindings_ctx: &mut BC,
-        device_id: D,
-    ) -> Self::GmpProtoState<BC> {
-        IgmpState::new::<_, CC>(bindings_ctx, device_id)
-    }
 }
 
 impl IpDeviceStateIpExt for Ipv6 {
@@ -99,17 +78,6 @@ impl IpDeviceStateIpExt for Ipv6 {
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = ();
     type GmpTimerId<D: WeakDeviceIdentifier> = MldTimerId<D>;
     type GmpProtoConfig = MldConfig;
-
-    fn new_gmp_state<
-        D: WeakDeviceIdentifier,
-        CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
-        BC: IpDeviceStateBindingsTypes + TimerContext,
-    >(
-        _bindings_ctx: &mut BC,
-        _device_id: D,
-    ) -> Self::GmpProtoState<BC> {
-        ()
-    }
 }
 
 /// The state associated with an IP address assigned to an IP device.
@@ -411,7 +379,7 @@ impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext> IpDev
             addrs: Default::default(),
             multicast_groups: RwLock::new(IpDeviceMulticastGroups {
                 groups: Default::default(),
-                gmp_proto: I::new_gmp_state::<_, CC, _>(bindings_ctx, device_id.clone()),
+                gmp_proto: Default::default(),
                 gmp: GmpState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx, device_id),
                 gmp_config: Default::default(),
             }),

@@ -10,13 +10,14 @@
 use core::fmt::Debug;
 use core::time::Duration;
 
+use derivative::Derivative;
 use log::{debug, error};
 use net_declare::net_ip_v4;
 use net_types::ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr};
 use net_types::{MulticastAddr, SpecifiedAddr, Witness};
 use netstack3_base::{
-    AnyDevice, CoreTimerContext, DeviceIdContext, ErrorAndSerializer, HandleableTimer,
-    Ipv4DeviceAddr, TimerContext, WeakDeviceIdentifier,
+    AnyDevice, DeviceIdContext, ErrorAndSerializer, HandleableTimer, Instant, InstantContext,
+    Ipv4DeviceAddr, WeakDeviceIdentifier,
 };
 use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, PacketBuilder, Serializer};
 use packet_formats::igmp::messages::{
@@ -36,8 +37,8 @@ use zerocopy::SplitByteSlice;
 use crate::internal::base::{IpDeviceMtuContext, IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
     self, v2, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpEnabledGroup,
-    GmpGroupState, GmpMode, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt,
-    MulticastGroupSet, NotAMemberErr,
+    GmpGroupState, GmpMode, GmpState, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout,
+    IpExt, MulticastGroupSet, NotAMemberErr,
 };
 
 /// The destination address for all IGMPv3 reports.
@@ -58,23 +59,32 @@ pub trait IgmpBindingsContext: GmpBindingsContext + 'static {}
 impl<BC> IgmpBindingsContext for BC where BC: GmpBindingsContext + 'static {}
 
 /// The IGMP state for a device.
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
 pub struct IgmpState<BT: IgmpBindingsTypes> {
-    v1_router_present_timer: BT::Timer,
-    v1_router_present: bool,
+    compat_mode: IgmpCompatMode<BT::Instant>,
 }
 
-impl<BC: IgmpBindingsTypes + TimerContext> IgmpState<BC> {
-    /// Constructs a new `IgmpState` for `device`.
-    pub fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<IgmpTimerId<D>, BC>>(
-        bindings_ctx: &mut BC,
-        device: D,
-    ) -> Self {
-        Self {
-            v1_router_present_timer: CC::new_timer(
-                bindings_ctx,
-                IgmpTimerId::V1RouterPresent { device },
-            ),
-            v1_router_present: false,
+#[derive(Default)]
+#[cfg_attr(test, derive(Debug, Eq, PartialEq, Copy, Clone))]
+enum IgmpCompatMode<I: Instant> {
+    /// Running in IGMPv2 or IGMPv3 (depending on generic state in
+    /// [`GmpState`]).
+    #[default]
+    V2OrV3,
+    /// Operating in IGMPv1 mode if `now` is before `until`, otherwise IGMPv2 or
+    /// IGMPv3.
+    V1Compat { until: I },
+    // TODO(https://fxbug.dev/42071006): Introduce v1 forced mode via API call.
+}
+
+impl<I: Instant> IgmpCompatMode<I> {
+    /// Returns `true` if we should send IGMPv1 messages at the current time
+    /// given by `bindings_ctx`.
+    fn should_send_v1<BC: InstantContext<Instant = I>>(&self, bindings_ctx: &mut BC) -> bool {
+        match self {
+            Self::V2OrV3 => false,
+            Self::V1Compat { until } => bindings_ctx.now() < *until,
         }
     }
 }
@@ -322,10 +332,10 @@ where
         msg_type: gmp::v1::GmpMessageType,
     ) {
         let group_addr = group_addr.into_multicast_addr();
-        let Self { igmp_state: IgmpState { v1_router_present, .. }, core_ctx } = self;
+        let Self { igmp_state: IgmpState { compat_mode, .. }, core_ctx } = self;
         let result = match msg_type {
             gmp::v1::GmpMessageType::Report => {
-                if *v1_router_present {
+                if compat_mode.should_send_v1(bindings_ctx) {
                     send_igmp_v2_message::<_, _, IgmpMembershipReportV1>(
                         core_ctx,
                         bindings_ctx,
@@ -403,38 +413,66 @@ where
         bindings_ctx: &mut BC,
         _device: &Self::DeviceId,
         actions: Igmpv2Actions,
+        gmp_state: &GmpState<Ipv4, BC>,
+        config: &Self::Config,
     ) {
-        let Self {
-            igmp_state: IgmpState { v1_router_present_timer, v1_router_present, .. },
-            core_ctx: _,
-        } = self;
+        let Self { igmp_state: IgmpState { compat_mode }, core_ctx: _ } = self;
         match actions {
-            // TODO(https://fxbug.dev/42071006): Consider the GMP mode to
-            // install a v1 router present timer or not.
-            Igmpv2Actions::ScheduleV1RouterPresentTimer(duration) => {
-                *v1_router_present = true;
-                let _: Option<BC::Instant> =
-                    bindings_ctx.schedule_timer(duration, v1_router_present_timer);
+            Igmpv2Actions::UpdateV1CompatModeTimeout => {
+                match compat_mode {
+                    IgmpCompatMode::V2OrV3 | IgmpCompatMode::V1Compat { .. } => (),
+                    // TODO(https://fxbug.dev/42071006): Don't track v1 router
+                    // present in forced v1 mode.
+                }
+
+                let compat = match gmp_state.mode {
+                    GmpMode::V1 { compat } => compat,
+                    // Can't still be in v2 mode and observing v1 router.
+                    GmpMode::V2 => unreachable!(),
+                };
+                // If we're in compatibility mode, the generic gmp
+                // mode-exit timer will allow us to exit.
+                let duration = if compat {
+                    // From RFC 3376 section 4:
+                    //
+                    // The Group Compatibility Mode variable is based on whether
+                    // an older version report was heard in the last Older
+                    // Version Host Present Timeout seconds.
+                    gmp_state.v2_proto.older_version_querier_present_timeout(config).get()
+                } else {
+                    // From RFC 2236 section 4:
+                    //
+                    // This variable MUST be based upon whether or not an IGMPv1
+                    // query was heard in the last [Version 1 Router Present
+                    // Timeout] seconds, and MUST NOT be based upon the type of
+                    // the last Query heard.
+                    config.v1_router_present_timeout
+                };
+                let until = bindings_ctx.now().saturating_add(duration);
+                *compat_mode = IgmpCompatMode::V1Compat { until };
             }
         }
     }
 
-    fn handle_mode_change(
-        &mut self,
-        bindings_ctx: &mut BC,
-        _device: &Self::DeviceId,
-        new_mode: GmpMode,
-    ) {
+    fn handle_mode_change(&mut self, new_mode: GmpMode) {
         match new_mode {
             GmpMode::V1 { .. } => {}
             GmpMode::V2 => {
-                let Self {
-                    igmp_state: IgmpState { v1_router_present_timer, v1_router_present },
-                    core_ctx: _,
-                } = self;
-                // Remove any information around v1 routers present when entering GMPv2.
-                *v1_router_present = false;
-                let _: Option<_> = bindings_ctx.cancel_timer(v1_router_present_timer);
+                let Self { igmp_state: IgmpState { compat_mode }, core_ctx: _ } = self;
+                // Remove any information around v1 routers present when
+                // entering GMPv2.
+                *compat_mode = IgmpCompatMode::V2OrV3;
+            }
+        }
+    }
+
+    fn handle_disabled(&mut self) {
+        let Self { igmp_state: IgmpState { compat_mode }, core_ctx: _ } = self;
+        match compat_mode {
+            IgmpCompatMode::V2OrV3 => {}
+            IgmpCompatMode::V1Compat { .. } => {
+                // Exit compat mode on disable.
+                *compat_mode = IgmpCompatMode::V2OrV3;
             }
         }
     }
@@ -473,32 +511,24 @@ pub(crate) type IgmpResult<T> = Result<T, IgmpError>;
 
 /// An IGMP timer ID.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub enum IgmpTimerId<D: WeakDeviceIdentifier> {
-    /// A GMP timer.
-    Gmp(GmpTimerId<Ipv4, D>),
-    /// The timer used to determine whether there is a router speaking IGMPv1.
-    #[allow(missing_docs)]
-    V1RouterPresent { device: D },
-}
+pub struct IgmpTimerId<D: WeakDeviceIdentifier>(GmpTimerId<Ipv4, D>);
 
 impl<D: WeakDeviceIdentifier> IgmpTimerId<D> {
     pub(crate) fn device_id(&self) -> &D {
-        match self {
-            Self::Gmp(id) => id.device_id(),
-            Self::V1RouterPresent { device } => device,
-        }
+        let Self(inner) = self;
+        inner.device_id()
     }
 
-    /// Creates a new [`IgmpTimerId`] for a GMP delayed report on `device`.
+    /// Creates a new [`IgmpTimerId`] for `device`.
     #[cfg(any(test, feature = "testutils"))]
-    pub fn new_delayed_report(device: D) -> Self {
-        Self::Gmp(GmpTimerId { device, _marker: Default::default() })
+    pub const fn new(device: D) -> Self {
+        Self(GmpTimerId::new(device))
     }
 }
 
 impl<D: WeakDeviceIdentifier> From<GmpTimerId<Ipv4, D>> for IgmpTimerId<D> {
     fn from(id: GmpTimerId<Ipv4, D>) -> IgmpTimerId<D> {
-        IgmpTimerId::Gmp(id)
+        Self(id)
     }
 }
 
@@ -506,21 +536,8 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> HandleableTimer<CC, BC>
     for IgmpTimerId<CC::WeakDeviceId>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
-        match self {
-            IgmpTimerId::Gmp(id) => gmp::handle_timer(core_ctx, bindings_ctx, id),
-            IgmpTimerId::V1RouterPresent { device } => {
-                let Some(device) = device.upgrade() else {
-                    return;
-                };
-                IgmpContext::with_igmp_state_mut(
-                    core_ctx,
-                    &device,
-                    |_core_ctx, GmpStateRef { .. }, IgmpState { v1_router_present, .. }| {
-                        *v1_router_present = false;
-                    },
-                )
-            }
-        }
+        let Self(gmp) = self;
+        gmp::handle_timer(core_ctx, bindings_ctx, gmp);
     }
 }
 
@@ -610,7 +627,7 @@ where
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Igmpv2Actions {
-    ScheduleV1RouterPresentTimer(Duration),
+    UpdateV1CompatModeTimeout,
 }
 
 #[derive(Debug)]
@@ -684,8 +701,7 @@ impl gmp::v1::ProtocolConfig for IgmpConfig {
         // IGMPv1 responses before the timer expires. Please refer to
         // https://tools.ietf.org/html/rfc2236#section-4 for details.
         let v1_router_present = max_resp_time.as_micros() == 0;
-        v1_router_present
-            .then(|| Igmpv2Actions::ScheduleV1RouterPresentTimer(self.v1_router_present_timeout))
+        v1_router_present.then(|| Igmpv2Actions::UpdateV1CompatModeTimeout)
     }
 }
 
@@ -708,12 +724,12 @@ mod tests {
     use alloc::vec::Vec;
     use assert_matches::assert_matches;
 
-    use net_types::ip::{Ip, IpVersionMarker, Mtu};
+    use net_types::ip::{Ip, Mtu};
     use netstack3_base::testutil::{
-        assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
-        FakeWeakDeviceId, TestIpExt as _,
+        assert_empty, run_with_many_seeds, FakeDeviceId, FakeTimerCtxExt, FakeWeakDeviceId,
+        TestIpExt as _,
     };
-    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _};
+    use netstack3_base::{CtxPair, Instant as _, IntoCoreTimerCtx, SendFrameContext as _};
     use packet::serialize::Buf;
     use packet::{ParsablePacket as _, ParseBuffer};
     use packet_formats::gmp::GroupRecordType;
@@ -762,6 +778,13 @@ mod tests {
     impl FakeIgmpCtx {
         fn gmp_state(&mut self) -> &mut GmpState<Ipv4, FakeBindingsCtx> {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().gmp_state
+        }
+
+        fn gmp_state_and_config(
+            &mut self,
+        ) -> (&mut GmpState<Ipv4, FakeBindingsCtx>, &mut IgmpConfig) {
+            let shared = Rc::get_mut(&mut self.shared).unwrap().get_mut();
+            (&mut shared.gmp_state, &mut shared.config)
         }
 
         fn groups(
@@ -882,55 +905,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_igmp_state_with_igmpv1_router() {
-        run_with_many_seeds(|seed| {
-            let mut rng = new_rng(seed);
-            let cfg = IgmpConfig::default();
-            let (mut s, _actions) =
-                gmp::v1::GmpStateMachine::join_group(&mut rng, FakeInstant::default(), false, &cfg);
-            assert_eq!(
-                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default(), &cfg),
-                gmp::v1::QueryReceivedActions {
-                    generic: None,
-                    protocol_specific: Some(Igmpv2Actions::ScheduleV1RouterPresentTimer(
-                        DEFAULT_V1_ROUTER_PRESENT_TIMEOUT
-                    ))
-                }
-            );
-            assert_eq!(s.report_timer_expired(), gmp::v1::ReportTimerExpiredActions);
-        });
-    }
-
-    #[test]
-    fn test_igmp_state_igmpv1_router_present_timer_expires() {
-        run_with_many_seeds(|seed| {
-            let mut rng = new_rng(seed);
-            let cfg = IgmpConfig::default();
-            let (mut s, _actions) =
-                gmp::v1::GmpStateMachine::join_group(&mut rng, FakeInstant::default(), false, &cfg);
-            assert_eq!(
-                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default(), &cfg),
-                gmp::v1::QueryReceivedActions {
-                    generic: None,
-                    protocol_specific: Some(Igmpv2Actions::ScheduleV1RouterPresentTimer(
-                        DEFAULT_V1_ROUTER_PRESENT_TIMEOUT
-                    ))
-                }
-            );
-            assert_eq!(
-                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default(), &cfg),
-                gmp::v1::QueryReceivedActions {
-                    generic: None,
-                    protocol_specific: Some(Igmpv2Actions::ScheduleV1RouterPresentTimer(
-                        DEFAULT_V1_ROUTER_PRESENT_TIMEOUT
-                    ))
-                }
-            );
-            assert_eq!(s.report_received(), gmp::v1::ReportReceivedActions { stop_timer: true });
-        });
-    }
-
     const MY_ADDR: SpecifiedAddr<Ipv4Addr> =
         unsafe { SpecifiedAddr::new_unchecked(Ipv4Addr::new([192, 168, 0, 2])) };
     const ROUTER_ADDR: Ipv4Addr = Ipv4Addr::new([192, 168, 0, 1]);
@@ -938,12 +912,7 @@ mod tests {
     const GROUP_ADDR: MulticastAddr<Ipv4Addr> = <Ipv4 as gmp::testutil::TestIpExt>::GROUP_ADDR1;
     const GROUP_ADDR_2: MulticastAddr<Ipv4Addr> = <Ipv4 as gmp::testutil::TestIpExt>::GROUP_ADDR2;
     const GMP_TIMER_ID: IgmpTimerId<FakeWeakDeviceId<FakeDeviceId>> =
-        IgmpTimerId::Gmp(GmpTimerId {
-            device: FakeWeakDeviceId(FakeDeviceId),
-            _marker: IpVersionMarker::new(),
-        });
-    const V1_ROUTER_PRESENT_TIMER_ID: IgmpTimerId<FakeWeakDeviceId<FakeDeviceId>> =
-        IgmpTimerId::V1RouterPresent { device: FakeWeakDeviceId(FakeDeviceId) };
+        IgmpTimerId::new(FakeWeakDeviceId(FakeDeviceId));
 
     fn receive_igmp_query(
         core_ctx: &mut FakeCoreCtx,
@@ -992,10 +961,7 @@ mod tests {
                         FakeWeakDeviceId(FakeDeviceId),
                         igmp_enabled,
                     ),
-                    igmp_state: IgmpState::new::<_, IntoCoreTimerCtx>(
-                        bindings_ctx,
-                        FakeWeakDeviceId(FakeDeviceId),
-                    ),
+                    igmp_state: Default::default(),
                     config: Default::default(),
                 })),
                 igmp_enabled,
@@ -1110,11 +1076,11 @@ mod tests {
     }
 
     #[test]
-    fn test_igmp_integration_igmpv1_router_present() {
+    fn test_igmpv2_integration_igmpv1_router_present() {
         run_with_many_seeds(|seed| {
             let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
 
-            assert_eq!(core_ctx.state.igmp_state().v1_router_present, false);
+            assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
             assert_eq!(
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
@@ -1124,29 +1090,28 @@ mod tests {
                 &gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(),
                 now..=(now + IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
-            let instant1 = bindings_ctx.timers.timers()[0].0.clone();
 
             receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(0));
             assert_eq!(core_ctx.frames().len(), 1);
 
             // Since we have heard from the v1 router, we should have set our
             // flag.
-            assert_eq!(core_ctx.state.igmp_state().v1_router_present, true);
-
-            assert_eq!(core_ctx.frames().len(), 1);
-            // Two timers: one for the delayed report, one for the v1 router
-            // timer.
             let now = bindings_ctx.now();
+            let until = now.panicking_add(DEFAULT_V1_ROUTER_PRESENT_TIMEOUT);
+            assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V1Compat { until });
+            assert_eq!(
+                core_ctx.state.igmp_state().compat_mode.should_send_v1(&mut bindings_ctx),
+                true
+            );
+            assert_eq!(core_ctx.frames().len(), 1);
             core_ctx.state.gmp_state().timers.assert_range([(
                 &gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(),
                 now..=(now + IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
-            bindings_ctx.timers.assert_timers_installed_range([
-                (GMP_TIMER_ID, now..=(now + IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL)),
-                (V1_ROUTER_PRESENT_TIMER_ID, now..=(now + DEFAULT_V1_ROUTER_PRESENT_TIMEOUT)),
-            ]);
-            let instant2 = bindings_ctx.timers.timers()[1].0.clone();
-            assert_eq!(instant1, instant2);
+            bindings_ctx.timers.assert_timers_installed_range([(
+                GMP_TIMER_ID,
+                now..=(now + IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL),
+            )]);
 
             core_ctx
                 .state
@@ -1162,12 +1127,14 @@ mod tests {
             // report.
             assert_eq!(frame[24], 0x12);
 
+            // Sleep until v1 router present is no more.
+            bindings_ctx.timers.instant.time = until;
+
+            // After the elapsed time, we should reset our flag for v1 routers.
             assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx),
-                Some(V1_ROUTER_PRESENT_TIMER_ID)
+                core_ctx.state.igmp_state().compat_mode.should_send_v1(&mut bindings_ctx),
+                false
             );
-            // After the second timer, we should reset our flag for v1 routers.
-            assert_eq!(core_ctx.state.igmp_state().v1_router_present, false);
 
             receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10));
             core_ctx
@@ -1595,5 +1562,99 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(report, vec![(sent_report_addr.get(), sent_report_mode, sent_report_sources)]);
+    }
+
+    /// Tests IGMPv3 entering compatibility modes.
+    #[test]
+    fn igmpv3_version_compat() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(0);
+        core_ctx.with_gmp_state_mut_and_ctx(&FakeDeviceId, |mut core_ctx, state| {
+            gmp::enter_mode(&mut core_ctx, &mut bindings_ctx, state, GmpMode::V2);
+        });
+
+        for _ in 0..2 {
+            assert_eq!(
+                gmp::v1::handle_query_message(
+                    &mut core_ctx,
+                    &mut bindings_ctx,
+                    &FakeDeviceId,
+                    &gmp::testutil::FakeV1Query {
+                        group_addr: Ipv4::UNSPECIFIED_ADDRESS,
+                        max_response_time: Duration::ZERO
+                    }
+                ),
+                Ok(())
+            );
+            // We should be in GMPv1 compat mode with an IGMPv1 router present
+            // and the compat instant is set by the IGMPv3 RFC definition.
+            assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: true });
+            let (gmp_state, config) = core_ctx.state.gmp_state_and_config();
+            let until = bindings_ctx.now().panicking_add(
+                gmp_state.v2_proto.older_version_querier_present_timeout(config).get(),
+            );
+            assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V1Compat { until });
+            assert_eq!(
+                core_ctx.state.igmp_state().compat_mode.should_send_v1(&mut bindings_ctx),
+                true
+            );
+            bindings_ctx.timers.instant.sleep(Duration::from_secs(2));
+        }
+
+        let (v2_deadline, ()) =
+            core_ctx.state.gmp_state().timers.get(&gmp::TimerIdInner::V1Compat).unwrap();
+        let prev_compat = core_ctx.state.igmp_state().compat_mode;
+        // Now receive an IGMPv2 query. The IGMPv1 compat deadline should not
+        // move.
+        assert_eq!(
+            gmp::v1::handle_query_message(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                &FakeDeviceId,
+                &gmp::testutil::FakeV1Query {
+                    group_addr: Ipv4::UNSPECIFIED_ADDRESS,
+                    max_response_time: Duration::from_secs(10)
+                }
+            ),
+            Ok(())
+        );
+        assert_eq!(core_ctx.state.igmp_state().compat_mode, prev_compat);
+        assert_ne!(
+            core_ctx.state.gmp_state().timers.get(&gmp::TimerIdInner::V1Compat).unwrap(),
+            (v2_deadline, &())
+        );
+        // We haven't moved timers so we should still be sending IGMPv1 responses.
+        assert_eq!(core_ctx.state.igmp_state().compat_mode.should_send_v1(&mut bindings_ctx), true);
+
+        // Triggering the next timer should clear IGMPv2 compat back into IGMPv3
+        // and we update the compat mode.
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
+        assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
+        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V2);
+        assert_eq!(
+            core_ctx.state.igmp_state().compat_mode.should_send_v1(&mut bindings_ctx),
+            false
+        );
+    }
+
+    #[test]
+    fn version_compat_clears_on_disable() {
+        let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(0);
+        assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
+        assert_eq!(
+            gmp::v1::handle_query_message(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                &FakeDeviceId,
+                &gmp::testutil::FakeV1Query {
+                    group_addr: Ipv4::UNSPECIFIED_ADDRESS,
+                    max_response_time: Duration::ZERO
+                }
+            ),
+            Ok(())
+        );
+        assert_matches!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V1Compat { .. });
+        core_ctx.state.igmp_enabled = false;
+        core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
+        assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
     }
 }

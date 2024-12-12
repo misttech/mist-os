@@ -291,8 +291,7 @@ fn enable_disable_ipv6() {
             ),
             (
                 TimerId::from(
-                    Ipv6DeviceTimerId::Mld(MldTimerId::new_delayed_report(device_id.downgrade()))
-                        .into_common(),
+                    Ipv6DeviceTimerId::Mld(MldTimerId::new(device_id.downgrade())).into_common(),
                 ),
                 ..,
             ),

@@ -129,17 +129,15 @@ impl<I: IpExt> GmpContextInner<I, FakeGmpBindingsContext<I>> for &'_ mut FakeGmp
         _bindings_ctx: &mut FakeGmpBindingsContext<I>,
         _device: &Self::DeviceId,
         actions: Never,
+        _gmp_state: &GmpState<I, FakeGmpBindingsContext<I>>,
+        _config: &Self::Config,
     ) {
         match actions {}
     }
 
-    fn handle_mode_change(
-        &mut self,
-        _bindings_ctx: &mut FakeGmpBindingsContext<I>,
-        _device: &Self::DeviceId,
-        _new_mode: GmpMode,
-    ) {
-    }
+    fn handle_mode_change(&mut self, _new_mode: GmpMode) {}
+
+    fn handle_disabled(&mut self) {}
 }
 
 #[derive(Debug, Default)]

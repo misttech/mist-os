@@ -67,8 +67,7 @@ fn test_igmp_enable_disable_integration() {
     // the timer ID in bindings matches the state of the single timer id in
     // the local timer heap in GMP.
     let timer_id = TimerId::from(
-        Ipv4DeviceTimerId::from(IgmpTimerId::new_delayed_report(device_id.downgrade()))
-            .into_common(),
+        Ipv4DeviceTimerId::from(IgmpTimerId::new(device_id.downgrade())).into_common(),
     );
     let range = now..=(now + IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL);
     struct TestConfig {
@@ -206,9 +205,8 @@ fn test_mld_enable_disable_integration() {
     // ever join a single group for the duration of the test. Given that,
     // the timer ID in bindings matches the state of the single timer id in
     // the local timer heap in GMP.
-    let snmc_timer_id = TimerId::from(
-        Ipv6DeviceTimerId::Mld(MldTimerId::new_delayed_report(device_id.downgrade())).into_common(),
-    );
+    let snmc_timer_id =
+        TimerId::from(Ipv6DeviceTimerId::Mld(MldTimerId::new(device_id.downgrade())).into_common());
     let range = now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL);
     struct TestConfig {
         ip_enabled: bool,

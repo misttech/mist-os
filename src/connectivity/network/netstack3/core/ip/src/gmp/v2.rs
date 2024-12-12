@@ -1620,13 +1620,7 @@ mod tests {
         );
 
         core_ctx.with_gmp_state_mut_and_ctx(&FakeDeviceId, |mut core_ctx, state| {
-            gmp::enter_mode(
-                &mut core_ctx,
-                bindings_ctx,
-                &FakeDeviceId,
-                state,
-                GmpMode::V1 { compat: false },
-            );
+            gmp::enter_mode(&mut core_ctx, bindings_ctx, state, GmpMode::V1 { compat: false });
         });
 
         assert_eq!(
