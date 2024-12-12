@@ -65,7 +65,7 @@ class VmPageOrMarker {
     // kAlignBits represents the number of low bits in a reference that must be zero so they can be
     // used for internal metadata. This is declared here for convenience, and is asserted to be in
     // sync with the private kReferenceBits.
-    static constexpr uint64_t kAlignBits = 4;
+    static constexpr uint64_t kAlignBits = 2;
     explicit constexpr ReferenceValue(uint64_t raw) : value_(raw) {
       DEBUG_ASSERT((value_ & BIT_MASK(kAlignBits)) == 0);
     }
@@ -315,10 +315,10 @@ class VmPageOrMarker {
   static constexpr uint64_t kReferenceType = 0b10;
   static constexpr uint64_t kIntervalType = 0b11;
 
-  // Ensure two additional bits are available for storing metadata inside of references. The
-  // remaining bits are available for the actual ref value being stored. Unlike the page type, which
-  // does not allow the 0 value to be stored, a ref value of 0 is valid and may be stored.
-  static_assert(ReferenceValue::kAlignBits == (kTypeBits + 2));
+  // Ensure the reference values have alignment such the type bits can be set without overlapping
+  // actual ref being stored. Unlike the page type, which does not allow the 0 value to be stored, a
+  // ref value of 0 is valid and may be stored.
+  static_assert(ReferenceValue::kAlignBits == kTypeBits);
 
   // In addition to storing the type for an interval, we also need to track the type of interval
   // sentinel: the start, the end, or a single slot marker.
