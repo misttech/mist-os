@@ -22,8 +22,8 @@ use netstack3_base::{
 use packet_formats::utils::NonZeroDuration;
 
 use crate::internal::gmp::{
-    self, GmpContext, GmpContextInner, GmpGroupState, GmpMode, GmpState, GmpStateRef, GmpTimerId,
-    GmpTypeLayout, IpExt, MulticastGroupSet,
+    self, GmpContext, GmpContextInner, GmpEnabledGroup, GmpGroupState, GmpMode, GmpState,
+    GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
 };
 
 pub(super) struct FakeGmpContext<I: IpExt> {
@@ -99,10 +99,10 @@ impl<I: IpExt> GmpContextInner<I, FakeGmpBindingsContext<I>> for &'_ mut FakeGmp
         &mut self,
         _bindings_ctx: &mut FakeGmpBindingsContext<I>,
         _device: &Self::DeviceId,
-        group_addr: MulticastAddr<I::Addr>,
+        group_addr: GmpEnabledGroup<I::Addr>,
         msg_type: gmp::v1::GmpMessageType,
     ) {
-        self.v1_messages.push((group_addr, msg_type));
+        self.v1_messages.push((group_addr.into_multicast_addr(), msg_type));
     }
 
     fn send_report_v2(

@@ -17,15 +17,22 @@ use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
 use crate::internal::gmp::{
-    self, GmpBindingsContext, GmpContext, GmpContextInner, GmpGroupState, GmpMode, GmpStateRef,
-    GroupJoinResult, GroupLeaveResult, IpExt, NotAMemberErr, QueryTarget,
+    self, GmpBindingsContext, GmpContext, GmpContextInner, GmpEnabledGroup, GmpGroupState, GmpMode,
+    GmpStateRef, GroupJoinResult, GroupLeaveResult, IpExt, NotAMemberErr, QueryTarget,
 };
 
 /// Timers installed by GMP v1.
 ///
 /// The timer always refers to a delayed report.
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub(super) struct DelayedReportTimerId<I: Ip>(pub(super) MulticastAddr<I::Addr>);
+pub(super) struct DelayedReportTimerId<I: Ip>(pub(super) GmpEnabledGroup<I::Addr>);
+
+#[cfg(test)]
+impl<I: IpExt> DelayedReportTimerId<I> {
+    pub(super) fn new_multicast(addr: MulticastAddr<I::Addr>) -> Self {
+        Self(GmpEnabledGroup::try_new(addr).expect("not GMP enabled"))
+    }
+}
 
 /// A type of GMP v1 message.
 #[derive(Debug, Eq, PartialEq)]
@@ -45,7 +52,7 @@ impl JoinGroupActions {
 }
 
 /// Actions to take as a consequence of leaving a group.
-#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+#[derive(Debug, PartialEq, Eq)]
 pub(super) struct LeaveGroupActions {
     send_leave: bool,
     stop_timer: bool,
@@ -505,7 +512,7 @@ pub(super) fn handle_timer<I, CC, BC>(
     debug_assert!(gmp.mode.is_v1());
     let DelayedReportTimerId(group_addr) = timer;
     let ReportTimerExpiredActions {} = groups
-        .get_mut(&group_addr)
+        .get_mut(group_addr.as_ref())
         .expect("get state for group with expired report timer")
         .v1_mut()
         .report_timer_expired();
@@ -545,9 +552,11 @@ where
         if !gmp.mode.is_v1() {
             return Ok(());
         }
+        let group_addr =
+            GmpEnabledGroup::try_new(group_addr).map_err(|addr| NotAMemberErr(*addr))?;
         let ReportReceivedActions { stop_timer } = groups
-            .get_mut(&group_addr)
-            .ok_or_else(|| NotAMemberErr(*group_addr))
+            .get_mut(group_addr.as_ref())
+            .ok_or_else(|| NotAMemberErr(*group_addr.multicast_addr()))
             .map(|a| a.v1_mut().report_received())?;
         if stop_timer {
             assert_matches!(
@@ -629,13 +638,19 @@ where
     let target = query.group_addr();
     let target = QueryTarget::new(target).ok_or_else(|| NotAMemberErr(target))?;
     let iter = match target {
-        QueryTarget::Unspecified => {
-            either::Either::Left(groups.iter_mut().map(|(addr, state)| (*addr, state)))
+        QueryTarget::Unspecified => either::Either::Left(
+            groups
+                .iter_mut()
+                .filter_map(|(addr, state)| GmpEnabledGroup::new(*addr).map(|addr| (addr, state))),
+        ),
+        QueryTarget::Specified(group_addr) => {
+            let group_addr =
+                GmpEnabledGroup::try_new(group_addr).map_err(|addr| NotAMemberErr(*addr))?;
+            let state = groups
+                .get_mut(group_addr.as_ref())
+                .ok_or_else(|| NotAMemberErr(*group_addr.into_multicast_addr()))?;
+            either::Either::Right(core::iter::once((group_addr, state)))
         }
-        QueryTarget::Specified(group_addr) => either::Either::Right(core::iter::once((
-            group_addr,
-            groups.get_mut(&group_addr).ok_or_else(|| NotAMemberErr(*group_addr))?,
-        ))),
     };
 
     for (group_addr, state) in iter {
@@ -691,10 +706,10 @@ pub(super) fn handle_enabled<I, CC, BC>(
     let now = bindings_ctx.now();
 
     for (group_addr, state) in groups.iter_mut() {
-        let group_addr = *group_addr;
-        if !I::should_perform_gmp(group_addr) {
-            continue;
-        }
+        let group_addr = match GmpEnabledGroup::new(*group_addr) {
+            Some(a) => a,
+            None => continue,
+        };
 
         let JoinGroupActions { send_report_and_schedule_timer } =
             state.v1_mut().join_if_non_member(&mut bindings_ctx.rng(), now, config);
@@ -728,15 +743,19 @@ pub(super) fn handle_disabled<I, CC, BC>(
     debug_assert!(gmp.mode.is_v1());
 
     for (group_addr, state) in groups.groups_mut() {
+        let group_addr = match GmpEnabledGroup::new(*group_addr) {
+            Some(a) => a,
+            None => continue,
+        };
         let LeaveGroupActions { send_leave, stop_timer } = state.v1_mut().leave_if_member(config);
         if stop_timer {
             assert_matches!(
-                gmp.timers.cancel(bindings_ctx, &DelayedReportTimerId(*group_addr).into()),
+                gmp.timers.cancel(bindings_ctx, &DelayedReportTimerId(group_addr).into()),
                 Some(_)
             );
         }
         if send_leave {
-            core_ctx.send_message_v1(bindings_ctx, device, *group_addr, GmpMessageType::Leave);
+            core_ctx.send_message_v1(bindings_ctx, device, group_addr, GmpMessageType::Leave);
         }
     }
 }
@@ -757,7 +776,8 @@ where
     debug_assert!(gmp.mode.is_v1());
     let now = bindings_ctx.now();
 
-    let gmp_disabled = !enabled || !I::should_perform_gmp(group_addr);
+    let group_addr_witness = GmpEnabledGroup::try_new(group_addr);
+    let gmp_disabled = !enabled || group_addr_witness.is_err();
     let result = groups.join_group_with(group_addr, || {
         let (state, actions) =
             GmpStateMachine::join_group(&mut bindings_ctx.rng(), now, gmp_disabled, config);
@@ -765,6 +785,9 @@ where
     });
     result.map(|JoinGroupActions { send_report_and_schedule_timer }| {
         if let Some(delay) = send_report_and_schedule_timer {
+            // Invariant: if gmp_disabled then a non-member group must not
+            // generate any actions.
+            let group_addr = group_addr_witness.expect("generated report for GMP-disabled group");
             assert_matches!(
                 gmp.timers.schedule_after(
                     bindings_ctx,
@@ -796,7 +819,17 @@ where
     debug_assert!(gmp.mode.is_v1());
 
     groups.leave_group(group_addr).map(|state| {
-        let LeaveGroupActions { send_leave, stop_timer } = state.into_v1().leave_group(config);
+        let actions = state.into_v1().leave_group(config);
+        let group_addr = match GmpEnabledGroup::new(group_addr) {
+            Some(addr) => addr,
+            None => {
+                // Invariant: No actions must be generated for non member
+                // groups.
+                assert_eq!(actions, LeaveGroupActions::NOOP);
+                return;
+            }
+        };
+        let LeaveGroupActions { send_leave, stop_timer } = actions;
         if stop_timer {
             assert_matches!(
                 gmp.timers.cancel(bindings_ctx, &DelayedReportTimerId(group_addr).into()),

@@ -726,7 +726,7 @@ trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        group_addr: MulticastAddr<I::Addr>,
+        group_addr: GmpEnabledGroup<I::Addr>,
         msg_type: v1::GmpMessageType,
     );
 
@@ -921,6 +921,12 @@ mod witness {
         pub fn multicast_addr(&self) -> MulticastAddr<A> {
             let Self(addr) = self;
             *addr
+        }
+
+        /// Consumes the witness returning a multicast address.
+        pub fn into_multicast_addr(self) -> MulticastAddr<A> {
+            let Self(addr) = self;
+            addr
         }
     }
 
