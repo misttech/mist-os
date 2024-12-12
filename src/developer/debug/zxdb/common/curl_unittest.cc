@@ -7,7 +7,9 @@
 #include <arpa/inet.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <condition_variable>
 #include <cstddef>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -139,6 +141,93 @@ TEST(Curl, PerformDummy) {
 
   loop.PostTimer(FROM_HERE, 10, [&]() { loop.QuitNow(); });
   loop.Run();
+
+  Curl::GlobalCleanup();
+  loop.Cleanup();
+}
+
+namespace {
+
+std::condition_variable cond;
+std::mutex mutex;
+
+// Stops the given message loop when |remaining_threads| is 0.
+void WaitForCondVar(debug::MessageLoop* loop, size_t& remaining_threads) {
+  std::unique_lock lock(mutex);
+
+  // Block until there are no more running threads. This will block |loop| until the condition
+  // variable is signaled..
+  cond.wait(lock, [&remaining_threads]() { return remaining_threads == 0; });
+
+  loop->QuitNow();
+}
+}  // namespace
+
+TEST(Curl, MultiThreadedPerform) {
+  constexpr std::string message = "Hello world!";
+  SimpleHttpServer server(message);
+  server.Serve();
+
+  debug::MessageLoopPoll loop;
+  ASSERT_TRUE(loop.Init(nullptr));
+
+  Curl::GlobalInit();
+
+  constexpr size_t kNumThreads = 2;
+  std::vector<std::thread> threads(kNumThreads);
+  std::vector<std::string> replies;
+
+  // Protected by |mutex| above.
+  size_t remaining_threads = kNumThreads;
+
+  // Each of these will have a unique thread_local MultiHandle, and explicitly cannot capture the
+  // outer MessageLoop, which will conflict
+  auto fn = [&remaining_threads, &replies, port = server.port()](int id) {
+    // Each thread needs a message loop to service the curl objects.
+    debug::MessageLoopPoll local_loop;
+    ASSERT_TRUE(local_loop.Init(nullptr));
+
+    auto curl = fxl::MakeRefCounted<Curl>();
+    curl->SetURL("http://127.0.0.1:" + std::to_string(port));
+    curl->set_data_callback([&](const std::string& data) -> size_t {
+      std::lock_guard l(mutex);
+      replies.push_back(data);
+      return data.size();
+    });
+    curl->Perform([&](Curl* curl, Curl::Error err) {
+      ASSERT_FALSE(err) << err.ToString();
+      {
+        std::lock_guard lock(mutex);
+        --remaining_threads;
+      }
+
+      cond.notify_one();
+
+      local_loop.QuitNow();
+    });
+
+    local_loop.Run();
+    local_loop.Cleanup();
+  };
+
+  size_t c = 0;
+  for (auto& thread : threads) {
+    thread = std::thread(fn, c++);
+  }
+
+  loop.PostTask(FROM_HERE,
+                [&loop, &remaining_threads]() { WaitForCondVar(&loop, remaining_threads); });
+
+  loop.Run();
+
+  // Once the loop returns, all threads should be finished and join immediately.
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  for (const auto& reply : replies) {
+    ASSERT_EQ(reply, message);
+  }
 
   Curl::GlobalCleanup();
   loop.Cleanup();

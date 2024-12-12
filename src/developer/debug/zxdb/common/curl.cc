@@ -6,6 +6,9 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <memory>
+
+#include "curl/multi.h"
 #include "src/developer/debug/shared/message_loop.h"
 
 namespace zxdb {
@@ -22,15 +25,56 @@ void curl_easy_setopt_CHECK(CURL* handle, CURLoption option, T t) {
 
 }  // namespace
 
-// All Curl instances share one Curl::MultiHandle instance. RefCountedThreadSafe is used to destroy
-// the MultiHandle after the last Curl instance is destructed.
-class Curl::MultiHandle final : public fxl::RefCountedThreadSafe<Curl::MultiHandle> {
+// All Curl instances share one Curl::MultiHandle instance.
+//
+// LIFETIME SEMANTICS
+// =============================
+// The Curl::MultiHandle lives so long as at least one EasyHandle exists. When the last EasyHandle
+// is removed, the associated MultiHandle is cleaned up and removed. The curl_multi_cleanup routine
+// can issue additional callbacks to |SocketFunction|. This object must remain valid during these
+// callbacks to ensure that the higher level callbacks used with the respective Curl objects are
+// issued.
+//
+// The callbacks |TimerFunction| and |SocketFunction| are registered with libcurl below. These
+// functions will never call libcurl functions directly, instead tasks are posted to the message
+// loop, even in the case of a 0ms timeout given to |TimerFunction|. These callbacks are owned by
+// the message loop, and while it is tempting to use reference counting to ensure that this object
+// lives through all of the tasks on the message loop, it will not work due to the behavior of
+// curl_multi_cleanup mentioned above.
+//
+// Consider the following situation to see where this goes wrong:
+//
+// Suppose we have a reference counted object, and the message loop is being destroyed during
+// program teardown while a posted task holds a reference to this MultiHandle object, then the final
+// task being destructed will trigger this class to be destructed. This causes a problem, because we
+// cannot call curl_multi_cleanup from our own destructor. If we call it from our own destructor, we
+// will end up in |SocketFunction| as a result libcurl's cleanup process, which will post a task to
+// the message loop that increments the reference count for |this| from the destructor. When that
+// task is executed, everything will work (the CURLM object isn't completely invalid until
+// curl_multi_cleanup returns) until that reference counted object destructs, returning the
+// reference count to 0, causing its destruction. From here, we try to call curl_multi_cleanup
+// again, but libcurl catches this and will return a CURLE_RECURSIVE_API_CALL error because we've
+// already begun cleanup from the original destructor.
+class Curl::MultiHandle {
  public:
-  static fxl::RefPtr<Curl::MultiHandle> GetInstance();
+  static Curl::MultiHandle* GetInstance();
+
+  // Returns true if there is an existing MultiHandle instance. If this returns true, then it is
+  // guaranteed that a subsequent synchronous call to |GetInstance| will not perform a new
+  // allocation.
+  static bool HasInstance();
+
+  MultiHandle();
+  ~MultiHandle();
 
   // Adds an easy handle and starts the transfer. The ownership of the easy handle will be shared
   // by this class when the transfer is in progress.
   void AddEasyHandle(Curl* curl);
+
+  // Must be called before destructing. This calls the curl multihandle cleanup routines, which
+  // could reentrantly call |SocketFunction|, so we need to remain in a valid state until those
+  // cleanup routines are completed. Once they are, this object can be destructed.
+  void Cleanup();
 
  private:
   // Function given to CURL which it uses to inform us it would like to do IO on a socket and that
@@ -43,14 +87,16 @@ class Curl::MultiHandle final : public fxl::RefCountedThreadSafe<Curl::MultiHand
   // cancel the outstanding timer.
   static int TimerFunction(CURLM* multi, long timeout_ms, void* userp);
 
-  // MultiHandle() will check and set the pointer, and ~MultiHandle() will check and reset it to
-  // make sure there's at most 1 instance per thread at a time.
-  static thread_local MultiHandle* instance_;
-
-  MultiHandle();
-  ~MultiHandle();
+  // Unique MultiHandle for all |Curl| (shorthand for an "EasyHandle") instances being used for
+  // downloads. This is unique for this thread and is set by calling |GetInstance|. Once all
+  // EasyHandles (i.e. all |Curl| objects have been destroyed) are closed for this MultiHandle, then
+  // this MultiHandle is cleaned up and deleted. The next download started by the upper layers will
+  // create a new MultiHandle instance.
+  static thread_local std::unique_ptr<MultiHandle> instance_;
 
   void ProcessResponses();
+
+  void DrainResponses();
 
   CURLM* multi_handle_;
 
@@ -63,28 +109,26 @@ class Curl::MultiHandle final : public fxl::RefCountedThreadSafe<Curl::MultiHand
 
   // Indicates whether we already have a task posted to process the messages in multi_handler_.
   bool process_pending_ = false;
-
-  // Used in TimerFunction to avoid scheduling 2 timers and invalidate timers after destruction,
-  // because currently there's no way to cancel a timer from the message loop.
-  std::shared_ptr<bool> last_timer_valid_ = std::make_shared<bool>(false);
-
-  FRIEND_REF_COUNTED_THREAD_SAFE(MultiHandle);
-  FRIEND_MAKE_REF_COUNTED(MultiHandle);
 };
 
-thread_local Curl::MultiHandle* Curl::MultiHandle::instance_ = nullptr;
+thread_local std::unique_ptr<Curl::MultiHandle> Curl::MultiHandle::instance_ = nullptr;
 
-fxl::RefPtr<Curl::MultiHandle> Curl::MultiHandle::GetInstance() {
-  if (instance_) {
-    return fxl::RefPtr<Curl::MultiHandle>(instance_);
+bool Curl::MultiHandle::HasInstance() { return !!instance_; }
+
+Curl::MultiHandle* Curl::MultiHandle::GetInstance() {
+  if (HasInstance()) {
+    return instance_.get();
   }
-  return fxl::MakeRefCounted<Curl::MultiHandle>();
+
+  instance_ = std::make_unique<Curl::MultiHandle>();
+
+  return instance_.get();
 }
 
 void Curl::MultiHandle::AddEasyHandle(Curl* curl) {
   easy_handles_.emplace(curl->curl_, fxl::RefPtr<Curl>(curl));
   auto result = curl_multi_add_handle(multi_handle_, curl->curl_);
-  FX_DCHECK(result == CURLM_OK);
+  FX_DCHECK(result == CURLM_OK) << curl_multi_strerror(result);
 
   // There's a chance that the response is available immediately in curl_multi_add_handle, which
   // could happen when the server is localhost, e.g. requesting authentication from metadata server
@@ -93,45 +137,77 @@ void Curl::MultiHandle::AddEasyHandle(Curl* curl) {
   ProcessResponses();
 }
 
+void Curl::MultiHandle::Cleanup() {
+  // Remove any existing watches. New ones may be installed by |curl_multi_cleanup|.
+  watches_.clear();
+
+  auto result = curl_multi_cleanup(multi_handle_);
+  FX_DCHECK(result == CURLM_OK) << curl_multi_strerror(result);
+
+  multi_handle_ = nullptr;
+  instance_.reset();
+}
+
 void Curl::MultiHandle::ProcessResponses() {
+  FX_CHECK(instance_) << __PRETTY_FUNCTION__ << " instance_ is null!";
+
   if (process_pending_) {
     return;
   }
+
   process_pending_ = true;
 
-  debug::MessageLoop::Current()->PostTask(FROM_HERE, [self = fxl::RefPtr<MultiHandle>(this)]() {
-    self->process_pending_ = false;
-
-    int _ignore;
-    while (auto info = curl_multi_info_read(self->multi_handle_, &_ignore)) {
-      if (info->msg != CURLMSG_DONE) {
-        // CURLMSG_DONE is the only value for msg, documented or otherwise, so this is mostly
-        // future-proofing at writing.
-        continue;
-      }
-
-      auto easy_handle_it = self->easy_handles_.find(info->easy_handle);
-      FX_DCHECK(easy_handle_it != self->easy_handles_.end());
-      fxl::RefPtr<Curl> curl = std::move(easy_handle_it->second);
-      curl->FreeSList();
-      self->easy_handles_.erase(easy_handle_it);
-
-      // The document says WARNING: The data the returned pointer points to will not survive
-      // calling curl_multi_cleanup, curl_multi_remove_handle or curl_easy_cleanup.
-      CURLcode code = info->data.result;
-      auto result = curl_multi_remove_handle(self->multi_handle_, info->easy_handle);
-      FX_DCHECK(result == CURLM_OK);
-      // info is invalid now.
-
-      curl->multi_cb_(curl.get(), Curl::Error(code));
-      // curl->multi_cb_ becomes nullptr now because fit::callback can only be called once.
-    }
+  // This is to ensure that we do not reentrantly call libcurl routines from within either
+  // |SocketFunction| or |TimerFunction|, which is not allowed.
+  debug::MessageLoop::Current()->PostTask(FROM_HERE, []() {
+    FX_CHECK(instance_) << "ProcessResponses callback but instance_ is null!";
+    instance_->DrainResponses();
   });
+}
+
+void Curl::MultiHandle::DrainResponses() {
+  process_pending_ = false;
+
+  int _ignore;
+  while (auto info = curl_multi_info_read(multi_handle_, &_ignore)) {
+    if (info->msg != CURLMSG_DONE) {
+      // CURLMSG_DONE is the only value for msg, documented or otherwise, so this is mostly
+      // future-proofing at writing.
+      continue;
+    }
+
+    auto easy_handle_it = easy_handles_.find(info->easy_handle);
+    FX_DCHECK(easy_handle_it != easy_handles_.end());
+    fxl::RefPtr<Curl> curl = std::move(easy_handle_it->second);
+    curl->FreeSList();
+    easy_handles_.erase(easy_handle_it);
+
+    // The document says WARNING: The data the returned pointer points to will not survive
+    // calling curl_multi_cleanup, curl_multi_remove_handle or curl_easy_cleanup.
+    CURLcode code = info->data.result;
+    auto result = curl_multi_remove_handle(multi_handle_, info->easy_handle);
+    FX_DCHECK(result == CURLM_OK);
+    // info is invalid now.
+
+    curl->multi_cb_(curl.get(), Curl::Error(code));
+
+    // curl->multi_cb_ becomes nullptr now because fit::callback can only be called once. Since we
+    // moved |curl| out of our map, it going out of scope drops our reference, possibly destructing
+    // it.
+  }
+
+  // If we just deleted our last handle, then it is time to cleanup.
+  if (easy_handles_.empty()) {
+    FX_CHECK(this == instance_.get());
+    // Note that the cleanup routines called here are allowed to call |SocketFunction| again.
+    Cleanup();
+    // |this| and |instance_| are no longer valid.
+  }
 }
 
 int Curl::MultiHandle::SocketFunction(CURL* /*easy*/, curl_socket_t s, int what, void* /*userp*/,
                                       void* /*socketp*/) {
-  FX_DCHECK(instance_);
+  FX_CHECK(instance_);
 
   if (what == CURL_POLL_REMOVE || what == CURL_POLL_NONE) {
     instance_->watches_.erase(s);
@@ -154,8 +230,10 @@ int Curl::MultiHandle::SocketFunction(CURL* /*easy*/, curl_socket_t s, int what,
     }
 
     instance_->watches_[s] = debug::MessageLoop::Current()->WatchFD(
-        mode, s,
-        [self = fxl::RefPtr<MultiHandle>(instance_)](int fd, bool read, bool write, bool err) {
+        mode, s, [](int fd, bool read, bool write, bool err) {
+          // |instance_| should still be valid while we have an easy handle.
+          FX_CHECK(instance_) << "SocketFunction callback, MultiHandle:<null>";
+
           int action = 0;
           if (read)
             action |= CURL_CSELECT_IN;
@@ -164,16 +242,11 @@ int Curl::MultiHandle::SocketFunction(CURL* /*easy*/, curl_socket_t s, int what,
           if (err)
             action |= CURL_CSELECT_ERR;
 
-          // curl_multi_socket_action might stop watching when the transfer is done, which will
-          // destroy this closure and invalidate the self pointer. Copy it into a variable to
-          // prolong its life.
-          auto prolonged = self;
-
           int _ignore;
-          auto result = curl_multi_socket_action(prolonged->multi_handle_, fd, action, &_ignore);
+          auto result = curl_multi_socket_action(instance_->multi_handle_, fd, action, &_ignore);
           FX_DCHECK(result == CURLM_OK);
 
-          prolonged->ProcessResponses();
+          instance_->ProcessResponses();
         });
   }
 
@@ -183,28 +256,22 @@ int Curl::MultiHandle::SocketFunction(CURL* /*easy*/, curl_socket_t s, int what,
 int Curl::MultiHandle::TimerFunction(CURLM* /*multi*/, long timeout_ms, void* /*userp*/) {
   FX_DCHECK(instance_);
 
-  *instance_->last_timer_valid_ = false;
   // A timeout_ms value of -1 passed to this callback means you should delete the timer.
   if (timeout_ms < 0) {
     return 0;
   }
 
-  instance_->last_timer_valid_ = std::make_shared<bool>(true);
-  auto cb = [self = fxl::RefPtr<MultiHandle>(instance_), valid = instance_->last_timer_valid_]() {
-    if (!*valid) {
+  auto cb = []() {
+    if (!HasInstance()) {
       return;
     }
 
-    // curl_multi_socket_action might stop watching when the transfer is done, which will destroy
-    // this closure and invalidate the self pointer. Copy it into a variable to prolong its life.
-    auto prolonged = self;
-
     int _ignore;
     auto result =
-        curl_multi_socket_action(prolonged->multi_handle_, CURL_SOCKET_TIMEOUT, 0, &_ignore);
+        curl_multi_socket_action(instance_->multi_handle_, CURL_SOCKET_TIMEOUT, 0, &_ignore);
     FX_DCHECK(result == CURLM_OK);
 
-    prolonged->ProcessResponses();
+    instance_->ProcessResponses();
   };
 
   if (timeout_ms == 0) {
@@ -218,7 +285,6 @@ int Curl::MultiHandle::TimerFunction(CURLM* /*multi*/, long timeout_ms, void* /*
 
 Curl::MultiHandle::MultiHandle() {
   FX_DCHECK(instance_ == nullptr);
-  instance_ = this;
 
   FX_DCHECK(global_initialized);
 
@@ -232,13 +298,20 @@ Curl::MultiHandle::MultiHandle() {
 }
 
 Curl::MultiHandle::~MultiHandle() {
-  *last_timer_valid_ = false;
+  // It is possible for |easy_handles_| to be non-empty here, if for example, there is a request
+  // that the server is not responding to. In that case, the MultiHandle object could be tearing
+  // down from TLS destructors after the message loop, and the MultiHandle is now invalid.
+  easy_handles_.clear();
+  watches_.clear();
 
-  auto result = curl_multi_cleanup(multi_handle_);
-  FX_DCHECK(result == CURLM_OK);
-
-  FX_DCHECK(instance_ == this);
-  instance_ = nullptr;
+  // Since this class is owned by a thread_local, it's possible to be destructed without having
+  // |Cleanup| called (e.g. during TLS destructors), using the same reasoning as above, leaving the
+  // multihandle leaked. By clearing |easy_handles_| above, none of these cleanup tasks should call
+  // |SocketFunction| since there are no more valid connections.
+  if (multi_handle_) {
+    auto result = curl_multi_cleanup(multi_handle_);
+    FX_CHECK(result == CURLM_OK);
+  }
 }
 
 void Curl::GlobalInit() {
@@ -250,6 +323,10 @@ void Curl::GlobalInit() {
 
 void Curl::GlobalCleanup() {
   FX_DCHECK(global_initialized);
+  if (Curl::MultiHandle::HasInstance()) {
+    // We have a live MultiHandle which must be cleaned up first.
+    Curl::MultiHandle::GetInstance()->Cleanup();
+  }
   curl_global_cleanup();
   global_initialized = false;
 }
