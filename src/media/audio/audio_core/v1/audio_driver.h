@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef FUCHSIA_SRC_MEDIA_AUDIO_AUDIO_CORE_V1_AUDIO_DRIVER_H_
-#define FUCHSIA_SRC_MEDIA_AUDIO_AUDIO_CORE_V1_AUDIO_DRIVER_H_
+#ifndef SRC_MEDIA_AUDIO_AUDIO_CORE_V1_AUDIO_DRIVER_H_
+#define SRC_MEDIA_AUDIO_AUDIO_CORE_V1_AUDIO_DRIVER_H_
 
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
@@ -304,4 +304,4 @@ class AudioDriver {
 
 }  // namespace media::audio
 
-#endif  // FUCHSIA_SRC_MEDIA_AUDIO_AUDIO_CORE_V1_AUDIO_DRIVER_H_
+#endif  // SRC_MEDIA_AUDIO_AUDIO_CORE_V1_AUDIO_DRIVER_H_
