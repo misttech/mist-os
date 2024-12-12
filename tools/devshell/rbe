@@ -144,8 +144,8 @@ EOF
     # gcert only works in environments that get unrestricted LOAS credentials
     # whereas gcloud auth will always work.
     # https://fuchsia.dev/internal/intree/concepts/remote-builds#authentication
-    gcloud_auth "$@" || {
-      echo "Failed to authenticate with gcloud."
+    ensure_auth_for_reclient "$@" || {
+      echo "Failed to authenticate for reclient."
       return 1
     }
   done
@@ -161,6 +161,14 @@ function setup_bazel_workspace() {
     --topdir="$BAZEL_TEST_DIR"
 }
 
+function get_loas_cert_type_for_bazel() {
+  local loas_cert_type=restricted
+  if [[ "$FX_BUILD_AUTO_AUTH" == 1 ]]
+  then loas_cert_type="$(get_loas_cert_type)"
+  fi
+  echo "$loas_cert_type"
+}
+
 function test_bazel_rbe() {
   setup_bazel_workspace
   # Test authentication to RBE and BES (both share the same gcloud auth).
@@ -170,12 +178,9 @@ function test_bazel_rbe() {
 
   # TODO(b/342026853): using gcert for bazel authentication is opt-in while
   # it is still experimental.  Opt-in with FX_BUILD_AUTO_AUTH=1.
-  local loas_type=restricted
-  if [[ "$FX_BUILD_AUTO_AUTH" == 1 ]]
-  then loas_type="$(get_loas_cert_type)"
-  fi
+  local -r loas_cert_type="$(get_loas_cert_type_for_bazel)"
   local -a auth_config=()
-  if [[ "$loas_type" == "unrestricted" ]]
+  if [[ "$loas_cert_type" == "unrestricted" ]]
   then auth_config+=( --config=gcertauth )
   fi
   (
@@ -199,8 +204,9 @@ It will retry until success.
 EOF
   until test_bazel_rbe
   do
-    gcloud_auth "$@" || {
-      echo "Failed to authenticate with gcloud."
+    echo "If the previous build attempt failed due to authentication, follow the prompts to authenticate."
+    ensure_auth_for_bazel "$@" || {
+      echo "Failed to authenticate for bazel."
       return 1
     }
   done
@@ -303,10 +309,17 @@ function check_loas_subcommand() {
   style::echo --green "$loas_cert_type"
 }
 
-function ensure_loas() {
-  gcertstatus -check_ssh=false --check_remaining=2h > /dev/null || gcert
+function gcert_auth() {
+  gcert
 }
 
+function ensure_loas() {
+  gcertstatus -check_ssh=false --check_remaining=2h > /dev/null || gcert_auth
+}
+
+# With the gcloud auth workflow, there is a risk that the current
+# credentials expire before the end of the build because OAuth tokens
+# only last one hour.
 function ensure_oauth() {
   ensure_gcloud && {
     # Check for the user's id among list of credentialed accounts.
@@ -314,23 +327,35 @@ function ensure_oauth() {
   }
 }
 
-# For builds that use remote services like RBE, ResultStore,
-# ensure that there are valid credentials at the time a build
-# is launched.
-function preflight_subcommand() {
-  if ! fx-build-needs-auth
-  then return 0
-  fi
+function ensure_auth_for_reclient() {
   local -r loas_cert_type="$(get_loas_cert_type)" || {
     exit 1
   }
   case "$loas_cert_type" in
     unrestricted) ensure_loas ;;
     restricted) ensure_oauth ;;
-    # With the gcloud auth workflow, there is a risk that the current
-    # credentials expire before the end of the build because OAuth tokens
-    # only last one hour.
   esac
+}
+
+function ensure_auth_for_bazel() {
+  local -r loas_cert_type="$(get_loas_cert_type_for_bazel)" || {
+    exit 1
+  }
+  case "$loas_cert_type" in
+    unrestricted) ensure_loas ;;
+    restricted) ensure_oauth ;;
+  esac
+}
+
+# For builds that use remote services like RBE, ResultStore,
+# ensure that there are valid credentials at the time a build
+# is launched.
+function preflight_subcommand() {
+  # If no authenticated services are used, this is a no-op.
+  if ! fx-build-needs-auth
+  then return 0
+  fi
+  ensure_auth_for_reclient && ensure_auth_for_bazel
 }
 
 # LINT.IfChange(reproxy_log_dirs)
