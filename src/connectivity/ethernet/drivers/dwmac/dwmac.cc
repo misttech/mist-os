@@ -163,41 +163,47 @@ void DWMacDevice::UpdateLinkStatus() {
 
 zx_status_t DWMacDevice::InitPdev() {
   // Map mac control registers and dma control registers.
-  auto status = pdev_.MapMmio(kEthMacMmio, &mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "dwmac: could not map dwmac mmio: %d", status);
-    return status;
+  zx::result mmio = pdev_.MapMmio(kEthMacMmio);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio: %s", mmio.status_string());
+    return mmio.status_value();
   }
+  mmio_ = std::move(mmio.value());
 
   // Map dma interrupt.
-  status = pdev_.GetInterrupt(0, &dma_irq_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "dwmac: could not map dma interrupt");
-    return status;
+  zx::result interrupt = pdev_.GetInterrupt(0);
+  if (interrupt.is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt: %s", interrupt.status_string());
+    return interrupt.status_value();
   }
+  dma_irq_ = std::move(interrupt.value());
 
   // Get ETH_BOARD protocol.
   if (!eth_board_.is_valid()) {
-    zxlogf(ERROR, "dwmac: could not obtain ETH_BOARD protocol: %d", status);
-    return status;
+    zxlogf(ERROR, "dwmac: could not obtain ETH_BOARD protocol");
+    return ZX_ERR_BAD_STATE;
   }
 
-  return status;
+  return ZX_OK;
 }
 
 zx_status_t DWMacDevice::Create(void* ctx, zx_device_t* device) {
-  auto pdev = ddk::PDevFidl::FromFragment(device);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "%s could not get ZX_PROTOCOL_PDEV", __func__);
-    return ZX_ERR_NO_RESOURCES;
+  fdf::PDev pdev;
+  {
+    zx::result pdev_client = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+        fuchsia_hardware_platform_device::Service::Device>(device, "pdev");
+    if (pdev_client.is_error()) {
+      zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client.status_string());
+      return pdev_client.status_value();
+    }
+    pdev = fdf::PDev{std::move(pdev_client.value())};
   }
 
   // Get our bti.
-  zx::bti bti;
-  zx_status_t status = pdev.GetBti(0, &bti);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "dwmac: could not obtain bti: %d", status);
-    return status;
+  zx::result bti = pdev.GetBti(0);
+  if (bti.is_error()) {
+    zxlogf(ERROR, "Failed to get bti: %s", bti.status_string());
+    return bti.status_value();
   }
 
   zx::result client =
@@ -208,10 +214,10 @@ zx_status_t DWMacDevice::Create(void* ctx, zx_device_t* device) {
            zx_status_get_string(client.error_value()));
     return client.error_value();
   }
-  auto mac_device =
-      std::make_unique<DWMacDevice>(device, std::move(pdev), std::move(bti), std::move(*client));
+  auto mac_device = std::make_unique<DWMacDevice>(device, std::move(pdev), std::move(bti.value()),
+                                                  std::move(*client));
 
-  status = mac_device->InitPdev();
+  zx_status_t status = mac_device->InitPdev();
   if (status != ZX_OK) {
     return status;
   }
@@ -402,7 +408,7 @@ zx_status_t DWMacDevice::EthMacRegisterCallbacks(const eth_mac_callbacks_t* cbs)
   return ZX_OK;
 }
 
-DWMacDevice::DWMacDevice(zx_device_t* device, ddk::PDevFidl pdev, zx::bti bti,
+DWMacDevice::DWMacDevice(zx_device_t* device, fdf::PDev pdev, zx::bti bti,
                          fidl::ClientEnd<fuchsia_hardware_ethernet_board::EthBoard> eth_board)
     : ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspendable>(device),
       bti_(std::move(bti)),
