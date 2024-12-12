@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-/// A single-threaded port-based executor for Fuchsia OS.
+/// A single-threaded port-based executor for Fuchsia.
 ///
 /// Having a `LocalExecutor` in scope allows the creation and polling of zircon objects, such as
 /// [`fuchsia_async::Channel`].

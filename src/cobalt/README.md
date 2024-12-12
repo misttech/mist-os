@@ -32,7 +32,7 @@ logic for Cobalt. Cobalt Core gets pulled into a Fuchsia checkout
 at `//third_party/cobalt`.
 
 ## Cobalt on Fuchsia
-This directory contains an embedding of Cobalt into the Fuchsia OS. The
+This directory contains an embedding of Cobalt into Fuchsia. The
 primary components are:
 
 - A Cobalt FIDL service in [bin/app](/src/cobalt/bin/app)

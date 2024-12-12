@@ -1,4 +1,4 @@
-This is a port of gperftools to the Fuchsia OS
+This is a port of gperftools to Fuchsia
 
 An example of usage of the library is at garnet/examples/profiler
 

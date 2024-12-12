@@ -36,7 +36,7 @@ name = "%(package_name)s"
 version = "%(version)s"
 license = "BSD-3-Clause"
 authors = ["rust-fuchsia@fuchsia.com"]
-description = "Rust crate for Fuchsia OS"
+description = "Rust crate for Fuchsia"
 repository = "https://fuchsia.googlesource.com"
 edition = "%(edition)s"
 %(default_target)s
