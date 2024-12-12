@@ -345,7 +345,7 @@ def _test_api_levels():
 
     no_repo_default_api_level_failure_test(
         name = "failure_test_pkg_without_api_level_and_no_repo_default",
-        expected_failure_message = '\'pkg_without_api_level_for_test\' does not have a valid API level set. Valid API levels are ["',
+        expected_failure_message = '`@fuchsia_sdk//fuchsia:fuchsia_api_level` has not been set to an API level. Has an API level been specified for this target? Valid API levels are ["',
         target_under_test = ":pkg_without_api_level",
         tags = ["manual"],
     )
@@ -387,10 +387,7 @@ def fuchsia_package_test_suite(name, **kwargs):
             # ":failure_test_retired_api_level",
             ":failure_test_unknown_numerical_api_level",
             ":failure_test_lowercase_next_api_level",
-
-            # This test fails as expected but during the transition, which avoids expect_failure.
-            # TODO(https://fxbug.dev/354047162): Enable once the error is not during the transition.
-            # ":failure_test_pkg_without_api_level_and_no_repo_default",
+            ":failure_test_pkg_without_api_level_and_no_repo_default",
             ":pkg_at_next_api_level_and_no_repo_default",
             ":pkg_at_next_api_level_and_unknown_repo_default",
             ":override_api_level_overrides_unknown_repo_default",

@@ -6,7 +6,6 @@
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
-load("@fuchsia_sdk//fuchsia/private:fuchsia_api_level.bzl", "get_fuchsia_api_level")
 load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shell_wrapper_provider")
 load("@rules_fuchsia//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
@@ -211,9 +210,6 @@ def _fuchsia_package_checker_analysistest_impl(ctx):
     target_under_test = analysistest.target_under_test(env)
     package_info = target_under_test[FuchsiaPackageInfo]
 
-    # This simply demonstrates the issue described in the function comment above.
-    asserts.equals(env, get_fuchsia_api_level(ctx), "")
-
     _verify_package_resources(package_info, ctx.attr)
 
     return analysistest.end(env)
@@ -222,9 +218,6 @@ _ANALYSIS_TEST_ATTRS = {
     "expected_abi_revision": attr.string(
         doc = "ABI revision we should find in the package, as a string-wrapped hexadecimal integer.",
         mandatory = True,
-    ),
-    "_fuchsia_api_level": attr.label(
-        default = "@fuchsia_sdk//fuchsia:fuchsia_api_level",
     ),
 } | _PACKAGE_RESOURCE_ATTRS
 

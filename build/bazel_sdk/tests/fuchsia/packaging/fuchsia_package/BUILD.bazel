@@ -96,10 +96,7 @@ test_suite(
         # TODO(https://fxbug.dev/354047162): Update repo default to a supported level and enable.
         # ":pkg_without_api_level_and_some_supported_repo_default",
         ":pkg_without_api_level_and_repo_default_next",
-
-        # This test fails as expected but during the transition, which avoids expect_failure.
-        # TODO(https://fxbug.dev/354047162): Enable once the error is not during the transition.
-        # ":failure_test_pkg_without_api_level_and_no_repo_default",
+        ":failure_test_pkg_without_api_level_and_no_repo_default",
         ":failure_test_pkg_without_api_level_and_unknown_repo_default",
         ":failure_test_pkg_at_next_api_level_with_unknown_override_api_level",
     ],
@@ -426,9 +423,13 @@ repo_default_api_level_next_fuchsia_package_checker_test(
 
 no_repo_default_api_level_failure_test(
     name = "failure_test_pkg_without_api_level_and_no_repo_default",
-    expected_failure_message = '\'pkg_without_api_level_for_test\' does not have a valid API level set. Valid API levels are ["',
+    expected_failure_message = '`@fuchsia_sdk//fuchsia:fuchsia_api_level` has not been set to an API level. Has an API level been specified for this target? Valid API levels are ["',
     tags = ["manual"],
-    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_without_api_level",
+
+    # With ":cc_component" included in the package, this test fails with:
+    # ERROR: .../obj/build/bazel/bazel_sdk/bazel_sdk_tests/output_base/external/fuchsia_sdk/pkg/fdio/BUILD.bazel:26:11: @@fuchsia_sdk//fuchsia/constraints:is_x64_api_HEAD is not a valid select() condition for @@fuchsia_sdk//pkg/fdio:fdio.
+    # TODO(https://fxbug.dev/382773036): Fix this and use pkg_without_api_level.
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_without_api_level_without_cc_component",
 )
 
 unknown_repo_default_api_level_failure_test(

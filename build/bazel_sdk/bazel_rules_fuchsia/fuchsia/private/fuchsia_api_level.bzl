@@ -54,12 +54,19 @@ def get_fuchsia_api_levels():
 def get_fuchsia_api_level(ctx):
     """ Returns the raw api level to use for building.
 
-    This method can return any of the valid API levels including the empty string.
-"""
-    return ctx.attr._fuchsia_api_level[FuchsiaAPILevelInfo].level
+    When using this function in a rule, add `FUCHSIA_API_LEVEL_ATTRS` to its `attrs`.
 
-def fail_missing_api_level(name):
-    fail("'{}' does not have a valid API level set. Valid API levels are {}".format(name, _valid_api_level_names()))
+    Must only be called within the scope of `fuchsia_transition` or some other
+    context where FUCHSIA_API_LEVEL_TARGET_NAME has been set appropriately,
+    including considering all ways to set the API level as appropriate.
+
+    Args:
+        ctx: A rule context object.
+
+    Returns:
+        A string containing the valid API level in FUCHSIA_API_LEVEL_TARGET_NAME.
+    """
+    return ctx.attr._fuchsia_api_level[FuchsiaAPILevelInfo].level
 
 def _valid_api_level_names():
     """ Returns a list of strings containing the names of the API levels supported by the SDK.
@@ -121,10 +128,17 @@ def u32_for_fuchsia_api_level_or_none(api_level):
 def _fuchsia_api_level_impl(ctx):
     raw_level = ctx.build_setting_value
 
-    # Allow the empty string here even though it is not a supported level.
-    # TODO(https://fxbug.dev/354047162): Clarify the purpose of allowing the
-    # empty string, which was first added in https://fxrev.dev/926337.
-    if raw_level != "" and raw_level not in _valid_api_level_names():
+    if raw_level == "":
+        # All we know is that this rule is being analyzed with the level set to the empty string,
+        # which is the default, and the label of the rule. We do not know why the rule is being
+        # analyzed, though most likely it is FUCHSIA_API_LEVEL_TARGET_NAME being analyzed for a
+        # target after `fuchsia_transition`, meaning none of the API level mechanisms were set.
+        fail("ERROR: `{}` has not been set to an API level. Has an API level been specified for this target? Valid API levels are {}".format(
+            ctx.label,
+            _valid_api_level_names(),
+        ))
+
+    if raw_level not in _valid_api_level_names():
         fail('ERROR: "{}" is not an API level supported by this SDK. API level should be one of {}'.format(
             raw_level,
             _valid_api_level_names(),

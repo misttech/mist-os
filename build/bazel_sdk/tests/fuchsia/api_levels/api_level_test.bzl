@@ -33,6 +33,7 @@ def _make_test_fuchsia_api_level(name, level):
     fuchsia_api_level(
         name = name,
         build_setting_default = level,
+        target_compatible_with = ["@platforms//os:fuchsia"],
     )
 
 def _test_level_setting():
@@ -90,10 +91,10 @@ def _test_level_setting():
         level = "",
     )
 
-    level_setting_test(
+    level_setting_failure_test(
         name = "test_unset",
         target_under_test = ":unset",
-        expected_level = "",
+        expected_failure_message = '`@//fuchsia/api_levels:unset` has not been set to an API level. Has an API level been specified for this target? Valid API levels are ["',
         tags = ["manual"],
     )
 
