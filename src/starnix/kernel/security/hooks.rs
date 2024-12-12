@@ -694,6 +694,18 @@ pub fn sb_umount(
     })
 }
 
+/// Checks if `current_task` has the permission to read file attributes for  `fs_node`.
+/// Corresponds to the `inode_getattr()` hook.
+pub fn check_fs_node_getattr_access(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_fs_node_getattr_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_getattr_access(security_server, current_task, fs_node)
+    })
+}
+
 /// This is called by Starnix even for filesystems which support extended attributes, unlike Linux
 /// LSM.
 /// Partially corresponds to the `inode_setxattr()` LSM hook: It is equivalent to

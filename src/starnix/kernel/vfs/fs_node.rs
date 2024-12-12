@@ -2190,6 +2190,8 @@ impl FsNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::check_fs_node_getattr_access(current_task, self)?;
+
         let info = self.fetch_and_refresh_info(locked, current_task)?;
 
         let time_to_kernel_timespec_pair = |t| {
@@ -2243,6 +2245,8 @@ impl FsNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::check_fs_node_getattr_access(current_task, self)?;
+
         // Ignore mask for now and fill in all of the fields.
         let info = if flags.contains(StatxFlags::AT_STATX_DONT_SYNC) {
             self.info()

@@ -755,6 +755,23 @@ pub fn fs_node_permission(
     Ok(())
 }
 
+pub(super) fn check_fs_node_getattr_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+) -> Result<(), Errno> {
+    let current_sid = current_task.security_state.lock().current_sid;
+    let file_sid = fs_node_effective_sid(fs_node);
+    let file_class = file_class_from_file_mode(fs_node.info().mode)?;
+    todo_check_permission!(
+        TODO("https://fxbug.dev/383284672", "Enable permission checks in getattr."),
+        &security_server.as_permission_check(),
+        current_sid,
+        file_sid,
+        CommonFilePermission::GetAttr.for_class(file_class),
+    )
+}
+
 pub(super) fn check_fs_node_setxattr_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -1370,7 +1387,7 @@ pub(super) fn fs_node_set_label_with_task(fs_node: &FsNode, task: WeakRef<Task>)
 /// Returns the security id currently stored in `fs_node`, if any. This API should only be used
 /// by code that is responsible for controlling the cached security id; e.g., to check its
 /// current value before engaging logic that may compute a new value. Access control enforcement
-/// code should use `get_effective_fs_node_security_id()`, *not* this function.
+/// code should use `fs_node_effective_sid()`, *not* this function.
 pub(super) fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
     match fs_node.security_state.lock().label.clone() {
         FsNodeLabel::SecurityId { sid } => Some(sid),
