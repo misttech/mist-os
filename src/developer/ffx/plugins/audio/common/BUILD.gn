@@ -11,25 +11,16 @@ rustc_library("ffx_audio_common") {
 
   deps = [
     "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/developer/ffx/command:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/media/audio/lib/rust",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:blocking",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:tracing",
   ]
 
-  sources = [
-    "src/ffxtool.rs",
-    "src/lib.rs",
-  ]
+  sources = [ "src/lib.rs" ]
 }

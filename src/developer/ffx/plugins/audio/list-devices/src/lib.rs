@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use ffx_audio_common::ffxtool::{exposed_dir, optional_moniker};
 use ffx_audio_device::device_list_untagged;
 use ffx_audio_device::list::{get_devices, ListResult};
 use ffx_audio_listdevices_args::ListDevicesCommand;
+use ffx_optional_moniker::{exposed_dir, optional_moniker};
 use fho::{FfxMain, FfxTool, MachineWriter};
 use fuchsia_audio::Registry;
 use {fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_io as fio};

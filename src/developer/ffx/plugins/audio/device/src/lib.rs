@@ -8,9 +8,9 @@
 use crate::list::DeviceQuery;
 use async_trait::async_trait;
 use blocking::Unblock;
-use ffx_audio_common::ffxtool::{exposed_dir, optional_moniker};
 use ffx_audio_device_args::{DeviceCommand, RecordCommand, SetCommand, SetSubCommand, SubCommand};
 use ffx_command::user_error;
+use ffx_optional_moniker::{exposed_dir, optional_moniker};
 use fho::{moniker, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl::HandleBased;

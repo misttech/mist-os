@@ -38,6 +38,7 @@ ffx_plugin("ffx_audio_device") {
     "//src/developer/ffx/command:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/plugins/audio/common:ffx_audio_common",
+    "//src/developer/ffx/plugins/audio/ffx_optional_moniker",
     "//src/lib/fidl/rust/fidl",
     "//src/media/audio/lib/rust",
     "//third_party/rust_crates:async-trait",
