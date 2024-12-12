@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/power-controller.h"
 
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
 #include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
@@ -13,7 +14,6 @@
 #include <atomic>
 #include <cstdint>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -407,7 +407,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryTimeoutAfterRetry) {
 
   bool report_busy_mailbox = false;
 
-  ddk_fake::FakeMmioRegRegion fake_mmio_region(sizeof(uint32_t), 0x140000 / sizeof(uint32_t));
+  fake_mmio::FakeMmioRegRegion fake_mmio_region(sizeof(uint32_t), 0x140000 / sizeof(uint32_t));
 
   fake_mmio_region[kMailboxInterfaceOffset].SetWriteCallback([&](uint64_t value) {
     EXPECT_EQ(0x8000'0007, value) << "Unexpected command";
@@ -609,7 +609,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnRetryTimeoutAf
 
   bool report_busy_mailbox = false;
 
-  ddk_fake::FakeMmioRegRegion fake_mmio_region(sizeof(uint32_t), 0x140000 / sizeof(uint32_t));
+  fake_mmio::FakeMmioRegRegion fake_mmio_region(sizeof(uint32_t), 0x140000 / sizeof(uint32_t));
   fake_mmio_region[kMailboxInterfaceOffset].SetWriteCallback([&](uint64_t value) {
     EXPECT_EQ(0x8000'0026, value) << "Unexpected command";
     report_busy_mailbox = true;
@@ -810,7 +810,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryTimeoutAft
 
   bool report_busy_mailbox = false;
 
-  ddk_fake::FakeMmioRegRegion fake_mmio_region(sizeof(uint32_t), 0x140000 / sizeof(uint32_t));
+  fake_mmio::FakeMmioRegRegion fake_mmio_region(sizeof(uint32_t), 0x140000 / sizeof(uint32_t));
   fake_mmio_region[kMailboxInterfaceOffset].SetWriteCallback([&](uint64_t value) {
     EXPECT_EQ(0x8000'0021, value) << "Unexpected command";
     report_busy_mailbox = true;

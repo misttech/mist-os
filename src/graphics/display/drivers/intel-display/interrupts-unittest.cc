@@ -9,13 +9,13 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/sync/completion.h>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
 #include "src/devices/pci/testing/pci_protocol_fake.h"
@@ -53,7 +53,7 @@ class InterruptTest : public testing::Test {
   ddk::Pci pci_;
   pci::FakePciProtocol fake_pci_;
 
-  ddk_fake::FakeMmioRegRegion mmio_space_{32, kMmioRegCount};
+  fake_mmio::FakeMmioRegRegion mmio_space_{32, kMmioRegCount};
   fdf::MmioBuffer mmio_buffer_{mmio_space_.GetMmioBuffer()};
 };
 

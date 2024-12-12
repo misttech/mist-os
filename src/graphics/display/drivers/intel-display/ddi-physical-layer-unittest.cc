@@ -4,11 +4,11 @@
 
 #include "src/graphics/display/drivers/intel-display/ddi-physical-layer.h"
 
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
 #include <lib/driver/mock-mmio-range/cpp/mock-mmio-range.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/intel-display/ddi-physical-layer-internal.h"
@@ -90,7 +90,7 @@ TEST_F(TypeCDdiTigerLakeTest, EnableFsm_TypeCColdBlock_Failure) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
+  fake_mmio::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
   mmio_region[kMailboxInterfaceOffset].SetWriteCallback(
@@ -329,7 +329,7 @@ TEST_F(TypeCDdiTigerLakeTest, DisableFsm_TypeCColdUnblock_Failure) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
+  fake_mmio::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
   mmio_region[kMailboxInterfaceOffset].SetWriteCallback(
@@ -374,7 +374,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_OnlyValidOnHealthy) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
+  fake_mmio::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
   EXPECT_DEATH(
@@ -424,7 +424,7 @@ TEST_F(TypeCDdiTigerLakeTest, Disable_FailsOnUnhealthy) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
+  fake_mmio::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
   {
@@ -517,7 +517,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Failure_TcColdCannotBlock) {
   bool tccold_block_requested = false;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
+  fake_mmio::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
   mmio_region[kMailboxInterfaceOffset].SetWriteCallback(
@@ -715,7 +715,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_FailureOnBailout) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_2;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
+  fake_mmio::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
   bool most_recent_tccold_request_is_block = false;
@@ -815,7 +815,7 @@ TEST_F(TypeCDdiTigerLakeTest, Disable_Failure_TcColdCannotUnblock) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_2;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
+  fake_mmio::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
   // Re-enable safe mode.

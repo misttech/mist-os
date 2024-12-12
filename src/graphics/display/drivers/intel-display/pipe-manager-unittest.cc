@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/pipe-manager.h"
 
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
@@ -11,7 +12,6 @@
 #include <memory>
 #include <vector>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/intel-display/ddi-physical-layer-manager.h"
@@ -47,7 +47,7 @@ class PipeManagerTest : public ::testing::Test {
  protected:
   constexpr static uint32_t kMinimumRegCount = 0xd0000 / sizeof(uint32_t);
   fdf_testing::ScopedGlobalLogger logger_;
-  ddk_fake::FakeMmioRegRegion reg_region_{sizeof(uint32_t), kMinimumRegCount};
+  fake_mmio::FakeMmioRegRegion reg_region_{sizeof(uint32_t), kMinimumRegCount};
   std::optional<fdf::MmioBuffer> mmio_buffer_;
   Controller controller_;
 };
