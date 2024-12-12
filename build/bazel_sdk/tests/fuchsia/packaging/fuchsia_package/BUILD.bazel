@@ -29,7 +29,7 @@ REPO_DEFAULT_ABI_REVISION = [
     level.abi_revision
     for level in get_fuchsia_api_levels()
     # TODO(https://fxbug.dev/354047162): Figure out a way to automate the API level name.
-    if level.api_level == "15"
+    if level.api_level == "16"
 ][0]
 
 # Values used in tests of `pkg_for_test` and variantes for different levels.
@@ -92,9 +92,7 @@ test_suite(
         ":pkg_at_next_api_level_and_unknown_repo_default",
         ":override_api_level_overrides_unknown_repo_default",
         ":override_api_level_overrides_unknown_package_and_repo_default",
-
-        # TODO(https://fxbug.dev/354047162): Update repo default to a supported level and enable.
-        # ":pkg_without_api_level_and_some_supported_repo_default",
+        ":pkg_without_api_level_and_some_supported_repo_default",
         ":pkg_without_api_level_and_repo_default_next",
         ":failure_test_pkg_without_api_level_and_no_repo_default",
         ":failure_test_pkg_without_api_level_and_unknown_repo_default",

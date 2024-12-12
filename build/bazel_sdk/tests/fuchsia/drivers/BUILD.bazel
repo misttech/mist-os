@@ -20,12 +20,22 @@ test_suite(
 driver_binary_test(
     name = "test_fuchsia_cc_driver_without_srcs",
     driver = ":driver_no_srcs",
+
+    # Like all components containing a C++ binary, the test package depends on
+    # @@fuchsia_sdk//pkg/fdio:fdio at the target API level.
+    # Without the line below, the driver will target the repo default API level.
+    # By default, however, fdio is only built and available at  "HEAD"`.
+    # Thus, we must override the target API level to one that will always work.
+    # TODO(https://fxbug.dev/382560521): Make this unnecessary (in every such
+    # test), ideally by allowing other API levels to always work.
     fuchsia_api_level = "HEAD",
 )
 
 driver_binary_test(
     name = "test_driver_with_direct_srcs",
     driver = ":driver_with_srcs",
+
+    # See the comment above.
     fuchsia_api_level = "HEAD",
 )
 
