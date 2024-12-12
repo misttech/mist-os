@@ -19,7 +19,6 @@ use netstack3_base::{
     Ipv4DeviceAddr, TimerContext, WeakDeviceIdentifier,
 };
 use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, PacketBuilder, Serializer};
-use packet_formats::gmp::GmpReportGroupRecord;
 use packet_formats::igmp::messages::{
     IgmpLeaveGroup, IgmpMembershipQueryV2, IgmpMembershipQueryV3, IgmpMembershipReportV1,
     IgmpMembershipReportV2, IgmpMembershipReportV3Builder, IgmpPacket,
@@ -368,7 +367,7 @@ where
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        groups: impl Iterator<Item: GmpReportGroupRecord<Ipv4Addr> + Clone> + Clone,
+        groups: impl Iterator<Item: gmp::v2::VerifiedReportGroupRecord<Ipv4Addr> + Clone> + Clone,
     ) {
         let Self { core_ctx, igmp_state: _ } = self;
         let dst_ip = ALL_IGMPV3_CAPABLE_ROUTERS;
@@ -725,7 +724,9 @@ mod tests {
     use super::*;
     use crate::internal::base::{IpPacketDestination, IpSendFrameError, SendIpPacketMeta};
     use crate::internal::fragmentation::FragmentableIpSerializer;
-    use crate::internal::gmp::{GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult};
+    use crate::internal::gmp::{
+        GmpEnabledGroup, GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult,
+    };
 
     /// Metadata for sending an IGMP packet.
     #[derive(Debug, PartialEq)]
@@ -1552,7 +1553,12 @@ mod tests {
             core_ctx.send_report_v2(
                 &mut bindings_ctx,
                 &FakeDeviceId,
-                [(sent_report_addr, sent_report_mode, sent_report_sources.iter())].into_iter(),
+                [gmp::v2::GroupRecord::new_with_sources(
+                    GmpEnabledGroup::new(sent_report_addr).unwrap(),
+                    sent_report_mode,
+                    sent_report_sources.iter(),
+                )]
+                .into_iter(),
             );
         });
 

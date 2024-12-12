@@ -53,7 +53,6 @@ use netstack3_base::{
     AnyDevice, CoreTimerContext, DeviceIdContext, InstantBindingsTypes, LocalTimerHeap, RngContext,
     TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
-use packet_formats::gmp::GmpReportGroupRecord;
 use rand::Rng;
 
 /// The result of joining a multicast group.
@@ -736,7 +735,7 @@ trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        groups: impl Iterator<Item: GmpReportGroupRecord<I::Addr> + Clone> + Clone,
+        groups: impl Iterator<Item: v2::VerifiedReportGroupRecord<I::Addr> + Clone> + Clone,
     );
 
     /// Runs protocol-specific actions.
@@ -897,6 +896,43 @@ impl<A: IpAddress> QueryTarget<A> {
     }
 }
 
+mod witness {
+    use super::*;
+
+    /// A witness type for an IP multicast address that passes
+    /// [`IpExt::should_perform_gmp`].
+    #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+    pub(super) struct GmpEnabledGroup<A>(MulticastAddr<A>);
+
+    impl<A: IpAddress<Version: IpExt>> GmpEnabledGroup<A> {
+        /// Creates a new `GmpEnabledGroup` if `addr` should have GMP performed
+        /// on it.
+        pub fn new(addr: MulticastAddr<A>) -> Option<Self> {
+            <A::Version as IpExt>::should_perform_gmp(addr).then(|| Self(addr))
+        }
+
+        /// Like [`GmpEnabledGroup::new`] but returns a `Result` with `addr` on
+        /// `Err`.
+        pub fn try_new(addr: MulticastAddr<A>) -> Result<Self, MulticastAddr<A>> {
+            Self::new(addr).ok_or_else(|| addr)
+        }
+
+        /// Returns a copy of the multicast address witness.
+        pub fn multicast_addr(&self) -> MulticastAddr<A> {
+            let Self(addr) = self;
+            *addr
+        }
+    }
+
+    impl<A> AsRef<MulticastAddr<A>> for GmpEnabledGroup<A> {
+        fn as_ref(&self) -> &MulticastAddr<A> {
+            let Self(addr) = self;
+            addr
+        }
+    }
+}
+use witness::GmpEnabledGroup;
+
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
@@ -1037,7 +1073,10 @@ mod tests {
             &mut core_ctx.gmp.v2_proto;
         *robustness_variable = robustness_variable.checked_add(1).unwrap();
         *query_interval = *query_interval + Duration::from_secs(20);
-        *left_groups = [(I::GROUP_ADDR1, NonZeroU8::new(1).unwrap())].into_iter().collect();
+        *left_groups =
+            [(GmpEnabledGroup::new(I::GROUP_ADDR1).unwrap(), NonZeroU8::new(1).unwrap())]
+                .into_iter()
+                .collect();
         core_ctx.enabled = false;
         core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
         assert_eq!(core_ctx.gmp.v2_proto, v2::ProtocolState::default());

@@ -21,7 +21,6 @@ use netstack3_base::{
 use netstack3_filter as filter;
 use packet::serialize::{PacketBuilder, Serializer};
 use packet::InnerPacketBuilder;
-use packet_formats::gmp::GmpReportGroupRecord;
 use packet_formats::icmp::mld::{
     IcmpMldv1MessageType, MldPacket, Mldv1Body, Mldv1MessageBuilder, Mldv2QueryBody,
     Mldv2ReportMessageBuilder, MulticastListenerDone, MulticastListenerReport,
@@ -291,7 +290,7 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        groups: impl Iterator<Item: GmpReportGroupRecord<Ipv6Addr> + Clone> + Clone,
+        groups: impl Iterator<Item: gmp::v2::VerifiedReportGroupRecord<Ipv6Addr> + Clone> + Clone,
     ) {
         let dst_ip = ALL_MLDV2_CAPABLE_ROUTERS;
         let (ipv6, icmp) =
@@ -572,7 +571,9 @@ mod tests {
     use super::*;
     use crate::internal::base::{IpPacketDestination, IpSendFrameError, SendIpPacketMeta};
     use crate::internal::fragmentation::FragmentableIpSerializer;
-    use crate::internal::gmp::{GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult};
+    use crate::internal::gmp::{
+        GmpEnabledGroup, GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult,
+    };
 
     /// Metadata for sending an MLD packet in an IP packet.
     #[derive(Debug, PartialEq)]
@@ -1411,7 +1412,12 @@ mod tests {
         (&mut core_ctx).send_report_v2(
             &mut bindings_ctx,
             &FakeDeviceId,
-            [(sent_report_addr, sent_report_mode, sent_report_sources.iter())].into_iter(),
+            [gmp::v2::GroupRecord::new_with_sources(
+                GmpEnabledGroup::new(sent_report_addr).unwrap(),
+                sent_report_mode,
+                sent_report_sources.iter(),
+            )]
+            .into_iter(),
         );
         let frames = core_ctx.take_frames();
         let (MldFrameMetadata { device: FakeDeviceId, dst_ip }, frame) =
