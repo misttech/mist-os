@@ -18,6 +18,8 @@
 #define FTLN_DEBUG_RECYCLES FALSE
 #endif
 
+#define FTLN_MIGRATE_COLD_DATA_PER_RECYCLE 0
+
 // Type Definitions
 typedef struct {
   ui32 vpn0;
@@ -1064,6 +1066,87 @@ int FtlnMetaWr(FTLN ftl, ui32 type) {
   return result;
 }
 
+// Assesses free block/page availability to determine if a block can be safely
+// moved. Returns 1 if it is safe to move_blk, 0 otherwise.
+static int safe_to_move_blk(FTLN ftl) {
+  ui32 num_mpages_needed = ftl->pgs_per_blk + ftl->map_cache->num_dirty;
+  if (num_mpages_needed > ftl->num_map_pgs) {
+    // Can't need to flush more map pages than there are.
+    num_mpages_needed = ftl->num_map_pgs;
+  }
+  ui32 free_mpages = free_map_list_pgs(ftl);
+  ui32 num_blks_needed = 0;
+  if (num_mpages_needed >= free_mpages) {
+    // We need to grab a new map block if we finish this one. So even if we
+    // don't overflow it, allocate one block if we fill it, and more if we will
+    // fill any other blocks as well.
+    num_mpages_needed -= free_mpages;
+    num_blks_needed = num_mpages_needed / ftl->pgs_per_blk + 1;
+  }
+
+  return num_blks_needed + FTLN_MIN_FREE_BLKS <= ftl->num_free_blks;
+}
+
+// Moves a volume block's data entirely to another. Returns non-zero on failure.
+static int move_blk(FTLN ftl, ui32 src, ui32 dest) {
+  PfAssert(IS_FREE(ftl->bdata[dest]));
+  // If the block is unerased, erase it now. Return -1 if error.
+  if ((ftl->bdata[dest] & ERASED_BLK_FLAG) == 0)
+    if (FtlnEraseBlk(ftl, dest))
+      return -1;
+
+  // Decrement free block count.
+  PfAssert(ftl->num_free_blks);
+  --ftl->num_free_blks;
+
+  // Save the current free_vpn, since it can resume use after this.
+  ui32 old_free_vpage = ftl->free_vpn;
+  // Set free volume page pointer to first page in block.
+  ftl->free_vpn = dest * ftl->pgs_per_blk;
+
+  // Clear block's free/erased flags and read count.
+  ftl->bdata[dest] = 0;  // clr free flag, used/read pages cnts
+
+  if (recycle_vblk(ftl, src) != 0) {
+    return -1;
+  }
+
+  // Restore the free_vpn to where it was.
+  ftl->free_vpn = old_free_vpage;
+
+  return 0;
+}
+
+// Returns the index of the "coldest" block it can, defined by having very low
+// relative wear and all data currently in use. Returns -1 if no blocks are
+// sufficiently cold.
+static int find_cold_block(FTLN ftl) {
+  const ui32 kColdWearLag = 200;
+  if (ftl->high_wc <= kColdWearLag) {
+    return -1;
+  }
+  ui32 cold_limit = ftl->high_wc - kColdWearLag;
+
+  if (ftl->low_wc > cold_limit) {
+    return -1;
+  }
+
+  ui32 best_selector = ftl->high_wc;
+  int cold_b = -1;
+  for (ui32 b = 0; b < ftl->num_blks; ++b) {
+    // Blocks should be fully utilized volume blocks with sufficiently high wear lag.
+    if (IS_FREE(ftl->bdata[b]) || IS_MAP_BLK(ftl->bdata[b]) ||
+        NUM_USED(ftl->bdata[b]) != ftl->pgs_per_blk || ftl->blk_wc[b] > cold_limit)
+      continue;
+
+    if (ftl->blk_wc[b] < best_selector) {
+      cold_b = (int)b;
+      best_selector = ftl->blk_wc[b];
+    }
+  }
+  return cold_b;
+}
+
 // FtlnRecCheck: Prepare to write page(s) by reclaiming dirty blocks
 //               in advance to (re)establish the reserved number of
 //               free blocks
@@ -1096,11 +1179,14 @@ int FtlnRecCheck(FTLN ftl, int wr_cnt) {
           ftl->free_vpn, free_vol_list_pgs(ftl), ftl->free_mpn, free_map_list_pgs(ftl),
           ftl->num_free_blks);
     }
+    int cold_migration_limit = FTLN_MIGRATE_COLD_DATA_PER_RECYCLE;
 
     // Loop until enough pages are free.
     for (count = 1;; ++count) {
+      // Don't look for low wear blocks to boost when migrating cold data.
+      int should_boost_low_wear = (count & 1) && !FTLN_MIGRATE_COLD_DATA_PER_RECYCLE;
       // Perform one recycle operation. Return -1 if error.
-      if (recycle(ftl, /*should_boost_low_wear=*/count & 1) != 0)
+      if (recycle(ftl, should_boost_low_wear) != 0)
         return -1;
 
       // Record the highest number of consecutive recycles.
@@ -1117,6 +1203,25 @@ int FtlnRecCheck(FTLN ftl, int wr_cnt) {
             " free blocks = %2u\n",
             count, ftl->free_vpn, free_vol_list_pgs(ftl), ftl->free_mpn, free_map_list_pgs(ftl),
             ftl->num_free_blks);
+      }
+
+      if (cold_migration_limit > 0 && safe_to_move_blk(ftl)) {
+        ui32 rec_b = FtlnHiWcFreeBlk(ftl);
+        // If the high wear block is really high wear, try to arrest that wear
+        // by moving cold data onto it.
+        if (ftl->high_wc - ftl->blk_wc[rec_b] < 16) {
+          int cold = find_cold_block(ftl);
+          if (cold >= 0) {
+            --cold_migration_limit;
+            if (move_blk(ftl, cold, rec_b) != 0) {
+              return -1;
+            }
+          } else {
+            // If we didn't find a cold block on the first look, there shouldn't
+            // be any after more recycles either.
+            cold_migration_limit = 0;
+          }
+        }
       }
 
       // Break if enough pages have been freed.
