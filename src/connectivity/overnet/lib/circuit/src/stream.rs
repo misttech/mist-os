@@ -9,6 +9,16 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex as SyncMutex};
 use tokio::sync::oneshot;
 
+/// We shrink our internal buffers until they are no more than this much larger
+/// than the actual data we are accumulating.
+///
+/// The value of 1MiB was discovered experimentally to yield acceptable
+/// performance on tests.
+const BUFFER_TRIM_GRANULARITY: usize = 1048576;
+
+/// BUFFER_TRIM_GRANULARITY should be a power of 2.
+const _: () = assert!(BUFFER_TRIM_GRANULARITY.is_power_of_two());
+
 /// Indicates whether a stream is open or closed, and if closed, why it closed.
 #[derive(Debug, Clone)]
 enum Status {
@@ -143,6 +153,14 @@ impl Reader {
 
                     state.readable -= consumed;
                     state.deque.drain(..consumed);
+                    let target_capacity = std::cmp::max(
+                        state.deque.len().next_multiple_of(BUFFER_TRIM_GRANULARITY),
+                        BUFFER_TRIM_GRANULARITY,
+                    );
+
+                    if target_capacity <= state.deque.capacity() / 2 {
+                        state.deque.shrink_to(target_capacity);
+                    }
                     return Ok(ret);
                 }
 
