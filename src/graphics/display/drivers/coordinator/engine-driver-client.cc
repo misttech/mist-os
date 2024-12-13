@@ -70,10 +70,12 @@ zx::result<std::unique_ptr<EngineDriverClient>> CreateFidlEngineDriverClient(
 
 zx::result<std::unique_ptr<EngineDriverClient>> CreateBanjoEngineDriverClient(
     std::shared_ptr<fdf::Namespace> incoming) {
-  zx::result dc_result = compat::ConnectBanjo<ddk::DisplayEngineProtocolClient>(incoming);
+  zx::result<ddk::DisplayEngineProtocolClient> dc_result =
+      compat::ConnectBanjo<ddk::DisplayEngineProtocolClient>(incoming);
   if (dc_result.is_error()) {
     FDF_LOG(WARNING, "Failed to connect to Banjo server via the compat client: %s",
             dc_result.status_string());
+    return dc_result.take_error();
   }
   ddk::DisplayEngineProtocolClient dc = std::move(dc_result).value();
   if (!dc.is_valid()) {
