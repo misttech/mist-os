@@ -74,8 +74,8 @@ pub fn convert_to_sme_disconnect_reason(
 
 // An internal version of fidl_policy::ScanResult that can be cloned
 // To avoid printing PII, only allow Debug in tests, runtime logging should use Display
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone)]
+#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, PartialEq)]
 pub struct ScanResult {
     /// Network properties used to distinguish between networks and to group
     /// individual APs.
@@ -104,8 +104,8 @@ pub enum ScanObservation {
 
 // An internal version of fidl_policy::Bss with extended information
 // To avoid printing PII, only allow Debug in tests, runtime logging should use Display
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone)]
+#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, PartialEq)]
 pub struct Bss {
     /// MAC address for the AP interface.
     pub bssid: Bssid,

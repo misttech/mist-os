@@ -96,6 +96,18 @@ impl ScanRequestApi for ScanRequester {
     }
 }
 
+// Wrapper struct to track it the scan request is being retried.
+#[derive(Debug, Clone)]
+struct ScanRequest {
+    pub sme_req: fidl_sme::ScanRequest,
+    pub is_retry: bool,
+}
+impl From<fidl_sme::ScanRequest> for ScanRequest {
+    fn from(sme_req: fidl_sme::ScanRequest) -> Self {
+        Self { sme_req, is_retry: false }
+    }
+}
+
 /// Create a future representing the scan manager loop.
 pub async fn serve_scanning_loop(
     iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
@@ -111,7 +123,7 @@ pub async fn serve_scanning_loop(
     let ongoing_scan = Fuse::terminated();
     let mut ongoing_scan = pin!(ongoing_scan);
 
-    let transform_next_sme_req = |next_sme_req: Option<fidl_sme::ScanRequest>| match next_sme_req {
+    let transform_next_sme_req = |next_sme_req: Option<ScanRequest>| match next_sme_req {
         None => Fuse::terminated(),
         Some(next_sme_req) => perform_scan(
             next_sme_req,
@@ -130,7 +142,7 @@ pub async fn serve_scanning_loop(
                         queue.add_request(reason, ssids, channels, responder, zx::MonotonicInstant::get());
                         // Check if there's an ongoing scan, otherwise take one from the queue
                         if ongoing_scan.is_terminated() {
-                            ongoing_scan.set(transform_next_sme_req(queue.get_next_sme_request()));
+                            ongoing_scan.set(transform_next_sme_req(queue.get_next_sme_request().map(|req| req.into())));
                         }
                     },
                     None => {
@@ -139,22 +151,50 @@ pub async fn serve_scanning_loop(
                 }
             },
             (completed_sme_request, scan_results) = ongoing_scan => {
-                // Send scan results to Location
-                if let Ok(ref results) = scan_results {
-                    if !results.is_empty() {
-                        location_sensor_updates.push(location_sensor_updater
-                            .update_scan_results(results.clone())
-                            .on_timeout(zx::MonotonicDuration::from_seconds(SCAN_CONSUMER_MAX_SECONDS_ALLOWED), || {
-                                error!("Timed out waiting for location sensor to get results");
-
-                            })
+                if scan_results == Err(types::ScanError::Cancelled) && !completed_sme_request.is_retry {
+                    // Retry after delay on first cancellation attempt.
+                    info!("Driver requested a delay before retrying the cancelled scan request.");
+                    fasync::Timer::new(zx::MonotonicDuration::from_millis(SCAN_RETRY_DELAY_MS).after_now()).await;
+                    ongoing_scan.set(transform_next_sme_req(Some(ScanRequest {is_retry: true, ..completed_sme_request})));
+                    continue;
+                }
+                match scan_results {
+                    Ok(ref results) => {
+                        // Return results to requester.
+                        queue.handle_completed_sme_scan(
+                            completed_sme_request.sme_req.clone(),
+                            scan_results.clone(),
+                            zx::MonotonicInstant::get()
                         );
+                        // Send scan results to Location
+                        if !results.is_empty() {
+                            location_sensor_updates.push(location_sensor_updater
+                                .update_scan_results(results.clone())
+                                .on_timeout(zx::MonotonicDuration::from_seconds(SCAN_CONSUMER_MAX_SECONDS_ALLOWED), || {
+                                    error!("Timed out waiting for location sensor to get results");
+                                })
+                            );
+                        }
+                    },
+                    Err(error) => {
+                        // Handle all other cases (including cancellation after retry). Return
+                        // results immediately.
+                        queue.handle_completed_sme_scan(
+                            completed_sme_request.sme_req.clone(),
+                            scan_results.clone(),
+                            zx::MonotonicInstant::get()
+                        );
+                        // If there was a cancellation after retrying, add a back off.
+                        if error == types::ScanError::Cancelled {
+                            info!("After multiple cancelled attempts, driver requested a delay before serving new scan requests.");
+                            fasync::Timer::new(zx::MonotonicDuration::from_millis(SCAN_RETRY_DELAY_MS).after_now()).await;
+                        }
                     }
                 }
-                // Send scan results to requesters
-                queue.handle_completed_sme_scan(completed_sme_request, scan_results, zx::MonotonicInstant::get());
-                // Get the next (if any) request from the queue
-                ongoing_scan.set(transform_next_sme_req(queue.get_next_sme_request()));
+                // Fetch the next request
+                ongoing_scan.set(transform_next_sme_req(
+                    queue.get_next_sme_request().map(|req| req.into())
+                ));
             },
             () = location_sensor_updates.select_next_some() => {},
             complete => {
@@ -233,66 +273,49 @@ async fn sme_scan(
     }
 }
 
-/// Handles incoming scan requests by creating a new SME scan request. Will retry scan once if SME
-/// returns a ScanErrorCode::Cancelled.
+/// Handles incoming scan requests by creating a new SME scan request.
 async fn perform_scan(
-    scan_request: fidl_sme::ScanRequest,
+    scan_request: ScanRequest,
     iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
     saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
     telemetry_sender: TelemetrySender,
-) -> (fidl_sme::ScanRequest, Result<Vec<types::ScanResult>, types::ScanError>) {
-    let mut bss_by_network: HashMap<types::NetworkIdentifierDetailed, Vec<types::Bss>> =
-        HashMap::new();
+) -> (ScanRequest, Result<Vec<types::ScanResult>, types::ScanError>) {
+    let bss_by_network: HashMap<types::NetworkIdentifierDetailed, Vec<types::Bss>>;
     let mut scan_event_inspect_data = ScanEventInspectData::new();
     let mut scan_defects: Vec<ScanIssue> = vec![];
 
-    // If scan returns cancelled error code, wait and retry once.
-    for iter in 0..2 {
-        let sme_proxy = match iface_manager.lock().await.get_sme_proxy_for_scan().await {
-            Ok(proxy) => proxy,
-            Err(_) => {
-                warn!("Failed to get sme proxy for passive scan");
-                return (scan_request, Err(types::ScanError::GeneralError));
-            }
-        };
-        let scan_results = sme_scan(&sme_proxy, &scan_request, &mut scan_defects).await;
-        report_scan_defects_to_sme(&sme_proxy, &scan_results, &scan_request).await;
+    let sme_proxy = match iface_manager.lock().await.get_sme_proxy_for_scan().await {
+        Ok(proxy) => proxy,
+        Err(_) => {
+            warn!("Failed to get sme proxy for passive scan");
+            return (scan_request, Err(types::ScanError::GeneralError));
+        }
+    };
+    let scan_results = sme_scan(&sme_proxy, &scan_request.sme_req, &mut scan_defects).await;
+    report_scan_defects_to_sme(&sme_proxy, &scan_results, &scan_request.sme_req).await;
 
-        match scan_results {
-            Ok(results) => {
-                let target_ssids = match scan_request {
-                    fidl_sme::ScanRequest::Passive(_) => vec![],
-                    fidl_sme::ScanRequest::Active(ref req) => req
-                        .ssids
-                        .iter()
-                        .map(|s| types::Ssid::from_bytes_unchecked(s.to_vec()))
-                        .collect(),
-                };
-                bss_by_network =
-                    bss_to_network_map(results, &target_ssids, &mut scan_event_inspect_data);
-                saved_networks_manager.record_scan_result(target_ssids, &bss_by_network).await;
-                break;
-            }
-            Err(scan_err) => match scan_err {
-                types::ScanError::GeneralError => {
-                    return (scan_request, Err(scan_err));
-                }
-                types::ScanError::Cancelled => {
-                    if iter > 0 {
-                        return (scan_request, Err(scan_err));
-                    }
-                    info!("Driver requested a delay before retrying scan");
-                    fasync::Timer::new(
-                        zx::MonotonicDuration::from_millis(SCAN_RETRY_DELAY_MS).after_now(),
-                    )
-                    .await;
-                }
-            },
+    match scan_results {
+        Ok(results) => {
+            // Record observed BSSs to saved networks manager.
+            let target_ssids = match scan_request.sme_req {
+                fidl_sme::ScanRequest::Passive(_) => vec![],
+                fidl_sme::ScanRequest::Active(ref req) => req
+                    .ssids
+                    .iter()
+                    .map(|s| types::Ssid::from_bytes_unchecked(s.to_vec()))
+                    .collect(),
+            };
+            bss_by_network =
+                bss_to_network_map(results, &target_ssids, &mut scan_event_inspect_data);
+            saved_networks_manager.record_scan_result(target_ssids, &bss_by_network).await;
+        }
+        Err(scan_err) => {
+            return (scan_request, Err(scan_err));
         }
     }
 
     // If the passive scan results are empty, report an empty scan results metric.
-    if let fidl_sme::ScanRequest::Passive(_) = scan_request {
+    if let fidl_sme::ScanRequest::Passive(_) = scan_request.sme_req {
         if bss_by_network.is_empty() {
             scan_defects.push(ScanIssue::EmptyScanResults);
         }
@@ -341,12 +364,11 @@ impl ScanResultUpdate for LocationSensorUpdater {
     }
 }
 
-#[allow(clippy::ptr_arg, reason = "mass allow for https://fxbug.dev/381896734")]
 /// Converts sme::ScanResult to our internal BSS type, then adds it to a map.
 /// Only keeps the first unique instance of a BSSID
 fn bss_to_network_map(
     scan_result_list: Vec<wlan_common::scan::ScanResult>,
-    target_ssids: &Vec<types::Ssid>,
+    target_ssids: &[types::Ssid],
     scan_event_inspect_data: &mut ScanEventInspectData,
 ) -> HashMap<types::NetworkIdentifierDetailed, Vec<types::Bss>> {
     let mut bss_by_network: HashMap<types::NetworkIdentifierDetailed, Vec<types::Bss>> =
@@ -861,7 +883,7 @@ mod tests {
         // Issue request to scan.
         let sme_scan = passive_sme_req();
         let scan_fut =
-            perform_scan(sme_scan.clone(), client, saved_networks_manager, telemetry_sender);
+            perform_scan(sme_scan.clone().into(), client, saved_networks_manager, telemetry_sender);
         let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler forward so that it will respond to the iterator get next request.
@@ -882,8 +904,8 @@ mod tests {
         );
 
         // Process scan handler
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((req, results)) => {
-            assert_eq!(req, sme_scan);
+        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((request, results)) => {
+            assert_eq!(request.sme_req, sme_scan);
             assert_eq!(results.unwrap(), internal_aps);
         });
 
@@ -907,7 +929,7 @@ mod tests {
         // Issue request to scan.
         let sme_scan = passive_sme_req();
         let scan_fut = perform_scan(
-            sme_scan.clone(),
+            sme_scan.clone().into(),
             client.clone(),
             saved_networks_manager,
             telemetry_sender,
@@ -930,8 +952,8 @@ mod tests {
         );
 
         // Process response from SME (which is empty) and expect the future to complete.
-        assert_variant!(exec.run_until_stalled(&mut scan_fut),  Poll::Ready((req, results)) => {
-            assert_eq!(req, sme_scan);
+        assert_variant!(exec.run_until_stalled(&mut scan_fut),  Poll::Ready((request, results)) => {
+            assert_eq!(request.sme_req, sme_scan);
             assert!(results.unwrap().is_empty());
         });
 
@@ -959,7 +981,7 @@ mod tests {
         // Issue request to scan.
         let sme_scan = active_sme_req(vec!["foo"], vec![]);
         let scan_fut = perform_scan(
-            sme_scan.clone(),
+            sme_scan.clone().into(),
             client.clone(),
             saved_networks_manager,
             telemetry_sender,
@@ -982,8 +1004,8 @@ mod tests {
         );
 
         // Process response from SME (which is empty) and expect the future to complete.
-        assert_variant!(exec.run_until_stalled(&mut scan_fut),  Poll::Ready((req, results)) => {
-            assert_eq!(req, sme_scan);
+        assert_variant!(exec.run_until_stalled(&mut scan_fut),  Poll::Ready((request, results)) => {
+            assert_eq!(request.sme_req, sme_scan);
             assert!(results.unwrap().is_empty());
         });
 
@@ -1018,7 +1040,7 @@ mod tests {
 
         // Issue request to scan.
         let scan_fut = perform_scan(
-            sme_scan_request.clone(),
+            sme_scan_request.clone().into(),
             client,
             saved_networks_manager.clone(),
             telemetry_sender,
@@ -1166,7 +1188,7 @@ mod tests {
                     scan_result.clone().try_into().expect("Failed to convert ScanResult")
                 })
                 .collect::<Vec<wlan_common::scan::ScanResult>>(),
-            &vec![],
+            &[],
             &mut ScanEventInspectData::new(),
         );
         assert_eq!(bss_by_network.len(), 1);
@@ -1202,7 +1224,7 @@ mod tests {
         // Issue request to scan.
         let sme_scan = active_sme_req(vec![], vec![1]);
         let scan_fut = perform_scan(
-            sme_scan.clone(),
+            sme_scan.clone().into(),
             client.clone(),
             saved_networks_manager,
             telemetry_sender,
@@ -1220,8 +1242,8 @@ mod tests {
         );
 
         // The scan future should complete with an error.
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((req, results)) => {
-            assert_eq!(req, sme_scan);
+        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((request, results)) => {
+            assert_eq!(request.sme_req, sme_scan);
             assert_eq!(results, Err(policy_failure_mode));
         });
 
@@ -1229,103 +1251,6 @@ mod tests {
         let logged_defects = get_fake_defects(&mut exec, client);
         let expected_defects = vec![expected_defect];
         assert_eq!(logged_defects, expected_defects);
-    }
-
-    #[test_case(fidl_sme::ScanErrorCode::ShouldWait, false; "Scan error ShouldWait with failed retry")]
-    #[test_case(fidl_sme::ScanErrorCode::ShouldWait, true; "Scan error ShouldWait with successful retry")]
-    #[test_case(fidl_sme::ScanErrorCode::CanceledByDriverOrFirmware, true; "Scan error CanceledByDriverOrFirmware with successful retry")]
-    #[fuchsia::test]
-    fn scan_error_retries_once(error_code: fidl_sme::ScanErrorCode, retry_succeeds: bool) {
-        let mut exec = fasync::TestExecutor::new();
-        let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
-        let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
-        let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
-
-        // Issue request to scan.
-        let sme_scan = active_sme_req(vec![], vec![1]);
-        let scan_fut = perform_scan(
-            sme_scan.clone(),
-            client.clone(),
-            saved_networks_manager,
-            telemetry_sender,
-        );
-        let mut scan_fut = pin!(scan_fut);
-
-        // Progress scan handler
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
-
-        // Check that a scan request was sent to the sme and send back a cancellation error.
-        assert_variant!(
-            exec.run_until_stalled(&mut sme_stream.next()),
-            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
-                 req: _, responder,
-            }))) => {
-                // Send failed scan response.
-                responder.send(Err(error_code)).expect("failed to send scan error");
-            }
-        );
-
-        // Process scan future. Should hit pending with retry timer.
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
-
-        // Wake up the timer and advance the scanning future
-        assert!(exec.wake_next_timer().is_some());
-
-        // Process scan future, which will should be awaiting a scan retry,
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
-
-        if retry_succeeds {
-            // Create mock scan data and send it via the SME. Although it's an active scan, the
-            // scan doesn't target any of these SSIDs, so results should be ScanObservation::Passive
-            let MockScanData { sme_results: input_aps, internal_results: internal_aps } =
-                create_scan_ap_data(types::ScanObservation::Passive);
-            assert_variant!(
-                exec.run_until_stalled(&mut sme_stream.next()),
-                Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
-                    req, responder,
-                }))) => {
-                    assert_eq!(req, sme_scan.clone());
-                    let vmo = write_vmo(input_aps).expect("failed to write VMO");
-                    responder.send(Ok(vmo)).expect("failed to send scan data");
-                }
-            );
-
-            // Check the scan results.
-            assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((req, results)) => {
-                assert_eq!(req, sme_scan);
-                assert_eq!(results.unwrap(), internal_aps);
-            });
-
-            // Verify one defect was logged.
-            let logged_defects = get_fake_defects(&mut exec, client);
-            let expected_defects = vec![Defect::Iface(IfaceFailure::CanceledScan { iface_id: 0 })];
-            assert_eq!(logged_defects, expected_defects);
-        } else {
-            // Send another cancelleation error code.
-            assert_variant!(
-                exec.run_until_stalled(&mut sme_stream.next()),
-                Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
-                     req: _, responder,
-                }))) => {
-                    // Send failed scan response.
-                    responder.send(Err(error_code)).expect("failed to send scan error");
-                }
-            );
-
-            // Process scan future, which should now have a response.
-            assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((req, results)) => {
-                assert_eq!(req, sme_scan);
-                assert_eq!(results, Err(types::ScanError::Cancelled));
-            });
-
-            // Verify that both defects were logged.
-            let logged_defects = get_fake_defects(&mut exec, client);
-            let expected_defects = vec![
-                Defect::Iface(IfaceFailure::CanceledScan { iface_id: 0 }),
-                Defect::Iface(IfaceFailure::CanceledScan { iface_id: 0 }),
-            ];
-            assert_eq!(logged_defects, expected_defects);
-        }
     }
 
     #[fuchsia::test]
@@ -1338,7 +1263,7 @@ mod tests {
         // Issue request to scan.
         let sme_scan = passive_sme_req();
         let scan_fut =
-            perform_scan(sme_scan.clone(), client, saved_networks_manager, telemetry_sender);
+            perform_scan(sme_scan.clone().into(), client, saved_networks_manager, telemetry_sender);
         let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler forward so that it will respond to the iterator get next request.
@@ -1348,8 +1273,8 @@ mod tests {
         assert!(exec.wake_next_timer().is_some());
 
         // Check that an error is returned for the scan and there are no location sensor results.
-        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((req, results)) => {
-            assert_eq!(req, sme_scan);
+        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready((request, results)) => {
+            assert_eq!(request.sme_req, sme_scan);
             assert_eq!(results, Err(types::ScanError::GeneralError));
         });
     }
@@ -1776,5 +1701,226 @@ mod tests {
                 assert_eq!(scan_defects, vec![]);
                 assert_eq!(inspect_data.unknown_protection_ies, vec![readable_ie]);
         });
+    }
+
+    #[test_case(fidl_sme::ScanErrorCode::ShouldWait, false; "Scan error ShouldWait with failed retry")]
+    #[test_case(fidl_sme::ScanErrorCode::ShouldWait, true; "Scan error ShouldWait with successful retry")]
+    #[test_case(fidl_sme::ScanErrorCode::CanceledByDriverOrFirmware, true; "Scan error CanceledByDriverOrFirmware with successful retry")]
+    #[fuchsia::test]
+    fn scanning_loop_retries_cancelled_request_once(
+        error_code: fidl_sme::ScanErrorCode,
+        retry_succeeds: bool,
+    ) {
+        let mut exec = fasync::TestExecutor::new();
+        let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
+        let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
+        let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
+        let (location_sensor, _, _) = MockScanResultConsumer::new();
+        let (scan_request_sender, scan_request_receiver) = mpsc::channel(100);
+        let scan_requester = Arc::new(ScanRequester { sender: scan_request_sender });
+        let scanning_loop = serve_scanning_loop(
+            iface_mgr.clone(),
+            saved_networks_manager.clone(),
+            telemetry_sender,
+            location_sensor,
+            scan_request_receiver,
+        );
+        let mut scanning_loop = pin!(scanning_loop);
+
+        // Issue request to scan.
+        let req_channels = vec![13];
+        let scan_req_fut = scan_requester.perform_scan(
+            ScanReason::BssSelection,
+            vec!["foo".try_into().unwrap()],
+            req_channels.iter().map(|c| generate_channel(*c)).collect(),
+        );
+        let mut scan_req_fut = pin!(scan_req_fut);
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // Check that the scan request was sent to the SME.
+        let responder = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => {
+                // Make sure it's the right scan
+                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                    assert_eq!(req.channels, req_channels)
+                });
+                responder
+            }
+        );
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // Send back a error from SME for the request.
+        responder.send(Err(error_code)).expect("failed to send scan error");
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // Request should return still be pending, awaiting retry.
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
+
+        // There should be no new SME requests yet.
+        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+
+        // Wake up the back off timer and advance the scan request future.
+        assert!(exec.wake_next_timer().is_some());
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // Verify the retry scan request was sent to SME.
+        let responder = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => {
+                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                    assert_eq!(req.channels, req_channels)
+                });
+                responder
+            }
+        );
+
+        if retry_succeeds {
+            // Create mock scan data and send it via the SME. Although it's an active scan, the
+            // scan doesn't target any of these SSIDs, so results should be ScanObservation::Passive
+            let MockScanData { sme_results: input_aps, internal_results: _internal_aps } =
+                create_scan_ap_data(types::ScanObservation::Passive);
+            let vmo = write_vmo(input_aps).expect("failed to write VMO");
+            responder.send(Ok(vmo)).expect("failed to send scan data");
+            assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+            // Verify one defect was logged.
+            let logged_defects = get_fake_defects(&mut exec, iface_mgr);
+            let expected_defects = vec![Defect::Iface(IfaceFailure::CanceledScan { iface_id: 0 })];
+            assert_eq!(logged_defects, expected_defects);
+        } else {
+            // Send back a error from SME.
+            responder.send(Err(error_code)).expect("failed to send scan error");
+            assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+            // Verify that both defects were logged.
+            let logged_defects = get_fake_defects(&mut exec, iface_mgr);
+            let expected_defects = vec![
+                Defect::Iface(IfaceFailure::CanceledScan { iface_id: 0 }),
+                Defect::Iface(IfaceFailure::CanceledScan { iface_id: 0 }),
+            ];
+            assert_eq!(logged_defects, expected_defects);
+        }
+        // Request should get a response now.
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Ready(_));
+
+        // There should be no new SME requests.
+        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+    }
+
+    #[fuchsia::test]
+    fn scanning_loop_backs_off_after_cancelled_request() {
+        let mut exec = fasync::TestExecutor::new();
+        let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
+        let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
+        let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
+        let (location_sensor, _, _) = MockScanResultConsumer::new();
+        let (scan_request_sender, scan_request_receiver) = mpsc::channel(100);
+        let scan_requester = Arc::new(ScanRequester { sender: scan_request_sender });
+        let scanning_loop = serve_scanning_loop(
+            iface_mgr.clone(),
+            saved_networks_manager.clone(),
+            telemetry_sender,
+            location_sensor,
+            scan_request_receiver,
+        );
+        let mut scanning_loop = pin!(scanning_loop);
+
+        // Issue first request to scan.
+        let first_req_channels = vec![13];
+        let scan_req_fut1 = scan_requester.perform_scan(
+            ScanReason::BssSelection,
+            vec!["foo".try_into().unwrap()],
+            first_req_channels.iter().map(|c| generate_channel(*c)).collect(),
+        );
+        let mut scan_req_fut1 = pin!(scan_req_fut1);
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // Check the first scan request was sent to the SME.
+        let responder = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => {
+                // Make sure it's the right scan
+                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                    assert_eq!(req.channels, first_req_channels)
+                });
+                responder
+            }
+        );
+
+        // Issue a second request to scan.
+        let second_req_channels = vec![55];
+        let scan_req_fut2 = scan_requester.perform_scan(
+            ScanReason::BssSelection,
+            vec!["foo".try_into().unwrap()],
+            second_req_channels.iter().map(|c| generate_channel(*c)).collect(),
+        );
+        let mut scan_req_fut2 = pin!(scan_req_fut2);
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // There should be no new SME requests in the queue.
+        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+
+        // Send back a ShouldWait error from SME for the first request.
+        responder
+            .send(Err(fidl_sme::ScanErrorCode::ShouldWait))
+            .expect("failed to send scan error");
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // First request still be pending, as it awaits a retry.
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
+
+        // There should be no new SME requests, since the first request should be backing off
+        // before issuing a retry.
+        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+
+        // Wake up the back off timer and advance the scan request future.
+        assert!(exec.wake_next_timer().is_some());
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // Verify the retry scan request was sent to SME.
+        let responder = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => {
+                // Make sure it's the right scan
+                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                    assert_eq!(req.channels, first_req_channels)
+                });
+                responder
+            }
+        );
+
+        // Send back another ShouldWait error from SME for the first request retry.
+        responder
+            .send(Err(fidl_sme::ScanErrorCode::ShouldWait))
+            .expect("failed to send scan error");
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // The first scan req future should now be Ready, returning a Cancelled error.
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Ready(results) => {
+            assert_eq!(results, Err(types::ScanError::Cancelled));
+        });
+
+        // There should be no SME requests in the queue, because the scan loop should be backing
+        // off before serviving the next scan request.
+        assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+
+        // Wake up the back off timer.
+        assert!(exec.wake_next_timer().is_some());
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // There should now be an SME scan request for the second scan req.
+        assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, .. }))) => {
+                // Make sure it's the right scan
+                assert_variant!(req, fidl_sme::ScanRequest::Active(req) => {
+                    assert_eq!(req.channels, second_req_channels)
+                });
+            }
+        );
     }
 }
