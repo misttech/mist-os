@@ -20,7 +20,7 @@ pub enum {{ name }} {
         {{ member.name.camel()|ident }} = {{ member.value.value }},
     {%- endfor %}
     {%- if !enm.is_strict -%}
-        Unknown({{ natural_int }}),
+        UnknownOrdinal({{ natural_int }}),
     {%- endif %}
 }
 
@@ -43,7 +43,7 @@ where
                 Self::{{ member.name.camel()|ident }} => {{ member.value.value }},
             {% endfor %}
             {% if !enm.is_strict %}
-                Self::Unknown(value) => value,
+                Self::UnknownOrdinal(value) => value,
             {% endif %}
         });
 
@@ -60,7 +60,7 @@ impl ::core::convert::From<{{ wire_name }}> for {{ name }} {
             {% if enm.is_strict %}
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
             {% else %}
-                value => Self::Unknown(value),
+                value => Self::UnknownOrdinal(value),
             {% endif %}
         }
     }
@@ -131,7 +131,7 @@ impl ::core::convert::From<{{ name }}> for {{ wire_name }} {
                 {{ name }}::{{ member.name.camel()|ident }} => {{ wire_name }}::{{ member.name.screaming_snake()|ident }},
             {% endfor %}
             {% if !enm.is_strict %}
-                {{ name }}::Unknown(value) => {{ wire_name }} {
+                {{ name }}::UnknownOrdinal(value) => {{ wire_name }} {
                     value: {{ wire_int }}::from(value),
                 }
             {% endif %}

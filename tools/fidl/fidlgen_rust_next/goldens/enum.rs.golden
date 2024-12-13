@@ -6,7 +6,7 @@
 #[derive(Debug)]
 #[repr(u32)]
 pub enum MyEmptyFlexibleEnum {
-    Unknown(u32),
+    UnknownOrdinal(u32),
 }
 
 impl ::fidl_next::Encodable for MyEmptyFlexibleEnum {
@@ -24,7 +24,7 @@ where
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireMyEmptyFlexibleEnum { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
-            Self::Unknown(value) => value,
+            Self::UnknownOrdinal(value) => value,
         });
 
         Ok(())
@@ -34,7 +34,7 @@ where
 impl ::core::convert::From<WireMyEmptyFlexibleEnum> for MyEmptyFlexibleEnum {
     fn from(wire: WireMyEmptyFlexibleEnum) -> Self {
         match u32::from(wire.value) {
-            value => Self::Unknown(value),
+            value => Self::UnknownOrdinal(value),
         }
     }
 }
@@ -70,7 +70,7 @@ where
 impl ::core::convert::From<MyEmptyFlexibleEnum> for WireMyEmptyFlexibleEnum {
     fn from(natural: MyEmptyFlexibleEnum) -> Self {
         match natural {
-            MyEmptyFlexibleEnum::Unknown(value) => {
+            MyEmptyFlexibleEnum::UnknownOrdinal(value) => {
                 WireMyEmptyFlexibleEnum { value: ::fidl_next::u32_le::from(value) }
             }
         }
@@ -83,7 +83,7 @@ impl ::core::convert::From<MyEmptyFlexibleEnum> for WireMyEmptyFlexibleEnum {
 pub enum MyFlexibleEnum {
     Foo = 1,
     Bar = 2,
-    Unknown(u32),
+    UnknownOrdinal(u32),
 }
 
 impl ::fidl_next::Encodable for MyFlexibleEnum {
@@ -105,7 +105,7 @@ where
 
             Self::Bar => 2,
 
-            Self::Unknown(value) => value,
+            Self::UnknownOrdinal(value) => value,
         });
 
         Ok(())
@@ -119,7 +119,7 @@ impl ::core::convert::From<WireMyFlexibleEnum> for MyFlexibleEnum {
 
             2 => Self::Bar,
 
-            value => Self::Unknown(value),
+            value => Self::UnknownOrdinal(value),
         }
     }
 }
@@ -165,7 +165,7 @@ impl ::core::convert::From<MyFlexibleEnum> for WireMyFlexibleEnum {
 
             MyFlexibleEnum::Bar => WireMyFlexibleEnum::BAR,
 
-            MyFlexibleEnum::Unknown(value) => {
+            MyFlexibleEnum::UnknownOrdinal(value) => {
                 WireMyFlexibleEnum { value: ::fidl_next::u32_le::from(value) }
             }
         }
@@ -179,7 +179,7 @@ pub enum MyFlexibleEnumWithCustomUnknown {
     Foo = 1,
     Bar = 2,
     CustomUnknown = 3,
-    Unknown(u32),
+    UnknownOrdinal(u32),
 }
 
 impl ::fidl_next::Encodable for MyFlexibleEnumWithCustomUnknown {
@@ -203,7 +203,7 @@ where
 
             Self::CustomUnknown => 3,
 
-            Self::Unknown(value) => value,
+            Self::UnknownOrdinal(value) => value,
         });
 
         Ok(())
@@ -221,7 +221,7 @@ impl ::core::convert::From<WireMyFlexibleEnumWithCustomUnknown>
 
             3 => Self::CustomUnknown,
 
-            value => Self::Unknown(value),
+            value => Self::UnknownOrdinal(value),
         }
     }
 }
@@ -278,7 +278,7 @@ impl ::core::convert::From<MyFlexibleEnumWithCustomUnknown>
                 WireMyFlexibleEnumWithCustomUnknown::CUSTOM_UNKNOWN
             }
 
-            MyFlexibleEnumWithCustomUnknown::Unknown(value) => {
+            MyFlexibleEnumWithCustomUnknown::UnknownOrdinal(value) => {
                 WireMyFlexibleEnumWithCustomUnknown { value: ::fidl_next::u32_le::from(value) }
             }
         }

@@ -54,7 +54,7 @@ pub enum {{ name }} {
         {{ member.name.camel()|ident }}({{ context.natural_type(member.ty) }}),
     {% endfor %}
     {% if !union.is_strict %}
-        Unknown(u64),
+        UnknownOrdinal(u64),
     {% endif %}
 }
 
@@ -84,7 +84,7 @@ where
                 >(value, {{ member.ordinal }}, encoder, raw)?,
             {% endfor %}
             {% if !union.is_strict %}
-                Self::Unknown(ordinal) => return Err(
+                Self::UnknownOrdinal(ordinal) => return Err(
                     ::fidl_next::EncodeError::UnknownUnionOrdinal(
                         *ordinal as usize
                     )
@@ -164,7 +164,7 @@ pub enum {{ wire_name }}Ref{{ access_params }} {
         {{ member.name.camel()|ident }}(&'union {{ context.wire_type(member.ty) }}),
     {% endfor %}
     {% if !union.is_strict %}
-        Unknown(u64),
+        UnknownOrdinal(u64),
     {% endif %}
 }
 
@@ -173,7 +173,7 @@ pub enum {{ wire_name }}Mut{{ access_params }} {
         {{ member.name.camel()|ident }}(&'union mut {{ context.wire_type(member.ty) }}),
     {% endfor %}
     {% if !union.is_strict %}
-        Unknown(u64),
+        UnknownOrdinal(u64),
     {% endif %}
 }
 
@@ -188,7 +188,7 @@ impl{{ params }} {{ wire_name }}{{ params }} {
             {% if union.is_strict %}
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
             {% else %}
-                unknown => {{ wire_name }}Ref::Unknown(unknown),
+                unknown => {{ wire_name }}Ref::UnknownOrdinal(unknown),
             {% endif %}
         }
     }
@@ -203,7 +203,7 @@ impl{{ params }} {{ wire_name }}{{ params }} {
             {% if union.is_strict %}
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
             {% else %}
-                unknown => {{ wire_name }}Mut::Unknown(unknown),
+                unknown => {{ wire_name }}Mut::UnknownOrdinal(unknown),
             {% endif %}
         }
     }
