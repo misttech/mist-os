@@ -652,6 +652,7 @@ class EfiDevicePartitionerWithStorageHostTests : public EfiDevicePartitionerTest
     IsolatedDevmgr::Args args;
     args.enable_storage_host = true;
     args.netboot = true;
+    args.disable_block_watcher = true;
     return args;
   }
 
