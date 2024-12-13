@@ -116,9 +116,21 @@ default_args = {
   pw_async_FAKE_DISPATCHER_BACKEND =
       "//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"
 
+  pw_build_PYTHON_BUILD_VENV =
+      "//third_party/pigweed:fuchsia_pigweed_python_venv"
+
   # Use protoc from the Fuchsia build for Pigweed
   pw_protobuf_compiler_PROTOC_TARGET = "//third_party/protobuf:protoc"
   pw_protobuf_compiler_PROTOC_BINARY = "host_x64/protoc"
+
+  # Use the in-tree protobuf Python package when running protoc.
+  pw_protobuf_compiler_PROTOC_PYTHON_DEPS = [
+    "//third_party/pigweed/backends/pw_protobuf_compiler:protoc_python_package",
+  ]
+
+  # Don't generate .pyi files for pw_proto_library targets since it
+  # requires protoc-gen-mypy.
+  pw_protobuf_compiler_GENERATE_PYTHON_TYPE_HINTS = false
 
   # Settings for pigweed's CHRE module.
   dir_pw_third_party_chre = "//third_party/chre/src"
