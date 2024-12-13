@@ -35,6 +35,7 @@ source_set("cpp") {
     "layer-composition-operations.cc",
     "layer-composition-operations.h",
     "layer-id.h",
+    "mode.h",
     "rectangle.h",
     "vsync-ack-cookie.h",
   ]
@@ -71,6 +72,7 @@ test_sources = [
   "image-tiling-type-test.cc",
   "layer-composition-operations-test.cc",
   "layer-id-test.cc",
+  "mode-test.cc",
   "rectangle-test.cc",
   "vsync-ack-cookie-test.cc",
 ]
