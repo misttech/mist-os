@@ -1,0 +1,20 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "mock-mmio-range",
+    srcs = [
+        "mock-mmio-range.cc",
+    ],
+    hdrs = [
+        "mock-mmio-range.h",
+    ],
+    target_compatible_with = ["@platforms//os:fuchsia"],
+    deps = [
+        "@fuchsia_sdk//pkg/mmio",
+        "@fuchsia_sdk//pkg/stdcompat",
+    ],
+)
