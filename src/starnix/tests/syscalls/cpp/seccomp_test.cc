@@ -28,7 +28,11 @@ namespace {
 constexpr uint32_t kFilteredSyscall = SYS_vserver;
 #elif defined(__aarch64__) || defined(__riscv)
 // Use the first of arch_specific_syscalls. It is not implemented on ARM64 or RISC-V.
-constexpr uint32_t kFilteredSyscall = __NR_arch_specific_syscall;
+// TODO(b/383629319): Newer revisions of bionic seem to cause a build failure as
+// we can't find a reference to __NR_arch_specific_syscall. Use the underlying
+// number here until we can figure this out. This value is currently sourced
+// from: bionic/libc/kernel/uapi/asm-generic/unistd.h.
+constexpr uint32_t kFilteredSyscall = 244;
 #else
 #error Unsupported Architecture
 #endif
