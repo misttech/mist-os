@@ -3,14 +3,26 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 pub type U32 = u32;
+
+/// The wire type corresponding to [`U32`].
 pub type WireU32 = ::fidl_next::u32_le;
+
 pub type VecOfStrings = Vec<String>;
+
+/// The wire type corresponding to [`VecOfStrings`].
 pub type WireVecOfStrings<'buf> = ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>;
+
 pub type VecOfStringsAtMost5 = Vec<String>;
+
+/// The wire type corresponding to [`VecOfStringsAtMost5`].
 pub type WireVecOfStringsAtMost5<'buf> =
     ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>;
+
 pub type ReferenceMe = fidl_test_someotherlibrary::ReferenceMe;
+
+/// The wire type corresponding to [`ReferenceMe`].
 pub type WireReferenceMe = fidl_test_someotherlibrary::WireReferenceMe;
+
 #[derive(Clone, Copy, Debug)]
 #[repr(u32)]
 pub enum ObjType {
@@ -34,6 +46,7 @@ where
         ::fidl_next::munge!(let WireObjType { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
             Self::None => 0,
+
             Self::Channel => 4,
         });
 
@@ -45,7 +58,9 @@ impl ::core::convert::From<WireObjType> for ObjType {
     fn from(wire: WireObjType) -> Self {
         match u32::from(wire.value) {
             0 => Self::None,
+
             4 => Self::Channel,
+
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -57,6 +72,7 @@ impl ::fidl_next::TakeFrom<WireObjType> for ObjType {
     }
 }
 
+/// The wire type corresponding to [`ObjType`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireObjType {
@@ -65,6 +81,7 @@ pub struct WireObjType {
 
 impl WireObjType {
     pub const NONE: WireObjType = WireObjType { value: ::fidl_next::u32_le::from_native(0) };
+
     pub const CHANNEL: WireObjType = WireObjType { value: ::fidl_next::u32_le::from_native(4) };
 }
 
@@ -91,24 +108,38 @@ impl ::core::convert::From<ObjType> for WireObjType {
     fn from(natural: ObjType) -> Self {
         match natural {
             ObjType::None => WireObjType::NONE,
+
             ObjType::Channel => WireObjType::CHANNEL,
         }
     }
 }
 
 pub type Channel = ::fidl_next::zx::Handle;
+
+/// The wire type corresponding to [`Channel`].
 pub type WireChannel = ::fidl_next::WireHandle;
+
 pub type AliasOfChannel = ::fidl_next::zx::Handle;
+
+/// The wire type corresponding to [`AliasOfChannel`].
 pub type WireAliasOfChannel = ::fidl_next::WireHandle;
+
 #[derive(Debug)]
 pub struct ExampleOfUseOfAliases {
     pub field_of_u32: u32,
+
     pub field_of_vec_of_strings: Vec<String>,
+
     pub field_of_vec_of_strings_at_most_nine: Vec<String>,
+
     pub field_of_vec_of_strings_at_most_5: Vec<String>,
+
     pub field_of_vec_of_ref_me_at_most_5: Vec<fidl_test_someotherlibrary::ReferenceMe>,
+
     pub field_of_channel: ::fidl_next::zx::Handle,
+
     pub field_of_client_end: ::fidl_next::zx::Handle,
+
     pub field_of_nullable_client_end: Option<::fidl_next::zx::Handle>,
 }
 
@@ -119,12 +150,19 @@ impl ::fidl_next::Encodable for ExampleOfUseOfAliases {
 impl<___E> ::fidl_next::Encode<___E> for ExampleOfUseOfAliases
 where
     u32: ::fidl_next::Encode<___E>,
+
     Vec<String>: ::fidl_next::Encode<___E>,
+
     Vec<String>: ::fidl_next::Encode<___E>,
+
     Vec<String>: ::fidl_next::Encode<___E>,
+
     Vec<fidl_test_someotherlibrary::ReferenceMe>: ::fidl_next::Encode<___E>,
+
     ::fidl_next::zx::Handle: ::fidl_next::Encode<___E>,
+
     ::fidl_next::zx::Handle: ::fidl_next::Encode<___E>,
+
     Option<::fidl_next::zx::Handle>: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -142,36 +180,46 @@ where
                 field_of_channel,
                 field_of_client_end,
                 field_of_nullable_client_end,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.field_of_u32, encoder, field_of_u32)?;
+
         ::fidl_next::Encode::encode(
             &mut self.field_of_vec_of_strings,
             encoder,
             field_of_vec_of_strings,
         )?;
+
         ::fidl_next::Encode::encode(
             &mut self.field_of_vec_of_strings_at_most_nine,
             encoder,
             field_of_vec_of_strings_at_most_nine,
         )?;
+
         ::fidl_next::Encode::encode(
             &mut self.field_of_vec_of_strings_at_most_5,
             encoder,
             field_of_vec_of_strings_at_most_5,
         )?;
+
         ::fidl_next::Encode::encode(
             &mut self.field_of_vec_of_ref_me_at_most_5,
             encoder,
             field_of_vec_of_ref_me_at_most_5,
         )?;
+
         ::fidl_next::Encode::encode(&mut self.field_of_channel, encoder, field_of_channel)?;
+
         ::fidl_next::Encode::encode(&mut self.field_of_client_end, encoder, field_of_client_end)?;
+
         ::fidl_next::Encode::encode(
             &mut self.field_of_nullable_client_end,
             encoder,
             field_of_nullable_client_end,
         )?;
+
         Ok(())
     }
 }
@@ -205,20 +253,27 @@ impl<'buf> ::fidl_next::TakeFrom<WireExampleOfUseOfAliases<'buf>> for ExampleOfU
     fn take_from(from: &mut WireExampleOfUseOfAliases<'buf>) -> Self {
         Self {
             field_of_u32: ::fidl_next::TakeFrom::take_from(&mut from.field_of_u32),
+
             field_of_vec_of_strings: ::fidl_next::TakeFrom::take_from(
                 &mut from.field_of_vec_of_strings,
             ),
+
             field_of_vec_of_strings_at_most_nine: ::fidl_next::TakeFrom::take_from(
                 &mut from.field_of_vec_of_strings_at_most_nine,
             ),
+
             field_of_vec_of_strings_at_most_5: ::fidl_next::TakeFrom::take_from(
                 &mut from.field_of_vec_of_strings_at_most_5,
             ),
+
             field_of_vec_of_ref_me_at_most_5: ::fidl_next::TakeFrom::take_from(
                 &mut from.field_of_vec_of_ref_me_at_most_5,
             ),
+
             field_of_channel: ::fidl_next::TakeFrom::take_from(&mut from.field_of_channel),
+
             field_of_client_end: ::fidl_next::TakeFrom::take_from(&mut from.field_of_client_end),
+
             field_of_nullable_client_end: ::fidl_next::TakeFrom::take_from(
                 &mut from.field_of_nullable_client_end,
             ),
@@ -226,19 +281,27 @@ impl<'buf> ::fidl_next::TakeFrom<WireExampleOfUseOfAliases<'buf>> for ExampleOfU
     }
 }
 
+/// The wire type corersponding to [`ExampleOfUseOfAliases`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireExampleOfUseOfAliases<'buf> {
     pub field_of_u32: ::fidl_next::u32_le,
+
     pub field_of_vec_of_strings: ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>,
+
     pub field_of_vec_of_strings_at_most_nine:
         ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>,
+
     pub field_of_vec_of_strings_at_most_5:
         ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>,
+
     pub field_of_vec_of_ref_me_at_most_5:
         ::fidl_next::WireVector<'buf, fidl_test_someotherlibrary::WireReferenceMe>,
+
     pub field_of_channel: ::fidl_next::WireHandle,
+
     pub field_of_client_end: ::fidl_next::WireHandle,
+
     pub field_of_nullable_client_end: ::fidl_next::WireOptionalHandle,
 }
 
@@ -247,13 +310,20 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>: ::fidl_next::Decode<___D>,
+
     ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>: ::fidl_next::Decode<___D>,
+
     ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>: ::fidl_next::Decode<___D>,
+
     ::fidl_next::WireVector<'buf, fidl_test_someotherlibrary::WireReferenceMe>:
         ::fidl_next::Decode<___D>,
+
     ::fidl_next::WireHandle: ::fidl_next::Decode<___D>,
+
     ::fidl_next::WireHandle: ::fidl_next::Decode<___D>,
+
     ::fidl_next::WireOptionalHandle: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -270,11 +340,16 @@ where
                 mut field_of_channel,
                 mut field_of_client_end,
                 mut field_of_nullable_client_end,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(field_of_u32.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(field_of_vec_of_strings.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(field_of_vec_of_strings_at_most_nine.as_mut(), decoder)?;
+
         let field_of_vec_of_strings_at_most_nine =
             unsafe { field_of_vec_of_strings_at_most_nine.deref_unchecked() };
 
@@ -286,6 +361,7 @@ where
         }
 
         ::fidl_next::Decode::decode(field_of_vec_of_strings_at_most_5.as_mut(), decoder)?;
+
         let field_of_vec_of_strings_at_most_5 =
             unsafe { field_of_vec_of_strings_at_most_5.deref_unchecked() };
 
@@ -297,6 +373,7 @@ where
         }
 
         ::fidl_next::Decode::decode(field_of_vec_of_ref_me_at_most_5.as_mut(), decoder)?;
+
         let field_of_vec_of_ref_me_at_most_5 =
             unsafe { field_of_vec_of_ref_me_at_most_5.deref_unchecked() };
 
@@ -308,8 +385,11 @@ where
         }
 
         ::fidl_next::Decode::decode(field_of_channel.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(field_of_client_end.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(field_of_nullable_client_end.as_mut(), decoder)?;
+
         Ok(())
     }
 }

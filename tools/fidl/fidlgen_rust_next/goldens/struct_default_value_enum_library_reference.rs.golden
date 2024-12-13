@@ -23,9 +23,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 field,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.field, encoder, field)?;
+
         Ok(())
     }
 }
@@ -61,6 +64,7 @@ impl ::fidl_next::TakeFrom<WireFoo> for Foo {
     }
 }
 
+/// The wire type corersponding to [`Foo`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireFoo {
@@ -80,9 +84,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut field,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(field.as_mut(), decoder)?;
+
         Ok(())
     }
 }

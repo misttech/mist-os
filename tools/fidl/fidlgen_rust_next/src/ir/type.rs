@@ -62,7 +62,6 @@ pub enum TypeKind {
     Identifier {
         identifier: CompIdent,
         nullable: bool,
-        #[expect(dead_code)]
         #[serde(default)]
         protocol_transport: String,
     },

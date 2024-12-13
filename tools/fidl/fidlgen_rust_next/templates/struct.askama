@@ -1,0 +1,172 @@
+{% let is_static = strct.shape.max_out_of_line == 0 %}
+{% let name = strct.name.decl_name().camel() %}
+
+{% let params %}
+{% if is_static %}
+    {% let params = "" %}
+{% else %}
+    {% let params = "<'buf>" %}
+{% endif %}
+
+{% if let Some(doc) = strct.attributes.doc_string() %}
+    #[doc = "{{ doc.escape_default() }}"]
+{% endif %}
+#[derive(
+    {% if !strct.is_resource %}
+        Clone,
+    {% endif %}
+    {% if compiler.config.emit_debug_impls %}
+        Debug,
+    {% endif %}
+)]
+pub struct {{ name }} {
+    {% for member in strct.members %}
+        pub {{ member.name.snake() }}: {{ compiler.natural_type(member.ty) }},
+    {% endfor %}
+}
+
+impl ::fidl_next::Encodable for {{ name }} {
+    type Encoded<'buf> = Wire{{ name }}{{ params }};
+}
+
+impl<___E> ::fidl_next::Encode<___E> for {{ name }}
+where
+    {% for member in strct.members %}
+        {{ compiler.natural_type(member.ty) }}: ::fidl_next::Encode<___E>,
+    {% endfor %}
+{
+    fn encode(
+        &mut self,
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                {% for member in strct.members -%}
+                    {{ member.name.snake() }},
+                {% endfor %}
+            } = slot;
+        }
+
+        {% for member in strct.members %}
+            ::fidl_next::Encode::encode(&mut self.{{ member.name.snake() }}, encoder, {{ member.name.snake() }})?;
+        {% endfor %}
+        Ok(())
+    }
+}
+
+impl ::fidl_next::EncodableOption for Box<{{ name }}> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, Wire{{ name }}{{ params }}>;
+}
+
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<{{ name }}>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    {{ name }}: ::fidl_next::Encode<___E>,
+{
+    fn encode_option(
+        this: Option<&mut Self>,
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
+        } else {
+            ::fidl_next::WireBox::encode_absent(slot);
+        }
+
+        Ok(())
+    }
+}
+
+impl{{ params }} ::fidl_next::TakeFrom<Wire{{ name }}{{ params }}> for {{ name }} {
+    fn take_from(from: &mut Wire{{ name }}{{ params }}) -> Self {
+        Self {
+            {% for member in strct.members %}
+                {% let member_name = member.name.snake() %}
+                {{ member_name }}: ::fidl_next::TakeFrom::take_from(&mut from.{{ member_name }}),
+            {% endfor %}
+        }
+    }
+}
+
+/// The wire type corersponding to [`{{ name }}`].
+#[derive(
+    {% if is_static && !strct.is_resource %}
+        Clone,
+    {% endif %}
+    {% if compiler.config.emit_debug_impls %}
+        Debug,
+    {% endif %}
+)]
+#[repr(C)]
+pub struct Wire{{ name }}{{ params }} {
+    {% for member in strct.members %}
+        pub {{ member.name.snake() }}: {{ compiler.wire_type(member.ty) }},
+    {% endfor %}
+}
+
+unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> for Wire{{ name }}{{ params }}
+where
+    ___D: ?Sized,
+    {% for member in strct.members %}
+        {{ compiler.wire_type(member.ty) }}: ::fidl_next::Decode<___D>,
+    {% endfor %}
+{
+    fn decode(
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
+            let Self {
+                {% for member in strct.members -%}
+                    mut {{ member.name.snake() }},
+                {% endfor %}
+            } = slot;
+        }
+
+        {% for member in strct.members %}
+            {% let member_name = member.name.snake() %}
+            ::fidl_next::Decode::decode({{ member_name }}.as_mut(), decoder)?;
+            {# type check #}
+            {% match member.ty.kind %}
+                {% when TypeKind::Array { element_count, element_type } %}
+                {% when TypeKind::Vector { element_count, element_type, nullable } %}
+                    {% if let Some(limit) = element_count %}
+                        let {{ member_name }} = unsafe { {{ member_name }}.deref_unchecked() };
+                        {% if nullable %}
+                            if let Some({{ member_name }}) = {{ member_name }}.as_ref() {
+                        {% endif %}
+                                if {{ member_name }}.len() > {{ limit }} {
+                                    return Err(::fidl_next::DecodeError::VectorTooLong {
+                                        size: {{ member_name }}.len() as u64,
+                                        limit: {{ limit }},
+                                    });
+                                }
+                        {% if nullable %}
+                            }
+                        {% endif %}
+                    {% endif %}
+                {% when TypeKind::String { element_count, nullable } %}
+                    {% if let Some(limit) = element_count %}
+                        let {{ member_name }} = unsafe { {{ member_name }}.deref_unchecked() };
+                        {% if nullable %}
+                            if let Some({{ member_name }}) = {{ member_name }}.as_ref() {
+                        {% endif %}
+                                if {{ member_name }}.len() > {{ limit }} {
+                                    return Err(::fidl_next::DecodeError::VectorTooLong {
+                                        size: {{ member_name }}.len() as u64,
+                                        limit: {{ limit }},
+                                    });
+                                }
+                        {% if nullable %}
+                            }
+                        {% endif %}
+                    {% endif %}
+                {% else %} {# todo #}
+            {% endmatch %}
+        {% endfor %}
+        Ok(())
+    }
+}

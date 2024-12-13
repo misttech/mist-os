@@ -1,0 +1,15 @@
+{% let name = cnst.name.decl_name().screaming_snake() %}
+
+{% if let Some(doc) = cnst.attributes.doc_string() %}
+    #[doc = "{{ doc.escape_default() }}"]
+{% endif %}
+{% match cnst.ty.kind %}
+    {% when TypeKind::String { element_count, nullable } %}
+        pub const {{ name }}: &str = "{{ cnst.value.value.escape_default() }}";
+    {% when TypeKind::Primitive { subtype }  %}
+        pub const {{ name }}: {{ compiler.natural_prim(subtype) }} = {{ cnst.value.value }};
+    {% when TypeKind::Identifier { identifier, nullable, protocol_transport } %}
+        pub const {{ name }}: {{ compiler.natural_id(identifier) }} = {{ compiler.natural_constant(cnst.value, cnst.ty) }};
+    {% else %}
+        panic!("invalid constant type");
+{% endmatch %}

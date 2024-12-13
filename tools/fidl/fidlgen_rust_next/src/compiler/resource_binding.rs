@@ -5,6 +5,7 @@
 pub struct ResourceBinding {
     pub wire_path: String,
     pub optional_wire_path: String,
+    #[allow(dead_code)]
     pub natural_path: String,
 }
 

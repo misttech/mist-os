@@ -1,0 +1,10 @@
+{% match int %}
+    {% when IntType::Int8 %} i8
+    {% when IntType::Int16 %} ::fidl_next::i16_le
+    {% when IntType::Int32 %} ::fidl_next::i32_le
+    {% when IntType::Int64 %} ::fidl_next::i64_le
+    {% when IntType::Uint8 %} u8
+    {% when IntType::Uint16 %} ::fidl_next::u16_le
+    {% when IntType::Uint32 %} ::fidl_next::u32_le
+    {% when IntType::Uint64 %} ::fidl_next::u64_le
+{% endmatch %}

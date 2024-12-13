@@ -23,9 +23,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 a,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         Ok(())
     }
 }
@@ -61,6 +64,7 @@ impl ::fidl_next::TakeFrom<WireStructLargeArray> for StructLargeArray {
     }
 }
 
+/// The wire type corersponding to [`StructLargeArray`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireStructLargeArray {
@@ -80,9 +84,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut a,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -108,9 +115,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 a,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         Ok(())
     }
 }
@@ -146,6 +156,7 @@ impl ::fidl_next::TakeFrom<WireStructSmallArray> for StructSmallArray {
     }
 }
 
+/// The wire type corersponding to [`StructSmallArray`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireStructSmallArray {
@@ -165,9 +176,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut a,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -242,6 +256,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireTableLargeArray<'buf>> for TableLargeArray 
     }
 }
 
+/// The wire type corresponding to [`TableLargeArray`].
 #[repr(C)]
 pub struct WireTableLargeArray<'buf> {
     table: ::fidl_next::WireTable<'buf>,
@@ -368,6 +383,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireTableSmallArray<'buf>> for TableSmallArray 
     }
 }
 
+/// The wire type corresponding to [`TableSmallArray`].
 #[repr(C)]
 pub struct WireTableSmallArray<'buf> {
     table: ::fidl_next::WireTable<'buf>,
@@ -425,7 +441,6 @@ impl ::core::fmt::Debug for WireTableSmallArray<'_> {
 }
 
 #[derive(Clone, Debug)]
-
 pub enum UnionLargeArray {
     A([u32; 100]),
 }
@@ -508,6 +523,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalUnionLargeArray<'buf>>
     }
 }
 
+/// The wire type corresponding to [`UnionLargeArray`].
 #[repr(transparent)]
 pub struct WireUnionLargeArray<'buf> {
     raw: ::fidl_next::RawWireUnion,
@@ -526,6 +542,7 @@ impl<'buf> WireUnionLargeArray<'buf> {
     pub fn as_ref(&self) -> WireUnionLargeArrayRef<'_> {
         match self.raw.ordinal() {
             1 => WireUnionLargeArrayRef::A(unsafe { self.raw.get().deref_unchecked() }),
+
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -533,6 +550,7 @@ impl<'buf> WireUnionLargeArray<'buf> {
     pub fn as_mut(&mut self) -> WireUnionLargeArrayMut<'_> {
         match self.raw.ordinal() {
             1 => WireUnionLargeArrayMut::A(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -565,7 +583,6 @@ impl<'buf> ::core::fmt::Debug for WireUnionLargeArray<'buf> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<[::fidl_next::u32_le; 100]>().fmt(f) },
-
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -651,7 +668,6 @@ impl<'buf> ::core::fmt::Debug for WireOptionalUnionLargeArray<'buf> {
 }
 
 #[derive(Clone, Debug)]
-
 pub enum UnionSmallArray {
     A([u32; 2]),
 }
@@ -734,6 +750,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalUnionSmallArray<'buf>>
     }
 }
 
+/// The wire type corresponding to [`UnionSmallArray`].
 #[repr(transparent)]
 pub struct WireUnionSmallArray<'buf> {
     raw: ::fidl_next::RawWireUnion,
@@ -752,6 +769,7 @@ impl<'buf> WireUnionSmallArray<'buf> {
     pub fn as_ref(&self) -> WireUnionSmallArrayRef<'_> {
         match self.raw.ordinal() {
             1 => WireUnionSmallArrayRef::A(unsafe { self.raw.get().deref_unchecked() }),
+
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -759,6 +777,7 @@ impl<'buf> WireUnionSmallArray<'buf> {
     pub fn as_mut(&mut self) -> WireUnionSmallArrayMut<'_> {
         match self.raw.ordinal() {
             1 => WireUnionSmallArrayMut::A(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -791,7 +810,6 @@ impl<'buf> ::core::fmt::Debug for WireUnionSmallArray<'buf> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<[::fidl_next::u32_le; 2]>().fmt(f) },
-
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }

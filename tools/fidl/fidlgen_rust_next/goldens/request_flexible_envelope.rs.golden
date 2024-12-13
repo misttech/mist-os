@@ -3,10 +3,11 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 #[derive(Clone, Debug)]
-
 pub enum FlexibleFoo {
     S(String),
+
     I(i32),
+
     Unknown(u64),
 }
 
@@ -19,6 +20,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
 
     String: ::fidl_next::Encode<___E>,
+
     i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -32,6 +34,7 @@ where
             Self::S(value) => {
                 ::fidl_next::RawWireUnion::encode_as::<___E, String>(value, 1, encoder, raw)?
             }
+
             Self::I(value) => {
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
             }
@@ -98,6 +101,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalFlexibleFoo<'buf>> for Option<Box<F
     }
 }
 
+/// The wire type corresponding to [`FlexibleFoo`].
 #[repr(transparent)]
 pub struct WireFlexibleFoo<'buf> {
     raw: ::fidl_next::RawWireUnion,
@@ -106,13 +110,17 @@ pub struct WireFlexibleFoo<'buf> {
 
 pub enum WireFlexibleFooRef<'union, 'buf> {
     S(&'union ::fidl_next::WireString<'buf>),
+
     I(&'union ::fidl_next::i32_le),
+
     Unknown(u64),
 }
 
 pub enum WireFlexibleFooMut<'union, 'buf> {
     S(&'union mut ::fidl_next::WireString<'buf>),
+
     I(&'union mut ::fidl_next::i32_le),
+
     Unknown(u64),
 }
 
@@ -122,6 +130,7 @@ impl<'buf> WireFlexibleFoo<'buf> {
             1 => WireFlexibleFooRef::S(unsafe { self.raw.get().deref_unchecked() }),
 
             2 => WireFlexibleFooRef::I(unsafe { self.raw.get().deref_unchecked() }),
+
             unknown => WireFlexibleFooRef::Unknown(unknown),
         }
     }
@@ -131,6 +140,7 @@ impl<'buf> WireFlexibleFoo<'buf> {
             1 => WireFlexibleFooMut::S(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
             2 => WireFlexibleFooMut::I(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+
             unknown => WireFlexibleFooMut::Unknown(unknown),
         }
     }
@@ -141,6 +151,7 @@ where
     ___D: ::fidl_next::Decoder<'buf>,
 
     ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -152,7 +163,9 @@ where
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString<'buf>>(
                 raw, decoder,
             )?,
+
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
         }
 
@@ -167,7 +180,6 @@ impl<'buf> ::core::fmt::Debug for WireFlexibleFoo<'buf> {
                 self.raw.get().deref_unchecked::<::fidl_next::WireString<'buf>>().fmt(f)
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
-
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -227,6 +239,7 @@ where
     ___D: ::fidl_next::Decoder<'buf>,
 
     ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -238,6 +251,7 @@ where
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString<'buf>>(
                 raw, decoder,
             )?,
+
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
@@ -255,9 +269,9 @@ impl<'buf> ::core::fmt::Debug for WireOptionalFlexibleFoo<'buf> {
 }
 
 #[derive(Clone, Debug)]
-
 pub enum StrictFoo {
     S(String),
+
     I(i32),
 }
 
@@ -270,6 +284,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
 
     String: ::fidl_next::Encode<___E>,
+
     i32: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -283,6 +298,7 @@ where
             Self::S(value) => {
                 ::fidl_next::RawWireUnion::encode_as::<___E, String>(value, 1, encoder, raw)?
             }
+
             Self::I(value) => {
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 2, encoder, raw)?
             }
@@ -345,6 +361,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalStrictFoo<'buf>> for Option<Box<Str
     }
 }
 
+/// The wire type corresponding to [`StrictFoo`].
 #[repr(transparent)]
 pub struct WireStrictFoo<'buf> {
     raw: ::fidl_next::RawWireUnion,
@@ -353,11 +370,13 @@ pub struct WireStrictFoo<'buf> {
 
 pub enum WireStrictFooRef<'union, 'buf> {
     S(&'union ::fidl_next::WireString<'buf>),
+
     I(&'union ::fidl_next::i32_le),
 }
 
 pub enum WireStrictFooMut<'union, 'buf> {
     S(&'union mut ::fidl_next::WireString<'buf>),
+
     I(&'union mut ::fidl_next::i32_le),
 }
 
@@ -367,6 +386,7 @@ impl<'buf> WireStrictFoo<'buf> {
             1 => WireStrictFooRef::S(unsafe { self.raw.get().deref_unchecked() }),
 
             2 => WireStrictFooRef::I(unsafe { self.raw.get().deref_unchecked() }),
+
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -376,6 +396,7 @@ impl<'buf> WireStrictFoo<'buf> {
             1 => WireStrictFooMut::S(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
             2 => WireStrictFooMut::I(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -386,6 +407,7 @@ where
     ___D: ::fidl_next::Decoder<'buf>,
 
     ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -397,6 +419,7 @@ where
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString<'buf>>(
                 raw, decoder,
             )?,
+
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -413,7 +436,6 @@ impl<'buf> ::core::fmt::Debug for WireStrictFoo<'buf> {
                 self.raw.get().deref_unchecked::<::fidl_next::WireString<'buf>>().fmt(f)
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
-
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -473,6 +495,7 @@ where
     ___D: ::fidl_next::Decoder<'buf>,
 
     ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -484,6 +507,7 @@ where
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString<'buf>>(
                 raw, decoder,
             )?,
+
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
@@ -521,9 +545,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 s,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.s, encoder, s)?;
+
         Ok(())
     }
 }
@@ -562,6 +589,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireProtocolRequestStrictResponseFlexibleReques
     }
 }
 
+/// The wire type corersponding to [`ProtocolRequestStrictResponseFlexibleRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireProtocolRequestStrictResponseFlexibleRequest<'buf> {
@@ -582,9 +610,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut s,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(s.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -610,9 +641,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 f,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.f, encoder, f)?;
+
         Ok(())
     }
 }
@@ -651,6 +685,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireProtocolRequestStrictResponseFlexibleRespon
     }
 }
 
+/// The wire type corersponding to [`ProtocolRequestStrictResponseFlexibleResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireProtocolRequestStrictResponseFlexibleResponse<'buf> {
@@ -671,9 +706,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut f,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(f.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -699,9 +737,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 s,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.s, encoder, s)?;
+
         Ok(())
     }
 }
@@ -740,6 +781,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireProtocolRequestFlexibleResponseStrictReques
     }
 }
 
+/// The wire type corersponding to [`ProtocolRequestFlexibleResponseStrictRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireProtocolRequestFlexibleResponseStrictRequest<'buf> {
@@ -760,9 +802,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut s,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(s.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -788,9 +833,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 f,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.f, encoder, f)?;
+
         Ok(())
     }
 }
@@ -829,6 +877,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireProtocolRequestFlexibleResponseStrictRespon
     }
 }
 
+/// The wire type corersponding to [`ProtocolRequestFlexibleResponseStrictResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireProtocolRequestFlexibleResponseStrictResponse<'buf> {
@@ -849,9 +898,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut f,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(f.as_mut(), decoder)?;
+
         Ok(())
     }
 }

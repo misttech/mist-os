@@ -1,0 +1,62 @@
+{%- match ty.kind -%}
+    {%- when TypeKind::Array with { element_type, element_count } -%}
+        [ {{ compiler.natural_type(element_type) }} ; {{ element_count }}]
+    {%- when TypeKind::Vector with { element_type, element_count: _, nullable } -%}
+        {%- if nullable -%}
+            Option<Vec<{{ compiler.natural_type(element_type) }}>>
+        {%- else -%}
+            Vec<{{ compiler.natural_type(element_type) }}>
+        {%- endif -%}
+    {%- when TypeKind::String with { element_count: _, nullable } -%}
+        {%- if nullable -%}
+            Option<String>
+        {%- else -%}
+            String
+        {%- endif -%}
+    {%- when TypeKind::Handle with { nullable, rights: _, subtype: _, resource_identifier: _ } -%}
+        {%- if nullable -%}
+            Option<{{ compiler.config.resource_bindings.handle.natural_path }}>
+        {%- else -%}
+            {{ compiler.config.resource_bindings.handle.natural_path }}
+        {%- endif -%}
+    {%- when TypeKind::Endpoint with { nullable, role, protocol: _, protocol_transport: _ } -%}
+        ::fidl_next::EndpointResource<
+            {%- if nullable -%}
+                Option<{{ compiler.config.resource_bindings.handle.natural_path }}>,
+            {%- else -%}
+                {{ compiler.config.resource_bindings.handle.natural_path }},
+            {%- endif -%}
+            {%- match role -%}
+                {%- when EndpointRole::Client -%}
+                    ::fidl_next::ClientEndpoint
+                {%- when EndpointRole::Server -%}
+                    ::fidl_next::ServerEndpoint
+            {%- endmatch -%}
+        >
+    {%- when TypeKind::Primitive with { subtype } -%}
+        {{ compiler.natural_prim(subtype) }}
+    {%- when TypeKind::Identifier with { identifier, nullable, protocol_transport: _ } -%}
+        {%- match compiler.schema.get_decl_type(identifier).unwrap() -%}
+            {%- when DeclType::Bits -%} {{ compiler.natural_id(identifier) }}
+            {%- when DeclType::Enum -%} {{ compiler.natural_id(identifier) }}
+            {%- when DeclType::Table -%} {{ compiler.natural_id(identifier) }}
+            {%- when DeclType::Struct -%}
+                {%- if nullable -%}
+                    Option<Box<{{ compiler.natural_id(identifier) }}>>
+                {%- else -%}
+                    {{ compiler.natural_id(identifier) }}
+                {%- endif -%}
+            {%- when DeclType::Union -%}
+                {%- if nullable -%}
+                    Option<Box<{{ compiler.natural_id(identifier) }}>>
+                {%- else -%}
+                    {{ compiler.natural_id(identifier) }}
+                {%- endif -%}
+            {%- else -%}
+                {{ todo!() }}
+        {%- endmatch -%}
+    {%- when TypeKind::Internal with { subtype } -%}
+        {%- match subtype -%}
+            {%- when InternalSubtype::FrameworkError -%} ::fidl_next::FrameworkError
+        {%- endmatch -%}
+{%- endmatch -%}

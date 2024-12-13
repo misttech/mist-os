@@ -23,9 +23,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 s,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.s, encoder, s)?;
+
         Ok(())
     }
 }
@@ -61,6 +64,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireSuperFooRequest<'buf>> for SuperFooRequest 
     }
 }
 
+/// The wire type corersponding to [`SuperFooRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireSuperFooRequest<'buf> {
@@ -80,9 +84,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut s,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(s.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -108,9 +115,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 y,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.y, encoder, y)?;
+
         Ok(())
     }
 }
@@ -146,6 +156,7 @@ impl ::fidl_next::TakeFrom<WireSuperFooResponse> for SuperFooResponse {
     }
 }
 
+/// The wire type corersponding to [`SuperFooResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSuperFooResponse {
@@ -165,9 +176,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut y,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(y.as_mut(), decoder)?;
+
         Ok(())
     }
 }

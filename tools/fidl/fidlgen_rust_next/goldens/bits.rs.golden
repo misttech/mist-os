@@ -3,8 +3,14 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 ::fidl_next::bitflags! {
-    #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-    #[derive(Debug)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
     pub struct EmptyBits: u32 {
         const _ = !0;
     }
@@ -41,6 +47,7 @@ impl ::fidl_next::TakeFrom<WireEmptyBits> for EmptyBits {
     }
 }
 
+/// The wire type corresponding to [`EmptyBits`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireEmptyBits {
@@ -66,8 +73,14 @@ impl ::core::convert::From<EmptyBits> for WireEmptyBits {
 }
 
 ::fidl_next::bitflags! {
-    #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-    #[derive(Debug)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
     pub struct FlexibleBits: u64 {
         const SMALLEST = 1;
         const BIGGEST = 9223372036854775808;
@@ -106,6 +119,7 @@ impl ::fidl_next::TakeFrom<WireFlexibleBits> for FlexibleBits {
     }
 }
 
+/// The wire type corresponding to [`FlexibleBits`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireFlexibleBits {
@@ -131,12 +145,19 @@ impl ::core::convert::From<FlexibleBits> for WireFlexibleBits {
 }
 
 ::fidl_next::bitflags! {
-    #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-    #[derive(Debug)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
     pub struct MyBits: u32 {
         const MY_FIRST_BIT = 1;
         const MY_OTHER_BIT = 2;
         const MASK = 4;
+
     }
 }
 
@@ -171,6 +192,7 @@ impl ::fidl_next::TakeFrom<WireMyBits> for MyBits {
     }
 }
 
+/// The wire type corresponding to [`MyBits`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireMyBits {
@@ -188,7 +210,7 @@ where
         ::fidl_next::munge!(let Self { value } = slot);
         let set = u32::from(*value);
         if set & !MyBits::all().bits() != 0 {
-            return Err(fidl_next::DecodeError::InvalidBits {
+            return Err(::fidl_next::DecodeError::InvalidBits {
                 expected: MyBits::all().bits() as usize,
                 actual: set as usize,
             });
@@ -205,11 +227,18 @@ impl ::core::convert::From<MyBits> for WireMyBits {
 }
 
 ::fidl_next::bitflags! {
-    #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-    #[derive(Debug)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
     pub struct StrictBits: u64 {
         const SMALLEST = 1;
         const BIGGEST = 9223372036854775808;
+
     }
 }
 
@@ -244,6 +273,7 @@ impl ::fidl_next::TakeFrom<WireStrictBits> for StrictBits {
     }
 }
 
+/// The wire type corresponding to [`StrictBits`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireStrictBits {
@@ -261,7 +291,7 @@ where
         ::fidl_next::munge!(let Self { value } = slot);
         let set = u64::from(*value);
         if set & !StrictBits::all().bits() != 0 {
-            return Err(fidl_next::DecodeError::InvalidBits {
+            return Err(::fidl_next::DecodeError::InvalidBits {
                 expected: StrictBits::all().bits() as usize,
                 actual: set as usize,
             });

@@ -1,0 +1,25 @@
+{% let (lib, ty) = id.split() %}
+
+{% if lib == "zx" && ty.non_canonical() == "ObjType" %}
+    fidl_next::zx::ObjectType
+{% else %}
+    {% if lib == compiler.schema.name %}
+        crate::
+    {% else if lib == "zx" %}
+        fidl_next::zx::
+    {% else %}
+        {% let escaped = lib.replace(".", "_") %}
+        fidl_{{ escaped }}::
+    {% endif %}
+    {% match compiler.schema.get_decl_type(id).unwrap() %}
+        {% when DeclType::Alias %} {{ prefix }}{{ ty.camel() }}
+        {% when DeclType::Bits %} {{ prefix }}{{ ty.camel() }}
+        {% when DeclType::Enum %} {{ prefix }}{{ ty.camel() }}
+        {% when DeclType::Struct %} {{ prefix }}{{ ty.camel() }}
+        {% when DeclType::Table %} {{ prefix }}{{ ty.camel() }}
+        {% when DeclType::Union %} {{ prefix }}{{ ty.camel() }}
+        {% when DeclType::Const %} {{ prefix }}{{ ty.screaming_snake() }}
+        {% else %}
+            {{ todo!() }}
+    {% endmatch %}
+{% endif %}

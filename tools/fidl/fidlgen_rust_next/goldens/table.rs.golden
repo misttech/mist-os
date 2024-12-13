@@ -52,6 +52,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireEmptyTable<'buf>> for EmptyTable {
     }
 }
 
+/// The wire type corresponding to [`EmptyTable`].
 #[repr(C)]
 pub struct WireEmptyTable<'buf> {
     table: ::fidl_next::WireTable<'buf>,
@@ -135,6 +136,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireExtensionTable<'buf>> for ExtensionTable {
     }
 }
 
+/// The wire type corresponding to [`ExtensionTable`].
 #[repr(C)]
 pub struct WireExtensionTable<'buf> {
     table: ::fidl_next::WireTable<'buf>,
@@ -171,20 +173,24 @@ impl ::core::fmt::Debug for WireExtensionTable<'_> {
 #[derive(Clone, Debug)]
 pub struct NewerSimpleTable {
     pub x: Option<i64>,
+
     pub y: Option<i64>,
+
     pub z: Option<i64>,
 }
 
 impl NewerSimpleTable {
     fn __max_ordinal(&self) -> usize {
-        if self.z.is_some() {
-            return 6;
+        if self.x.is_some() {
+            return 1;
         }
+
         if self.y.is_some() {
             return 5;
         }
-        if self.x.is_some() {
-            return 1;
+
+        if self.z.is_some() {
+            return 6;
         }
 
         0
@@ -200,7 +206,9 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
 
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -269,13 +277,16 @@ where
 impl<'buf> ::fidl_next::TakeFrom<WireNewerSimpleTable<'buf>> for NewerSimpleTable {
     fn take_from(from: &mut WireNewerSimpleTable<'buf>) -> Self {
         Self {
-            z: from.z_mut().map(::fidl_next::TakeFrom::take_from),
-            y: from.y_mut().map(::fidl_next::TakeFrom::take_from),
             x: from.x_mut().map(::fidl_next::TakeFrom::take_from),
+
+            y: from.y_mut().map(::fidl_next::TakeFrom::take_from),
+
+            z: from.z_mut().map(::fidl_next::TakeFrom::take_from),
         }
     }
 }
 
+/// The wire type corresponding to [`NewerSimpleTable`].
 #[repr(C)]
 pub struct WireNewerSimpleTable<'buf> {
     table: ::fidl_next::WireTable<'buf>,
@@ -286,7 +297,9 @@ where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -450,6 +463,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireOlderSimpleTable<'buf>> for OlderSimpleTabl
     }
 }
 
+/// The wire type corresponding to [`OlderSimpleTable`].
 #[repr(C)]
 pub struct WireOlderSimpleTable<'buf> {
     table: ::fidl_next::WireTable<'buf>,
@@ -509,20 +523,24 @@ impl ::core::fmt::Debug for WireOlderSimpleTable<'_> {
 #[derive(Clone, Debug)]
 pub struct ReverseOrdinalTable {
     pub z: Option<i64>,
+
     pub y: Option<i64>,
+
     pub x: Option<i64>,
 }
 
 impl ReverseOrdinalTable {
     fn __max_ordinal(&self) -> usize {
-        if self.x.is_some() {
-            return 3;
+        if self.z.is_some() {
+            return 1;
         }
+
         if self.y.is_some() {
             return 2;
         }
-        if self.z.is_some() {
-            return 1;
+
+        if self.x.is_some() {
+            return 3;
         }
 
         0
@@ -538,7 +556,9 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
 
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -607,13 +627,16 @@ where
 impl<'buf> ::fidl_next::TakeFrom<WireReverseOrdinalTable<'buf>> for ReverseOrdinalTable {
     fn take_from(from: &mut WireReverseOrdinalTable<'buf>) -> Self {
         Self {
-            x: from.x_mut().map(::fidl_next::TakeFrom::take_from),
-            y: from.y_mut().map(::fidl_next::TakeFrom::take_from),
             z: from.z_mut().map(::fidl_next::TakeFrom::take_from),
+
+            y: from.y_mut().map(::fidl_next::TakeFrom::take_from),
+
+            x: from.x_mut().map(::fidl_next::TakeFrom::take_from),
         }
     }
 }
 
+/// The wire type corresponding to [`ReverseOrdinalTable`].
 #[repr(C)]
 pub struct WireReverseOrdinalTable<'buf> {
     table: ::fidl_next::WireTable<'buf>,
@@ -624,7 +647,9 @@ where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -721,16 +746,18 @@ impl ::core::fmt::Debug for WireReverseOrdinalTable<'_> {
 #[derive(Clone, Debug)]
 pub struct SimpleTable {
     pub x: Option<i64>,
+
     pub y: Option<i64>,
 }
 
 impl SimpleTable {
     fn __max_ordinal(&self) -> usize {
-        if self.y.is_some() {
-            return 5;
-        }
         if self.x.is_some() {
             return 1;
+        }
+
+        if self.y.is_some() {
+            return 5;
         }
 
         0
@@ -746,6 +773,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
 
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -802,12 +830,14 @@ where
 impl<'buf> ::fidl_next::TakeFrom<WireSimpleTable<'buf>> for SimpleTable {
     fn take_from(from: &mut WireSimpleTable<'buf>) -> Self {
         Self {
-            y: from.y_mut().map(::fidl_next::TakeFrom::take_from),
             x: from.x_mut().map(::fidl_next::TakeFrom::take_from),
+
+            y: from.y_mut().map(::fidl_next::TakeFrom::take_from),
         }
     }
 }
 
+/// The wire type corresponding to [`SimpleTable`].
 #[repr(C)]
 pub struct WireSimpleTable<'buf> {
     table: ::fidl_next::WireTable<'buf>,
@@ -818,6 +848,7 @@ where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -889,264 +920,390 @@ impl ::core::fmt::Debug for WireSimpleTable<'_> {
 #[derive(Clone, Debug)]
 pub struct SixtyFourOrdinalTable {
     pub v1: Option<i64>,
+
     pub v2: Option<i64>,
+
     pub v3: Option<i64>,
+
     pub v4: Option<i64>,
+
     pub v5: Option<i64>,
+
     pub v6: Option<i64>,
+
     pub v7: Option<i64>,
+
     pub v8: Option<i64>,
+
     pub v9: Option<i64>,
+
     pub v10: Option<i64>,
+
     pub v11: Option<i64>,
+
     pub v12: Option<i64>,
+
     pub v13: Option<i64>,
+
     pub v14: Option<i64>,
+
     pub v15: Option<i64>,
+
     pub v16: Option<i64>,
+
     pub v17: Option<i64>,
+
     pub v18: Option<i64>,
+
     pub v19: Option<i64>,
+
     pub v20: Option<i64>,
+
     pub v21: Option<i64>,
+
     pub v22: Option<i64>,
+
     pub v23: Option<i64>,
+
     pub v24: Option<i64>,
+
     pub v25: Option<i64>,
+
     pub v26: Option<i64>,
+
     pub v27: Option<i64>,
+
     pub v28: Option<i64>,
+
     pub v29: Option<i64>,
+
     pub v30: Option<i64>,
+
     pub v31: Option<i64>,
+
     pub v32: Option<i64>,
+
     pub v33: Option<i64>,
+
     pub v34: Option<i64>,
+
     pub v35: Option<i64>,
+
     pub v36: Option<i64>,
+
     pub v37: Option<i64>,
+
     pub v38: Option<i64>,
+
     pub v39: Option<i64>,
+
     pub v40: Option<i64>,
+
     pub v41: Option<i64>,
+
     pub v42: Option<i64>,
+
     pub v43: Option<i64>,
+
     pub v44: Option<i64>,
+
     pub v45: Option<i64>,
+
     pub v46: Option<i64>,
+
     pub v47: Option<i64>,
+
     pub v48: Option<i64>,
+
     pub v49: Option<i64>,
+
     pub v50: Option<i64>,
+
     pub v51: Option<i64>,
+
     pub v52: Option<i64>,
+
     pub v53: Option<i64>,
+
     pub v54: Option<i64>,
+
     pub v55: Option<i64>,
+
     pub v56: Option<i64>,
+
     pub v57: Option<i64>,
+
     pub v58: Option<i64>,
+
     pub v59: Option<i64>,
+
     pub v60: Option<i64>,
+
     pub v61: Option<i64>,
+
     pub v62: Option<i64>,
+
     pub v63: Option<i64>,
+
     pub v64: Option<crate::ExtensionTable>,
 }
 
 impl SixtyFourOrdinalTable {
     fn __max_ordinal(&self) -> usize {
-        if self.v64.is_some() {
-            return 64;
+        if self.v1.is_some() {
+            return 1;
         }
-        if self.v63.is_some() {
-            return 63;
-        }
-        if self.v62.is_some() {
-            return 62;
-        }
-        if self.v61.is_some() {
-            return 61;
-        }
-        if self.v60.is_some() {
-            return 60;
-        }
-        if self.v59.is_some() {
-            return 59;
-        }
-        if self.v58.is_some() {
-            return 58;
-        }
-        if self.v57.is_some() {
-            return 57;
-        }
-        if self.v56.is_some() {
-            return 56;
-        }
-        if self.v55.is_some() {
-            return 55;
-        }
-        if self.v54.is_some() {
-            return 54;
-        }
-        if self.v53.is_some() {
-            return 53;
-        }
-        if self.v52.is_some() {
-            return 52;
-        }
-        if self.v51.is_some() {
-            return 51;
-        }
-        if self.v50.is_some() {
-            return 50;
-        }
-        if self.v49.is_some() {
-            return 49;
-        }
-        if self.v48.is_some() {
-            return 48;
-        }
-        if self.v47.is_some() {
-            return 47;
-        }
-        if self.v46.is_some() {
-            return 46;
-        }
-        if self.v45.is_some() {
-            return 45;
-        }
-        if self.v44.is_some() {
-            return 44;
-        }
-        if self.v43.is_some() {
-            return 43;
-        }
-        if self.v42.is_some() {
-            return 42;
-        }
-        if self.v41.is_some() {
-            return 41;
-        }
-        if self.v40.is_some() {
-            return 40;
-        }
-        if self.v39.is_some() {
-            return 39;
-        }
-        if self.v38.is_some() {
-            return 38;
-        }
-        if self.v37.is_some() {
-            return 37;
-        }
-        if self.v36.is_some() {
-            return 36;
-        }
-        if self.v35.is_some() {
-            return 35;
-        }
-        if self.v34.is_some() {
-            return 34;
-        }
-        if self.v33.is_some() {
-            return 33;
-        }
-        if self.v32.is_some() {
-            return 32;
-        }
-        if self.v31.is_some() {
-            return 31;
-        }
-        if self.v30.is_some() {
-            return 30;
-        }
-        if self.v29.is_some() {
-            return 29;
-        }
-        if self.v28.is_some() {
-            return 28;
-        }
-        if self.v27.is_some() {
-            return 27;
-        }
-        if self.v26.is_some() {
-            return 26;
-        }
-        if self.v25.is_some() {
-            return 25;
-        }
-        if self.v24.is_some() {
-            return 24;
-        }
-        if self.v23.is_some() {
-            return 23;
-        }
-        if self.v22.is_some() {
-            return 22;
-        }
-        if self.v21.is_some() {
-            return 21;
-        }
-        if self.v20.is_some() {
-            return 20;
-        }
-        if self.v19.is_some() {
-            return 19;
-        }
-        if self.v18.is_some() {
-            return 18;
-        }
-        if self.v17.is_some() {
-            return 17;
-        }
-        if self.v16.is_some() {
-            return 16;
-        }
-        if self.v15.is_some() {
-            return 15;
-        }
-        if self.v14.is_some() {
-            return 14;
-        }
-        if self.v13.is_some() {
-            return 13;
-        }
-        if self.v12.is_some() {
-            return 12;
-        }
-        if self.v11.is_some() {
-            return 11;
-        }
-        if self.v10.is_some() {
-            return 10;
-        }
-        if self.v9.is_some() {
-            return 9;
-        }
-        if self.v8.is_some() {
-            return 8;
-        }
-        if self.v7.is_some() {
-            return 7;
-        }
-        if self.v6.is_some() {
-            return 6;
-        }
-        if self.v5.is_some() {
-            return 5;
-        }
-        if self.v4.is_some() {
-            return 4;
-        }
-        if self.v3.is_some() {
-            return 3;
-        }
+
         if self.v2.is_some() {
             return 2;
         }
-        if self.v1.is_some() {
-            return 1;
+
+        if self.v3.is_some() {
+            return 3;
+        }
+
+        if self.v4.is_some() {
+            return 4;
+        }
+
+        if self.v5.is_some() {
+            return 5;
+        }
+
+        if self.v6.is_some() {
+            return 6;
+        }
+
+        if self.v7.is_some() {
+            return 7;
+        }
+
+        if self.v8.is_some() {
+            return 8;
+        }
+
+        if self.v9.is_some() {
+            return 9;
+        }
+
+        if self.v10.is_some() {
+            return 10;
+        }
+
+        if self.v11.is_some() {
+            return 11;
+        }
+
+        if self.v12.is_some() {
+            return 12;
+        }
+
+        if self.v13.is_some() {
+            return 13;
+        }
+
+        if self.v14.is_some() {
+            return 14;
+        }
+
+        if self.v15.is_some() {
+            return 15;
+        }
+
+        if self.v16.is_some() {
+            return 16;
+        }
+
+        if self.v17.is_some() {
+            return 17;
+        }
+
+        if self.v18.is_some() {
+            return 18;
+        }
+
+        if self.v19.is_some() {
+            return 19;
+        }
+
+        if self.v20.is_some() {
+            return 20;
+        }
+
+        if self.v21.is_some() {
+            return 21;
+        }
+
+        if self.v22.is_some() {
+            return 22;
+        }
+
+        if self.v23.is_some() {
+            return 23;
+        }
+
+        if self.v24.is_some() {
+            return 24;
+        }
+
+        if self.v25.is_some() {
+            return 25;
+        }
+
+        if self.v26.is_some() {
+            return 26;
+        }
+
+        if self.v27.is_some() {
+            return 27;
+        }
+
+        if self.v28.is_some() {
+            return 28;
+        }
+
+        if self.v29.is_some() {
+            return 29;
+        }
+
+        if self.v30.is_some() {
+            return 30;
+        }
+
+        if self.v31.is_some() {
+            return 31;
+        }
+
+        if self.v32.is_some() {
+            return 32;
+        }
+
+        if self.v33.is_some() {
+            return 33;
+        }
+
+        if self.v34.is_some() {
+            return 34;
+        }
+
+        if self.v35.is_some() {
+            return 35;
+        }
+
+        if self.v36.is_some() {
+            return 36;
+        }
+
+        if self.v37.is_some() {
+            return 37;
+        }
+
+        if self.v38.is_some() {
+            return 38;
+        }
+
+        if self.v39.is_some() {
+            return 39;
+        }
+
+        if self.v40.is_some() {
+            return 40;
+        }
+
+        if self.v41.is_some() {
+            return 41;
+        }
+
+        if self.v42.is_some() {
+            return 42;
+        }
+
+        if self.v43.is_some() {
+            return 43;
+        }
+
+        if self.v44.is_some() {
+            return 44;
+        }
+
+        if self.v45.is_some() {
+            return 45;
+        }
+
+        if self.v46.is_some() {
+            return 46;
+        }
+
+        if self.v47.is_some() {
+            return 47;
+        }
+
+        if self.v48.is_some() {
+            return 48;
+        }
+
+        if self.v49.is_some() {
+            return 49;
+        }
+
+        if self.v50.is_some() {
+            return 50;
+        }
+
+        if self.v51.is_some() {
+            return 51;
+        }
+
+        if self.v52.is_some() {
+            return 52;
+        }
+
+        if self.v53.is_some() {
+            return 53;
+        }
+
+        if self.v54.is_some() {
+            return 54;
+        }
+
+        if self.v55.is_some() {
+            return 55;
+        }
+
+        if self.v56.is_some() {
+            return 56;
+        }
+
+        if self.v57.is_some() {
+            return 57;
+        }
+
+        if self.v58.is_some() {
+            return 58;
+        }
+
+        if self.v59.is_some() {
+            return 59;
+        }
+
+        if self.v60.is_some() {
+            return 60;
+        }
+
+        if self.v61.is_some() {
+            return 61;
+        }
+
+        if self.v62.is_some() {
+            return 62;
+        }
+
+        if self.v63.is_some() {
+            return 63;
+        }
+
+        if self.v64.is_some() {
+            return 64;
         }
 
         0
@@ -1162,68 +1319,131 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
 
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     i64: ::fidl_next::Encode<___E>,
+
     crate::ExtensionTable: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -2024,74 +2244,138 @@ where
 impl<'buf> ::fidl_next::TakeFrom<WireSixtyFourOrdinalTable<'buf>> for SixtyFourOrdinalTable {
     fn take_from(from: &mut WireSixtyFourOrdinalTable<'buf>) -> Self {
         Self {
-            v64: from.v64_mut().map(::fidl_next::TakeFrom::take_from),
-            v63: from.v63_mut().map(::fidl_next::TakeFrom::take_from),
-            v62: from.v62_mut().map(::fidl_next::TakeFrom::take_from),
-            v61: from.v61_mut().map(::fidl_next::TakeFrom::take_from),
-            v60: from.v60_mut().map(::fidl_next::TakeFrom::take_from),
-            v59: from.v59_mut().map(::fidl_next::TakeFrom::take_from),
-            v58: from.v58_mut().map(::fidl_next::TakeFrom::take_from),
-            v57: from.v57_mut().map(::fidl_next::TakeFrom::take_from),
-            v56: from.v56_mut().map(::fidl_next::TakeFrom::take_from),
-            v55: from.v55_mut().map(::fidl_next::TakeFrom::take_from),
-            v54: from.v54_mut().map(::fidl_next::TakeFrom::take_from),
-            v53: from.v53_mut().map(::fidl_next::TakeFrom::take_from),
-            v52: from.v52_mut().map(::fidl_next::TakeFrom::take_from),
-            v51: from.v51_mut().map(::fidl_next::TakeFrom::take_from),
-            v50: from.v50_mut().map(::fidl_next::TakeFrom::take_from),
-            v49: from.v49_mut().map(::fidl_next::TakeFrom::take_from),
-            v48: from.v48_mut().map(::fidl_next::TakeFrom::take_from),
-            v47: from.v47_mut().map(::fidl_next::TakeFrom::take_from),
-            v46: from.v46_mut().map(::fidl_next::TakeFrom::take_from),
-            v45: from.v45_mut().map(::fidl_next::TakeFrom::take_from),
-            v44: from.v44_mut().map(::fidl_next::TakeFrom::take_from),
-            v43: from.v43_mut().map(::fidl_next::TakeFrom::take_from),
-            v42: from.v42_mut().map(::fidl_next::TakeFrom::take_from),
-            v41: from.v41_mut().map(::fidl_next::TakeFrom::take_from),
-            v40: from.v40_mut().map(::fidl_next::TakeFrom::take_from),
-            v39: from.v39_mut().map(::fidl_next::TakeFrom::take_from),
-            v38: from.v38_mut().map(::fidl_next::TakeFrom::take_from),
-            v37: from.v37_mut().map(::fidl_next::TakeFrom::take_from),
-            v36: from.v36_mut().map(::fidl_next::TakeFrom::take_from),
-            v35: from.v35_mut().map(::fidl_next::TakeFrom::take_from),
-            v34: from.v34_mut().map(::fidl_next::TakeFrom::take_from),
-            v33: from.v33_mut().map(::fidl_next::TakeFrom::take_from),
-            v32: from.v32_mut().map(::fidl_next::TakeFrom::take_from),
-            v31: from.v31_mut().map(::fidl_next::TakeFrom::take_from),
-            v30: from.v30_mut().map(::fidl_next::TakeFrom::take_from),
-            v29: from.v29_mut().map(::fidl_next::TakeFrom::take_from),
-            v28: from.v28_mut().map(::fidl_next::TakeFrom::take_from),
-            v27: from.v27_mut().map(::fidl_next::TakeFrom::take_from),
-            v26: from.v26_mut().map(::fidl_next::TakeFrom::take_from),
-            v25: from.v25_mut().map(::fidl_next::TakeFrom::take_from),
-            v24: from.v24_mut().map(::fidl_next::TakeFrom::take_from),
-            v23: from.v23_mut().map(::fidl_next::TakeFrom::take_from),
-            v22: from.v22_mut().map(::fidl_next::TakeFrom::take_from),
-            v21: from.v21_mut().map(::fidl_next::TakeFrom::take_from),
-            v20: from.v20_mut().map(::fidl_next::TakeFrom::take_from),
-            v19: from.v19_mut().map(::fidl_next::TakeFrom::take_from),
-            v18: from.v18_mut().map(::fidl_next::TakeFrom::take_from),
-            v17: from.v17_mut().map(::fidl_next::TakeFrom::take_from),
-            v16: from.v16_mut().map(::fidl_next::TakeFrom::take_from),
-            v15: from.v15_mut().map(::fidl_next::TakeFrom::take_from),
-            v14: from.v14_mut().map(::fidl_next::TakeFrom::take_from),
-            v13: from.v13_mut().map(::fidl_next::TakeFrom::take_from),
-            v12: from.v12_mut().map(::fidl_next::TakeFrom::take_from),
-            v11: from.v11_mut().map(::fidl_next::TakeFrom::take_from),
-            v10: from.v10_mut().map(::fidl_next::TakeFrom::take_from),
-            v9: from.v9_mut().map(::fidl_next::TakeFrom::take_from),
-            v8: from.v8_mut().map(::fidl_next::TakeFrom::take_from),
-            v7: from.v7_mut().map(::fidl_next::TakeFrom::take_from),
-            v6: from.v6_mut().map(::fidl_next::TakeFrom::take_from),
-            v5: from.v5_mut().map(::fidl_next::TakeFrom::take_from),
-            v4: from.v4_mut().map(::fidl_next::TakeFrom::take_from),
-            v3: from.v3_mut().map(::fidl_next::TakeFrom::take_from),
-            v2: from.v2_mut().map(::fidl_next::TakeFrom::take_from),
             v1: from.v1_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v2: from.v2_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v3: from.v3_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v4: from.v4_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v5: from.v5_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v6: from.v6_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v7: from.v7_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v8: from.v8_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v9: from.v9_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v10: from.v10_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v11: from.v11_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v12: from.v12_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v13: from.v13_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v14: from.v14_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v15: from.v15_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v16: from.v16_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v17: from.v17_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v18: from.v18_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v19: from.v19_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v20: from.v20_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v21: from.v21_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v22: from.v22_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v23: from.v23_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v24: from.v24_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v25: from.v25_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v26: from.v26_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v27: from.v27_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v28: from.v28_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v29: from.v29_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v30: from.v30_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v31: from.v31_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v32: from.v32_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v33: from.v33_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v34: from.v34_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v35: from.v35_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v36: from.v36_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v37: from.v37_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v38: from.v38_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v39: from.v39_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v40: from.v40_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v41: from.v41_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v42: from.v42_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v43: from.v43_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v44: from.v44_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v45: from.v45_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v46: from.v46_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v47: from.v47_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v48: from.v48_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v49: from.v49_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v50: from.v50_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v51: from.v51_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v52: from.v52_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v53: from.v53_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v54: from.v54_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v55: from.v55_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v56: from.v56_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v57: from.v57_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v58: from.v58_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v59: from.v59_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v60: from.v60_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v61: from.v61_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v62: from.v62_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v63: from.v63_mut().map(::fidl_next::TakeFrom::take_from),
+
+            v64: from.v64_mut().map(::fidl_next::TakeFrom::take_from),
         }
     }
 }
 
+/// The wire type corresponding to [`SixtyFourOrdinalTable`].
 #[repr(C)]
 pub struct WireSixtyFourOrdinalTable<'buf> {
     table: ::fidl_next::WireTable<'buf>,
@@ -2102,68 +2386,131 @@ where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     crate::WireExtensionTable<'buf>: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -3669,6 +4016,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireTableWithAttributes<'buf>> for TableWithAtt
     }
 }
 
+/// The wire type corresponding to [`TableWithAttributes`].
 #[repr(C)]
 pub struct WireTableWithAttributes<'buf> {
     table: ::fidl_next::WireTable<'buf>,

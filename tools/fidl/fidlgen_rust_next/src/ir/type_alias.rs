@@ -6,10 +6,12 @@ use serde::Deserialize;
 
 use crate::de::Index;
 
-use super::{CompIdent, Type};
+use super::{Attributes, CompIdent, Type};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct TypeAlias {
+    #[serde(flatten)]
+    pub attributes: Attributes,
     pub name: CompIdent,
     #[serde(rename = "type")]
     pub ty: Type,

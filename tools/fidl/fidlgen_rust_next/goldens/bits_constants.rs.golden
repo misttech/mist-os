@@ -3,12 +3,19 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 ::fidl_next::bitflags! {
-    #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-    #[derive(Debug)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
     pub struct BitsType: u32 {
         const A = 1;
         const B = 128;
         const C = 2;
+
     }
 }
 
@@ -43,6 +50,7 @@ impl ::fidl_next::TakeFrom<WireBitsType> for BitsType {
     }
 }
 
+/// The wire type corresponding to [`BitsType`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireBitsType {
@@ -60,7 +68,7 @@ where
         ::fidl_next::munge!(let Self { value } = slot);
         let set = u32::from(*value);
         if set & !BitsType::all().bits() != 0 {
-            return Err(fidl_next::DecodeError::InvalidBits {
+            return Err(::fidl_next::DecodeError::InvalidBits {
                 expected: BitsType::all().bits() as usize,
                 actual: set as usize,
             });
@@ -75,7 +83,11 @@ impl ::core::convert::From<BitsType> for WireBitsType {
         Self { value: ::fidl_next::u32_le::from(natural.bits()) }
     }
 }
+
 pub const CONST0: crate::BitsType = crate::BitsType::from_bits_retain(0);
+
 pub const CONST1: crate::BitsType = crate::BitsType::A;
+
 pub const CONST2: crate::BitsType = crate::BitsType::from_bits_retain(129);
+
 pub const CONST3: crate::BitsType = crate::BitsType::from_bits_retain(131);

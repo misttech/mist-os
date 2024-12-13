@@ -5,6 +5,7 @@
 #[derive(Clone, Debug)]
 pub struct BasicStruct {
     pub x: u32,
+
     pub y: String,
 }
 
@@ -15,6 +16,7 @@ impl ::fidl_next::Encodable for BasicStruct {
 impl<___E> ::fidl_next::Encode<___E> for BasicStruct
 where
     u32: ::fidl_next::Encode<___E>,
+
     String: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -26,10 +28,14 @@ where
             let Self::Encoded {
                 x,
                 y,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.x, encoder, x)?;
+
         ::fidl_next::Encode::encode(&mut self.y, encoder, y)?;
+
         Ok(())
     }
 }
@@ -63,15 +69,18 @@ impl<'buf> ::fidl_next::TakeFrom<WireBasicStruct<'buf>> for BasicStruct {
     fn take_from(from: &mut WireBasicStruct<'buf>) -> Self {
         Self {
             x: ::fidl_next::TakeFrom::take_from(&mut from.x),
+
             y: ::fidl_next::TakeFrom::take_from(&mut from.y),
         }
     }
 }
 
+/// The wire type corersponding to [`BasicStruct`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireBasicStruct<'buf> {
     pub x: ::fidl_next::u32_le,
+
     pub y: ::fidl_next::WireString<'buf>,
 }
 
@@ -80,6 +89,7 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -90,10 +100,14 @@ where
             let Self {
                 mut x,
                 mut y,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(x.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(y.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -101,6 +115,7 @@ where
 #[derive(Clone, Debug)]
 pub struct Simple {
     pub f1: u8,
+
     pub f2: bool,
 }
 
@@ -111,6 +126,7 @@ impl ::fidl_next::Encodable for Simple {
 impl<___E> ::fidl_next::Encode<___E> for Simple
 where
     u8: ::fidl_next::Encode<___E>,
+
     bool: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -122,10 +138,14 @@ where
             let Self::Encoded {
                 f1,
                 f2,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.f1, encoder, f1)?;
+
         ::fidl_next::Encode::encode(&mut self.f2, encoder, f2)?;
+
         Ok(())
     }
 }
@@ -159,15 +179,18 @@ impl ::fidl_next::TakeFrom<WireSimple> for Simple {
     fn take_from(from: &mut WireSimple) -> Self {
         Self {
             f1: ::fidl_next::TakeFrom::take_from(&mut from.f1),
+
             f2: ::fidl_next::TakeFrom::take_from(&mut from.f2),
         }
     }
 }
 
+/// The wire type corersponding to [`Simple`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSimple {
     pub f1: u8,
+
     pub f2: bool,
 }
 
@@ -176,6 +199,7 @@ where
     ___D: ?Sized,
 
     u8: ::fidl_next::Decode<___D>,
+
     bool: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -186,10 +210,14 @@ where
             let Self {
                 mut f1,
                 mut f2,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(f1.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(f2.as_mut(), decoder)?;
+
         Ok(())
     }
 }

@@ -3,9 +3,12 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 pub const BASIC: &str = "\'\"\\\n\r\t";
+
 pub const DOLLAR: &str = "$";
+
 pub const DOLLAR_BRACE: &str = "${";
-/// "pleaseescapethisdocommentproperly"
+
+#[doc = " \"pleaseescapethisdocommentproperly\"\n"]
 #[derive(Clone, Debug)]
 pub struct DocCommentWithQuotes {}
 
@@ -21,6 +24,7 @@ impl<___E> ::fidl_next::Encode<___E> for DocCommentWithQuotes {
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
+
             } = slot;
         }
 
@@ -59,7 +63,7 @@ impl ::fidl_next::TakeFrom<WireDocCommentWithQuotes> for DocCommentWithQuotes {
     }
 }
 
-/// "pleaseescapethisdocommentproperly"
+/// The wire type corersponding to [`DocCommentWithQuotes`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDocCommentWithQuotes {}
@@ -74,6 +78,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge! {
             let Self {
+
             } = slot;
         }
 
@@ -82,8 +87,13 @@ where
 }
 
 pub const MAX: &str = "\u{10ffff}";
+
 pub const NULL: &str = "\u{0}";
+
 pub const SMILE_LEADING_ZERO: &str = "\u{1f600}";
+
 pub const SMILE_LITERAL: &str = "\u{1f600}";
+
 pub const SMILE_LOWER: &str = "\u{1f600}";
+
 pub const SMILE_UPPER: &str = "\u{1f600}";

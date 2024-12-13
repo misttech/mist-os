@@ -8,27 +8,14 @@ import("//build/testing/golden_files.gni")
 import("//tools/fidl/fidlc/testdata/info.gni")
 
 if (is_host) {
+  cargo_manifest_dir = rebase_path(".", root_build_dir)
+
   rustc_binary("fidlgen_rust_next") {
     edition = "2021"
     sources = [
       "src/compiler/mod.rs",
-      "src/compiler/natural/alias.rs",
-      "src/compiler/natural/bits.rs",
-      "src/compiler/natural/const.rs",
-      "src/compiler/natural/enum.rs",
-      "src/compiler/natural/mod.rs",
-      "src/compiler/natural/struct.rs",
-      "src/compiler/natural/table.rs",
-      "src/compiler/natural/union.rs",
       "src/compiler/resource_binding.rs",
       "src/compiler/util.rs",
-      "src/compiler/wire/alias.rs",
-      "src/compiler/wire/bits.rs",
-      "src/compiler/wire/enum.rs",
-      "src/compiler/wire/mod.rs",
-      "src/compiler/wire/struct.rs",
-      "src/compiler/wire/table.rs",
-      "src/compiler/wire/union.rs",
       "src/de.rs",
       "src/ir/attribute.rs",
       "src/ir/bits.rs",
@@ -52,10 +39,36 @@ if (is_host) {
     ]
     deps = [
       "//third_party/rust_crates:argh",
+      "//third_party/rust_crates:askama",
       "//third_party/rust_crates:bitflags",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
     ]
+    inputs = [
+      # Configuration
+      "askama.toml",
+
+      # Templates
+      "templates/alias.askama",
+      "templates/bits.askama",
+      "templates/const.askama",
+      "templates/enum.askama",
+      "templates/schema.askama",
+      "templates/struct.askama",
+      "templates/table.askama",
+      "templates/union.askama",
+
+      # Helpers
+      "templates/natural_constant.askama",
+      "templates/natural_int.askama",
+      "templates/natural_prim.askama",
+      "templates/natural_type.askama",
+      "templates/prefixed_id.askama",
+      "templates/wire_int.askama",
+      "templates/wire_prim.askama",
+      "templates/wire_type.askama",
+    ]
+    rustenv = [ "CARGO_MANIFEST_DIR=${cargo_manifest_dir}" ]
     with_unit_tests = true
   }
 

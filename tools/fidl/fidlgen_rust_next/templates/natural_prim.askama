@@ -1,0 +1,13 @@
+{% match prim %}
+    {% when PrimSubtype::Bool %} bool
+    {% when PrimSubtype::Float32 %} f32
+    {% when PrimSubtype::Float64 %} f64
+    {% when PrimSubtype::Int8 %} i8
+    {% when PrimSubtype::Int16 %} i16
+    {% when PrimSubtype::Int32 %} i32
+    {% when PrimSubtype::Int64 %} i64
+    {% when PrimSubtype::Uint8 %} u8
+    {% when PrimSubtype::Uint16 %} u16
+    {% when PrimSubtype::Uint32 %} u32
+    {% when PrimSubtype::Uint64 %} u64
+{% endmatch %}

@@ -2,7 +2,8 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
+#[derive(Debug)]
 #[repr(u32)]
 pub enum MyEmptyFlexibleEnum {
     Unknown(u32),
@@ -44,7 +45,9 @@ impl ::fidl_next::TakeFrom<WireMyEmptyFlexibleEnum> for MyEmptyFlexibleEnum {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+/// The wire type corresponding to [`MyEmptyFlexibleEnum`].
+#[derive(Clone, Copy)]
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct WireMyEmptyFlexibleEnum {
     value: ::fidl_next::u32_le,
@@ -74,7 +77,8 @@ impl ::core::convert::From<MyEmptyFlexibleEnum> for WireMyEmptyFlexibleEnum {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
+#[derive(Debug)]
 #[repr(u32)]
 pub enum MyFlexibleEnum {
     Foo = 1,
@@ -98,7 +102,9 @@ where
         ::fidl_next::munge!(let WireMyFlexibleEnum { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
             Self::Foo => 1,
+
             Self::Bar => 2,
+
             Self::Unknown(value) => value,
         });
 
@@ -110,7 +116,9 @@ impl ::core::convert::From<WireMyFlexibleEnum> for MyFlexibleEnum {
     fn from(wire: WireMyFlexibleEnum) -> Self {
         match u32::from(wire.value) {
             1 => Self::Foo,
+
             2 => Self::Bar,
+
             value => Self::Unknown(value),
         }
     }
@@ -122,7 +130,9 @@ impl ::fidl_next::TakeFrom<WireMyFlexibleEnum> for MyFlexibleEnum {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+/// The wire type corresponding to [`MyFlexibleEnum`].
+#[derive(Clone, Copy)]
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct WireMyFlexibleEnum {
     value: ::fidl_next::u32_le,
@@ -131,6 +141,7 @@ pub struct WireMyFlexibleEnum {
 impl WireMyFlexibleEnum {
     pub const FOO: WireMyFlexibleEnum =
         WireMyFlexibleEnum { value: ::fidl_next::u32_le::from_native(1) };
+
     pub const BAR: WireMyFlexibleEnum =
         WireMyFlexibleEnum { value: ::fidl_next::u32_le::from_native(2) };
 }
@@ -151,7 +162,9 @@ impl ::core::convert::From<MyFlexibleEnum> for WireMyFlexibleEnum {
     fn from(natural: MyFlexibleEnum) -> Self {
         match natural {
             MyFlexibleEnum::Foo => WireMyFlexibleEnum::FOO,
+
             MyFlexibleEnum::Bar => WireMyFlexibleEnum::BAR,
+
             MyFlexibleEnum::Unknown(value) => {
                 WireMyFlexibleEnum { value: ::fidl_next::u32_le::from(value) }
             }
@@ -159,7 +172,8 @@ impl ::core::convert::From<MyFlexibleEnum> for WireMyFlexibleEnum {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
+#[derive(Debug)]
 #[repr(u32)]
 pub enum MyFlexibleEnumWithCustomUnknown {
     Foo = 1,
@@ -184,8 +198,11 @@ where
         ::fidl_next::munge!(let WireMyFlexibleEnumWithCustomUnknown { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
             Self::Foo => 1,
+
             Self::Bar => 2,
+
             Self::CustomUnknown => 3,
+
             Self::Unknown(value) => value,
         });
 
@@ -199,8 +216,11 @@ impl ::core::convert::From<WireMyFlexibleEnumWithCustomUnknown>
     fn from(wire: WireMyFlexibleEnumWithCustomUnknown) -> Self {
         match u32::from(wire.value) {
             1 => Self::Foo,
+
             2 => Self::Bar,
+
             3 => Self::CustomUnknown,
+
             value => Self::Unknown(value),
         }
     }
@@ -214,7 +234,9 @@ impl ::fidl_next::TakeFrom<WireMyFlexibleEnumWithCustomUnknown>
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+/// The wire type corresponding to [`MyFlexibleEnumWithCustomUnknown`].
+#[derive(Clone, Copy)]
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct WireMyFlexibleEnumWithCustomUnknown {
     value: ::fidl_next::u32_le,
@@ -223,8 +245,10 @@ pub struct WireMyFlexibleEnumWithCustomUnknown {
 impl WireMyFlexibleEnumWithCustomUnknown {
     pub const FOO: WireMyFlexibleEnumWithCustomUnknown =
         WireMyFlexibleEnumWithCustomUnknown { value: ::fidl_next::u32_le::from_native(1) };
+
     pub const BAR: WireMyFlexibleEnumWithCustomUnknown =
         WireMyFlexibleEnumWithCustomUnknown { value: ::fidl_next::u32_le::from_native(2) };
+
     pub const CUSTOM_UNKNOWN: WireMyFlexibleEnumWithCustomUnknown =
         WireMyFlexibleEnumWithCustomUnknown { value: ::fidl_next::u32_le::from_native(3) };
 }
@@ -247,10 +271,13 @@ impl ::core::convert::From<MyFlexibleEnumWithCustomUnknown>
     fn from(natural: MyFlexibleEnumWithCustomUnknown) -> Self {
         match natural {
             MyFlexibleEnumWithCustomUnknown::Foo => WireMyFlexibleEnumWithCustomUnknown::FOO,
+
             MyFlexibleEnumWithCustomUnknown::Bar => WireMyFlexibleEnumWithCustomUnknown::BAR,
+
             MyFlexibleEnumWithCustomUnknown::CustomUnknown => {
                 WireMyFlexibleEnumWithCustomUnknown::CUSTOM_UNKNOWN
             }
+
             MyFlexibleEnumWithCustomUnknown::Unknown(value) => {
                 WireMyFlexibleEnumWithCustomUnknown { value: ::fidl_next::u32_le::from(value) }
             }
@@ -258,7 +285,8 @@ impl ::core::convert::From<MyFlexibleEnumWithCustomUnknown>
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
+#[derive(Debug)]
 #[repr(u32)]
 pub enum MyStrictEnum {
     Foo = 1,
@@ -281,6 +309,7 @@ where
         ::fidl_next::munge!(let WireMyStrictEnum { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
             Self::Foo => 1,
+
             Self::Bar => 2,
         });
 
@@ -292,7 +321,9 @@ impl ::core::convert::From<WireMyStrictEnum> for MyStrictEnum {
     fn from(wire: WireMyStrictEnum) -> Self {
         match u32::from(wire.value) {
             1 => Self::Foo,
+
             2 => Self::Bar,
+
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -304,7 +335,9 @@ impl ::fidl_next::TakeFrom<WireMyStrictEnum> for MyStrictEnum {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+/// The wire type corresponding to [`MyStrictEnum`].
+#[derive(Clone, Copy)]
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct WireMyStrictEnum {
     value: ::fidl_next::u32_le,
@@ -313,6 +346,7 @@ pub struct WireMyStrictEnum {
 impl WireMyStrictEnum {
     pub const FOO: WireMyStrictEnum =
         WireMyStrictEnum { value: ::fidl_next::u32_le::from_native(1) };
+
     pub const BAR: WireMyStrictEnum =
         WireMyStrictEnum { value: ::fidl_next::u32_le::from_native(2) };
 }
@@ -340,6 +374,7 @@ impl ::core::convert::From<MyStrictEnum> for WireMyStrictEnum {
     fn from(natural: MyStrictEnum) -> Self {
         match natural {
             MyStrictEnum::Foo => WireMyStrictEnum::FOO,
+
             MyStrictEnum::Bar => WireMyStrictEnum::BAR,
         }
     }

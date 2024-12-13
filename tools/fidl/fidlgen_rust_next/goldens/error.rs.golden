@@ -23,9 +23,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 s,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.s, encoder, s)?;
+
         Ok(())
     }
 }
@@ -61,6 +64,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireExampleFooRequest<'buf>> for ExampleFooRequ
     }
 }
 
+/// The wire type corersponding to [`ExampleFooRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireExampleFooRequest<'buf> {
@@ -80,9 +84,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut s,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(s.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -108,9 +115,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 y,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.y, encoder, y)?;
+
         Ok(())
     }
 }
@@ -146,6 +156,7 @@ impl ::fidl_next::TakeFrom<WireExampleFooResponse> for ExampleFooResponse {
     }
 }
 
+/// The wire type corersponding to [`ExampleFooResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireExampleFooResponse {
@@ -165,17 +176,20 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut y,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(y.as_mut(), decoder)?;
+
         Ok(())
     }
 }
 
 #[derive(Clone, Debug)]
-
 pub enum ExampleFooResult {
     Response(crate::ExampleFooResponse),
+
     Err(u32),
 }
 
@@ -188,6 +202,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
 
     crate::ExampleFooResponse: ::fidl_next::Encode<___E>,
+
     u32: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -202,6 +217,7 @@ where
                 ___E,
                 crate::ExampleFooResponse,
             >(value, 1, encoder, raw)?,
+
             Self::Err(value) => {
                 ::fidl_next::RawWireUnion::encode_as::<___E, u32>(value, 2, encoder, raw)?
             }
@@ -266,6 +282,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalExampleFooResult<'buf>>
     }
 }
 
+/// The wire type corresponding to [`ExampleFooResult`].
 #[repr(transparent)]
 pub struct WireExampleFooResult<'buf> {
     raw: ::fidl_next::RawWireUnion,
@@ -274,11 +291,13 @@ pub struct WireExampleFooResult<'buf> {
 
 pub enum WireExampleFooResultRef<'union> {
     Response(&'union crate::WireExampleFooResponse),
+
     Err(&'union ::fidl_next::u32_le),
 }
 
 pub enum WireExampleFooResultMut<'union> {
     Response(&'union mut crate::WireExampleFooResponse),
+
     Err(&'union mut ::fidl_next::u32_le),
 }
 
@@ -288,6 +307,7 @@ impl<'buf> WireExampleFooResult<'buf> {
             1 => WireExampleFooResultRef::Response(unsafe { self.raw.get().deref_unchecked() }),
 
             2 => WireExampleFooResultRef::Err(unsafe { self.raw.get().deref_unchecked() }),
+
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -299,6 +319,7 @@ impl<'buf> WireExampleFooResult<'buf> {
             }),
 
             2 => WireExampleFooResultMut::Err(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -309,6 +330,7 @@ where
     ___D: ::fidl_next::Decoder<'buf>,
 
     crate::WireExampleFooResponse: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -320,6 +342,7 @@ where
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireExampleFooResponse>(
                 raw, decoder,
             )?,
+
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -336,7 +359,6 @@ impl<'buf> ::core::fmt::Debug for WireExampleFooResult<'buf> {
                 self.raw.get().deref_unchecked::<crate::WireExampleFooResponse>().fmt(f)
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
-
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -396,6 +418,7 @@ where
     ___D: ::fidl_next::Decoder<'buf>,
 
     crate::WireExampleFooResponse: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -407,6 +430,7 @@ where
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireExampleFooResponse>(
                 raw, decoder,
             )?,
+
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,

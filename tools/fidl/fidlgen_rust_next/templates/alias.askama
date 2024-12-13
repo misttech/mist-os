@@ -1,0 +1,12 @@
+{% let name = alias.name.decl_name().camel() %}
+{% let is_static = alias.ty.shape.max_out_of_line == 0 %}
+{% let natural_ty = compiler.natural_type(alias.ty) %}
+{% let wire_ty = compiler.wire_type(alias.ty) %}
+
+{% if let Some(doc) = alias.attributes.doc_string() %}
+    #[doc = "{{ doc.escape_default() }}"]
+{% endif %}
+pub type {{ name }} = {{ natural_ty }};
+
+/// The wire type corresponding to [`{{ name }}`].
+pub type Wire{{ name }}{% if !is_static %}<'buf>{% endif %} = {{ wire_ty }};

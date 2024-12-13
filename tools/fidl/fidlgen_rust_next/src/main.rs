@@ -31,6 +31,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use argh::FromArgs;
+use askama::Template;
 
 use self::compiler::{Compiler, Config, ResourceBindings};
 use self::ir::Schema;
@@ -60,9 +61,9 @@ fn main() {
         .expect("failed to parse source JSON IR");
 
     let config = Config { emit_debug_impls: true, resource_bindings: ResourceBindings::default() };
-    let mut compiler = Compiler::new(&schema, config);
+    let compiler = Compiler::new(&schema, config);
     let out = File::create(&args.output_filename).expect("failed to create output file");
-    compiler.emit(&mut BufWriter::new(out)).expect("failed to emit FIDL bindings");
+    compiler.write_into(&mut BufWriter::new(out)).expect("failed to emit FIDL bindings");
 
     Command::new(args.rustfmt)
         .arg("--config-path")

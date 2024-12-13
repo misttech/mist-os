@@ -17,6 +17,7 @@ impl<___E> ::fidl_next::Encode<___E> for Empty {
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
+
             } = slot;
         }
 
@@ -55,6 +56,7 @@ impl ::fidl_next::TakeFrom<WireEmpty> for Empty {
     }
 }
 
+/// The wire type corersponding to [`Empty`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmpty {}
@@ -69,6 +71,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge! {
             let Self {
+
             } = slot;
         }
 
@@ -97,9 +100,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 e,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.e, encoder, e)?;
+
         Ok(())
     }
 }
@@ -135,6 +141,7 @@ impl ::fidl_next::TakeFrom<WireEmptyProtocolSendRequest> for EmptyProtocolSendRe
     }
 }
 
+/// The wire type corersponding to [`EmptyProtocolSendRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmptyProtocolSendRequest {
@@ -154,9 +161,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut e,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(e.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -182,9 +192,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 e,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.e, encoder, e)?;
+
         Ok(())
     }
 }
@@ -220,6 +233,7 @@ impl ::fidl_next::TakeFrom<WireEmptyProtocolReceiveRequest> for EmptyProtocolRec
     }
 }
 
+/// The wire type corersponding to [`EmptyProtocolReceiveRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmptyProtocolReceiveRequest {
@@ -239,9 +253,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut e,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(e.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -267,9 +284,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 e,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.e, encoder, e)?;
+
         Ok(())
     }
 }
@@ -307,6 +327,7 @@ impl ::fidl_next::TakeFrom<WireEmptyProtocolSendAndReceiveRequest>
     }
 }
 
+/// The wire type corersponding to [`EmptyProtocolSendAndReceiveRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmptyProtocolSendAndReceiveRequest {
@@ -326,9 +347,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut e,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(e.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -354,9 +378,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 e,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.e, encoder, e)?;
+
         Ok(())
     }
 }
@@ -394,6 +421,7 @@ impl ::fidl_next::TakeFrom<WireEmptyProtocolSendAndReceiveResponse>
     }
 }
 
+/// The wire type corersponding to [`EmptyProtocolSendAndReceiveResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmptyProtocolSendAndReceiveResponse {
@@ -413,9 +441,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut e,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(e.as_mut(), decoder)?;
+
         Ok(())
     }
 }
