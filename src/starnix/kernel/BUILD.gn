@@ -560,6 +560,7 @@ rustc_library("starnix_logging") {
     "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/fuchsia-runtime",
     "//src/lib/trace/rust:trace",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",

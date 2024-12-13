@@ -17,7 +17,7 @@ use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use macro_rules_attribute::apply;
-use starnix_logging::{log_debug, log_warn, set_zx_name};
+use starnix_logging::{log_debug, log_warn, set_current_task_info, set_zx_name};
 use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock, TaskRelease};
 use starnix_types::ownership::{
     OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef,
@@ -41,7 +41,7 @@ use std::collections::VecDeque;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::{cmp, fmt};
 use zx::{
     AsHandleRef, Signals, Task as _, {self as zx},
@@ -951,9 +951,6 @@ pub struct Task {
     /// filters without holding a lock
     pub seccomp_filter_state: SeccompState,
 
-    /// Used to ensure that all logs related to this task carry the same metadata about the task.
-    logging_span: OnceLock<starnix_logging::Span>,
-
     /// Tell you whether you are tracing syscall entry / exit without a lock.
     pub trace_syscalls: AtomicBool,
 
@@ -1126,7 +1123,6 @@ impl Task {
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,
-            logging_span: OnceLock::new(),
             trace_syscalls: AtomicBool::new(false),
             proc_pid_directory_cache: Mutex::new(None),
             security_state,
@@ -1461,21 +1457,16 @@ impl Task {
             );
         }
 
-        let debug_info = starnix_logging::TaskDebugInfo {
-            pid: self.thread_group.leader,
-            tid: self.id,
-            command: name,
-        };
-        self.update_logging_span(&debug_info);
+        set_current_task_info(&name, self.thread_group.leader, self.id);
 
         // Truncate to 16 bytes, including null byte.
-        let bytes = debug_info.command.to_bytes();
+        let bytes = name.to_bytes();
 
         self.persistent_info.lock().command = if bytes.len() > 15 {
             // SAFETY: Substring of a CString will contain no null bytes.
             CString::new(&bytes[..15]).unwrap()
         } else {
-            debug_info.command
+            name
         };
     }
 
@@ -1510,23 +1501,6 @@ impl Task {
             // TODO(https://fxbug.dev/42078242): How can we calculate system time?
             system_time: zx::MonotonicDuration::default(),
         }
-    }
-
-    pub fn logging_span(&self) -> starnix_logging::Span {
-        let logging_span = self.logging_span.get_or_init(|| {
-            starnix_logging::Span::new(&starnix_logging::TaskDebugInfo {
-                pid: self.thread_group.leader,
-                tid: self.id,
-                command: self.command(),
-            })
-        });
-        logging_span.clone()
-    }
-
-    fn update_logging_span(&self, debug_info: &starnix_logging::TaskDebugInfo) {
-        let logging_span =
-            self.logging_span.get_or_init(|| starnix_logging::Span::new(&debug_info));
-        logging_span.update(debug_info);
     }
 
     pub fn get_signal_action(&self, signal: Signal) -> sigaction {

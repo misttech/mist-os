@@ -22,7 +22,7 @@ use fuchsia_inspect::NumericProperty;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
 use starnix_logging::{
     firehose_trace_duration, firehose_trace_duration_begin, firehose_trace_duration_end,
-    firehose_trace_instant, log_error, log_trace, log_warn, set_zx_name, ARG_NAME,
+    firehose_trace_instant, log_error, log_trace, log_warn, set_current_task_info, ARG_NAME,
     CATEGORY_STARNIX, NAME_EXECUTE_SYSCALL, NAME_HANDLE_EXCEPTION, NAME_READ_RESTRICTED_STATE,
     NAME_RESTRICTED_KICK, NAME_RUN_TASK, NAME_WRITE_RESTRICTED_STATE,
 };
@@ -198,9 +198,11 @@ fn run_task(
 ) -> Result<ExitStatus, Error> {
     let mut profiling_guard = ProfileDuration::enter("TaskLoopSetup");
 
-    set_zx_name(&fuchsia_runtime::thread_self(), current_task.command().as_bytes());
-    let span = current_task.logging_span();
-    let _span_guard = span.enter();
+    set_current_task_info(
+        &current_task.task.command(),
+        current_task.task.thread_group.leader,
+        current_task.id,
+    );
 
     firehose_trace_duration!(CATEGORY_STARNIX, NAME_RUN_TASK);
 
