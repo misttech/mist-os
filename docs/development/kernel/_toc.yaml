@@ -24,3 +24,5 @@ toc:
   path: /docs/development/kernel/time.md
 - title: "Notes on kernel development"
   path: /docs/development/kernel/notes_on_kernel_development.md
+- title: "Adding a new object type"
+  path: /docs/development/kernel/adding_an_object_type.md
