@@ -200,13 +200,13 @@ class HidDeviceTest : public ::testing::Test {
                       auto result = client->ReadReport();
                       ASSERT_TRUE(result.ok());
                       ASSERT_TRUE(result->is_ok());
-                      ASSERT_TRUE(result.value()->report.has_buf());
-                      ASSERT_TRUE(result.value()->report.buf().count() <= report_size);
+                      ASSERT_TRUE(result.value()->has_buf());
+                      ASSERT_TRUE(result.value()->buf().count() <= report_size);
 
-                      for (size_t i = 0; i < result.value()->report.buf().count(); i++) {
-                        report_data[i] = result.value()->report.buf()[i];
+                      for (size_t i = 0; i < result.value()->buf().count(); i++) {
+                        report_data[i] = result.value()->buf()[i];
                       }
-                      *returned_size = result.value()->report.buf().count();
+                      *returned_size = result.value()->buf().count();
                     })
                     .is_ok());
   }
@@ -294,8 +294,8 @@ TEST_F(HidDeviceTest, BootMouseSendReportWithTime) {
                     auto result = client->ReadReport();
                     ASSERT_TRUE(result.ok());
                     ASSERT_TRUE(result->is_ok());
-                    ASSERT_TRUE(result.value()->report.has_timestamp());
-                    ASSERT_EQ(result.value()->report.timestamp(), kTimestamp);
+                    ASSERT_TRUE(result.value()->has_timestamp());
+                    ASSERT_EQ(result.value()->timestamp(), kTimestamp);
                   })
                   .is_ok());
   ASSERT_NO_FATAL_FAILURE();
@@ -385,10 +385,10 @@ TEST_F(HidDeviceTest, ReadReportSingleReport) {
                     auto result = client->ReadReport();
                     ASSERT_TRUE(result.ok());
                     ASSERT_TRUE(result->is_ok());
-                    ASSERT_EQ(time, result.value()->report.timestamp());
-                    ASSERT_EQ(sizeof(mouse_report), result.value()->report.buf().count());
-                    for (size_t i = 0; i < result.value()->report.buf().count(); i++) {
-                      EXPECT_EQ(mouse_report[i], result.value()->report.buf()[i]);
+                    ASSERT_EQ(time, result.value()->timestamp());
+                    ASSERT_EQ(sizeof(mouse_report), result.value()->buf().count());
+                    for (size_t i = 0; i < result.value()->buf().count(); i++) {
+                      EXPECT_EQ(mouse_report[i], result.value()->buf()[i]);
                     }
                   })
                   .is_ok());
@@ -421,11 +421,11 @@ TEST_F(HidDeviceTest, ReadReportDoubleReport) {
                     auto result = client->ReadReport();
                     ASSERT_TRUE(result.ok());
                     ASSERT_TRUE(result->is_ok());
-                    ASSERT_EQ(time, result.value()->report.timestamp());
+                    ASSERT_EQ(time, result.value()->timestamp());
                     ASSERT_EQ(sizeof(hid_boot_mouse_report_t),
-                              result.value()->report.buf().count());
-                    for (size_t i = 0; i < result.value()->report.buf().count(); i++) {
-                      EXPECT_EQ(double_mouse_report[i], result.value()->report.buf()[i]);
+                              result.value()->buf().count());
+                    for (size_t i = 0; i < result.value()->buf().count(); i++) {
+                      EXPECT_EQ(double_mouse_report[i], result.value()->buf()[i]);
                     }
                   })
                   .is_ok());
@@ -435,12 +435,12 @@ TEST_F(HidDeviceTest, ReadReportDoubleReport) {
                     auto result = client->ReadReport();
                     ASSERT_TRUE(result.ok());
                     ASSERT_TRUE(result->is_ok());
-                    ASSERT_EQ(time, result.value()->report.timestamp());
+                    ASSERT_EQ(time, result.value()->timestamp());
                     ASSERT_EQ(sizeof(hid_boot_mouse_report_t),
-                              result.value()->report.buf().count());
-                    for (size_t i = 0; i < result.value()->report.buf().count(); i++) {
+                              result.value()->buf().count());
+                    for (size_t i = 0; i < result.value()->buf().count(); i++) {
                       EXPECT_EQ(double_mouse_report[i + sizeof(hid_boot_mouse_report_t)],
-                                result.value()->report.buf()[i]);
+                                result.value()->buf()[i]);
                     }
                   })
                   .is_ok());

@@ -232,15 +232,15 @@ static zx_status_t hid_input_read_report(input_args_t* args, const zx::event& re
       report_event.wait_one(ZX_USER_SIGNAL_0, zx::time::infinite(), nullptr);
       continue;
     }
-    if (!result.value()->report.has_buf()) {
+    if (!result.value()->has_buf()) {
       return ZX_ERR_INTERNAL;
     }
-    if (result.value()->report.buf().count() > report_size) {
+    if (result.value()->buf().count() > report_size) {
       return ZX_ERR_BUFFER_TOO_SMALL;
     }
 
-    *returned_size = result.value()->report.buf().count();
-    memcpy(report_data, result.value()->report.buf().data(), result.value()->report.buf().count());
+    *returned_size = result.value()->buf().count();
+    memcpy(report_data, result.value()->buf().data(), result.value()->buf().count());
 
     return ZX_OK;
   }

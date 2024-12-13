@@ -79,9 +79,7 @@ closed protocol Hidbus {
     /// Timestamp should be whenever the report was created. Ideally it should
     /// come from the driver's IRQ callback. If the driver doesn't have
     /// something like that it should fill this with `zx_clock_get_monotonic()`
-    strict -> OnReportReceived(resource struct {
-        report Report;
-    });
+    strict -> OnReportReceived(Report);
 
     /// Methods matching HID spec 1.11 Chapter 7 Requests
     /// 7.1.1 Get_Descriptor
