@@ -88,7 +88,7 @@ impl<'a> Iterator for Split<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::IdExt as _;
+    use crate::id::IdExt as _;
     use crate::ir::Id;
 
     const TEST_CASES: &[&str] = &[

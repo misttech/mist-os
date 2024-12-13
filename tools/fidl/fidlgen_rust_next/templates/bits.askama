@@ -1,7 +1,7 @@
 {% let name = bits.name.decl_name().camel() %}
 {% let subtype = self.subtype() %}
-{% let natural_subtype = compiler.natural_prim(subtype) %}
-{% let wire_subtype = compiler.wire_prim(subtype) %}
+{% let natural_subtype = context.natural_prim(subtype) %}
+{% let wire_subtype = context.wire_prim(subtype) %}
 
 {% if let Some(doc) = bits.attributes.doc_string() %}
     #[doc = "{{ doc.escape_default() }}"]
@@ -10,7 +10,7 @@
     #[derive(
         Clone,
         Copy,
-        {% if compiler.config.emit_debug_impls -%}
+        {% if context.config.emit_debug_impls -%}
             Debug,
         {%- endif %}
         PartialEq,
@@ -65,7 +65,7 @@ impl ::fidl_next::TakeFrom<Wire{{ name }}> for {{ name }} {
 #[derive(
     Clone,
     Copy,
-    {% if compiler.config.emit_debug_impls -%}
+    {% if context.config.emit_debug_impls -%}
         Debug,
     {%- endif %}
 )]

@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub struct Config {
+    pub emit_debug_impls: bool,
+    pub resource_bindings: ResourceBindings,
+}
+
 pub struct ResourceBinding {
     pub wire_path: String,
     pub optional_wire_path: String,

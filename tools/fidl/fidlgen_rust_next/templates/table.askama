@@ -7,13 +7,13 @@
 {% if !table.is_resource %}
     Clone,
 {% endif %}
-{% if compiler.config.emit_debug_impls %}
+{% if context.config.emit_debug_impls %}
     Debug,
 {% endif %}
 )]
 pub struct {{ name }} {
     {% for member in table.members %}
-        pub {{ member.name.snake() }}: Option<{{ compiler.natural_type(member.ty) }}>,
+        pub {{ member.name.snake() }}: Option<{{ context.natural_type(member.ty) }}>,
     {% endfor %}
 }
 
@@ -34,7 +34,7 @@ impl<___E> ::fidl_next::Encode<___E> for {{ name }}
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     {% for member in table.members %}
-        {{ compiler.natural_type(member.ty) }}: ::fidl_next::Encode<___E>,
+        {{ context.natural_type(member.ty) }}: ::fidl_next::Encode<___E>,
     {% endfor %}
 {
     fn encode(
@@ -96,7 +96,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for Wire{{ name }}<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
     {% for member in table.members %}
-        {{ compiler.wire_type(member.ty) }}: ::fidl_next::Decode<___D>,
+        {{ context.wire_type(member.ty) }}: ::fidl_next::Decode<___D>,
     {% endfor %}
 {
     fn decode(
@@ -115,7 +115,7 @@ where
                     {{ member.ordinal }} => {
                         ::fidl_next::WireEnvelope::decode_as::<
                             ___D,
-                            {{ compiler.wire_type(member.ty) }},
+                            {{ context.wire_type(member.ty) }},
                         >(slot.as_mut(), decoder)?;
                         {# type check #}
                         {% match member.ty.kind -%}
@@ -126,7 +126,7 @@ where
                                         slot
                                             .deref_unchecked()
                                             .deref_unchecked::<
-                                                {{ compiler.wire_type(member.ty) }}
+                                                {{ context.wire_type(member.ty) }}
                                             >()
                                     };
                                     {% if nullable -%}
@@ -148,7 +148,7 @@ where
                                         slot
                                             .deref_unchecked()
                                             .deref_unchecked::<
-                                                {{ compiler.wire_type(member.ty) }}
+                                                {{ context.wire_type(member.ty) }}
                                             >()
                                     };
                                     {% if nullable -%}
@@ -180,19 +180,19 @@ impl<'buf> Wire{{ name }}<'buf> {
     {% for member in table.members %}
         {% let member_name = member.name.snake() %}
 
-        pub fn {{ member_name }}(&self) -> Option<&{{ compiler.wire_type(member.ty) }}> {
+        pub fn {{ member_name }}(&self) -> Option<&{{ context.wire_type(member.ty) }}> {
             unsafe {
                 Some(self.table.get({{ member.ordinal }})?.deref_unchecked())
             }
         }
 
-        pub fn {{ member_name }}_mut(&mut self) -> Option<&mut {{ compiler.wire_type(member.ty) }}> {
+        pub fn {{ member_name }}_mut(&mut self) -> Option<&mut {{ context.wire_type(member.ty) }}> {
             unsafe {
                 Some(self.table.get_mut({{ member.ordinal }})?.deref_mut_unchecked())
             }
         }
 
-        pub fn take_{{ member_name }}(&mut self) -> Option<{{ compiler.wire_type(member.ty) }}> {
+        pub fn take_{{ member_name }}(&mut self) -> Option<{{ context.wire_type(member.ty) }}> {
             unsafe {
                 Some(self.table.get_mut({{ member.ordinal }})?.take_unchecked())
             }
@@ -200,7 +200,7 @@ impl<'buf> Wire{{ name }}<'buf> {
     {% endfor %}
 }
 
-{% if compiler.config.emit_debug_impls %}
+{% if context.config.emit_debug_impls %}
     impl ::core::fmt::Debug for Wire{{ name }}<'_> {
         fn fmt(
             &self,

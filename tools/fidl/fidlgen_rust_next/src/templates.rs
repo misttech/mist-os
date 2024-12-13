@@ -5,68 +5,59 @@
 // Templates generate a lot of code which have tendencies to trip lints.
 #![expect(clippy::diverging_sub_expression, dead_code, unreachable_code)]
 
-mod resource_binding;
-mod util;
-
 use askama::Template;
 
-use self::util::IdExt as _;
+use crate::config::Config;
+use crate::id::IdExt as _;
 use crate::ir::*;
-
-pub use self::resource_binding::ResourceBindings;
-
-pub struct Config {
-    pub emit_debug_impls: bool,
-    pub resource_bindings: ResourceBindings,
-}
 
 #[derive(Template)]
 #[template(path = "schema.askama")]
-pub struct Compiler<'a> {
-    schema: &'a Schema,
+pub struct Context {
+    schema: Schema,
     config: Config,
 }
 
-impl<'a> Compiler<'a> {
-    pub fn new(schema: &'a Schema, config: Config) -> Self {
+impl Context {
+    pub fn new(schema: Schema, config: Config) -> Self {
         Self { schema, config }
     }
 
-    fn natural_id<'b>(&'b self, id: &'b CompId) -> PrefixedIdTemplate<'b> {
-        PrefixedIdTemplate { id, prefix: "", compiler: self }
+    fn natural_id<'a>(&'a self, id: &'a CompId) -> PrefixedIdTemplate<'a> {
+        PrefixedIdTemplate { id, prefix: "", context: self }
     }
 
-    fn wire_id<'b>(&'b self, id: &'b CompId) -> PrefixedIdTemplate<'b> {
-        PrefixedIdTemplate { id, prefix: "Wire", compiler: self }
+    fn wire_id<'a>(&'a self, id: &'a CompId) -> PrefixedIdTemplate<'a> {
+        PrefixedIdTemplate { id, prefix: "Wire", context: self }
     }
 
-    fn wire_optional_id<'b>(&'b self, id: &'b CompId) -> PrefixedIdTemplate<'b> {
-        PrefixedIdTemplate { id, prefix: "WireOptional", compiler: self }
+    fn wire_optional_id<'a>(&'a self, id: &'a CompId) -> PrefixedIdTemplate<'a> {
+        PrefixedIdTemplate { id, prefix: "WireOptional", context: self }
     }
 
-    fn natural_constant<'b>(
-        &'b self,
-        constant: &'b Constant,
-        ty: &'b Type,
-    ) -> NaturalConstantTemplate<'b> {
-        NaturalConstantTemplate { constant, ty, compiler: self }
+    fn natural_constant<'a>(
+        &'a self,
+        constant: &'a Constant,
+        ty: &'a Type,
+    ) -> NaturalConstantTemplate<'a> {
+        NaturalConstantTemplate { constant, ty, context: self }
     }
 }
 
 #[derive(Template)]
 #[template(path = "prefixed_id.askama", whitespace = "suppress")]
-struct PrefixedIdTemplate<'b> {
-    id: &'b CompId,
-    prefix: &'b str,
-    compiler: &'b Compiler<'b>,
+struct PrefixedIdTemplate<'a> {
+    id: &'a CompId,
+    prefix: &'a str,
+    context: &'a Context,
 }
 
 #[derive(Template)]
 #[template(path = "natural_constant.askama", whitespace = "suppress")]
-struct NaturalConstantTemplate<'b> {
-    constant: &'b Constant,
-    ty: &'b Type,
-    compiler: &'b Compiler<'b>,
+struct NaturalConstantTemplate<'a> {
+    constant: &'a Constant,
+    ty: &'a Type,
+    context: &'a Context,
 }
 
 macro_rules! template {
@@ -78,12 +69,12 @@ macro_rules! template {
         #[template(path = $path, whitespace = $ws)]
         struct $name<'a> {
             $field: &'a $ir,
-            compiler: &'a Compiler<'a>,
+            context: &'a Context,
         }
 
-        impl Compiler<'_> {
-            fn $fn<'b>(&'b self, $field: &'b $ir) -> $name<'b> {
-                $name { $field, compiler: self }
+        impl Context {
+            fn $fn<'a>(&'a self, $field: &'a $ir) -> $name<'a> {
+                $name { $field, context: self }
             }
         }
     }

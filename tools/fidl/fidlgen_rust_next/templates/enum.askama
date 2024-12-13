@@ -1,6 +1,6 @@
 {% let name = enm.name.decl_name().camel() %}
-{% let natural_int = compiler.natural_int(enm.ty) %}
-{% let wire_int = compiler.wire_int(enm.ty) %}
+{% let natural_int = context.natural_int(enm.ty) %}
+{% let wire_int = context.wire_int(enm.ty) %}
 
 {% if let Some(doc) = enm.attributes.doc_string() %}
     #[doc = "{{ doc.escape_default() }}"]
@@ -8,7 +8,7 @@
 #[derive(
     Clone,
     Copy,
-    {% if compiler.config.emit_debug_impls -%}
+    {% if context.config.emit_debug_impls -%}
         Debug,
     {%- endif %}
 )]
@@ -74,7 +74,7 @@ impl ::fidl_next::TakeFrom<Wire{{ name }}> for {{ name }} {
 #[derive(
     Clone,
     Copy,
-    {% if compiler.config.emit_debug_impls -%}
+    {% if context.config.emit_debug_impls -%}
         Debug,
     {%- endif %}
 )]

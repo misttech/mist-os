@@ -13,10 +13,9 @@ if (is_host) {
   rustc_binary("fidlgen_rust_next") {
     edition = "2021"
     sources = [
-      "src/compiler/mod.rs",
-      "src/compiler/resource_binding.rs",
-      "src/compiler/util.rs",
+      "src/config.rs",
       "src/de.rs",
+      "src/id.rs",
       "src/ir/attribute.rs",
       "src/ir/bits.rs",
       "src/ir/const.rs",
@@ -36,6 +35,7 @@ if (is_host) {
       "src/ir/type_shape.rs",
       "src/ir/union.rs",
       "src/main.rs",
+      "src/templates.rs",
     ]
     deps = [
       "//third_party/rust_crates:argh",

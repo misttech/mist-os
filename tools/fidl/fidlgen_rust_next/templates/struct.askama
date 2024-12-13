@@ -15,13 +15,13 @@
     {% if !strct.is_resource %}
         Clone,
     {% endif %}
-    {% if compiler.config.emit_debug_impls %}
+    {% if context.config.emit_debug_impls %}
         Debug,
     {% endif %}
 )]
 pub struct {{ name }} {
     {% for member in strct.members %}
-        pub {{ member.name.snake() }}: {{ compiler.natural_type(member.ty) }},
+        pub {{ member.name.snake() }}: {{ context.natural_type(member.ty) }},
     {% endfor %}
 }
 
@@ -32,7 +32,7 @@ impl ::fidl_next::Encodable for {{ name }} {
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
 where
     {% for member in strct.members %}
-        {{ compiler.natural_type(member.ty) }}: ::fidl_next::Encode<___E>,
+        {{ context.natural_type(member.ty) }}: ::fidl_next::Encode<___E>,
     {% endfor %}
 {
     fn encode(
@@ -96,14 +96,14 @@ impl{{ params }} ::fidl_next::TakeFrom<Wire{{ name }}{{ params }}> for {{ name }
     {% if is_static && !strct.is_resource %}
         Clone,
     {% endif %}
-    {% if compiler.config.emit_debug_impls %}
+    {% if context.config.emit_debug_impls %}
         Debug,
     {% endif %}
 )]
 #[repr(C)]
 pub struct Wire{{ name }}{{ params }} {
     {% for member in strct.members %}
-        pub {{ member.name.snake() }}: {{ compiler.wire_type(member.ty) }},
+        pub {{ member.name.snake() }}: {{ context.wire_type(member.ty) }},
     {% endfor %}
 }
 
@@ -111,7 +111,7 @@ unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> 
 where
     ___D: ?Sized,
     {% for member in strct.members %}
-        {{ compiler.wire_type(member.ty) }}: ::fidl_next::Decode<___D>,
+        {{ context.wire_type(member.ty) }}: ::fidl_next::Decode<___D>,
     {% endfor %}
 {
     fn decode(

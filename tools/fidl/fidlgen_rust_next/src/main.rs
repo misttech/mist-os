@@ -21,9 +21,11 @@
 )]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
-mod compiler;
+mod config;
 mod de;
+mod id;
 mod ir;
+mod templates;
 
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
@@ -33,8 +35,9 @@ use std::process::Command;
 use argh::FromArgs;
 use askama::Template;
 
-use self::compiler::{Compiler, Config, ResourceBindings};
+use self::config::{Config, ResourceBindings};
 use self::ir::Schema;
+use self::templates::Context;
 
 /// Generate Rust bindings from FIDL IR
 #[derive(FromArgs)]
@@ -61,9 +64,9 @@ fn main() {
         .expect("failed to parse source JSON IR");
 
     let config = Config { emit_debug_impls: true, resource_bindings: ResourceBindings::default() };
-    let compiler = Compiler::new(&schema, config);
+    let context = Context::new(schema, config);
     let out = File::create(&args.output_filename).expect("failed to create output file");
-    compiler.write_into(&mut BufWriter::new(out)).expect("failed to emit FIDL bindings");
+    context.write_into(&mut BufWriter::new(out)).expect("failed to emit FIDL bindings");
 
     Command::new(args.rustfmt)
         .arg("--config-path")
