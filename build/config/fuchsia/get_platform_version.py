@@ -52,24 +52,24 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
     retired_api_levels: list[int] = [
         int(level)
         for level in api_levels
-        if api_levels[level]["status"] == "unsupported"
+        if api_levels[level]["phase"] == "retired"
     ]
     sunset_api_levels: list[int] = [
         int(level)
         for level in api_levels
-        if api_levels[level]["status"] == "sunset"
+        if api_levels[level]["phase"] == "sunset"
     ]
     supported_api_levels: list[int] = [
         int(level)
         for level in api_levels
-        if api_levels[level]["status"] == "supported"
+        if api_levels[level]["phase"] == "supported"
     ]
 
     assert len(api_levels) == (
         len(retired_api_levels)
         + len(sunset_api_levels)
         + len(supported_api_levels)
-    ), '"api_levels" contains a level with an unexpected "status".'
+    ), '"api_levels" contains a level with an unexpected "phase".'
 
     # Special API levels are added below.
     runtime_supported_api_levels = sunset_api_levels + supported_api_levels
@@ -80,7 +80,7 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
     runtime_supported_api_levels += ["NEXT", "HEAD"]
     idk_buildable_api_levels += ["NEXT"]
 
-    # Validate the JSON data, including the specific levels and their status.
+    # Validate the JSON data, including the specific levels and their phase.
     expected_special_levels = ["NEXT", "HEAD", "PLATFORM"]
     special_api_levels = data["data"]["special_api_levels"]
     assert len(special_api_levels) == len(expected_special_levels)
@@ -89,7 +89,6 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         assert (
             level == expected_level
         ), f'Special API level "{level}" is in the position expected to contain "{expected_level}".'
-        assert special_api_levels[level]["status"] == "in-development"
 
     return {
         # All numbered API levels in the JSON file.

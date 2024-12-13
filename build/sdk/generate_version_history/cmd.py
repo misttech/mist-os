@@ -63,6 +63,10 @@ def main() -> None:
         version_history, daily_commit_hash, daily_commit_timestamp
     )
 
+    # TODO(https://fxbug.dev/383361369): Delete this once all clients have been
+    # updated to use "phase".
+    generate_version_history.add_deprecated_status_field(version_history)
+
     with args.output.open("w") as f:
         json.dump(version_history, f, indent=2)
 

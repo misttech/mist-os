@@ -49,3 +49,28 @@ def replace_special_abi_revisions(
             )
         else:
             assert False, "Unknown special API level: %s" % level
+
+
+def add_deprecated_status_field(version_history: Any) -> None:
+    """Modifies `version_history` to add a `status` field to each API level and
+    special API level, based on the newer "phase" field.
+
+    TODO(https://fxbug.dev/383361369): Delete this once all clients have been
+    updated to use "phase".
+    """
+    for value in version_history["data"]["api_levels"].values():
+        phase = value.get("phase")
+        if phase == "retired":
+            value["status"] = "unsupported"
+        elif phase == "sunset":
+            # Sunset doesn't have a precisely analogous "status" - we'll
+            # consider sunset levels "unsupported" in the old model, to be
+            # safe.
+            value["status"] = "unsupported"
+        elif phase == "supported":
+            value["status"] = "supported"
+        else:
+            assert False, f"Unknown phase: {phase}"
+
+    for value in version_history["data"]["special_api_levels"].values():
+        value["status"] = "in-development"
