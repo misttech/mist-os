@@ -14,6 +14,7 @@ type AdcChannel = table {
     2: name string:ADC_NAME_MAX_LENGTH;
 };
 
+@serializable
 type Metadata = table {
     /// ADC Channels to expose.
     1: channels vector<AdcChannel>:MAX;

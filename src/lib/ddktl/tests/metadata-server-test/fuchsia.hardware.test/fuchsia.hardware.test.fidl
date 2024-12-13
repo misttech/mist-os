@@ -8,6 +8,7 @@ using zx;
 
 const METADATA_TYPE_NAME string = "fuchsia.hardware.test.Metadata";
 
+@serializable
 type Metadata = table {
     1: test_property string:MAX;
 };
