@@ -153,7 +153,7 @@ are visible to readers in the HTML page source.
 ### Single-line comments
 
 <pre class="prettyprint lang-html">{% verbatim %}
-{# This is a single line comment #}{% endverbatim %}
+&#123;# This is a single line comment #}{% endverbatim %}
 </pre>
 
 ### Multi-line comments
@@ -386,7 +386,7 @@ In the main text, include a label[^1] that starts with a caret.
 {% verbatim %}[^1]: The footnote content goes here.{% endverbatim %}
 
 {% verbatim %}[^2]: Longer footnote content can be span multiple lines
-    by indenting the continuation 4 spaces.
+    by indenting the continuation 4 spaces.{% endverbatim %}
 ```
 
 The footnote label can be any arbitrary string as long as it starts with a
