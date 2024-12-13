@@ -16,14 +16,4 @@
             url: "fuchsia-pkg://fuchsia.com/package_for_scrutiny_testing#meta/component_with_collection.cm",
         },
     ],
-    offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#component_with_broken_use",
-                "#component_with_collection",
-            ],
-        },
-    ],
 }
