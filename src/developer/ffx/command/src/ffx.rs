@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    analytics_command, return_user_error, user_error, Error, FfxContext, MetricsSession, Result,
-};
+use crate::metrics::analytics_command;
+use crate::{return_user_error, user_error, Error, FfxContext, MetricsSession, Result};
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_command_error::bug;

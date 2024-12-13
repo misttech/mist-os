@@ -7,8 +7,8 @@ pub mod macros;
 mod context;
 mod error;
 
-pub use context::*;
-pub use error::*;
+pub use context::FfxContext;
+pub use error::{Error, NonFatalError, Result};
 
 #[doc(hidden)]
 pub mod macro_deps {
