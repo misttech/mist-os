@@ -502,6 +502,11 @@ where
             .recv()
             .expect("caller should always send task builder before disconnecting")
             .into();
+
+        // We don't need the receiver anymore. If we don't drop the receiver now, we'll keep it
+        // allocated for the lifetime of the thread.
+        std::mem::drop(receiver);
+
         let pre_run_result = { pre_run(&mut locked, &mut current_task) };
         if pre_run_result.is_err() {
             log_error!("Pre run failed from {pre_run_result:?}. The task will not be run.");
@@ -576,6 +581,9 @@ where
     sender
         .send(task_builder)
         .expect("receiver should not be disconnected because thread spawned successfully");
+
+    // We're done with the sender now. We drop the sender explicitly to free the memory earlier.
+    std::mem::drop(sender);
 
     // Set the task's thread handle
     let pthread = join_handle.as_pthread_t();
