@@ -9,7 +9,9 @@
 #include <string.h>
 #endif
 
+#ifdef ZIRCON_BOOT_USE_INTERNAL_BOOTFS
 #include <lib/zbi-format/internal/bootfs.h>
+#endif  // ZIRCON_BOOT_USE_INTERNAL_BOOTFS
 #include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zircon_boot/zbi_utils.h>
@@ -56,6 +58,8 @@ zbi_result_t AppendZbiFile(zbi_header_t* zbi, size_t capacity, const char* name,
 
   return ZBI_RESULT_OK;
 }
+
+#ifdef ZIRCON_BOOT_USE_INTERNAL_BOOTFS
 
 // AddFactoryFile is a helper function to AddBootfsFactoryFiles. It appends a directory entry
 // and the payload in an initialized bootfs zbi item.
@@ -251,6 +255,8 @@ zbi_result_t AppendBootfsFactoryFiles(zbi_header_t* zbi, size_t capacity, const 
   }
   return ZBI_RESULT_OK;
 }
+
+#endif  // ZIRCON_BOOT_USE_INTERNAL_BOOTFS
 
 static bool GetKernelLength(const zbi_header_t* zbi, size_t* kernel_len,
                             size_t* kernel_and_scratch_memory_len) {

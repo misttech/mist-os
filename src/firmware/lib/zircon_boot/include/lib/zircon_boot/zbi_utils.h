@@ -32,6 +32,14 @@ zbi_result_t AppendCurrentSlotZbiItem(zbi_header_t* zbi, size_t capacity, AbrSlo
 zbi_result_t AppendZbiFile(zbi_header_t* zbi, size_t capacity, const char* name,
                            const void* file_data, size_t file_data_size);
 
+// Define this to enable APIs using the internal bootfs ZBI type:
+// https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/zbi-format/include/lib/zbi-format/internal/bootfs.h.
+//
+// New boards should not use this type; it is only intended for use internally within the kernel
+// and does not have the same stability guarantees as public ZBI types. This is only intended for
+// legacy boards that are already using it.
+#ifdef ZIRCON_BOOT_USE_INTERNAL_BOOTFS
+
 // A callback function to read a factory file given the name.
 //
 // @context: Caller data for the function to be called with.
@@ -58,6 +66,8 @@ typedef bool (*read_factory_t)(void* context, const char* name, size_t capacity,
 zbi_result_t AppendBootfsFactoryFiles(zbi_header_t* zbi, size_t capacity, const char** file_names,
                                       size_t file_count, read_factory_t read_factory,
                                       void* read_factory_context);
+
+#endif  // ZIRCON_BOOT_USE_INTERNAL_BOOTFS
 
 // Alignment requirement for the buffer to boot zircon kernel. At the time this is written,
 // all our products on ARM use 64Kb alignment.
