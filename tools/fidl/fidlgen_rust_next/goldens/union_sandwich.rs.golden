@@ -92,26 +92,30 @@ pub struct WireUnionSize12Alignment4<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireUnionSize12Alignment4Ref<'union> {
-    Variant(&'union [u8; 6]),
-}
+pub mod union_size12_alignment4 {
+    pub enum Ref<'union> {
+        Variant(&'union [u8; 6]),
+    }
 
-pub enum WireUnionSize12Alignment4Mut<'union> {
-    Variant(&'union mut [u8; 6]),
+    pub enum Mut<'union> {
+        Variant(&'union mut [u8; 6]),
+    }
 }
 
 impl<'buf> WireUnionSize12Alignment4<'buf> {
-    pub fn as_ref(&self) -> WireUnionSize12Alignment4Ref<'_> {
+    pub fn as_ref(&self) -> crate::union_size12_alignment4::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionSize12Alignment4Ref::Variant(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union_size12_alignment4::Ref::Variant(unsafe {
+                self.raw.get().deref_unchecked()
+            }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireUnionSize12Alignment4Mut<'_> {
+    pub fn as_mut(&mut self) -> crate::union_size12_alignment4::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionSize12Alignment4Mut::Variant(unsafe {
+            1 => crate::union_size12_alignment4::Mut::Variant(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
@@ -557,26 +561,30 @@ pub struct WireUnionSize24Alignment8<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireUnionSize24Alignment8Ref<'union> {
-    Variant(&'union crate::WireStructSize16Alignment8),
-}
+pub mod union_size24_alignment8 {
+    pub enum Ref<'union> {
+        Variant(&'union crate::WireStructSize16Alignment8),
+    }
 
-pub enum WireUnionSize24Alignment8Mut<'union> {
-    Variant(&'union mut crate::WireStructSize16Alignment8),
+    pub enum Mut<'union> {
+        Variant(&'union mut crate::WireStructSize16Alignment8),
+    }
 }
 
 impl<'buf> WireUnionSize24Alignment8<'buf> {
-    pub fn as_ref(&self) -> WireUnionSize24Alignment8Ref<'_> {
+    pub fn as_ref(&self) -> crate::union_size24_alignment8::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionSize24Alignment8Ref::Variant(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union_size24_alignment8::Ref::Variant(unsafe {
+                self.raw.get().deref_unchecked()
+            }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireUnionSize24Alignment8Mut<'_> {
+    pub fn as_mut(&mut self) -> crate::union_size24_alignment8::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionSize24Alignment8Mut::Variant(unsafe {
+            1 => crate::union_size24_alignment8::Mut::Variant(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
@@ -917,26 +925,30 @@ pub struct WireUnionSize36Alignment4<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireUnionSize36Alignment4Ref<'union> {
-    Variant(&'union [u8; 32]),
-}
+pub mod union_size36_alignment4 {
+    pub enum Ref<'union> {
+        Variant(&'union [u8; 32]),
+    }
 
-pub enum WireUnionSize36Alignment4Mut<'union> {
-    Variant(&'union mut [u8; 32]),
+    pub enum Mut<'union> {
+        Variant(&'union mut [u8; 32]),
+    }
 }
 
 impl<'buf> WireUnionSize36Alignment4<'buf> {
-    pub fn as_ref(&self) -> WireUnionSize36Alignment4Ref<'_> {
+    pub fn as_ref(&self) -> crate::union_size36_alignment4::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionSize36Alignment4Ref::Variant(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union_size36_alignment4::Ref::Variant(unsafe {
+                self.raw.get().deref_unchecked()
+            }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireUnionSize36Alignment4Mut<'_> {
+    pub fn as_mut(&mut self) -> crate::union_size36_alignment4::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionSize36Alignment4Mut::Variant(unsafe {
+            1 => crate::union_size36_alignment4::Mut::Variant(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
@@ -1269,26 +1281,30 @@ pub struct WireUnionSize8Alignment4 {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireUnionSize8Alignment4Ref<'union> {
-    Variant(&'union ::fidl_next::u32_le),
-}
+pub mod union_size8_alignment4 {
+    pub enum Ref<'union> {
+        Variant(&'union ::fidl_next::u32_le),
+    }
 
-pub enum WireUnionSize8Alignment4Mut<'union> {
-    Variant(&'union mut ::fidl_next::u32_le),
+    pub enum Mut<'union> {
+        Variant(&'union mut ::fidl_next::u32_le),
+    }
 }
 
 impl WireUnionSize8Alignment4 {
-    pub fn as_ref(&self) -> WireUnionSize8Alignment4Ref<'_> {
+    pub fn as_ref(&self) -> crate::union_size8_alignment4::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionSize8Alignment4Ref::Variant(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union_size8_alignment4::Ref::Variant(unsafe {
+                self.raw.get().deref_unchecked()
+            }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireUnionSize8Alignment4Mut<'_> {
+    pub fn as_mut(&mut self) -> crate::union_size8_alignment4::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionSize8Alignment4Mut::Variant(unsafe {
+            1 => crate::union_size8_alignment4::Mut::Variant(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 

@@ -251,26 +251,30 @@ pub struct WireSerializableUnion {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireSerializableUnionRef<'union> {
-    Unused(&'union bool),
-}
+pub mod serializable_union {
+    pub enum Ref<'union> {
+        Unused(&'union bool),
+    }
 
-pub enum WireSerializableUnionMut<'union> {
-    Unused(&'union mut bool),
+    pub enum Mut<'union> {
+        Unused(&'union mut bool),
+    }
 }
 
 impl WireSerializableUnion {
-    pub fn as_ref(&self) -> WireSerializableUnionRef<'_> {
+    pub fn as_ref(&self) -> crate::serializable_union::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireSerializableUnionRef::Unused(unsafe { self.raw.get().deref_unchecked() }),
+            1 => {
+                crate::serializable_union::Ref::Unused(unsafe { self.raw.get().deref_unchecked() })
+            }
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireSerializableUnionMut<'_> {
+    pub fn as_mut(&mut self) -> crate::serializable_union::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireSerializableUnionMut::Unused(unsafe {
+            1 => crate::serializable_union::Mut::Unused(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 

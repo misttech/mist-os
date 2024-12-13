@@ -530,26 +530,30 @@ pub struct WireUnionLargeArray<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireUnionLargeArrayRef<'union> {
-    A(&'union [::fidl_next::u32_le; 100]),
-}
+pub mod union_large_array {
+    pub enum Ref<'union> {
+        A(&'union [::fidl_next::u32_le; 100]),
+    }
 
-pub enum WireUnionLargeArrayMut<'union> {
-    A(&'union mut [::fidl_next::u32_le; 100]),
+    pub enum Mut<'union> {
+        A(&'union mut [::fidl_next::u32_le; 100]),
+    }
 }
 
 impl<'buf> WireUnionLargeArray<'buf> {
-    pub fn as_ref(&self) -> WireUnionLargeArrayRef<'_> {
+    pub fn as_ref(&self) -> crate::union_large_array::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionLargeArrayRef::A(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union_large_array::Ref::A(unsafe { self.raw.get().deref_unchecked() }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireUnionLargeArrayMut<'_> {
+    pub fn as_mut(&mut self) -> crate::union_large_array::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionLargeArrayMut::A(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            1 => crate::union_large_array::Mut::A(unsafe {
+                self.raw.get_mut().deref_mut_unchecked()
+            }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -757,26 +761,30 @@ pub struct WireUnionSmallArray<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireUnionSmallArrayRef<'union> {
-    A(&'union [::fidl_next::u32_le; 2]),
-}
+pub mod union_small_array {
+    pub enum Ref<'union> {
+        A(&'union [::fidl_next::u32_le; 2]),
+    }
 
-pub enum WireUnionSmallArrayMut<'union> {
-    A(&'union mut [::fidl_next::u32_le; 2]),
+    pub enum Mut<'union> {
+        A(&'union mut [::fidl_next::u32_le; 2]),
+    }
 }
 
 impl<'buf> WireUnionSmallArray<'buf> {
-    pub fn as_ref(&self) -> WireUnionSmallArrayRef<'_> {
+    pub fn as_ref(&self) -> crate::union_small_array::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionSmallArrayRef::A(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union_small_array::Ref::A(unsafe { self.raw.get().deref_unchecked() }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireUnionSmallArrayMut<'_> {
+    pub fn as_mut(&mut self) -> crate::union_small_array::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionSmallArrayMut::A(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            1 => crate::union_small_array::Mut::A(unsafe {
+                self.raw.get_mut().deref_mut_unchecked()
+            }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }

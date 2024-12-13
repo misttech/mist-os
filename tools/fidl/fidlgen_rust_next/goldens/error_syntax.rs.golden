@@ -300,26 +300,28 @@ pub struct WireExampleUseOfErrorSyntaxCallWhichMayFailResult<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireExampleUseOfErrorSyntaxCallWhichMayFailResultRef<'union> {
-    Response(&'union crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse),
+pub mod example_use_of_error_syntax_call_which_may_fail_result {
+    pub enum Ref<'union> {
+        Response(&'union crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse),
 
-    Err(&'union ::fidl_next::u32_le),
-}
+        Err(&'union ::fidl_next::u32_le),
+    }
 
-pub enum WireExampleUseOfErrorSyntaxCallWhichMayFailResultMut<'union> {
-    Response(&'union mut crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse),
+    pub enum Mut<'union> {
+        Response(&'union mut crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse),
 
-    Err(&'union mut ::fidl_next::u32_le),
+        Err(&'union mut ::fidl_next::u32_le),
+    }
 }
 
 impl<'buf> WireExampleUseOfErrorSyntaxCallWhichMayFailResult<'buf> {
-    pub fn as_ref(&self) -> WireExampleUseOfErrorSyntaxCallWhichMayFailResultRef<'_> {
+    pub fn as_ref(&self) -> crate::example_use_of_error_syntax_call_which_may_fail_result::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireExampleUseOfErrorSyntaxCallWhichMayFailResultRef::Response(unsafe {
-                self.raw.get().deref_unchecked()
-            }),
+            1 => crate::example_use_of_error_syntax_call_which_may_fail_result::Ref::Response(
+                unsafe { self.raw.get().deref_unchecked() },
+            ),
 
-            2 => WireExampleUseOfErrorSyntaxCallWhichMayFailResultRef::Err(unsafe {
+            2 => crate::example_use_of_error_syntax_call_which_may_fail_result::Ref::Err(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
@@ -327,13 +329,15 @@ impl<'buf> WireExampleUseOfErrorSyntaxCallWhichMayFailResult<'buf> {
         }
     }
 
-    pub fn as_mut(&mut self) -> WireExampleUseOfErrorSyntaxCallWhichMayFailResultMut<'_> {
+    pub fn as_mut(
+        &mut self,
+    ) -> crate::example_use_of_error_syntax_call_which_may_fail_result::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireExampleUseOfErrorSyntaxCallWhichMayFailResultMut::Response(unsafe {
-                self.raw.get_mut().deref_mut_unchecked()
-            }),
+            1 => crate::example_use_of_error_syntax_call_which_may_fail_result::Mut::Response(
+                unsafe { self.raw.get_mut().deref_mut_unchecked() },
+            ),
 
-            2 => WireExampleUseOfErrorSyntaxCallWhichMayFailResultMut::Err(unsafe {
+            2 => crate::example_use_of_error_syntax_call_which_may_fail_result::Mut::Err(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 

@@ -747,52 +747,54 @@ pub struct WireExpression<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireExpressionRef<'union, 'buf> {
-    Value(&'union ::fidl_next::u64_le),
+pub mod expression {
+    pub enum Ref<'union, 'buf> {
+        Value(&'union ::fidl_next::u64_le),
 
-    BinOp(&'union crate::WireOverrideTest<'buf>),
+        BinOp(&'union crate::WireOverrideTest<'buf>),
 
-    FunctionApplication(&'union crate::WireFunctionApplication<'buf>),
+        FunctionApplication(&'union crate::WireFunctionApplication<'buf>),
 
-    UnknownOrdinal(u64),
-}
+        UnknownOrdinal(u64),
+    }
 
-pub enum WireExpressionMut<'union, 'buf> {
-    Value(&'union mut ::fidl_next::u64_le),
+    pub enum Mut<'union, 'buf> {
+        Value(&'union mut ::fidl_next::u64_le),
 
-    BinOp(&'union mut crate::WireOverrideTest<'buf>),
+        BinOp(&'union mut crate::WireOverrideTest<'buf>),
 
-    FunctionApplication(&'union mut crate::WireFunctionApplication<'buf>),
+        FunctionApplication(&'union mut crate::WireFunctionApplication<'buf>),
 
-    UnknownOrdinal(u64),
+        UnknownOrdinal(u64),
+    }
 }
 
 impl<'buf> WireExpression<'buf> {
-    pub fn as_ref(&self) -> WireExpressionRef<'_, 'buf> {
+    pub fn as_ref(&self) -> crate::expression::Ref<'_, 'buf> {
         match self.raw.ordinal() {
-            1 => WireExpressionRef::Value(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::expression::Ref::Value(unsafe { self.raw.get().deref_unchecked() }),
 
-            2 => WireExpressionRef::BinOp(unsafe { self.raw.get().deref_unchecked() }),
+            2 => crate::expression::Ref::BinOp(unsafe { self.raw.get().deref_unchecked() }),
 
-            3 => {
-                WireExpressionRef::FunctionApplication(unsafe { self.raw.get().deref_unchecked() })
-            }
+            3 => crate::expression::Ref::FunctionApplication(unsafe {
+                self.raw.get().deref_unchecked()
+            }),
 
-            unknown => WireExpressionRef::UnknownOrdinal(unknown),
+            unknown => crate::expression::Ref::UnknownOrdinal(unknown),
         }
     }
 
-    pub fn as_mut(&mut self) -> WireExpressionMut<'_, 'buf> {
+    pub fn as_mut(&mut self) -> crate::expression::Mut<'_, 'buf> {
         match self.raw.ordinal() {
-            1 => WireExpressionMut::Value(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            1 => crate::expression::Mut::Value(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            2 => WireExpressionMut::BinOp(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            2 => crate::expression::Mut::BinOp(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            3 => WireExpressionMut::FunctionApplication(unsafe {
+            3 => crate::expression::Mut::FunctionApplication(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => WireExpressionMut::UnknownOrdinal(unknown),
+            unknown => crate::expression::Mut::UnknownOrdinal(unknown),
         }
     }
 }
@@ -1032,32 +1034,36 @@ pub struct WireUnionMember {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireUnionMemberRef<'union> {
-    UnionData(&'union u8),
+pub mod union_member {
+    pub enum Ref<'union> {
+        UnionData(&'union u8),
 
-    UnknownOrdinal(u64),
-}
+        UnknownOrdinal(u64),
+    }
 
-pub enum WireUnionMemberMut<'union> {
-    UnionData(&'union mut u8),
+    pub enum Mut<'union> {
+        UnionData(&'union mut u8),
 
-    UnknownOrdinal(u64),
+        UnknownOrdinal(u64),
+    }
 }
 
 impl WireUnionMember {
-    pub fn as_ref(&self) -> WireUnionMemberRef<'_> {
+    pub fn as_ref(&self) -> crate::union_member::Ref<'_> {
         match self.raw.ordinal() {
-            2 => WireUnionMemberRef::UnionData(unsafe { self.raw.get().deref_unchecked() }),
+            2 => crate::union_member::Ref::UnionData(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => WireUnionMemberRef::UnknownOrdinal(unknown),
+            unknown => crate::union_member::Ref::UnknownOrdinal(unknown),
         }
     }
 
-    pub fn as_mut(&mut self) -> WireUnionMemberMut<'_> {
+    pub fn as_mut(&mut self) -> crate::union_member::Mut<'_> {
         match self.raw.ordinal() {
-            2 => WireUnionMemberMut::UnionData(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            2 => crate::union_member::Mut::UnionData(unsafe {
+                self.raw.get_mut().deref_mut_unchecked()
+            }),
 
-            unknown => WireUnionMemberMut::UnknownOrdinal(unknown),
+            unknown => crate::union_member::Mut::UnknownOrdinal(unknown),
         }
     }
 }
@@ -1845,26 +1851,28 @@ pub struct WireSomeProtocolSomeMethodResult {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireSomeProtocolSomeMethodResultRef<'union> {
-    Response(&'union crate::WireSomeProtocolSomeMethodResponse),
+pub mod some_protocol_some_method_result {
+    pub enum Ref<'union> {
+        Response(&'union crate::WireSomeProtocolSomeMethodResponse),
 
-    Err(&'union crate::WireSomeProtocolSomeMethodError),
-}
+        Err(&'union crate::WireSomeProtocolSomeMethodError),
+    }
 
-pub enum WireSomeProtocolSomeMethodResultMut<'union> {
-    Response(&'union mut crate::WireSomeProtocolSomeMethodResponse),
+    pub enum Mut<'union> {
+        Response(&'union mut crate::WireSomeProtocolSomeMethodResponse),
 
-    Err(&'union mut crate::WireSomeProtocolSomeMethodError),
+        Err(&'union mut crate::WireSomeProtocolSomeMethodError),
+    }
 }
 
 impl WireSomeProtocolSomeMethodResult {
-    pub fn as_ref(&self) -> WireSomeProtocolSomeMethodResultRef<'_> {
+    pub fn as_ref(&self) -> crate::some_protocol_some_method_result::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireSomeProtocolSomeMethodResultRef::Response(unsafe {
+            1 => crate::some_protocol_some_method_result::Ref::Response(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
-            2 => WireSomeProtocolSomeMethodResultRef::Err(unsafe {
+            2 => crate::some_protocol_some_method_result::Ref::Err(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
@@ -1872,13 +1880,13 @@ impl WireSomeProtocolSomeMethodResult {
         }
     }
 
-    pub fn as_mut(&mut self) -> WireSomeProtocolSomeMethodResultMut<'_> {
+    pub fn as_mut(&mut self) -> crate::some_protocol_some_method_result::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireSomeProtocolSomeMethodResultMut::Response(unsafe {
+            1 => crate::some_protocol_some_method_result::Mut::Response(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            2 => WireSomeProtocolSomeMethodResultMut::Err(unsafe {
+            2 => crate::some_protocol_some_method_result::Mut::Err(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 

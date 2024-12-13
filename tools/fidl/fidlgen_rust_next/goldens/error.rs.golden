@@ -289,36 +289,42 @@ pub struct WireExampleFooResult<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireExampleFooResultRef<'union> {
-    Response(&'union crate::WireExampleFooResponse),
+pub mod example_foo_result {
+    pub enum Ref<'union> {
+        Response(&'union crate::WireExampleFooResponse),
 
-    Err(&'union ::fidl_next::u32_le),
-}
+        Err(&'union ::fidl_next::u32_le),
+    }
 
-pub enum WireExampleFooResultMut<'union> {
-    Response(&'union mut crate::WireExampleFooResponse),
+    pub enum Mut<'union> {
+        Response(&'union mut crate::WireExampleFooResponse),
 
-    Err(&'union mut ::fidl_next::u32_le),
+        Err(&'union mut ::fidl_next::u32_le),
+    }
 }
 
 impl<'buf> WireExampleFooResult<'buf> {
-    pub fn as_ref(&self) -> WireExampleFooResultRef<'_> {
+    pub fn as_ref(&self) -> crate::example_foo_result::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireExampleFooResultRef::Response(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::example_foo_result::Ref::Response(unsafe {
+                self.raw.get().deref_unchecked()
+            }),
 
-            2 => WireExampleFooResultRef::Err(unsafe { self.raw.get().deref_unchecked() }),
+            2 => crate::example_foo_result::Ref::Err(unsafe { self.raw.get().deref_unchecked() }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireExampleFooResultMut<'_> {
+    pub fn as_mut(&mut self) -> crate::example_foo_result::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireExampleFooResultMut::Response(unsafe {
+            1 => crate::example_foo_result::Mut::Response(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            2 => WireExampleFooResultMut::Err(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            2 => crate::example_foo_result::Mut::Err(unsafe {
+                self.raw.get_mut().deref_mut_unchecked()
+            }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }

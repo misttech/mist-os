@@ -108,40 +108,42 @@ pub struct WireFlexibleFoo<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireFlexibleFooRef<'union, 'buf> {
-    S(&'union ::fidl_next::WireString<'buf>),
+pub mod flexible_foo {
+    pub enum Ref<'union, 'buf> {
+        S(&'union ::fidl_next::WireString<'buf>),
 
-    I(&'union ::fidl_next::i32_le),
+        I(&'union ::fidl_next::i32_le),
 
-    UnknownOrdinal(u64),
-}
+        UnknownOrdinal(u64),
+    }
 
-pub enum WireFlexibleFooMut<'union, 'buf> {
-    S(&'union mut ::fidl_next::WireString<'buf>),
+    pub enum Mut<'union, 'buf> {
+        S(&'union mut ::fidl_next::WireString<'buf>),
 
-    I(&'union mut ::fidl_next::i32_le),
+        I(&'union mut ::fidl_next::i32_le),
 
-    UnknownOrdinal(u64),
+        UnknownOrdinal(u64),
+    }
 }
 
 impl<'buf> WireFlexibleFoo<'buf> {
-    pub fn as_ref(&self) -> WireFlexibleFooRef<'_, 'buf> {
+    pub fn as_ref(&self) -> crate::flexible_foo::Ref<'_, 'buf> {
         match self.raw.ordinal() {
-            1 => WireFlexibleFooRef::S(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::flexible_foo::Ref::S(unsafe { self.raw.get().deref_unchecked() }),
 
-            2 => WireFlexibleFooRef::I(unsafe { self.raw.get().deref_unchecked() }),
+            2 => crate::flexible_foo::Ref::I(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => WireFlexibleFooRef::UnknownOrdinal(unknown),
+            unknown => crate::flexible_foo::Ref::UnknownOrdinal(unknown),
         }
     }
 
-    pub fn as_mut(&mut self) -> WireFlexibleFooMut<'_, 'buf> {
+    pub fn as_mut(&mut self) -> crate::flexible_foo::Mut<'_, 'buf> {
         match self.raw.ordinal() {
-            1 => WireFlexibleFooMut::S(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            1 => crate::flexible_foo::Mut::S(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            2 => WireFlexibleFooMut::I(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            2 => crate::flexible_foo::Mut::I(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            unknown => WireFlexibleFooMut::UnknownOrdinal(unknown),
+            unknown => crate::flexible_foo::Mut::UnknownOrdinal(unknown),
         }
     }
 }
@@ -368,34 +370,36 @@ pub struct WireStrictFoo<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireStrictFooRef<'union, 'buf> {
-    S(&'union ::fidl_next::WireString<'buf>),
+pub mod strict_foo {
+    pub enum Ref<'union, 'buf> {
+        S(&'union ::fidl_next::WireString<'buf>),
 
-    I(&'union ::fidl_next::i32_le),
-}
+        I(&'union ::fidl_next::i32_le),
+    }
 
-pub enum WireStrictFooMut<'union, 'buf> {
-    S(&'union mut ::fidl_next::WireString<'buf>),
+    pub enum Mut<'union, 'buf> {
+        S(&'union mut ::fidl_next::WireString<'buf>),
 
-    I(&'union mut ::fidl_next::i32_le),
+        I(&'union mut ::fidl_next::i32_le),
+    }
 }
 
 impl<'buf> WireStrictFoo<'buf> {
-    pub fn as_ref(&self) -> WireStrictFooRef<'_, 'buf> {
+    pub fn as_ref(&self) -> crate::strict_foo::Ref<'_, 'buf> {
         match self.raw.ordinal() {
-            1 => WireStrictFooRef::S(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::strict_foo::Ref::S(unsafe { self.raw.get().deref_unchecked() }),
 
-            2 => WireStrictFooRef::I(unsafe { self.raw.get().deref_unchecked() }),
+            2 => crate::strict_foo::Ref::I(unsafe { self.raw.get().deref_unchecked() }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireStrictFooMut<'_, 'buf> {
+    pub fn as_mut(&mut self) -> crate::strict_foo::Mut<'_, 'buf> {
         match self.raw.ordinal() {
-            1 => WireStrictFooMut::S(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            1 => crate::strict_foo::Mut::S(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            2 => WireStrictFooMut::I(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            2 => crate::strict_foo::Mut::I(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }

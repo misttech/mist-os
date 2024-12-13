@@ -2,6 +2,7 @@
 {% let base_name = union.name.decl_name().camel() %}
 {% let name = filters::ident(base_name)? %}
 {% let wire_name = format!("Wire{base_name}") %}
+{% let mod_name = filters::ident(union.name.decl_name().snake())? %}
 
 {% let params %}
 {% let phantom %}
@@ -159,51 +160,53 @@ pub struct {{ wire_name }}{{ params }} {
     _phantom: ::core::marker::PhantomData<{{ phantom }}>,
 }
 
-pub enum {{ wire_name }}Ref{{ access_params }} {
-    {% for member in union.members %}
-        {{ member.name.camel()|ident }}(&'union {{ context.wire_type(member.ty) }}),
-    {% endfor %}
-    {% if !union.is_strict %}
-        UnknownOrdinal(u64),
-    {% endif %}
-}
+pub mod {{ mod_name }} {
+    pub enum Ref{{ access_params }} {
+        {% for member in union.members %}
+            {{ member.name.camel()|ident }}(&'union {{ context.wire_type(member.ty) }}),
+        {% endfor %}
+        {% if !union.is_strict %}
+            UnknownOrdinal(u64),
+        {% endif %}
+    }
 
-pub enum {{ wire_name }}Mut{{ access_params }} {
-    {% for member in union.members %}
-        {{ member.name.camel()|ident }}(&'union mut {{ context.wire_type(member.ty) }}),
-    {% endfor %}
-    {% if !union.is_strict %}
-        UnknownOrdinal(u64),
-    {% endif %}
+    pub enum Mut{{ access_params }} {
+        {% for member in union.members %}
+            {{ member.name.camel()|ident }}(&'union mut {{ context.wire_type(member.ty) }}),
+        {% endfor %}
+        {% if !union.is_strict %}
+            UnknownOrdinal(u64),
+        {% endif %}
+    }
 }
 
 impl{{ params }} {{ wire_name }}{{ params }} {
-    pub fn as_ref(&self) -> {{ wire_name }}Ref{{ access_args }} {
+    pub fn as_ref(&self) -> crate::{{ mod_name }}::Ref{{ access_args }} {
         match self.raw.ordinal() {
             {% for member in union.members %}
-                {{ member.ordinal }} => {{ wire_name }}Ref::{{ member.name.camel()|ident }}(
+                {{ member.ordinal }} => crate::{{ mod_name }}::Ref::{{ member.name.camel()|ident }}(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
             {% endfor %}
             {% if union.is_strict %}
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
             {% else %}
-                unknown => {{ wire_name }}Ref::UnknownOrdinal(unknown),
+                unknown => crate::{{ mod_name }}::Ref::UnknownOrdinal(unknown),
             {% endif %}
         }
     }
 
-    pub fn as_mut(&mut self) -> {{ wire_name }}Mut{{ access_args }} {
+    pub fn as_mut(&mut self) -> crate::{{ mod_name }}::Mut{{ access_args }} {
         match self.raw.ordinal() {
             {% for member in union.members %}
-                {{ member.ordinal }} => {{ wire_name }}Mut::{{ member.name.camel()|ident }}(
+                {{ member.ordinal }} => crate::{{ mod_name }}::Mut::{{ member.name.camel()|ident }}(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
             {% endfor %}
             {% if union.is_strict %}
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
             {% else %}
-                unknown => {{ wire_name }}Mut::UnknownOrdinal(unknown),
+                unknown => crate::{{ mod_name }}::Mut::UnknownOrdinal(unknown),
             {% endif %}
         }
     }

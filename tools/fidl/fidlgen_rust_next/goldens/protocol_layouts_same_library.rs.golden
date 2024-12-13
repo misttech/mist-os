@@ -224,18 +224,20 @@ pub struct WireComposedProtocolTwoWayAnonComposedRequest {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireComposedProtocolTwoWayAnonComposedRequestRef<'union> {
-    B(&'union bool),
-}
+pub mod composed_protocol_two_way_anon_composed_request {
+    pub enum Ref<'union> {
+        B(&'union bool),
+    }
 
-pub enum WireComposedProtocolTwoWayAnonComposedRequestMut<'union> {
-    B(&'union mut bool),
+    pub enum Mut<'union> {
+        B(&'union mut bool),
+    }
 }
 
 impl WireComposedProtocolTwoWayAnonComposedRequest {
-    pub fn as_ref(&self) -> WireComposedProtocolTwoWayAnonComposedRequestRef<'_> {
+    pub fn as_ref(&self) -> crate::composed_protocol_two_way_anon_composed_request::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireComposedProtocolTwoWayAnonComposedRequestRef::B(unsafe {
+            1 => crate::composed_protocol_two_way_anon_composed_request::Ref::B(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
@@ -243,9 +245,9 @@ impl WireComposedProtocolTwoWayAnonComposedRequest {
         }
     }
 
-    pub fn as_mut(&mut self) -> WireComposedProtocolTwoWayAnonComposedRequestMut<'_> {
+    pub fn as_mut(&mut self) -> crate::composed_protocol_two_way_anon_composed_request::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireComposedProtocolTwoWayAnonComposedRequestMut::B(unsafe {
+            1 => crate::composed_protocol_two_way_anon_composed_request::Mut::B(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
@@ -753,30 +755,40 @@ pub struct WireComposedProtocolTwoWayAnonComposedWithErrorResponse {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireComposedProtocolTwoWayAnonComposedWithErrorResponseRef<'union> {
-    B(&'union bool),
-}
+pub mod composed_protocol_two_way_anon_composed_with_error_response {
+    pub enum Ref<'union> {
+        B(&'union bool),
+    }
 
-pub enum WireComposedProtocolTwoWayAnonComposedWithErrorResponseMut<'union> {
-    B(&'union mut bool),
+    pub enum Mut<'union> {
+        B(&'union mut bool),
+    }
 }
 
 impl WireComposedProtocolTwoWayAnonComposedWithErrorResponse {
-    pub fn as_ref(&self) -> WireComposedProtocolTwoWayAnonComposedWithErrorResponseRef<'_> {
+    pub fn as_ref(
+        &self,
+    ) -> crate::composed_protocol_two_way_anon_composed_with_error_response::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireComposedProtocolTwoWayAnonComposedWithErrorResponseRef::B(unsafe {
-                self.raw.get().deref_unchecked()
-            }),
+            1 => {
+                crate::composed_protocol_two_way_anon_composed_with_error_response::Ref::B(unsafe {
+                    self.raw.get().deref_unchecked()
+                })
+            }
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireComposedProtocolTwoWayAnonComposedWithErrorResponseMut<'_> {
+    pub fn as_mut(
+        &mut self,
+    ) -> crate::composed_protocol_two_way_anon_composed_with_error_response::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireComposedProtocolTwoWayAnonComposedWithErrorResponseMut::B(unsafe {
-                self.raw.get_mut().deref_mut_unchecked()
-            }),
+            1 => {
+                crate::composed_protocol_two_way_anon_composed_with_error_response::Mut::B(unsafe {
+                    self.raw.get_mut().deref_mut_unchecked()
+                })
+            }
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -1036,42 +1048,52 @@ pub struct WireComposedProtocolTwoWayAnonComposedWithErrorResult<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireComposedProtocolTwoWayAnonComposedWithErrorResultRef<'union> {
-    Response(&'union crate::WireComposedProtocolTwoWayAnonComposedWithErrorResponse),
+pub mod composed_protocol_two_way_anon_composed_with_error_result {
+    pub enum Ref<'union> {
+        Response(&'union crate::WireComposedProtocolTwoWayAnonComposedWithErrorResponse),
 
-    Err(&'union ::fidl_next::u32_le),
-}
+        Err(&'union ::fidl_next::u32_le),
+    }
 
-pub enum WireComposedProtocolTwoWayAnonComposedWithErrorResultMut<'union> {
-    Response(&'union mut crate::WireComposedProtocolTwoWayAnonComposedWithErrorResponse),
+    pub enum Mut<'union> {
+        Response(&'union mut crate::WireComposedProtocolTwoWayAnonComposedWithErrorResponse),
 
-    Err(&'union mut ::fidl_next::u32_le),
+        Err(&'union mut ::fidl_next::u32_le),
+    }
 }
 
 impl<'buf> WireComposedProtocolTwoWayAnonComposedWithErrorResult<'buf> {
-    pub fn as_ref(&self) -> WireComposedProtocolTwoWayAnonComposedWithErrorResultRef<'_> {
+    pub fn as_ref(
+        &self,
+    ) -> crate::composed_protocol_two_way_anon_composed_with_error_result::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireComposedProtocolTwoWayAnonComposedWithErrorResultRef::Response(unsafe {
-                self.raw.get().deref_unchecked()
-            }),
+            1 => crate::composed_protocol_two_way_anon_composed_with_error_result::Ref::Response(
+                unsafe { self.raw.get().deref_unchecked() },
+            ),
 
-            2 => WireComposedProtocolTwoWayAnonComposedWithErrorResultRef::Err(unsafe {
-                self.raw.get().deref_unchecked()
-            }),
+            2 => {
+                crate::composed_protocol_two_way_anon_composed_with_error_result::Ref::Err(unsafe {
+                    self.raw.get().deref_unchecked()
+                })
+            }
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireComposedProtocolTwoWayAnonComposedWithErrorResultMut<'_> {
+    pub fn as_mut(
+        &mut self,
+    ) -> crate::composed_protocol_two_way_anon_composed_with_error_result::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireComposedProtocolTwoWayAnonComposedWithErrorResultMut::Response(unsafe {
-                self.raw.get_mut().deref_mut_unchecked()
-            }),
+            1 => crate::composed_protocol_two_way_anon_composed_with_error_result::Mut::Response(
+                unsafe { self.raw.get_mut().deref_mut_unchecked() },
+            ),
 
-            2 => WireComposedProtocolTwoWayAnonComposedWithErrorResultMut::Err(unsafe {
-                self.raw.get_mut().deref_mut_unchecked()
-            }),
+            2 => {
+                crate::composed_protocol_two_way_anon_composed_with_error_result::Mut::Err(unsafe {
+                    self.raw.get_mut().deref_mut_unchecked()
+                })
+            }
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -1302,18 +1324,20 @@ pub struct WireComposedProtocolOnAnonComposedRequest {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireComposedProtocolOnAnonComposedRequestRef<'union> {
-    B(&'union bool),
-}
+pub mod composed_protocol_on_anon_composed_request {
+    pub enum Ref<'union> {
+        B(&'union bool),
+    }
 
-pub enum WireComposedProtocolOnAnonComposedRequestMut<'union> {
-    B(&'union mut bool),
+    pub enum Mut<'union> {
+        B(&'union mut bool),
+    }
 }
 
 impl WireComposedProtocolOnAnonComposedRequest {
-    pub fn as_ref(&self) -> WireComposedProtocolOnAnonComposedRequestRef<'_> {
+    pub fn as_ref(&self) -> crate::composed_protocol_on_anon_composed_request::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireComposedProtocolOnAnonComposedRequestRef::B(unsafe {
+            1 => crate::composed_protocol_on_anon_composed_request::Ref::B(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
@@ -1321,9 +1345,9 @@ impl WireComposedProtocolOnAnonComposedRequest {
         }
     }
 
-    pub fn as_mut(&mut self) -> WireComposedProtocolOnAnonComposedRequestMut<'_> {
+    pub fn as_mut(&mut self) -> crate::composed_protocol_on_anon_composed_request::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireComposedProtocolOnAnonComposedRequestMut::B(unsafe {
+            1 => crate::composed_protocol_on_anon_composed_request::Mut::B(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
@@ -1688,26 +1712,28 @@ pub struct WireUnionPayload {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireUnionPayloadRef<'union> {
-    B(&'union bool),
-}
+pub mod union_payload {
+    pub enum Ref<'union> {
+        B(&'union bool),
+    }
 
-pub enum WireUnionPayloadMut<'union> {
-    B(&'union mut bool),
+    pub enum Mut<'union> {
+        B(&'union mut bool),
+    }
 }
 
 impl WireUnionPayload {
-    pub fn as_ref(&self) -> WireUnionPayloadRef<'_> {
+    pub fn as_ref(&self) -> crate::union_payload::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionPayloadRef::B(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union_payload::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireUnionPayloadMut<'_> {
+    pub fn as_mut(&mut self) -> crate::union_payload::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireUnionPayloadMut::B(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            1 => crate::union_payload::Mut::B(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -1963,42 +1989,48 @@ pub struct WireComposedProtocolTwoWayNamedComposedWithErrorResult<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireComposedProtocolTwoWayNamedComposedWithErrorResultRef<'union> {
-    Response(&'union crate::WireUnionPayload),
+pub mod composed_protocol_two_way_named_composed_with_error_result {
+    pub enum Ref<'union> {
+        Response(&'union crate::WireUnionPayload),
 
-    Err(&'union ::fidl_next::u32_le),
-}
+        Err(&'union ::fidl_next::u32_le),
+    }
 
-pub enum WireComposedProtocolTwoWayNamedComposedWithErrorResultMut<'union> {
-    Response(&'union mut crate::WireUnionPayload),
+    pub enum Mut<'union> {
+        Response(&'union mut crate::WireUnionPayload),
 
-    Err(&'union mut ::fidl_next::u32_le),
+        Err(&'union mut ::fidl_next::u32_le),
+    }
 }
 
 impl<'buf> WireComposedProtocolTwoWayNamedComposedWithErrorResult<'buf> {
-    pub fn as_ref(&self) -> WireComposedProtocolTwoWayNamedComposedWithErrorResultRef<'_> {
+    pub fn as_ref(
+        &self,
+    ) -> crate::composed_protocol_two_way_named_composed_with_error_result::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireComposedProtocolTwoWayNamedComposedWithErrorResultRef::Response(unsafe {
-                self.raw.get().deref_unchecked()
-            }),
+            1 => crate::composed_protocol_two_way_named_composed_with_error_result::Ref::Response(
+                unsafe { self.raw.get().deref_unchecked() },
+            ),
 
-            2 => WireComposedProtocolTwoWayNamedComposedWithErrorResultRef::Err(unsafe {
-                self.raw.get().deref_unchecked()
-            }),
+            2 => crate::composed_protocol_two_way_named_composed_with_error_result::Ref::Err(
+                unsafe { self.raw.get().deref_unchecked() },
+            ),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 
-    pub fn as_mut(&mut self) -> WireComposedProtocolTwoWayNamedComposedWithErrorResultMut<'_> {
+    pub fn as_mut(
+        &mut self,
+    ) -> crate::composed_protocol_two_way_named_composed_with_error_result::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireComposedProtocolTwoWayNamedComposedWithErrorResultMut::Response(unsafe {
-                self.raw.get_mut().deref_mut_unchecked()
-            }),
+            1 => crate::composed_protocol_two_way_named_composed_with_error_result::Mut::Response(
+                unsafe { self.raw.get_mut().deref_mut_unchecked() },
+            ),
 
-            2 => WireComposedProtocolTwoWayNamedComposedWithErrorResultMut::Err(unsafe {
-                self.raw.get_mut().deref_mut_unchecked()
-            }),
+            2 => crate::composed_protocol_two_way_named_composed_with_error_result::Mut::Err(
+                unsafe { self.raw.get_mut().deref_mut_unchecked() },
+            ),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -2236,26 +2268,28 @@ pub struct WireMainProtocolTwoWayLocalWithErrorResult<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireMainProtocolTwoWayLocalWithErrorResultRef<'union> {
-    Response(&'union crate::WireUnionPayload),
+pub mod main_protocol_two_way_local_with_error_result {
+    pub enum Ref<'union> {
+        Response(&'union crate::WireUnionPayload),
 
-    Err(&'union ::fidl_next::u32_le),
-}
+        Err(&'union ::fidl_next::u32_le),
+    }
 
-pub enum WireMainProtocolTwoWayLocalWithErrorResultMut<'union> {
-    Response(&'union mut crate::WireUnionPayload),
+    pub enum Mut<'union> {
+        Response(&'union mut crate::WireUnionPayload),
 
-    Err(&'union mut ::fidl_next::u32_le),
+        Err(&'union mut ::fidl_next::u32_le),
+    }
 }
 
 impl<'buf> WireMainProtocolTwoWayLocalWithErrorResult<'buf> {
-    pub fn as_ref(&self) -> WireMainProtocolTwoWayLocalWithErrorResultRef<'_> {
+    pub fn as_ref(&self) -> crate::main_protocol_two_way_local_with_error_result::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireMainProtocolTwoWayLocalWithErrorResultRef::Response(unsafe {
+            1 => crate::main_protocol_two_way_local_with_error_result::Ref::Response(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
-            2 => WireMainProtocolTwoWayLocalWithErrorResultRef::Err(unsafe {
+            2 => crate::main_protocol_two_way_local_with_error_result::Ref::Err(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
@@ -2263,13 +2297,13 @@ impl<'buf> WireMainProtocolTwoWayLocalWithErrorResult<'buf> {
         }
     }
 
-    pub fn as_mut(&mut self) -> WireMainProtocolTwoWayLocalWithErrorResultMut<'_> {
+    pub fn as_mut(&mut self) -> crate::main_protocol_two_way_local_with_error_result::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireMainProtocolTwoWayLocalWithErrorResultMut::Response(unsafe {
+            1 => crate::main_protocol_two_way_local_with_error_result::Mut::Response(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            2 => WireMainProtocolTwoWayLocalWithErrorResultMut::Err(unsafe {
+            2 => crate::main_protocol_two_way_local_with_error_result::Mut::Err(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
@@ -2625,36 +2659,38 @@ pub struct WireMainProtocolTwoWayAnonRequest {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireMainProtocolTwoWayAnonRequestRef<'union> {
-    B(&'union bool),
+pub mod main_protocol_two_way_anon_request {
+    pub enum Ref<'union> {
+        B(&'union bool),
 
-    UnknownOrdinal(u64),
-}
+        UnknownOrdinal(u64),
+    }
 
-pub enum WireMainProtocolTwoWayAnonRequestMut<'union> {
-    B(&'union mut bool),
+    pub enum Mut<'union> {
+        B(&'union mut bool),
 
-    UnknownOrdinal(u64),
+        UnknownOrdinal(u64),
+    }
 }
 
 impl WireMainProtocolTwoWayAnonRequest {
-    pub fn as_ref(&self) -> WireMainProtocolTwoWayAnonRequestRef<'_> {
+    pub fn as_ref(&self) -> crate::main_protocol_two_way_anon_request::Ref<'_> {
         match self.raw.ordinal() {
-            1 => {
-                WireMainProtocolTwoWayAnonRequestRef::B(unsafe { self.raw.get().deref_unchecked() })
-            }
+            1 => crate::main_protocol_two_way_anon_request::Ref::B(unsafe {
+                self.raw.get().deref_unchecked()
+            }),
 
-            unknown => WireMainProtocolTwoWayAnonRequestRef::UnknownOrdinal(unknown),
+            unknown => crate::main_protocol_two_way_anon_request::Ref::UnknownOrdinal(unknown),
         }
     }
 
-    pub fn as_mut(&mut self) -> WireMainProtocolTwoWayAnonRequestMut<'_> {
+    pub fn as_mut(&mut self) -> crate::main_protocol_two_way_anon_request::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireMainProtocolTwoWayAnonRequestMut::B(unsafe {
+            1 => crate::main_protocol_two_way_anon_request::Mut::B(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => WireMainProtocolTwoWayAnonRequestMut::UnknownOrdinal(unknown),
+            unknown => crate::main_protocol_two_way_anon_request::Mut::UnknownOrdinal(unknown),
         }
     }
 }
@@ -3162,36 +3198,42 @@ pub struct WireMainProtocolTwoWayAnonWithErrorResponse {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireMainProtocolTwoWayAnonWithErrorResponseRef<'union> {
-    B(&'union bool),
+pub mod main_protocol_two_way_anon_with_error_response {
+    pub enum Ref<'union> {
+        B(&'union bool),
 
-    UnknownOrdinal(u64),
-}
+        UnknownOrdinal(u64),
+    }
 
-pub enum WireMainProtocolTwoWayAnonWithErrorResponseMut<'union> {
-    B(&'union mut bool),
+    pub enum Mut<'union> {
+        B(&'union mut bool),
 
-    UnknownOrdinal(u64),
+        UnknownOrdinal(u64),
+    }
 }
 
 impl WireMainProtocolTwoWayAnonWithErrorResponse {
-    pub fn as_ref(&self) -> WireMainProtocolTwoWayAnonWithErrorResponseRef<'_> {
+    pub fn as_ref(&self) -> crate::main_protocol_two_way_anon_with_error_response::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireMainProtocolTwoWayAnonWithErrorResponseRef::B(unsafe {
+            1 => crate::main_protocol_two_way_anon_with_error_response::Ref::B(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
-            unknown => WireMainProtocolTwoWayAnonWithErrorResponseRef::UnknownOrdinal(unknown),
+            unknown => {
+                crate::main_protocol_two_way_anon_with_error_response::Ref::UnknownOrdinal(unknown)
+            }
         }
     }
 
-    pub fn as_mut(&mut self) -> WireMainProtocolTwoWayAnonWithErrorResponseMut<'_> {
+    pub fn as_mut(&mut self) -> crate::main_protocol_two_way_anon_with_error_response::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireMainProtocolTwoWayAnonWithErrorResponseMut::B(unsafe {
+            1 => crate::main_protocol_two_way_anon_with_error_response::Mut::B(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => WireMainProtocolTwoWayAnonWithErrorResponseMut::UnknownOrdinal(unknown),
+            unknown => {
+                crate::main_protocol_two_way_anon_with_error_response::Mut::UnknownOrdinal(unknown)
+            }
         }
     }
 }
@@ -3448,26 +3490,28 @@ pub struct WireMainProtocolTwoWayAnonWithErrorResult<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireMainProtocolTwoWayAnonWithErrorResultRef<'union> {
-    Response(&'union crate::WireMainProtocolTwoWayAnonWithErrorResponse),
+pub mod main_protocol_two_way_anon_with_error_result {
+    pub enum Ref<'union> {
+        Response(&'union crate::WireMainProtocolTwoWayAnonWithErrorResponse),
 
-    Err(&'union ::fidl_next::u32_le),
-}
+        Err(&'union ::fidl_next::u32_le),
+    }
 
-pub enum WireMainProtocolTwoWayAnonWithErrorResultMut<'union> {
-    Response(&'union mut crate::WireMainProtocolTwoWayAnonWithErrorResponse),
+    pub enum Mut<'union> {
+        Response(&'union mut crate::WireMainProtocolTwoWayAnonWithErrorResponse),
 
-    Err(&'union mut ::fidl_next::u32_le),
+        Err(&'union mut ::fidl_next::u32_le),
+    }
 }
 
 impl<'buf> WireMainProtocolTwoWayAnonWithErrorResult<'buf> {
-    pub fn as_ref(&self) -> WireMainProtocolTwoWayAnonWithErrorResultRef<'_> {
+    pub fn as_ref(&self) -> crate::main_protocol_two_way_anon_with_error_result::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireMainProtocolTwoWayAnonWithErrorResultRef::Response(unsafe {
+            1 => crate::main_protocol_two_way_anon_with_error_result::Ref::Response(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
-            2 => WireMainProtocolTwoWayAnonWithErrorResultRef::Err(unsafe {
+            2 => crate::main_protocol_two_way_anon_with_error_result::Ref::Err(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
@@ -3475,13 +3519,13 @@ impl<'buf> WireMainProtocolTwoWayAnonWithErrorResult<'buf> {
         }
     }
 
-    pub fn as_mut(&mut self) -> WireMainProtocolTwoWayAnonWithErrorResultMut<'_> {
+    pub fn as_mut(&mut self) -> crate::main_protocol_two_way_anon_with_error_result::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireMainProtocolTwoWayAnonWithErrorResultMut::Response(unsafe {
+            1 => crate::main_protocol_two_way_anon_with_error_result::Mut::Response(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            2 => WireMainProtocolTwoWayAnonWithErrorResultMut::Err(unsafe {
+            2 => crate::main_protocol_two_way_anon_with_error_result::Mut::Err(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
@@ -3715,34 +3759,38 @@ pub struct WireMainProtocolOnAnonRequest {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireMainProtocolOnAnonRequestRef<'union> {
-    B(&'union bool),
+pub mod main_protocol_on_anon_request {
+    pub enum Ref<'union> {
+        B(&'union bool),
 
-    UnknownOrdinal(u64),
-}
+        UnknownOrdinal(u64),
+    }
 
-pub enum WireMainProtocolOnAnonRequestMut<'union> {
-    B(&'union mut bool),
+    pub enum Mut<'union> {
+        B(&'union mut bool),
 
-    UnknownOrdinal(u64),
+        UnknownOrdinal(u64),
+    }
 }
 
 impl WireMainProtocolOnAnonRequest {
-    pub fn as_ref(&self) -> WireMainProtocolOnAnonRequestRef<'_> {
+    pub fn as_ref(&self) -> crate::main_protocol_on_anon_request::Ref<'_> {
         match self.raw.ordinal() {
-            1 => WireMainProtocolOnAnonRequestRef::B(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::main_protocol_on_anon_request::Ref::B(unsafe {
+                self.raw.get().deref_unchecked()
+            }),
 
-            unknown => WireMainProtocolOnAnonRequestRef::UnknownOrdinal(unknown),
+            unknown => crate::main_protocol_on_anon_request::Ref::UnknownOrdinal(unknown),
         }
     }
 
-    pub fn as_mut(&mut self) -> WireMainProtocolOnAnonRequestMut<'_> {
+    pub fn as_mut(&mut self) -> crate::main_protocol_on_anon_request::Mut<'_> {
         match self.raw.ordinal() {
-            1 => WireMainProtocolOnAnonRequestMut::B(unsafe {
+            1 => crate::main_protocol_on_anon_request::Mut::B(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => WireMainProtocolOnAnonRequestMut::UnknownOrdinal(unknown),
+            unknown => crate::main_protocol_on_anon_request::Mut::UnknownOrdinal(unknown),
         }
     }
 }
