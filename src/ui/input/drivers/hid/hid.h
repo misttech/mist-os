@@ -11,7 +11,6 @@
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
-#include <lib/driver/power/cpp/wake-lease.h>
 #include <lib/hid-parser/item.h>
 #include <lib/hid-parser/parser.h>
 #include <lib/hid-parser/usages.h>
@@ -39,8 +38,7 @@ class HidDevice : public fidl::WireServer<fuchsia_hardware_input::Controller>,
                   public fidl::WireAsyncEventHandler<fuchsia_hardware_hidbus::Hidbus> {
  public:
   explicit HidDevice(fidl::ClientEnd<fuchsia_hardware_hidbus::Hidbus> hidbus)
-      : hidbus_(std::move(hidbus), fdf::Dispatcher::GetCurrent()->async_dispatcher(), this),
-        wake_lease_(fdf::Dispatcher::GetCurrent()->async_dispatcher(), "hid", {}) {}
+      : hidbus_(std::move(hidbus), fdf::Dispatcher::GetCurrent()->async_dispatcher(), this) {}
   ~HidDevice() override {
     instance_list_.clear();
     ReleaseReassemblyBuffer();
@@ -79,8 +77,6 @@ class HidDevice : public fidl::WireServer<fuchsia_hardware_input::Controller>,
 
   fuchsia_hardware_hidbus::HidInfo info_;
   fidl::WireClient<fuchsia_hardware_hidbus::Hidbus> hidbus_;
-
-  fdf_power::WakeLease wake_lease_;
 
   // Reassembly buffer for input events too large to fit in a single interrupt
   // transaction.

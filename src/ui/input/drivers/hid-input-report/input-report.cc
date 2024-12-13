@@ -67,6 +67,11 @@ void InputReport::HandleReports(
       FDF_LOG(ERROR, "Report does not have data!");
       continue;
     }
+    if (report.has_wake_lease()) {
+      const zx::duration kLeaseTimeout = zx::msec(500);
+      wake_lease_.DepositWakeLease(std::move(report.wake_lease()),
+                                   zx::deadline_after(kLeaseTimeout));
+    }
     HandleReport(cpp20::span<uint8_t>(report.buf().data(), report.buf().count()),
                  report.has_timestamp() ? zx::time(report.timestamp()) : time);
   }

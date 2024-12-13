@@ -149,8 +149,12 @@ void HidDevice::OnReportReceived(fidl::WireEvent<fhidbus::Hidbus::OnReportReceiv
   }
 
   if (event->has_wake_lease()) {
-    const zx::duration kLeaseTimeout = zx::msec(500);
-    wake_lease_.DepositWakeLease(std::move(event->wake_lease()), zx::deadline_after(kLeaseTimeout));
+    zx::eventpair wake_lease = std::move(event->wake_lease());
+    for (auto& instance : instance_list_) {
+      zx::eventpair wake_lease_dup;
+      ZX_ASSERT(wake_lease.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_lease_dup) == ZX_OK);
+      instance.SetWakeLease(std::move(wake_lease_dup));
+    }
   }
 
   size_t len = event->buf().count();

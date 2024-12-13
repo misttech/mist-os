@@ -38,6 +38,7 @@ source_set("driver-internals") {
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/logging/cpp",
+    "//sdk/lib/driver/power/cpp",
     "//sdk/lib/inspect/component/cpp",
     "//src/ui/input/lib/hid",
     "//src/ui/input/lib/hid-input-report",

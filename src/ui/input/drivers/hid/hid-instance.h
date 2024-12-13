@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.input/cpp/wire.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/cpp/completion.h>
+#include <lib/zx/eventpair.h>
 
 #include <list>
 
@@ -43,6 +44,7 @@ class HidInstance : public fidl::WireServer<fuchsia_hardware_input::Device>,
 
   void CloseInstance();
   void WriteToFifo(const uint8_t* report, size_t report_len, zx_time_t time);
+  void SetWakeLease(const zx::eventpair& wake_lease);
 
  private:
   void SetReadable();

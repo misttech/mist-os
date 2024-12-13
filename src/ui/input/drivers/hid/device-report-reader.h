@@ -33,6 +33,7 @@ class DeviceReportsReader : public fidl::WireServer<fuchsia_hardware_input::Devi
 
   void ReadReports(ReadReportsCompleter::Sync& completer) override;
   zx_status_t WriteToFifo(const uint8_t* report, size_t report_len, zx_time_t time);
+  void SetWakeLease(const zx::eventpair& wake_lease);
 
  private:
   zx_status_t SendReports();
@@ -41,6 +42,8 @@ class DeviceReportsReader : public fidl::WireServer<fuchsia_hardware_input::Devi
   static constexpr size_t kDataFifoSize = 4096;
   fbl::RingBuffer<uint8_t, kDataFifoSize> data_fifo_;
   fbl::RingBuffer<zx_time_t, fuchsia_hardware_input::wire::kMaxReportsCount> timestamps_;
+
+  zx::eventpair wake_lease_;
 
   std::optional<ReadReportsCompleter::Async> waiting_read_;
   uint32_t trace_id_ = 0;

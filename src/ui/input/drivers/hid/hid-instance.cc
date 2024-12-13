@@ -101,8 +101,8 @@ void HidInstance::ReadReport(ReadReportCompleter::Sync& completer) {
 
   auto buf_view = fidl::VectorView<uint8_t>::FromExternal(buf.data(), report_size);
   fidl::Arena arena;
-  completer.ReplySuccess(
-      fhidbus::wire::Report::Builder(arena).buf(buf_view).timestamp(time).Build());
+  auto report = fhidbus::wire::Report::Builder(arena).buf(buf_view).timestamp(time);
+  completer.ReplySuccess(report.Build());
 }
 
 void HidInstance::ReadReports(ReadReportsCompleter::Sync& completer) {
@@ -269,6 +269,12 @@ void HidInstance::WriteToFifo(const uint8_t* report, size_t report_len, zx_time_
   flags_ &= ~kHidFlagsWriteFailed;
   if (was_empty) {
     SetReadable();
+  }
+}
+
+void HidInstance::SetWakeLease(const zx::eventpair& wake_lease) {
+  for (auto& reader : readers_) {
+    reader.SetWakeLease(wake_lease);
   }
 }
 

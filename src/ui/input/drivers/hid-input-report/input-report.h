@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.input/cpp/wire.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/power/cpp/wake-lease.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zx/result.h>
@@ -26,7 +27,8 @@ class InputReport : public fidl::WireServer<fuchsia_input_report::InputDevice>,
                     public InputReportBase {
  public:
   explicit InputReport(fidl::ClientEnd<fuchsia_hardware_input::Device> input_device)
-      : input_device_(std::move(input_device)) {}
+      : input_device_(std::move(input_device)),
+        wake_lease_(fdf::Dispatcher::GetCurrent()->async_dispatcher(), "hid-input-report", {}) {}
 
   zx_status_t Start();
 
@@ -83,6 +85,8 @@ class InputReport : public fidl::WireServer<fuchsia_input_report::InputDevice>,
 
   fidl::WireSyncClient<fuchsia_hardware_input::Device> input_device_;
   fidl::WireClient<fuchsia_hardware_input::DeviceReportsReader> dev_reader_;
+
+  fdf_power::WakeLease wake_lease_;
 
   std::vector<std::unique_ptr<hid_input_report::Device>> devices_;
 
