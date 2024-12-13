@@ -10,9 +10,9 @@
 #include <zircon/assert.h>
 
 #include <cstdint>
+#include <mutex>
 #include <optional>
 
-#include <fbl/auto_lock.h>
 #include <usb/peripheral.h>
 #include <usb/request-cpp.h>
 
@@ -35,11 +35,11 @@ void CompleteTxn(CompleterType& completer, zx_status_t status) {
 void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& completer) {
   // Should always be started on a clean state.
   {
-    fbl::AutoLock _(&bulk_in_ep_.mutex_);
+    std::lock_guard<std::mutex> _(bulk_in_ep_.mutex_);
     ZX_ASSERT(tx_pending_reqs_.empty());
   }
   {
-    fbl::AutoLock _(&bulk_out_ep_.mutex_);
+    std::lock_guard<std::mutex> _(bulk_out_ep_.mutex_);
     ZX_ASSERT(rx_requests_.empty());
   }
 
@@ -71,7 +71,7 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
   CompleteTxn(completer, status);
 
   // Run receive to pass up messages received while disconnected.
-  fbl::AutoLock _(&bulk_out_ep_.mutex_);
+  std::lock_guard<std::mutex> _(bulk_out_ep_.mutex_);
   ReceiveLocked();
 }
 
@@ -108,7 +108,7 @@ void UsbAdbDevice::Stop() {
   });
 
   {
-    fbl::AutoLock _(&bulk_out_ep_.mutex_);
+    std::lock_guard<std::mutex> _(bulk_out_ep_.mutex_);
     while (!rx_requests_.empty()) {
       rx_requests_.front().Reply(fit::error(ZX_ERR_BAD_STATE));
       rx_requests_.pop();
@@ -120,7 +120,7 @@ void UsbAdbDevice::Stop() {
   }
 
   {
-    fbl::AutoLock _(&bulk_in_ep_.mutex_);
+    std::lock_guard<std::mutex> _(bulk_in_ep_.mutex_);
     while (!tx_pending_reqs_.empty()) {
       CompleteTxn(tx_pending_reqs_.front().completer, ZX_ERR_CANCELED);
       tx_pending_reqs_.pop();
@@ -132,7 +132,7 @@ void UsbAdbDevice::Stop() {
     zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
   }
 
-  fbl::AutoLock _(&lock_);
+  std::lock_guard<std::mutex> _(lock_);
   stop_completed_ = true;
   ShutdownComplete();
 }
@@ -240,7 +240,7 @@ void UsbAdbDevice::QueueTx(QueueTxRequest& request, QueueTxCompleter::Sync& comp
     return;
   }
 
-  fbl::AutoLock _(&bulk_in_ep_.mutex_);
+  std::lock_guard<std::mutex> _(bulk_in_ep_.mutex_);
   tx_pending_reqs_.emplace(
       txn_req_t{.request = std::move(request), .start = 0, .completer = completer.ToAsync()});
 
@@ -257,7 +257,7 @@ void UsbAdbDevice::Receive(ReceiveCompleter::Sync& completer) {
     return;
   }
 
-  fbl::AutoLock lock(&bulk_out_ep_.mutex_);
+  std::lock_guard<std::mutex> lock(bulk_out_ep_.mutex_);
   rx_requests_.emplace(completer.ToAsync());
   ReceiveLocked();
 }
@@ -265,7 +265,7 @@ void UsbAdbDevice::Receive(ReceiveCompleter::Sync& completer) {
 zx_status_t UsbAdbDevice::InsertUsbRequest(fuchsia_hardware_usb_request::Request req,
                                            usb::EndpointClient<UsbAdbDevice>& ep) {
   ep.PutRequest(usb::FidlRequest(std::move(req)));
-  fbl::AutoLock _(&lock_);
+  std::lock_guard<std::mutex> _(lock_);
   // Return without adding the request to the pool during shutdown.
   auto ret = shutdown_callback_ ? ZX_ERR_CANCELED : ZX_OK;
   ShutdownComplete();
@@ -277,7 +277,7 @@ void UsbAdbDevice::RxComplete(fendpoint::Completion completion) {
   ZX_ASSERT(completion.request()->data()->size() == 1);
   // Return early during shutdown.
   bool is_shutdown = [this]() {
-    fbl::AutoLock _(&lock_);
+    std::lock_guard<std::mutex> _(lock_);
     return !!shutdown_callback_;
   }();
   if (is_shutdown || (*completion.status() == ZX_ERR_IO_NOT_PRESENT)) {
@@ -285,13 +285,13 @@ void UsbAdbDevice::RxComplete(fendpoint::Completion completion) {
     return;
   }
 
-  fbl::AutoLock _(&bulk_out_ep_.mutex_);
+  std::lock_guard<std::mutex> _(bulk_out_ep_.mutex_);
   pending_replies_.push(std::move(completion));
   ReceiveLocked();
 }
 
 void UsbAdbDevice::TxComplete(fendpoint::Completion completion) {
-  fbl::AutoLock _(&bulk_in_ep_.mutex_);
+  std::lock_guard<std::mutex> _(bulk_in_ep_.mutex_);
   if (InsertUsbRequest(std::move(completion.request().value()), bulk_in_ep_) != ZX_OK) {
     return;
   }
@@ -390,7 +390,7 @@ zx_status_t UsbAdbDevice::ConfigureEndpoints(bool enable) {
 zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetConfigured(bool configured, usb_speed_t speed) {
   zxlogf(INFO, "configured? - %d  speed - %d.", configured, speed);
   {
-    fbl::AutoLock _(&lock_);
+    std::lock_guard<std::mutex> _(lock_);
     status_ = fadb::StatusFlags(configured);
   }
 
@@ -411,7 +411,7 @@ zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetInterface(uint8_t interface, ui
   }
 
   {
-    fbl::AutoLock _(&lock_);
+    std::lock_guard<std::mutex> _(lock_);
     status_ = alt_setting ? fadb::StatusFlags::kOnline : fadb::StatusFlags(0);
   }
 

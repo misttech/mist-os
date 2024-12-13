@@ -13,10 +13,9 @@
 #include <lib/ddk/debug.h>  // nogncheck
 #endif
 
+#include <mutex>
 #include <queue>
 
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 #include <usb/request-fidl.h>
 
 namespace usb {
@@ -54,11 +53,11 @@ class EndpointClientBase {
   // destructed.
   zx_status_t DeleteRequest(usb::FidlRequest&& request) __TA_REQUIRES(mutex_);
 
-  fbl::Mutex mutex_;
+  std::mutex mutex_;
   const std::function<zx::result<std::optional<usb::MappedVmo>>(
       const fuchsia_hardware_usb_request::Buffer& buffer)>
       GetMapped = [&](const fuchsia_hardware_usb_request::Buffer& buffer) {
-        fbl::AutoLock _(&mutex_);
+        std::lock_guard<std::mutex> _(mutex_);
         return get_mapped(buffer);
       };
   const std::function<zx::result<std::optional<usb::MappedVmo>>(
@@ -67,7 +66,7 @@ class EndpointClientBase {
                             __TA_REQUIRES(mutex_) { return get_mapped(buffer); };
   std::optional<zx_vaddr_t> GetMappedAddr(const fuchsia_hardware_usb_request::Request& request,
                                           size_t idx) {
-    fbl::AutoLock _(&mutex_);
+    std::lock_guard<std::mutex> _(mutex_);
     return GetMappedAddrLocked(request, idx);
   }
   std::optional<zx_vaddr_t> GetMappedAddrLocked(

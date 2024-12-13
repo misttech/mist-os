@@ -7,6 +7,7 @@
 #include <lib/zx/vmar.h>
 
 #include <functional>
+#include <mutex>
 
 namespace usb::internal {
 
@@ -137,7 +138,7 @@ size_t EndpointClientBase::RegisterVmos(size_t vmo_count, size_t vmo_size) {
             // Try for the next one.
             continue;
           }
-          fbl::AutoLock _(&mutex_);
+          std::lock_guard<std::mutex> _(mutex_);
           vmo_mapped_addrs_.emplace(*vmo.id(), usb::MappedVmo{mapped_addr, vmo_size});
         }
         sync_completion_signal(&wait);

@@ -14,12 +14,11 @@
 #include <lib/sync/cpp/completion.h>
 #include <zircon/compiler.h>
 
+#include <mutex>
 #include <queue>
 
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 #include <usb-endpoint/usb-endpoint-client.h>
 #include <usb/descriptors.h>
 
@@ -88,7 +87,7 @@ class UsbAdbDevice : public UsbAdb,
 
   // Public for testing
   void SetShutdownCallback(fit::callback<void()> cb) {
-    fbl::AutoLock _(&lock_);
+    std::lock_guard<std::mutex> _(lock_);
     shutdown_callback_ = std::move(cb);
   }
 
@@ -124,7 +123,7 @@ class UsbAdbDevice : public UsbAdb,
   uint8_t bulk_in_addr() const { return descriptors_.bulk_in_ep.b_endpoint_address; }
 
   bool Online() const {
-    fbl::AutoLock _(&lock_);
+    std::lock_guard<std::mutex> _(lock_);
     return (status_ == fadb::StatusFlags::kOnline) && !shutdown_callback_;
   }
 
@@ -166,7 +165,7 @@ class UsbAdbDevice : public UsbAdb,
 
   // Lock for guarding driver states. This should be held for only a short duration and is the inner
   // most lock in all cases.
-  mutable fbl::Mutex lock_ __TA_ACQUIRED_AFTER(bulk_in_ep_.mutex_)
+  mutable std::mutex lock_ __TA_ACQUIRED_AFTER(bulk_in_ep_.mutex_)
       __TA_ACQUIRED_AFTER(bulk_out_ep_.mutex_);
 
   // USB ADB interface descriptor.

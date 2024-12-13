@@ -23,7 +23,6 @@ source_set("usb-endpoint-client") {
     "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
-    "//zircon/system/ulib/fbl",
   ]
   public_configs = [ ":includes" ]
 }
@@ -35,7 +34,6 @@ source_set("usb-endpoint-client-dfv2-compat-logging") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
     "//sdk/lib/driver/compat/cpp:logging",
-    "//zircon/system/ulib/fbl",
   ]
   public_configs = [
     ":includes",
@@ -52,10 +50,7 @@ source_set("usb-endpoint-server") {
     "//src/devices/usb/lib/usb:usb",
     "//src/devices/usb/lib/usb:usb-fidl",
   ]
-  deps = [
-    "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
-    "//zircon/system/ulib/fbl",
-  ]
+  deps = [ "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp" ]
   public_configs = [ ":includes" ]
 }
 
@@ -66,10 +61,7 @@ source_set("usb-endpoint-server-sdk") {
     "//src/devices/lib/dma-buffer",
     "//src/devices/usb/lib/usb:usb-fidl-sdk",
   ]
-  deps = [
-    "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
-    "//zircon/system/ulib/fbl",
-  ]
+  deps = [ "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp" ]
   public_configs = [ ":includes" ]
 }
 
@@ -82,10 +74,7 @@ source_set("usb-endpoint-server-dfv2-compat-logging") {
     "//src/devices/usb/lib/usb:usb-dfv2-compat-logging",
     "//src/devices/usb/lib/usb:usb-fidl-dfv2-compat-logging",
   ]
-  deps = [
-    "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
-    "//zircon/system/ulib/fbl",
-  ]
+  deps = [ "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp" ]
   public_configs = [
     ":includes",
     ":enable-dfv2-compat-logging",
