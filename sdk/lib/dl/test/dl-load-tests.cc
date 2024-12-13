@@ -1509,6 +1509,70 @@ TYPED_TEST(DlTests, StartupModulesStaticTlsGetAddr) {
   ASSERT_TRUE(this->DlClose(open.value()).is_ok());
 }
 
+// dlopen a module whose initializers and finalizers are decoded by legacy
+// DT_INIT and DT_FINI sections. These functions will update the global
+// gInitFiniState, and that value is checked in this test to ensure those
+// functions were run.
+TYPED_TEST(DlTests, InitFiniLegacy) {
+  const std::string kFile = TestModule("init-fini-legacy");
+
+  if constexpr (!TestFixture::kSupportsInitFini) {
+    GTEST_SKIP() << "test requires init/fini support";
+  }
+
+  ASSERT_EQ(gInitFiniState, 0);
+
+  this->ExpectRootModule(kFile);
+
+  auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value()) << open.error_value();
+
+  EXPECT_EQ(gInitFiniState, 101);
+
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+
+  if (TestFixture::kDlCloseCanRunFinalizers) {
+    EXPECT_EQ(gInitFiniState, 102);
+  }
+
+  gInitFiniState = 0;
+}
+
+// Similar to InitFiniLegacy test, except dlopen a module whose initializers and
+// finalizers are decoded from DT_INIT_ARRAY/DT_FINI_ARRAY sections. This also
+// tests that multiple initializers/finalizers in the dlopen-ed module are run in
+// correct order.
+TYPED_TEST(DlTests, InitFiniArray) {
+  const std::string kFile = TestModule("init-fini-array");
+
+  if constexpr (!TestFixture::kSupportsInitFini) {
+    GTEST_SKIP() << "test requires init/fini support";
+  }
+
+  ASSERT_EQ(gInitFiniState, 0);
+
+  this->ExpectRootModule(kFile);
+
+  auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value()) << open.error_value();
+
+  // Expect the three ctors to have run in the order expected by the functions
+  // in init-fini-array.cc
+  EXPECT_EQ(gInitFiniState, 3);
+
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+
+  if (TestFixture::kDlCloseCanRunFinalizers) {
+    // Expect the three dtors to have run in the order expected by the functions
+    // in init-fini-array.cc
+    EXPECT_EQ(gInitFiniState, 6);
+  }
+
+  gInitFiniState = 0;
+}
+
 // A common test subroutine for basic TLS accesses.
 //
 // This test exercises the following sequence of events:

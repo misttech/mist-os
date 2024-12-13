@@ -23,6 +23,8 @@ per_test_modules = [
   ":multiple-transitive-foo-deps",
   ":root-precedence-in-dep-resolution",
   ":precedence-in-dep-resolution",
+  ":init-fini-array",
+  ":init-fini-legacy",
 ]
 
 per_test_executables = [
@@ -75,6 +77,8 @@ per_test_suffices = [
   "PrecedenceInDepResolution",
   "StartupModulesBasic",
   "StartupModulesPriorityOverGlobal",
+  "InitFiniArray",
+  "InitFiniLegacy",
 ]
 
 # This reaches all the runtime deps of //sdk/lib/dl/test:dl-unittests.
@@ -108,6 +112,7 @@ group("dl-unittest.deps") {
   testonly = true
   deps = [
     ":has-foo-v1.StartupModulesPriorityOverGlobal",
+    ":init-fini-var",
     ":ld-dep-foo-v1.StartupModulesBasic",
     ":ld-dep-foo-v2.StartupModulesBasic",
     ":static-tls-var",
@@ -1525,6 +1530,29 @@ foreach(test, [ "" ] + per_test_suffices) {
     sources = [ "foo.cc" ]
     deps = [ ":ld-dep-foo-v1$suffix" ]
   }
+
+  # A basic module that will run DT_INIT/DT_FINI functions when it is dlopened.
+  test_loadable_module("init-fini-legacy$suffix.module") {
+    sources = [ "init-fini-legacy.cc" ]
+    deps = [ ":init-fini-var" ]
+
+    # This is needed to make sure ctor/dtor are tagged with DT_INIT/DT_FINI.
+    ldflags = [ "-Wl,-init=ctor,-fini=dtor" ]
+  }
+
+  # A basic module that will run DT_INIT_ARRAY/DT_FINI_ARRAY functions when it
+  # is dlopened.
+  test_loadable_module("init-fini-array$suffix.module") {
+    sources = [ "init-fini-array.cc" ]
+    deps = [ ":init-fini-var" ]
+  }
+}
+
+# This is a startup module that exports a global variable that gets modified by
+# other targets (e.g :init-fini-legacy, :init-fini-array). This does not need to
+# be suffixed, since its loaded only once at startup.
+test_shared_library("init-fini-var") {
+  sources = [ "init-fini-var.cc" ]
 }
 
 test_shared_library("static-tls-var") {

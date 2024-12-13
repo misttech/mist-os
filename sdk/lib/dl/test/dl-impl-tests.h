@@ -32,8 +32,14 @@ class DlImplTests : public Base {
   static constexpr bool kSupportsNoLoadMode = false;
   // TODO(https://fxbug.dev/342480690): Support Dynamic TLS
   static constexpr bool kSupportsDynamicTls = false;
+  // TODO(https://fxbug.dev/382340693): Support initializers/finalizers
+  static constexpr bool kSupportsInitFini = false;
+  // TODO(https://fxbug.dev/382529434): Have dlclose() run finalizers
+  static constexpr bool kDlCloseCanRunFinalizers = false;
 
   void SetUp() override {
+    Base::SetUp();
+
     fbl::AllocChecker ac;
     dynamic_linker_ = RuntimeDynamicLinker::Create(gStartupLdAbi, ac);
     ASSERT_TRUE(ac.check());
