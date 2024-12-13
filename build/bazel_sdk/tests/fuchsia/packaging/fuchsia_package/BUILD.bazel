@@ -3,9 +3,9 @@
 # found in the LICENSE file.
 
 load("@fuchsia_sdk//fuchsia:defs.bzl", "get_fuchsia_api_levels")
-load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test", "no_repo_default_api_level_fuchsia_package_checker_test", "repo_default_api_level_next_fuchsia_package_checker_test", "repo_default_unknown_and_override_next_api_level_fuchsia_package_checker_test", "repo_default_unknown_api_level_fuchsia_package_checker_test")
 load("//fuchsia/packaging:common_utils.bzl", "failure_test", "no_repo_default_api_level_failure_test", "unknown_override_api_level_failure_test", "unknown_repo_default_api_level_failure_test")
 load("//test_utils:api_levels.bzl", "some_valid_numerical_api_level_as_string")
+load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test", "no_repo_default_api_level_fuchsia_package_checker_test", "repo_default_api_level_next_fuchsia_package_checker_test", "repo_default_unknown_and_override_next_api_level_fuchsia_package_checker_test", "repo_default_unknown_api_level_fuchsia_package_checker_test")
 
 NUMERICAL_LEVEL_ABI_REVISION = [
     level.abi_revision
@@ -34,7 +34,7 @@ REPO_DEFAULT_ABI_REVISION = [
 
 # Values used in tests of `pkg_for_test` and variantes for different levels.
 EXPECTED_BLOBS_IN_PKG = {
-    "bin/cc_bin": "cc_bin_native_stripped",
+    "bin/cc_bin": "cc_bin.binary_stripped",
     "data/text_file.txt": "text_file.txt",
 
     # Common files that should automatically be added
@@ -119,7 +119,7 @@ fuchsia_package_checker_test(
     size = "small",
     expected_abi_revision = HEAD_ABI_REVISION,
     expected_blobs_to_file_names = {
-        "bin/cc_bin_static_cpp": "cc_bin_static_cpp_native_stripped",
+        "bin/cc_bin_static_cpp": "cc_bin_static_cpp.binary_stripped",
 
         # Common files that should automatically be added
 
@@ -141,7 +141,7 @@ fuchsia_package_checker_test(
     size = "small",
     expected_abi_revision = HEAD_ABI_REVISION,
     expected_blobs_to_file_names = {
-        "bin/cc_test": "cc_test_native_stripped",
+        "bin/cc_test": "cc_test.binary_stripped",
         "data/text_file.txt": "text_file.txt",
 
         # Common files that should automatically be added
@@ -170,7 +170,7 @@ fuchsia_package_checker_test(
     size = "small",
     expected_abi_revision = HEAD_ABI_REVISION,
     expected_blobs_to_file_names = {
-        "bin/cc_unit_test": "cc_unit_test_native_stripped",
+        "bin/cc_unit_test": "cc_unit_test.binary_stripped",
         # Common files that should automatically be added
 
         # From SDK sysroot
@@ -236,7 +236,7 @@ fuchsia_package_checker_test(
         "driver/test_driver_so.so": "test_driver_so.so_stripped",
 
         # The driver tool
-        "bin/ctl": "ctl_native_stripped",
+        "bin/ctl": "ctl.binary_stripped",
 
         # Common files
         "lib/ld.so.1": "ld.so.1",

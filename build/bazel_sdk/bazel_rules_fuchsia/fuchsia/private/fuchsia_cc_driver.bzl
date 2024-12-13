@@ -4,7 +4,7 @@
 
 """A wrapper around cc_binary to be used for drivers targeting Fuchsia."""
 
-load("//fuchsia/private:fuchsia_cc.bzl", "fuchsia_wrap_cc_binary")
+load("//fuchsia/private:fuchsia_cc.bzl", "data_for_features", "fuchsia_cc")
 
 def fuchsia_cc_driver(
         name,
@@ -114,12 +114,13 @@ def fuchsia_cc_driver(
     tags = kwargs.pop("tags", None)
     testonly = kwargs.pop("testonly", None)
 
-    fuchsia_wrap_cc_binary(
+    fuchsia_cc(
         name = name,
         bin_name = shared_lib_name,
         install_root = "driver/",
-        cc_binary = ":{}".format(cc_shared_library_name),
-        exact_cc_binary_deps = deps,
+        native_target = cc_shared_library_name,
+        data = data_for_features(features),
+        deps = deps,
         visibility = visibility,
         testonly = testonly,
         features = features,
