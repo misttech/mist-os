@@ -166,18 +166,6 @@ unwinder::Error MinidumpMemory::SnapshotMemoryRegion::ReadBytes(uint64_t addr, u
   return unwinder::Error("error reading from the memory snapshot");
 }
 
-unwinder::Error MinidumpMemory::FileMemoryRegion::ReadBytes(uint64_t addr, uint64_t size,
-                                                            void* dst) {
-  if (addr < load_address_) {
-    return unwinder::Error("out of boundary");
-  }
-  fseek(file_.get(), static_cast<int64_t>(addr - load_address_), SEEK_SET);
-  if (fread(dst, 1, size, file_.get()) != size) {
-    return unwinder::Error("short read");
-  }
-  return unwinder::Success();
-}
-
 std::string MinidumpGetBuildId(const crashpad::ModuleSnapshot& mod) {
   auto build_id = mod.BuildID();
 
