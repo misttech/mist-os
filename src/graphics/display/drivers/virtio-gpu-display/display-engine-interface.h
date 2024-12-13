@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_INTERFACE_H_
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 
 #include <cstdint>

@@ -4,17 +4,19 @@
 
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-banjo.h"
 
+#include <fidl/fuchsia.images2/cpp/wire.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 #include <zircon/time.h>
 
 #include <cstdint>
 
-#include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-#include <fbl/vector.h>
 
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
 
 namespace virtio_display {
 
@@ -32,12 +34,35 @@ void DisplayEngineEventsBanjo::SetListener(
   display_engine_listener_ = *display_engine_listener;
 }
 
-void DisplayEngineEventsBanjo::OnDisplayAdded(const raw_display_info_t& added_display_args) {
+void DisplayEngineEventsBanjo::OnDisplayAdded(
+    display::DisplayId display_id, cpp20::span<const display::Mode> preferred_modes,
+    cpp20::span<const fuchsia_images2::wire::PixelFormat> pixel_formats) {
+  ZX_DEBUG_ASSERT(preferred_modes.size() == 1);
+  ZX_DEBUG_ASSERT(pixel_formats.size() == 1);
+
+  const display_mode_t banjo_preferred_mode = preferred_modes[0].ToBanjo();
+  const cpp20::span<const display_mode_t> banjo_preferred_modes(&banjo_preferred_mode, 1);
+
+  const fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format =
+      static_cast<fuchsia_images2_pixel_format_enum_value_t>(pixel_formats[0]);
+  const cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats(
+      &banjo_pixel_format, 1);
+
+  const raw_display_info_t banjo_display_info = {
+      .display_id = display::ToBanjoDisplayId(display_id),
+      .preferred_modes_list = banjo_preferred_modes.data(),
+      .preferred_modes_count = banjo_preferred_modes.size(),
+      .edid_bytes_list = nullptr,
+      .edid_bytes_count = 0,
+      .pixel_formats_list = banjo_pixel_formats.data(),
+      .pixel_formats_count = banjo_pixel_formats.size(),
+  };
+
   fbl::AutoLock event_lock(&event_mutex_);
   if (display_engine_listener_.ops == nullptr) {
     return;
   }
-  display_engine_listener_on_display_added(&display_engine_listener_, &added_display_args);
+  display_engine_listener_on_display_added(&display_engine_listener_, &banjo_display_info);
 }
 
 void DisplayEngineEventsBanjo::OnDisplayRemoved(display::DisplayId display_id) {
