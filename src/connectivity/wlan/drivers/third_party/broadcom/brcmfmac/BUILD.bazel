@@ -14,3 +14,21 @@ fuchsia_prebuilt_package(
         "meta/brcmfmac.cm",
     ],
 )
+
+fuchsia_prebuilt_package(
+    name = "brcmfmac-sherlock",
+    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
+    archive = "@gn_targets//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-sherlock",
+    drivers = [
+        "meta/brcmfmac.cm",
+    ],
+)
+
+fuchsia_prebuilt_package(
+    name = "brcmfmac-nelson",
+    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
+    archive = "@gn_targets//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-nelson",
+    drivers = [
+        "meta/brcmfmac.cm",
+    ],
+)

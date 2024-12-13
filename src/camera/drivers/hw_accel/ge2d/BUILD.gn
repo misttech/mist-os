@@ -76,6 +76,7 @@ fuchsia_driver_component("ge2d-driver") {
 }
 
 fuchsia_driver_package("ge2d") {
+  export_to_bazel = true
   driver_components = [ ":ge2d-driver" ]
 }
 

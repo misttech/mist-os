@@ -1,0 +1,15 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@fuchsia_sdk//fuchsia:assembly.bzl", "fuchsia_prebuilt_package")
+
+package(default_visibility = ["//visibility:public"])
+
+fuchsia_prebuilt_package(
+    name = "gt6853",
+    archive = "@gn_targets//src/ui/input/drivers/gt6853:gt6853",
+    drivers = [
+        "meta/gt6853.cm",
+    ],
+)

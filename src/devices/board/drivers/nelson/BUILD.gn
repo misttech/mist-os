@@ -178,6 +178,7 @@ fuchsia_driver_component("nelson-module") {
 }
 
 fuchsia_driver_package("package") {
+  export_to_bazel = true
   package_name = "nelson-module"
   driver_components = [
     ":nelson-module",

@@ -63,6 +63,7 @@ fuchsia_driver_component("aml_mipicsi_driver") {
 
 fuchsia_driver_package("driver_package") {
   package_name = "aml-mipicsi"
+  export_to_bazel = true
   driver_components = [ ":aml_mipicsi_driver" ]
 }
 

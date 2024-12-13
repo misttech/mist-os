@@ -49,6 +49,7 @@ fuchsia_driver_component("max98373") {
 
 fuchsia_driver_package("package") {
   package_name = "max98373"
+  export_to_bazel = true
   driver_components = [ ":max98373" ]
 }
 

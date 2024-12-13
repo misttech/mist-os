@@ -114,6 +114,7 @@ template("ot_radio_driver") {
   }
 
   fuchsia_driver_package("openthread-${driver_suffix}") {
+    export_to_bazel = true
     driver_components = [ ":ot-radio-${driver_suffix}" ]
     deps = []
     if (internal_access) {

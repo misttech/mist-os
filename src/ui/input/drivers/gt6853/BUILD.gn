@@ -13,6 +13,7 @@ config_9365_path = "gt6853/goodix_cfg_group_fiti9365.bin"
 firmware_path = "gt6853/goodix_firmware.bin"
 
 fuchsia_driver_package("gt6853") {
+  export_to_bazel = true
   driver_components = [ ":gt6853-module" ]
 
   deps = []

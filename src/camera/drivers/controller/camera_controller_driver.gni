@@ -99,6 +99,7 @@ template("camera_controller_driver") {
   }
 
   fuchsia_driver_package(package_name) {
+    export_to_bazel = true
     driver_components = [ ":${driver_component_target}" ]
 
     deps = []
