@@ -19,6 +19,10 @@
 #include <linux/filter.h>
 #include <linux/seccomp.h>
 
+#ifndef SECCOMP_FILTER_FLAG_TSYNC_ESRCH
+#define SECCOMP_FILTER_FLAG_TSYNC_ESRCH (1ULL << 4)
+#endif  // SECCOMP_FILTER_FLAG_TSYNC_ESRCH
+
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 namespace {

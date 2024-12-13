@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "third_party/android/platform/bionic/libc/kernel/uapi/linux/bpf.h"
+
 #include <fcntl.h>
 #include <sys/epoll.h>
 #include <sys/file.h>
@@ -18,7 +20,6 @@
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
-#include <linux/bpf.h>
 
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 

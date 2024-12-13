@@ -20,6 +20,17 @@
 #include "src/starnix/tests/syscalls/cpp/syscall_matchers.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
+#ifndef LOOP_CONFIGURE
+struct loop_config {
+  uint32_t fd;
+  uint32_t block_size;
+  struct loop_info64 info;
+  uint64_t __reserved[8];
+};
+
+#define LOOP_CONFIGURE 0x4C0A
+#endif  // LOOP_CONFIGURE
+
 namespace {
 
 bool skip_loop_tests = false;

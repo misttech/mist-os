@@ -179,21 +179,6 @@ config("march") {
   }
 }
 
-# TODO(https://fxbug.dev/350479500) Remove these and reference any missing headers directly.
-config("bionic_uapi") {
-  include_dirs = [
-    "//third_party/android/platform/bionic/libc/kernel/uapi",
-    "//third_party/android/platform/bionic/libc/kernel/android/uapi",
-  ]
-  if (current_cpu == "x64") {
-    include_dirs +=
-        [ "//third_party/android/platform/bionic/libc/kernel/uapi/asm-x86" ]
-  } else if (current_cpu == "arm64") {
-    include_dirs +=
-        [ "//third_party/android/platform/bionic/libc/kernel/uapi/asm-arm64" ]
-  }
-}
-
 template("syscall_test") {
   test_name = invoker.test_name
 
@@ -226,7 +211,6 @@ template("syscall_test") {
       "//zircon/system/ulib/fbl",
     ]
     _test_configs = [
-      ":bionic_uapi",
       "//build/config:rtti",
       "//build/config:thread_safety_annotations",
 
