@@ -18,6 +18,7 @@ rustc_binary("bin") {
     "fidl:fuchsia.archivist.test_rust",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host_rust",
     "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",

@@ -11,8 +11,8 @@ use fuchsia_component_test::{
 use tracing::warn;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_diagnostics as fdiagnostics,
-    fidl_fuchsia_inspect as finspect, fidl_fuchsia_logger as flogger,
-    fidl_fuchsia_tracing_provider as ftracing,
+    fidl_fuchsia_diagnostics_host as fdiagnostics_host, fidl_fuchsia_inspect as finspect,
+    fidl_fuchsia_logger as flogger, fidl_fuchsia_tracing_provider as ftracing,
 };
 
 const ARCHIVIST_URL: &str = "#meta/archivist.cm";
@@ -167,6 +167,32 @@ impl ArchivistRealmFactory {
                     .capability(Capability::event_stream("capability_requested"))
                     .from(Ref::parent())
                     .to(&archivist),
+            )
+            .await?;
+
+        // NOTE: needed for CTF. We can remove this when we stop supporting F25.
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
+                    .capability(Capability::protocol::<fdiagnostics_host::ArchiveAccessorMarker>())
+                    .capability(
+                        Capability::protocol_by_name(format!(
+                            "{}.feedback",
+                            fdiagnostics::ArchiveAccessorMarker::PROTOCOL_NAME
+                        ))
+                        .as_("fuchsia.diagnostics.FeedbackArchiveAccessor"),
+                    )
+                    .capability(
+                        Capability::protocol_by_name(format!(
+                            "{}.lowpan",
+                            fdiagnostics::ArchiveAccessorMarker::PROTOCOL_NAME
+                        ))
+                        .as_("fuchsia.diagnostics.LoWPANArchiveAccessor"),
+                    )
+                    .from_dictionary("diagnostics-accessors")
+                    .from(&test_realm)
+                    .to(Ref::parent()),
             )
             .await?;
 
