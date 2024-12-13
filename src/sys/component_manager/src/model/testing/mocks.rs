@@ -425,6 +425,8 @@ pub enum ControlMessage {
 pub struct ControllerActionResponse {
     pub close_channel: bool,
     pub delay: Option<zx::MonotonicDuration>,
+    pub termination_status: Option<zx::Status>,
+    pub exit_code: Option<i64>,
 }
 
 pub struct MockController {
@@ -451,8 +453,18 @@ impl MockController {
             server_end,
             messages,
             koid,
-            ControllerActionResponse { close_channel: true, delay: None },
-            ControllerActionResponse { close_channel: true, delay: None },
+            ControllerActionResponse {
+                close_channel: true,
+                delay: None,
+                termination_status: Some(zx::Status::OK),
+                exit_code: Some(MOCK_EXIT_CODE),
+            },
+            ControllerActionResponse {
+                close_channel: true,
+                delay: None,
+                termination_status: Some(zx::Status::OK),
+                exit_code: Some(MOCK_EXIT_CODE),
+            },
         )
     }
 
@@ -478,10 +490,18 @@ impl MockController {
         }
     }
 
-    fn ok_on_stop_info() -> fcrunner::ComponentStopInfo {
+    fn on_stop_info_for_stop(&self) -> fcrunner::ComponentStopInfo {
         fcrunner::ComponentStopInfo {
-            termination_status: Some(zx::Status::OK.into_raw()),
-            exit_code: Some(MOCK_EXIT_CODE),
+            termination_status: self.stop_resp.termination_status.map(|s| s.into_raw()),
+            exit_code: self.stop_resp.exit_code,
+            ..Default::default()
+        }
+    }
+
+    fn on_stop_info_for_kill(&self) -> fcrunner::ComponentStopInfo {
+        fcrunner::ComponentStopInfo {
+            termination_status: self.kill_resp.termination_status.map(|s| s.into_raw()),
+            exit_code: self.kill_resp.exit_code,
             ..Default::default()
         }
     }
@@ -517,6 +537,7 @@ impl MockController {
                             .get_mut(&self.koid)
                             .expect("component channel koid key missing from mock runner map")
                             .push(ControlMessage::Stop);
+                        let stop_info = self.on_stop_info_for_stop();
                         if let Some(delay) = self.stop_resp.delay {
                             let delay_copy = delay.clone();
                             let close_channel = self.stop_resp.close_channel;
@@ -525,12 +546,12 @@ impl MockController {
                                 fasync::Timer::new(fasync::MonotonicInstant::after(delay_copy))
                                     .await;
                                 if close_channel {
-                                    let _ = control.send_on_stop(Self::ok_on_stop_info());
+                                    let _ = control.send_on_stop(stop_info);
                                 }
                             })
                             .detach();
                         } else if self.stop_resp.close_channel {
-                            let _ = control.send_on_stop(Self::ok_on_stop_info());
+                            let _ = control.send_on_stop(stop_info);
                             break;
                         }
                     }
@@ -541,6 +562,7 @@ impl MockController {
                             .get_mut(&self.koid)
                             .expect("component channel koid key missing from mock runner map")
                             .push(ControlMessage::Kill);
+                        let stop_info = self.on_stop_info_for_kill();
                         if let Some(delay) = self.kill_resp.delay {
                             let delay_copy = delay.clone();
                             let close_channel = self.kill_resp.close_channel;
@@ -548,7 +570,7 @@ impl MockController {
                                 fasync::Timer::new(fasync::MonotonicInstant::after(delay_copy))
                                     .await;
                                 if close_channel {
-                                    let _ = control.send_on_stop(Self::ok_on_stop_info());
+                                    let _ = control.send_on_stop(stop_info);
                                 }
                             })
                             .detach();
@@ -556,7 +578,7 @@ impl MockController {
                                 break;
                             }
                         } else if self.kill_resp.close_channel {
-                            let _ = control.send_on_stop(Self::ok_on_stop_info());
+                            let _ = control.send_on_stop(stop_info);
                             break;
                         }
                     }

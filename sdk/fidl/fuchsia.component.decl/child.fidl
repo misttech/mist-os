@@ -48,7 +48,7 @@ type Child = table {
 /// Describes under what conditions the component may be started.
 type StartupMode = strict enum {
     /// Start component instance only when it receives an incoming capability request or it's
-    /// started directly with `fuchsia.component.Controller/Start`.
+    /// started directly with [`fuchsia.component/Controller.Start`].
     LAZY = 0;
 
     /// Start component instance automatically when the parent starts or (for dynamic
@@ -62,9 +62,10 @@ type OnTerminate = strict enum {
     /// No action, the default
     NONE = 0;
 
-    /// Trigger a graceful system reboot if the component terminates for any
-    /// reason. This is a specialized feature gated by Component Framework
-    /// security policy.
+    /// Trigger a graceful system reboot if the component terminates, unless its controller reports
+    /// via [`fuchsia.component.runner/ComponentController.OnStop`] a `termination_status` of Ok and
+    /// an `exit_code` that is either unset or 0. This is a specialized feature gated by Component
+    /// Framework security policy.
     REBOOT = 1;
 };
 

@@ -52,6 +52,7 @@ use instance::{
 use manager::ComponentManagerInstance;
 use moniker::{ChildName, Moniker};
 use router_error::{Explain, RouterError};
+use runner::component::StopInfo;
 use sandbox::{
     Capability, Connector, Data, Dict, DirEntry, Message, Request, Routable, Router, RouterResponse,
 };
@@ -647,11 +648,17 @@ impl ComponentInstance {
                         self.environment.stop_timeout()
                     );
                 }
-                if !shut_down && self.on_terminate == fdecl::OnTerminate::Reboot {
+                let cleanly_stopped = matches!(
+                    ret.disposition,
+                    StopDisposition::Stopped(StopInfo{ termination_status, exit_code })
+                        if termination_status == zx::Status::OK && exit_code.unwrap_or(0) == 0
+                );
+                if !shut_down && !cleanly_stopped && self.on_terminate == fdecl::OnTerminate::Reboot
+                {
                     warn!(
-                        "Component with on_terminate=REBOOT terminated: {}. \
+                        "Component with on_terminate=REBOOT terminated uncleanly: {} {:?}. \
                             Rebooting the system",
-                        self.moniker
+                        self.moniker, ret.disposition
                     );
                     let top_instance = self
                         .top_instance()
@@ -2696,6 +2703,8 @@ pub mod tests {
             Box::new(move || ControllerActionResponse {
                 close_channel: true,
                 delay: Some(response_delay),
+                termination_status: Some(zx::Status::OK),
+                exit_code: Some(1),
             }),
         );
 

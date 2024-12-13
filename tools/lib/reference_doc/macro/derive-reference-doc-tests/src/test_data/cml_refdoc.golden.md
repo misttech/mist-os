@@ -244,8 +244,8 @@ The `children` section declares child component instances as described in
 - `on_terminate`: (_optional `string`_) Determines the fault recovery policy to apply if this component terminates.
     - `none` _(default)_: Do nothing.
     - `reboot`: Gracefully reboot the system if the component terminates for
-        any reason. This is a special feature for use only by a narrow set of
-        components; see [Termination policies][doc-reboot-on-terminate] for more
+        any reason other than graceful exit. This is a special feature for use only by a narrow
+        set of components; see [Termination policies][doc-reboot-on-terminate] for more
         information.
 - `environment`: (_optional `string`_) If present, the name of the environment to be assigned to the child component instance, one
     of [`environments`](#environments). If omitted, the child will inherit the same environment

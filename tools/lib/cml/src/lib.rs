@@ -3328,8 +3328,8 @@ pub struct Child {
     /// Determines the fault recovery policy to apply if this component terminates.
     /// - `none` _(default)_: Do nothing.
     /// - `reboot`: Gracefully reboot the system if the component terminates for
-    ///     any reason. This is a special feature for use only by a narrow set of
-    ///     components; see [Termination policies][doc-reboot-on-terminate] for more
+    ///     any reason other than graceful exit. This is a special feature for use only by a narrow
+    ///     set of components; see [Termination policies][doc-reboot-on-terminate] for more
     ///     information.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_terminate: Option<OnTerminate>,
