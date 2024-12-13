@@ -1,5 +1,7 @@
 {% let is_static = strct.shape.max_out_of_line == 0 %}
-{% let name = strct.name.decl_name().camel() %}
+{% let base_name = strct.name.decl_name().camel() %}
+{% let name = filters::ident(base_name)? %}
+{% let wire_name = format!("Wire{base_name}") %}
 
 {% let params %}
 {% if is_static %}
@@ -21,12 +23,12 @@
 )]
 pub struct {{ name }} {
     {% for member in strct.members %}
-        pub {{ member.name.snake() }}: {{ context.natural_type(member.ty) }},
+        pub {{ member.name.snake()|ident }}: {{ context.natural_type(member.ty) }},
     {% endfor %}
 }
 
 impl ::fidl_next::Encodable for {{ name }} {
-    type Encoded<'buf> = Wire{{ name }}{{ params }};
+    type Encoded<'buf> = {{ wire_name }}{{ params }};
 }
 
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
@@ -43,20 +45,21 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 {% for member in strct.members -%}
-                    {{ member.name.snake() }},
+                    {{ member.name.snake()|ident }},
                 {% endfor %}
             } = slot;
         }
 
         {% for member in strct.members %}
-            ::fidl_next::Encode::encode(&mut self.{{ member.name.snake() }}, encoder, {{ member.name.snake() }})?;
+            {% let member_name = filters::ident(member.name.snake())? %}
+            ::fidl_next::Encode::encode(&mut self.{{ member_name }}, encoder, {{ member_name }})?;
         {% endfor %}
         Ok(())
     }
 }
 
 impl ::fidl_next::EncodableOption for Box<{{ name }}> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, Wire{{ name }}{{ params }}>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, {{ wire_name }}{{ params }}>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<{{ name }}>
@@ -80,11 +83,11 @@ where
     }
 }
 
-impl{{ params }} ::fidl_next::TakeFrom<Wire{{ name }}{{ params }}> for {{ name }} {
-    fn take_from(from: &mut Wire{{ name }}{{ params }}) -> Self {
+impl{{ params }} ::fidl_next::TakeFrom<{{ wire_name }}{{ params }}> for {{ name }} {
+    fn take_from(from: &mut {{ wire_name }}{{ params }}) -> Self {
         Self {
             {% for member in strct.members %}
-                {% let member_name = member.name.snake() %}
+                {% let member_name = filters::ident(member.name.snake())? %}
                 {{ member_name }}: ::fidl_next::TakeFrom::take_from(&mut from.{{ member_name }}),
             {% endfor %}
         }
@@ -101,13 +104,13 @@ impl{{ params }} ::fidl_next::TakeFrom<Wire{{ name }}{{ params }}> for {{ name }
     {% endif %}
 )]
 #[repr(C)]
-pub struct Wire{{ name }}{{ params }} {
+pub struct {{ wire_name }}{{ params }} {
     {% for member in strct.members %}
-        pub {{ member.name.snake() }}: {{ context.wire_type(member.ty) }},
+        pub {{ member.name.snake()|ident }}: {{ context.wire_type(member.ty) }},
     {% endfor %}
 }
 
-unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> for Wire{{ name }}{{ params }}
+unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> for {{ wire_name }}{{ params }}
 where
     ___D: ?Sized,
     {% for member in strct.members %}
@@ -121,13 +124,13 @@ where
         ::fidl_next::munge! {
             let Self {
                 {% for member in strct.members -%}
-                    mut {{ member.name.snake() }},
+                    mut {{ member.name.snake()|ident }},
                 {% endfor %}
             } = slot;
         }
 
         {% for member in strct.members %}
-            {% let member_name = member.name.snake() %}
+            {% let member_name = filters::ident(member.name.snake())? %}
             ::fidl_next::Decode::decode({{ member_name }}.as_mut(), decoder)?;
             {# type check #}
             {% match member.ty.kind %}

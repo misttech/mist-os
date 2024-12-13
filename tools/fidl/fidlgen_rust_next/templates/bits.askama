@@ -1,11 +1,13 @@
-{% let name = bits.name.decl_name().camel() %}
+{% let base_name = bits.name.decl_name().camel() %}
+{% let name = filters::ident(base_name)? %}
+{% let wire_name = format!("Wire{base_name}") %}
 {% let subtype = self.subtype() %}
 {% let natural_subtype = context.natural_prim(subtype) %}
 {% let wire_subtype = context.wire_prim(subtype) %}
 
-{% if let Some(doc) = bits.attributes.doc_string() %}
-    #[doc = "{{ doc.escape_default() }}"]
-{% endif %}
+    {% if let Some(doc) = bits.attributes.doc_string() %}
+        #[doc = "{{ doc.escape_default() }}"]
+    {% endif %}
 ::fidl_next::bitflags! {
     #[derive(
         Clone,
@@ -22,7 +24,7 @@
             {%- if let Some(doc) = member.attributes.doc_string() -%}
                 #[doc = "{{ doc.escape_default() }}"]
             {%- endif -%}
-            const {{ member.name.screaming_snake() }} = {{ member.value.value }};
+            const {{ member.name.screaming_snake()|ident }} = {{ member.value.value }};
         {% endfor %}
         {%- if !bits.is_strict -%}
             const _ = !0;
@@ -31,7 +33,7 @@
 }
 
 impl ::fidl_next::Encodable for {{ name }} {
-    type Encoded<'buf> = Wire{{ name }};
+    type Encoded<'buf> = {{ wire_name }};
 }
 
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
@@ -43,20 +45,20 @@ where
         _: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let Wire{{ name }} { mut value } = slot);
+        ::fidl_next::munge!(let {{ wire_name }} { mut value } = slot);
         *value = {{ wire_subtype }}::from(self.bits());
         Ok(())
     }
 }
 
-impl ::core::convert::From<Wire{{ name }}> for {{ name }} {
-    fn from(wire: Wire{{ name }}) -> Self {
+impl ::core::convert::From<{{ wire_name }}> for {{ name }} {
+    fn from(wire: {{ wire_name }}) -> Self {
         Self::from_bits_retain({{ natural_subtype }}::from(wire.value))
     }
 }
 
-impl ::fidl_next::TakeFrom<Wire{{ name }}> for {{ name }} {
-    fn take_from(from: &mut Wire{{ name }}) -> Self {
+impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+    fn take_from(from: &mut {{ wire_name }}) -> Self {
         Self::from(*from)
     }
 }
@@ -70,11 +72,11 @@ impl ::fidl_next::TakeFrom<Wire{{ name }}> for {{ name }} {
     {%- endif %}
 )]
 #[repr(transparent)]
-pub struct Wire{{ name }} {
+pub struct {{ wire_name }} {
     value: {{ wire_subtype }},
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for Wire{{ name }}
+unsafe impl<___D> ::fidl_next::Decode<___D> for {{ wire_name }}
 where
     ___D: ?Sized,
 {
@@ -96,7 +98,7 @@ where
     }
 }
 
-impl ::core::convert::From<{{ name }}> for Wire{{ name }} {
+impl ::core::convert::From<{{ name }}> for {{ wire_name }} {
     fn from(natural: {{ name }}) -> Self {
         Self {
             value: {{ wire_subtype }}::from(natural.bits()),

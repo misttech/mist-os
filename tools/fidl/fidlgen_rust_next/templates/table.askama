@@ -1,4 +1,6 @@
-{% let name = table.name.decl_name().camel() %}
+{% let base_name = table.name.decl_name().camel() %}
+{% let name = filters::ident(base_name)? %}
+{% let wire_name = format!("Wire{base_name}") %}
 
 {% if let Some(doc) = table.attributes.doc_string() %}
     #[doc = "{{ doc.escape_default() }}"]
@@ -13,21 +15,21 @@
 )]
 pub struct {{ name }} {
     {% for member in table.members %}
-        pub {{ member.name.snake() }}: Option<{{ context.natural_type(member.ty) }}>,
+        pub {{ member.name.snake()|ident }}: Option<{{ context.natural_type(member.ty) }}>,
     {% endfor %}
 }
 
 impl {{ name }} {
     fn __max_ordinal(&self) -> usize {
         {% for member in table.members %}
-            if self.{{ member.name.snake() }}.is_some() { return {{ member.ordinal }}; }
+            if self.{{ member.name.snake()|ident }}.is_some() { return {{ member.ordinal }}; }
         {% endfor %}
         0
     }
 }
 
 impl ::fidl_next::Encodable for {{ name }} {
-    type Encoded<'buf> = Wire{{ name }}<'buf>;
+    type Encoded<'buf> = {{ wire_name }}<'buf>;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
@@ -42,7 +44,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let Wire{{ name }} { table } = slot);
+        ::fidl_next::munge!(let {{ wire_name }} { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
@@ -53,7 +55,7 @@ where
             let mut slot = ::fidl_next::Slot::new(&mut backing);
             match i {
                 {% for member in table.members.iter().rev() %}
-                    {% let member_name = member.name.snake() %}
+                    {% let member_name = filters::ident(member.name.snake())? %}
                     {{ member.ordinal }} => if let Some({{ member_name }}) = &mut self.{{ member_name }} {
                         ::fidl_next::WireEnvelope::encode_value(
                             {{ member_name }},
@@ -75,11 +77,11 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<Wire{{ name }}<'buf>> for {{ name }} {
-    fn take_from(from: &mut Wire{{ name }}<'buf>) -> Self {
+impl<'buf> ::fidl_next::TakeFrom<{{ wire_name }}<'buf>> for {{ name }} {
+    fn take_from(from: &mut {{ wire_name }}<'buf>) -> Self {
         Self {
             {% for member in table.members %}
-                {% let member_name = member.name.snake() %}
+                {% let member_name = filters::ident(member.name.snake())? %}
                 {{ member_name }}: from.{{ member_name }}_mut().map(::fidl_next::TakeFrom::take_from),
             {% endfor %}
         }
@@ -88,11 +90,11 @@ impl<'buf> ::fidl_next::TakeFrom<Wire{{ name }}<'buf>> for {{ name }} {
 
 /// The wire type corresponding to [`{{ name }}`].
 #[repr(C)]
-pub struct Wire{{ name }}<'buf> {
+pub struct {{ wire_name }}<'buf> {
     table: ::fidl_next::WireTable<'buf>,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for Wire{{ name }}<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for {{ wire_name }}<'buf>
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
     {% for member in table.members %}
@@ -111,7 +113,7 @@ where
             |ordinal, mut slot, decoder| match ordinal {
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
                 {% for member in table.members %}
-                    {% let member_name = member.name.snake() %}
+                    {% let member_name = filters::ident(member.name.snake())? %}
                     {{ member.ordinal }} => {
                         ::fidl_next::WireEnvelope::decode_as::<
                             ___D,
@@ -176,11 +178,11 @@ where
     }
 }
 
-impl<'buf> Wire{{ name }}<'buf> {
+impl<'buf> {{ wire_name }}<'buf> {
     {% for member in table.members %}
         {% let member_name = member.name.snake() %}
 
-        pub fn {{ member_name }}(&self) -> Option<&{{ context.wire_type(member.ty) }}> {
+        pub fn {{ member_name|ident }}(&self) -> Option<&{{ context.wire_type(member.ty) }}> {
             unsafe {
                 Some(self.table.get({{ member.ordinal }})?.deref_unchecked())
             }
@@ -201,14 +203,14 @@ impl<'buf> Wire{{ name }}<'buf> {
 }
 
 {% if context.config.emit_debug_impls %}
-    impl ::core::fmt::Debug for Wire{{ name }}<'_> {
+    impl ::core::fmt::Debug for {{ wire_name }}<'_> {
         fn fmt(
             &self,
             f: &mut ::core::fmt::Formatter<'_>,
         ) -> Result<(), ::core::fmt::Error> {
             f.debug_struct("{{ name }}")
             {% for member in table.members %}
-                {% let member_name = member.name.snake() %}
+                {% let member_name = filters::ident(member.name.snake())? %}
                 .field("{{ member_name }}", &self.{{ member_name }}())
             {% endfor %}
                 .finish()

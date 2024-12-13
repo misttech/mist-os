@@ -1,4 +1,6 @@
-{% let name = enm.name.decl_name().camel() %}
+{% let base_name = enm.name.decl_name().camel() %}
+{% let name = filters::ident(base_name)? %}
+{% let wire_name = format!("Wire{base_name}") %}
 {% let natural_int = context.natural_int(enm.ty) %}
 {% let wire_int = context.wire_int(enm.ty) %}
 
@@ -15,7 +17,7 @@
 #[repr({{ natural_int }})]
 pub enum {{ name }} {
     {% for member in enm.members -%}
-        {{ member.name.camel() }} = {{ member.value.value }},
+        {{ member.name.camel()|ident }} = {{ member.value.value }},
     {%- endfor %}
     {%- if !enm.is_strict -%}
         Unknown({{ natural_int }}),
@@ -23,7 +25,7 @@ pub enum {{ name }} {
 }
 
 impl ::fidl_next::Encodable for {{ name }} {
-    type Encoded<'buf> = Wire{{ name }};
+    type Encoded<'buf> = {{ wire_name }};
 }
 
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
@@ -35,10 +37,10 @@ where
         _: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let Wire{{ name }} { mut value } = slot);
+        ::fidl_next::munge!(let {{ wire_name }} { mut value } = slot);
         *value = {{ wire_int }}::from(match *self {
             {% for member in enm.members %}
-                Self::{{ member.name.camel() }} => {{ member.value.value }},
+                Self::{{ member.name.camel()|ident }} => {{ member.value.value }},
             {% endfor %}
             {% if !enm.is_strict %}
                 Self::Unknown(value) => value,
@@ -49,11 +51,11 @@ where
     }
 }
 
-impl ::core::convert::From<Wire{{ name }}> for {{ name }} {
-    fn from(wire: Wire{{ name }}) -> Self {
+impl ::core::convert::From<{{ wire_name }}> for {{ name }} {
+    fn from(wire: {{ wire_name }}) -> Self {
         match {{ natural_int }}::from(wire.value) {
             {% for member in enm.members %}
-                {{ member.value.value }} => Self::{{ member.name.camel() }},
+                {{ member.value.value }} => Self::{{ member.name.camel()|ident }},
             {% endfor %}
             {% if enm.is_strict %}
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -64,8 +66,8 @@ impl ::core::convert::From<Wire{{ name }}> for {{ name }} {
     }
 }
 
-impl ::fidl_next::TakeFrom<Wire{{ name }}> for {{ name }} {
-    fn take_from(from: &mut Wire{{ name }}) -> Self {
+impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+    fn take_from(from: &mut {{ wire_name }}) -> Self {
         Self::from(*from)
     }
 }
@@ -79,13 +81,13 @@ impl ::fidl_next::TakeFrom<Wire{{ name }}> for {{ name }} {
     {%- endif %}
 )]
 #[repr(transparent)]
-pub struct Wire{{ name }} {
+pub struct {{ wire_name }} {
     value: {{ wire_int }},
 }
 
-impl Wire{{ name }} {
+impl {{ wire_name }} {
     {% for member in enm.members %}
-        pub const {{ member.name.screaming_snake() }}: Wire{{ name }} = Wire{{ name }} {
+        pub const {{ member.name.screaming_snake()|ident }}: {{ wire_name }} = {{ wire_name }} {
             value:
             {% match enm.ty %}
                 {% when IntType::Int8 %} {{ member.value.value }}
@@ -96,7 +98,7 @@ impl Wire{{ name }} {
     {% endfor %}
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for Wire{{ name }}
+unsafe impl<___D> ::fidl_next::Decode<___D> for {{ wire_name }}
 where
     ___D: ?Sized,
 {
@@ -122,14 +124,14 @@ where
     }
 }
 
-impl ::core::convert::From<{{ name }}> for Wire{{ name }} {
+impl ::core::convert::From<{{ name }}> for {{ wire_name }} {
     fn from(natural: {{ name }}) -> Self {
         match natural {
             {% for member in enm.members %}
-                {{ name }}::{{ member.name.camel() }} => Wire{{ name }}::{{ member.name.screaming_snake() }},
+                {{ name }}::{{ member.name.camel()|ident }} => {{ wire_name }}::{{ member.name.screaming_snake()|ident }},
             {% endfor %}
             {% if !enm.is_strict %}
-                {{ name }}::Unknown(value) => Wire{{ name }} {
+                {{ name }}::Unknown(value) => {{ wire_name }} {
                     value: {{ wire_int }}::from(value),
                 }
             {% endif %}

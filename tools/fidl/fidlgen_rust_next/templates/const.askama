@@ -1,4 +1,5 @@
-{% let name = cnst.name.decl_name().screaming_snake() %}
+{% let base_name = cnst.name.decl_name().screaming_snake() %}
+{% let name = filters::ident(base_name)? %}
 
 {% if let Some(doc) = cnst.attributes.doc_string() %}
     #[doc = "{{ doc.escape_default() }}"]

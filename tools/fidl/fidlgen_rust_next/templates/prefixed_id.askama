@@ -11,15 +11,23 @@
         {% let escaped = lib.replace(".", "_") %}
         fidl_{{ escaped }}::
     {% endif %}
+
+    {% let ty_name %}
     {% match context.schema.get_decl_type(id).unwrap() %}
-        {% when DeclType::Alias %} {{ prefix }}{{ ty.camel() }}
-        {% when DeclType::Bits %} {{ prefix }}{{ ty.camel() }}
-        {% when DeclType::Enum %} {{ prefix }}{{ ty.camel() }}
-        {% when DeclType::Struct %} {{ prefix }}{{ ty.camel() }}
-        {% when DeclType::Table %} {{ prefix }}{{ ty.camel() }}
-        {% when DeclType::Union %} {{ prefix }}{{ ty.camel() }}
-        {% when DeclType::Const %} {{ prefix }}{{ ty.screaming_snake() }}
+        {% when DeclType::Alias %} {% let ty_name = ty.camel() %}
+        {% when DeclType::Bits %} {% let ty_name = ty.camel() %}
+        {% when DeclType::Enum %} {% let ty_name = ty.camel() %}
+        {% when DeclType::Struct %} {% let ty_name = ty.camel() %}
+        {% when DeclType::Table %} {% let ty_name = ty.camel() %}
+        {% when DeclType::Union %} {% let ty_name = ty.camel() %}
+        {% when DeclType::Const %} {% let ty_name = ty.screaming_snake() %}
         {% else %}
             {{ todo!() }}
     {% endmatch %}
+
+    {% if prefix == "" %}
+        {{ ty_name|ident }}
+    {% else %}
+        {{ prefix }}{{ ty_name }}
+    {% endif %}
 {% endif %}

@@ -117,3 +117,74 @@ impl UnionTemplate<'_> {
         result
     }
 }
+
+mod filters {
+    use std::collections::HashMap;
+    use std::sync::LazyLock;
+
+    use core::fmt::Display;
+
+    pub fn ident<T: Display>(value: T) -> askama::Result<String> {
+        let string = value.to_string();
+        Ok(ESCAPED.get(&string).map(ToString::to_string).unwrap_or(string))
+    }
+
+    static ESCAPED: LazyLock<HashMap<String, String>> = LazyLock::new(|| {
+        ESCAPED_LIST.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    });
+    const ESCAPED_LIST: &[(&str, &str)] = &[
+        ("abstract", "r#abstract"),
+        ("as", "r#as"),
+        ("async", "r#async"),
+        ("await", "r#await"),
+        ("become", "r#become"),
+        ("box", "r#box"),
+        ("break", "r#break"),
+        ("const", "r#const"),
+        ("continue", "r#continue"),
+        ("crate", "crate_"),
+        ("do", "r#do"),
+        ("dyn", "r#dyn"),
+        ("else", "r#else"),
+        ("enum", "r#enum"),
+        ("extern", "r#extern"),
+        ("false", "r#false"),
+        ("final", "r#final"),
+        ("fn", "r#fn"),
+        ("for", "r#for"),
+        ("if", "r#if"),
+        ("impl", "r#impl"),
+        ("in", "r#in"),
+        ("let", "r#let"),
+        ("loop", "r#loop"),
+        ("macro", "r#macro"),
+        ("macro_rules", "r#macro_rules"),
+        ("match", "r#match"),
+        ("mod", "r#mod"),
+        ("move", "r#move"),
+        ("mut", "r#mut"),
+        ("override", "r#override"),
+        ("pub", "r#pub"),
+        ("priv", "r#priv"),
+        ("ref", "r#ref"),
+        ("return", "r#return"),
+        ("self", "self_"),
+        ("Self", "Self_"),
+        ("static", "r#static"),
+        ("struct", "r#struct"),
+        ("super", "super_"),
+        ("trait", "r#trait"),
+        ("true", "r#true"),
+        ("try", "r#try"),
+        ("type", "r#type"),
+        ("typeof", "r#typeof"),
+        ("union", "r#union"),
+        ("unsafe", "r#unsafe"),
+        ("unsized", "r#unsized"),
+        ("use", "r#use"),
+        ("virtual", "r#virtual"),
+        ("where", "r#where"),
+        ("while", "r#while"),
+        ("yield", "r#yield"),
+    ];
+}
