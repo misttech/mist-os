@@ -25,10 +25,6 @@ pub struct SelectorsCommand {
     pub selectors: Vec<String>,
 
     #[argh(option)]
-    /// DEPRECATED: use `--component` instead.
-    pub manifest: Option<String>,
-
-    #[argh(option)]
     /// a fuzzy-search query. May include URL, moniker, or manifest fragments. No selector-escaping
     /// for moniker is needed in this query. Selectors following --component should omit the
     /// component selector, as they will be spliced together by the tool with the correct escaping.
@@ -46,28 +42,14 @@ impl Command for SelectorsCommand {
     type Result = SelectorsResult;
 
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
-        if self.manifest.is_some() {
-            panic!("ERROR: option `--manifest` is deprecated, please use `--component` instead");
-        }
-
-        if self.selectors.is_empty() && self.component.is_none() && self.manifest.is_none() {
-            return Err(Error::invalid_arguments(
-                "Expected 1 or more component queries or tree selectors. Got zero.",
-            ));
+        if self.selectors.is_empty() && self.component.is_none() {
+            return Err(Error::invalid_arguments("Expected 1 or more selectors. Got zero."));
         }
 
         let mut selectors = if let Some(component) = self.component {
             utils::process_component_query_with_partial_selectors(
                 component,
                 self.selectors.into_iter(),
-                provider,
-            )
-            .await?
-        } else if let Some(manifest) = self.manifest {
-            utils::get_selectors_for_manifest(
-                manifest,
-                self.selectors,
-                self.accessor.clone(),
                 provider,
             )
             .await?

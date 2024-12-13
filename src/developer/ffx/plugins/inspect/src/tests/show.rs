@@ -16,13 +16,7 @@ use iquery::commands::ShowCommand;
 async fn test_show_no_parameters() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
-    let cmd = ShowCommand {
-        component: None,
-        manifest: None,
-        selectors: vec![],
-        accessor: None,
-        name: None,
-    };
+    let cmd = ShowCommand { component: None, selectors: vec![], accessor: None, name: None };
     let mut inspects = make_inspects();
     let inspect_data =
         inspect_accessor_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
@@ -47,7 +41,6 @@ async fn test_show_unknown_component_search() {
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ShowCommand {
         component: Some(String::from("some-bad-moniker")),
-        manifest: None,
         selectors: vec![],
         accessor: None,
         name: None,
@@ -76,7 +69,6 @@ async fn test_show_unknown_manifest() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ShowCommand {
-        manifest: None,
         component: Some(String::from("some-bad-moniker")),
         selectors: vec![],
         accessor: None,
@@ -107,7 +99,6 @@ async fn test_show_with_component_search() {
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ShowCommand {
         component: Some(String::from("moniker1")),
-        manifest: None,
         selectors: vec![],
         accessor: None,
         name: None,
@@ -147,7 +138,6 @@ async fn test_show_with_manifest_that_exists() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ShowCommand {
-        manifest: None,
         component: Some(String::from("moniker1")),
         selectors: vec![],
         accessor: None,
@@ -190,7 +180,6 @@ async fn test_show_with_selectors_with_no_data() {
     let cmd = ShowCommand {
         component: None,
         name: None,
-        manifest: None,
         selectors: vec![String::from("test/moniker1:name:hello_not_real")],
         accessor: None,
     };
@@ -225,7 +214,6 @@ async fn test_show_with_selectors_with_data() {
     let cmd = ShowCommand {
         component: None,
         name: None,
-        manifest: None,
         selectors: vec![String::from("test/moniker1:name:hello_6")],
         accessor: None,
     };

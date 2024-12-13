@@ -14,18 +14,6 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "manifest"
-        }
-      },
-      "optionality": "optional",
-      "long": "--manifest",
-      "short": null,
-      "description": "DEPRECATED: use `--component` instead.",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
           "arg_name": "component"
         }
       },

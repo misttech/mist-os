@@ -69,12 +69,6 @@ impl Serialize for ListResultItem {
 #[derive(Serialize)]
 pub struct ListResult(Vec<ListResultItem>);
 
-impl ListResult {
-    pub(crate) fn into_inner(self) -> Vec<ListResultItem> {
-        self.0
-    }
-}
-
 impl fmt::Display for ListResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for item in self.0.iter() {
@@ -130,10 +124,6 @@ pub fn list_response_items(
 #[argh(subcommand, name = "list")]
 pub struct ListCommand {
     #[argh(option)]
-    /// DEPRECATED: use `--component` instead.
-    pub manifest: Option<String>,
-
-    #[argh(option)]
     /// a fuzzy-search query. May include URL, moniker, or manifest fragments.
     /// a fauzzy-search query for the component we are interested in. May include URL, moniker, or
     /// manifest fragments. If this is provided, the output will only contain monikers for
@@ -161,11 +151,6 @@ impl Command for ListCommand {
     type Result = ListResult;
 
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
-        if self.manifest.is_some() {
-            panic!(
-                "WARNING: --manifest is DEPRECATED and will be removed soon. Please use --component only."
-            );
-        }
         let mut selectors = if let Some(query) = self.component {
             let instances = find_components(provider.realm_query(), &query).await?;
             instances_to_root_selectors(instances)?
