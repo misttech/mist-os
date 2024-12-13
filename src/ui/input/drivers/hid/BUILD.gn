@@ -27,6 +27,7 @@ source_set("driver-internals") {
     "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/power/cpp",
     "//src/devices/bind/fuchsia.hid:fuchsia.hid_cpp",
     "//src/ui/input/lib/hid",
     "//src/ui/input/lib/hid-parser",

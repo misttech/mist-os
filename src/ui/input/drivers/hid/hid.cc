@@ -148,6 +148,11 @@ void HidDevice::OnReportReceived(fidl::WireEvent<fhidbus::Hidbus::OnReportReceiv
     return;
   }
 
+  if (event->has_wake_lease()) {
+    const zx::duration kLeaseTimeout = zx::msec(500);
+    wake_lease_.DepositWakeLease(std::move(event->wake_lease()), zx::deadline_after(kLeaseTimeout));
+  }
+
   size_t len = event->buf().count();
   const uint8_t* buf = event->buf().data();
   auto timestamp = event->has_timestamp() ? event->timestamp() : zx_clock_get_monotonic();
