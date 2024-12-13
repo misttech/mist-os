@@ -85,18 +85,15 @@ zx::result<FvmPartition> CreateFvmPartition(const std::string& device_path, size
   static std::atomic<int> counter(0);
   std::string path = "/test-fvm-" + std::to_string(++counter);
 
-  auto endpoints = fidl::CreateEndpoints<fio::Directory>();
-  if (endpoints.is_error())
-    return endpoints.take_error();
-  if (fidl::OneWayStatus status = fidl::WireCall<fuchsia_io::Directory>(volume->ExportRoot())
-                                      ->Clone2(fidl::ServerEnd<fuchsia_unknown::Cloneable>(
-                                          endpoints->server.TakeChannel()));
+  auto [client, server] = fidl::Endpoints<fio::Directory>::Create();
+  if (fidl::OneWayStatus status =
+          fidl::WireCall<fuchsia_io::Directory>(volume->ExportRoot())
+              ->Clone(fidl::ServerEnd<fuchsia_unknown::Cloneable>(server.TakeChannel()));
       !status.ok()) {
     return zx::error(status.status());
   }
 
-  auto binding =
-      fs_management::NamespaceBinding::Create(path.c_str(), std::move(endpoints->client));
+  auto binding = fs_management::NamespaceBinding::Create(path.c_str(), std::move(client));
   if (binding.is_error())
     return binding.take_error();
 

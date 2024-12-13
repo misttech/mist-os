@@ -23,7 +23,7 @@ class EchoCommon : public fidl::WireServer<Echo> {
     bindings_.AddBinding(dispatcher_, std::move(request), this, fidl::kIgnoreBindingClosure);
   }
 
-  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) override {
+  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override {
     Connect(fidl::ServerEnd<Echo>(request->request.TakeChannel()));
   }
 

@@ -44,7 +44,7 @@ void PtyServer::AddConnection(fidl::ServerEnd<fuchsia_hardware_pty::Device> requ
                        [keep_alive = shared_from_this()](fidl::UnbindInfo) {});
 }
 
-void PtyServer::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
+void PtyServer::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   AddConnection(fidl::ServerEnd<fuchsia_hardware_pty::Device>(request->request.TakeChannel()));
 }
 

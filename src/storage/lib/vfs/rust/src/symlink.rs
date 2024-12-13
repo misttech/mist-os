@@ -93,12 +93,17 @@ impl<T: Symlink> Connection<T> {
         match req {
             #[cfg(fuchsia_api_level_at_least = "NEXT")]
             fio::SymlinkRequest::DeprecatedClone { flags, object, control_handle: _ } => {
-                self.handle_clone_deprecated(flags, object);
+                self.handle_deprecated_clone(flags, object);
             }
             #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::SymlinkRequest::Clone { flags, object, control_handle: _ } => {
-                self.handle_clone_deprecated(flags, object);
+                self.handle_deprecated_clone(flags, object);
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::Clone { request, control_handle: _ } => {
+                self.handle_clone(ServerEnd::new(request.into_channel()));
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::SymlinkRequest::Clone2 { request, control_handle: _ } => {
                 self.handle_clone(ServerEnd::new(request.into_channel()));
             }
@@ -202,7 +207,7 @@ impl<T: Symlink> Connection<T> {
         Ok(false)
     }
 
-    fn handle_clone_deprecated(
+    fn handle_deprecated_clone(
         &mut self,
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,
@@ -523,7 +528,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_clone2() {
+    async fn test_clone() {
         let scope = ExecutionScope::new();
         let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
         scope.spawn(
@@ -537,7 +542,7 @@ mod tests {
             .unwrap();
         // Clone the original connection and query it's attributes, which should match the original.
         let (cloned_client, cloned_server) = create_proxy::<fio::SymlinkMarker>();
-        client_end.clone2(ServerEnd::new(cloned_server.into_channel())).unwrap();
+        client_end.clone(ServerEnd::new(cloned_server.into_channel())).unwrap();
         let cloned_attrs = cloned_client
             .get_attributes(fio::NodeAttributesQuery::all())
             .await

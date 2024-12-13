@@ -25,7 +25,7 @@ TEST(UnsafeTest, BorrowChannel) {
   ASSERT_TRUE(dir.is_valid());
 
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_unknown::Cloneable>::Create();
-  auto result = fidl::WireCall(dir)->Clone2(std::move(server_end));
+  auto result = fidl::WireCall(dir)->Clone(std::move(server_end));
   ASSERT_OK(result.status());
 
   fdio_unsafe_release(io);

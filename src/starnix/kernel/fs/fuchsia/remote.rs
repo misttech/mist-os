@@ -1692,7 +1692,7 @@ mod test {
         {
             let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
             let (server, client) = zx::Channel::create();
-            fixture.root().clone2(server.into()).expect("clone failed");
+            fixture.root().clone(server.into()).expect("clone failed");
             let fs = RemoteFs::new_fs(
                 &kernel,
                 client,
@@ -1737,7 +1737,7 @@ mod test {
         {
             let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
             let (server, client) = zx::Channel::create();
-            fixture.root().clone2(server.into()).expect("clone failed after remount");
+            fixture.root().clone(server.into()).expect("clone failed after remount");
             let fs = RemoteFs::new_fs(
                 &kernel,
                 client,
@@ -1782,7 +1782,7 @@ mod test {
         // Simulate a first run of starnix.
         {
             let (server, client) = zx::Channel::create();
-            fixture.root().clone2(server.into()).expect("clone failed");
+            fixture.root().clone(server.into()).expect("clone failed");
 
             let (kernel, _init_task) = create_kernel_and_task();
             kernel
@@ -1854,7 +1854,7 @@ mod test {
         .await;
 
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -1910,7 +1910,7 @@ mod test {
         let fixture = TestFixture::new().await;
 
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFDIR.bits() | 0o777);
 
@@ -2006,7 +2006,7 @@ mod test {
     async fn test_remote_special_node() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
         const FIFO_MODE: FileMode = FileMode::from_bits(FileMode::IFIFO.bits() | 0o777);
         const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
         let (kernel, _init_task) = create_kernel_and_task();
@@ -2084,7 +2084,7 @@ mod test {
         let fixture = TestFixture::new().await;
 
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -2141,7 +2141,7 @@ mod test {
         .await;
 
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -2181,7 +2181,7 @@ mod test {
     async fn test_lookup_on_fsverity_enabled_file() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
@@ -2233,7 +2233,7 @@ mod test {
         )
         .await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -2268,7 +2268,7 @@ mod test {
     async fn test_update_attributes_persists() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
@@ -2315,7 +2315,7 @@ mod test {
         )
         .await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -2351,7 +2351,7 @@ mod test {
     async fn test_statfs() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         let (kernel, _init_task, mut locked) = create_kernel_task_and_unlocked();
         kernel
@@ -2391,7 +2391,7 @@ mod test {
     async fn test_allocate_workaround() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -2449,7 +2449,7 @@ mod test {
     async fn test_allocate_overflow() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         kernel
@@ -2507,7 +2507,7 @@ mod test {
     async fn test_time_modify_persists() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
@@ -2575,7 +2575,7 @@ mod test {
         )
         .await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
         let (kernel, _init_task) = create_kernel_and_task();
         let refreshed_modified_time = kernel
             .kthreads
@@ -2617,7 +2617,7 @@ mod test {
     async fn test_update_atime_mtime() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
@@ -2700,7 +2700,7 @@ mod test {
     async fn test_write_updates_mtime_ctime() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
@@ -2781,7 +2781,7 @@ mod test {
     async fn test_casefold_persists() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
 
         let (kernel, _init_task) = create_kernel_and_task();
         let _ = kernel
@@ -2834,7 +2834,7 @@ mod test {
         )
         .await;
         let (server, client) = zx::Channel::create();
-        fixture.root().clone2(server.into()).expect("clone failed");
+        fixture.root().clone(server.into()).expect("clone failed");
         let (kernel, _init_task) = create_kernel_and_task();
         let casefold = kernel
             .kthreads

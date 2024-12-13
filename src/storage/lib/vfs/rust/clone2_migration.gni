@@ -5,5 +5,5 @@
 # TODO(https://fxbug.dev/324080864): Remove this file when Clone2 has migrated to Clone.
 declare_args() {
   # Temporary variable used to transition out-of-tree fuchsia.unknown/Cloneable servers.
-  use_clone2_signature = true
+  use_clone2_signature = false
 }

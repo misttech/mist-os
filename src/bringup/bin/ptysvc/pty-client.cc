@@ -20,7 +20,7 @@ void PtyClient::AddConnection(fidl::ServerEnd<fuchsia_hardware_pty::Device> requ
   bindings_.AddBinding(server().dispatcher(), std::move(request), this, [](fidl::UnbindInfo) {});
 }
 
-void PtyClient::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
+void PtyClient::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   AddConnection(fidl::ServerEnd<fuchsia_hardware_pty::Device>(request->request.TakeChannel()));
 }
 

@@ -53,9 +53,9 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   void DeprecatedClone(DeprecatedCloneRequestView request,
                        DeprecatedCloneCompleter::Sync& completer) final;
 #else
-  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) final;
-#endif
   void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) final;
+#endif
+  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) final;
   void Close(CloseCompleter::Sync& completer) final;
   void Query(QueryCompleter::Sync& completer) final;
   void GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) final;

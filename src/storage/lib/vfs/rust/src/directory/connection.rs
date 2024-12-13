@@ -84,16 +84,22 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             #[cfg(fuchsia_api_level_at_least = "NEXT")]
             fio::DirectoryRequest::DeprecatedClone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"Directory::DeprecatedClone");
-                self.handle_clone(flags, object);
+                self.handle_deprecated_clone(flags, object);
             }
             #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::Clone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"Directory::Clone");
-                self.handle_clone(flags, object);
+                self.handle_deprecated_clone(flags, object);
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::Clone { request, control_handle: _ } => {
+                trace::duration!(c"storage", c"Directory::Clone");
+                self.handle_clone(request.into_channel());
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::Clone2 { request, control_handle: _ } => {
                 trace::duration!(c"storage", c"Directory::Clone2");
-                self.handle_clone2(request.into_channel());
+                self.handle_clone(request.into_channel());
             }
             fio::DirectoryRequest::Close { responder } => {
                 trace::duration!(c"storage", c"Directory::Close");
@@ -271,7 +277,11 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         Ok(ConnectionState::Alive)
     }
 
-    fn handle_clone(&self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {
+    fn handle_deprecated_clone(
+        &self,
+        flags: fio::OpenFlags,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
         let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
         let flags = match inherit_rights_for_clone(self.options.to_io1(), flags) {
             Ok(updated) => updated,
@@ -284,7 +294,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         self.directory.clone().open(self.scope.clone(), flags, Path::dot(), server_end);
     }
 
-    fn handle_clone2(&mut self, object: fidl::Channel) {
+    fn handle_clone(&mut self, object: fidl::Channel) {
         let flags = self.options.rights.to_flags() | fio::Flags::PROTOCOL_DIRECTORY;
         ObjectRequest::new3(flags, &Default::default(), object).handle(|req| {
             self.directory.clone().open3(self.scope.clone(), Path::dot(), flags, req)

@@ -100,7 +100,7 @@ impl Clone for Namespace {
                 let borrowed = fio::DirectorySynchronousProxy::new(borrowed);
                 let (client_end, server_end) =
                     fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
-                let _ = borrowed.clone2(server_end.into_channel().into());
+                let _ = borrowed.clone(server_end.into_channel().into());
                 std::mem::forget(borrowed.into_channel());
                 client_end
             }

@@ -61,7 +61,7 @@ class PacketSocketServer final
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) final {
+  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) final {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -98,7 +98,7 @@ class RawSocketServer final : public fidl::testing::WireTestBase<fuchsia_posix_s
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) final {
+  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) final {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -170,7 +170,7 @@ class SynchronousDatagramSocketServer final
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) final {
+  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) final {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 

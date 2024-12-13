@@ -1,11 +1,11 @@
 [
     {
         "kind": "protocol/member",
-        "name": "fuchsia.unknown/Cloneable.Clone2",
+        "name": "fuchsia.unknown/Cloneable.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol",
@@ -15,13 +15,13 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.unknown/CloneableClone2Request.request",
+        "name": "fuchsia.unknown/CloneableCloneRequest.request",
         "ordinal": "1",
         "type": "server_end:fuchsia.unknown/Cloneable"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.unknown/CloneableClone2Request",
+        "name": "fuchsia.unknown/CloneableCloneRequest",
         "resourceness": "resource"
     },
     {

@@ -85,7 +85,7 @@ class ConsoleDevice : public Device,
   void AddConnection(fidl::ServerEnd<fuchsia_hardware_pty::Device> server_end);
 
   // fuchsia.hardware.pty.Device.
-  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) override;
+  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override;
   void Close(CloseCompleter::Sync& completer) override;
   void Query(QueryCompleter::Sync& completer) override;
   void Read(ReadRequestView request, ReadCompleter::Sync& completer) override;

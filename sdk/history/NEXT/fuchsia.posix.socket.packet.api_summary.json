@@ -280,11 +280,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.posix.socket.packet/Socket.Clone2",
+        "name": "fuchsia.posix.socket.packet/Socket.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol/member",

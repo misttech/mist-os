@@ -472,7 +472,7 @@ async fn assert_clone_success(
         .expect("open parent directory");
     let (clone, server_end) = create_proxy::<fio::FileMarker>();
     let node_request = fidl::endpoints::ServerEnd::new(server_end.into_channel());
-    parent.clone2(node_request).expect("cloned node");
+    parent.clone(node_request).expect("cloned node");
     let bytes = clone.read(fio::MAX_BUF).await.unwrap().map_err(zx::Status::from_raw).unwrap();
     assert_eq!(std::str::from_utf8(&bytes).unwrap(), expected_contents);
 }

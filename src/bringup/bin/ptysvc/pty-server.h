@@ -37,7 +37,7 @@ class PtyServer : public std::enable_shared_from_this<PtyServer>,
 
   void AddConnection(fidl::ServerEnd<fuchsia_hardware_pty::Device> request);
 
-  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) final;
+  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) final;
   void Close(CloseCompleter::Sync& completer) final;
   void Query(QueryCompleter::Sync& completer) final;
   void Read(ReadRequestView request, ReadCompleter::Sync& completer) final;

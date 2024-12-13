@@ -267,7 +267,7 @@ void ConsoleDevice::AddConnection(fidl::ServerEnd<fuchsia_hardware_pty::Device> 
                        this, [](fidl::UnbindInfo) {});
 }
 
-void ConsoleDevice::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
+void ConsoleDevice::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   AddConnection(fidl::ServerEnd<fuchsia_hardware_pty::Device>(request->request.TakeChannel()));
 }
 

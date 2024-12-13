@@ -107,7 +107,7 @@ class MountTestTemplate : public testing::Test {
     auto [clone_root_client_end, clone_root_server_end] =
         fidl::Endpoints<fuchsia_io::Directory>::Create();
     ZX_ASSERT(fidl::WireCall(root_client_end())
-                  ->Clone2(fidl::ServerEnd<fuchsia_unknown::Cloneable>(
+                  ->Clone(fidl::ServerEnd<fuchsia_unknown::Cloneable>(
                       clone_root_server_end.TakeChannel()))
                   .ok());
     return std::move(clone_root_client_end);

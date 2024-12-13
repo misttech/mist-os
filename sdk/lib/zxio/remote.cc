@@ -557,7 +557,11 @@ class Remote : public HasIo {
     // fuchsia.io/Node composes fuchsia.unknown/Cloneable. The client end below will speak whatever
     // protocol was negotiated for the current connection.
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_unknown::Cloneable>::Create();
-    const fidl::Status result = client()->Clone2(std::move(server_end));
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+    const fidl::Status result = client_->Clone(std::move(server_end));
+#else
+    const fidl::Status result = client_->Clone2(std::move(server_end));
+#endif
     if (!result.ok()) {
       return result.status();
     }

@@ -7,11 +7,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.hardware.pty/Device.Clone2",
+        "name": "fuchsia.hardware.pty/Device.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol/member",

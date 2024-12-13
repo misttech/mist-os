@@ -193,8 +193,7 @@ where
 {
     while let Some(request) = stream.try_next().await? {
         if let Some(server_end) = get_directory_request_fn(request) {
-            if let Err(err) = directory_mutex.lock().await.clone2(server_end.into_channel().into())
-            {
+            if let Err(err) = directory_mutex.lock().await.clone(server_end.into_channel().into()) {
                 tracing::error!(
                     "Failed to clone directory connection for {}: {:?}",
                     RS::Protocol::DEBUG_NAME,

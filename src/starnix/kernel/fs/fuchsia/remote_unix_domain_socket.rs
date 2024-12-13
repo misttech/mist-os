@@ -283,7 +283,7 @@ impl SocketOps for RemoteUnixDomainSocket {
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         let (proxy, server) = zx::Channel::create();
-        self.client.clone2(server.into()).map_err(|_| errno!(ECONNREFUSED))?;
+        self.client.clone(server.into()).map_err(|_| errno!(ECONNREFUSED))?;
         Ok(Some(proxy.into()))
     }
 }
@@ -318,7 +318,7 @@ mod tests {
                             let client = funknown::CloneableSynchronousProxy::new(channel);
                             let (proxy, server) = zx::Channel::create();
                             let new_handle = client
-                                .clone2(server.into())
+                                .clone(server.into())
                                 .map(|_| proxy.into())
                                 .map_err(|_| zx::Status::NOT_SUPPORTED);
                             (new_handle, client.into_channel().into_handle())
@@ -455,7 +455,7 @@ mod tests {
                                 .send(fbinder::UNIX_DOMAIN_SOCKET_PROTOCOL_NAME.as_bytes())
                                 .is_ok());
                         }
-                        Ok(fbinder::UnixDomainSocketRequest::Clone2 { request, .. }) => {
+                        Ok(fbinder::UnixDomainSocketRequest::Clone { request, .. }) => {
                             self.serve(request.into()).await;
                         }
                         Ok(fbinder::UnixDomainSocketRequest::Close { responder }) => {

@@ -1397,7 +1397,7 @@ where
                 maybe_log_error!("disconnect", &result);
                 responder.send(result).unwrap_or_log("failed to respond");
             }
-            Request::Clone2 { request, control_handle: _ } => {
+            Request::Clone { request, control_handle: _ } => {
                 let channel = fidl::AsyncChannel::from_channel(request.into_channel());
                 let stream =
                     fposix_socket::SynchronousDatagramSocketRequestStream::from_channel(channel);
@@ -3209,7 +3209,7 @@ mod tests {
         let (client, server) =
             fidl::endpoints::create_proxy::<fposix_socket::SynchronousDatagramSocketMarker>();
         let server = ServerEnd::new(server.into_channel());
-        let () = socket.clone2(server).expect("socket clone");
+        let () = socket.clone(server).expect("socket clone");
         client
     }
 

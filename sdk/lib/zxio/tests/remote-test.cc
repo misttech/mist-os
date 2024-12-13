@@ -115,12 +115,11 @@ TEST_F(Remote, Borrow) {
 
 class TestCloneServer : public TestServerBase {
  public:
-  using CloneFunc =
-      fit::function<void(Clone2RequestView request, Clone2Completer::Sync& completer)>;
+  using CloneFunc = fit::function<void(CloneRequestView request, CloneCompleter::Sync& completer)>;
 
   void set_clone_func(CloneFunc clone_func) { clone_func_ = std::move(clone_func); }
 
-  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) override {
+  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override {
     clone_func_(request, completer);
   }
 
@@ -137,7 +136,7 @@ class CloneTest : public zxtest::Test {
     ASSERT_OK(server_end.status_value());
 
     node_server_.set_clone_func(
-        [this](auto request, auto& completer) { Clone2(request, completer); });
+        [this](auto request, auto& completer) { Clone(request, completer); });
 
     fidl::BindServer(server_loop_.dispatcher(), std::move(server_end.value()), &node_server_);
 
@@ -149,8 +148,8 @@ class CloneTest : public zxtest::Test {
   fidl::ClientEnd<fio::Node> TakeClientEnd() { return std::move(client_end_); }
 
  private:
-  void Clone2(TestCloneServer::Clone2RequestView request,
-              TestCloneServer::Clone2Completer::Sync& completer) {
+  void Clone(TestCloneServer::CloneRequestView request,
+             TestCloneServer::CloneCompleter::Sync& completer) {
     auto server = std::make_unique<TestServerBase>();
     auto binding_ref =
         fidl::BindServer(server_loop_.dispatcher(),

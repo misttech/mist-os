@@ -109,7 +109,11 @@ void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& 
                                   std::move(request->object));
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
+#else
 void DirectoryConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
+#endif
   Connection::NodeClone(fio::Flags::kProtocolDirectory | fs::internal::RightsToFlags(rights()),
                         request->request.TakeChannel());
 }
