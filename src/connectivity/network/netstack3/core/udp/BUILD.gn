@@ -81,7 +81,6 @@ rustc_library_with_features("netstack3-udp") {
         "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
         "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-testutils",
         "//src/connectivity/network/netstack3/core/ip:netstack3-ip-testutils",
-        "//src/lib/const-unwrap",
         "//third_party/rust_crates:assert_matches",
         "//third_party/rust_crates:itertools",
         "//third_party/rust_crates:test-case",

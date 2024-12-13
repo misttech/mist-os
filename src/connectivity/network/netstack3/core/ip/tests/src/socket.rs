@@ -6,7 +6,6 @@ use alloc::vec::Vec;
 use core::num::NonZeroU8;
 
 use assert_matches::assert_matches;
-use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
 
 use net_types::ip::{AddrSubnet, GenericOverIp, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
@@ -439,7 +438,7 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
 
     let cfg = I::TEST_ADDRS;
     let proto = I::ICMP_IP_PROTO;
-    let socket_options = WithHopLimit(Some(const_unwrap_option(NonZeroU8::new(1))));
+    let socket_options = WithHopLimit(Some(NonZeroU8::new(1).unwrap()));
 
     let TestAddrs::<_> { local_mac, remote_mac, local_ip, remote_ip, subnet } = cfg;
 
@@ -559,7 +558,7 @@ fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
     #[derive(Copy, Clone, Debug)]
     struct SetHopLimitFor<A>(SpecifiedAddr<A>);
 
-    const SET_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(42));
+    const SET_HOP_LIMIT: NonZeroU8 = NonZeroU8::new(42).unwrap();
 
     impl<A> OptionDelegationMarker for SetHopLimitFor<A> {}
 

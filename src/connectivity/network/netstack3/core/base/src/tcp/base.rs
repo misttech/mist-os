@@ -9,7 +9,6 @@ use core::num::NonZeroU16;
 use core::ops::Range;
 
 use alloc::vec::Vec;
-use const_unwrap::const_unwrap_option;
 use core::mem::MaybeUninit;
 use net_types::ip::{Ip, IpVersion};
 use packet::InnerPacketBuilder;
@@ -62,8 +61,8 @@ impl Mss {
         //  implementations MUST assume a default send MSS of 536 (576 - 40) for
         //  IPv4 or 1220 (1280 - 60) for IPv6 (MUST-15).
         match I::VERSION {
-            IpVersion::V4 => Mss(const_unwrap_option(NonZeroU16::new(536))),
-            IpVersion::V6 => Mss(const_unwrap_option(NonZeroU16::new(1220))),
+            IpVersion::V4 => Mss(NonZeroU16::new(536).unwrap()),
+            IpVersion::V6 => Mss(NonZeroU16::new(1220).unwrap()),
         }
     }
 

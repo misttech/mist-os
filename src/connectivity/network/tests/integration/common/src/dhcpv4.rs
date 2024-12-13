@@ -35,10 +35,8 @@ impl TestConfig {
 
         let Range { start, end } = pool_offsets;
 
-        let max_offset = 1u8
-            << const_unwrap::const_unwrap_option(
-                32u8.checked_sub(DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get()),
-            );
+        let max_offset =
+            1u8 << 32u8.checked_sub(DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get()).unwrap();
 
         assert!(
             server_addr_offset < max_offset,

@@ -61,7 +61,6 @@ pub(crate) fn ip_addr_from_route<I: Ip>(route_addr: &RouteAddress) -> Result<I::
 }
 
 pub(crate) mod errno {
-    use const_unwrap::const_unwrap_option;
     use net_types::ip::GenericOverIp;
 
     use super::*;
@@ -75,17 +74,16 @@ pub(crate) mod errno {
     pub(crate) struct Errno(i32);
 
     impl Errno {
-        pub(crate) const EADDRNOTAVAIL: Errno =
-            const_unwrap_option(Errno::new(-libc::EADDRNOTAVAIL));
-        pub(crate) const EAFNOSUPPORT: Errno = const_unwrap_option(Errno::new(-libc::EAFNOSUPPORT));
-        pub(crate) const EBUSY: Errno = const_unwrap_option(Errno::new(-libc::EBUSY));
-        pub(crate) const EEXIST: Errno = const_unwrap_option(Errno::new(-libc::EEXIST));
-        pub(crate) const EINVAL: Errno = const_unwrap_option(Errno::new(-libc::EINVAL));
-        pub(crate) const ENODEV: Errno = const_unwrap_option(Errno::new(-libc::ENODEV));
-        pub(crate) const ENOENT: Errno = const_unwrap_option(Errno::new(-libc::ENOENT));
-        pub(crate) const ENOTSUP: Errno = const_unwrap_option(Errno::new(-libc::ENOTSUP));
-        pub(crate) const ESRCH: Errno = const_unwrap_option(Errno::new(-libc::ESRCH));
-        pub(crate) const ETOOMANYREFS: Errno = const_unwrap_option(Errno::new(-libc::ETOOMANYREFS));
+        pub(crate) const EADDRNOTAVAIL: Errno = Errno::new(-libc::EADDRNOTAVAIL).unwrap();
+        pub(crate) const EAFNOSUPPORT: Errno = Errno::new(-libc::EAFNOSUPPORT).unwrap();
+        pub(crate) const EBUSY: Errno = Errno::new(-libc::EBUSY).unwrap();
+        pub(crate) const EEXIST: Errno = Errno::new(-libc::EEXIST).unwrap();
+        pub(crate) const EINVAL: Errno = Errno::new(-libc::EINVAL).unwrap();
+        pub(crate) const ENODEV: Errno = Errno::new(-libc::ENODEV).unwrap();
+        pub(crate) const ENOENT: Errno = Errno::new(-libc::ENOENT).unwrap();
+        pub(crate) const ENOTSUP: Errno = Errno::new(-libc::ENOTSUP).unwrap();
+        pub(crate) const ESRCH: Errno = Errno::new(-libc::ESRCH).unwrap();
+        pub(crate) const ETOOMANYREFS: Errno = Errno::new(-libc::ETOOMANYREFS).unwrap();
 
         /// Construct a new [`Errno`] from the given negative integer.
         ///

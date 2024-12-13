@@ -56,7 +56,6 @@ ffx_plugin("ffx_audio_device") {
     "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/developer/ffx/lib/writer:lib",
-    "//src/lib/const-unwrap",
     "//src/lib/fuchsia",
     "//src/media/audio/lib/rust",
     "//third_party/rust_crates:assert_matches",

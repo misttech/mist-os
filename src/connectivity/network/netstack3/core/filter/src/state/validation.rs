@@ -457,7 +457,6 @@ mod tests {
     use core::num::NonZeroU16;
 
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_types::ip::Ipv4;
     use test_case::test_case;
@@ -634,7 +633,7 @@ mod tests {
         transport_matcher(I::map_ip((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6))
     }
 
-    const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8080));
+    const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(8080).unwrap();
 
     #[ip_test(I)]
     #[test_case(

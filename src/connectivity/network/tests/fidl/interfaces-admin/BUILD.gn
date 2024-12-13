@@ -25,7 +25,6 @@ rustc_test("interfaces-admin") {
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/async-utils",
-    "//src/lib/const-unwrap",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/network/fidl_fuchsia_net_ext",

@@ -605,7 +605,6 @@ mod testutils {
 #[cfg(test)]
 mod test {
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{Ipv4, Ipv6};
@@ -941,8 +940,8 @@ mod test {
         const DST_IP: Self::Addr = net_ip_v6!("2001:db8::2");
     }
 
-    const SRC_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1234));
-    const DST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(9876));
+    const SRC_PORT: NonZeroU16 = NonZeroU16::new(1234).unwrap();
+    const DST_PORT: NonZeroU16 = NonZeroU16::new(9876).unwrap();
 
     #[ip_test(I)]
     fn from_segment_builder<I: TestIpExt>() {

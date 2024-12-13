@@ -15,7 +15,6 @@ use core::ops::ControlFlow;
 use core::ops::DerefMut;
 use core::sync::atomic::{self, AtomicU16};
 
-use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
@@ -103,7 +102,7 @@ use crate::internal::{ipv6, multicast_forwarding};
 mod tests;
 
 /// Default IPv4 TTL.
-pub const DEFAULT_TTL: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
+pub const DEFAULT_TTL: NonZeroU8 = NonZeroU8::new(64).unwrap();
 
 /// Hop limits for packets sent to multicast and unicast destinations.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -115,7 +114,7 @@ pub struct HopLimits {
 
 /// Default hop limits for sockets.
 pub const DEFAULT_HOP_LIMITS: HopLimits =
-    HopLimits { unicast: DEFAULT_TTL, multicast: const_unwrap_option(NonZeroU8::new(1)) };
+    HopLimits { unicast: DEFAULT_TTL, multicast: NonZeroU8::new(1).unwrap() };
 
 /// The IPv6 subnet that contains all addresses; `::/0`.
 // Safe because 0 is less than the number of IPv6 address bits.

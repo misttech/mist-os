@@ -2149,8 +2149,7 @@ mod tests {
     }
 
     // Safety: This is safe because the initial value is not zero.
-    const NON_ZERO_USIZE_ONE: NonZeroUsize =
-        const_unwrap::const_unwrap_option(NonZeroUsize::new(1));
+    const NON_ZERO_USIZE_ONE: NonZeroUsize = NonZeroUsize::new(1).unwrap();
 
     #[test]
     fn test_query_stats_inspect_average() {

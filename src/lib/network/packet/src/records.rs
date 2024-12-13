@@ -1345,7 +1345,6 @@ pub mod options {
     use core::mem;
     use core::num::{NonZeroUsize, TryFromIntError};
 
-    use const_unwrap::const_unwrap_option;
     use zerocopy::byteorder::ByteOrder;
     use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
@@ -1615,7 +1614,7 @@ pub mod options {
         ///
         /// [`TypeLengthValue`]: LengthEncoding::TypeLengthValue
         const LENGTH_ENCODING: LengthEncoding = LengthEncoding::TypeLengthValue {
-            option_len_multiplier: const_unwrap_option(NonZeroUsize::new(1)),
+            option_len_multiplier: NonZeroUsize::new(1).unwrap(),
         };
     }
 
@@ -1941,7 +1940,7 @@ pub mod options {
             type KindLenField = u8;
 
             const LENGTH_ENCODING: LengthEncoding = LengthEncoding::TypeLengthValue {
-                option_len_multiplier: const_unwrap_option(NonZeroUsize::new(8)),
+                option_len_multiplier: NonZeroUsize::new(8).unwrap(),
             };
         }
 
@@ -1949,7 +1948,7 @@ pub mod options {
             type KindLenField = u8;
 
             const LENGTH_ENCODING: LengthEncoding = LengthEncoding::TypeLengthValue {
-                option_len_multiplier: const_unwrap_option(NonZeroUsize::new(8)),
+                option_len_multiplier: NonZeroUsize::new(8).unwrap(),
             };
         }
 
@@ -2048,10 +2047,10 @@ pub mod options {
         #[test]
         fn test_length_encoding() {
             const TLV_1: LengthEncoding = LengthEncoding::TypeLengthValue {
-                option_len_multiplier: const_unwrap_option(NonZeroUsize::new(1)),
+                option_len_multiplier: NonZeroUsize::new(1).unwrap(),
             };
             const TLV_2: LengthEncoding = LengthEncoding::TypeLengthValue {
-                option_len_multiplier: const_unwrap_option(NonZeroUsize::new(2)),
+                option_len_multiplier: NonZeroUsize::new(2).unwrap(),
             };
 
             // Test LengthEncoding::record_length

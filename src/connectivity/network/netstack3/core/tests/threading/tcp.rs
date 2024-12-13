@@ -4,7 +4,6 @@
 
 use std::num::{NonZeroU16, NonZeroUsize};
 
-use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
 use loom::sync::Arc;
 use net_types::ZonedAddr;
@@ -38,8 +37,8 @@ enum CloseOrShutdown {
 )]
 fn race_connect_close<I: IpExt>(which: ServerOrClient, close_or_shutdown: CloseOrShutdown) {
     loom_model(low_preemption_bound_model(), move || {
-        const SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));
-        const BACKLOG: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(1));
+        const SERVER_PORT: NonZeroU16 = NonZeroU16::new(22222).unwrap();
+        const BACKLOG: NonZeroUsize = NonZeroUsize::new(1).unwrap();
         let FakeCtx { core_ctx, bindings_ctx } = FakeCtx::default();
         let mut ctx = CtxPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
         let lo = ctx.test_api().add_loopback();

@@ -50,7 +50,6 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.hardware.vsock:fuchsia.hardware.vsock_rust",
     "//sdk/fidl/fuchsia.vsock:fuchsia.vsock_rust",
     "//sdk/rust/zx",
-    "//src/lib/const-unwrap",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",

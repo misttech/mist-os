@@ -30,7 +30,6 @@ rustc_test("management") {
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/connectivity/policy/tests/integration/common:policy_testing_common",
-    "//src/lib/const-unwrap",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",

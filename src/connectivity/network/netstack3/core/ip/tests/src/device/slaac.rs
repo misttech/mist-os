@@ -72,10 +72,8 @@ fn integration_remove_all_addresses_on_ipv6_disable() {
     let TestAddrs { local_mac, remote_mac, local_ip: _, remote_ip: _, subnet: _ } =
         Ipv6::TEST_ADDRS;
 
-    const ONE_HOUR: NonZeroDuration =
-        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(60 * 60));
-    const TWO_HOURS: NonZeroDuration =
-        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(2 * 60 * 60));
+    const ONE_HOUR: NonZeroDuration = NonZeroDuration::from_secs(60 * 60).unwrap();
+    const TWO_HOURS: NonZeroDuration = NonZeroDuration::from_secs(2 * 60 * 60).unwrap();
 
     let mut ctx = FakeCtx::default();
     let device_id = ctx

@@ -15,7 +15,6 @@ use std::num::{NonZeroU16, NonZeroU64};
 use std::time::Duration;
 
 use assert_matches::assert_matches;
-use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_net_multicast_ext::{
     self as fnet_multicast_ext, FidlMulticastAdminIpExt, TableControllerProxy,
 };
@@ -1353,7 +1352,7 @@ async fn inspect_filtering_state(name: &str) {
         },
     });
 
-    const NONZERO_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8080));
+    const NONZERO_PORT: NonZeroU16 = NonZeroU16::new(8080).unwrap();
 
     let namespace = NamespaceId(String::from("test-namespace"));
     let ingress_routine = RoutineId { namespace: namespace.clone(), name: String::from("ingress") };

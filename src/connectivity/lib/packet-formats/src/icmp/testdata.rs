@@ -34,7 +34,6 @@ pub(crate) mod ndp_neighbor {
 pub(crate) mod ndp_router {
     use core::num::NonZeroU8;
 
-    use const_unwrap::const_unwrap_option;
     use net_types::ip::{Ipv6Addr, Subnet};
 
     use crate::icmp::ndp::RoutePreference;
@@ -95,9 +94,9 @@ pub(crate) mod ndp_router {
     ];
 
     /// Options in the Advertisement packet.
-    pub(crate) const HOP_LIMIT: Option<NonZeroU8> = Some(const_unwrap_option(NonZeroU8::new(64)));
+    pub(crate) const HOP_LIMIT: Option<NonZeroU8> = Some(NonZeroU8::new(64).unwrap());
     pub(crate) const LIFETIME: Option<NonZeroDuration> =
-        Some(const_unwrap_option(NonZeroDuration::from_secs(3600)));
+        Some(NonZeroDuration::from_secs(3600).unwrap());
     pub(crate) const REACHABLE_TIME: Option<NonZeroDuration> = None;
     pub(crate) const RETRANS_TIMER: Option<NonZeroDuration> = None;
 

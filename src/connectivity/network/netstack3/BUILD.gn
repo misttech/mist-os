@@ -44,7 +44,6 @@ common_deps = [
   "//src/connectivity/lib/packet-formats",
   "//src/connectivity/network/lib/explicit",
   "//src/lib/async-utils",
-  "//src/lib/const-unwrap",
   "//src/lib/debug/rust",
   "//src/lib/diagnostics/inspect/rust",
   "//src/lib/diagnostics/log/rust",

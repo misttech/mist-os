@@ -12,7 +12,6 @@ use std::pin::pin;
 use anyhow::{anyhow, Context as _};
 use assert_matches::assert_matches;
 use async_trait::async_trait;
-use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _, IpExt as _};
 use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext};
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
@@ -4370,7 +4369,7 @@ async fn setup_redirect_test<'a>(
     }
 }
 
-const LISTEN_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(11111));
+const LISTEN_PORT: NonZeroU16 = NonZeroU16::new(11111).unwrap();
 
 struct TestCaseV4 {
     original_dst: std::net::SocketAddr,

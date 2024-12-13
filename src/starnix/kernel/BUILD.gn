@@ -421,7 +421,6 @@ rustc_library("starnix_core") {
 
   test_deps = [
     "//src/connectivity/lib/net-declare",
-    "//src/lib/const-unwrap",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",

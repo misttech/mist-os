@@ -2688,7 +2688,6 @@ mod tests {
     use alloc::borrow::ToOwned;
     use alloc::collections::{HashMap, HashSet};
     use alloc::vec;
-    use const_unwrap::const_unwrap_option;
     use core::convert::TryInto as _;
     use core::ops::{Deref, DerefMut};
 
@@ -3289,10 +3288,10 @@ mod tests {
         .expect("Receive IP packet succeeds");
     }
 
-    const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
-    const OTHER_LOCAL_PORT: NonZeroU16 = const_unwrap_option(LOCAL_PORT.checked_add(1));
-    const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(200));
-    const OTHER_REMOTE_PORT: NonZeroU16 = const_unwrap_option(REMOTE_PORT.checked_add(1));
+    const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(100).unwrap();
+    const OTHER_LOCAL_PORT: NonZeroU16 = LOCAL_PORT.checked_add(1).unwrap();
+    const REMOTE_PORT: NonZeroU16 = NonZeroU16::new(200).unwrap();
+    const OTHER_REMOTE_PORT: NonZeroU16 = REMOTE_PORT.checked_add(1).unwrap();
 
     fn conn_addr<I>(
         device: Option<FakeWeakDeviceId<FakeDeviceId>>,
@@ -3708,10 +3707,7 @@ mod tests {
         assert!(api.get_posix_reuse_port(&socket));
         assert_eq!(
             api.core_ctx().bound_sockets.ip_socket_ctx.state.multicast_memberships::<I>(),
-            HashMap::from([(
-                (FakeDeviceId, multicast_addr),
-                const_unwrap_option(NonZeroUsize::new(1))
-            )])
+            HashMap::from([((FakeDeviceId, multicast_addr), NonZeroUsize::new(1).unwrap())])
         );
         assert_eq!(
             api.set_multicast_membership(
@@ -3757,10 +3753,7 @@ mod tests {
         assert!(api.get_posix_reuse_port(&socket));
         assert_eq!(
             api.core_ctx().bound_sockets.ip_socket_ctx.state.multicast_memberships::<I>(),
-            HashMap::from([(
-                (FakeDeviceId, multicast_addr),
-                const_unwrap_option(NonZeroUsize::new(1))
-            )])
+            HashMap::from([((FakeDeviceId, multicast_addr), NonZeroUsize::new(1).unwrap())])
         );
         assert_eq!(
             api.set_multicast_membership(
@@ -4293,8 +4286,8 @@ mod tests {
     }
 
     #[ip_test(I)]
-    #[test_case(const_unwrap_option(NonZeroU16::new(u16::MAX)), Ok(const_unwrap_option(NonZeroU16::new(u16::MAX))); "ephemeral available")]
-    #[test_case(const_unwrap_option(NonZeroU16::new(100)), Err(LocalAddressError::FailedToAllocateLocalPort);
+    #[test_case(NonZeroU16::new(u16::MAX).unwrap(), Ok(NonZeroU16::new(u16::MAX).unwrap()); "ephemeral available")]
+    #[test_case(NonZeroU16::new(100).unwrap(), Err(LocalAddressError::FailedToAllocateLocalPort);
         "no ephemeral available")]
     fn test_bind_picked_port_all_others_taken<I: TestIpExt>(
         available_port: NonZeroU16,
@@ -5163,10 +5156,7 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(
             ip_options,
-            HashMap::from([(
-                (MultipleDevicesId::A, mcast_addr),
-                const_unwrap_option(NonZeroUsize::new(1))
-            )])
+            HashMap::from([((MultipleDevicesId::A, mcast_addr), NonZeroUsize::new(1).unwrap())])
         );
     }
 
@@ -5238,7 +5228,7 @@ mod tests {
             ip_options,
             expected_result.map_or(HashMap::default(), |()| HashMap::from([(
                 (bound_device, mcast_addr),
-                const_unwrap_option(NonZeroUsize::new(1))
+                NonZeroUsize::new(1).unwrap()
             )]))
         );
     }
@@ -5297,10 +5287,7 @@ mod tests {
 
         assert_eq!(
             api.core_ctx().bound_sockets.ip_socket_ctx.state.multicast_memberships::<I>(),
-            HashMap::from([(
-                (MultipleDevicesId::A, group),
-                const_unwrap_option(NonZeroUsize::new(1))
-            )])
+            HashMap::from([((MultipleDevicesId::A, group), NonZeroUsize::new(1).unwrap())])
         );
 
         api.close(unbound).into_removed();
@@ -5342,8 +5329,8 @@ mod tests {
         assert_eq!(
             api.core_ctx().bound_sockets.ip_socket_ctx.state.multicast_memberships::<I>(),
             HashMap::from([
-                ((MultipleDevicesId::A, first_group), const_unwrap_option(NonZeroUsize::new(1))),
-                ((MultipleDevicesId::A, second_group), const_unwrap_option(NonZeroUsize::new(1)))
+                ((MultipleDevicesId::A, first_group), NonZeroUsize::new(1).unwrap()),
+                ((MultipleDevicesId::A, second_group), NonZeroUsize::new(1).unwrap())
             ])
         );
 
@@ -5391,8 +5378,8 @@ mod tests {
         assert_eq!(
             api.core_ctx().bound_sockets.ip_socket_ctx.state.multicast_memberships::<I>(),
             HashMap::from([
-                ((MultipleDevicesId::A, first_group), const_unwrap_option(NonZeroUsize::new(1))),
-                ((MultipleDevicesId::A, second_group), const_unwrap_option(NonZeroUsize::new(1)))
+                ((MultipleDevicesId::A, first_group), NonZeroUsize::new(1).unwrap()),
+                ((MultipleDevicesId::A, second_group), NonZeroUsize::new(1).unwrap())
             ])
         );
 
@@ -6098,8 +6085,8 @@ mod tests {
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let listener = api.create();
 
-        const UNICAST_HOPS: NonZeroU8 = const_unwrap_option(NonZeroU8::new(23));
-        const MULTICAST_HOPS: NonZeroU8 = const_unwrap_option(NonZeroU8::new(98));
+        const UNICAST_HOPS: NonZeroU8 = NonZeroU8::new(23).unwrap();
+        const MULTICAST_HOPS: NonZeroU8 = NonZeroU8::new(98).unwrap();
         api.set_unicast_hop_limit(&listener, Some(UNICAST_HOPS), I::VERSION).unwrap();
         api.set_multicast_hop_limit(&listener, Some(MULTICAST_HOPS), I::VERSION).unwrap();
 
@@ -6277,7 +6264,7 @@ mod tests {
         ));
 
         // Specifically selected to be in the `EPHEMERAL_RANGE`.
-        const AVAILABLE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(54321));
+        const AVAILABLE_PORT: NonZeroU16 = NonZeroU16::new(54321).unwrap();
 
         // Densely pack the port space for one IP Version.
         for port in 1..=u16::MAX {

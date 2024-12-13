@@ -1853,7 +1853,6 @@ pub fn ipv6_to_subnet(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use const_unwrap::const_unwrap_option;
     use itertools::Itertools;
     use net_declare::{fidl_ip, fidl_subnet};
     use starnix_uapi::{
@@ -1870,11 +1869,9 @@ mod tests {
     const PORT: u16 = 2345u16.to_be();
     const PORT_RANGE_START: u16 = 2000u16.to_be();
     const PORT_RANGE_END: u16 = 3000u16.to_be();
-    const NONZERO_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2345));
-    const NONZERO_PORT_RANGE: RangeInclusive<NonZeroU16> = RangeInclusive::new(
-        const_unwrap_option(NonZeroU16::new(2000)),
-        const_unwrap_option(NonZeroU16::new(3000)),
-    );
+    const NONZERO_PORT: NonZeroU16 = NonZeroU16::new(2345).unwrap();
+    const NONZERO_PORT_RANGE: RangeInclusive<NonZeroU16> =
+        RangeInclusive::new(NonZeroU16::new(2000).unwrap(), NonZeroU16::new(3000).unwrap());
 
     fn string_to_16_chars(string: &str) -> [c_char; 16] {
         let mut buffer = [0; 16];

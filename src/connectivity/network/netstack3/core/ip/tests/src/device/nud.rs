@@ -466,7 +466,7 @@ fn bind_and_connect_sockets<
     net: &mut FakeNudNetwork<L>,
     local_buffers: tcp::testutil::ProvidedBuffers,
 ) -> TcpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx> {
-    const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
+    const REMOTE_PORT: NonZeroU16 = NonZeroU16::new(33333).unwrap();
 
     net.with_context("remote", |ctx| {
         let mut tcp_api = ctx.core_api().tcp::<I>();
@@ -642,7 +642,7 @@ fn icmp_error_on_address_resolution_failure_tcp_local<I: TestIpExt + IpExt>() {
 
     let mut tcp_api = ctx.core_api().tcp::<I>();
     let socket = tcp_api.create(tcp::testutil::ProvidedBuffers::default());
-    const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
+    const REMOTE_PORT: NonZeroU16 = NonZeroU16::new(33333).unwrap();
     tcp_api
         .connect(&socket, Some(net_types::ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), REMOTE_PORT)
         .unwrap();
@@ -691,7 +691,7 @@ fn icmp_error_on_address_resolution_failure_tcp_forwarding<I: TestIpExt + IpExt>
     let socket = net.with_context("local", |ctx| {
         let mut tcp_api = ctx.core_api().tcp::<I>();
         let socket = tcp_api.create(tcp::testutil::ProvidedBuffers::default());
-        const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
+        const REMOTE_PORT: NonZeroU16 = NonZeroU16::new(33333).unwrap();
         tcp_api
             .connect(
                 &socket,

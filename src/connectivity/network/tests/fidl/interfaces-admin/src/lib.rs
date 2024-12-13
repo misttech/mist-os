@@ -272,11 +272,8 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
 
     {
         const VALID_UNTIL: fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant =
-            const_unwrap::const_unwrap_option(
-                fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::from_nanos(
-                    123_000_000_000,
-                ),
-            );
+            fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::from_nanos(123_000_000_000)
+                .unwrap();
         addr_state_provider
             .update_address_properties(&fidl_fuchsia_net_interfaces_admin::AddressProperties {
                 preferred_lifetime_info: None,
@@ -324,9 +321,8 @@ async fn add_address_sets_correct_valid_until<N: Netstack>(name: &str) {
         .expect("install endpoint into Netstack");
 
     const VALID_UNTIL: fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant =
-        const_unwrap::const_unwrap_option(
-            fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::from_nanos(123_000_000_000),
-        );
+        fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::from_nanos(123_000_000_000)
+            .unwrap();
 
     const ADDR: fidl_fuchsia_net::Subnet = fidl_subnet!("2001:0db8::1/64");
     let _addr_state_provider = interfaces::add_address_wait_assigned(

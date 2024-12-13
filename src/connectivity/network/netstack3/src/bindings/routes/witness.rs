@@ -48,10 +48,8 @@ impl<I: Ip> From<TableId<I>> for fnet_routes_ext::TableId {
     }
 }
 
-pub(crate) const IPV4_MAIN_TABLE_ID: TableId<Ipv4> =
-    const_unwrap::const_unwrap_option(TableId::new(0));
-pub(crate) const IPV6_MAIN_TABLE_ID: TableId<Ipv6> =
-    const_unwrap::const_unwrap_option(TableId::new(1));
+pub(crate) const IPV4_MAIN_TABLE_ID: TableId<Ipv4> = TableId::new(0).unwrap();
+pub(crate) const IPV6_MAIN_TABLE_ID: TableId<Ipv6> = TableId::new(1).unwrap();
 
 /// Returns the main table ID for the IP version
 pub(crate) fn main_table_id<I: Ip>() -> TableId<I> {

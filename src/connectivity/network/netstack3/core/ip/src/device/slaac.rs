@@ -15,7 +15,6 @@ use core::ops::ControlFlow;
 use core::time::Duration;
 
 use assert_matches::assert_matches;
-use const_unwrap::const_unwrap_option;
 use log::{debug, error, trace};
 use net_types::ip::{AddrSubnet, IpAddress, Ipv6, Ipv6Addr, Subnet};
 use net_types::Witness as _;
@@ -41,7 +40,7 @@ use crate::internal::device::{AddressRemovedReason, IpDeviceEvent, Ipv6DeviceAdd
 ///
 /// 2 hours.
 const MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE: NonZeroDuration =
-    const_unwrap_option(NonZeroDuration::new(Duration::from_secs(7200)));
+    NonZeroDuration::new(Duration::from_secs(7200)).unwrap();
 
 /// Required prefix length for SLAAC.
 ///
@@ -1043,13 +1042,13 @@ impl TemporarySlaacAddressConfiguration {
     ///
     /// [RFC 8981 Section 3.8]: https://www.rfc-editor.org/rfc/rfc8981#section-3.8
     pub const DEFAULT_TEMP_VALID_LIFETIME: NonZeroDuration = // 2 days
-        const_unwrap_option(NonZeroDuration::from_secs(2 * 24 * 60 * 60u64));
+        NonZeroDuration::from_secs(2 * 24 * 60 * 60u64).unwrap();
 
     /// Default TEMP_PREFERRED_LIFETIME specified by [RFC 8981 Section 3.8].
     ///
     /// [RFC 8981 Section 3.8]: https://www.rfc-editor.org/rfc/rfc8981#section-3.8
     pub const DEFAULT_TEMP_PREFERRED_LIFETIME: NonZeroDuration = // 1 day
-        const_unwrap_option(NonZeroDuration::from_secs(1 * 24 * 60 * 60u64));
+        NonZeroDuration::from_secs(1 * 24 * 60 * 60u64).unwrap();
 
     /// Default TEMP_IDGEN_RETRIES specified by [RFC 8981 Section 3.8].
     ///
@@ -1161,8 +1160,7 @@ impl<'a, Instant> From<&'a SlaacConfig<Instant>> for SlaacType {
 //      1000)
 //
 //      ..., such that REGEN_ADVANCE is expressed in seconds.
-pub const SLAAC_MIN_REGEN_ADVANCE: NonZeroDuration =
-    const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(2));
+pub const SLAAC_MIN_REGEN_ADVANCE: NonZeroDuration = NonZeroDuration::from_secs(2).unwrap();
 
 /// Computes REGEN_ADVANCE as specified in [RFC 8981 Section 3.8].
 ///
@@ -2428,8 +2426,7 @@ mod tests {
 
     const SECRET_KEY: IidSecret = IidSecret::ALL_ONES;
 
-    const ONE_HOUR: NonZeroDuration =
-        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(ONE_HOUR_AS_SECS as u64));
+    const ONE_HOUR: NonZeroDuration = NonZeroDuration::from_secs(ONE_HOUR_AS_SECS as u64).unwrap();
 
     struct DontGenerateTemporaryAddressTest {
         preferred_lifetime_config: NonZeroDuration,

@@ -1808,7 +1808,6 @@ mod tests {
     use core::fmt::Debug;
     use netstack3_base::{SeqNum, UnscaledWindowSize};
 
-    use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use packet::InnerPacketBuilder as _;
     use packet_formats::icmp::IcmpUnusedCode;
@@ -1818,10 +1817,10 @@ mod tests {
     use super::testutil::internal::TestIpExt;
     use super::*;
 
-    const SRC_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(11111));
-    const DST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));
-    const SRC_PORT_2: NonZeroU16 = const_unwrap_option(NonZeroU16::new(44444));
-    const DST_PORT_2: NonZeroU16 = const_unwrap_option(NonZeroU16::new(55555));
+    const SRC_PORT: NonZeroU16 = NonZeroU16::new(11111).unwrap();
+    const DST_PORT: NonZeroU16 = NonZeroU16::new(22222).unwrap();
+    const SRC_PORT_2: NonZeroU16 = NonZeroU16::new(44444).unwrap();
+    const DST_PORT_2: NonZeroU16 = NonZeroU16::new(55555).unwrap();
 
     const SEQ_NUM: u32 = 1;
     const ACK_NUM: Option<u32> = Some(2);

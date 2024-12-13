@@ -1177,7 +1177,7 @@ mod tests {
     use super::*;
 
     const REMOTE_ID: u16 = 27;
-    const ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(10));
+    const ICMP_ID: NonZeroU16 = NonZeroU16::new(10).unwrap();
     const SEQ_NUM: u16 = 0xF0;
 
     /// Utilities for accessing locked internal state in tests.
@@ -1533,8 +1533,8 @@ mod tests {
         let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
         let sock = api.create();
 
-        const BIND_ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(10));
-        const OTHER_ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(16));
+        const BIND_ICMP_ID: NonZeroU16 = NonZeroU16::new(10).unwrap();
+        const OTHER_ICMP_ID: NonZeroU16 = NonZeroU16::new(16).unwrap();
 
         api.bind(&sock, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(BIND_ICMP_ID))
             .unwrap();

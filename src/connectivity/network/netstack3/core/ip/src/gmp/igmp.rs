@@ -657,7 +657,8 @@ const DEFAULT_V1_ROUTER_PRESENT_TIMEOUT: Duration = Duration::from_secs(400);
 /// 4].
 ///
 /// [RFC 2236 Section 4]: https://tools.ietf.org/html/rfc2236#section-4
-const DEFAULT_V1_QUERY_MAX_RESP_TIME: Duration = Duration::from_secs(10);
+const DEFAULT_V1_QUERY_MAX_RESP_TIME: NonZeroDuration =
+    NonZeroDuration::new(Duration::from_secs(10)).unwrap();
 
 impl Default for IgmpConfig {
     fn default() -> Self {
@@ -688,9 +689,7 @@ impl gmp::v1::ProtocolConfig for IgmpConfig {
         //        The IGMPv1 router will send General Queries with the Max
         //        Response Time set to 0.  This MUST be interpreted as a value
         //        of 100 (10 seconds).
-        Some(NonZeroDuration::new(resp_time).unwrap_or_else(|| {
-            const_unwrap::const_unwrap_option(NonZeroDuration::new(DEFAULT_V1_QUERY_MAX_RESP_TIME))
-        }))
+        Some(NonZeroDuration::new(resp_time).unwrap_or(DEFAULT_V1_QUERY_MAX_RESP_TIME))
     }
 
     type QuerySpecificActions = Igmpv2Actions;

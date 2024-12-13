@@ -744,7 +744,7 @@ mod test {
             .map(|addr| SpecifiedAddr::new(addr).unwrap())
             .collect::<HashSet<_>>();
 
-        let device_id = const_unwrap::const_unwrap_option(NonZeroU64::new(5));
+        let device_id = NonZeroU64::new(5).unwrap();
 
         let apply_fut = crate::apply_new_routers(
             device_id,

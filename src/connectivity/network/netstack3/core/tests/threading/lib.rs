@@ -9,7 +9,6 @@
 use std::num::NonZeroU16;
 
 use assert_matches::assert_matches;
-use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
 use loom::sync::Arc;
 use net_declare::{net_ip_v4, net_ip_v6, net_mac, net_subnet_v4, net_subnet_v6};
@@ -211,8 +210,8 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: TestIpExt>() {
             )
             .unwrap();
 
-        const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));
-        const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33333));
+        const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(22222).unwrap();
+        const REMOTE_PORT: NonZeroU16 = NonZeroU16::new(33333).unwrap();
 
         // Bind a UDP socket to the device we added so we can trigger link
         // resolution by sending IP packets.
@@ -331,8 +330,8 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: TestIpExt>() {
             )
             .unwrap();
 
-        const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));
-        const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33333));
+        const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(22222).unwrap();
+        const REMOTE_PORT: NonZeroU16 = NonZeroU16::new(33333).unwrap();
 
         // Bind a UDP socket to the device we added so we can trigger link
         // resolution by sending IP packets.

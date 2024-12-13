@@ -477,7 +477,6 @@ pub mod options {
     use core::time::Duration;
 
     use byteorder::{ByteOrder, NetworkEndian};
-    use const_unwrap::const_unwrap_option;
     use net_types::ip::{IpAddress as _, Ipv6Addr, Subnet, SubnetError};
     use net_types::UnicastAddress;
     use packet::records::options::{
@@ -496,7 +495,7 @@ pub mod options {
     /// A value representing an infinite lifetime for various NDP options'
     /// lifetime fields.
     pub const INFINITE_LIFETIME: NonZeroDuration =
-        const_unwrap_option(NonZeroDuration::from_secs(INFINITE_LIFETIME_SECONDS as u64));
+        NonZeroDuration::from_secs(INFINITE_LIFETIME_SECONDS as u64).unwrap();
 
     /// The number of reserved bytes immediately following the kind and length
     /// bytes in a Redirected Header option.
@@ -1000,7 +999,7 @@ pub mod options {
 
         // For NDP options the length should be multiplied by 8.
         const LENGTH_ENCODING: LengthEncoding = LengthEncoding::TypeLengthValue {
-            option_len_multiplier: const_unwrap_option(NonZeroUsize::new(8)),
+            option_len_multiplier: NonZeroUsize::new(8).unwrap(),
         };
     }
 

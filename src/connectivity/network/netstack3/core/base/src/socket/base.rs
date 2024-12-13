@@ -1330,7 +1330,6 @@ mod tests {
     use alloc::vec::Vec;
 
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{Ipv4Addr, Ipv6, Ipv6Addr};
     use test_case::test_case;
@@ -1564,7 +1563,7 @@ mod tests {
     > = ListenerAddr {
         ip: ListenerIpAddr {
             addr: Some(unsafe { SocketIpAddr::new_unchecked(net_ip_v4!("1.2.3.4")) }),
-            identifier: const_unwrap_option(NonZeroU16::new(1)),
+            identifier: NonZeroU16::new(1).unwrap(),
         },
         device: None,
     };
@@ -1576,7 +1575,7 @@ mod tests {
         ip: ConnIpAddr {
             local: (
                 unsafe { SocketIpAddr::new_unchecked(net_ip_v4!("5.6.7.8")) },
-                const_unwrap_option(NonZeroU16::new(1)),
+                NonZeroU16::new(1).unwrap(),
             ),
             remote: unsafe { (SocketIpAddr::new_unchecked(net_ip_v4!("8.7.6.5")), ()) },
         },

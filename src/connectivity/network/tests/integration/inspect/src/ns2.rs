@@ -22,7 +22,6 @@ use {
     fidl_fuchsia_posix_socket_raw as fposix_socket_raw, fuchsia_async as fasync,
 };
 
-use const_unwrap::const_unwrap_option;
 use diagnostics_hierarchy::{DiagnosticsHierarchy, Property};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet};
@@ -400,7 +399,7 @@ struct PacketAttributes {
     port: NonZeroU16,
 }
 
-const INVALID_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1234));
+const INVALID_PORT: NonZeroU16 = NonZeroU16::new(1234).unwrap();
 
 #[netstack_test]
 #[test_case(

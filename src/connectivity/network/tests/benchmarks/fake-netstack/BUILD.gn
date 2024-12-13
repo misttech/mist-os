@@ -17,7 +17,6 @@ rustc_binary("bin") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/lib/async-utils",
-    "//src/lib/const-unwrap",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

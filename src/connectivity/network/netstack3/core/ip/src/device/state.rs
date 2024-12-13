@@ -11,7 +11,6 @@ use core::num::{NonZeroU16, NonZeroU8};
 use core::ops::{Deref, DerefMut};
 use core::time::Duration;
 
-use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ip::{
@@ -46,12 +45,11 @@ use super::dad::NonceCollection;
 /// The default value for *RetransTimer* as defined in [RFC 4861 section 10].
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-pub const RETRANS_TIMER_DEFAULT: NonZeroDuration =
-    const_unwrap_option(NonZeroDuration::from_secs(1));
+pub const RETRANS_TIMER_DEFAULT: NonZeroDuration = NonZeroDuration::from_secs(1).unwrap();
 
 /// The default value for the default hop limit to be used when sending IP
 /// packets.
-const DEFAULT_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
+const DEFAULT_HOP_LIMIT: NonZeroU8 = NonZeroU8::new(64).unwrap();
 
 /// An `Ip` extension trait adding IP device state properties.
 pub trait IpDeviceStateIpExt: BroadcastIpExt {
@@ -594,13 +592,13 @@ impl Ipv6DeviceConfiguration {
     /// The default `MAX_RTR_SOLICITATIONS` value from [RFC 4861 section 10].
     ///
     /// [RFC 4861 section 10]: https://datatracker.ietf.org/doc/html/rfc4861#section-10
-    pub const DEFAULT_MAX_RTR_SOLICITATIONS: NonZeroU8 = const_unwrap_option(NonZeroU8::new(3));
+    pub const DEFAULT_MAX_RTR_SOLICITATIONS: NonZeroU8 = NonZeroU8::new(3).unwrap();
 
     /// The default `DupAddrDetectTransmits` value from [RFC 4862 Section 5.1]
     ///
     /// [RFC 4862 Section 5.1]: https://www.rfc-editor.org/rfc/rfc4862#section-5.1
     pub const DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS: NonZeroU16 =
-        const_unwrap_option(NonZeroU16::new(1));
+        NonZeroU16::new(1).unwrap();
 }
 
 impl AsRef<IpDeviceConfiguration> for Ipv6DeviceConfiguration {

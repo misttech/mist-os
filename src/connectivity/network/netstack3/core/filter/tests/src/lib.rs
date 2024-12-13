@@ -11,7 +11,6 @@
 use std::num::NonZeroU16;
 use std::sync::Arc;
 
-use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
 use net_types::ZonedAddr;
 use packet::{Buf, Serializer as _};
@@ -28,8 +27,8 @@ use netstack3_core::filter::{
 use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder};
 use netstack3_core::IpExt;
 
-const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));
-const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(44444));
+const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(22222).unwrap();
+const REMOTE_PORT: NonZeroU16 = NonZeroU16::new(44444).unwrap();
 
 fn make_udp_reply_packet<I: TestIpExt>() -> Buf<Vec<u8>> {
     Buf::new([1], ..)

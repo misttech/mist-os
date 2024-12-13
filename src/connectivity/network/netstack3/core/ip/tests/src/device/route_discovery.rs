@@ -35,12 +35,9 @@ use netstack3_ip::{
     IPV6_DEFAULT_SUBNET,
 };
 
-const ONE_SECOND: NonZeroDuration =
-    const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(1));
-const TWO_SECONDS: NonZeroDuration =
-    const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(2));
-const THREE_SECONDS: NonZeroDuration =
-    const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(3));
+const ONE_SECOND: NonZeroDuration = NonZeroDuration::from_secs(1).unwrap();
+const TWO_SECONDS: NonZeroDuration = NonZeroDuration::from_secs(2).unwrap();
+const THREE_SECONDS: NonZeroDuration = NonZeroDuration::from_secs(3).unwrap();
 
 fn setup() -> (FakeCtx, DeviceId<FakeBindingsCtx>, TestAddrs<Ipv6Addr>) {
     let TestAddrs { local_mac, remote_mac: _, local_ip: _, remote_ip: _, subnet: _ } =

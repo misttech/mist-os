@@ -1145,7 +1145,6 @@ mod tests {
     use core::marker::PhantomData;
 
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_types::ip::{AddrSubnet, Ipv4};
     use netstack3_base::IntoCoreTimerCtx;
@@ -1706,7 +1705,7 @@ mod tests {
         assert_eq!(conn.external_data().source.get(), Some(&ShouldNat::No));
     }
 
-    const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(55555));
+    const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(55555).unwrap();
 
     #[ip_test(I)]
     #[test_case(
@@ -2128,7 +2127,7 @@ mod tests {
         // `ensure_port_in_range` (as is done for implicit SNAT), then rewriting should
         // succeed and be a no-op, even if the port is not in the specified range,
         let pre_nat = conn.reply_tuple_mut().clone();
-        const NEW_PORT: NonZeroU16 = const_unwrap_option(LOCAL_PORT.checked_add(1));
+        const NEW_PORT: NonZeroU16 = LOCAL_PORT.checked_add(1).unwrap();
         let result = rewrite_reply_tuple_port(
             &mut bindings_ctx,
             &table,
@@ -2157,7 +2156,7 @@ mod tests {
 
         // If the port is not in the specified range, but there is an available port,
         // rewriting should succeed.
-        const NEW_PORT: NonZeroU16 = const_unwrap_option(LOCAL_PORT.checked_add(1));
+        const NEW_PORT: NonZeroU16 = LOCAL_PORT.checked_add(1).unwrap();
         let result = rewrite_reply_tuple_port(
             &mut bindings_ctx,
             &table,
@@ -2221,7 +2220,7 @@ mod tests {
         // Fill the conntrack table with tuples such that there is only one tuple that
         // does not conflict with an existing one and which has a port in the specified
         // range.
-        const MAX_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(LOCAL_PORT.get() + 100));
+        const MAX_PORT: NonZeroU16 = NonZeroU16::new(LOCAL_PORT.get() + 100).unwrap();
         for port in LOCAL_PORT.get()..=MAX_PORT.get() {
             let packet = packet_with_port(which, port);
             let (conn, _dir) = table
@@ -2241,7 +2240,7 @@ mod tests {
         // results in a unique tuple.
         let mut conn =
             ConnectionExclusive::with_reply_tuple(&bindings_ctx, which, LOCAL_PORT.get());
-        const MIN_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(LOCAL_PORT.get() - 1));
+        const MIN_PORT: NonZeroU16 = NonZeroU16::new(LOCAL_PORT.get() - 1).unwrap();
         let result = rewrite_reply_tuple_port(
             &mut bindings_ctx,
             &table,

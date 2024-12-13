@@ -41,28 +41,25 @@ pub(crate) mod api;
 /// 4861 section 10].
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-pub(crate) const DEFAULT_MAX_MULTICAST_SOLICIT: NonZeroU16 =
-    const_unwrap::const_unwrap_option(NonZeroU16::new(3));
+pub(crate) const DEFAULT_MAX_MULTICAST_SOLICIT: NonZeroU16 = NonZeroU16::new(3).unwrap();
 
 /// The default maximum number of unicast solicitations as defined in [RFC 4861
 /// section 10].
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const DEFAULT_MAX_UNICAST_SOLICIT: NonZeroU16 =
-    const_unwrap::const_unwrap_option(NonZeroU16::new(3));
+const DEFAULT_MAX_UNICAST_SOLICIT: NonZeroU16 = NonZeroU16::new(3).unwrap();
 
 /// The maximum amount of time between retransmissions of neighbor probe
 /// messages as defined in [RFC 7048 section 4].
 ///
 /// [RFC 7048 section 4]: https://tools.ietf.org/html/rfc7048#section-4
-const MAX_RETRANS_TIMER: NonZeroDuration =
-    const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(60));
+const MAX_RETRANS_TIMER: NonZeroDuration = NonZeroDuration::from_secs(60).unwrap();
 
 /// The exponential backoff factor for retransmissions of multicast neighbor
 /// probe messages as defined in [RFC 7048 section 4].
 ///
 /// [RFC 7048 section 4]: https://tools.ietf.org/html/rfc7048#section-4
-const BACKOFF_MULTIPLE: NonZeroU32 = const_unwrap::const_unwrap_option(NonZeroU32::new(3));
+const BACKOFF_MULTIPLE: NonZeroU32 = NonZeroU32::new(3).unwrap();
 
 const MAX_PENDING_FRAMES: usize = 10;
 
@@ -70,15 +67,13 @@ const MAX_PENDING_FRAMES: usize = 10;
 /// confirmation, as defined in [RFC 4861 section 6.3.2].
 ///
 /// [RFC 4861 section 6.3.2]: https://tools.ietf.org/html/rfc4861#section-6.3.2
-const DEFAULT_BASE_REACHABLE_TIME: NonZeroDuration =
-    const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(30));
+const DEFAULT_BASE_REACHABLE_TIME: NonZeroDuration = NonZeroDuration::from_secs(30).unwrap();
 
 /// The time after which a neighbor in the DELAY state transitions to PROBE, as
 /// defined in [RFC 4861 section 10].
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const DELAY_FIRST_PROBE_TIME: NonZeroDuration =
-    const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(5));
+const DELAY_FIRST_PROBE_TIME: NonZeroDuration = NonZeroDuration::from_secs(5).unwrap();
 
 /// The maximum number of neighbor entries in the neighbor table for a given
 /// device. When the number of entries is above this number and an entry
@@ -88,8 +83,7 @@ pub const MAX_ENTRIES: usize = 512;
 
 /// The minimum amount of time between garbage collection passes when the
 /// neighbor table grows beyond `MAX_SIZE`.
-const MIN_GARBAGE_COLLECTION_INTERVAL: NonZeroDuration =
-    const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(30));
+const MIN_GARBAGE_COLLECTION_INTERVAL: NonZeroDuration = NonZeroDuration::from_secs(30).unwrap();
 
 /// NUD counters.
 #[derive(Default)]
@@ -2965,8 +2959,7 @@ mod tests {
         }
     }
 
-    const ONE_SECOND: NonZeroDuration =
-        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(1));
+    const ONE_SECOND: NonZeroDuration = NonZeroDuration::from_secs(1).unwrap();
 
     #[track_caller]
     fn check_lookup_has<I: Ip>(

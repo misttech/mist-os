@@ -9,7 +9,6 @@
 use std::collections::HashMap;
 use std::num::NonZeroU64;
 
-use const_unwrap::const_unwrap_option;
 use fidl::endpoints::Proxy as _;
 
 use net_declare::fidl_subnet;
@@ -53,7 +52,7 @@ async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str)
             1,
             fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
                 properties: fidl_fuchsia_net_interfaces_ext::Properties {
-                    id: const_unwrap_option(NonZeroU64::new(1)),
+                    id: NonZeroU64::new(1).unwrap(),
                     name: "lo".to_owned(),
                     port_class: fidl_fuchsia_net_interfaces_ext::PortClass::Loopback,
                     online: true,

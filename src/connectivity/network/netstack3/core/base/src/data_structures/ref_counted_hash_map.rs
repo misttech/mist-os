@@ -54,7 +54,7 @@ impl<K: Eq + Hash, V> RefCountedHashMap<K, V> {
             Entry::Vacant(entry) => {
                 let (value, output) = f();
                 let _: &mut (NonZeroUsize, V) =
-                    entry.insert((const_unwrap::const_unwrap_option(NonZeroUsize::new(1)), value));
+                    entry.insert((NonZeroUsize::new(1).unwrap(), value));
                 InsertResult::Inserted(output)
             }
         }

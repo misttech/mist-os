@@ -7,7 +7,6 @@ use core::num::{NonZeroU16, NonZeroU8};
 use core::time::Duration;
 
 use assert_matches::assert_matches;
-use const_unwrap::const_unwrap_option;
 use net_declare::net_mac;
 use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv6, Mtu};
 use net_types::{SpecifiedAddr, UnicastAddr, Witness as _};
@@ -85,7 +84,7 @@ fn remove_ethernet_device_disables_timers() {
             .update_configuration(
                 &device,
                 Ipv6DeviceConfigurationUpdate {
-                    max_router_solicitations: Some(Some(const_unwrap_option(NonZeroU8::new(2)))),
+                    max_router_solicitations: Some(Some(NonZeroU8::new(2).unwrap())),
                     slaac_config: SlaacConfigurationUpdate {
                         enable_stable_addresses: Some(true),
                         ..Default::default()
@@ -186,7 +185,7 @@ fn tx_queue(
             Ipv6DeviceConfigurationUpdate {
                 // Enable DAD so that the auto-generated address triggers a DAD
                 // message immediately on interface enable.
-                dad_transmits: Some(Some(const_unwrap_option(NonZeroU16::new(1)))),
+                dad_transmits: Some(Some(NonZeroU16::new(1).unwrap())),
                 // Enable stable addresses so the link-local address is auto-
                 // generated.
                 slaac_config: SlaacConfigurationUpdate {

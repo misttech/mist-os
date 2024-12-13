@@ -2049,7 +2049,7 @@ fn test_host_slaac_address_deprecate_while_tentative() {
         &mut core_ctx.context(),
         bindings_ctx,
         &device,
-        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(10)),
+        NonZeroDuration::from_secs(10).unwrap(),
     );
 
     // Receive a new RA with new prefix (autonomous).

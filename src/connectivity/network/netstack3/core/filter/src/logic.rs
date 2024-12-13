@@ -800,7 +800,6 @@ mod tests {
     use alloc::vec::Vec;
 
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
     use ip_test_macro::ip_test;
     use net_types::ip::{AddrSubnet, Ipv4, Ipv4Addr, Ipv6Addr};
@@ -1037,7 +1036,7 @@ mod tests {
 
     #[test]
     fn transparent_proxy_terminal_for_entire_hook() {
-        const TPROXY_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8080));
+        const TPROXY_PORT: NonZeroU16 = NonZeroU16::new(8080).unwrap();
 
         let ingress = Hook {
             routines: vec![

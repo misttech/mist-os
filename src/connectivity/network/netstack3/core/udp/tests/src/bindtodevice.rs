@@ -4,7 +4,6 @@
 
 use core::num::NonZeroU16;
 
-use const_unwrap::const_unwrap_option;
 use either::Either;
 use ip_test_macro::ip_test;
 use net_types::ip::Subnet;
@@ -18,7 +17,7 @@ use netstack3_core::udp::SendToError;
 use netstack3_core::IpExt;
 use packet::Buf;
 
-const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
+const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(100).unwrap();
 
 // Tests that attempting to send to a loopback address on a non loopback
 // interface fails even when we have a matching route.

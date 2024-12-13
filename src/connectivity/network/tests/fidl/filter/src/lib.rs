@@ -15,7 +15,6 @@ use std::pin::pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use assert_matches::assert_matches;
-use const_unwrap::const_unwrap_option;
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_net_filter_ext::{
     self as fnet_filter_ext, Action, AddressMatcher, AddressMatcherType, AddressRange, Change,
@@ -1892,7 +1891,7 @@ async fn invalid_matcher_for_hook(
     assert_eq!(invalid_rule, rule_id);
 }
 
-const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8080));
+const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(8080).unwrap();
 
 #[netstack_test]
 #[test_case(

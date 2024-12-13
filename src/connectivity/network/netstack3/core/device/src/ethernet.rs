@@ -9,7 +9,6 @@ use core::fmt::Debug;
 use core::num::NonZeroU32;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 
-use const_unwrap::const_unwrap_option;
 use log::{debug, trace};
 use net_types::ethernet::Mac;
 use net_types::ip::{GenericOverIp, Ip, IpMarked, Ipv4, Ipv6, Mtu};
@@ -183,8 +182,7 @@ impl MaxEthernetFrameSize {
     /// The minimum ethernet frame size.
     ///
     /// We don't care about FCS, so the minimum frame size for us is 64 - 4.
-    pub const MIN: MaxEthernetFrameSize =
-        MaxEthernetFrameSize(const_unwrap_option(NonZeroU32::new(60)));
+    pub const MIN: MaxEthernetFrameSize = MaxEthernetFrameSize(NonZeroU32::new(60).unwrap());
 
     /// Creates from the maximum size of ethernet header and ethernet payload,
     /// checks that it is valid, i.e., larger than the minimum frame size.
@@ -192,7 +190,7 @@ impl MaxEthernetFrameSize {
         if frame_size < Self::MIN.get().get() {
             return None;
         }
-        Some(Self(const_unwrap_option(NonZeroU32::new(frame_size))))
+        Some(Self(NonZeroU32::new(frame_size).unwrap()))
     }
 
     const fn get(&self) -> NonZeroU32 {
@@ -841,7 +839,7 @@ pub(crate) mod testutil {
 
     /// The mimum implied maximum Ethernet frame size for IPv6.
     pub const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
-        const_unwrap::const_unwrap_option(MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU));
+        MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU).unwrap();
 }
 
 #[cfg(test)]

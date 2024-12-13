@@ -7,7 +7,6 @@
 use core::num::NonZeroU8;
 use core::time::Duration;
 
-use const_unwrap::const_unwrap_option;
 use net_types::ip::{GenericOverIp, Ip, IpMarked, Mtu};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
@@ -331,12 +330,17 @@ pub struct KeepAlive {
 
 impl Default for KeepAlive {
     fn default() -> Self {
+        // Default values inspired by Linux's TCP implementation:
+        // https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L155-L157
+        const DEFAULT_IDLE_DURATION: NonZeroDuration =
+            NonZeroDuration::from_secs(2 * 60 * 60).unwrap();
+        const DEFAULT_INTERVAL: NonZeroDuration = NonZeroDuration::from_secs(75).unwrap();
+        const DEFAULT_COUNT: NonZeroU8 = NonZeroU8::new(9).unwrap();
+
         Self {
-            // Default values inspired by Linux's TCP implementation:
-            // https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L155-L157
-            idle: const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(2 * 60 * 60)),
-            interval: const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(75)),
-            count: const_unwrap_option(NonZeroU8::new(9)),
+            idle: DEFAULT_IDLE_DURATION,
+            interval: DEFAULT_INTERVAL,
+            count: DEFAULT_COUNT,
             // Per RFC 9293(https://datatracker.ietf.org/doc/html/rfc9293#section-3.8.4):
             //   ... they MUST default to off.
             enabled: false,
@@ -438,7 +442,5 @@ pub(crate) mod testutil {
     ///   The default TCP Maximum Segment Size is 536.
     pub(crate) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE: usize = 536;
     pub(crate) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE: Mss =
-        Mss(const_unwrap::const_unwrap_option(core::num::NonZeroU16::new(
-            DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE as u16,
-        )));
+        Mss(core::num::NonZeroU16::new(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE as u16).unwrap());
 }

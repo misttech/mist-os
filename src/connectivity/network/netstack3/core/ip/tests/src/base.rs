@@ -8,7 +8,6 @@ use assert_matches::assert_matches;
 use core::num::NonZeroU16;
 use core::time::Duration;
 
-use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
 use net_declare::{net_ip_v4, net_ip_v6};
 use net_types::ethernet::Mac;
@@ -2305,7 +2304,7 @@ fn conntrack_entry_retained_across_loopback<I: TestDualStackIpExt + IpExt>(
         .expect("install redirect rule");
 
     // Create a dual-stack listening socket.
-    const LISTENER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33333));
+    const LISTENER_PORT: NonZeroU16 = NonZeroU16::new(33333).unwrap();
     let mut v6_api = ctx.core_api().udp::<Ipv6>();
     let listener = v6_api.create();
     v6_api.set_dual_stack_enabled(&listener, true).unwrap();

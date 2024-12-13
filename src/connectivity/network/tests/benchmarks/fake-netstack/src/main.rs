@@ -8,7 +8,6 @@
 
 use anyhow::Context as _;
 use async_utils::stream::{Tagged, WithTag as _};
-use const_unwrap::const_unwrap_option;
 use fidl::endpoints::{ControlHandle as _, RequestStream as _};
 use fidl::{HandleBased as _, Peered as _};
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
@@ -154,11 +153,11 @@ async fn handle_provider_request(
 const DEFAULT_BUFFER_SIZE: u64 = 32 << 10; // 32KiB
 
 const ZXSIO_SIGNAL_DATAGRAM_INCOMING: zx::Signals =
-    const_unwrap_option(zx::Signals::from_bits(fposix_socket::SIGNAL_DATAGRAM_INCOMING));
+    zx::Signals::from_bits(fposix_socket::SIGNAL_DATAGRAM_INCOMING).unwrap();
 const ZXSIO_SIGNAL_DATAGRAM_OUTGOING: zx::Signals =
-    const_unwrap_option(zx::Signals::from_bits(fposix_socket::SIGNAL_DATAGRAM_OUTGOING));
+    zx::Signals::from_bits(fposix_socket::SIGNAL_DATAGRAM_OUTGOING).unwrap();
 const ZXSIO_SIGNAL_STREAM_CONNECTED: zx::Signals =
-    const_unwrap_option(zx::Signals::from_bits(fposix_socket::SIGNAL_STREAM_CONNECTED));
+    zx::Signals::from_bits(fposix_socket::SIGNAL_STREAM_CONNECTED).unwrap();
 
 // The IANA suggests this range for ephemeral ports in RFC 6335, section 6.
 const EPHEMERAL_PORTS: std::ops::RangeInclusive<u16> = 49152..=65535;

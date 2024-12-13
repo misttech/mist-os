@@ -342,7 +342,7 @@ impl TimeValue {
             u32::MAX => TimeValue::NonZero(NonZeroTimeValue::Infinity),
             t => TimeValue::NonZero(NonZeroTimeValue::Finite(
                 // should succeed for non zero or u32::MAX values
-                const_unwrap::const_unwrap_option(NonZeroOrMaxU32::new(t)),
+                NonZeroOrMaxU32::new(t).unwrap(),
             )),
         }
     }

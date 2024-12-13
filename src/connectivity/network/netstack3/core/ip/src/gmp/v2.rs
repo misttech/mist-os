@@ -14,7 +14,6 @@ use core::num::NonZeroU8;
 
 use alloc::collections::hash_map::HashMap;
 use alloc::collections::HashSet;
-use const_unwrap::const_unwrap_option;
 use core::time::Duration;
 use net_types::ip::{Ip, IpAddress};
 use net_types::{MulticastAddr, Witness as _};
@@ -35,7 +34,7 @@ use crate::internal::gmp::{
 /// [RFC 3376 section 8.3]:
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-8.3
 pub(super) const DEFAULT_QUERY_RESPONSE_INTERVAL: NonZeroDuration =
-    const_unwrap_option(NonZeroDuration::from_secs(10));
+    NonZeroDuration::from_secs(10).unwrap();
 
 /// The default value for Unsolicited Report Interval defined in [RFC 3810
 /// section 9.11] and [RFC 3376 section 8.11].
@@ -45,7 +44,7 @@ pub(super) const DEFAULT_QUERY_RESPONSE_INTERVAL: NonZeroDuration =
 /// [RFC 3376 section 8.11]:
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-8.3
 pub(super) const DEFAULT_UNSOLICITED_REPORT_INTERVAL: NonZeroDuration =
-    const_unwrap_option(NonZeroDuration::from_secs(1));
+    NonZeroDuration::from_secs(1).unwrap();
 
 /// The default value for the Robustness Variable defined in [RFC 3810
 /// section 9.1] and [RFC 3376 section 8.1].
@@ -54,7 +53,7 @@ pub(super) const DEFAULT_UNSOLICITED_REPORT_INTERVAL: NonZeroDuration =
 ///     https://datatracker.ietf.org/doc/html/rfc3810#section-9.1
 /// [RFC 3376 section 8.1]:
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-8.1
-pub(super) const DEFAULT_ROBUSTNESS_VARIABLE: NonZeroU8 = const_unwrap_option(NonZeroU8::new(2));
+pub(super) const DEFAULT_ROBUSTNESS_VARIABLE: NonZeroU8 = NonZeroU8::new(2).unwrap();
 
 /// The default value for the Query Interval defined in [RFC 3810
 /// section 9.2] and [RFC 3376 section 8.2].
@@ -63,8 +62,7 @@ pub(super) const DEFAULT_ROBUSTNESS_VARIABLE: NonZeroU8 = const_unwrap_option(No
 ///     https://datatracker.ietf.org/doc/html/rfc3810#section-9.2
 /// [RFC 3376 section 8.2]:
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-8.2
-pub(super) const DEFAULT_QUERY_INTERVAL: NonZeroDuration =
-    const_unwrap_option(NonZeroDuration::from_secs(125));
+pub(super) const DEFAULT_QUERY_INTERVAL: NonZeroDuration = NonZeroDuration::from_secs(125).unwrap();
 
 /// A delay to use before issuing state change reports in response to interface
 /// state changes (e.g leaving/joining groups).

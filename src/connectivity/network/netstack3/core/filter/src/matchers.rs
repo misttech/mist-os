@@ -198,7 +198,6 @@ pub(crate) mod testutil {
     use alloc::string::String;
     use core::num::NonZeroU64;
 
-    use const_unwrap::const_unwrap_option;
     use netstack3_base::testutil::{FakeStrongDeviceId, FakeWeakDeviceId};
     use netstack3_base::{DeviceIdentifier, DeviceWithName, StrongDeviceIdentifier};
 
@@ -256,7 +255,7 @@ pub(crate) mod testutil {
 
     pub fn wlan_interface() -> FakeDeviceId {
         FakeDeviceId {
-            id: const_unwrap_option(NonZeroU64::new(1)),
+            id: NonZeroU64::new(1).unwrap(),
             name: String::from("wlan"),
             class: FakeDeviceClass::Wlan,
         }
@@ -264,7 +263,7 @@ pub(crate) mod testutil {
 
     pub fn ethernet_interface() -> FakeDeviceId {
         FakeDeviceId {
-            id: const_unwrap_option(NonZeroU64::new(2)),
+            id: NonZeroU64::new(2).unwrap(),
             name: String::from("eth"),
             class: FakeDeviceClass::Ethernet,
         }
