@@ -5,10 +5,10 @@
 {% let natural_subtype = context.natural_prim(subtype) %}
 {% let wire_subtype = context.wire_prim(subtype) %}
 
+::fidl_next::bitflags! {
     {% if let Some(doc) = bits.attributes.doc_string() %}
         #[doc = "{{ doc.escape_default() }}"]
     {% endif %}
-::fidl_next::bitflags! {
     #[derive(
         Clone,
         Copy,
