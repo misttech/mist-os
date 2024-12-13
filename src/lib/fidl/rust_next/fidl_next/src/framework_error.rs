@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 /// An internal framework error.
+#[derive(Clone, Copy, Debug)]
 #[repr(i32)]
 pub enum FrameworkError {
     /// The protocol method was not recognized by the receiver.
