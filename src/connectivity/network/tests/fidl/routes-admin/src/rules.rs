@@ -176,7 +176,7 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
             &new_rule_set,
             RULE_INDEX_0,
             RuleMatcher::default(),
-            RuleAction::Lookup(table_id),
+            RuleAction::Lookup(fnet_routes_ext::TableId::new(table_id)),
         )
         .await,
         Ok(Err(fnet_routes_admin::RuleSetError::Unauthenticated)),
@@ -192,7 +192,7 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
         &new_rule_set,
         RULE_INDEX_0,
         RuleMatcher::default(),
-        RuleAction::Lookup(table_id),
+        RuleAction::Lookup(fnet_routes_ext::TableId::new(table_id)),
     )
     .await
     .expect("fidl error")
@@ -305,7 +305,7 @@ async fn table_removal_removes_rules<
         &rule_set,
         RuleIndex::from(0),
         RuleMatcher::default(),
-        RuleAction::Lookup(user_table_id.get()),
+        RuleAction::Lookup(user_table_id),
     )
     .await
     .expect("fidl error")
@@ -321,7 +321,7 @@ async fn table_removal_removes_rules<
         priority: fnet_routes_ext::rules::DEFAULT_RULE_SET_PRIORITY,
         index: RuleIndex::from(0),
         matcher: Default::default(),
-        action: RuleAction::Lookup(main_table_id.get()),
+        action: RuleAction::Lookup(main_table_id),
     };
     // We have two rules: the one we just added and the default rule that exists from the beginning.
     assert_eq!(
@@ -331,7 +331,7 @@ async fn table_removal_removes_rules<
                 priority: RuleSetPriority::from(0),
                 index: RuleIndex::from(0),
                 matcher: Default::default(),
-                action: RuleAction::Lookup(user_table_id.get())
+                action: RuleAction::Lookup(user_table_id)
             },
             default_rule.clone(),
         ])
@@ -610,7 +610,7 @@ async fn add_default_route_for_mark<
             }),
             ..Default::default()
         },
-        fnet_routes_ext::rules::RuleAction::Lookup(table_id.get()),
+        fnet_routes_ext::rules::RuleAction::Lookup(table_id),
     )
     .await
     .expect("fidl")
