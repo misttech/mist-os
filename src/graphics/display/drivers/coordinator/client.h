@@ -139,8 +139,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   void OnFenceFired(FenceReference* fence);
 
   void TearDown(zx_status_t epitaph);
-  // This is used for testing
-  void TearDownTest();
+  void TearDownForTesting();
 
   bool IsValid() const { return valid_; }
   ClientId id() const { return id_; }
@@ -385,8 +384,7 @@ class ClientProxy {
   // greater than existing pending controller stamps.
   void UpdateConfigStampMapping(ConfigStampPair stamps);
 
-  // This is used for testing
-  void CloseTest();
+  void CloseForTesting();
 
   // Test helpers
   size_t TEST_imported_images_count() const { return handler_.TEST_imported_images_count(); }

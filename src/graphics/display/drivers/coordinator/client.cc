@@ -1514,7 +1514,7 @@ void Client::TearDown(zx_status_t epitaph) {
   ApplyConfig();
 }
 
-void Client::TearDownTest() { valid_ = false; }
+void Client::TearDownForTesting() { valid_ = false; }
 
 bool Client::CleanUpAllImages() {
   // Clean up all image fences.
@@ -1871,7 +1871,7 @@ void ClientProxy::UpdateConfigStampMapping(ConfigStampPair stamps) {
   });
 }
 
-void ClientProxy::CloseTest() { handler_.TearDownTest(); }
+void ClientProxy::CloseForTesting() { handler_.TearDownForTesting(); }
 
 void ClientProxy::CloseOnControllerLoop() {
   // Tasks only fail to post if the looper is dead. That can happen if the
