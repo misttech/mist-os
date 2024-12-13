@@ -82,11 +82,6 @@ pub struct StopAllApsRequest {
 }
 
 #[derive(Debug)]
-pub struct HasWpa3IfaceRequest {
-    pub responder: oneshot::Sender<bool>,
-}
-
-#[derive(Debug)]
 pub struct SetCountryRequest {
     pub country_code: Option<[u8; REGION_CODE_LEN]>,
     pub responder: oneshot::Sender<Result<(), Error>>,
@@ -113,7 +108,6 @@ pub enum IfaceManagerRequest {
     GetScanProxy(ScanProxyRequest),
     StartClientConnections(StartClientConnectionsRequest),
     StartAp(StartApRequest),
-    HasWpa3Iface(HasWpa3IfaceRequest),
     AtomicOperation(AtomicOperation),
 }
 

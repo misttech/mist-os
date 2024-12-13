@@ -752,10 +752,6 @@ mod tests {
             unimplemented!();
         }
 
-        fn get_wpa3_capable_client(&mut self) -> Option<u16> {
-            unimplemented!();
-        }
-
         async fn create_or_get_ap_iface(&mut self) -> Result<Option<u16>, PhyManagerError> {
             unimplemented!();
         }
@@ -784,10 +780,6 @@ mod tests {
             &mut self,
             _country_code: Option<[u8; REGION_CODE_LEN]>,
         ) -> Result<(), PhyManagerError> {
-            unimplemented!();
-        }
-
-        fn has_wpa3_client_iface(&self) -> bool {
             unimplemented!();
         }
 
@@ -875,10 +867,6 @@ mod tests {
 
         async fn stop_all_aps(&mut self) -> Result<(), Error> {
             unimplemented!()
-        }
-
-        async fn has_wpa3_capable_client(&mut self) -> Result<bool, Error> {
-            unimplemented!();
         }
 
         async fn set_country(

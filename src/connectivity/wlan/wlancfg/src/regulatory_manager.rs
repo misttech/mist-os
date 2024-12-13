@@ -454,10 +454,6 @@ mod tests {
             unimplemented!()
         }
 
-        async fn has_wpa3_capable_client(&mut self) -> Result<bool, Error> {
-            unimplemented!();
-        }
-
         async fn set_country(
             &mut self,
             country_code: Option<[u8; REGION_CODE_LEN]>,

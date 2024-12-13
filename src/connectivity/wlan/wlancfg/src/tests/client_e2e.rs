@@ -369,16 +369,6 @@ fn add_phy(exec: &mut TestExecutor, test_values: &mut TestValues) {
     ));
 }
 
-fn security_support_with_wpa3() -> fidl_common::SecuritySupport {
-    fidl_common::SecuritySupport {
-        mfp: fidl_common::MfpFeature { supported: true },
-        sae: fidl_common::SaeFeature {
-            driver_handler_supported: true,
-            sme_handler_supported: true,
-        },
-    }
-}
-
 /// Adds a phy and prepares client interfaces by turning on client connections
 fn prepare_client_interface(
     exec: &mut TestExecutor,
@@ -416,37 +406,6 @@ fn prepare_client_interface(
                     ..Default::default()
                 })
             ).is_ok());
-        }
-    );
-
-    // Expect a feature support query as part of the interface creation
-    let feature_support_req = run_while(
-        exec,
-        &mut test_values.internal_objects.internal_futures,
-        test_values.external_interfaces.monitor_service_stream.next(),
-    );
-    assert_variant!(
-        feature_support_req,
-        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
-            iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
-        })) => {
-            assert!(responder.send(Ok(())).is_ok());
-            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle();
-
-            // Send back feature support information
-            let security_support_req = run_while(
-                exec,
-                &mut test_values.internal_objects.internal_futures,
-                stream.next(),
-            );
-            assert_variant!(
-                security_support_req,
-                Some(Ok(fidl_sme::FeatureSupportRequest::QuerySecuritySupport {
-                    responder
-                })) => {
-                    assert!(responder.send(Ok(&security_support_with_wpa3())).is_ok());
-                }
-            );
         }
     );
 
@@ -492,37 +451,6 @@ fn prepare_client_interface(
     );
 
     let iface_sme_stream = sme_server.into_stream();
-
-    // There will be another security support query as part of adding the interface to iface_manager
-    let feature_support_req = run_while(
-        exec,
-        &mut test_values.internal_objects.internal_futures,
-        test_values.external_interfaces.monitor_service_stream.next(),
-    );
-    assert_variant!(
-        feature_support_req,
-        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
-            iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
-        })) => {
-            assert!(responder.send(Ok(())).is_ok());
-            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle();
-
-            // Send back feature support information
-            let security_support_req = run_while(
-                exec,
-                &mut test_values.internal_objects.internal_futures,
-                stream.next(),
-            );
-            assert_variant!(
-                security_support_req,
-                Some(Ok(fidl_sme::FeatureSupportRequest::QuerySecuritySupport {
-                    responder
-                })) => {
-                    assert!(responder.send(Ok(&security_support_with_wpa3())).is_ok());
-                }
-            );
-        }
-    );
 
     // Expect to get an SME request for the state machine creation
     let sme_req = run_while(
@@ -1914,38 +1842,6 @@ fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
         }
     );
 
-    // Expect a feature support query as part of the interface creation
-    let feature_support_req = run_while(
-        exec,
-        &mut test_values.internal_objects.internal_futures,
-        test_values.external_interfaces.monitor_service_stream.next(),
-    );
-    assert_variant!(
-        feature_support_req,
-        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
-            iface_id, feature_support_server, responder
-        })) => {
-            assert_eq!(iface_id, expected_iface_id);
-            assert!(responder.send(Ok(())).is_ok());
-            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle();
-
-            // Send back feature support information
-            let security_support_req = run_while(
-                exec,
-                &mut test_values.internal_objects.internal_futures,
-                stream.next(),
-            );
-            assert_variant!(
-                security_support_req,
-                Some(Ok(fidl_sme::FeatureSupportRequest::QuerySecuritySupport {
-                    responder
-                })) => {
-                    assert!(responder.send(Ok(&security_support_with_wpa3())).is_ok());
-                }
-            );
-        }
-    );
-
     // Expect that we have requested a client SME proxy as part of interface creation
     let sme_req = run_while(
         exec,
@@ -1964,38 +1860,6 @@ fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
         }
     );
     let sme_stream = sme_server.into_stream();
-
-    // There will be another security support query as part of adding the interface to iface_manager
-    let feature_support_req = run_while(
-        exec,
-        &mut test_values.internal_objects.internal_futures,
-        test_values.external_interfaces.monitor_service_stream.next(),
-    );
-    assert_variant!(
-        feature_support_req,
-        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
-            iface_id, feature_support_server, responder
-        })) => {
-            assert_eq!(iface_id, expected_iface_id);
-            assert!(responder.send(Ok(())).is_ok());
-            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle();
-
-            // Send back feature support information
-            let security_support_req = run_while(
-                exec,
-                &mut test_values.internal_objects.internal_futures,
-                stream.next(),
-            );
-            assert_variant!(
-                security_support_req,
-                Some(Ok(fidl_sme::FeatureSupportRequest::QuerySecuritySupport {
-                    responder
-                })) => {
-                    assert!(responder.send(Ok(&security_support_with_wpa3())).is_ok());
-                }
-            );
-        }
-    );
 
     // Run the iface removal notification to completion.  This is subtle, but the device watcher
     // holds a lock on the IfaceManager until this future completes.

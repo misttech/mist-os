@@ -484,7 +484,6 @@ mod tests {
 
     struct FakeIfaceManager {
         pub sme_proxy: fidl_fuchsia_wlan_sme::ClientSmeProxy,
-        pub wpa3_capable: bool,
         pub defect_sender: mpsc::Sender<Defect>,
         pub defect_receiver: mpsc::Receiver<Defect>,
     }
@@ -492,12 +491,7 @@ mod tests {
     impl FakeIfaceManager {
         pub fn new(proxy: fidl_fuchsia_wlan_sme::ClientSmeProxy) -> Self {
             let (defect_sender, defect_receiver) = mpsc::channel(100);
-            FakeIfaceManager {
-                sme_proxy: proxy,
-                wpa3_capable: true,
-                defect_sender,
-                defect_receiver,
-            }
+            FakeIfaceManager { sme_proxy: proxy, defect_sender, defect_receiver }
         }
     }
 
@@ -559,10 +553,6 @@ mod tests {
 
         async fn stop_all_aps(&mut self) -> Result<(), Error> {
             unimplemented!()
-        }
-
-        async fn has_wpa3_capable_client(&mut self) -> Result<bool, Error> {
-            Ok(self.wpa3_capable)
         }
 
         async fn set_country(

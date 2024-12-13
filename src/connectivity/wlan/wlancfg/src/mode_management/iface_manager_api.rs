@@ -83,9 +83,6 @@ pub trait IfaceManagerApi {
     /// Stops all AP interfaces and destroys them.
     async fn stop_all_aps(&mut self) -> Result<(), Error>;
 
-    /// Returns whether or not there is an iface that can support a WPA3 connection.
-    async fn has_wpa3_capable_client(&mut self) -> Result<bool, Error>;
-
     /// Sets the country code for WLAN PHYs.
     async fn set_country(
         &mut self,
@@ -171,13 +168,6 @@ impl IfaceManagerApi for IfaceManager {
         let req = StartApRequest { config, responder };
         self.sender.try_send(IfaceManagerRequest::StartAp(req))?;
         receiver.await?
-    }
-
-    async fn has_wpa3_capable_client(&mut self) -> Result<bool, Error> {
-        let (responder, receiver) = oneshot::channel();
-        let req = HasWpa3IfaceRequest { responder };
-        self.sender.try_send(IfaceManagerRequest::HasWpa3Iface(req))?;
-        Ok(receiver.await?)
     }
 
     async fn stop_client_connections(
@@ -635,8 +625,7 @@ mod tests {
                     handle_negative_test_responder(responder, failure_mode);
                 }
                 // Boolean responder values
-                IfaceManagerRequest::HasIdleIface(HasIdleIfaceRequest { responder })
-                | IfaceManagerRequest::HasWpa3Iface(HasWpa3IfaceRequest { responder }) => {
+                IfaceManagerRequest::HasIdleIface(HasIdleIfaceRequest { responder }) => {
                     handle_negative_test_responder(responder, failure_mode);
                 }
             }
@@ -1449,67 +1438,6 @@ mod tests {
 
         // Verify that the client gets the response
         assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Ready(Err(_)));
-    }
-
-    #[fuchsia::test]
-    fn test_has_wpa3_capable_client_success() {
-        let mut test_values = test_setup();
-
-        // Query whether there is an iface that can do WPA3.
-        let has_wpa3_fut = test_values.iface_manager.has_wpa3_capable_client();
-        let mut has_wpa3_fut = pin!(has_wpa3_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut has_wpa3_fut), Poll::Pending);
-
-        // Verify that the service sees the query
-        let next_message = test_values.receiver.next();
-        let mut next_message = pin!(next_message);
-
-        assert_variant!(
-            test_values.exec.run_until_stalled(&mut next_message),
-            Poll::Ready(
-                Some(IfaceManagerRequest::HasWpa3Iface(HasWpa3IfaceRequest{ responder}))
-            ) => responder.send(true).expect("failed to reply to wpa3 iface query")
-        );
-
-        // Verify that the client side finishes
-        assert_variant!(
-            test_values.exec.run_until_stalled(&mut has_wpa3_fut),
-            Poll::Ready(Ok(true))
-        );
-    }
-
-    #[test_case(NegativeTestFailureMode::RequestFailure; "request failure")]
-    #[test_case(NegativeTestFailureMode::ServiceFailure; "service failure")]
-    #[fuchsia::test(add_test_attr = false)]
-    fn has_wpa3_negative_test(failure_mode: NegativeTestFailureMode) {
-        let mut test_values = test_setup();
-
-        // Query whether there is an iface with WPA3 support
-        let has_wpa3_fut = test_values.iface_manager.has_wpa3_capable_client();
-        let mut has_wpa3_fut = pin!(has_wpa3_fut);
-        assert_variant!(test_values.exec.run_until_stalled(&mut has_wpa3_fut), Poll::Pending);
-
-        let service_fut =
-            iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        let mut service_fut = pin!(service_fut);
-
-        match failure_mode {
-            NegativeTestFailureMode::RequestFailure => {}
-            _ => {
-                // Run the request and the servicing of the request
-                assert_variant!(
-                    test_values.exec.run_until_stalled(&mut has_wpa3_fut),
-                    Poll::Pending
-                );
-                assert_variant!(
-                    test_values.exec.run_until_stalled(&mut service_fut),
-                    Poll::Ready(())
-                );
-            }
-        }
-
-        // Verify that the request completes in error.
-        assert_variant!(test_values.exec.run_until_stalled(&mut has_wpa3_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]

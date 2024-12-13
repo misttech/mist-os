@@ -19,6 +19,7 @@ use crate::util::state_machine::{status_publisher_and_reader, StateMachineStatus
 use crate::util::{atomic_oneshot_stream, future_with_metadata, listener};
 use anyhow::{format_err, Error};
 use fidl::endpoints::create_proxy;
+use fuchsia_async as fasync;
 use fuchsia_inspect_contrib::log::InspectListClosure;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log};
@@ -33,7 +34,6 @@ use std::pin::pin;
 use std::sync::Arc;
 use std::unimplemented;
 use tracing::{debug, error, info, warn};
-use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync};
 
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
 // value is taken from legacy state machine.
@@ -59,7 +59,6 @@ struct ClientIfaceContainer {
     sme_proxy: SmeForClientStateMachine,
     config: Option<ap_types::NetworkIdentifier>,
     client_state_machine: Option<Box<dyn client_fsm::ClientApi>>,
-    security_support: fidl_common::SecuritySupport,
     /// The time of the last scan for roaming or new connection on this iface.
     last_roam_time: fasync::MonotonicInstant,
     status: StateMachineStatusReader<client_fsm::Status>,
@@ -228,34 +227,6 @@ impl IfaceManagerService {
         self.setup_client_container(iface_id).await
     }
 
-    async fn get_wpa3_capable_client(
-        &mut self,
-        iface_id: Option<u16>,
-    ) -> Result<ClientIfaceContainer, Error> {
-        let iface_id = match iface_id {
-            Some(iface_id) => iface_id,
-            None => {
-                // If no iface_id is specified and if there there are any unconfigured client
-                // ifaces, use the first available unconfigured iface.
-                if let Some(removal_index) = self.clients.iter().position(|client_container| {
-                    client_container.config.is_none()
-                        && wpa3_supported(client_container.security_support)
-                }) {
-                    return Ok(self.clients.remove(removal_index));
-                }
-
-                // If all of the known client ifaces are configured, ask the PhyManager for a
-                // client iface.
-                match self.phy_manager.lock().await.get_wpa3_capable_client() {
-                    None => return Err(format_err!("no client ifaces available")),
-                    Some(id) => id,
-                }
-            }
-        };
-
-        self.setup_client_container(iface_id).await
-    }
-
     /// Remove the client iface from the list of configured ifaces if it is there, and create a
     /// ClientIfaceContainer for it if it is needed.
     async fn setup_client_container(
@@ -276,16 +247,8 @@ impl IfaceManagerService {
             .get_client_sme(iface_id, sme_server)
             .await?
             .map_err(zx::Status::from_raw)?;
-        let (features_proxy, features_server) = create_proxy();
-        self.dev_monitor_proxy.get_feature_support(iface_id, features_server).await?.map_err(
-            |e| format_err!("Error occurred getting iface's features support proxy: {}", e),
-        )?;
         let sme_proxy =
             SmeForClientStateMachine::new(sme_proxy, iface_id, self.defect_sender.clone());
-
-        // Get the security support for this iface.
-        let security_support =
-            features_proxy.query_security_support().await?.map_err(zx::Status::from_raw)?;
 
         // Setup a status reader for the container.  Since this state machine is uninitialized,
         // drop the publishing end and allow the reader side to assume the default state.
@@ -296,7 +259,6 @@ impl IfaceManagerService {
             sme_proxy,
             config: None,
             client_state_machine: None,
-            security_support,
             last_roam_time: fasync::MonotonicInstant::now(),
             status,
         })
@@ -505,12 +467,8 @@ impl IfaceManagerService {
 
     async fn connect(&mut self, selection: client_types::ConnectSelection) -> Result<(), Error> {
         // Get a ClientIfaceContainer.
-        let mut client_iface =
-            if selection.target.network.security_type == client_types::SecurityType::Wpa3 {
-                self.get_wpa3_capable_client(None).await?
-            } else {
-                self.get_client(None).await?
-            };
+        let mut client_iface = self.get_client(None).await?;
+
         // Set the new config on this client
         client_iface.config = Some(selection.target.network.clone());
 
@@ -946,21 +904,6 @@ impl IfaceManagerService {
 
         fut.boxed_local()
     }
-
-    /// Returns whether or not there is a client interface that is WPA3 capable, in other words
-    /// wheter or not this device can connect to a network using WPA3. Check with the PhyManager
-    /// in case it is aware of an iface that IfaceManager is not tracking.
-    pub async fn has_wpa3_capable_client(&self) -> bool {
-        let guard = self.phy_manager.lock().await;
-        guard.has_wpa3_client_iface()
-    }
-}
-
-/// Returns whether the security support indicates WPA3 support.
-pub fn wpa3_supported(security_support: fidl_common::SecuritySupport) -> bool {
-    security_support.mfp.supported
-        && (security_support.sae.driver_handler_supported
-            || security_support.sae.sme_handler_supported)
 }
 
 /// Queues a connection selection future for idle interface autoconnect.
@@ -1283,11 +1226,6 @@ async fn handle_iface_manager_request(
                 error!("could not respond to StartApRequest");
             }
         }
-        IfaceManagerRequest::HasWpa3Iface(HasWpa3IfaceRequest { responder }) => {
-            if responder.send(iface_manager.has_wpa3_capable_client().await).is_err() {
-                error!("could not respond to HasWpa3IfaceRequest");
-            }
-        }
         IfaceManagerRequest::AtomicOperation(operation) => {
             let fut = match operation {
                 AtomicOperation::Disconnect(DisconnectRequest {
@@ -1544,8 +1482,7 @@ mod tests {
     use crate::regulatory_manager::REGION_CODE_LEN;
     use crate::util::testing::fakes::FakeScanRequester;
     use crate::util::testing::{
-        generate_connect_selection, generate_random_bss, generate_random_scanned_candidate,
-        poll_sme_req,
+        generate_connect_selection, generate_random_scanned_candidate, poll_sme_req,
     };
     use async_trait::async_trait;
     use diagnostics_assertions::assert_data_tree;
@@ -1559,7 +1496,7 @@ mod tests {
     use std::pin::pin;
     use test_case::test_case;
     use wlan_common::channel::Cbw;
-    use wlan_common::{assert_variant, random_fidl_bss_description, RadioConfig};
+    use wlan_common::{assert_variant, RadioConfig};
     use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_inspect as inspect};
 
     // Responses that FakePhyManager will provide
@@ -1676,7 +1613,6 @@ mod tests {
         create_iface_ok: bool,
         destroy_iface_ok: bool,
         set_country_ok: bool,
-        wpa3_iface: Option<u16>,
         country_code: Option<[u8; REGION_CODE_LEN]>,
         client_connections_enabled: bool,
         client_ifaces: Vec<u16>,
@@ -1728,10 +1664,6 @@ mod tests {
             Some(TEST_CLIENT_IFACE_ID)
         }
 
-        fn get_wpa3_capable_client(&mut self) -> Option<u16> {
-            self.wpa3_iface
-        }
-
         async fn create_or_get_ap_iface(&mut self) -> Result<Option<u16>, PhyManagerError> {
             if self.create_iface_ok {
                 Ok(Some(TEST_AP_IFACE_ID))
@@ -1778,10 +1710,6 @@ mod tests {
             } else {
                 Err(PhyManagerError::PhySetCountryFailure)
             }
-        }
-
-        fn has_wpa3_client_iface(&self) -> bool {
-            self.wpa3_iface.is_some()
         }
 
         fn record_defect(&mut self, defect: Defect) {
@@ -1890,14 +1818,12 @@ mod tests {
             sme_proxy,
             config: None,
             client_state_machine: None,
-            security_support: fake_security_support(),
             last_roam_time: fasync::MonotonicInstant::now(),
             status,
         };
         let phy_manager = FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -1959,7 +1885,6 @@ mod tests {
         let phy_manager = FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -2237,250 +2162,6 @@ mod tests {
         assert!(iface_manager.connection_selection_futures.is_empty());
     }
 
-    #[fuchsia::test]
-    fn test_wpa3_supported() {
-        // Valid WPA3 feature sets
-        let mut driver_handler_mfp = fake_security_support();
-        driver_handler_mfp.sae.driver_handler_supported = true;
-        driver_handler_mfp.mfp.supported = true;
-        assert!(wpa3_supported(driver_handler_mfp));
-
-        let mut sme_handler_mfp = fake_security_support();
-        sme_handler_mfp.sae.sme_handler_supported = true;
-        sme_handler_mfp.mfp.supported = true;
-        assert!(wpa3_supported(sme_handler_mfp));
-
-        let mut driver_and_sme_handler_mfp = fake_security_support();
-        driver_and_sme_handler_mfp.sae.driver_handler_supported = true;
-        driver_and_sme_handler_mfp.sae.sme_handler_supported = true;
-        driver_and_sme_handler_mfp.mfp.supported = true;
-        assert!(wpa3_supported(driver_and_sme_handler_mfp));
-
-        // Invalid WPA3 feature sets
-        let mut driver_handler_only = fake_security_support();
-        driver_handler_only.sae.driver_handler_supported = true;
-        assert!(!wpa3_supported(driver_handler_only));
-
-        let mut sme_handler_only = fake_security_support();
-        sme_handler_only.sae.sme_handler_supported = true;
-        assert!(!wpa3_supported(sme_handler_only));
-
-        let mut driver_and_sme_handler_only = fake_security_support();
-        driver_and_sme_handler_only.sae.driver_handler_supported = true;
-        driver_and_sme_handler_only.sae.sme_handler_supported = true;
-        assert!(!wpa3_supported(driver_and_sme_handler_only));
-
-        let mut mfp_only = fake_security_support();
-        mfp_only.mfp.supported = true;
-        assert!(!wpa3_supported(mfp_only));
-    }
-
-    /// Tests the case where connect is called for a WPA3 connection an there is an unconfigured
-    /// WPA3 iface available.
-    #[test_case(true, true, false)]
-    #[test_case(true, false, true)]
-    #[test_case(true, true, true)]
-    #[fuchsia::test(add_test_attr = false)]
-    fn test_connect_with_unconfigured_wpa3_iface(
-        mfp_supported: bool,
-        sae_driver_handler_supported: bool,
-        sae_sme_handler_supported: bool,
-    ) {
-        let mut exec = fuchsia_async::TestExecutor::new();
-
-        let test_values = test_setup(&mut exec);
-        // The default FakePhyManager will not have a WPA3 iface which is intentional because if
-        // an unconfigured iface is available with WPA3, it should be used without asking
-        // PhyManager for an iface.
-        let (mut iface_manager, mut _sme_stream) =
-            create_iface_manager_with_client(&test_values, false);
-        let mut security_support = fake_security_support();
-        security_support.mfp.supported = mfp_supported;
-        security_support.sae.driver_handler_supported = sae_driver_handler_supported;
-        security_support.sae.sme_handler_supported = sae_sme_handler_supported;
-        iface_manager.clients[0].security_support = security_support;
-
-        let network_id = NetworkIdentifier::new(TEST_SSID.clone(), SecurityType::Wpa3);
-        let connect_selection = client_types::ConnectSelection {
-            target: client_types::ScannedCandidate {
-                network: network_id,
-                security_type_detailed: client_types::SecurityTypeDetailed::Wpa3Personal,
-                bss: client_types::Bss {
-                    bss_description: random_fidl_bss_description!(Wpa3, ssid: TEST_SSID.clone())
-                        .into(),
-                    ..generate_random_bss()
-                },
-                ..generate_random_scanned_candidate()
-            },
-            reason: client_types::ConnectReason::FidlConnectRequest,
-        };
-
-        let mut save_network_fut = test_values.saved_networks.store(
-            connect_selection.target.network.clone(),
-            connect_selection.target.credential.clone(),
-        );
-        let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
-
-        {
-            let connect_fut = iface_manager.connect(connect_selection.clone());
-            let mut connect_fut = pin!(connect_fut);
-
-            // Expect that we have requested a client SME proxy.
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
-
-            let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
-            let sme_server = assert_variant!(
-                poll_service_req(&mut exec, &mut monitor_service_fut),
-                Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
-                    iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
-                }) => {
-                    // Send back a positive acknowledgement.
-                    assert!(responder.send(Ok(())).is_ok());
-
-                    sme_server
-                }
-            );
-            _sme_stream = sme_server.into_stream().into_future();
-
-            match exec.run_until_stalled(&mut connect_fut) {
-                Poll::Ready(connect_result) => match connect_result {
-                    Ok(_) => {}
-                    Err(e) => panic!("failed to connect with {}", e),
-                },
-                Poll::Pending => panic!("expected the connect request to finish"),
-            };
-        }
-        // Start running the client state machine.
-        run_state_machine_futures(&mut exec, &mut iface_manager);
-
-        // Acknowledge the disconnection attempt.
-        assert_variant!(
-            poll_sme_req(&mut exec, &mut _sme_stream),
-            Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_fuchsia_wlan_sme::UserDisconnectReason::Startup }) => {
-                responder.send().expect("could not send response")
-            }
-        );
-
-        // Make sure that the connect request has been sent out.
-        run_state_machine_futures(&mut exec, &mut iface_manager);
-        let connect_txn_handle = assert_variant!(
-            poll_sme_req(&mut exec, &mut _sme_stream),
-            Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
-                assert_eq!(req.ssid, connect_selection.target.network.ssid.clone());
-                let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle();
-                ctrl
-            }
-        );
-        connect_txn_handle
-            .send_on_connect_result(&fake_successful_connect_result())
-            .expect("failed to send connection completion");
-
-        // Run the state machine future again so that it acks the oneshot.
-        run_state_machine_futures(&mut exec, &mut iface_manager);
-
-        // Verify that the ClientIfaceContainer has been moved from unconfigured to configured.
-        assert_eq!(iface_manager.clients.len(), 1);
-        assert_eq!(iface_manager.clients[0].config, Some(connect_selection.target.network.clone()));
-    }
-
-    /// Tests the case where connect is called for a WPA3 connection and a client iface exists but
-    /// does not support WPA3. The connect should fail without trying to connect.
-    #[fuchsia::test]
-    fn test_connect_wpa3_no_wpa3_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new();
-
-        let test_values = test_setup(&mut exec);
-        // By default IfaceManager has an iface but not one with WPA3.
-        let (mut iface_manager, mut _sme_stream) =
-            create_iface_manager_with_client(&test_values, false);
-
-        // Call connect on the IfaceManager
-        let connect_selection = client_types::ConnectSelection {
-            target: client_types::ScannedCandidate {
-                network: NetworkIdentifier::new(TEST_SSID.clone(), SecurityType::Wpa3),
-                security_type_detailed: client_types::SecurityTypeDetailed::Wpa3Personal,
-                bss: client_types::Bss {
-                    bss_description: random_fidl_bss_description!(Wpa3, ssid: TEST_SSID.clone())
-                        .into(),
-                    ..generate_random_bss()
-                },
-                ..generate_random_scanned_candidate()
-            },
-            reason: client_types::ConnectReason::FidlConnectRequest,
-        };
-        let connect_fut = iface_manager.connect(connect_selection);
-
-        // Verify that the request to connect results in an error.
-        let mut connect_fut = pin!(connect_fut);
-        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_)));
-    }
-
-    /// Tests the case where a connect is called and the WPA3 capable iface is configured.
-    /// PhyManager should be asked for an iface that supports WPA3.
-    #[fuchsia::test]
-    fn test_connect_wpa3_with_configured_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new();
-        // Build the connect request for connecting to the WPA3 network.
-        let connect_selection = client_types::ConnectSelection {
-            target: client_types::ScannedCandidate {
-                network: NetworkIdentifier::new(TEST_SSID.clone(), SecurityType::Wpa3),
-                security_type_detailed: client_types::SecurityTypeDetailed::Wpa3Personal,
-                bss: client_types::Bss {
-                    bss_description: random_fidl_bss_description!(Wpa3, ssid: TEST_SSID.clone())
-                        .into(),
-                    ..generate_random_bss()
-                },
-                ..generate_random_scanned_candidate()
-            },
-            reason: client_types::ConnectReason::FidlConnectRequest,
-        };
-
-        // Create a configured ClientIfaceContainer.
-        let test_values = test_setup(&mut exec);
-        let (mut iface_manager, _) = create_iface_manager_with_client(&test_values, true);
-        // Use a PhyManager that has a WPA3 client iface.
-        iface_manager.phy_manager = Arc::new(Mutex::new(FakePhyManager {
-            create_iface_ok: true,
-            destroy_iface_ok: false,
-            wpa3_iface: Some(0),
-            set_country_ok: true,
-            country_code: None,
-            client_connections_enabled: true,
-            client_ifaces: vec![TEST_CLIENT_IFACE_ID],
-            defects: vec![],
-            recovery_sender: None,
-        }));
-
-        // Configure the mock CSM with the expected connect request
-        iface_manager.clients[0].client_state_machine = Some(Box::new(FakeClient {
-            disconnect_ok: false,
-            is_alive: true,
-            expected_connect_selection: Some(connect_selection.clone()),
-        }));
-        {
-            let connect_fut = iface_manager.connect(connect_selection.clone());
-            let mut connect_fut = pin!(connect_fut);
-
-            // Run the connect request to completion.
-            match exec.run_until_stalled(&mut connect_fut) {
-                Poll::Ready(connect_result) => match connect_result {
-                    Ok(_) => {}
-                    Err(e) => panic!("failed to connect with {}", e),
-                },
-                Poll::Pending => panic!("expected the connect request to finish"),
-            };
-        }
-
-        // Start running the client state machine.
-        run_state_machine_futures(&mut exec, &mut iface_manager);
-
-        // Verify that the ClientIfaceContainer has the correct config.
-        assert_eq!(iface_manager.clients.len(), 1);
-        assert_eq!(iface_manager.clients[0].config, Some(connect_selection.target.network));
-    }
-
     /// Tests the case where connect is called, but no client ifaces exist.
     #[fuchsia::test]
     fn test_connect_with_no_ifaces() {
@@ -2527,7 +2208,6 @@ mod tests {
             create_iface_ok: true,
             destroy_iface_ok: true,
             set_country_ok: true,
-            wpa3_iface: None,
             country_code: None,
             client_connections_enabled: false,
             client_ifaces: vec![],
@@ -2896,7 +2576,6 @@ mod tests {
         iface_manager.phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: false,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -3113,7 +2792,6 @@ mod tests {
         iface_manager.phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: false,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -3142,7 +2820,6 @@ mod tests {
         iface_manager.phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: false,
@@ -3188,28 +2865,6 @@ mod tests {
                 }))) => {
                     // Send back a positive acknowledgement.
                     assert!(responder.send(Ok(())).is_ok());
-                }
-            );
-
-            // There will be a security support query.
-            assert_variant!(exec.run_until_stalled(&mut start_fut), Poll::Pending);
-            let features_server = assert_variant!(
-                exec.run_until_stalled(&mut test_values.monitor_service_stream.next()),
-                Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
-                    iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
-                }))) => {
-                    assert!(responder.send(Ok(())).is_ok());
-                    feature_support_server
-                }
-            );
-            assert_variant!(exec.run_until_stalled(&mut start_fut), Poll::Pending);
-            let mut features_req_fut = features_server.into_stream().into_future();
-            assert_variant!(
-                poll_service_req(&mut exec, &mut features_req_fut),
-                Poll::Ready(fidl_fuchsia_wlan_sme::FeatureSupportRequest::QuerySecuritySupport {
-                    responder
-                }) => {
-                    responder.send(Ok(&fake_security_support())).expect("Failed to send security support response");
                 }
             );
 
@@ -3702,28 +3357,6 @@ mod tests {
                 }
             );
 
-            // Expected a DeviceMonitor request to get iface info.
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            let features_server = assert_variant!(
-                exec.run_until_stalled(&mut test_values.monitor_service_stream.next()),
-                Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
-                    iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
-                }))) => {
-                    assert!(responder.send(Ok(())).is_ok());
-                    feature_support_server
-                }
-            );
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            let mut features_req_fut = features_server.into_stream().into_future();
-            assert_variant!(
-                poll_service_req(&mut exec, &mut features_req_fut),
-                Poll::Ready(fidl_fuchsia_wlan_sme::FeatureSupportRequest::QuerySecuritySupport {
-                    responder
-                }) => {
-                    responder.send(Ok(&fake_security_support())).expect("Failed to send security support response");
-                }
-            );
-
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }
 
@@ -3956,25 +3589,6 @@ mod tests {
             );
 
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            let features_server = assert_variant!(
-                poll_service_req(&mut exec, &mut monitor_service_fut),
-                Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
-                    iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
-                }) => {
-                    assert!(responder.send(Ok(())).is_ok());
-                    feature_support_server
-                }
-            );
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            let mut features_req_fut = features_server.into_stream().into_future();
-            assert_variant!(
-                poll_service_req(&mut exec, &mut features_req_fut),
-                Poll::Ready(fidl_fuchsia_wlan_sme::FeatureSupportRequest::QuerySecuritySupport {
-                    responder
-                }) => {
-                    responder.send(Ok(&fake_security_support())).expect("Failed to send security support response");
-                }
-            );
 
             // Expect that we have requested a client SME proxy from creating the client state
             // machine.
@@ -4549,7 +4163,6 @@ mod tests {
         let phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: false,
             destroy_iface_ok: false,
-            wpa3_iface: None,
             set_country_ok: false,
             country_code: None,
             client_connections_enabled: false,
@@ -4630,28 +4243,6 @@ mod tests {
             }) => {
                 // Send back a positive acknowledgement.
                 assert!(responder.send(Ok(())).is_ok());
-            }
-        );
-
-        // Expect that we have queried an iface from get_client creating a new IfaceContainer.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let features_server = assert_variant!(
-            poll_service_req(&mut exec, &mut monitor_service_fut),
-            Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
-                iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
-            }) => {
-                assert!(responder.send(Ok(())).is_ok());
-                feature_support_server
-            }
-        );
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let mut features_req_fut = features_server.into_stream().into_future();
-        assert_variant!(
-            poll_service_req(&mut exec, &mut features_req_fut),
-            Poll::Ready(fidl_fuchsia_wlan_sme::FeatureSupportRequest::QuerySecuritySupport {
-                responder
-            }) => {
-                responder.send(Ok(&fake_security_support())).expect("Failed to send security support response");
             }
         );
 
@@ -4748,7 +4339,6 @@ mod tests {
         FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -4763,7 +4353,6 @@ mod tests {
         FakePhyManager {
             create_iface_ok: false,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -4778,7 +4367,6 @@ mod tests {
         FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -4829,7 +4417,6 @@ mod tests {
         FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -4844,7 +4431,6 @@ mod tests {
         FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: false,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -4859,7 +4445,6 @@ mod tests {
         FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -5553,57 +5138,6 @@ mod tests {
         assert!(iface_manager.aps.is_empty());
     }
 
-    /// Test that if PhyManager knows of a client iface that supports WPA3, has_wpa3_capable_client
-    /// will return true.
-    #[fuchsia::test]
-    fn test_has_wpa3_capable_client() {
-        let mut exec = fuchsia_async::TestExecutor::new();
-
-        // Create a configured ClientIfaceContainer.
-        let test_values = test_setup(&mut exec);
-        let (mut iface_manager, _) = create_iface_manager_with_client(&test_values, true);
-        iface_manager.phy_manager = Arc::new(Mutex::new(FakePhyManager {
-            create_iface_ok: true,
-            destroy_iface_ok: true,
-            wpa3_iface: Some(0),
-            set_country_ok: true,
-            country_code: None,
-            client_connections_enabled: true,
-            client_ifaces: vec![TEST_CLIENT_IFACE_ID],
-            defects: vec![],
-            recovery_sender: None,
-        }));
-        let fut = iface_manager.has_wpa3_capable_client();
-        let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(true));
-    }
-
-    /// Test that if PhyManager does not have a WPA3 client iface, has_wpa3_capable_client will
-    /// return false.
-    #[fuchsia::test]
-    fn test_has_no_wpa3_capable_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new();
-
-        // Create a configured ClientIfaceContainer.
-        let test_values = test_setup(&mut exec);
-        let (mut iface_manager, _) = create_iface_manager_with_client(&test_values, true);
-
-        iface_manager.phy_manager = Arc::new(Mutex::new(FakePhyManager {
-            create_iface_ok: true,
-            destroy_iface_ok: true,
-            wpa3_iface: None,
-            set_country_ok: true,
-            country_code: None,
-            client_connections_enabled: true,
-            client_ifaces: vec![TEST_CLIENT_IFACE_ID],
-            defects: vec![],
-            recovery_sender: None,
-        }));
-        let fut = iface_manager.has_wpa3_capable_client();
-        let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(false));
-    }
-
     /// Tests the operation of setting the country code.  The test cases of interest are:
     /// 1. Client connections and APs are initially enabled and all operations succeed.
     /// 2. Client connections are initially enabled and all operations succeed except restarting
@@ -5659,7 +5193,6 @@ mod tests {
             create_iface_ok,
             destroy_iface_ok,
             set_country_ok,
-            wpa3_iface: None,
             country_code: None,
             client_connections_enabled,
             client_ifaces: vec![],
@@ -5729,17 +5262,6 @@ mod tests {
         }
     }
 
-    /// Create an empty security support structure.
-    fn fake_security_support() -> fidl_common::SecuritySupport {
-        fidl_common::SecuritySupport {
-            mfp: fidl_common::MfpFeature { supported: false },
-            sae: fidl_common::SaeFeature {
-                driver_handler_supported: false,
-                sme_handler_supported: false,
-            },
-        }
-    }
-
     /// Ensure that defect reports are passed through to the PhyManager.
     #[fuchsia::test]
     fn test_record_defect() {
@@ -5747,7 +5269,6 @@ mod tests {
         let phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -5788,7 +5309,6 @@ mod tests {
         let phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -5846,7 +5366,6 @@ mod tests {
         let phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -5909,7 +5428,6 @@ mod tests {
         let phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -5992,7 +5510,6 @@ mod tests {
         let phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -6167,7 +5684,6 @@ mod tests {
             let phy_manager = Arc::new(Mutex::new(FakePhyManager {
                 create_iface_ok: false,
                 destroy_iface_ok: false,
-                wpa3_iface: None,
                 set_country_ok: false,
                 country_code: None,
                 client_connections_enabled: false,
@@ -6279,7 +5795,6 @@ mod tests {
         let phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
-            wpa3_iface: None,
             set_country_ok: true,
             country_code: None,
             client_connections_enabled: true,
@@ -6315,7 +5830,6 @@ mod tests {
             sme_proxy,
             config: None,
             client_state_machine: None,
-            security_support: fake_security_support(),
             last_roam_time: fasync::MonotonicInstant::now(),
             status,
         };
