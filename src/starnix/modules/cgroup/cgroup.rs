@@ -7,7 +7,8 @@
 //! There is no support for actual resource constraints, or any operations outside of adding tasks
 //! to a control group (for the duration of their lifetime).
 
-use starnix_core::task::{CurrentTask, Task};
+use starnix_core::signals::send_freeze_signal;
+use starnix_core::task::{CurrentTask, Task, WaitQueue, Waiter};
 use starnix_core::vfs::buffers::InputBuffer;
 use starnix_core::vfs::{
     fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, fs_node_impl_not_dir,
@@ -16,7 +17,7 @@ use starnix_core::vfs::{
     FsString, VecDirectory, VecDirectoryEntry,
 };
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, Locked, Mutex, MutexGuard};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -62,6 +63,12 @@ pub trait CgroupOps: Send + Sync + 'static {
 
     /// Return all pids that belong to this cgroup.
     fn get_pids(&self) -> Vec<pid_t>;
+
+    /// Freeze all tasks in the cgroup.
+    fn freeze(&self, current_task: &CurrentTask) -> Result<(), Errno>;
+
+    /// Thaw all tasks in the cgroup.
+    fn thaw(&self);
 }
 
 /// `CgroupRoot` is the root of the cgroup hierarchy. The root cgroup is different from the rest of
@@ -169,6 +176,14 @@ impl CgroupOps for CgroupRoot {
         track_stub!(TODO("https://fxbug.dev/377429221"), "get tasks from root cgroup");
         vec![]
     }
+
+    fn freeze(&self, _current_task: &CurrentTask) -> Result<(), Errno> {
+        unreachable!("Root cgroup cannot freeze any processes.");
+    }
+
+    fn thaw(&self) {
+        unreachable!("Root cgroup cannot thaw any processes.");
+    }
 }
 
 #[derive(Default)]
@@ -190,8 +205,7 @@ impl CgroupChildren {
         let mut child_state = child.state.lock();
         assert!(!child_state.deleted, "child cannot be deleted");
 
-        if !child_state.tasks.is_empty() {
-            // TODO(https://fxbug.dev/375677856): Should filter out tasks that are no longer around.
+        if !get_pids_locked(&mut child_state).is_empty() {
             return error!(EBUSY);
         }
         if !child_state.children.is_empty() {
@@ -235,6 +249,9 @@ struct CgroupState {
 
     /// If true, can no longer add children or tasks.
     deleted: bool,
+
+    /// Wait queue to thaw all blocked tasks in this cgroup.
+    wait_queue: WaitQueue,
 }
 
 /// `Cgroup` is a non-root cgroup in a cgroup hierarchy, and can have other `Cgroup`s as children.
@@ -248,6 +265,20 @@ pub struct Cgroup {
     interface_nodes: BTreeMap<FsString, FsNodeHandle>,
 }
 pub type CgroupHandle = Arc<Cgroup>;
+
+fn get_pids_locked(guard: &mut MutexGuard<'_, CgroupState>) -> Vec<pid_t> {
+    let mut pids: Vec<pid_t> = vec![];
+    guard.tasks.retain(|t| {
+        if let Some(t) = t.upgrade() {
+            pids.push(t.get_pid());
+            true
+        } else {
+            // Filter out the tasks that have been dropped.
+            false
+        }
+    });
+    pids
+}
 
 impl Cgroup {
     pub fn new(current_task: &CurrentTask, fs: &FileSystemHandle) -> CgroupHandle {
@@ -281,7 +312,7 @@ impl Cgroup {
                         FREEZE_FILE.into(),
                         fs.create_node(
                             current_task,
-                            FreezerFile::new_node(),
+                            FreezerFile::new_node(weak.clone() as Weak<Self>),
                             FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
                         ),
                     ),
@@ -342,18 +373,24 @@ impl CgroupOps for Cgroup {
     }
 
     fn get_pids(&self) -> Vec<pid_t> {
-        let mut pids: Vec<pid_t> = vec![];
-        let mut state = self.state.lock();
-        state.tasks.retain(|t| {
-            if let Some(t) = t.upgrade() {
-                pids.push(t.get_pid());
-                true
-            } else {
-                // Filter out the tasks that have been dropped.
-                false
+        get_pids_locked(&mut self.state.lock())
+    }
+
+    fn freeze(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        let pids = current_task.kernel().pids.read();
+        let mut guard = self.state.lock();
+        for pid in get_pids_locked(&mut guard) {
+            if let Some(task) = pids.get_task(pid).upgrade() {
+                let waiter = Waiter::new();
+                guard.wait_queue.wait_async(&waiter);
+                send_freeze_signal(&task, waiter)?;
             }
-        });
-        pids
+        }
+        Ok(())
+    }
+
+    fn thaw(&self) {
+        self.state.lock().wait_queue.notify_all();
     }
 }
 

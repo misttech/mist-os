@@ -72,13 +72,13 @@ class CgroupFreezerTest : public ::testing::Test {
       waitpid(pid, NULL, 0);
     }
     if (std::filesystem::exists(test_cgroup_path())) {
-      ASSERT_TRUE(std::filesystem::remove(test_cgroup_path()));
+      ASSERT_THAT(rmdir(test_cgroup_path().c_str()), SyscallSucceeds());
     }
     if (std::filesystem::exists(cgroup_path())) {
       if (test_helper::HasSysAdmin()) {
         ASSERT_THAT(umount(cgroup_path().c_str()), SyscallSucceeds());
       }
-      ASSERT_TRUE(std::filesystem::remove(cgroup_path()));
+      ASSERT_THAT(rmdir(cgroup_path().c_str()), SyscallSucceeds());
     }
   }
 
@@ -103,25 +103,27 @@ TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
   pid_t parent_pid = getpid();
   test_helper::ForkHelper fork_helper;
 
+  // Set up a signal set to wait for SIGUSR1 which will be sent by the child process
+  test_helper::SignalMaskHelper mask_helper;
+  mask_helper.blockSignal(SIGUSR1);
+
   pid_t child_pid = fork_helper.RunInForkedProcess([parent_pid] {
     // Set up a signal set to wait for SIGUSR1 which will be sent by the child process
     test_helper::SignalMaskHelper mask_helper;
     mask_helper.blockSignal(SIGUSR1);
 
-    while (true) {
-      // Wait for SIGUSR1
-      mask_helper.waitForSignal(SIGUSR1);
-      kill(parent_pid, SIGUSR1);
-    }
+    // Wait for the first SIGUSR1 before freeze
+    mask_helper.waitForSignal(SIGUSR1);
+    kill(parent_pid, SIGUSR1);
+
+    // Wait for the second SIGUSR1 after freeze
+    mask_helper.waitForSignal(SIGUSR1);
+    kill(parent_pid, SIGUSR1);
   });
   test_pids_.push_back(child_pid);
 
   // Write the child PID to the cgroup
   files::WriteFile(procs_path(), std::to_string(child_pid));
-
-  // Set up a signal set to wait for SIGUSR1 which will be sent by the child process
-  test_helper::SignalMaskHelper mask_helper;
-  mask_helper.blockSignal(SIGUSR1);
 
   // Send signal; child should receive it.
   kill(child_pid, SIGUSR1);
@@ -129,7 +131,6 @@ TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
 
   // Freeze the cgroup
   files::WriteFile(freezer_path(), "1");
-  ASSERT_TRUE(wait_freeze_state_changed(true));
 
   // Send signal; frozen child should *not* receive it.
   kill(child_pid, SIGUSR1);
@@ -139,7 +140,6 @@ TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
 
   // Unfreeze the child process
   files::WriteFile(freezer_path(), "0");
-  ASSERT_TRUE(wait_freeze_state_changed(false));
 
   // Child will process the last signal after thawed.
   mask_helper.waitForSignal(SIGUSR1);
@@ -148,4 +148,10 @@ TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
   EXPECT_EQ(0, kill(child_pid, SIGKILL));
   // Wait for the child process to terminate
   fork_helper.WaitForChildren();
+}
+
+TEST_F(CgroupFreezerTest, CheckStateInEventsFile) {
+  // Freeze the cgroup
+  files::WriteFile(freezer_path(), "1");
+  ASSERT_TRUE(wait_freeze_state_changed(true));
 }

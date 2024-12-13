@@ -101,8 +101,8 @@
                 // TODO(https://fxbug.dev/379958264)
                 "CgroupTest.WriteToInterfaceFileAfterCgroupIsDeleted",
 
-                // TODO(https://fxbug.dev/333766695): Re-enable impl of cgroup.freezer is complete
-                "CgroupFreezerTest.FreezeSingleProcess",
+                // TODO(https://fxbug.dev/377755814): Re-enable impl of cgroup.events is complete
+                "CgroupFreezerTest.CheckStateInEventsFile",
             ],
         },
     ],

@@ -394,9 +394,6 @@ pub struct TaskMutableState {
 
     /// Information that a tracer needs to inspect this process.
     pub captured_thread_state: Option<CapturedThreadState>,
-
-    /// Whether this process is frozen by the cgroup freezer.
-    pub frozen: bool,
 }
 
 impl TaskMutableState {
@@ -1119,7 +1116,6 @@ impl Task {
                 default_timerslack_ns: timerslack_ns,
                 ptrace: None,
                 captured_thread_state: None,
-                frozen: false,
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,
