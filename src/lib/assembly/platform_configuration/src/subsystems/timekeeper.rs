@@ -48,6 +48,8 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
         // Allows Timekeeper to short-circuit RTC driver detection at startup.
         let has_real_time_clock = context.board_info.provides_feature("fuchsia::real_time_clock");
 
+        let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms;
+
         let mut config_builder = builder
             .package("timekeeper")
             .component("meta/timekeeper.cm")
@@ -76,7 +78,8 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             .field("power_topology_integration_enabled", false)?
             .field("serve_test_protocols", serve_test_protocols)?
             .field("has_real_time_clock", has_real_time_clock)?
-            .field("utc_start_at_startup_when_invalid_rtc", config.utc_start_at_startup_when_invalid_rtc)?;
+            .field("utc_start_at_startup_when_invalid_rtc", config.utc_start_at_startup_when_invalid_rtc)?
+            .field("serve_fuchsia_time_alarms", serve_fuchsia_time_alarms)?;
 
         let mut time_source_config_builder = builder
             .package("httpsdate-time-source-pull")

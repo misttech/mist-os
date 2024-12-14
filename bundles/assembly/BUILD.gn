@@ -1034,6 +1034,39 @@ assembly_input_bundle("timekeeper_persistence") {
   ]
 }
 
+# The bundle supporting wake alarms through Timekeeper.
+assembly_input_bundle("timekeeper_wake_alarms") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/sys/time/timekeeper/timekeeper-wake-alarms.core_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
+# The bundle supporting wake alarms through Timekeeper, hardware specific
+# for the vim3's aml-hrtimer.
+assembly_input_bundle("timekeeper_wake_alarms_aml_hrtimer") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/sys/time/timekeeper/timekeeper-wake-alarms-aml-hrtimer.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # Network realm definition.
 #
 # This AIB defines the base network package, which lays out the network realm.
