@@ -76,6 +76,7 @@ cpp20::span<Fastboot::VariableEntry> Fastboot::GetVariableTable() {
       {"slot-retry-count", VarFuncAndArgs{&Fastboot::GetVarSlotRetryCount, kSlotArgs}},
       {"slot-successful", VarFuncAndArgs{&Fastboot::GetVarSlotSuccessful, kSlotArgs}},
       {"slot-unbootable", VarFuncAndArgs{&Fastboot::GetVarSlotUnbootable, kSlotArgs}},
+      {"slot-unbootable-reason", VarFuncAndArgs{&Fastboot::GetVarSlotUnbootableReason, kSlotArgs}},
       // Constant based variables
       {"slot-count", {"2"}},
       {"slot-suffixes", {"a,b"}},
@@ -404,6 +405,55 @@ zx::result<> Fastboot::GetVarSlotUnbootable(const CommandArgs &args, fastboot::T
   }
 
   return resp(ResponseType::kOkay, info.is_bootable ? "no" : "yes", transport);
+}
+
+zx::result<> Fastboot::GetVarSlotUnbootableReason(const CommandArgs &args,
+                                                  fastboot::Transport *transport,
+                                                  const Responder &resp) {
+  if (args.num_args < 3) {
+    return resp(ResponseType::kFail, "Not enough arguments", transport);
+  }
+
+  std::optional<AbrSlotIndex> idx = ParseAbrSlotStr(args.args[2], true);
+  if (!idx) {
+    return resp(ResponseType::kFail, "slot name is invalid", transport);
+  }
+
+  AbrOps abr_ops = GetAbrOps();
+  AbrSlotInfo info;
+  AbrResult res = AbrGetSlotInfo(&abr_ops, *idx, &info);
+  if (res != kAbrResultOk) {
+    return resp(ResponseType::kFail, "Failed to get slot unbootable reason", transport);
+  }
+
+  if (info.is_bootable) {
+    return resp(ResponseType::kOkay, "N/A", transport);
+  }
+
+  const char *str = "unknown";
+  // Cast to `AbrUnbootableReason` so the compiler checks that we've handled all the known cases
+  // (but it still might not be one of these values if the metadata writer had a newer libabr
+  // version with additional reasons we don't know about).
+  switch (static_cast<AbrUnbootableReason>(info.unbootable_reason)) {
+    case kAbrUnbootableReasonNone:
+      str = "none given";
+      break;
+    case kAbrUnbootableReasonNoMoreTries:
+      str = "no more attempts";
+      break;
+    case kAbrUnbootableReasonOsRequested:
+      str = "OS requested";
+      break;
+    case kAbrUnbootableReasonVerificationFailure:
+      str = "verification failure";
+      break;
+  }
+
+  // Give a human-readable string as well as the raw value for programmatic parsing and in case of
+  // unknown values.
+  char buffer[64];
+  snprintf(buffer, sizeof(buffer), "%d (%s)", info.unbootable_reason, str);
+  return resp(ResponseType::kOkay, buffer, transport);
 }
 
 class GptDataHolder {

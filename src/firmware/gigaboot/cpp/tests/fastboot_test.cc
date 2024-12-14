@@ -361,11 +361,11 @@ class FastbootSlotTest : public ::testing::Test {
     }
   }
 
-  void MarkUnbootable(AbrSlotIndex slot) {
+  void MarkUnbootable(AbrSlotIndex slot, AbrUnbootableReason reason = kAbrUnbootableReasonNone) {
     mock_zb_ops_.AddPartition(GPT_DURABLE_BOOT_NAME, sizeof(AbrData));
     ZirconBootOps zb_ops = mock_zb_ops_.GetZirconBootOps();
     AbrOps abr_ops = GetAbrOpsFromZirconBootOps(&zb_ops);
-    AbrResult res = AbrMarkSlotUnbootable(&abr_ops, slot, kAbrUnbootableReasonNone);
+    AbrResult res = AbrMarkSlotUnbootable(&abr_ops, slot, reason);
     ASSERT_EQ(res, kAbrResultOk);
   }
 
@@ -479,6 +479,32 @@ TEST_P(FastbootSlotABTest, GetVarSlotUnbootable) {
   ret = fastboot.ProcessPacket(&transport);
   ASSERT_TRUE(ret.is_ok());
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), {"OKAYyes"}));
+}
+
+TEST_P(FastbootSlotABTest, GetVarSlotUnbootableReason) {
+  FastbootSlotTestCase const& test_case = GetParam();
+
+  Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
+  fastboot::TestTransport transport;
+
+  MarkSuccesful(test_case.slot_index);
+
+  std::string command = std::string{"getvar:slot-unbootable-reason:"} + test_case.slot_str;
+
+  // Bootable -> "N/A"
+  transport.AddInPacket(command);
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), {"OKAYN/A"}));
+
+  // No more tries -> "1 (no more attempts)"
+  MarkUnbootable(test_case.slot_index, kAbrUnbootableReasonNoMoreTries);
+  transport.ClearOutPackets();
+  transport.AddInPacket(command);
+  ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  ASSERT_NO_FATAL_FAILURE(
+      CheckPacketsEqual(transport.GetOutPackets(), {"OKAY1 (no more attempts)"}));
 }
 
 TEST_P(FastbootSlotABTest, GetVarSlotRetryCount) {
