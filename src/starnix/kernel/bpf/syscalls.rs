@@ -91,8 +91,10 @@ fn install_bpf_fd(
     obj: impl Into<BpfHandle>,
 ) -> Result<SyscallResult, Errno> {
     let handle: BpfHandle = obj.into();
+    let name = handle.type_name();
     // All BPF FDs have the CLOEXEC flag turned on by default.
-    let file = Anon::new_file(current_task, Box::new(handle), OpenFlags::RDWR | OpenFlags::CLOEXEC);
+    let file =
+        Anon::new_file(current_task, Box::new(handle), OpenFlags::RDWR | OpenFlags::CLOEXEC, name);
     Ok(current_task.add_file(file, FdFlags::CLOEXEC)?.into())
 }
 

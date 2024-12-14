@@ -559,6 +559,7 @@ pub fn export_buffer(
                     current_task,
                     Box::new(MemoryFileObject::new(Arc::new(memory))),
                     OpenFlags::RDWR,
+                    "[fuchsia:magma_export_buffer]",
                 )
             }
         };
@@ -617,6 +618,7 @@ pub fn get_buffer_handle(
             current_task,
             Box::new(MemoryFileObject::new(Arc::new(memory))),
             OpenFlags::RDWR,
+            "[fuchsia:magma_buffer]",
         );
         let fd = current_task.add_file(file, FdFlags::empty())?;
         response.handle_out = fd.raw() as u64;
@@ -655,6 +657,7 @@ pub fn query(
             current_task,
             Box::new(MemoryFileObject::new(Arc::new(memory))),
             OpenFlags::RDWR,
+            "[fuchsia:magma_vmo]",
             |id| {
                 let mut info =
                     FsNodeInfo::new(id, FileMode::from_bits(0o600), current_task.as_fscred());

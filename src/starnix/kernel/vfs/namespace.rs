@@ -1445,7 +1445,7 @@ impl NamespaceNode {
     /// A task may have a custom root set by `chroot`.
     pub fn path_from_root(&self, root: Option<&NamespaceNode>) -> PathWithReachability {
         if self.mount.is_none() {
-            return PathWithReachability::Reachable(self.entry.local_name());
+            return PathWithReachability::Reachable(self.entry.node.internal_name());
         }
 
         let mut path = PathBuilder::new();
@@ -1470,7 +1470,12 @@ impl NamespaceNode {
             }
         }
 
-        PathWithReachability::Reachable(path.build_absolute())
+        let mut absolute_path = path.build_absolute();
+        if self.entry.is_dead() {
+            absolute_path.extend_from_slice(b" (deleted)");
+        }
+
+        PathWithReachability::Reachable(absolute_path)
     }
 
     pub fn mount(&self, what: WhatToMount, flags: MountFlags) -> Result<(), Errno> {

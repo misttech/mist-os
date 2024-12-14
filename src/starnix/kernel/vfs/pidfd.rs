@@ -60,6 +60,7 @@ pub fn new_pidfd(current_task: &CurrentTask, proc: &ThreadGroup, flags: OpenFlag
             terminated_event: Arc::new(proc.drop_notifier.event()),
         }),
         flags,
+        "[pidfd]",
     )
 }
 

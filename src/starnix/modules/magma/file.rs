@@ -840,7 +840,12 @@ impl FileOps for MagmaFile {
                         b"magma semaphore\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
                     let sync_file = SyncFile::new(*sync_file_name, SyncFence { sync_points });
 
-                    let file = Anon::new_file(current_task, Box::new(sync_file), OpenFlags::RDWR);
+                    let file = Anon::new_file(
+                        current_task,
+                        Box::new(sync_file),
+                        OpenFlags::RDWR,
+                        "sync_file",
+                    );
 
                     let fd = current_task.add_file(file, FdFlags::empty())?;
                     sync_file_fd = fd.raw();

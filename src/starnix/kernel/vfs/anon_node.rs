@@ -5,7 +5,7 @@
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{
     fs_node_impl_not_dir, CacheMode, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
-    FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
+    FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr, FsString,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::vfs::default_statfs;
@@ -15,7 +15,12 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{error, ino_t, statfs, ANON_INODE_FS_MAGIC};
 use std::sync::Arc;
 
-pub struct Anon;
+#[derive(Default)]
+pub struct Anon {
+    /// If this instance represents an `anon_inode` then `name` holds the type-name of the node,
+    /// e.g. "inotify", "sync_file", "[usereventfd]", etc.
+    name: Option<&'static str>,
+}
 
 impl FsNodeOps for Anon {
     fs_node_impl_not_dir!();
@@ -29,6 +34,10 @@ impl FsNodeOps for Anon {
     ) -> Result<Box<dyn FileOps>, Errno> {
         error!(ENOSYS)
     }
+
+    fn internal_name(&self, _node: &FsNode) -> Option<FsString> {
+        self.name.map(|name| format!("anon_inode:{}", name).into())
+    }
 }
 
 impl Anon {
@@ -36,13 +45,14 @@ impl Anon {
         current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
         flags: OpenFlags,
+        name: &'static str,
         info: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FileHandle {
         let fs = anon_fs(current_task.kernel());
         FileObject::new_anonymous(
             current_task,
             ops,
-            fs.create_node(current_task, Anon, info),
+            fs.create_node(current_task, Anon { name: Some(name) }, info),
             flags,
         )
     }
@@ -51,11 +61,13 @@ impl Anon {
         current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
         flags: OpenFlags,
+        name: &'static str,
     ) -> FileHandle {
         Self::new_file_extended(
             current_task,
             ops,
             flags,
+            name,
             FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
         )
     }

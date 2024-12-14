@@ -56,6 +56,14 @@ impl BpfHandle {
             _ => error!(EINVAL),
         }
     }
+
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Self::Map(_) => "bpf-map",
+            Self::Program(_) | Self::ProgramStub(_) => "bpf-prog",
+            Self::BpfTypeFormat(_) => "bpf-type",
+        }
+    }
 }
 
 impl From<Program> for BpfHandle {

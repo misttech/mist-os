@@ -177,6 +177,17 @@ impl DirEntry {
         Self::new(node, None, FsString::default())
     }
 
+    /// Returns a new `DirEntry` that is ready marked as having been deleted.
+    pub fn new_deleted(
+        node: FsNodeHandle,
+        parent: Option<DirEntryHandle>,
+        local_name: FsString,
+    ) -> DirEntryHandle {
+        let entry = DirEntry::new(node, parent, local_name);
+        entry.state.write().is_dead = true;
+        entry
+    }
+
     /// Returns a file handle to this entry, associated with an anonymous namespace.
     pub fn open_anonymous<L>(
         self: &DirEntryHandle,
@@ -442,7 +453,8 @@ impl DirEntry {
 
         let node =
             self.node.create_tmpfile(locked, current_task, mount, mode, owner, link_behavior)?;
-        Ok(DirEntry::new_unrooted(node))
+        let local_name = format!("#{}", node.node_id).into();
+        Ok(DirEntry::new_deleted(node, Some(self.clone()), local_name))
     }
 
     pub fn unlink<L>(

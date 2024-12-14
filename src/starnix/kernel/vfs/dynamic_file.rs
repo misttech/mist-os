@@ -334,10 +334,10 @@ impl FileOps for ConstFile {
 
 #[cfg(test)]
 mod tests {
-    use crate::testing::{create_kernel_task_and_unlocked, AutoReleasableTask};
+    use crate::testing::{anon_test_file, create_kernel_task_and_unlocked, AutoReleasableTask};
     use crate::vfs::{
-        Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle, SeekTarget,
-        SequenceFileSource, VecOutputBuffer,
+        DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle, SeekTarget, SequenceFileSource,
+        VecOutputBuffer,
     };
     use starnix_sync::{Locked, Mutex, Unlocked};
     use starnix_uapi::errors::Errno;
@@ -363,7 +363,7 @@ mod tests {
     ) -> (AutoReleasableTask, FileHandle, Locked<'l, Unlocked>) {
         let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let file =
-            Anon::new_file(&current_task, Box::new(DynamicFile::new(source)), OpenFlags::RDONLY);
+            anon_test_file(&current_task, Box::new(DynamicFile::new(source)), OpenFlags::RDONLY);
         (current_task, file, locked)
     }
 

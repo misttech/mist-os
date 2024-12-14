@@ -104,7 +104,7 @@ impl EpollFileObject {
             let _l2 = epoll.trigger_list.lock();
         }
 
-        Anon::new_file(current_task, epoll, OpenFlags::RDWR)
+        Anon::new_file(current_task, epoll, OpenFlags::RDWR, "[eventpoll]")
     }
 
     fn new_wait_handler(&self, key: ReadyItemKey) -> EventHandler {

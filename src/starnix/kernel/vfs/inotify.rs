@@ -113,6 +113,7 @@ impl InotifyFileObject {
                 .into(),
             }),
             flags,
+            "inotify",
         )
     }
 

@@ -100,6 +100,7 @@ impl TimerFile {
                 )),
             }),
             flags,
+            "[timerfd]",
         ))
     }
 

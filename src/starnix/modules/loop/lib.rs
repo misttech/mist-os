@@ -776,9 +776,7 @@ mod tests {
     use starnix_core::fs::fuchsia::new_remote_file;
     use starnix_core::testing::*;
     use starnix_core::vfs::buffers::*;
-    use starnix_core::vfs::{
-        Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FdFlags, FsNodeOps,
-    };
+    use starnix_core::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FdFlags, FsNodeOps};
 
     #[derive(Clone)]
     struct PassthroughTestFile(Vec<u8>);
@@ -808,7 +806,7 @@ mod tests {
             .add_with_flags(&current_task, backing_file, FdFlags::empty())
             .unwrap();
 
-        let loop_file = Anon::new_file(
+        let loop_file = anon_test_file(
             &current_task,
             Box::new(LoopDeviceFile { device: Arc::new(LoopDevice::default()) }),
             open_flags,
@@ -834,7 +832,7 @@ mod tests {
             let expected_contents = b"hello, world!";
 
             let backing_node = FsNode::new_root(PassthroughTestFile::new_node(expected_contents));
-            let backing_file = Anon::new_file(
+            let backing_file = anon_test_file(
                 current_task,
                 backing_node.create_file_ops(locked, current_task, OpenFlags::RDONLY).unwrap(),
                 OpenFlags::RDONLY,
@@ -853,7 +851,7 @@ mod tests {
     async fn offset_works() {
         spawn_kernel_and_run(|locked, current_task| {
             let backing_node = FsNode::new_root(PassthroughTestFile::new_node(b"hello, world!"));
-            let backing_file = Anon::new_file(
+            let backing_file = anon_test_file(
                 current_task,
                 backing_node.create_file_ops(locked, current_task, OpenFlags::RDONLY).unwrap(),
                 OpenFlags::RDONLY,

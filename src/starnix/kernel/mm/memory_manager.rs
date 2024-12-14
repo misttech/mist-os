@@ -4280,12 +4280,6 @@ fn write_map(
                     .flat_map(|b| if *b == b'\n' { b"\\012" } else { std::slice::from_ref(b) })
                     .copied(),
             );
-            // If the mapping is file-backed and the file has been
-            // deleted, the string " (deleted)" is appended to the
-            // pathname.
-            if name.entry.is_dead() {
-                sink.write(b" (deleted)");
-            }
         }
         MappingName::Vma(name) => {
             fill_to_name(sink);

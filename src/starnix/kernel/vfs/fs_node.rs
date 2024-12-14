@@ -872,6 +872,13 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     fn get_fsverity_descriptor(&self, _log_blocksize: u8) -> Result<fsverity_descriptor, Errno> {
         error!(ENOTSUP)
     }
+
+    /// Returns a descriptive name for this node, suitable to report to userspace in situations
+    /// where the node's path is unavailable (e.g. because it is anonymous, and has no path).
+    /// If no name is returned then a default name of the form "<class:[<node_id>]" will be used.
+    fn internal_name(&self, _node: &FsNode) -> Option<FsString> {
+        None
+    }
 }
 
 impl<T> From<T> for Box<dyn FsNodeOps>
@@ -2579,6 +2586,24 @@ impl FsNode {
     pub fn create_write_guard(&self, mode: FileWriteGuardMode) -> Result<FileWriteGuard, Errno> {
         let handle = self.weak_handle.upgrade().ok_or_else(|| errno!(ENOENT))?;
         self.write_guard_state.lock().create_write_guard(handle, mode)
+    }
+
+    /// Returns a string describing this `FsNode` in the format used by "/proc/../fd" for anonymous
+    /// file descriptors. By default this is in the form:
+    ///   <class>:[<node_id>]
+    /// though `FsNodeOps` may customize this as required.
+    pub fn internal_name(&self) -> FsString {
+        if let Some(name) = self.ops().internal_name(self) {
+            return name;
+        };
+        let class = if self.is_sock() {
+            "socket"
+        } else if self.is_fifo() {
+            "pipe"
+        } else {
+            "file"
+        };
+        format!("{}:[{}]", class, self.node_id).into()
     }
 }
 

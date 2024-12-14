@@ -7090,19 +7090,21 @@ pub mod tests {
         current_task: &CurrentTask,
         binder_driver: &BinderDevice,
     ) -> FileHandle {
+        // `open()` requires an `FsNode` so create one in `AnonFs`.
         let fs = anon_fs(current_task.kernel());
         let node = fs.create_node(
             &current_task,
-            Anon,
+            Anon::default(),
             FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
         );
+
         let mut locked = locked.cast_locked::<DeviceOpen>();
         FileObject::new_anonymous(
             current_task,
             binder_driver
                 .open(&mut locked, &current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
                 .expect("binder dev open failed"),
-            Arc::clone(&node),
+            node,
             OpenFlags::RDWR,
         )
     }

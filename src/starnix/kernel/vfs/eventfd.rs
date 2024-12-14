@@ -55,6 +55,7 @@ pub fn new_eventfd(
             eventfd_type,
         }),
         open_flags,
+        "[eventfd]",
     )
 }
 

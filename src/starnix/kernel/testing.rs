@@ -438,7 +438,7 @@ pub struct PanickingFile;
 impl PanickingFile {
     /// Creates a [`FileObject`] whose implementation panics on reads, writes, and ioctls.
     pub fn new_file(current_task: &CurrentTask) -> FileHandle {
-        Anon::new_file(current_task, Box::new(PanickingFile), OpenFlags::RDWR)
+        anon_test_file(current_task, Box::new(PanickingFile), OpenFlags::RDWR)
     }
 }
 
@@ -478,6 +478,15 @@ impl FileOps for PanickingFile {
     ) -> Result<SyscallResult, Errno> {
         panic!("ioctl called on TestFile")
     }
+}
+
+/// Returns a new anonymous test file with the specified `ops` and `flags`.
+pub fn anon_test_file(
+    current_task: &CurrentTask,
+    ops: Box<dyn FileOps>,
+    flags: OpenFlags,
+) -> FileHandle {
+    Anon::new_file(current_task, ops, flags, "[fuchsia:test_file]")
 }
 
 /// Helper to write out data to a task's memory sequentially.

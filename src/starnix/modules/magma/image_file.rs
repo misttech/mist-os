@@ -56,6 +56,7 @@ impl ImageFile {
             current_task,
             Box::new(ImageFile { info, memory: Arc::new(memory) }),
             OpenFlags::RDWR,
+            "[fuchsia:image]",
             |id| {
                 let mut info =
                     FsNodeInfo::new(id, FileMode::from_bits(0o600), current_task.as_fscred());
