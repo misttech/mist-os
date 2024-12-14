@@ -22,7 +22,7 @@ use packet_formats::ethernet::{
     ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
 use packet_formats::icmp::{
-    IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode,
+    IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpParseArgs, IcmpZeroCode,
     Icmpv4DestUnreachableCode, Icmpv6Packet, Icmpv6PacketTooBig, Icmpv6ParameterProblemCode,
     MessageBody,
 };
@@ -757,7 +757,7 @@ fn test_ipv6_packet_too_big() {
             },
         )
         .unwrap();
-    assert_eq!(code, IcmpUnusedCode);
+    assert_eq!(code, IcmpZeroCode);
     // MTU should match the MTU for the link.
     assert_eq!(message, Icmpv6PacketTooBig::new(1280));
 }
@@ -787,7 +787,7 @@ fn create_packet_too_big_buf<A: IpAddress>(
             .encapsulate(IcmpPacketBuilder::<Ipv6, Icmpv6PacketTooBig>::new(
                 dst_ip,
                 src_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 Icmpv6PacketTooBig::new(u32::from(mtu)),
             ))
             .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, 64, Ipv6Proto::Icmpv6))
@@ -1080,7 +1080,7 @@ fn test_invalid_icmpv4_in_ipv6() {
     let icmp_builder = IcmpPacketBuilder::<Ipv4, _>::new(
         ic_config.remote_ip,
         ic_config.local_ip,
-        IcmpUnusedCode,
+        IcmpZeroCode,
         IcmpEchoRequest::new(0, 0),
     );
 
@@ -1124,7 +1124,7 @@ fn test_invalid_icmpv6_in_ipv4() {
     let icmp_builder = IcmpPacketBuilder::<Ipv6, _>::new(
         ic_config.remote_ip,
         ic_config.local_ip,
-        IcmpUnusedCode,
+        IcmpZeroCode,
         IcmpEchoRequest::new(0, 0),
     );
 

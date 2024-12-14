@@ -383,7 +383,7 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
         let icmp_builder = IcmpPacketBuilder::<I, _>::new(
             local_ip.addr(),
             remote_ip.addr(),
-            packet_formats::icmp::IcmpUnusedCode,
+            packet_formats::icmp::IcmpZeroCode,
             IcmpEchoRequest::new(id.get(), icmp_echo.message().seq()),
         );
         Ok(body.encapsulate(icmp_builder))
@@ -1172,7 +1172,7 @@ mod tests {
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx, InnerFakeIpSocketCtx};
     use netstack3_ip::{ReceiveIpPacketMeta, SendIpPacketMeta};
     use packet::Buf;
-    use packet_formats::icmp::{IcmpPacket, IcmpParseArgs, IcmpUnusedCode};
+    use packet_formats::icmp::{IcmpPacket, IcmpParseArgs, IcmpZeroCode};
 
     use super::*;
 
@@ -1403,7 +1403,7 @@ mod tests {
             .encapsulate(IcmpPacketBuilder::<I, _>::new(
                 I::TEST_ADDRS.local_ip.get(),
                 I::TEST_ADDRS.remote_ip.get(),
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 packet_formats::icmp::IcmpEchoReply::new(0, 1),
             ))
             .serialize_vec_outer()
@@ -1459,7 +1459,7 @@ mod tests {
             .encapsulate(IcmpPacketBuilder::<I, _>::new(
                 I::UNSPECIFIED_ADDRESS,
                 I::UNSPECIFIED_ADDRESS,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 // Use 0 here to show that this is filled by the API.
                 IcmpEchoRequest::new(0, SEQ_NUM),
             ))
@@ -1492,7 +1492,7 @@ mod tests {
                 // Use whatever here this is not validated by this module.
                 I::UNSPECIFIED_ADDRESS,
                 I::UNSPECIFIED_ADDRESS,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 IcmpEchoReply::new(ICMP_ID.get(), SEQ_NUM),
             ))
             .serialize_vec_outer()
@@ -1544,7 +1544,7 @@ mod tests {
                 // Use whatever here this is not validated by this module.
                 I::UNSPECIFIED_ADDRESS,
                 I::UNSPECIFIED_ADDRESS,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 IcmpEchoReply::new(OTHER_ICMP_ID.get(), SEQ_NUM),
             ))
             .serialize_vec_outer()

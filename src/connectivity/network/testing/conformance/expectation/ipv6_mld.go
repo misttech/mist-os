@@ -68,7 +68,7 @@ var ipv6MldExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{1, 16}: Fail,
 	{2, 3}:  Pass,
 	{2, 4}:  Fail,
-	{2, 5}:  Fail,
+	{2, 5}:  Pass,
 	{2, 6}:  Fail,
 	{3, 1}:  Pass,
 	{3, 2}:  Fail,

@@ -2900,7 +2900,7 @@ mod tests {
                 >::new(
                     <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
                     <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
-                    packet_formats::icmp::IcmpUnusedCode,
+                    packet_formats::icmp::IcmpZeroCode,
                     packet_formats::icmp::IcmpEchoRequest::new(0, 1),
                 ))
                 .serialize_vec_outer()
@@ -2932,7 +2932,7 @@ mod tests {
                 >::new(
                     src_ip,
                     dst_ip,
-                    packet_formats::icmp::IcmpUnusedCode,
+                    packet_formats::icmp::IcmpZeroCode,
                     packet_formats::icmp::IcmpEchoReply::new(id, 1),
                 ))
                 .serialize_vec_outer()

@@ -53,7 +53,7 @@ use netstack3_ip::{
 use packet::{EmptyBuf, InnerPacketBuilder, Serializer};
 use packet_formats::icmp::ndp::options::{NdpNonce, NdpOptionBuilder};
 use packet_formats::icmp::ndp::{NeighborSolicitation, OptionSequenceBuilder, RouterSolicitation};
-use packet_formats::icmp::IcmpUnusedCode;
+use packet_formats::icmp::IcmpZeroCode;
 
 use crate::context::prelude::*;
 use crate::context::WrapLockLevel;
@@ -802,7 +802,7 @@ impl<
             None,
             dst_ip.into_specified(),
             OptionSequenceBuilder::new(options.iter()).into_serializer(),
-            IcmpUnusedCode,
+            IcmpZeroCode,
             message,
         )
         .map_err(|IpSendFrameError { serializer: _, error }| {
@@ -870,7 +870,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
             src_ip.map(UnicastAddr::into_specified),
             dst_ip,
             body(src_ip),
-            IcmpUnusedCode,
+            IcmpZeroCode,
             message,
         )
     }

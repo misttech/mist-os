@@ -11,7 +11,7 @@ use net_types::{LinkLocalAddress as _, NonMappedAddr, Witness as _};
 use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
 use packet_formats::icmp::ndp::{OptionSequenceBuilder, RouterAdvertisement};
-use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::icmp::{IcmpPacketBuilder, IcmpZeroCode};
 use packet_formats::ip::Ipv6Proto;
 use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::utils::NonZeroDuration;
@@ -53,7 +53,7 @@ fn build_slaac_ra_packet(
         .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip,
             dst_ip,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             RouterAdvertisement::new(0, false, false, 0, 0, 0),
         ))
         .encapsulate(Ipv6PacketBuilder::new(

@@ -40,7 +40,7 @@ use packet::{Buf, BufferMut, InnerPacketBuilder as _, Serializer};
 use packet_formats::ethernet::EtherType;
 use packet_formats::icmp::ndp::options::NdpOptionBuilder;
 use packet_formats::icmp::ndp::{NeighborSolicitation, OptionSequenceBuilder};
-use packet_formats::icmp::IcmpUnusedCode;
+use packet_formats::icmp::IcmpZeroCode;
 use packet_formats::ipv4::Ipv4FragmentType;
 use packet_formats::utils::NonZeroDuration;
 
@@ -215,7 +215,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>
                 [NdpOptionBuilder::SourceLinkLayerAddress(mac.bytes().as_ref())].iter(),
             )
             .into_serializer(),
-            IcmpUnusedCode,
+            IcmpZeroCode,
             NeighborSolicitation::new(lookup_addr.get()),
         );
     }

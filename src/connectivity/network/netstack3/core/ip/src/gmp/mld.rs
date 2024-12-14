@@ -26,7 +26,7 @@ use packet_formats::icmp::mld::{
     Mldv2ReportMessageBuilder, MulticastListenerDone, MulticastListenerReport,
     MulticastListenerReportV2,
 };
-use packet_formats::icmp::{IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::icmp::{IcmpMessage, IcmpPacketBuilder, IcmpSenderZeroCode};
 use packet_formats::ip::Ipv6Proto;
 use packet_formats::ipv6::ext_hdrs::{
     ExtensionHeaderOptionAction, HopByHopOption, HopByHopOptionData,
@@ -495,7 +495,7 @@ const MLD_IP_HOP_LIMIT: u8 = 1;
 fn new_ip_and_icmp_builders<
     BC: MldBindingsContext,
     CC: MldSendContext<BC>,
-    M: IcmpMessage<Ipv6, Code = IcmpUnusedCode> + filter::IcmpMessage<Ipv6>,
+    M: IcmpMessage<Ipv6, Code = IcmpSenderZeroCode> + filter::IcmpMessage<Ipv6>,
 >(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
@@ -517,7 +517,7 @@ fn new_ip_and_icmp_builders<
         MldIpOptions::default(),
     )
     .unwrap();
-    let icmp = IcmpPacketBuilder::new(src_ip, dst_ip.get(), IcmpUnusedCode, msg);
+    let icmp = IcmpPacketBuilder::new(src_ip, dst_ip.get(), IcmpSenderZeroCode, msg);
     (ipv6, icmp)
 }
 
@@ -789,7 +789,7 @@ mod tests {
         .encapsulate(IcmpPacketBuilder::<_, _>::new(
             router_addr,
             MY_IP,
-            IcmpUnusedCode,
+            IcmpSenderZeroCode,
             MulticastListenerQuery,
         ))
         .serialize_vec_outer()
@@ -820,7 +820,7 @@ mod tests {
             .encapsulate(IcmpPacketBuilder::<_, _>::new(
                 router_addr,
                 MY_IP,
-                IcmpUnusedCode,
+                IcmpSenderZeroCode,
                 MulticastListenerReport,
             ))
             .serialize_vec_outer()

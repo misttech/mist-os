@@ -1810,7 +1810,7 @@ mod tests {
 
     use ip_test_macro::ip_test;
     use packet::InnerPacketBuilder as _;
-    use packet_formats::icmp::IcmpUnusedCode;
+    use packet_formats::icmp::IcmpZeroCode;
     use packet_formats::tcp::TcpSegmentBuilder;
     use test_case::test_case;
 
@@ -1987,7 +1987,7 @@ mod tests {
             [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
                 src_ip,
                 dst_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 icmp::IcmpEchoRequest::new(/* id */ src_port.get(), /* seq */ 0),
             ))
         }
@@ -2012,7 +2012,7 @@ mod tests {
             [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
                 src_ip,
                 dst_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 icmp::IcmpEchoReply::new(/* id */ dst_port.get(), /* seq */ 0),
             ))
         }
@@ -2175,7 +2175,7 @@ mod tests {
         let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             icmp::IcmpEchoRequest::new(SRC_PORT.get(), /* seq */ 0),
         ));
         serializer
@@ -2186,7 +2186,7 @@ mod tests {
         let equivalent = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             icmp::IcmpEchoRequest::new(SRC_PORT_2.get(), /* seq */ 0),
         ));
 
@@ -2198,7 +2198,7 @@ mod tests {
         let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             icmp::IcmpEchoReply::new(SRC_PORT.get(), /* seq */ 0),
         ));
         serializer
@@ -2209,7 +2209,7 @@ mod tests {
         let equivalent = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             icmp::IcmpEchoReply::new(SRC_PORT_2.get(), /* seq */ 0),
         ));
 
@@ -2222,7 +2222,7 @@ mod tests {
         let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::new(
             Ipv4::SRC_IP,
             Ipv4::DST_IP,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             icmp::Icmpv4TimestampRequest::new(
                 /* origin_timestamp */ 0,
                 /* id */ SRC_PORT.get(),

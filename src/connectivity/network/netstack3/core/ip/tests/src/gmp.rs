@@ -10,7 +10,7 @@ use net_types::{MulticastAddr, SpecifiedAddr, Witness as _};
 use packet::ParsablePacket as _;
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::mld::{MulticastListenerDone, MulticastListenerReport};
-use packet_formats::icmp::IcmpUnusedCode;
+use packet_formats::icmp::IcmpSenderZeroCode;
 use packet_formats::igmp::messages::IgmpPacket;
 use packet_formats::ip::Ipv4Proto;
 use packet_formats::testutil::{
@@ -261,10 +261,10 @@ fn test_mld_enable_disable_integration() {
         );
         assert_eq!(dst_ip, snmc_addr.get());
         assert_eq!(ttl, 1);
-        assert_eq!(code, IcmpUnusedCode);
+        assert_eq!(code, IcmpSenderZeroCode);
         assert_eq!(dst_ip, snmc_addr.get());
         assert_eq!(ttl, 1);
-        assert_eq!(code, IcmpUnusedCode);
+        assert_eq!(code, IcmpSenderZeroCode);
     };
     let check_sent_done = |bindings_ctx: &mut FakeBindingsCtx, specified_source: bool| {
         let frames = bindings_ctx.take_ethernet_frames();
@@ -287,7 +287,7 @@ fn test_mld_enable_disable_integration() {
         );
         assert_eq!(dst_ip, Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS.get());
         assert_eq!(ttl, 1);
-        assert_eq!(code, IcmpUnusedCode);
+        assert_eq!(code, IcmpSenderZeroCode);
     };
 
     // Enable IPv6 and MLD.

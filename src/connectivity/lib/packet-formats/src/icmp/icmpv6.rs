@@ -18,7 +18,7 @@ use crate::error::{ParseError, ParseResult};
 use super::common::{IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpTimeExceeded};
 use super::{
     mld, ndp, peek_message_type, HeaderPrefix, IcmpIpExt, IcmpMessageType, IcmpPacket,
-    IcmpPacketRaw, IcmpParseArgs, IcmpUnusedCode, OriginalPacket,
+    IcmpPacketRaw, IcmpParseArgs, IcmpZeroCode, OriginalPacket,
 };
 
 /// An ICMPv6 packet with a dynamic message type.
@@ -392,7 +392,7 @@ impl Icmpv6PacketTooBig {
     }
 }
 
-impl_icmp_message!(Ipv6, Icmpv6PacketTooBig, PacketTooBig, IcmpUnusedCode, OriginalPacket<B>);
+impl_icmp_message!(Ipv6, Icmpv6PacketTooBig, PacketTooBig, IcmpZeroCode, OriginalPacket<B>);
 
 create_protocol_enum!(
     #[allow(missing_docs)]

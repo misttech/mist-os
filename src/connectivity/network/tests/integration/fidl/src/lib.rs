@@ -28,7 +28,7 @@ use packet_formats::ethernet::{
     EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
 use packet_formats::icmp::{
-    IcmpEchoRequest, IcmpIpExt, IcmpPacket, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode,
+    IcmpEchoRequest, IcmpIpExt, IcmpPacket, IcmpPacketBuilder, IcmpParseArgs, IcmpZeroCode,
     MessageBody as _,
 };
 use packet_formats::ip::{IpExt, IpPacketBuilder as _};
@@ -398,7 +398,7 @@ async fn test_forwarding<I: IpExt + IcmpIpExt, N: Netstack>(
         .encapsulate(IcmpPacketBuilder::<I, _>::new(
             src_ip,
             dst_ip,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             IcmpEchoRequest::new(ECHO_ID, ECHO_SEQ),
         ))
         .encapsulate(<I as IpExt>::PacketBuilder::new(src_ip, dst_ip, TTL, I::ICMP_IP_PROTO))

@@ -50,7 +50,7 @@ use packet_formats::ethernet::{
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
 use packet_formats::icmp::ndp::NeighborAdvertisement;
 use packet_formats::icmp::{
-    IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode,
+    IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpZeroCode,
     Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv6DestUnreachableCode, Icmpv6Packet, MessageBody,
 };
 use packet_formats::igmp::messages::IgmpPacket;
@@ -2313,7 +2313,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
             src_ip,
             dst_ip,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
         ))
         .encapsulate(Ipv4PacketBuilder::new(src_ip, dst_ip, 1, Ipv4Proto::Icmp))
@@ -2388,7 +2388,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip,
             dst_ip,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
         ))
         .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, 1, Ipv6Proto::Icmpv6))

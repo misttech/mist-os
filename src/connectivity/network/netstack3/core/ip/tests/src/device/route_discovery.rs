@@ -13,7 +13,7 @@ use net_types::{LinkLocalUnicastAddr, Witness as _};
 use packet::{BufferMut, InnerPacketBuilder as _, Serializer as _};
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation, RouteInformation};
 use packet_formats::icmp::ndp::{OptionSequenceBuilder, RoutePreference, RouterAdvertisement};
-use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::icmp::{IcmpPacketBuilder, IcmpZeroCode};
 use packet_formats::ip::Ipv6Proto;
 use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::utils::NonZeroDuration;
@@ -135,7 +135,7 @@ fn router_advertisement_buf(
         .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip,
             dst_ip,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             RouterAdvertisement::new(
                 0,     /* hop_limit */
                 false, /* managed_flag */

@@ -46,7 +46,7 @@ use zerocopy::{
     FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, SplitByteSliceMut, Unaligned,
 };
 
-use crate::error::{ParseError, ParseResult};
+use crate::error::{NotZeroError, ParseError, ParseResult};
 use crate::ip::{IpProtoExt, Ipv4Proto, Ipv6Proto};
 use crate::ipv4::{self, Ipv4PacketRaw};
 use crate::ipv6::Ipv6PacketRaw;
@@ -762,17 +762,48 @@ impl<I: IcmpIpExt, M: IcmpMessage<I>> PacketBuilder for IcmpPacketBuilder<I, M> 
     }
 }
 
-/// The type of ICMP codes that are unused.
+/// An ICMP code that must be zero.
 ///
 /// Some ICMP messages do not use codes. In Rust, the `IcmpMessage::Code` type
-/// associated with these messages is `IcmpUnusedCode`. The only valid numerical
+/// associated with these messages is `IcmpZeroCode`. The only valid numerical
 /// value for this code is 0.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct IcmpUnusedCode;
+pub struct IcmpZeroCode;
 
-impl From<IcmpUnusedCode> for u8 {
-    fn from(_: IcmpUnusedCode) -> u8 {
+impl From<IcmpZeroCode> for u8 {
+    fn from(_: IcmpZeroCode) -> u8 {
         0
+    }
+}
+
+impl TryFrom<u8> for IcmpZeroCode {
+    type Error = NotZeroError<u8>;
+
+    fn try_from(value: u8) -> Result<Self, NotZeroError<u8>> {
+        if value == 0 {
+            Ok(Self)
+        } else {
+            Err(NotZeroError(value))
+        }
+    }
+}
+
+/// An ICMP code that is zero on serialization, but ignored on parsing.
+///
+/// This is used for ICMP messages whose specification states that senders must
+/// set Code to 0 but receivers must ignore it (e.g. MLD/MLDv2).
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct IcmpSenderZeroCode;
+
+impl From<IcmpSenderZeroCode> for u8 {
+    fn from(_: IcmpSenderZeroCode) -> u8 {
+        0
+    }
+}
+
+impl From<u8> for IcmpSenderZeroCode {
+    fn from(_: u8) -> Self {
+        Self
     }
 }
 
@@ -864,7 +895,7 @@ mod tests {
             .encapsulate(IcmpPacketBuilder::<I, _>::new(
                 *I::LOOPBACK_ADDRESS,
                 *I::LOOPBACK_ADDRESS,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 IcmpEchoRequest::new(1, 1),
             ))
             .serialize_vec_outer()

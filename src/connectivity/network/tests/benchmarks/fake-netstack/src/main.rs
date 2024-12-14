@@ -18,7 +18,7 @@ use net_types::ip::{Ip, Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
 use packet::{ParseBuffer as _, Serializer as _};
 use packet_formats::icmp::{
-    IcmpEchoReply, IcmpEchoRequest, IcmpMessage, IcmpPacketBuilder, IcmpPacketRaw, IcmpUnusedCode,
+    IcmpEchoReply, IcmpEchoRequest, IcmpMessage, IcmpPacketBuilder, IcmpPacketRaw, IcmpZeroCode,
 };
 use rand::Rng as _;
 use std::cell::RefCell;
@@ -462,12 +462,12 @@ fn serialize_icmp_echo_reply<I>(buf: packet::Buf<Vec<u8>>, reply: IcmpEchoReply)
 where
     I: packet_formats::icmp::IcmpIpExt,
     <I as Ip>::Addr: From<SpecifiedAddr<<I as Ip>::Addr>>,
-    IcmpEchoReply: IcmpMessage<I, Code = IcmpUnusedCode>,
+    IcmpEchoReply: IcmpMessage<I, Code = IcmpZeroCode>,
 {
     buf.encapsulate(IcmpPacketBuilder::<I, _>::new(
         I::LOOPBACK_ADDRESS,
         I::LOOPBACK_ADDRESS,
-        IcmpUnusedCode,
+        IcmpZeroCode,
         reply,
     ))
     .serialize_no_alloc_outer()

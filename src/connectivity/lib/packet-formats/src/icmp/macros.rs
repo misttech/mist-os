@@ -78,13 +78,6 @@ macro_rules! impl_icmp_message_inner_message_type {
 }
 
 macro_rules! impl_icmp_message_inner_code_from_u8 {
-    (IcmpUnusedCode, $var:ident) => {
-        if $var == 0 {
-            Some(IcmpUnusedCode)
-        } else {
-            None
-        }
-    };
     ($code:tt, $var:ident) => {
         $code::try_from($var).ok()
     };

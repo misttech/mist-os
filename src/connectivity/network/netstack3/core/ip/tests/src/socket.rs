@@ -12,7 +12,7 @@ use net_types::ip::{AddrSubnet, GenericOverIp, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6,
 use net_types::{SpecifiedAddr, Witness};
 use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer as _};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
-use packet_formats::icmp::{IcmpIpExt, IcmpUnusedCode};
+use packet_formats::icmp::{IcmpIpExt, IcmpZeroCode};
 use packet_formats::ip::IpPacket;
 use packet_formats::ipv4::{Ipv4OnlyMeta, Ipv4Packet};
 use packet_formats::testutil::{parse_ethernet_frame, parse_ip_packet_in_ethernet_frame};
@@ -406,7 +406,7 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
         .encapsulate(IcmpPacketBuilder::<I, _>::new(
             expected_from_ip.get(),
             to_ip.get(),
-            IcmpUnusedCode,
+            IcmpZeroCode,
             reply,
         ))
         .serialize_vec_outer()

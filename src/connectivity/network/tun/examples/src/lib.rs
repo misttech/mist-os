@@ -318,7 +318,7 @@ mod helpers {
         ETHERNET_MIN_BODY_LEN_NO_TAG,
     };
     use packet_formats::icmp::{
-        IcmpEchoRequest, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode, Icmpv4Packet,
+        IcmpEchoRequest, IcmpPacketBuilder, IcmpParseArgs, IcmpZeroCode, Icmpv4Packet,
     };
     use packet_formats::ip::Ipv4Proto;
     use packet_formats::ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder};
@@ -375,7 +375,7 @@ mod helpers {
             .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                 bob_ip,
                 alice_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 IcmpEchoRequest::new(ICMP_ID, ICMP_SEQNUM),
             ))
             .encapsulate(Ipv4PacketBuilder::new(bob_ip, alice_ip, 1, Ipv4Proto::Icmp))

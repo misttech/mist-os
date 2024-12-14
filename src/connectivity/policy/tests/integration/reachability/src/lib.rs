@@ -27,7 +27,7 @@ use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
 use packet_formats::ethernet::{
     EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
-use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode, MessageBody as _};
+use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpZeroCode, MessageBody as _};
 use packet_formats::ip::{Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::Ipv4PacketBuilder;
 use packet_formats::ipv6::Ipv6PacketBuilder;
@@ -119,7 +119,7 @@ fn reply_if_echo_request(
                     .encapsulate(IcmpPacketBuilder::<net_types::ip::Ipv4, _>::new(
                         dst_ip,
                         src_ip,
-                        IcmpUnusedCode,
+                        IcmpZeroCode,
                         message.reply(),
                     ))
                     .encapsulate(Ipv4PacketBuilder::new(
@@ -171,7 +171,7 @@ fn reply_if_echo_request(
                     .encapsulate(IcmpPacketBuilder::<net_types::ip::Ipv6, _>::new(
                         dst_ip,
                         src_ip,
-                        IcmpUnusedCode,
+                        IcmpZeroCode,
                         message.reply(),
                     ))
                     .encapsulate(Ipv6PacketBuilder::new(

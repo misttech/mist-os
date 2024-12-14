@@ -34,7 +34,7 @@ use packet_formats::icmp::ndp::{
 };
 use packet_formats::icmp::{
     peek_message_type, IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpMessageType,
-    IcmpPacket, IcmpPacketBuilder, IcmpPacketRaw, IcmpParseArgs, IcmpTimeExceeded, IcmpUnusedCode,
+    IcmpPacket, IcmpPacketBuilder, IcmpPacketRaw, IcmpParseArgs, IcmpTimeExceeded, IcmpZeroCode,
     Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv4ParameterProblem, Icmpv4ParameterProblemCode,
     Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6Packet, Icmpv6PacketTooBig,
     Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode, MessageBody,
@@ -911,7 +911,7 @@ impl<
                                 buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                                     src_ip,
                                     remote_ip,
-                                    IcmpUnusedCode,
+                                    IcmpZeroCode,
                                     reply,
                                 ))
                             },
@@ -1134,7 +1134,7 @@ fn send_neighbor_advertisement<
             src_ll.as_ref().map(AsRef::as_ref).map(NdpOptionBuilder::TargetLinkLayerAddress).iter(),
         )
         .into_serializer(),
-        IcmpUnusedCode,
+        IcmpZeroCode,
         advertisement,
     );
 }
@@ -2358,7 +2358,7 @@ pub(crate) fn send_icmpv6_packet_too_big<
         frame_dst,
         src_ip,
         dst_ip,
-        IcmpUnusedCode,
+        IcmpZeroCode,
         Icmpv6PacketTooBig::new(mtu.into()),
         original_packet,
         // As per RFC 4443 section 2.4.e,
@@ -2776,7 +2776,7 @@ pub(crate) mod testutil {
     use packet_formats::icmp::ndp::{
         NeighborAdvertisement, NeighborSolicitation, OptionSequenceBuilder,
     };
-    use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+    use packet_formats::icmp::{IcmpPacketBuilder, IcmpZeroCode};
     use packet_formats::ip::Ipv6Proto;
     use packet_formats::ipv6::Ipv6PacketBuilder;
 
@@ -2797,7 +2797,7 @@ pub(crate) mod testutil {
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 NeighborAdvertisement::new(router_flag, solicited_flag, override_flag, src_ip),
             ))
             .encapsulate(Ipv6PacketBuilder::new(
@@ -2824,7 +2824,7 @@ pub(crate) mod testutil {
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 NeighborSolicitation::new(target_addr),
             ))
             .encapsulate(Ipv6PacketBuilder::new(
@@ -3557,7 +3557,7 @@ mod tests {
             .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                 TEST_ADDRS_V4.local_ip,
                 TEST_ADDRS_V4.remote_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
             ))
             .encapsulate(<Ipv4 as packet_formats::ip::IpExt>::PacketBuilder::new(
@@ -3801,7 +3801,7 @@ mod tests {
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 TEST_ADDRS_V6.local_ip,
                 TEST_ADDRS_V6.remote_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
             ))
             .encapsulate(<Ipv6 as packet_formats::ip::IpExt>::PacketBuilder::new(
