@@ -39,6 +39,10 @@ executable("bin") {
 fuchsia_component("test-ui-stack-component") {
   testonly = true
   component_name = "test-ui-stack"
+
+  # TODO(b/345827642): Remove once Chromium is migrated
+  # to dictionaries and we no longer need this workaround.
+  check_includes = false
   manifest = "meta/test-ui-stack.cml"
   deps = [ ":bin" ]
 }

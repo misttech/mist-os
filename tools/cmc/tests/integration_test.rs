@@ -346,20 +346,48 @@ fn example_cml_integration_test() {
         }),
         Offer::Protocol(OfferProtocol {
             source: Some(Ref::Parent(ParentRef)),
+            source_name: Some("fuchsia.inspect.InspectSink".to_string()),
+            target: Some(Ref::Collection(CollectionRef { name: "explicit_dynamic".to_string() })),
+            target_name: Some("fuchsia.inspect.InspectSink".to_string()),
+            dependency_type: Some(DependencyType::Strong),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
+        Offer::Protocol(OfferProtocol {
+            source: Some(Ref::Parent(ParentRef)),
+            source_name: Some("fuchsia.inspect.InspectSink".to_string()),
+            target: Some(Ref::Collection(CollectionRef { name: "explicit_static".to_string() })),
+            target_name: Some("fuchsia.inspect.InspectSink".to_string()),
+            dependency_type: Some(DependencyType::Strong),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
+        Offer::Protocol(OfferProtocol {
+            source: Some(Ref::Parent(ParentRef)),
+            source_name: Some("fuchsia.inspect.InspectSink".to_string()),
+            target: Some(Ref::Collection(CollectionRef { name: "long_child_names".to_string() })),
+            target_name: Some("fuchsia.inspect.InspectSink".to_string()),
+            dependency_type: Some(DependencyType::Strong),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
+        Offer::Protocol(OfferProtocol {
+            source: Some(Ref::Parent(ParentRef)),
+            source_name: Some("fuchsia.inspect.InspectSink".to_string()),
+            target: Some(Ref::Collection(CollectionRef { name: "modular".to_string() })),
+            target_name: Some("fuchsia.inspect.InspectSink".to_string()),
+            dependency_type: Some(DependencyType::Strong),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
+        Offer::Protocol(OfferProtocol {
+            source: Some(Ref::Parent(ParentRef)),
             source_name: Some("fuchsia.logger.LogSink".to_string()),
             target: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
             target_name: Some("fuchsia.logger.LogSink".to_string()),
             dependency_type: Some(DependencyType::Strong),
             availability: Some(Availability::Required),
-            ..Default::default()
-        }),
-        Offer::Protocol(OfferProtocol {
-            source: Some(Ref::Parent(ParentRef)),
-            source_name: Some("fuchsia.inspect.InspectSink".to_string()),
-            target: Some(Ref::Collection(CollectionRef { name: "explicit_dynamic".to_string() })),
-            target_name: Some("fuchsia.inspect.InspectSink".to_string()),
-            dependency_type: Some(DependencyType::Strong),
-            availability: Some(Availability::Required),
+            source_dictionary: Some("diagnostics".to_string()),
             ..Default::default()
         }),
         Offer::Protocol(OfferProtocol {
@@ -369,15 +397,7 @@ fn example_cml_integration_test() {
             target_name: Some("fuchsia.logger.LogSink".to_string()),
             dependency_type: Some(DependencyType::Strong),
             availability: Some(Availability::Required),
-            ..Default::default()
-        }),
-        Offer::Protocol(OfferProtocol {
-            source: Some(Ref::Parent(ParentRef)),
-            source_name: Some("fuchsia.inspect.InspectSink".to_string()),
-            target: Some(Ref::Collection(CollectionRef { name: "explicit_static".to_string() })),
-            target_name: Some("fuchsia.inspect.InspectSink".to_string()),
-            dependency_type: Some(DependencyType::Strong),
-            availability: Some(Availability::Required),
+            source_dictionary: Some("diagnostics".to_string()),
             ..Default::default()
         }),
         Offer::Protocol(OfferProtocol {
@@ -387,15 +407,7 @@ fn example_cml_integration_test() {
             target_name: Some("fuchsia.logger.LogSink".to_string()),
             dependency_type: Some(DependencyType::Strong),
             availability: Some(Availability::Required),
-            ..Default::default()
-        }),
-        Offer::Protocol(OfferProtocol {
-            source: Some(Ref::Parent(ParentRef)),
-            source_name: Some("fuchsia.inspect.InspectSink".to_string()),
-            target: Some(Ref::Collection(CollectionRef { name: "long_child_names".to_string() })),
-            target_name: Some("fuchsia.inspect.InspectSink".to_string()),
-            dependency_type: Some(DependencyType::Strong),
-            availability: Some(Availability::Required),
+            source_dictionary: Some("diagnostics".to_string()),
             ..Default::default()
         }),
         Offer::Protocol(OfferProtocol {
@@ -405,15 +417,7 @@ fn example_cml_integration_test() {
             target_name: Some("fuchsia.logger.LogSink".to_string()),
             dependency_type: Some(DependencyType::Strong),
             availability: Some(Availability::Required),
-            ..Default::default()
-        }),
-        Offer::Protocol(OfferProtocol {
-            source: Some(Ref::Parent(ParentRef)),
-            source_name: Some("fuchsia.inspect.InspectSink".to_string()),
-            target: Some(Ref::Collection(CollectionRef { name: "modular".to_string() })),
-            target_name: Some("fuchsia.inspect.InspectSink".to_string()),
-            dependency_type: Some(DependencyType::Strong),
-            availability: Some(Availability::Required),
+            source_dictionary: Some("diagnostics".to_string()),
             ..Default::default()
         }),
         Offer::Protocol(OfferProtocol {
@@ -423,6 +427,7 @@ fn example_cml_integration_test() {
             target_name: Some("fuchsia.logger.LogSink".to_string()),
             dependency_type: Some(DependencyType::Strong),
             availability: Some(Availability::Required),
+            source_dictionary: Some("diagnostics".to_string()),
             ..Default::default()
         }),
     ];

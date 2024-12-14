@@ -4,7 +4,11 @@
 {
     include: [
         "inspect/client.shard.cml",
-        "syslog/shards/client.shard.cml",
+
+        // TODO(b/345827642): Use regular shards
+        // once Chromium migrates to dictionaries.
+        "syslog/shards/offer.shard.cml",
+        "syslog/shards/use.shard.cml",
         "trace/client.shard.cml",
     ],
     program: {
@@ -68,6 +72,11 @@
             directory: "dev-gpu",
             from: "parent",
             to: "#magma-codecs",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "all",
         },
     ],
     expose: [
