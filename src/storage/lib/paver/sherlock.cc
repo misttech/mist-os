@@ -34,11 +34,9 @@ zx::result<std::unique_ptr<DevicePartitioner>> SherlockPartitioner::Initialize(
   if (status_or_gpt.is_error()) {
     return status_or_gpt.take_error();
   }
-  if (status_or_gpt->initialize_partition_tables) {
-    LOG("Found GPT but it was missing expected partitions.  The device should be re-initialized "
-        "via fastboot.\n");
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
+  // NOTE: We explicitly ignore status_or_gpt->initialize_partition_tables here, as it just tells
+  // us that we failed to find the FVM, and the FVM might simply have a different type GUID than
+  // we expect.
 
   auto partitioner = WrapUnique(new SherlockPartitioner(std::move(status_or_gpt->gpt)));
 

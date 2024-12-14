@@ -1432,11 +1432,11 @@ TEST_F(NelsonPartitionerTests, InitializeWithoutGptFails) {
   ASSERT_NOT_OK(CreatePartitioner({}));
 }
 
-TEST_F(NelsonPartitionerTests, InitializeWithoutFvmFails) {
+TEST_F(NelsonPartitionerTests, InitializeWithoutFvmSucceeds) {
   std::unique_ptr<BlockDevice> gpt_dev;
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithGpt(&gpt_dev, 32 * kGibibyte));
 
-  ASSERT_NOT_OK(CreatePartitioner({}));
+  ASSERT_OK(CreatePartitioner({}));
 }
 
 TEST_F(NelsonPartitionerTests, FindPartition) {
