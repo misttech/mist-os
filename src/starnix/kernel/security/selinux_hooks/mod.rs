@@ -39,6 +39,72 @@ use std::sync::{Arc, OnceLock};
 /// contexts in a filesystem node extended attributes.
 const SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE: usize = 4096;
 
+/// Checks that `current_task` has permission to "use" the specified `file`, and the specified
+/// `permissions` to the underlying [`crate::vfs::FsNode`].
+fn has_file_permissions(
+    permission_check: &PermissionCheck<'_>,
+    subject_sid: SecurityId,
+    file: &FileObject,
+    permissions: &[Permission],
+) -> Result<(), Errno> {
+    // Validate that the `subject` has the "fd { use }" permission to the `file`.
+    // If the file and task security domains are identical then `fd { use }` is implicitly granted.
+    let file_sid = file.security_state.state.sid;
+    if subject_sid != file_sid {
+        check_permission(permission_check, subject_sid, file_sid, FdPermission::Use)?;
+    }
+
+    // Validate that the `subject` has the desired `permissions`, if any, to the underlying node.
+    if !permissions.is_empty() {
+        has_fs_node_permissions(permission_check, subject_sid, &file.name.entry.node, permissions)?;
+    }
+
+    Ok(())
+}
+
+/// Checks that `current_task` has the specified `permissions` to the `node`.
+fn has_fs_node_permissions(
+    permission_check: &PermissionCheck<'_>,
+    subject_sid: SecurityId,
+    node: &FsNode,
+    permissions: &[Permission],
+) -> Result<(), Errno> {
+    // TODO: https://fxbug.dev/364568735 - Anon nodes and pipes are not yet labeled.
+    // TODO: https://fxbug.dev/364568517 - Sockets are not yet labeled.
+    if let Some(target_sid) = get_cached_sid(node) {
+        for permission in permissions {
+            check_permission(permission_check, subject_sid, target_sid, permission.clone())?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Checks that `current_task` has `permissions` to `node`, with "todo_deny" on denial.
+fn todo_has_fs_node_permissions(
+    todo_deny: TodoDeny,
+    permission_check: &PermissionCheck<'_>,
+    subject_sid: SecurityId,
+    node: &FsNode,
+    permissions: &[Permission],
+) -> Result<(), Errno> {
+    // TODO: https://fxbug.dev/364568735 - Anon nodes and pipes are not yet labeled.
+    // TODO: https://fxbug.dev/364568517 - Sockets are not yet labeled.
+    if let Some(target_sid) = get_cached_sid(node) {
+        for permission in permissions {
+            todo_check_permission(
+                todo_deny.clone(),
+                permission_check,
+                subject_sid,
+                target_sid,
+                permission.clone(),
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
 /// Returns the relative path from the root of the file system containing this `DirEntry`.
 fn get_fs_relative_path(dir_entry: &DirEntryHandle) -> FsString {
     let mut path_builder = PathBuilder::new();
@@ -853,23 +919,16 @@ pub(super) fn check_file_ioctl_access(
     file: &FileObject,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let current_sid = current_task.security_state.lock().current_sid;
-    let file_sid = fs_node_effective_sid(file.node());
     let mode = file.node().info().mode;
     let file_class = file_class_from_file_mode(mode)?;
-    check_permission(
-        &permission_check,
-        current_sid,
-        file.security_state.state.sid,
-        FdPermission::Use,
-    )?;
-
-    todo_check_permission(
+    let subject_sid = current_task.security_state.lock().current_sid;
+    has_file_permissions(&permission_check, subject_sid, file, &[])?;
+    todo_has_fs_node_permissions(
         TODO_DENY!("https://fxbug.dev/364569179", "ioctl"),
         &permission_check,
-        current_sid,
-        file_sid,
-        CommonFilePermission::Ioctl.for_class(file_class),
+        subject_sid,
+        &file.name.entry.node,
+        &[CommonFilePermission::Ioctl.for_class(file_class)],
     )
 }
 
