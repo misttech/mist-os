@@ -244,35 +244,35 @@ fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct TodoDeny {
+    bug: BugRef,
+    message: &'static str,
+    location: &'static std::panic::Location<'static>,
+}
+
 #[macro_export]
-macro_rules! todo_check_permission {
-    (TODO($bug_url:literal, $todo_message:literal), $permission_check:expr, $source_sid:expr, $target_sid:expr, $permission:expr $(,)?) => {{
-        use crate::security::selinux_hooks::__todo_check_permission_inner;
+macro_rules! TODO_DENY {
+    ($bug_url:literal, $message:literal) => {{
+        use crate::security::selinux_hooks::TodoDeny;
         use starnix_logging::bug_ref;
-        __todo_check_permission_inner(
-            bug_ref!($bug_url),
-            $todo_message,
-            std::panic::Location::caller(),
-            $permission_check,
-            $source_sid,
-            $target_sid,
-            $permission.into(),
-        );
-        Ok(())
+        TodoDeny {
+            bug: bug_ref!($bug_url),
+            message: $message,
+            location: std::panic::Location::caller(),
+        }
     }};
 }
 
-#[doc(hidden)]
-#[inline]
-pub(super) fn __todo_check_permission_inner(
-    bug_ref: BugRef,
-    message: &'static str,
-    location: &'static std::panic::Location<'static>,
+/// Perform the specified check as would `check_permission()`, but report denials as "todo_deny" in
+/// the audit output, without actually denying access.fx build
+pub(super) fn todo_check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+    todo_deny: TodoDeny,
     permission_check: &PermissionCheck<'_>,
     source_sid: SecurityId,
     target_sid: SecurityId,
-    permission: Permission,
-) {
+    permission: P,
+) -> Result<(), Errno> {
     let _ = check_permission_internal(
         permission_check,
         source_sid,
@@ -285,7 +285,9 @@ pub(super) fn __todo_check_permission_inner(
 
                 // Re-using the `track_stub!()` internals to track the denial, and determine whether
                 // too many denial audit logs have already been emit for this case.
-                if __track_stub_inner(bug_ref, message, None, location) > MAX_TODO_AUDIT_DENIALS {
+                if __track_stub_inner(todo_deny.bug, todo_deny.message, None, todo_deny.location)
+                    > MAX_TODO_AUDIT_DENIALS
+                {
                     return;
                 }
                 context.set_decision("todo_deny");
@@ -294,6 +296,7 @@ pub(super) fn __todo_check_permission_inner(
             audit_log(context);
         },
     );
+    Ok(())
 }
 
 /// Returns the SID with which an `FsNode` of `new_node_class` would be labeled, if created by
@@ -409,19 +412,19 @@ fn may_create(
     let current_sid = current_task.security_state.lock().current_sid;
     let parent_sid = fs_node_effective_sid(parent);
 
-    todo_check_permission!(
-        TODO("https://fxbug.dev/374910392", "Check search permission."),
+    todo_check_permission(
+        TODO_DENY!("https://fxbug.dev/374910392", "Check search permission."),
         &permission_check,
         current_sid,
         parent_sid,
-        DirPermission::Search
+        DirPermission::Search,
     )?;
-    todo_check_permission!(
-        TODO("https://fxbug.dev/374910392", "Check add_name permission."),
+    todo_check_permission(
+        TODO_DENY!("https://fxbug.dev/374910392", "Check add_name permission."),
         &permission_check,
         current_sid,
         parent_sid,
-        DirPermission::AddName
+        DirPermission::AddName,
     )?;
 
     // Verify that the caller has permission to create new nodes of the desired type.
@@ -434,12 +437,12 @@ fn may_create(
     )?
     .map(|(sid, _)| sid)
     .unwrap_or_else(|| SecurityId::initial(InitialSid::File));
-    todo_check_permission!(
-        TODO("https://fxbug.dev/375381156", "Check create permission."),
+    todo_check_permission(
+        TODO_DENY!("https://fxbug.dev/375381156", "Check create permission."),
         &permission_check,
         current_sid,
         new_file_sid,
-        CommonFilePermission::Create.for_class(new_file_type)
+        CommonFilePermission::Create.for_class(new_file_type),
     )?;
 
     // Verify that the new node's label is permitted to be created in the target filesystem.
@@ -453,12 +456,12 @@ fn may_create(
             error!(EPERM)
         }
     }?;
-    todo_check_permission!(
-        TODO("https://fxbug.dev/375381156", "Check associate permission."),
+    todo_check_permission(
+        TODO_DENY!("https://fxbug.dev/375381156", "Check associate permission."),
         &permission_check,
         new_file_sid,
         filesystem_sid,
-        FileSystemPermission::Associate
+        FileSystemPermission::Associate,
     )?;
 
     Ok(())
@@ -692,8 +695,8 @@ pub fn fs_node_permission(
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     if permission_flags.contains(PermissionFlags::READ) {
-        todo_check_permission!(
-            TODO(
+        todo_check_permission(
+            TODO_DENY!(
                 "https://fxbug.dev/380855359",
                 "Check read permission when calling fs_node_permission."
             ),
@@ -705,8 +708,8 @@ pub fn fs_node_permission(
     }
 
     if permission_flags.contains(PermissionFlags::WRITE) {
-        todo_check_permission!(
-            TODO(
+        todo_check_permission(
+            TODO_DENY!(
                 "https://fxbug.dev/380855359",
                 "Check write permission when calling fs_node_permission."
             ),
@@ -728,8 +731,8 @@ pub fn fs_node_permission(
 
     if permission_flags.contains(PermissionFlags::EXEC) {
         if file_class == FileClass::Dir {
-            todo_check_permission!(
-                TODO(
+            todo_check_permission(
+                TODO_DENY!(
                     "https://fxbug.dev/380855359",
                     "Check search permission when calling fs_node_permission."
                 ),
@@ -739,8 +742,8 @@ pub fn fs_node_permission(
                 DirPermission::Search,
             )?;
         } else {
-            todo_check_permission!(
-                TODO(
+            todo_check_permission(
+                TODO_DENY!(
                     "https://fxbug.dev/380855359",
                     "Check execute permission when calling fs_node_permission."
                 ),
@@ -763,8 +766,8 @@ pub(super) fn check_fs_node_getattr_access(
     let current_sid = current_task.security_state.lock().current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
-    todo_check_permission!(
-        TODO("https://fxbug.dev/383284672", "Enable permission checks in getattr."),
+    todo_check_permission(
+        TODO_DENY!("https://fxbug.dev/383284672", "Enable permission checks in getattr."),
         &security_server.as_permission_check(),
         current_sid,
         file_sid,
@@ -861,8 +864,8 @@ pub(super) fn check_file_ioctl_access(
         FdPermission::Use,
     )?;
 
-    todo_check_permission!(
-        TODO("https://fxbug.dev/364569179", "ioctl"),
+    todo_check_permission(
+        TODO_DENY!("https://fxbug.dev/364569179", "ioctl"),
         &permission_check,
         current_sid,
         file_sid,

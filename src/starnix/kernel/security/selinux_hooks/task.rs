@@ -4,11 +4,11 @@
 
 use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid, fs_node_set_label_with_task,
-    FsNode, PermissionCheck, ProcessPermission, TaskAttrs,
+    todo_check_permission, FsNode, PermissionCheck, ProcessPermission, TaskAttrs,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityServer};
 use crate::task::{CurrentTask, Task};
-use crate::todo_check_permission;
+use crate::TODO_DENY;
 use selinux::{FdPermission, FilePermission, NullessByteStr, ObjectClass};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
@@ -63,12 +63,12 @@ fn close_inaccessible_file_descriptors(
     // `[child-process] [fd-from-child-fd-table]:fd { use }`.
     current_task.files.remap_fds(|file| {
         let target_sid = file.security_state.state.sid;
-        let fd_use_result: Result<(), Errno> = todo_check_permission!(
-            TODO("https://fxbug.dev/379870850", "Requires system to label all FDs correctly"),
+        let fd_use_result: Result<(), Errno> = todo_check_permission(
+            TODO_DENY!("https://fxbug.dev/379870850", "Requires system to label all FDs correctly"),
             &permission_check,
             source_sid,
             target_sid,
-            FdPermission::Use
+            FdPermission::Use,
         );
         match fd_use_result {
             Ok(_) => None,
@@ -117,8 +117,8 @@ pub fn check_exec_access(
     if current_sid == new_sid {
         // To `exec()` a binary in the caller's domain, the caller must be granted
         // "execute_no_trans" permission to the binary.
-        todo_check_permission!(
-            TODO(
+        todo_check_permission(
+            TODO_DENY!(
                 "https://fxbug.dev/330904217",
                 "Requires that SELinux Test Suite VM has correct labels"
             ),
@@ -132,8 +132,8 @@ pub fn check_exec_access(
         check_permission(&permission_check, current_sid, new_sid, ProcessPermission::Transition)?;
 
         // Check that the executable file has an entry point into the new domain.
-        todo_check_permission!(
-            TODO(
+        todo_check_permission(
+            TODO_DENY!(
                 "https://fxbug.dev/330904217",
                 "Requires that SELinux Test Suite VM has correct labels"
             ),
