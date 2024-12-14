@@ -18,6 +18,8 @@ rustc_library("binder_ndk_sys") {
 
   configs += [ "//src/lib/android:android_rust_config" ]
 
+  deps = [ "//third_party/rust_crates:libc" ]
+
   disable_clippy = true
 }
 
